@@ -39,8 +39,9 @@ herramientas/
   hacer-tarjeta.js     La tarjeta de visita lista para imprenta
   hacer-vcf.js         La ficha de contacto que se descarga el fan
   generador.html       Para regenerar cualquier QR sin tocar código
-  probar-qr.js         178 comprobaciones del generador
-  probar-web.js        22 comprobaciones de la página en navegador
+  leer-qr.js           Decodificador, escrito aparte para comprobar el anterior
+  probar-qr.js         180 comprobaciones del generador
+  probar-web.js        42 comprobaciones de la página en navegador
 servidor/
   contar.php           Contador de escaneos para cPanel, sin cookies
 imprenta/              Generado: los SVG que van a la imprenta

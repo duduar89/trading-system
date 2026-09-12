@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const QR = require('./qr.js');
+const { decodificar } = require('./leer-qr.js');
 const { construir: construirVcf } = require('./hacer-vcf.js');
 
 const RAIZ = path.join(__dirname, '..');
@@ -158,6 +159,7 @@ function escribirQR(config, salida) {
 
   const generados = [];
   const urls = [];
+  let releidos = 0;
 
   for (const soporte of config.soportes) {
     const url = config.urlDeSoporte(soporte.clave);
@@ -171,6 +173,18 @@ function escribirQR(config, salida) {
     // Pero se genera igual, porque en la práctica cada pieza NFC acaba llevando
     // un QR impreso al lado para quien no tenga NFC o no sepa usarlo.
     const qr = QR.generar(url, { nivel: config.opciones.nivelQR });
+
+    // Se vuelve a leer lo que se acaba de dibujar. Es barato y evita el único
+    // fallo de este proyecto que no tiene arreglo: quinientas piezas impresas
+    // con un código que no dice lo que creíamos.
+    const leido = decodificar(qr);
+    if (leido.texto !== url) {
+      throw new Error(
+        'El QR de "' + soporte.clave + '" no se relee bien: dice "' + leido.texto +
+        '" y debería decir "' + url + '". No se ha escrito nada.'
+      );
+    }
+
     const svg = QR.aSVG(qr, {
       margen: 4,
       escala: 16,
@@ -180,6 +194,7 @@ function escribirQR(config, salida) {
     });
     const destino = path.join(carpeta, 'qr-' + soporte.clave + '.svg');
     fs.writeFileSync(destino, svg, 'utf8');
+    releidos++;
     generados.push({ soporte, qr, destino, url });
   }
 
@@ -198,6 +213,7 @@ function escribirQR(config, salida) {
   ].join('\n');
   fs.writeFileSync(path.join(carpeta, 'urls.txt'), texto, 'utf8');
 
+  generados.releidos = releidos;
   return generados;
 }
 
@@ -249,6 +265,8 @@ function principal() {
     );
   });
   console.log('  · imprenta/urls.txt');
+  console.log('');
+  console.log('Los ' + qrs.releidos + ' códigos se han vuelto a leer y dicen lo que deben.');
 
   try {
     require('./hacer-tarjeta.js');

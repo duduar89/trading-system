@@ -82,13 +82,17 @@ Con lo primero, un `node herramientas/construir.js` deja todo listo para subir.
 
 ## Lo que ya está comprobado
 
-- **178 comprobaciones** sobre el generador de QR: contra el vector de referencia
+- **180 comprobaciones** sobre el generador de QR: contra el vector de referencia
   publicado de la norma, contra las tablas de formato, y 300 idas y vueltas
   leídas por un decodificador escrito aparte a propósito.
-- **22 comprobaciones en un navegador de verdad** sobre la página: el enlace y el
+- **Cada QR que se genera se vuelve a leer antes de escribirse en disco.** Lo que
+  llega a la imprenta ha sido leído, no solo dibujado. Y hay una prueba que
+  estropea un código a posta para confirmar que esa red salta.
+- **42 comprobaciones en un navegador de verdad** sobre la página: el enlace y el
   número, la sala dentro del mensaje, que nunca sale un `{sala}` a medias, el
   aviso dentro de Instagram con salida por `intent://`, que no pide nada a
-  servidores externos y que no se sale de la pantalla a 320 px de ancho.
+  servidores externos, que no se sale de la pantalla a 320 px de ancho, y que la
+  ficha de contacto aguanta un apellido con punto y coma.
 
 ```bash
 node herramientas/probar-qr.js
