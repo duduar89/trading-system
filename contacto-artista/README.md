@@ -62,7 +62,9 @@ docs/                  Por qué está hecho así, y cómo se usa en el bolo
   descarga antes de poder añadirse y el camino se bifurca: quien se pierde se
   queda creyendo que ya está.
 - **Sin dependencias y sin servicios de terceros.** Ni `npm install`, ni CDN, ni
-  generador de QR de pago. Un acortador ajeno que cierra convierte en papel para
-  reciclar todo el material impreso: le pasó a `goo.gl` en agosto de 2025.
+  generador de QR de pago. Cuando Google apagó su acortador `goo.gl`, el alcance
+  final del apagado se fue redefiniendo sobre la marcha — y ese es exactamente el
+  problema: la decisión no era suya. Un redirector ajeno puede cerrar, cambiar de
+  plan o empezar a cobrar, y se lleva por delante todo el material ya impreso.
 
 El razonamiento largo está en [`docs/01-analisis-metodos.md`](docs/01-analisis-metodos.md).

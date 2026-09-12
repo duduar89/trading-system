@@ -52,10 +52,13 @@ Dos reglas, y las dos están medidas por el propio generador
 
 **1. El logo va encima de los datos, nunca encima de los tres ojos de las
 esquinas ni de la línea punteada que los une.** La corrección de errores **no
-protege** esos patrones: tapar un trocito de un ojo mata el código aunque esté en
-nivel H. Un bloque de la misma superficie en la zona de datos se lee sin
-problema. El diseñador lo pondrá encima de un ojo si nadie se lo dice, porque
-visualmente es el sitio «lógico» para una marca.
+protege** esos patrones, y el margen es mucho menor de lo que parece: al
+comprobarlo con dos decodificadores independientes, **borrar un solo cuadro de la
+esquina de un ojo ya impide la lectura**, incluso en nivel H. Un bloque de la
+misma superficie en la zona de datos se lee sin problema.
+
+El diseñador lo pondrá encima de un ojo si nadie se lo dice, porque visualmente es
+el sitio «lógico» para una marca.
 
 **2. El lado del logo, como máximo el 25% del lado del código.**
 
@@ -74,17 +77,29 @@ Medido sobre nuestra URL corta: en nivel Q el código aguanta hasta un 35% del
 lado antes de romperse, así que el 25% deja margen de sobra. En nivel M rompe ya
 al 30%: otra razón para no bajar de Q.
 
+> El cálculo que hace `QR.analizarHueco` es **conservador a propósito**: da por
+> bueno el hueco solo mientras los códigos dañados de cada bloque no pasen de la
+> mitad de los de corrección, que es lo que un lector puede arreglar con
+> garantías sin saber dónde está el daño. Midiendo con decodificadores reales
+> sale un pelín más de margen (en Q y H aguantan hasta el 40%). Que el cálculo se
+> quede corto es lo que se quiere: la pieza va a una imprenta, no a una pantalla.
+
 ---
 
 ## Tamaños por soporte
 
-La regla es **lado del QR ≈ distancia de lectura / 10**, y conviene añadirle un
-20-30% para condiciones reales. Con la zona de silencio incluida dentro de la
-caja blanca:
+La regla de bolsillo es **lado del QR ≈ distancia de lectura / 10**. Sirve para
+empezar, pero tiene un defecto: **ignora cuántos cuadros tiene el código**, que es
+lo que de verdad decide si se lee. El criterio bueno es el otro:
+
+> **Que cada cuadro mida al menos 0,5 mm impreso.** `node
+> herramientas/construir.js` lo calcula y lo dice; si baja de ahí, avisa.
+
+Con eso en la cabeza, y con la zona de silencio dentro de la caja blanca:
 
 | Soporte | Se lee desde | Lado del QR |
 |---|---|---|
-| Tarjeta de visita | 20-25 cm | **2,5 cm** |
+| Tarjeta de visita | 20-25 cm | **2,5 cm** (3 cm si la URL es larga) |
 | Pegatina en la mesa de merchandising | 50-60 cm, de pie | **6 cm** |
 | Funda de la guitarra | 40-60 cm | **8 cm**, en zona plana |
 | Cartel o roll-up | 2,5-3 m | **25-30 cm** |
@@ -110,15 +125,18 @@ del archivo. **Que nadie los recorte al maquetar.**
 
 ## Color: negro sobre blanco, y punto
 
-- **Nunca invertido** (blanco sobre negro). Está medido: con el contraste máximo
-  posible, 21:1, **no se lee**. El problema no es el contraste, es la polaridad.
-  Los iPhone recientes suelen salvarlo reinvirtiendo la imagen; muchos Android
-  no. Resultado: funciona en el móvil del diseñador y falla en la mitad del
-  público.
+- **Nada de QR invertido** (blanco sobre negro). Y conviene decir el motivo bien,
+  porque circula mal: *no* es que un QR invertido sea ilegible. Al comprobarlo
+  con dos decodificadores distintos, uno falla con el invertido y **el otro lo
+  lee sin problema**. Es decir: **depende del lector que tenga delante**, que es
+  justo lo que no se puede elegir cuando el código está impreso en 500 tarjetas y
+  lo escanea quien sea con el móvil que sea. La norma asume módulos oscuros sobre
+  fondo claro; salirse de ahí es apostar.
 - Si el cartel es oscuro, el QR va **dentro de un rectángulo blanco**, no invertido.
-- Nada de amarillo (1,5:1), naranja (2,5:1) ni gris medio. En el PDF parece que
-  lee; en una foto de móvil con luz cálida y ruido, no.
-- Nada de degradados.
+- Nada de amarillo ni naranja: el amarillo puro sobre blanco no llega a 1,1:1 de
+  contraste y el naranja se queda en 2:1. En el PDF parece que lee; en una foto de
+  móvil con luz cálida y ruido, no.
+- Nada de gris medio ni degradados.
 
 ---
 
