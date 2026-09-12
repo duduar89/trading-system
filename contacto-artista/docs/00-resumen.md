@@ -93,11 +93,12 @@ Con lo primero, un `node herramientas/construir.js` deja todo listo para subir.
 - **Cada QR que se genera se vuelve a leer antes de escribirse en disco.** Lo que
   llega a la imprenta ha sido leído, no solo dibujado. Y hay una prueba que
   estropea un código a posta para confirmar que esa red salta.
-- **42 comprobaciones en un navegador de verdad** sobre la página: el enlace y el
+- **47 comprobaciones en un navegador de verdad** sobre la página: el enlace y el
   número, la sala dentro del mensaje, que nunca sale un `{sala}` a medias, el
   aviso dentro de Instagram con salida por `intent://`, que no pide nada a
   servidores externos, que no se sale de la pantalla a 320 px de ancho, y que la
-  ficha de contacto aguanta un apellido con punto y coma.
+  ficha de contacto aguanta un apellido con punto y coma y que una sala llamada
+  «Rock&Blues» o «Bar; El Sol» viaja entera hasta WhatsApp.
 
 ```bash
 node herramientas/probar-qr.js

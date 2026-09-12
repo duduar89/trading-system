@@ -117,7 +117,29 @@ function principal() {
       dom.indexOf('%7Bsala%7D') < 0 && dom.indexOf('undefined') < 0 && dom.indexOf('null') < 0);
   }
 
-  console.log('3. Dentro de Instagram: aviso y salida por intent://');
+  console.log('3. Salas con caracteres que rompen URLs');
+  {
+    // Un & sin codificar corta el parámetro text por la mitad y el fan envía
+    // medio mensaje; un ; o un # rompen además el enlace intent:// de Android.
+    const casos = [
+      { sala: 'Rock&Blues', dentro: 'Rock%26Blues' },
+      { sala: 'Bar; El Sol', dentro: 'Bar%3B%20El%20Sol' },
+      { sala: 'Sala #1', dentro: 'Sala%20%231' },
+      { sala: 'Café Berlín', dentro: 'Caf%C3%A9%20Berl%C3%ADn' }
+    ];
+    for (const caso of casos) {
+      const dom = volcar(navegador, base + '?f=tarjeta&sala=' + encodeURIComponent(caso.sala), UA_NORMAL);
+      comprobar('la sala "' + caso.sala + '" viaja entera en el enlace',
+        dom.indexOf(caso.dentro) > 0, (dom.match(/href="https:\/\/wa\.me[^"]{0,90}/) || ['sin enlace'])[0]);
+    }
+    // Y lo mismo dentro del intent:// de Android, donde ; y # son separadores.
+    const dom = volcar(navegador, base + '?f=x&sala=' + encodeURIComponent('Bar; El Sol'), UA_INSTAGRAM);
+    const enlace = (dom.match(/href="(intent:\/\/[^"]*)"/) || [])[1] || '';
+    comprobar('el intent:// no se parte con un punto y coma en la sala',
+      enlace.indexOf('Bar%3B') > 0 && enlace.split('#Intent;').length === 2, enlace.slice(0, 120));
+  }
+
+  console.log('4. Dentro de Instagram: aviso y salida por intent://');
   {
     const dom = volcar(navegador, base + '?f=instagram', UA_INSTAGRAM);
     comprobar('aparece el aviso de aplicación embebida', /aviso visible/.test(dom));
@@ -125,14 +147,14 @@ function principal() {
     comprobar('el intent lleva respaldo a wa.me', /browser_fallback_url/.test(dom));
   }
 
-  console.log('4. En iPhone dentro de Instagram: aviso, pero sin intent (allí no existe)');
+  console.log('5. En iPhone dentro de Instagram: aviso, pero sin intent (allí no existe)');
   {
     const dom = volcar(navegador, base + '?f=instagram', UA_IPHONE.replace('Safari/604.1', 'Safari/604.1 Instagram 300.0.0.0'));
     comprobar('aparece el aviso', /aviso visible/.test(dom));
     comprobar('el enlace sigue siendo wa.me', /href="https:\/\/wa\.me\/34620591728/.test(dom));
   }
 
-  console.log('5. La página no pide nada a servidores de fuera');
+  console.log('6. La página no pide nada a servidores de fuera');
   {
     const html = fs.readFileSync(path.join(temporal, 'index.html'), 'utf8');
     const css = fs.readFileSync(path.join(temporal, 'estilo.css'), 'utf8');
@@ -141,7 +163,7 @@ function principal() {
     comprobar('no hay @import de fuera', !/@import\s+url\(["']?https?:/.test(css));
   }
 
-  console.log('6. A 320 px de ancho (el móvil más estrecho que hay) no se sale nada');
+  console.log('7. A 320 px de ancho (el móvil más estrecho que hay) no se sale nada');
   {
     // Este Chromium no deja fijar el viewport por línea de órdenes, así que se
     // estrecha la propia página y se mide qué se sale. Sirve igual para lo que
@@ -169,7 +191,7 @@ window.addEventListener('load',function(){
     comprobar('nada se sale a 320 px de ancho', encontrado === 'nada se sale', encontrado || 'no se pudo medir');
   }
 
-  console.log('7. La página del QR de la artista');
+  console.log('8. La página del QR de la artista');
   {
     const dom = volcar(navegador, 'file://' + path.join(temporal, 'qr.html'), UA_IPHONE);
     comprobar('pinta un QR de verdad', /<svg[^>]*viewBox="0 0 \d+ \d+"/.test(dom) && /<path fill="#000000"/.test(dom));
@@ -177,7 +199,7 @@ window.addEventListener('load',function(){
     comprobar('el QR apunta a la propia página, no a wa.me', dom.indexOf('wa.me') < 0);
   }
 
-  console.log('8. El contador se genera con los soportes de verdad');
+  console.log('9. El contador se genera con los soportes de verdad');
   {
     const php = fs.readFileSync(path.join(temporal, 'contar.php'), 'utf8');
     for (const soporte of config.soportes) {
@@ -190,7 +212,7 @@ window.addEventListener('load',function(){
       php.indexOf("array('directo', 'otro');") < 0);
   }
 
-  console.log('9. La tarjeta de contacto está bien formada');
+  console.log('10. La tarjeta de contacto está bien formada');
   {
     const vcf = fs.readFileSync(path.join(temporal, 'contacto.vcf'), 'utf8');
     comprobar('empieza y acaba como debe', vcf.startsWith('BEGIN:VCARD') && vcf.trim().endsWith('END:VCARD'));
