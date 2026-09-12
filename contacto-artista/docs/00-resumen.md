@@ -106,6 +106,10 @@ node herramientas/probar-web.js
 
 ## Lo que NO está comprobado, y hay que comprobar en el mundo real
 
+**Está todo en `10-prueba-real.md`, montado como una matriz de media hora con dos
+móviles.** Es lo único del proyecto que no puedo hacer yo, y es donde este sistema
+se juega si funciona:
+
 - **Que el QR impreso se lee.** La lista de doce comprobaciones antes de tirar 500
   unidades está en `05-qr-imprenta.md`. No es opcional.
 - **Que los tags NFC se leen** en iPhone y en Android reales: `04-nfc.md`.
@@ -127,3 +131,4 @@ node herramientas/probar-web.js
 | `07-guion-bolo.md` | Lo que dice y hace ella en la sala |
 | `08-legal.md` | Lo que hay que tener montado |
 | `09-medir.md` | Qué números mirar |
+| `10-prueba-real.md` | **La prueba de media hora con dos móviles, antes del primer bolo** |
