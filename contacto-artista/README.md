@@ -35,11 +35,12 @@ web/                 Lo que se sube al subdominio
   privacidad.html      Aviso de privacidad
 herramientas/
   qr.js                Generador de códigos QR, sin dependencias
+  leer-qr.js           Decodificador, escrito aparte para comprobar el anterior
+  urls.js              Qué dirección lleva dentro cada soporte
   construir.js         Genera todo a partir de config.js
   hacer-tarjeta.js     La tarjeta de visita lista para imprenta
   hacer-vcf.js         La ficha de contacto que se descarga el fan
   generador.html       Para regenerar cualquier QR sin tocar código
-  leer-qr.js           Decodificador, escrito aparte para comprobar el anterior
   probar-qr.js         180 comprobaciones del generador
   probar-web.js        42 comprobaciones de la página en navegador
 servidor/
