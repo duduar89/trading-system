@@ -124,6 +124,28 @@ function copiarGenerador(salida) {
   return destino;
 }
 
+/*
+ * El contador se genera, no se copia: la lista de orígenes admitidos tiene que
+ * ser exactamente la de los soportes de config.js. Si no coinciden, los escaneos
+ * de la pulsera acaban contados como "otro" y se pierde justo el dato por el que
+ * se montó el contador.
+ */
+function escribirContador(config, salida) {
+  const plantilla = fs.readFileSync(path.join(__dirname, '..', 'servidor', 'contar.php'), 'utf8');
+  const claves = config.soportes.map((s) => s.clave).concat(['directo', 'otro']);
+  const lista = claves.map((c) => "'" + c + "'").join(', ');
+
+  const contenido = plantilla
+    .replace(/\$DESTINO_POR_DEFECTO = .*;\s*\/\*__DESTINO__\*\//,
+      "$DESTINO_POR_DEFECTO = 'https://wa.me/" + config.telefono.enlace + "';   /*__DESTINO__*/")
+    .replace(/\$ORIGENES = array\(.*?\);\s*\/\*__ORIGENES__\*\//s,
+      '$ORIGENES = array(' + lista + ');   /*__ORIGENES__*/');
+
+  const destino = path.join(salida, 'contar.php');
+  fs.writeFileSync(destino, contenido, 'utf8');
+  return destino;
+}
+
 function escribirVcf(config, salida) {
   const destino = path.join(salida, config.ficheros.vcard);
   fs.writeFileSync(destino, construirVcf(config), 'utf8');
@@ -185,6 +207,7 @@ function generar(config, salidaWeb, salidaImprenta) {
     avisos,
     ajustes: escribirAjustes(config, salidaWeb),
     generador: copiarGenerador(salidaWeb),
+    contador: escribirContador(config, salidaWeb),
     vcf: escribirVcf(config, salidaWeb),
     qrs: escribirQR(config, salidaImprenta)
   };
@@ -204,12 +227,14 @@ function principal() {
   const salidaWeb = path.join(RAIZ, 'web');
   const ajustes = escribirAjustes(config, salidaWeb);
   const generador = copiarGenerador(salidaWeb);
+  const contador = escribirContador(config, salidaWeb);
   const vcf = escribirVcf(config, salidaWeb);
   const qrs = escribirQR(config, path.join(RAIZ, 'imprenta'));
 
   console.log('Generado:');
   console.log('  · ' + path.relative(RAIZ, ajustes));
   console.log('  · ' + path.relative(RAIZ, generador));
+  console.log('  · ' + path.relative(RAIZ, contador));
   console.log('  · ' + path.relative(RAIZ, vcf));
   qrs.forEach(({ soporte, qr, destino }) => {
     console.log(

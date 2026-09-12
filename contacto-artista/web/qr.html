@@ -82,7 +82,7 @@
   <ul class="consejo">
     <li>Sube el brillo al máximo antes de enseñarlo.</li>
     <li>Que lo escaneen con la cámara normal, no hace falta ninguna aplicación.</li>
-    <li>Si alguien no puede, dile que te escriba al número: sale abajo del todo.</li>
+    <li>Si alguien no puede escanear, dale el número a voz: <strong id="numero">…</strong></li>
     <li>Esta página funciona sin cobertura una vez abierta.</li>
   </ul>
 </div>
@@ -93,6 +93,11 @@
 (function () {
   'use strict';
   var A = window.AJUSTES || {};
+  if (A.telefonoLegible) {
+    document.getElementById('numero').textContent = A.telefonoLegible;
+  } else {
+    document.getElementById('numero').parentNode.style.display = 'none';
+  }
   var campoSala = document.getElementById('sala');
   var contenedor = document.getElementById('codigo');
   var pie = document.getElementById('pie');

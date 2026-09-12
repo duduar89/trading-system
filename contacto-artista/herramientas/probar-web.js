@@ -170,7 +170,28 @@ window.addEventListener('load',function(){
     comprobar('nada se sale a 320 px de ancho', encontrado === 'nada se sale', encontrado || 'no se pudo medir');
   }
 
-  console.log('7. La tarjeta de contacto está bien formada');
+  console.log('7. La página del QR de la artista');
+  {
+    const dom = volcar(navegador, 'file://' + path.join(temporal, 'qr.html'), UA_IPHONE);
+    comprobar('pinta un QR de verdad', /<svg[^>]*viewBox="0 0 \d+ \d+"/.test(dom) && /<path fill="#000000"/.test(dom));
+    comprobar('enseña el número para decirlo en voz alta', /\+34 620 591 728/.test(dom));
+    comprobar('el QR apunta a la propia página, no a wa.me', dom.indexOf('wa.me') < 0);
+  }
+
+  console.log('8. El contador se genera con los soportes de verdad');
+  {
+    const php = fs.readFileSync(path.join(temporal, 'contar.php'), 'utf8');
+    for (const soporte of config.soportes) {
+      comprobar('el contador admite el soporte "' + soporte.clave + '"',
+        new RegExp("'" + soporte.clave + "'").test(php));
+    }
+    comprobar('el destino de respaldo lleva el número correcto',
+      /wa\.me\/34620591728/.test(php));
+    comprobar('no queda ninguna marca de plantilla sin sustituir',
+      php.indexOf("array('directo', 'otro');") < 0);
+  }
+
+  console.log('9. La tarjeta de contacto está bien formada');
   {
     const vcf = fs.readFileSync(path.join(temporal, 'contacto.vcf'), 'utf8');
     comprobar('empieza y acaba como debe', vcf.startsWith('BEGIN:VCARD') && vcf.trim().endsWith('END:VCARD'));
@@ -179,6 +200,25 @@ window.addEventListener('load',function(){
     comprobar('los saltos de línea son CRLF', vcf.indexOf('\r\n') > 0 && !/[^\r]\n/.test(vcf));
     const largas = vcf.split('\r\n').filter((l) => Buffer.byteLength(l, 'utf8') > 75);
     comprobar('ninguna línea pasa de 75 octetos', largas.length === 0, largas.join(' | '));
+
+    // Los caracteres que rompen una vCard son la coma, el punto y coma y la
+    // barra invertida: si no van escapados, el gestor de contactos parte el
+    // campo por la mitad y el apellido acaba en otro sitio.
+    const { escapar, construir } = require('./hacer-vcf.js');
+    comprobar('escapa el punto y coma', escapar('Ruiz; Ana') === 'Ruiz\\; Ana', escapar('Ruiz; Ana'));
+    comprobar('escapa la coma', escapar('Ana, la del sur') === 'Ana\\, la del sur');
+    comprobar('escapa la barra invertida', escapar('a\\b') === 'a\\\\b');
+
+    const dificil = JSON.parse(JSON.stringify(config));
+    dificil.artista.apellidos = 'Ruiz; Pérez, hija';
+    dificil.artista.nombreArtistico = 'Añá "La Voz" & Co';
+    const raro = construir(dificil);
+    comprobar('con nombre difícil, la ficha sigue teniendo una sola línea N',
+      (raro.match(/\r\nN:/g) || raro.match(/^N:/m) || []).length >= 0 &&
+      raro.split('\r\n').filter((l) => l.startsWith('N:')).length === 1);
+    comprobar('y el punto y coma del apellido va escapado', /Ruiz\\;/.test(raro), raro.split('\r\n')[2]);
+    const largasRaro = raro.split('\r\n').filter((l) => Buffer.byteLength(l, 'utf8') > 75);
+    comprobar('y sigue sin líneas largas', largasRaro.length === 0, largasRaro.join(' | '));
   }
 
   fs.rmSync(temporal, { recursive: true, force: true });

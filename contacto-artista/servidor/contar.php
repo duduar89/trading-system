@@ -20,16 +20,14 @@
  */
 
 // ---------------------------------------------------------------- ajustes
-$DESTINO_POR_DEFECTO = 'https://wa.me/34620591728';
+// ESTE BLOQUE LO REESCRIBE herramientas/construir.js DESDE config.js.
+// No editarlo a mano aquí: se pierde al regenerar. Los soportes se cambian en
+// config.js, que es donde también se generan los QR con esos mismos códigos.
+$DESTINO_POR_DEFECTO = 'https://wa.me/34620591728';   /*__DESTINO__*/
+$ORIGENES = array('directo', 'otro');                 /*__ORIGENES__*/
+
 $CARPETA_DATOS = __DIR__ . '/datos';
 $ARCHIVO = $CARPETA_DATOS . '/escaneos.csv';
-
-// Orígenes admitidos. Es una lista cerrada a propósito: si no, cualquiera puede
-// llenar el registro de basura llamando a la URL con el parámetro que quiera.
-$ORIGENES = array(
-    'tarjeta', 'nfc', 'cartel', 'pegatina', 'movil', 'merch',
-    'instagram', 'directo', 'otro'
-);
 
 // ------------------------------------------------------------- utilidades
 function origen_limpio($valor, $permitidos) {

@@ -22,7 +22,7 @@ function escapar(valor) {
     .replace(/\\/g, '\\\\')
     .replace(/\n/g, '\\n')
     .replace(/,/g, '\\,')
-    .replace(/;/g, '\;');
+    .replace(/;/g, '\\;');
 }
 
 // Plegado según RFC 6350: se cuenta en octetos, no en caracteres, porque una

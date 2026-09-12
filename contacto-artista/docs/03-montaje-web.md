@@ -36,6 +36,7 @@ escribe:
 - `web/ajustes.js` — los textos y el número para la página
 - `web/qr.js` — el generador, que la página del móvil necesita
 - `web/contacto.vcf` — la ficha de contacto que se descarga
+- `web/contar.php` — el contador, con la lista de soportes ya puesta
 - `imprenta/qr-*.svg` — un QR por soporte, listo para la imprenta
 - `imprenta/urls.txt` — las direcciones para grabar en los NFC
 
@@ -55,10 +56,14 @@ public_html/            ← la landing que ya existe, no se toca
     ├── qr.html
     ├── privacidad.html
     ├── contacto.vcf
-    └── contar.php      ← desde servidor/
+    └── contar.php
 ```
 
-Y para el contador:
+`contar.php` se **genera** a partir de `servidor/contar.php`: la lista de soportes
+que admite sale de `config.js`, para que no puedan descuadrarse. No se edita el de
+`web/`, se edita `config.js` y se vuelve a generar.
+
+Y para que el contador pueda escribir:
 
 ```
 hola/datos/            ← crear la carpeta, con permiso de escritura
