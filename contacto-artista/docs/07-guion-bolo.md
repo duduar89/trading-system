@@ -88,7 +88,11 @@ Esto es lo que convierte la noche en algo que sirve. Media hora, no más:
 
 1. **Guardar cada número** con nombre real y apellido «bolo»: *María Sala
    Clamores*. Así se encuentra dentro de un año.
-2. **Etiquetar** en WhatsApp Business con la etiqueta del bolo.
+2. **Etiquetar** en WhatsApp Business con la etiqueta del bolo. Y mirar **qué
+   escribió**: si mandó la frase entera («avísame de los próximos bolos») hay
+   permiso para escribirle en el futuro; si mandó un «hola» pelado porque borró el
+   texto, no lo hay, y esa persona solo entra en la lista de «contestar», no en la
+   de «avisar». Está explicado en `08-legal.md`.
 3. **Contestar a mano** a quien haya escrito algo más que el mensaje automático.
    Dos líneas, con su nombre.
 4. **Apuntar el número**: cuánta gente había, cuántos mensajes llegaron. Está

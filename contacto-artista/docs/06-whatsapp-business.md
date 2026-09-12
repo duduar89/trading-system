@@ -2,6 +2,12 @@
 
 ## Por qué merece la pena pasarse
 
+Y conviene decirlo de entrada: **el mensaje de bienvenida automático no existe en
+el WhatsApp normal.** Es una función de la aplicación WhatsApp Business, y un
+número no puede estar en las dos a la vez. Si el número sigue hoy en el WhatsApp
+personal, esto no es un ajuste que se activa: es una migración, y hay que hacerla
+antes del primer bolo con el sistema puesto.
+
 Con el **mismo número**, gratis, y sin que el fan note nada raro:
 
 - **Mensaje de bienvenida automático.** Salta solo cuando alguien escribe por
@@ -35,9 +41,23 @@ Tres cosas que hay que saber antes, no después:
 
 **1. Mensaje de bienvenida**
 Ajustes → Herramientas para empresas → Mensaje de bienvenida. Activarlo, pegar el
-texto de `02-mensajes.md` (empezando por la versión corta) y elegir a quién se
-envía: **«Todos los que no están en la libreta de direcciones»** es la opción
-correcta, porque es exactamente la gente nueva del bolo.
+texto de `02-mensajes.md` (empezando por la versión corta) y:
+
+- **Horario: «Siempre».** Se puede programar por horario comercial, y si se deja
+  así, la gente que escribe a la una de la madrugada saliendo del bolo —o sea,
+  toda— no recibe nada.
+- **A quién: «Todos los que no están en la libreta de direcciones».** Es
+  exactamente la gente nueva del bolo.
+
+Dos límites que conviene saber antes de escribir el texto:
+
+- **No admite variables.** Todos reciben exactamente el mismo mensaje: no se
+  puede meter el nombre del fan ni el de la sala. (Por eso el texto elegido no
+  los usa.)
+- **Dispara, pero no guarda nada.** No registra el nombre, ni la ciudad, ni el
+  permiso en ningún sitio que se pueda leer después. Es el acuse de recibo que
+  pide el siguiente paso, no el sistema de captura. Lo que se guarda, se guarda
+  a mano al día siguiente (`07-guion-bolo.md`).
 
 > **Al probarlo:** solo salta la **primera vez** que alguien escribe, o tras 14
 > días sin hablar. Probándolo dos veces seguidas con el mismo móvil parecerá que

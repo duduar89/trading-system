@@ -59,6 +59,18 @@ Y un sistema que nadie usa no protege a nadie. El mensaje del fan es una petici�
 expresa real y queda registrada en el chat; lo que hay que hacer es **conservar la
 prueba**, que es lo que dice el punto siguiente.
 
+**Y hay que saber por dónde se rompe, porque se rompe por un sitio concreto:** el
+texto prerellenado **el fan lo puede borrar**. Puede quitar la frase y enviar un
+«hola» pelado, y ella no tiene forma de saber qué decía el texto original ni de
+demostrarlo. Además un hilo de WhatsApp no es un registro: no se exporta, no
+tiene versión del texto aceptado, y desaparece si se pierde el móvil.
+
+De ahí sale la regla operativa del punto siguiente, que no es burocracia:
+**se apunta lo que la persona escribió de verdad, no lo que se suponía que iba a
+escribir.** Quien mandó la frase entera tiene permiso registrado; quien mandó un
+«hola» pelado **no lo tiene**, y con esa persona solo se puede hacer una cosa:
+contestarle.
+
 Si en algún momento se empieza a hacer promoción de verdad —tres o cuatro envíos
 al año, entradas de pago— merece la pena añadir la casilla. El sitio para ponerla
 está: la página puente.
@@ -77,11 +89,16 @@ Mínimo viable, en la hoja o en el CRM, al guardar cada contacto:
 | Teléfono | +34 6XX XXX XXX |
 | Fecha y hora del mensaje | 2026-09-20 23:41 |
 | De dónde salió | `tarjeta` / `pulsera`, y la sala |
-| Qué pidió | «Avísame de los próximos bolos» |
+| **Qué escribió de verdad** | copiar el mensaje tal cual llegó |
+| ¿Pidió que le avisen? | sí / no — si no, **no se le escribe promoción** |
 | Baja | vacío / fecha |
 
 Lo sensato es hacerlo al día siguiente, cuando se guardan los números (ver
-`07-guion-bolo.md`). Si esto se lleva al CRM del portal, **la casilla de baja
+`07-guion-bolo.md`). Y si algún día esto pasa a hacer envíos de verdad, merece la
+pena mover el permiso al sitio sólido: una casilla en la página y una fila en la
+base de datos con el teléfono, la fecha, la **versión del texto aceptado** y el
+código de origen. Eso convierte un argumento discutible en un expediente que se
+puede enseñar. Si esto se lleva al CRM del portal, **la casilla de baja
 tiene que filtrar en la consulta SQL que genera cada campaña**, no solo verse en
 la ficha: una sola reincidencia sobre alguien que ya pidió la baja es lo que
 multiplica el importe de una sanción.
