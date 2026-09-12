@@ -64,17 +64,30 @@ lo ve ella en el perfil de WhatsApp del fan.
 Se configura en WhatsApp Business (ver `06-whatsapp-business.md`). Salta sola
 cuando alguien escribe por primera vez.
 
-**La elegida**, versión corta de 128 caracteres:
+**La elegida**, versión corta:
 
-> Gracias por escribirme, de verdad 🙌 Guárdame como **[Nombre]**: si no me tienes
-> guardada, mis avisos no te llegan. Fechas: **[enlace]**
+> Gracias por escribirme, de verdad 🙌 Guárdame como **En la Gloria**, para que
+> sepas que soy yo cuando te escriba. Fechas: **[enlace]**
 
-**Y la versión larga**, 180 caracteres, si la aplicación admite ese tamaño:
+**Y la versión larga**, si la aplicación admite ese tamaño:
 
 > Gracias por escribirme, de verdad 🙌
-> Guárdame como **[Nombre]** en contactos: si no me tienes guardada, mis avisos de
-> bolos no te llegan.
-> Aquí las próximas fechas y el último tema: **[enlace]**
+> Guárdame como **En la Gloria** en contactos: así, cuando te escriba para
+> contarte el próximo bolo, sabrás que soy yo y no un número raro.
+> Aquí las fechas y el último tema: **[enlace]**
+
+> **Por qué NO dice «si no me tienes guardada, mis avisos no te llegan».**
+> Esa frase es cierta, pero solo de las **listas de difusión**, que son justo lo
+> que este sistema descarta (`01-analisis-metodos.md`). Estaríamos vendiéndole al
+> fan el beneficio de un canal que no vamos a usar, y el día que no le llegue
+> nada por ahí, la promesa queda en evidencia.
+>
+> La razón que sí se sostiene es la otra: **que reconozca quién le escribe.** Un
+> mensaje de un número desconocido tres meses después es exactamente el patrón
+> que hace que la gente bloquee y reporte — y los bloqueos son el camino a que
+> WhatsApp le cierre el número, que es el riesgo real de todo esto
+> (`08-legal.md`). Que la haya guardado no es un favor: es lo que hace que el
+> mensaje se lea en vez de denunciarse.
 
 **Empezar por la corta.** El límite real de caracteres del mensaje de bienvenida
 no está confirmado en documentación oficial —las fuentes dan 140, 200 y 250—, y
@@ -83,24 +96,18 @@ quería entregar. Se pega la corta, se mira en el móvil si el campo admite más
 solo entonces se sube a la larga.
 
 **Por qué pide una sola cosa.** Si pide dos («guárdame, dime tu nombre y sígueme
-en Instagram») no se hace ninguna, y la que se pierde es la de guardar, que es la
-que condiciona todo lo demás.
-
-**Y por qué esa razón funciona:** «si no me tienes guardada, mis avisos no te
-llegan» **es literalmente cierto** —las listas de difusión de WhatsApp solo se
-entregan a quien tenga guardado el número del remitente—, así que no es un
-capricho de ella, es la condición para que el fan reciba lo que acaba de pedir.
+en Instagram») no se hace ninguna, y la que se pierde es la de guardar.
 
 ### Alternativas
 
 **Con canción** (cuando el enlace es a un tema y no a una agenda):
 
 > ¡Ey! Qué alegría leerte 🎤 Te dejo el tema que sonó esta noche: [enlace]
-> Guárdame en contactos y eres de los primeros en saber el próximo bolo. [Nombre]
+> Guárdame como En la Gloria, que te escribo yo con el próximo bolo.
 
 **Sobria** (repertorio serio, público profesional):
 
-> Hola, soy [Nombre]. Gracias por venir y por escribirme.
+> Hola, soy Gloria, En la Gloria. Gracias por venir y por escribirme.
 > Guarda mi número y te escribo yo con las fechas nuevas, nada más.
 > Lo último, aquí: [enlace]
 
@@ -165,7 +172,18 @@ lo que tranquiliza al que duda.
 
 - **Acerca el móvil aquí**
 - Más pequeño: *Sin apps. Se abre mi WhatsApp.*
-- Si cabe: *iPhone: acércalo por la parte de arriba.*
+- Si cabe: *iPhone: acerca la parte de arriba y toca el aviso que sale.*
+
+Esa última línea no es un detalle: en iPhone **siempre** sale un aviso que hay que
+tocar, y en la mayoría de Android no sale ninguno (`04-nfc.md`). Si el texto
+promete que «se abre solo», la mitad del público se queda mirando el móvil
+pensando que no funciona.
+
+**Junto al QR de contacto sin conexión** (el que lleva la ficha dentro):
+
+- **¿Sin cobertura? Escanea este y me guardas.**
+
+Dos QR juntos sin decir cuál es cuál es peor que uno solo.
 
 ---
 

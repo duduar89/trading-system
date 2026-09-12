@@ -243,7 +243,52 @@ window.addEventListener('load',function(){
       php.indexOf("array('directo', 'otro');") < 0);
   }
 
-  console.log('11. La tarjeta de contacto está bien formada');
+  console.log('11. El contador no cuenta robots ni prelecturas');
+  {
+    // WhatsApp y Telegram visitan el enlace por su cuenta para dibujar la vista
+    // previa cuando alguien lo pega en un chat. Si eso se cuenta, el informe de
+    // "qué soporte funciona" miente hacia arriba desde el primer bolo.
+    let hayPhp = true;
+    try {
+      require('child_process').execFileSync('php', ['-v'], { stdio: 'ignore' });
+    } catch (e) {
+      hayPhp = false;
+    }
+
+    if (!hayPhp) {
+      console.log('   (no hay php en esta máquina: no se puede probar el contador)');
+    } else {
+      const casos = [
+        { ua: 'Mozilla/5.0 (iPhone) Safari/604.1', metodo: 'GET', cuenta: true, quien: 'un iPhone de verdad' },
+        { ua: 'WhatsApp/2.23.20.0 A', metodo: 'GET', cuenta: false, quien: 'la vista previa de WhatsApp' },
+        { ua: 'facebookexternalhit/1.1', metodo: 'GET', cuenta: false, quien: 'el robot de Facebook' },
+        { ua: 'TelegramBot (like TwitterBot)', metodo: 'GET', cuenta: false, quien: 'el robot de Telegram' },
+        { ua: '', metodo: 'GET', cuenta: false, quien: 'algo sin identificarse' },
+        { ua: 'Mozilla/5.0 (Android) Chrome/126', metodo: 'HEAD', cuenta: false, quien: 'una petición HEAD' }
+      ];
+      for (const caso of casos) {
+        const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'contador-'));
+        fs.copyFileSync(path.join(temporal, 'contar.php'), path.join(carpeta, 'contar.php'));
+        const guion =
+          '$_SERVER["HTTP_USER_AGENT"]=' + JSON.stringify(caso.ua) + ';' +
+          '$_SERVER["REQUEST_METHOD"]=' + JSON.stringify(caso.metodo) + ';' +
+          '$_GET["f"]="tarjeta"; $_GET["modo"]="aviso";' +
+          'include ' + JSON.stringify(path.join(carpeta, 'contar.php')) + ';';
+        try {
+          require('child_process').execFileSync('php', ['-r', guion], { stdio: 'ignore' });
+        } catch (e) { /* header() en CLI avisa: da igual */ }
+        const csv = path.join(carpeta, 'datos', 'escaneos.csv');
+        const lineas = fs.existsSync(csv)
+          ? fs.readFileSync(csv, 'utf8').trim().split('\n').filter((l) => l && !l.startsWith('fecha')).length
+          : 0;
+        comprobar((caso.cuenta ? 'cuenta ' : 'NO cuenta ') + caso.quien,
+          caso.cuenta ? lineas === 1 : lineas === 0, 'líneas escritas: ' + lineas);
+        fs.rmSync(carpeta, { recursive: true, force: true });
+      }
+    }
+  }
+
+  console.log('12. La tarjeta de contacto está bien formada');
   {
     const vcf = fs.readFileSync(path.join(temporal, 'contacto.vcf'), 'utf8');
     comprobar('empieza y acaba como debe', vcf.startsWith('BEGIN:VCARD') && vcf.trim().endsWith('END:VCARD'));

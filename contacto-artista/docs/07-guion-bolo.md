@@ -68,6 +68,30 @@ público tiene la cámara abierta).
 
 ---
 
+## El material que funciona sin ella
+
+Esto es lo que más se olvida al diseñar un sistema así: **el guion de arriba
+supone que ella tiene las manos libres y el móvil en la mano.** La realidad es
+guitarra colgada, cables, cobrar merchandising, firmar y abrazos. Y la gente se
+acerca en grupos, no de uno en uno.
+
+Por caudal, de más a menos:
+
+| Soporte | Cuánta gente a la vez | ¿Necesita que ella esté? |
+|---|---|---|
+| **Expositor en la mesa de merch** (A5 o A4 con el QR) | **Diez a la vez** | No |
+| Tarjetas de visita en un montón | Las que se lleven | No |
+| QR en la pantalla de su móvil | Uno | Sí, y le ocupa el móvil |
+| Toque NFC | Uno | Sí |
+
+**Conclusión que cambia la jerarquía:** el material impreso es el camino
+principal y su móvil es el respaldo, no al revés. El NFC es el soporte de menor
+caudal de todos: es el efecto sorpresa para quien ya se ha acercado a hablar, no
+la vía de captación.
+
+Y si hay alguien vendiendo merchandising, **que se aprenda la misma frase**. Es
+la persona que está quieta en un sitio toda la noche.
+
 ## Antes de salir de casa
 
 - [ ] **Página del QR abierta** (`/hola/qr.html`) con la sala de esta noche escrita.
@@ -78,7 +102,17 @@ público tiene la cámara abierta).
 - [ ] **Modo oscuro automático desactivado**: si se activa a medianoche puede
       invertir el código.
 - [ ] Tarjetas y tags NFC en el bolsillo, no en el fondo del bolso.
-- [ ] Batería. Si el móvil muere, muere el sistema entero.
+- [ ] **Batería externa.** Y esto no es un consejo genérico: lo de arriba —brillo
+      alto, autobloqueo desactivado, la pantalla encendida enseñando el QR— es
+      exactamente la configuración que se come la batería, la misma noche en la
+      que además graba vídeo. Si su móvil muere, mueren a la vez el QR de
+      pantalla, el NFC que ella ofrece y su capacidad de ver los mensajes.
+- [ ] El expositor de la mesa de merch y las tarjetas, que son lo que sigue
+      funcionando aunque su móvil se apague.
+- [ ] Si la mesa está a oscuras: **algo que ilumine el QR**. Un código impreso en
+      negro mate sobre una mesa sin luz no se ve ni para saber que existe. Una
+      lámpara de pinza, o colocar el material donde ya hay luz: la barra, la
+      taquilla, la salida.
 
 ---
 

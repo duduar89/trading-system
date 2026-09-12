@@ -88,14 +88,24 @@ function lienzo(contenido, nombre) {
 function caraA(config) {
   const nombre = config.mensajes.titulo;
   const tamanoNombre = nombre.length > 16 ? 7 : nombre.length > 11 ? 9 : 11;
-  return (
-    '    <text x="' + (ANCHO / 2) + '" y="' + (ALTO / 2 - 2) + '" text-anchor="middle" ' +
+  const centro = ANCHO / 2;
+  let svg =
+    '    <text x="' + centro + '" y="' + (ALTO / 2 - 2) + '" text-anchor="middle" ' +
     'font-family="Helvetica, Arial, sans-serif" font-size="' + tamanoNombre + '" font-weight="700" fill="#16151a">' +
     escapar(nombre) + '</text>\n' +
-    '    <text x="' + (ANCHO / 2) + '" y="' + (ALTO / 2 + 6) + '" text-anchor="middle" ' +
+    '    <text x="' + centro + '" y="' + (ALTO / 2 + 6) + '" text-anchor="middle" ' +
     'font-family="Helvetica, Arial, sans-serif" font-size="3.4" fill="#645f6e">' +
-    escapar(config.artista.actividad || '') + '</text>\n'
-  );
+    escapar(config.artista.actividad || '') + '</text>\n';
+
+  // El teléfono en texto es el último camino que queda en una sala sin
+  // cobertura, donde ni el QR ni el NFC llevan a ninguna parte.
+  if (config.opciones.imprimirTelefono) {
+    svg +=
+      '    <text x="' + centro + '" y="' + (ALTO - SEGURIDAD) + '" text-anchor="middle" ' +
+      'font-family="Helvetica, Arial, sans-serif" font-size="3.2" fill="#16151a">' +
+      escapar(config.telefono.internacional) + '</text>\n';
+  }
+  return svg;
 }
 
 function caraB(config, soporte) {

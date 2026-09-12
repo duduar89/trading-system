@@ -38,6 +38,44 @@ function origen_limpio($valor, $permitidos) {
     return $v;
 }
 
+/*
+ * Lo que NO se cuenta.
+ *
+ * Cuando alguien pega el enlace en un chat, WhatsApp, Telegram y compañía lo
+ * visitan por su cuenta para dibujar la vista previa. Y los navegadores a veces
+ * lo piden por adelantado. Si eso se cuenta, el informe de "qué soporte funciona"
+ * —que es la única razón de existir de este contador— queda contaminado desde el
+ * primer bolo, y encima hacia arriba, que es peor porque nadie sospecha.
+ */
+function es_robot() {
+    $ua = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+    if ($ua === '') {
+        return true;   // un navegador de verdad siempre se identifica
+    }
+    $patron = '/WhatsApp|facebookexternalhit|facebookcatalog|Twitterbot|TelegramBot|' .
+              'Slackbot|Discordbot|LinkedInBot|SkypeUriPreview|Applebot|Googlebot|' .
+              'bingbot|DuckDuckBot|YandexBot|Pinterest|redditbot|' .
+              'bot|crawler|spider|preview|curl|wget|python-requests|HeadlessChrome/i';
+    return (bool) preg_match($patron, $ua);
+}
+
+function es_peticion_de_verdad() {
+    $metodo = isset($_SERVER['REQUEST_METHOD']) ? strtoupper($_SERVER['REQUEST_METHOD']) : 'GET';
+    if ($metodo === 'HEAD') {
+        return false;   // nadie mira una página con HEAD
+    }
+    // Cabeceras de prelectura: el navegador se adelanta y la persona no ha ido.
+    foreach (array('HTTP_PURPOSE', 'HTTP_X_PURPOSE', 'HTTP_X_MOZ', 'HTTP_SEC_PURPOSE') as $cabecera) {
+        if (isset($_SERVER[$cabecera]) && stripos($_SERVER[$cabecera], 'prefetch') !== false) {
+            return false;
+        }
+        if (isset($_SERVER[$cabecera]) && stripos($_SERVER[$cabecera], 'preview') !== false) {
+            return false;
+        }
+    }
+    return true;
+}
+
 function es_movil() {
     $ua = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
     return preg_match('/Android|iPhone|iPad|iPod|Mobile|Opera Mini/i', $ua) ? 'movil' : 'otro';
@@ -68,8 +106,13 @@ function anotar($archivo, $carpeta, $fila) {
 
 // ---------------------------------------------------------------- proceso
 $origen = origen_limpio(isset($_GET['f']) ? $_GET['f'] : '', $ORIGENES);
-$fila = gmdate('Y-m-d H:i:s') . ',' . $origen . ',' . es_movil();
-anotar($ARCHIVO, $CARPETA_DATOS, $fila);
+
+// Se cuenta solo si hay una persona detrás. Si no, se sigue redirigiendo igual:
+// que no se cuente algo nunca puede impedir que el fan llegue a WhatsApp.
+if (es_peticion_de_verdad() && !es_robot()) {
+    $fila = gmdate('Y-m-d H:i:s') . ',' . $origen . ',' . es_movil();
+    anotar($ARCHIVO, $CARPETA_DATOS, $fila);
+}
 
 $modo = isset($_GET['modo']) ? $_GET['modo'] : 'ir';
 

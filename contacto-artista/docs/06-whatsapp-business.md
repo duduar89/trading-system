@@ -118,7 +118,11 @@ Y encima el límite es de 256 contactos por lista.
 
 Consecuencia práctica:
 
-- **No se construye el sistema sobre listas de difusión.**
+- **No se construye el sistema sobre listas de difusión.** Y por eso el mensaje de
+  bienvenida **no** le dice al fan «guárdame o mis avisos no te llegan»: sería
+  venderle el beneficio de un canal que no vamos a usar. Le dice que la guarde
+  para reconocerla cuando escriba, que es cierto y además es lo que evita que la
+  denuncien por spam.
 - Sí se usan, pero solo con la gente que sí la guardó, y sabiendo que son una
   parte.
 - La frase «guárdame, que si no te pierdo» dicha en el bolo es lo que desbloquea

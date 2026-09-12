@@ -136,7 +136,16 @@ const config = {
 
     // Colores del QR. Oscuro sobre claro, siempre.
     qrOscuro: '#16151a',
-    qrClaro: '#ffffff'
+    qrClaro: '#ffffff',
+
+    // Imprimir el teléfono en texto en la tarjeta.
+    // Va en true porque en una sala sin cobertura es el ÚNICO camino que queda:
+    // el QR no resuelve, el NFC abre una web que no carga, y lo que sí funciona
+    // es que alguien apunte el número y escriba al salir. La contrapartida es
+    // real y hay que saberla: un número impreso ya no se puede cambiar. Si algún
+    // día cambia de número, lo impreso deja de servir aunque los QR sigan
+    // funcionando, porque esos apuntan a la web y la web se actualiza sola.
+    imprimirTelefono: true
   },
 
   ficheros: {

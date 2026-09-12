@@ -74,6 +74,31 @@ function construir(c) {
   return lineas.map(plegar).join('\r\n') + '\r\n';
 }
 
+/*
+ * Versión mínima, la que va DENTRO de un código QR.
+ *
+ * Existe por un motivo muy concreto: muchas salas de conciertos son sótanos de
+ * hormigón sin cobertura. Ahí un QR que lleva una URL no hace nada y el fallo es
+ * mudo — ni el fan ni ella saben por qué no ha pasado nada. Un QR que lleva la
+ * ficha dentro se lee y se guarda con el móvil en modo avión.
+ *
+ * Va sin URL, sin correo y sin redes a propósito: cada campo son cuadros de más,
+ * y aquí lo que hace falta es que se lea en una mesa mal iluminada.
+ */
+function construirMinima(c) {
+  const a = c.artista;
+  const lineas = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    'N:' + escapar(a.apellidos) + ';' + escapar(a.nombre) + ';;;',
+    'FN:' + escapar(a.nombreArtistico || (a.nombre + ' ' + a.apellidos).trim()),
+    'TEL;TYPE=CELL:' + c.telefono.internacional.replace(/\s/g, ''),
+    'END:VCARD'
+  ];
+  if (a.actividad) lineas.splice(4, 0, 'ORG:' + escapar(a.actividad));
+  return lineas.map(plegar).join('\r\n') + '\r\n';
+}
+
 if (require.main === module) {
   const destino = path.join(__dirname, '..', 'web', config.ficheros.vcard);
   const contenido = construir(config);
@@ -84,4 +109,4 @@ if (require.main === module) {
   console.log(contenido.replace(/\r\n/g, '\n'));
 }
 
-module.exports = { construir, plegar, escapar };
+module.exports = { construir, construirMinima, plegar, escapar };

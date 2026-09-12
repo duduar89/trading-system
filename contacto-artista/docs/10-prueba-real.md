@@ -41,8 +41,20 @@ Se marca lo que pasa de verdad, no lo que debería pasar.
 | 13 | Escribir desde un número **que nunca le haya escrito**. ¿Salta la bienvenida? | | | Horario «Siempre» y que el número esté en WhatsApp Business: `06-whatsapp-business.md` |
 | 14 | Mirar `datos/escaneos.csv`. ¿Están las visitas con **el soporte correcto**? | | | `09-medir.md` |
 | 15 | Abrir `datos/escaneos.csv` **desde el navegador**. Tiene que dar error 403 | | | Falta el `.htaccess` |
+| 16 | **En modo avión**, escanear `qr-contacto.svg`. ¿Ofrece guardar el contacto? | | | Si no lo ofrece en algún móvil, ese soporte no sirve para ese sistema: apúntalo. `05-qr-imprenta.md` |
+| 17 | **En modo avión**, escanear el QR normal. Confirmar que **no hace nada** | | | Es lo esperado, y es justo por lo que existe la fila 16 |
 
 ---
+
+## Y una prueba que no es de móvil: la sala
+
+Antes del primer bolo en una sala nueva, **mirar si hay cobertura donde va a estar
+la mesa de merchandising.** Muchos locales son sótanos. Si no la hay:
+
+- El QR de contacto sin conexión (fila 16) pasa a ser el soporte principal de esa
+  noche.
+- Pedir al promotor la clave del WiFi junto con la ficha técnica. Es gratis y
+  nadie lo pide.
 
 ## Lo que se aprende, más allá del sí o no
 

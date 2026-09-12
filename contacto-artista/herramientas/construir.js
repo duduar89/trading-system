@@ -19,7 +19,7 @@ const path = require('path');
 const QR = require('./qr.js');
 const { decodificar } = require('./leer-qr.js');
 const { urlDe } = require('./urls.js');
-const { construir: construirVcf } = require('./hacer-vcf.js');
+const { construir: construirVcf, construirMinima } = require('./hacer-vcf.js');
 
 const RAIZ = path.join(__dirname, '..');
 
@@ -201,6 +201,31 @@ function escribirQR(config, salida) {
     generados.push({ soporte, qr, destino, url });
   }
 
+  /*
+   * El QR que lleva la ficha de contacto DENTRO, sin URL.
+   *
+   * Existe por un riesgo que no cubre ningún otro soporte: muchas salas son
+   * sótanos de hormigón sin cobertura. Ahí un QR que apunta a una web no hace
+   * nada, y el fallo es mudo: ni el fan ni ella saben por qué no ha pasado nada.
+   * Este se lee y se guarda con el móvil en modo avión.
+   */
+  const ficha = construirMinima(config);
+  const qrFicha = QR.generar(ficha, { nivel: 'M' });
+  if (decodificar(qrFicha).texto !== ficha) {
+    throw new Error('El QR de contacto no se relee bien. No se ha escrito nada.');
+  }
+  fs.writeFileSync(
+    path.join(carpeta, 'qr-contacto.svg'),
+    QR.aSVG(qrFicha, {
+      margen: 4,
+      escala: 16,
+      oscuro: config.opciones.qrOscuro,
+      claro: config.opciones.qrClaro,
+      titulo: 'Guardar el contacto sin conexión'
+    }),
+    'utf8'
+  );
+
   // Las URL para grabar en los tags, en un fichero de texto que se puede abrir
   // desde el móvil al lado de la aplicación de escritura NFC.
   const texto = [
@@ -216,7 +241,9 @@ function escribirQR(config, salida) {
   ].join('\n');
   fs.writeFileSync(path.join(carpeta, 'urls.txt'), texto, 'utf8');
 
-  generados.releidos = releidos;
+  generados.releidos = releidos + 1;
+  generados.fichaContacto = qrFicha;
+  generados.bytesFicha = Buffer.byteLength(ficha, 'utf8');
   return generados;
 }
 
@@ -268,6 +295,13 @@ function principal() {
     );
   });
   console.log('  · imprenta/urls.txt');
+  const ficha = qrs.fichaContacto;
+  const ladoFicha = Math.ceil(0.6 * (ficha.tamano + 8));
+  console.log(
+    '  · imprenta/qr-contacto.svg  (guarda su contacto SIN conexión, versión ' +
+    ficha.version + ', ' + ficha.tamano + '×' + ficha.tamano + ' cuadros)'
+  );
+  console.log('    imprimir a ' + ladoFicha + ' mm o más: lleva la ficha entera dentro (' + qrs.bytesFicha + ' bytes)');
   console.log('');
   console.log('Los ' + qrs.releidos + ' códigos se han vuelto a leer y dicen lo que deben.');
 

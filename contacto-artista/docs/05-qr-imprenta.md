@@ -103,6 +103,7 @@ Con eso en la cabeza, y con la zona de silencio dentro de la caja blanca:
 | Pegatina en la mesa de merchandising | 50-60 cm, de pie | **6 cm** |
 | Funda de la guitarra | 40-60 cm | **8 cm**, en zona plana |
 | Cartel o roll-up | 2,5-3 m | **25-30 cm** |
+| QR de contacto sin conexión | 20-30 cm | **35 mm mínimo** (lleva más datos dentro) |
 | Pantalla del móvil de ella | 20-30 cm | el ancho útil de la pantalla |
 
 ---
@@ -165,6 +166,34 @@ no escanear. Hace falta:
 3. **La URL escrita debajo**, legible y tecleable, para quien no pueda escanear.
    Y porque el iPhone enseña el dominio en un aviso antes de abrir nada: si
    coincide con lo que la persona acaba de leer al lado del código, lo toca.
+
+---
+
+## El segundo QR: el que funciona sin cobertura
+
+`imprenta/qr-contacto.svg` no lleva una dirección: **lleva su ficha de contacto
+dentro del propio dibujo**. Al escanearlo, el móvil ofrece guardar el contacto
+**sin pedir nada a internet**.
+
+Está porque hay un riesgo que ningún otro soporte cubre: **muchas salas de
+conciertos son sótanos de hormigón sin cobertura.** Ahí, un QR que apunta a una
+web no hace absolutamente nada, y el fallo es mudo — ni el fan ni ella saben por
+qué no ha pasado nada, y encima parece que el sistema está roto.
+
+- **Tamaño mínimo: 35 mm.** Lleva 124 bytes dentro, así que sale de versión 8
+  (49×49 cuadros): necesita más sitio que los demás. El programa lo dice al
+  generarlo.
+- **Va separado del QR principal**, con su propio texto: «¿Sin cobertura? Escanea
+  este y me guardas.» Dos QR juntos sin explicar cuál es cuál es peor que uno.
+- **Lo que no hace:** no abre WhatsApp, no cuenta nada y no genera ningún
+  permiso. Es una tarjeta de papel en forma de código: salva el contacto cuando
+  no hay red, y ya.
+
+> **Esto hay que probarlo en un móvil antes de imprimirlo.** Que la cámara de
+> serie ofrezca «añadir contacto» al leer una ficha dentro de un QR es lo
+> habitual en iPhone y en Android, pero no lo he podido comprobar en un teléfono
+> real. Está en la matriz de `10-prueba-real.md`. Si en algún móvil no ofreciera
+> guardar, el soporte sigue sin hacer daño: simplemente enseña el texto.
 
 ---
 

@@ -39,6 +39,12 @@ los móviles con cámara— y va impreso al lado, no escondido como plan B. Cuá
 usa de verdad cada uno no lo sabe nadie de antemano: por eso cada soporte lleva su
 propio código y se mide en los dos o tres primeros bolos.
 
+**Y un riesgo que no cubría ningún soporte:** muchas salas son sótanos de hormigón
+**sin cobertura**. Ahí el QR no resuelve, el NFC abre una web que no carga, y el
+fallo es mudo: parece que el sistema está roto. Por eso se entrega un **segundo QR
+que lleva su ficha de contacto dentro del propio dibujo** y se guarda con el móvil
+en modo avión, y el teléfono va impreso en texto en la tarjeta.
+
 ## El sistema, en una línea
 
 QR o NFC → una página suya de una pantalla → un botón grande a WhatsApp con el
@@ -119,12 +125,14 @@ tarjeta de visita están generados.
 - **Cada QR que se genera se vuelve a leer antes de escribirse en disco.** Lo que
   llega a la imprenta ha sido leído, no solo dibujado. Y hay una prueba que
   estropea un código a posta para confirmar que esa red salta.
-- **48 comprobaciones en un navegador de verdad** sobre la página: el enlace y el
+- **54 comprobaciones en un navegador de verdad** sobre la página: el enlace y el
   número, la sala dentro del mensaje, que nunca sale un `{sala}` a medias, el
   aviso dentro de Instagram con salida por `intent://`, que no pide nada a
   servidores externos, que no se sale de la pantalla a 320 px de ancho, y que la
-  ficha de contacto aguanta un apellido con punto y coma y que una sala llamada
-  «Rock&Blues» o «Bar; El Sol» viaja entera hasta WhatsApp.
+  ficha de contacto aguanta un apellido con punto y coma, que una sala llamada
+  «Rock&Blues» o «Bar; El Sol» viaja entera hasta WhatsApp, y que el contador
+  **no cuenta** las visitas que hacen WhatsApp o Telegram para dibujar la vista
+  previa cuando alguien pega el enlace en un chat.
 
 ```bash
 node herramientas/probar-qr.js

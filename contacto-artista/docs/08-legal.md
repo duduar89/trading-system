@@ -150,6 +150,22 @@ Está marcado como `RELLENAR` en `web/privacidad.html`.
 
 ---
 
+## Menores
+
+En un bolo hay gente de 14 a 17 años, y a veces menos. Conviene tenerlo decidido
+antes de que pase:
+
+- La LOPDGDD fija en **14 años** la edad a partir de la cual un menor puede
+  consentir por sí mismo el tratamiento de sus datos. *(Confirmar el artículo con
+  quien lleve lo jurídico: no he podido consultar el texto oficial.)* Por debajo
+  de esa edad hace falta consentimiento de quien tenga la patria potestad.
+- **Qué significa en la práctica:** a quien sea evidentemente muy joven, se le
+  contesta como a cualquiera, pero **no entra en ninguna lista** para escribirle
+  después.
+- Recoger teléfonos de menores de 14 en una base de fans no es un problema del
+  mismo tipo que el del artículo 21: es cualitativamente peor, y no se arregla a
+  posteriori.
+
 ## Entre ella y Brainstormers
 
 Si el CRM, el contador o los datos viven en el hosting de Brainstormers, ella es
