@@ -163,6 +163,10 @@ function escribirQR(config, salida) {
     const url = config.urlDeSoporte(soporte.clave);
     urls.push({ soporte, url });
 
+    // Los soportes de tipo "enlace" (el botón de su web, la biografía de
+    // Instagram) no se imprimen: son una URL que se pega en otro sitio.
+    if (soporte.tipo === 'enlace') continue;
+
     // Los soportes NFC no llevan QR propio: el tag guarda la URL directamente.
     // Pero se genera igual, porque en la práctica cada pieza NFC acaba llevando
     // un QR impreso al lado para quien no tenga NFC o no sepa usarlo.
@@ -188,6 +192,8 @@ function escribirQR(config, salida) {
     ...urls.map(({ soporte, url }) =>
       soporte.titulo + ' (' + soporte.tipo.toUpperCase() + ')\n  ' + url + '\n'
     ),
+    'Los de tipo ENLACE no se imprimen: se pegan donde toque (el botón de la web,',
+    'la biografía de Instagram). Los de tipo NFC se graban en el tag.',
     'Cómo se graban los NFC: docs/04-nfc.md'
   ].join('\n');
   fs.writeFileSync(path.join(carpeta, 'urls.txt'), texto, 'utf8');

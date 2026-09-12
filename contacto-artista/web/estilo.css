@@ -84,27 +84,32 @@ header { text-align: center; margin-bottom: 26px; }
    compite. Si compitiera, una parte del público guardaría el contacto sin
    escribir, que es justo el caso en que ella no se lleva nada. */
 .segundo-plano {
-  margin-top: 26px;
-  padding-top: 18px;
+  margin-top: 22px;
+  padding-top: 10px;
   border-top: 1px solid var(--linea);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 2px;
   align-items: center;
 }
 
+/* Los enlaces de segundo plano siguen siendo secundarios, pero se pueden pulsar
+   con el pulgar: 44 px de alto es el mínimo para acertar sin mirar, que es como
+   se usa esto en un pasillo a oscuras. */
 a.suave {
   color: var(--suave);
   text-decoration: none;
   font-size: 0.95rem;
+  padding: 11px 8px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   border-bottom: 1px solid var(--linea);
-  padding-bottom: 2px;
-  min-height: 24px;
 }
 
 a.suave:hover { color: var(--tinta); }
 
-#secundarios { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+#secundarios { display: flex; flex-direction: column; gap: 2px; align-items: center; }
 
 a.boton {
   display: flex;

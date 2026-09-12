@@ -59,6 +59,11 @@ public_html/            ← la landing que ya existe, no se toca
     └── contar.php
 ```
 
+**Si el hosting no tiene PHP** (alojamiento estático, Netlify, GitHub Pages),
+poner `opciones.medir` a `false` en `config.js` y no subir `contar.php`. Todo lo
+demás funciona igual; el recuento se saca entonces de los registros de acceso del
+servidor, filtrando por el parámetro `?f=`.
+
 `contar.php` se **genera** a partir de `servidor/contar.php`: la lista de soportes
 que admite sale de `config.js`, para que no puedan descuadrarse. No se edita el de
 `web/`, se edita `config.js` y se vuelve a generar.
@@ -101,6 +106,21 @@ AddType text/vcard .vcf
    otra aplicación».
 
 Hasta que el punto 8 no salga bien, no se imprime nada.
+
+## 5. Enlazarla desde donde ya hay público
+
+La página no es solo para el bolo. Con un código distinto cada sitio, y así se
+sabe de dónde llega la gente:
+
+| Dónde | Enlace |
+|---|---|
+| Un botón en la landing que ya existe | `https://SUBDOMINIO/hola/?f=web` |
+| La biografía de Instagram | `https://SUBDOMINIO/hola/?f=instagram` |
+
+Con el de Instagram hay un detalle que importa: quien lo pulse llegará **dentro
+del navegador de Instagram**, donde el enlace de WhatsApp no abre la aplicación.
+La página lo detecta y enseña el aviso con el número para copiar. Por eso este
+enlace nunca debe apuntar directamente a `wa.me`: ahí la conversión es casi cero.
 
 ---
 

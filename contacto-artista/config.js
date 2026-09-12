@@ -67,7 +67,12 @@ const config = {
     { clave: 'merch',    titulo: 'Mesa de merchandising',        tipo: 'qr' },
     { clave: 'pulsera',  titulo: 'Pulsera NFC',                  tipo: 'nfc' },
     { clave: 'chapa',    titulo: 'Chapa o pegatina NFC',         tipo: 'nfc' },
-    { clave: 'funda',    titulo: 'NFC en la funda del móvil',    tipo: 'nfc' }
+    { clave: 'funda',    titulo: 'NFC en la funda del móvil',    tipo: 'nfc' },
+
+    // Estos no llevan QR: son enlaces. Se listan igual para que el contador los
+    // admita y se pueda comparar de dónde llega la gente.
+    { clave: 'web',       titulo: 'Botón en su landing',          tipo: 'enlace' },
+    { clave: 'instagram', titulo: 'Biografía de Instagram',       tipo: 'enlace' }
   ],
 
   // ---------------------------------------------------------------- mensajes
