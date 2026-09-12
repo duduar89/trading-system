@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>El QR de esta noche</title>
+<meta name="robots" content="noindex">
+<style>
+  /*
+   * Esta página la abre ELLA, no el público. Es el QR que enseña en la mano
+   * después del bolo.
+   *
+   * Tres decisiones que vienen de cómo es un bolo de verdad:
+   *  - Fondo blanco puro y código negro puro, a pantalla completa. Un QR sobre
+   *    fondo de color o con el modo oscuro del móvil no lo lee ninguna cámara.
+   *  - El código se calcula aquí, en el teléfono. No hace falta cobertura: en
+   *    una sala llena no hay datos, y es justo cuando se necesita.
+   *  - Recuerda la última sala. La segunda noche se abre y ya está puesta.
+   */
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #ffffff;
+    color: #17151c;
+    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 16px 16px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+  .panel { width: 100%; max-width: 420px; }
+  h1 { font-size: 1.05rem; margin: 0 0 12px; font-weight: 600; text-align: center; color: #645f6e; }
+  label { display: block; font-size: 0.8rem; font-weight: 600; margin: 0 0 4px; color: #645f6e; }
+  input {
+    width: 100%; padding: 12px 14px; font: inherit; border: 1px solid #e6e0d8;
+    border-radius: 10px; background: #fff; color: inherit;
+  }
+  .codigo {
+    margin: 18px 0 10px;
+    display: flex;
+    justify-content: center;
+    background: #fff;
+    padding: 14px;
+    border-radius: 14px;
+  }
+  .codigo svg { width: 100%; max-width: 340px; height: auto; }
+  .pie { text-align: center; font-size: 0.9rem; color: #645f6e; margin: 0 0 14px; }
+  .pie strong { color: #17151c; }
+  button {
+    width: 100%; min-height: 52px; border-radius: 12px; border: 1px solid #17151c;
+    background: #17151c; color: #fff; font: inherit; font-weight: 650; font-size: 1.02rem;
+    cursor: pointer; margin-top: 10px;
+  }
+  button.secundario { background: #fff; color: #17151c; }
+  .consejo { font-size: 0.82rem; color: #645f6e; margin-top: 18px; line-height: 1.45; }
+  .consejo li { margin-bottom: 5px; }
+
+  /* Pantalla completa: solo el código, nada más, para enseñarlo. */
+  body.escena .panel > *:not(.codigo):not(.salir) { display: none; }
+  body.escena { justify-content: center; padding: 0; }
+  body.escena .codigo { padding: 0; }
+  body.escena .codigo svg { max-width: min(92vw, 92vh); }
+  .salir { display: none; }
+  body.escena .salir { display: block; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="panel">
+  <h1>El QR de esta noche</h1>
+
+  <label for="sala">¿Dónde tocas hoy?</label>
+  <input type="text" id="sala" placeholder="Sala Clamores" autocomplete="off" enterkeyhint="done">
+
+  <div class="codigo" id="codigo"></div>
+  <p class="pie" id="pie"></p>
+
+  <button type="button" id="escena">Enseñarlo a pantalla completa</button>
+  <button type="button" class="secundario salir" id="salir">Salir</button>
+
+  <ul class="consejo">
+    <li>Sube el brillo al máximo antes de enseñarlo.</li>
+    <li>Que lo escaneen con la cámara normal, no hace falta ninguna aplicación.</li>
+    <li>Si alguien no puede, dile que te escriba al número: sale abajo del todo.</li>
+    <li>Esta página funciona sin cobertura una vez abierta.</li>
+  </ul>
+</div>
+
+<script src="qr.js"></script>
+<script src="ajustes.js"></script>
+<script>
+(function () {
+  'use strict';
+  var A = window.AJUSTES || {};
+  var campoSala = document.getElementById('sala');
+  var contenedor = document.getElementById('codigo');
+  var pie = document.getElementById('pie');
+
+  var RECUERDO = 'sala-ultimo-bolo';
+  try {
+    var guardado = localStorage.getItem(RECUERDO);
+    if (guardado) campoSala.value = guardado;
+  } catch (e) { /* navegación privada: se sigue igual */ }
+
+  function direccion() {
+    var base = window.location.href.replace(/\/qr\.html.*$/, '/');
+    var url = base + '?f=pantalla';
+    var sala = campoSala.value.trim();
+    if (sala) url += '&sala=' + encodeURIComponent(sala);
+    return url;
+  }
+
+  function pintar() {
+    var url = direccion();
+    try {
+      var qr = QR.generar(url, { nivel: 'Q' });
+      contenedor.innerHTML = QR.aSVG(qr, { margen: 4, escala: 12, oscuro: '#000000', claro: '#ffffff' });
+      var svg = contenedor.querySelector('svg');
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+      pie.innerHTML = campoSala.value.trim()
+        ? 'Lleva escrito <strong>' + campoSala.value.trim().replace(/[<>&]/g, '') + '</strong>: sabrás de qué noche viene cada mensaje.'
+        : 'Escribe la sala y sabrás de qué noche viene cada mensaje.';
+    } catch (e) {
+      contenedor.textContent = e.message;
+    }
+    try { localStorage.setItem(RECUERDO, campoSala.value.trim()); } catch (e) {}
+  }
+
+  campoSala.addEventListener('input', pintar);
+  campoSala.addEventListener('change', pintar);
+
+  document.getElementById('escena').addEventListener('click', function () {
+    document.body.classList.add('escena');
+    campoSala.blur();
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(function () {});
+    }
+  });
+
+  document.getElementById('salir').addEventListener('click', function () {
+    document.body.classList.remove('escena');
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+  });
+
+  pintar();
+})();
+</script>
+</body>
+</html>

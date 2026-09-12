@@ -1,0 +1,10 @@
+# Copiar este contenido a  datos/.htaccess  en el servidor.
+# El registro de escaneos no se sirve por web: aunque no lleve datos personales,
+# no tiene por qué verlo cualquiera que adivine la URL.
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Order allow,deny
+  Deny from all
+</IfModule>

@@ -1,0 +1,183 @@
+/*
+ * estilo.css — la página puente.
+ *
+ * Reglas que no son decoración:
+ *  - Ninguna fuente ni recurso de fuera. Sin conexión al servidor de Google no
+ *    hay retraso, no hay cookie de terceros y no hay nada que consentir. En una
+ *    sala con la cobertura saturada, cada petición que no se hace es medio
+ *    segundo que la página sí aparece.
+ *  - El botón principal ocupa el ancho entero y mide 56 px de alto. Se pulsa con
+ *    el pulgar, de pie, con una copa en la otra mano y sin mirar.
+ *  - Contraste alto: la pantalla se mira en un pasillo oscuro o en la calle a
+ *    las tres de la mañana.
+ */
+
+:root {
+  color-scheme: light dark;
+  --papel: #fdfbf7;
+  --tinta: #17151c;
+  --suave: #645f6e;
+  --linea: #e6e0d8;
+  --tarjeta: #ffffff;
+  --acento: #6d2a52;
+  --verde: #1fa855;
+  --verde-oscuro: #16833f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --papel: #121016;
+    --tinta: #f4f1ee;
+    --suave: #a29bab;
+    --linea: #2c2833;
+    --tarjeta: #1b1822;
+    --acento: #e3a7c8;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--papel);
+  color: var(--tinta);
+  font: 17px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px 40px;
+}
+
+main {
+  width: 100%;
+  max-width: 420px;
+}
+
+header { text-align: center; margin-bottom: 26px; }
+
+.nombre {
+  font-size: 1.9rem;
+  line-height: 1.15;
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.saludo {
+  margin: 0;
+  color: var(--suave);
+  font-size: 1.02rem;
+  text-wrap: balance;
+}
+
+.empujon {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--suave);
+}
+
+/* Todo lo que no es el botón verde vive aquí: se ve, se puede pulsar, pero no
+   compite. Si compitiera, una parte del público guardaría el contacto sin
+   escribir, que es justo el caso en que ella no se lleva nada. */
+.segundo-plano {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--linea);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+a.suave {
+  color: var(--suave);
+  text-decoration: none;
+  font-size: 0.95rem;
+  border-bottom: 1px solid var(--linea);
+  padding-bottom: 2px;
+  min-height: 24px;
+}
+
+a.suave:hover { color: var(--tinta); }
+
+#secundarios { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+
+a.boton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  text-decoration: none;
+  font-weight: 650;
+  font-size: 1.05rem;
+  border: 1px solid var(--linea);
+  background: var(--tarjeta);
+  color: var(--tinta);
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+
+a.boton:active { transform: scale(0.985); }
+
+a.boton.principal {
+  background: var(--verde);
+  border-color: var(--verde-oscuro);
+  color: #fff;
+  font-size: 1.12rem;
+  box-shadow: 0 6px 18px -8px rgba(31, 168, 85, 0.9);
+}
+
+a.boton svg { flex: none; }
+
+.nota {
+  margin: 18px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--suave);
+  text-align: center;
+}
+
+.nota a { color: inherit; }
+
+/* Aviso para navegadores embebidos (Instagram, TikTok, Facebook): ahí el enlace
+   de WhatsApp no abre la aplicación y la gente se queda atrapada en una pantalla
+   de inicio de sesión. Esto lo enseña el JavaScript solo cuando toca. */
+.aviso {
+  display: none;
+  border: 1px solid var(--acento);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  font-size: 0.92rem;
+  background: var(--tarjeta);
+}
+
+.aviso.visible { display: block; }
+
+.aviso strong { display: block; margin-bottom: 4px; }
+
+.aviso button {
+  margin-top: 10px;
+  width: 100%;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--tinta);
+  background: transparent;
+  color: var(--tinta);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.copiado { font-size: 0.82rem; color: var(--verde-oscuro); margin-top: 8px; display: none; }
+.copiado.visible { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  a.boton { transition: none; }
+}

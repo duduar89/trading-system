@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacidad</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="estilo.css">
+<style>
+  body { align-items: flex-start; }
+  main { max-width: 560px; }
+  h1 { font-size: 1.4rem; margin: 0 0 6px; }
+  h2 { font-size: 1rem; margin: 26px 0 6px; }
+  p, li { font-size: 0.95rem; color: var(--suave); }
+  p.principal { color: var(--tinta); }
+  a { color: inherit; }
+  .volver { display: inline-block; margin-top: 28px; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="titulo">Privacidad</h1>
+  <p class="principal">Esta página no te pide datos, no te pone cookies y no te sigue.</p>
+
+  <h2>Qué hace esta página</h2>
+  <p>
+    Es un puente: te lleva a WhatsApp con el mensaje ya escrito, o te descarga la
+    ficha de contacto para que la guardes en tu teléfono. Nada más.
+  </p>
+
+  <h2>Qué se guarda</h2>
+  <p>
+    Un recuento. Cada visita suma uno a un contador según el soporte por el que
+    has llegado (una tarjeta, una pegatina, un cartel) y si entraste desde un
+    móvil. Ese contador no guarda tu dirección IP, ni un identificador, ni una
+    cookie: es un número, no una lista.
+  </p>
+  <p>
+    Aparte de eso, el servidor donde está alojada esta página conserva sus
+    registros de acceso, que incluyen la dirección IP, durante
+    <span id="diasLog">30</span> días por motivos de seguridad y funcionamiento,
+    con base en el interés legítimo (artículo 6.1.f del RGPD). No se usan para
+    perfilarte ni se cruzan con nada.
+  </p>
+
+  <h2>Qué pasa si me escribes</h2>
+  <p>
+    Si decides escribir por WhatsApp, la conversación es tuya y de
+    <span id="quien">la artista</span>: la ve ella en su teléfono y se guarda en
+    WhatsApp igual que cualquier otro chat, con las condiciones de WhatsApp.
+    Tu número quedará en su agenda para poder responderte y para reconocerte la
+    próxima vez.
+  </p>
+  <p>
+    No se te va a meter en ninguna lista de promociones por haber escrito. Si
+    alguna vez se te quiere avisar de un concierto, se te preguntará antes y
+    podrás decir que no en cualquier momento, escribiendo «baja» por el mismo
+    chat.
+  </p>
+
+  <h2>Tus derechos</h2>
+  <p>
+    Puedes pedir que se borre tu número de la agenda y de cualquier lista
+    escribiendo por el mismo WhatsApp o al correo que aparece en la ficha de
+    contacto. También puedes reclamar ante la Agencia Española de Protección de
+    Datos (<a href="https://www.aepd.es">aepd.es</a>).
+  </p>
+
+  <h2>Quién responde de esto</h2>
+  <p id="responsable">
+    RELLENAR: nombre o razón social, NIF, domicilio a efectos de notificaciones y
+    correo electrónico de contacto. Lo exige el artículo 10 de la Ley 34/2002, y
+    no es opcional. Ver <code>docs/08-legal.md</code>.
+  </p>
+
+  <a class="volver" href="./">← Volver</a>
+</main>
+<script src="ajustes.js"></script>
+<script>
+  if (window.AJUSTES) {
+    document.getElementById('quien').textContent = window.AJUSTES.nombre;
+    document.title = 'Privacidad — ' + window.AJUSTES.nombre;
+  }
+</script>
+</body>
+</html>

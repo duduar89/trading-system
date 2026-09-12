@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generador de QR — contacto de la artista</title>
+<style>
+  :root {
+    --tinta: #16151a;
+    --papel: #faf8f5;
+    --suave: #6f6a78;
+    --linea: #e2ddd6;
+    --acento: #7b2d5e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--tinta);
+    background: var(--papel);
+    padding: 24px 16px 64px;
+  }
+  main { max-width: 940px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--suave); margin: 0 0 28px; }
+  .rejilla { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 28px; align-items: start; }
+  @media (max-width: 760px) { .rejilla { grid-template-columns: 1fr; } }
+  fieldset { border: 1px solid var(--linea); border-radius: 12px; padding: 16px; margin: 0 0 16px; background: #fff; }
+  legend { padding: 0 6px; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--suave); }
+  label { display: block; font-size: 0.85rem; font-weight: 600; margin: 12px 0 4px; }
+  label:first-of-type { margin-top: 0; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--linea); border-radius: 8px;
+    font: inherit; background: #fff; color: inherit;
+  }
+  textarea { min-height: 72px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+  .fila { display: flex; gap: 12px; }
+  .fila > * { flex: 1; }
+  .ayuda { font-size: 0.78rem; color: var(--suave); margin: 4px 0 0; }
+  .vista { background: #fff; border: 1px solid var(--linea); border-radius: 12px; padding: 20px; text-align: center; position: sticky; top: 20px; }
+  .vista svg { max-width: 100%; height: auto; }
+  .datos { font-size: 0.8rem; color: var(--suave); margin-top: 12px; }
+  .botones { display: flex; gap: 8px; margin-top: 14px; }
+  button {
+    flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--tinta);
+    background: var(--tinta); color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button.secundario { background: #fff; color: var(--tinta); }
+  button:hover { opacity: 0.88; }
+  .aviso { border-left: 3px solid var(--acento); padding: 10px 14px; background: #fff; border-radius: 0 8px 8px 0; font-size: 0.88rem; margin-bottom: 16px; }
+  .error { color: #a11; font-size: 0.85rem; margin-top: 10px; }
+  ul.lista { font-size: 0.85rem; color: var(--suave); padding-left: 18px; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Generador de QR</h1>
+  <p class="sub">Sin internet y sin webs de terceros: el código se calcula aquí mismo, en este archivo.</p>
+
+  <div class="aviso">
+    <strong>Regla de oro:</strong> el QR nunca apunta a WhatsApp directamente, apunta a la URL
+    propia. Así el destino se cambia cuando haga falta sin volver a imprimir nada.
+  </div>
+
+  <div class="rejilla">
+    <div>
+      <fieldset>
+        <legend>Qué lleva dentro</legend>
+        <label for="texto">URL o texto</label>
+        <textarea id="texto">https://TU-SUBDOMINIO/hola?f=tarjeta</textarea>
+        <p class="ayuda">Cuanto más corta, menos cuadros tiene el código y mejor se lee de lejos.</p>
+
+        <label for="etiqueta">Nombre del archivo</label>
+        <input type="text" id="etiqueta" value="qr-tarjeta">
+      </fieldset>
+
+      <fieldset>
+        <legend>Cómo se imprime</legend>
+        <div class="fila">
+          <div>
+            <label for="nivel">Corrección de errores</label>
+            <select id="nivel">
+              <option value="L">L — 7% (solo pantalla)</option>
+              <option value="M">M — 15%</option>
+              <option value="Q" selected>Q — 25% (recomendado)</option>
+              <option value="H">H — 30% (si lleva logo encima)</option>
+            </select>
+          </div>
+          <div>
+            <label for="margen">Margen (módulos)</label>
+            <input type="number" id="margen" value="4" min="0" max="10">
+          </div>
+        </div>
+        <p class="ayuda">El margen blanco de 4 módulos no es decoración: por debajo de eso hay lectores que no ven el código.</p>
+
+        <div class="fila">
+          <div>
+            <label for="oscuro">Color oscuro</label>
+            <input type="text" id="oscuro" value="#16151a">
+          </div>
+          <div>
+            <label for="claro">Color claro</label>
+            <input type="text" id="claro" value="#ffffff">
+          </div>
+        </div>
+        <p class="ayuda">Siempre oscuro sobre claro, nunca al revés, y sin colores de contraste flojo.</p>
+
+        <label for="escala">Tamaño del PNG (píxeles por módulo)</label>
+        <input type="number" id="escala" value="16" min="4" max="60">
+      </fieldset>
+    </div>
+
+    <div class="vista">
+      <div id="lienzo"></div>
+      <div class="datos" id="datos"></div>
+      <div class="error" id="error"></div>
+      <div class="botones">
+        <button id="svg">Descargar SVG</button>
+        <button id="png" class="secundario">Descargar PNG</button>
+      </div>
+      <ul class="lista">
+        <li>Para imprenta, siempre el SVG.</li>
+        <li>Pruébalo con dos móviles distintos antes de mandarlo.</li>
+        <li>Mínimo 2 cm de lado en una tarjeta, 8 cm en un cartel.</li>
+      </ul>
+    </div>
+  </div>
+</main>
+
+<script src="qr.js"></script>
+<script>
+(function () {
+  var campos = ['texto', 'nivel', 'margen', 'oscuro', 'claro', 'escala'].map(function (id) {
+    return document.getElementById(id);
+  });
+  var lienzo = document.getElementById('lienzo');
+  var datos = document.getElementById('datos');
+  var error = document.getElementById('error');
+  var ultimo = null;
+
+  function pintar() {
+    error.textContent = '';
+    var texto = document.getElementById('texto').value.trim();
+    if (!texto) { lienzo.innerHTML = ''; datos.textContent = ''; return; }
+    try {
+      var qr = QR.generar(texto, { nivel: document.getElementById('nivel').value });
+      var svg = QR.aSVG(qr, {
+        margen: +document.getElementById('margen').value,
+        escala: +document.getElementById('escala').value,
+        oscuro: document.getElementById('oscuro').value,
+        claro: document.getElementById('claro').value
+      });
+      lienzo.innerHTML = svg;
+      var svgNodo = lienzo.querySelector('svg');
+      svgNodo.removeAttribute('width');
+      svgNodo.removeAttribute('height');
+      svgNodo.style.width = '260px';
+      ultimo = { qr: qr, svg: svg };
+      datos.textContent =
+        'Versión ' + qr.version + ' · ' + qr.tamano + '×' + qr.tamano + ' módulos · nivel ' +
+        qr.nivel + ' · ' + texto.length + ' caracteres';
+    } catch (e) {
+      ultimo = null;
+      lienzo.innerHTML = '';
+      datos.textContent = '';
+      error.textContent = e.message;
+    }
+  }
+
+  function descargar(nombre, contenido, tipo) {
+    var blob = new Blob([contenido], { type: tipo });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  document.getElementById('svg').addEventListener('click', function () {
+    if (!ultimo) return;
+    descargar(document.getElementById('etiqueta').value + '.svg', ultimo.svg, 'image/svg+xml');
+  });
+
+  document.getElementById('png').addEventListener('click', function () {
+    if (!ultimo) return;
+    var canvas = document.createElement('canvas');
+    QR.aCanvas(ultimo.qr, canvas, {
+      margen: +document.getElementById('margen').value,
+      escala: +document.getElementById('escala').value,
+      oscuro: document.getElementById('oscuro').value,
+      claro: document.getElementById('claro').value
+    });
+    canvas.toBlob(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = document.getElementById('etiqueta').value + '.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }, 'image/png');
+  });
+
+  campos.forEach(function (c) {
+    c.addEventListener('input', pintar);
+    c.addEventListener('change', pintar);
+  });
+  pintar();
+})();
+</script>
+</body>
+</html>
