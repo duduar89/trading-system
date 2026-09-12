@@ -58,8 +58,9 @@ docs/                  Por qué está hecho así, y cómo se usa en el bolo
   la persona tirada en una pantalla de inicio de sesión, y además se pierde la
   frase que hace que el sistema funcione: *el mensaje ya va escrito, solo dale a
   enviar*.
-- **«Guárdame en contactos» no es el botón principal.** En iPhone son cuatro o
-  cinco toques y mucha gente se queda a medias creyendo que ya está.
+- **«Guárdame en contactos» no es el botón principal.** En iPhone el archivo se
+  descarga antes de poder añadirse y el camino se bifurca: quien se pierde se
+  queda creyendo que ya está.
 - **Sin dependencias y sin servicios de terceros.** Ni `npm install`, ni CDN, ni
   generador de QR de pago. Un acortador ajeno que cierra convierte en papel para
   reciclar todo el material impreso: le pasó a `goo.gl` en agosto de 2025.

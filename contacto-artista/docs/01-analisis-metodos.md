@@ -125,11 +125,13 @@ para eso.
 ## Lo que se ha descartado, y por qué
 
 **«Guárdame en contactos» como botón principal.**
-Es tentador: si el fan la guarda, las listas de difusión le llegan. Pero en
-iPhone el archivo de contacto se descarga a Archivos y hay que abrirlo, pulsar
-Compartir y elegir «Añadir a contactos». Son cuatro o cinco toques y mucha gente
-se queda a medias **convencida de que ya lo ha hecho**. Sigue estando en la
-página, pero abajo y en segundo plano, no como acción principal.
+Es tentador: si el fan la guarda, las listas de difusión le llegan. Pero en iPhone
+el archivo se descarga primero y hay que ir a buscarlo: si sale bien, es abrirlo y
+pulsar «Crear contacto nuevo»; si sale mal —y sale mal a menudo— hay que entrar en
+Archivos, Compartir y Contactos. **El problema no es el número de toques, es que
+el camino se bifurca y no hay forma de saber por cuál va cada uno**, y quien se
+pierde se queda convencido de que ya lo ha hecho. Sigue estando en la página, pero
+abajo y en segundo plano, no como acción principal.
 
 **El Canal de WhatsApp como camino principal.**
 Es cómodo y no tiene riesgo de bloqueo, pero **los seguidores son anónimos para

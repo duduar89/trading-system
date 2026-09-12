@@ -28,11 +28,16 @@ avisar a esa gente del próximo bolo, y ahí hay tres cosas que casi nadie sabe:
    bandeja aunque no esté guardado. El enlace de WhatsApp no es un chat, es un
    mecanismo de captura.
 
-Y una cosa más, sobre el NFC: **no «se abre solo»**. Ni en iPhone ni en Android.
-Siempre sale un aviso que hay que tocar. Y en iPhone la lectura automática **se
-desactiva mientras la cámara está en uso**, que es lo que medio público está
-haciendo en un concierto. El NFC es el efecto sorpresa; **el QR es el que
-funciona siempre** y va impreso al lado, no escondido como plan B.
+Y una cosa más, sobre el NFC: **en iPhone no «se abre solo»** —sale una
+notificación y hay que tocarla, y eso no ha cambiado desde 2018—. En Android, en
+cambio, la mayoría de móviles sí abre el enlace directamente. Además, en iPhone la
+lectura automática **se desactiva mientras la cámara está en uso**, que es lo que
+medio público está haciendo en un concierto.
+
+El NFC es el efecto sorpresa; **el QR es el que funciona siempre** —en el 100% de
+los móviles con cámara— y va impreso al lado, no escondido como plan B. Cuánto se
+usa de verdad cada uno no lo sabe nadie de antemano: por eso cada soporte lleva su
+propio código y se mide en los dos o tres primeros bolos.
 
 ## El sistema, en una línea
 

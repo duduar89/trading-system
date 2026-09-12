@@ -7,15 +7,21 @@ seguridad.** Nunca se pone NFC sin QR al lado.
 
 ## Lo primero, porque cambia la expectativa
 
-**El NFC no «se abre solo».** Ni en iPhone, ni en Android en 2026.
+**En iPhone, el NFC no «se abre solo».** En Android, en la mayoría de móviles, sí.
 
-En los dos sistemas el flujo real es: acercar el móvil → sale un aviso → **la
-persona tiene que tocar el aviso** → se abre el navegador. Apple lo hace así a
-propósito para que nadie abra cosas sin querer, y Android hace lo mismo desde su
-versión 17.
+No son lo mismo, y conviene no contarlo como si lo fueran:
 
-Esto hay que decírselo a ella antes del primer bolo. Si espera magia, la demo se
-vive como un fallo delante de la gente.
+- **iPhone:** acercar el móvil → sale una **notificación** → **hay que tocarla** →
+  se abre el navegador. Apple lo hace así desde 2018 para que nadie abra cosas sin
+  querer, y no ha cambiado.
+- **Android:** la inmensa mayoría del parque **abre el enlace directamente**, sin
+  tocar nada. Android 16 cambió por dentro cómo se lanza, pero no añadió ningún
+  paso para el usuario. Solo desde **Android 17** hay que tocar un aviso, y a
+  finales de agosto de 2026 Android 17 es residual (en torno al 4% de los
+  móviles). Convergerán, pero eso es 2027 o 2028, no hoy.
+
+Esto hay que decírselo a ella antes del primer bolo. Si espera que se abra solo y
+el otro tiene un iPhone, la demo se vive como un fallo delante de la gente.
 
 Y hay más condiciones, todas reales:
 
@@ -29,9 +35,21 @@ Y hay más condiciones, todas reales:
 - **Android:** lee con la pantalla desbloqueada y el NFC activado en ajustes.
 - **Móviles sin NFC:** siguen saliendo al mercado en gama de entrada.
 
-Contar con que **entre un 15% y un 25% del público no lo va a poder usar al
-primer intento** es prudente. Por eso el QR va siempre al lado, impreso en la
-misma pieza, no escondido como plan B.
+Y hay que contar los escalones enteros, que son más de los que parece: tener NFC,
+tenerlo activado, pantalla encendida (y desbloqueada en Android), **no estar con
+la cámara abierta grabando** —que es lo que mucha gente hace justo antes de
+acercarse—, encontrar la antena, tocar el aviso si toca, y además enviar el
+mensaje al final.
+
+**Ningún porcentaje honesto sale de ahí.** Lo sensato es tratar el NFC como un
+acelerador para quien ya está convencido, dejar que el QR sea el camino principal
+—funciona en el 100% de los móviles con cámara— y **medir lo que pasa de verdad**
+con el contador en los dos o tres primeros bolos: para eso el NFC lleva su propio
+código.
+
+Los iPhone de 2017 o anteriores (X y anteriores) tienen lector NFC manual en el
+Centro de Control, pero hay que abrirlo a mano, y eso no lo va a hacer nadie en un
+concierto.
 
 ---
 
@@ -130,12 +148,17 @@ funda**, no en el chasis, y se prueba con esa funda concreta antes de compromete
 
 **Dónde apoya el otro móvil:**
 
-- **iPhone:** tercio superior de la parte de atrás, muy cerca del borde de arriba.
-  Apoyando el centro, donde está el logo, **no lee**.
-- **Android:** no hay una posición fija; en Samsung, Pixel y OnePlus suele ser el
-  centro de la trasera.
+- **iPhone:** tercio superior de la parte de atrás, junto al borde de arriba y a
+  las cámaras. Apoyando el centro, donde está el logo, **no lee**.
+- **Android:** ya no hay una respuesta única, y esto ha cambiado hace poco.
+  Antes solía estar en el centro de la trasera; los modelos nuevos la han subido
+  arriba (el Pixel 11 la movió a la parte superior, y la serie Galaxy S26 también
+  la tiene arriba).
 
-Esto ella tiene que saber señalarlo con el dedo, no explicarlo.
+**Consecuencia práctica: no se puede imprimir «apoya el centro del móvil».** La
+instrucción que funciona en iPhone y en los Android nuevos es **«acerca la parte
+de arriba del móvil»**, asumiendo que a alguna gente le tocará deslizarlo un poco
+buscando el punto. Eso ella tiene que saber señalarlo con el dedo, no explicarlo.
 
 **Con metal por medio** (una mesa metálica, una barra) hace falta tag on-metal
 con capa de ferrita, o separar el tag al menos 5 mm de la superficie.
@@ -144,10 +167,12 @@ con capa de ferrita, o separar el tag al menos 5 mm de la superficie.
 
 ## La frase que dice ella al acercarlo
 
-> «Desbloquea el móvil y acércalo aquí arriba. Te va a salir un aviso: tócalo.»
+> «Desbloquea el móvil y acércame aquí la parte de arriba. Si te sale un aviso,
+> tócalo.»
 
-Tres cosas en una frase: desbloquear, dónde apoyar, y que hay que tocar el aviso.
-Sin eso, la mitad de los intentos se quedan en un «no me hace nada».
+Tres cosas en una frase: desbloquear, qué parte del móvil acercar, y que **puede**
+salir un aviso —en iPhone sale siempre, en la mayoría de Android no—. Sin esto, la
+mitad de los intentos se quedan en un «no me hace nada».
 
 ---
 

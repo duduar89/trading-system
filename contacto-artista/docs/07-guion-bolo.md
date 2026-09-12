@@ -48,13 +48,18 @@ siga haciendo el gesto la cuarta noche.**
 
 ## Con el NFC
 
-> «Desbloquea el móvil y acércalo aquí arriba. Te va a salir un aviso: tócalo.»
+> «Desbloquea el móvil y acércame aquí la parte de arriba. Si te sale un aviso,
+> tócalo.»
 
-Tres cosas en una frase: desbloquear, dónde apoyar y que hay que tocar el aviso.
+Tres cosas en una frase: desbloquear, qué parte acercar, y que puede salir un
+aviso. En iPhone sale siempre y hay que tocarlo; en la mayoría de Android se abre
+directamente.
 
-Y saber señalar con el dedo: en **iPhone**, el tercio de arriba de la parte de
-atrás, junto al borde superior —apoyando el centro, donde está el logo, no lee—;
-en **Android**, normalmente el centro de la trasera.
+Y saber señalar con el dedo: en **iPhone**, el tercio de arriba de la trasera,
+junto al borde superior —apoyando el centro, donde está el logo, no lee—. En
+**Android** depende del modelo: los nuevos la tienen arriba también, los de hace
+unos años en el centro. Por eso la frase dice «la parte de arriba» y, si no va, se
+desliza el móvil un poco buscando.
 
 Si no funciona a la primera, **no insistir**: se pasa al QR sin darle
 importancia. «Anda, mira, mejor con la cámara.» Ver `04-nfc.md` para por qué
