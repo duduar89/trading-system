@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const QR = require('./qr.js');
+const { urlDe } = require('./urls.js');
 
 const ANCHO = 85;
 const ALTO = 55;
@@ -87,7 +88,7 @@ function caraA(config) {
 }
 
 function caraB(config, soporte) {
-  const url = config.urlDeSoporte(soporte);
+  const url = urlDe(config, soporte);
   const xQR = SEGURIDAD + 3;
   const yQR = (ALTO - LADO_QR) / 2;
   const { svg, qr } = qrAnidado(url, xQR, yQR, LADO_QR, config.opciones.nivelQR);
@@ -118,6 +119,17 @@ function caraB(config, soporte) {
 
 function principal() {
   const config = require('../config.js');
+
+  // Si se ejecuta esto suelto con la configuración a medias, saldría una tarjeta
+  // con la palabra RELLENAR impresa y un QR que no lleva a ninguna parte. Y una
+  // tarjeta se manda a imprimir sin volver a mirarla.
+  const pendiente = JSON.stringify([config.sitio, config.mensajes.titulo, config.artista])
+    .indexOf('RELLENAR') >= 0;
+  if (pendiente) {
+    console.error('config.js está a medias: falta rellenar el sitio, el nombre o los textos.');
+    console.error('Rellénalo y ejecuta  node herramientas/construir.js,  que genera esto y todo lo demás.');
+    process.exit(1);
+  }
   const carpeta = path.join(__dirname, '..', 'imprenta');
   if (!fs.existsSync(carpeta)) fs.mkdirSync(carpeta, { recursive: true });
 

@@ -83,7 +83,6 @@ function principal() {
   config.mensajes.titulo = 'Prueba';
   config.sitio = 'https://prueba.ejemplo.es';
   config.redes = [{ nombre: 'Canal de WhatsApp', url: 'https://whatsapp.com/channel/PRUEBA', clave: 'canal' }];
-  config.urlDeSoporte = require('../config.js').urlDeSoporte;
 
   const temporal = fs.mkdtempSync(path.join(os.tmpdir(), 'puente-'));
   for (const fichero of fs.readdirSync(path.join(__dirname, '..', 'web'))) {

@@ -1,0 +1,8 @@
+# Lo que genera  node herramientas/construir.js  a partir de config.js.
+# No se versiona: se regenera, y versionarlo invita a editarlo a mano y a que
+# deje de coincidir con la configuración.
+web/ajustes.js
+web/qr.js
+web/contacto.vcf
+web/contar.php
+imprenta/

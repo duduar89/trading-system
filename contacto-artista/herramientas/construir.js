@@ -18,9 +18,11 @@ const fs = require('fs');
 const path = require('path');
 const QR = require('./qr.js');
 const { decodificar } = require('./leer-qr.js');
+const { urlDe } = require('./urls.js');
 const { construir: construirVcf } = require('./hacer-vcf.js');
 
 const RAIZ = path.join(__dirname, '..');
+
 let problemas = [];
 let avisos = [];
 
@@ -70,7 +72,7 @@ function revisar(config) {
 
   // La URL larga engorda el QR. Con nivel Q, a partir de la versión 6 los
   // cuadros empiezan a ser demasiado pequeños para una tarjeta de visita.
-  const url = config.urlDeSoporte('tarjeta');
+  const url = urlDe(config, 'tarjeta');
   const prueba = QR.generar(url, { nivel: config.opciones.nivelQR });
   if (prueba.version > 5) {
     avisos.push(
@@ -162,7 +164,7 @@ function escribirQR(config, salida) {
   let releidos = 0;
 
   for (const soporte of config.soportes) {
-    const url = config.urlDeSoporte(soporte.clave);
+    const url = urlDe(config, soporte.clave);
     urls.push({ soporte, url });
 
     // Los soportes de tipo "enlace" (el botón de su web, la biografía de
@@ -269,7 +271,6 @@ function principal() {
   console.log('Los ' + qrs.releidos + ' códigos se han vuelto a leer y dicen lo que deben.');
 
   try {
-    require('./hacer-tarjeta.js');
     const tarjeta = require('child_process').execFileSync(process.execPath,
       [path.join(__dirname, 'hacer-tarjeta.js')], { encoding: 'utf8' });
     console.log('  · imprenta/tarjeta-cara-a.svg');

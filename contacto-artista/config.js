@@ -127,7 +127,9 @@ const config = {
   }
 };
 
-// Construye la URL de un soporte: la que va dentro del QR o grabada en el NFC.
+// Atajo cómodo para la consola. La construcción NO usa esto: tiene su propia
+// función (herramientas/construir.js, urlDe) para que copiar esta configuración
+// no se lleve por delante el método.
 config.urlDeSoporte = function (clave, extra) {
   let url = config.sitio + config.ruta + '?f=' + encodeURIComponent(clave);
   if (extra && extra.sala) url += '&sala=' + encodeURIComponent(extra.sala);
