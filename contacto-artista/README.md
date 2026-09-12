@@ -42,7 +42,7 @@ herramientas/
   hacer-vcf.js         La ficha de contacto que se descarga el fan
   generador.html       Para regenerar cualquier QR sin tocar código
   probar-qr.js         180 comprobaciones del generador
-  probar-web.js        47 comprobaciones de la página en navegador
+  probar-web.js        48 comprobaciones de la página en navegador
 servidor/
   contar.php           Contador de escaneos para cPanel, sin cookies
 imprenta/              Generado: los SVG que van a la imprenta

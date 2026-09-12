@@ -106,7 +106,8 @@ function escribirAjustes(config, salida) {
     enlaces: enlaces,
     medir: !!config.opciones.medir,
     rutaMedicion: config.opciones.rutaMedicion,
-    abrirAutomatico: !!config.opciones.abrirAutomatico
+    abrirAutomatico: !!config.opciones.abrirAutomatico,
+    avisoLegal: config.avisoLegal || null
   };
 
   const destino = path.join(salida, config.ficheros.ajustesWeb);

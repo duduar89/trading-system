@@ -15,13 +15,27 @@ const config = {
 
   // ---------------------------------------------------------------- quién es
   artista: {
-    nombre: 'RELLENAR',              // nombre de pila, para la tarjeta de contacto
-    apellidos: 'RELLENAR',
-    nombreArtistico: 'RELLENAR',     // como quiere que aparezca en la agenda del móvil
+    nombre: 'Gloria',
+    apellidos: 'Díez Monzones',
+    // Cómo aparece en la agenda de quien la guarde. Puesto así porque es lo que
+    // el fan acaba de leer en el aviso del móvil al escanear (el dominio lleva
+    // "enlagloria"), y que coincidan es lo que hace que la gente toque. Si en los
+    // carteles aparece de otra forma, se cambia aquí: es una línea.
+    nombreArtistico: 'En la Gloria',
     actividad: 'Cantante',           // va en el campo "empresa" de la ficha: ayuda a encontrarla luego
     titulo: '',                      // opcional: "Voz y piano", "Copla y flamenco"…
-    email: '',                       // opcional pero recomendable: es el único canal que no depende de Meta
+    email: '',                       // RELLENAR: hace falta para el aviso legal, ver docs/08-legal.md
     nota: ''                         // opcional: una línea que verá en su agenda quien la guarde
+  },
+
+  // ------------------------------------------------------------ aviso legal
+  // Lo exige el artículo 10 de la Ley 34/2002 y no es opcional. Se pinta en
+  // web/privacidad.html. Ver docs/08-legal.md.
+  avisoLegal: {
+    titular: 'Gloria Díez Monzones',
+    domicilio: 'Boadilla del Monte, Madrid',
+    nif: '',      // RELLENAR: la ley pide el NIF
+    email: ''     // RELLENAR: un correo de contacto, puede ser el del management
   },
 
   // ------------------------------------------------------------- el teléfono
@@ -35,9 +49,13 @@ const config = {
   },
 
   // ------------------------------------------------------------- dónde vive
-  // RELLENAR: el subdominio donde ya está publicada la landing. Sin barra final.
-  // Cuanto más corto, menos denso sale el QR y mejor se lee de lejos.
-  sitio: 'https://RELLENAR.ejemplo.es',
+  // El subdominio donde ya está publicada su landing. Sin barra final.
+  // Ojo: cada carácter de más engorda el QR. Con este dominio el código de la
+  // tarjeta sale de versión 6 (41×41 cuadros) y hay que imprimirlo a 30 mm para
+  // que cada cuadro llegue a 0,6 mm. La tarjeta ya lo calcula sola.
+  // Si el subdominio responde también SIN el www, quitarlo aquí ahorra cuatro
+  // caracteres. Compruébalo antes de cambiarlo.
+  sitio: 'https://www.enlagloriaevents.brainstormersagency.es',
 
   // Carpeta de la página puente dentro de ese sitio. Con barra al final a
   // propósito: sin ella el servidor contesta una redirección extra antes de
@@ -91,7 +109,7 @@ const config = {
     prerellenadoSinSala: '¡Hola! Vengo de verte esta noche 🙌 Avísame de los próximos bolos.',
 
     // Textos de la página puente.
-    titulo: 'RELLENAR',        // el nombre artístico, tal cual lo dice la gente
+    titulo: 'En la Gloria',    // el nombre artístico, tal cual lo dice la gente
     subtitulo: 'Nos acabamos de conocer. Ábreme el WhatsApp y te aviso yo del próximo bolo.',
     botonWhatsapp: 'Abrir mi WhatsApp',
     // Debajo del botón, en pequeño. Es la línea más importante de la página:

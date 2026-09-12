@@ -57,31 +57,57 @@ lo que hace legal escribirle dentro de tres meses. Ver `02-mensajes.md` y
 
 ---
 
-## Lo que necesito de ti para que esto funcione
+## Qué está puesto y qué falta
 
-Son cinco cosas. Cuatro son datos; una es una decisión que no puedo tomar yo.
+**Ya en `config.js`:**
 
-**1. El subdominio.** Dónde está publicada su landing. Va en `config.sitio`.
+| | |
+|---|---|
+| Subdominio | `https://www.enlagloriaevents.brainstormersagency.es` |
+| Nombre | Gloria Díez Monzones |
+| Nombre artístico | **En la Gloria** |
+| Teléfono | +34 620 591 728 |
+| Aviso legal | Gloria Díez Monzones · Boadilla del Monte, Madrid |
 
-**2. Su nombre.** Nombre, apellidos y nombre artístico tal y como quiere que
-aparezca en la agenda de quien la guarde. Va en `config.artista`.
+> **Lo de «En la Gloria» lo he decidido yo** y conviene confirmarlo. Está puesto
+> así porque es lo que el fan acaba de leer en el aviso del móvil al escanear —el
+> dominio lleva `enlagloria`— y que las dos cosas coincidan es lo que hace que la
+> gente toque. Si en los carteles aparece de otra forma, se cambia en `config.js`:
+> es una línea, y no hay que reimprimir nada.
 
-**3. Los enlaces que existan:** canal de WhatsApp, Instagram, Spotify, página de
-fechas. Lo que esté vacío sencillamente no se pinta.
+**Falta:**
 
-**4. Comprobar que el número tiene cuenta activa de WhatsApp.** Abrir
-`https://wa.me/34620591728` desde un móvil que no sea el suyo. Es el primer sitio
-donde puede fallar todo.
+1. **Sus enlaces**, cuando los tengas: canal de WhatsApp, Instagram, Spotify,
+   página de fechas. Lo que esté vacío no se pinta, así que puede subirse ya y
+   añadirlos después.
+2. **NIF y un correo de contacto.** El artículo 10 de la LSSI pide nombre, NIF,
+   domicilio y correo, y de momento hay dos de las cuatro. La página de privacidad
+   **enseña el hueco a propósito** («FALTA POR RELLENAR: NIF, correo de
+   contacto»): un hueco visible se arregla, uno silencioso se queda para siempre.
+   Si no quiere dar su NIF personal, se canaliza por su sociedad o su management,
+   pero hay que resolverlo antes de publicar. Ver `08-legal.md`.
+3. **Comprobar que el número tiene cuenta activa de WhatsApp**: abrir
+   `wa.me/34620591728` desde un móvil que no sea el suyo. Es el primer sitio donde
+   puede fallar todo.
+4. **¿El subdominio responde también sin el `www`?** Si sí, quitarlo de
+   `config.sitio` ahorra cuatro caracteres en todos los QR. Se comprueba en dos
+   segundos desde el navegador.
 
-**5. La decisión que es tuya y de ella — el aviso legal.** La ley obliga a
-publicar en la web nombre o razón social, NIF, domicilio a efectos de
-notificaciones y un correo (artículo 10 de la LSSI). En cuanto se lo expliques es
-probable que no quiera publicar su nombre civil ni su dirección particular. Se
-resuelve con su sociedad, con su management o con un domicilio a efectos de
-notificaciones, **y hay que resolverlo antes de publicar**. Está en `08-legal.md`
-y marcado como `RELLENAR` en `web/privacidad.html`.
+## Lo que cuesta este dominio, en milímetros
 
-Con lo primero, un `node herramientas/construir.js` deja todo listo para subir.
+El subdominio es largo (67 caracteres con la ruta y el código de soporte), y eso
+tiene efecto físico: el QR sale de **versión 6, 41×41 cuadros**. Consecuencia:
+
+- La tarjeta de visita **se imprime con el QR a 30 mm**, no a 25. Lo calcula sola
+  `hacer-tarjeta.js` para que cada cuadro llegue a 0,61 mm, por encima del suelo
+  de la impresión comercial. Cabe de sobra en una tarjeta de 85 mm.
+- En el cartel y en la pegatina no cambia nada.
+- Si alguna vez hace falta un QR realmente pequeño, en `03-montaje-web.md` está
+  cómo bajarlo a versión 4.
+
+Con eso, `node herramientas/construir.js` deja todo listo para subir. Ya se ha
+ejecutado: la web, la tarjeta de contacto, los siete QR y las dos caras de la
+tarjeta de visita están generados.
 
 ---
 
@@ -93,7 +119,7 @@ Con lo primero, un `node herramientas/construir.js` deja todo listo para subir.
 - **Cada QR que se genera se vuelve a leer antes de escribirse en disco.** Lo que
   llega a la imprenta ha sido leído, no solo dibujado. Y hay una prueba que
   estropea un código a posta para confirmar que esa red salta.
-- **47 comprobaciones en un navegador de verdad** sobre la página: el enlace y el
+- **48 comprobaciones en un navegador de verdad** sobre la página: el enlace y el
   número, la sala dentro del mensaje, que nunca sale un `{sala}` a medias, el
   aviso dentro de Instagram con salida por `intent://`, que no pide nada a
   servidores externos, que no se sale de la pantalla a 320 px de ancho, y que la

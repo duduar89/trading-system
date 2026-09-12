@@ -67,11 +67,7 @@
   </p>
 
   <h2>Quién responde de esto</h2>
-  <p id="responsable">
-    RELLENAR: nombre o razón social, NIF, domicilio a efectos de notificaciones y
-    correo electrónico de contacto. Lo exige el artículo 10 de la Ley 34/2002, y
-    no es opcional. Ver <code>docs/08-legal.md</code>.
-  </p>
+  <p id="responsable">…</p>
 
   <a class="volver" href="./">← Volver</a>
 </main>
@@ -80,6 +76,19 @@
   if (window.AJUSTES) {
     document.getElementById('quien').textContent = window.AJUSTES.nombre;
     document.title = 'Privacidad — ' + window.AJUSTES.nombre;
+
+    // Los datos del responsable los exige el artículo 10 de la LSSI. Se pintan
+    // desde config.js; lo que falte se ve en la propia página, a propósito: un
+    // hueco visible se arregla, uno silencioso se queda para siempre.
+    var legal = window.AJUSTES.avisoLegal || {};
+    var partes = [legal.titular, legal.nif, legal.domicilio, legal.email].filter(Boolean);
+    var faltan = [];
+    if (!legal.titular) faltan.push('nombre o razón social');
+    if (!legal.nif) faltan.push('NIF');
+    if (!legal.domicilio) faltan.push('domicilio a efectos de notificaciones');
+    if (!legal.email) faltan.push('correo de contacto');
+    document.getElementById('responsable').textContent =
+      partes.join(' · ') + (faltan.length ? '  [FALTA POR RELLENAR: ' + faltan.join(', ') + ']' : '');
   }
 </script>
 </body>

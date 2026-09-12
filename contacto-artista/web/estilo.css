@@ -37,6 +37,11 @@
 
 * { box-sizing: border-box; }
 
+/* Esto no es cosmética. El atributo hidden del HTML vale display:none, pero
+   cualquier regla que ponga un display después lo pisa sin avisar — y entonces
+   se enseña al público un botón de un canal que no existe. */
+[hidden] { display: none !important; }
+
 html, body { margin: 0; padding: 0; }
 
 body {
