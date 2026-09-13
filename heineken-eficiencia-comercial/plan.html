@@ -1,0 +1,1144 @@
+<title>Vender más, reunirse mejor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap">
+
+<style>
+:root{
+  --ground:#EDEFF2;
+  --surface:#FFFFFF;
+  --surface-2:#F6F8FA;
+  --ink:#141B22;
+  --ink-2:#4C5A67;
+  --ink-3:#74838F;
+  --line:#D5DBE1;
+  --line-soft:#E4E9ED;
+  --accent:#1B4965;
+  --accent-soft:#E2EBF1;
+  --amber:#A8600F;
+  --amber-soft:#F6EADA;
+  --danger:#8C2F2F;
+  --danger-soft:#F5E4E2;
+  --ok:#2A6350;
+  --ok-soft:#E0EDE7;
+  --shadow:0 1px 2px rgba(20,27,34,.06),0 8px 24px -18px rgba(20,27,34,.35);
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#10161B;
+    --surface:#171F26;
+    --surface-2:#1D262E;
+    --ink:#E7EDF2;
+    --ink-2:#A9B7C2;
+    --ink-3:#7E8D99;
+    --line:#2B3742;
+    --line-soft:#232E37;
+    --accent:#7FB3D1;
+    --accent-soft:#1B2C38;
+    --amber:#D9963F;
+    --amber-soft:#2E2416;
+    --danger:#D98A84;
+    --danger-soft:#31201F;
+    --ok:#72B79C;
+    --ok-soft:#182A23;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -18px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#10161B;
+  --surface:#171F26;
+  --surface-2:#1D262E;
+  --ink:#E7EDF2;
+  --ink-2:#A9B7C2;
+  --ink-3:#7E8D99;
+  --line:#2B3742;
+  --line-soft:#232E37;
+  --accent:#7FB3D1;
+  --accent-soft:#1B2C38;
+  --amber:#D9963F;
+  --amber-soft:#2E2416;
+  --danger:#D98A84;
+  --danger-soft:#31201F;
+  --ok:#72B79C;
+  --ok-soft:#182A23;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -18px rgba(0,0,0,.8);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:17px;
+  line-height:1.62;
+  margin:0;
+  padding-inline:20px;
+  padding-block:0;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:0}
+
+/* ---- masthead ---- */
+.mast{padding-block:56px 34px;border-bottom:2px solid var(--ink);display:flex;flex-direction:column;gap:18px}
+.eyebrow{
+  font-family:var(--mono);font-size:11.5px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3);
+}
+.mast h1{
+  font-family:var(--display);font-weight:800;font-size:clamp(38px,7.4vw,62px);
+  line-height:1.02;letter-spacing:-.025em;margin:0;text-wrap:balance;
+}
+.mast h1 em{font-style:normal;color:var(--accent)}
+.standfirst{font-size:clamp(18px,2.4vw,21px);line-height:1.5;color:var(--ink-2);margin:0;max-width:34em}
+.mast-meta{
+  font-family:var(--mono);font-size:12px;color:var(--ink-3);
+  display:flex;flex-wrap:wrap;gap:6px 18px;padding-top:6px;
+}
+
+/* ---- index ---- */
+.index{padding-block:26px;border-bottom:1px solid var(--line)}
+.index ol{
+  list-style:none;margin:0;padding:0;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:2px 26px;
+  counter-reset:idx;
+}
+.index li{counter-increment:idx;font-family:var(--display);font-size:14.5px;line-height:1.9}
+.index li a{color:var(--ink-2);text-decoration:none;display:flex;gap:10px;align-items:baseline}
+.index li a:hover{color:var(--accent)}
+.index li a::before{
+  content:counter(idx,decimal-leading-zero);
+  font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.06em;
+}
+
+/* ---- sections ---- */
+section{padding-block:46px;border-bottom:1px solid var(--line-soft)}
+section:last-of-type{border-bottom:none}
+h2{
+  font-family:var(--display);font-weight:800;font-size:clamp(25px,3.9vw,33px);
+  line-height:1.12;letter-spacing:-.02em;margin:0 0 6px;text-wrap:balance;
+}
+h3{
+  font-family:var(--display);font-weight:700;font-size:19px;line-height:1.25;
+  letter-spacing:-.01em;margin:34px 0 8px;text-wrap:balance;
+}
+h4{
+  font-family:var(--display);font-weight:600;font-size:15.5px;margin:22px 0 6px;
+  letter-spacing:-.005em;
+}
+.sec-kicker{
+  font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 12px;font-weight:600;
+}
+p{margin:0 0 15px;max-width:66ch}
+ul,ol{margin:0 0 15px;padding-left:1.15em;max-width:66ch}
+li{margin-bottom:7px}
+strong{font-weight:700}
+a{color:var(--accent)}
+em.term{font-style:italic;color:var(--ink-2)}
+
+/* ---- pull / thesis ---- */
+.thesis{
+  background:var(--surface);border-left:4px solid var(--accent);
+  padding:22px 24px;margin:0 0 26px;box-shadow:var(--shadow);border-radius:0 4px 4px 0;
+}
+.thesis p{margin:0;font-size:19px;line-height:1.5}
+.thesis p + p{margin-top:12px}
+
+.callout{
+  background:var(--surface-2);border:1px solid var(--line);
+  padding:16px 18px;border-radius:4px;margin:0 0 18px;
+}
+.callout p:last-child{margin-bottom:0}
+.callout.warn{background:var(--danger-soft);border-color:transparent}
+.callout.keep{background:var(--ok-soft);border-color:transparent}
+.callout.decide{background:var(--amber-soft);border-color:transparent}
+.callout-label{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+  font-weight:600;display:block;margin-bottom:7px;
+}
+.warn .callout-label{color:var(--danger)}
+.keep .callout-label{color:var(--ok)}
+.decide .callout-label{color:var(--amber)}
+.callout .callout-label{color:var(--ink-3)}
+
+/* ---- chips ---- */
+.chip{
+  display:inline-block;font-family:var(--mono);font-size:10px;font-weight:600;
+  letter-spacing:.09em;text-transform:uppercase;padding:3px 7px;border-radius:3px;
+  vertical-align:2px;white-space:nowrap;
+}
+.chip-you{background:var(--accent-soft);color:var(--accent)}
+.chip-dir{background:var(--amber-soft);color:var(--amber)}
+.chip-kill{background:var(--danger-soft);color:var(--danger)}
+.chip-keep{background:var(--ok-soft);color:var(--ok)}
+
+/* ---- data figures ---- */
+.figs{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:1px;background:var(--line);border:1px solid var(--line);margin:0 0 22px;border-radius:4px;overflow:hidden;
+}
+.fig{background:var(--surface);padding:15px 16px}
+.fig .n{
+  font-family:var(--display);font-weight:800;font-size:27px;line-height:1.05;
+  letter-spacing:-.03em;display:block;font-variant-numeric:tabular-nums;
+}
+.fig .n.neg{color:var(--danger)}
+.fig .l{font-size:13.5px;line-height:1.35;color:var(--ink-2);display:block;margin-top:5px}
+.fig .s{font-family:var(--mono);font-size:10px;color:var(--ink-3);display:block;margin-top:7px;letter-spacing:.04em}
+
+/* ---- tables ---- */
+.tscroll{overflow-x:auto;margin:0 0 20px;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;min-width:620px}
+th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line-soft);vertical-align:top;line-height:1.42}
+th{
+  font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);background:var(--surface-2);
+  border-bottom:1px solid var(--line);position:sticky;top:0;
+}
+tbody tr:last-child td{border-bottom:none}
+td.mono,th.mono{font-family:var(--mono);font-size:12.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+td strong{font-family:var(--display);font-weight:600;font-size:14.5px}
+
+/* ---- ficha (printable agenda) ---- */
+.ficha{
+  background:var(--surface);border:1px solid var(--line);border-radius:5px;
+  margin:0 0 22px;box-shadow:var(--shadow);overflow:hidden;
+}
+.ficha-head{padding:15px 18px;border-bottom:2px solid var(--ink);display:flex;flex-direction:column;gap:5px}
+.ficha-head .t{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.01em}
+.ficha-head .m{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);line-height:1.5}
+.ficha-body{padding:4px 0}
+.row{display:flex;gap:14px;padding:9px 18px;border-bottom:1px solid var(--line-soft);align-items:baseline}
+.row:last-child{border-bottom:none}
+.row .tm{
+  font-family:var(--mono);font-size:11.5px;font-weight:500;color:var(--accent);
+  flex:0 0 88px;font-variant-numeric:tabular-nums;letter-spacing:-.01em;
+}
+.row .bd{flex:1;font-size:14.5px;line-height:1.45;min-width:0}
+.row .bd b{font-family:var(--display);font-weight:600;font-size:14px;display:block;margin-bottom:2px}
+.ficha-rules{background:var(--surface-2);padding:14px 18px;border-top:1px solid var(--line)}
+.ficha-rules ol{margin:0;padding-left:1.2em;font-size:13.5px;line-height:1.5}
+.ficha-rules li{margin-bottom:5px}
+.ficha-rules .callout-label{color:var(--ink-3);margin-bottom:8px}
+
+/* ---- letter ---- */
+.letter{
+  background:var(--surface);border:1px solid var(--line);border-radius:5px;
+  padding:30px 30px;box-shadow:var(--shadow);
+}
+.letter p{font-size:16.5px;max-width:60ch}
+.letter .subject{
+  font-family:var(--mono);font-size:12.5px;color:var(--ink-2);border-bottom:1px solid var(--line);
+  padding-bottom:14px;margin-bottom:20px;letter-spacing:.01em;
+}
+.letter hr{border:none;border-top:1px solid var(--line-soft);margin:22px 0}
+
+/* ---- Q list ---- */
+.qlist{list-style:none;padding:0;margin:0;counter-reset:q;max-width:none}
+.qlist li{
+  counter-increment:q;display:flex;gap:14px;padding:13px 0;
+  border-bottom:1px solid var(--line-soft);margin:0;
+}
+.qlist li::before{
+  content:counter(q,decimal-leading-zero);font-family:var(--mono);font-size:11px;
+  color:var(--ink-3);flex:0 0 26px;padding-top:4px;letter-spacing:.04em;
+}
+.qlist .qt{font-size:15.5px;line-height:1.45}
+.qlist .qw{font-size:13.5px;line-height:1.45;color:var(--ink-2);margin-top:5px;display:block}
+
+/* ---- sources ---- */
+.src{font-size:13.5px;line-height:1.5;color:var(--ink-2);max-width:none}
+.src li{margin-bottom:11px}
+.src b{font-family:var(--display);font-size:13.5px;color:var(--ink)}
+.src .note{display:block;color:var(--ink-3);font-size:12.5px;margin-top:2px}
+
+footer{padding-block:34px 60px;border-top:2px solid var(--ink);margin-top:10px}
+footer p{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);line-height:1.7;max-width:none}
+
+@media (max-width:560px){
+  body{font-size:16px;padding-inline:16px}
+  .row{flex-direction:column;gap:3px}
+  .row .tm{flex:none}
+  .letter{padding:22px 18px}
+  .mast{padding-block:40px 26px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <span class="eyebrow">Trade Marketing Andalucía · Nota de trabajo</span>
+  <h1>Vender más,<br><em>reunirse mejor</em></h1>
+  <p class="standfirst">Respuesta a la pregunta del director comercial. Y por qué, antes de contestarla, conviene reformularla.</p>
+  <div class="mast-meta">
+    <span>Ámbito: HORECA Andalucía</span>
+    <span>Destinatarios: Dirección Comercial · Jefatura de Ventas regional</span>
+    <span>Documento interno de trabajo</span>
+  </div>
+</header>
+
+<nav class="index" aria-label="Índice">
+  <ol>
+    <li><a href="#reformular">La respuesta corta</a></li>
+    <li><a href="#diagnostico">El diagnóstico</a></li>
+    <li><a href="#mapa">El mapa de foros</a></li>
+    <li><a href="#que-ver">Qué debe verse en cada una</a></li>
+    <li><a href="#agendas">Las agendas, minuto a minuto</a></li>
+    <li><a href="#elimina">Qué se elimina y qué no se toca</a></li>
+    <li><a href="#trade">Tus palancas desde Trade</a></li>
+    <li><a href="#coche">Cambiar sala por coche</a></li>
+    <li><a href="#distribuidor">El distribuidor</a></li>
+    <li><a href="#metricas">Qué medir y cómo</a></li>
+    <li><a href="#calendario">El calendario andaluz</a></li>
+    <li><a href="#noventa">Plan de 90 días</a></li>
+    <li><a href="#riesgos">Riesgos</a></li>
+    <li><a href="#carta">La carta al director</a></li>
+    <li><a href="#preguntas">Lo que hay que averiguar antes</a></li>
+    <li><a href="#fuentes">Fuentes</a></li>
+  </ol>
+</nav>
+
+<!-- 1 -->
+<section id="reformular">
+  <p class="sec-kicker">01 · La respuesta corta</p>
+  <h2>«Reunirnos menos» no produce «vender más». Y «más calle» tampoco, si lo traducimos en más visitas.</h2>
+
+  <div class="thesis">
+    <p>El canal en el que trabajamos <strong>se está encogiendo</strong>. En 2025 las ventas de cerveza en hostelería cayeron un <strong>2,4 %</strong> mientras alimentación creció un 0,4 %, y el consumo por persona bajó un 4,4 %.</p>
+    <p>En un canal que cae, el crecimiento no sale de pisar más bares. Sale de <strong>cuota, mix y ejecución</strong>: el segundo grifo, el peso de premium y 0,0, el precio de la caña, el ritual de servicio. Y esa conversación con el hostelero dura media hora. Una visita de reposición dura ocho minutos.</p>
+  </div>
+
+  <div class="figs">
+    <div class="fig"><span class="n neg">−2,4 %</span><span class="l">Ventas de cerveza en hostelería, 2025</span><span class="s">Cerveceros de España / MAPA</span></div>
+    <div class="fig"><span class="n neg">−4,4 %</span><span class="l">Consumo por persona, 2025</span><span class="s">Cerveceros de España / MAPA</span></div>
+    <div class="fig"><span class="n">49.271</span><span class="l">Bares en Andalucía: la comunidad con más de España</span><span class="s">Anuario Hostelería de España</span></div>
+    <div class="fig"><span class="n">44 %</span><span class="l">De las bebidas consumidas en hostelería son cerveza</span><span class="s">Cerveceros de España / MAPA</span></div>
+  </div>
+
+  <p><strong>Si premiamos frecuencia, tendremos más visitas cortas de reposición y menos conversaciones de mix.</strong> Que es justo lo contrario de la estrategia de premiumización de la compañía. Este es el argumento que hay que poner primero, antes que ningún calendario.</p>
+
+  <p>Dicho eso, con las reuniones sí hay tres problemas reales, y ninguno es «hay demasiadas»:</p>
+
+  <ol>
+    <li><strong>Mezclamos tres niveles de decisión.</strong> La semanal debería cambiar el comportamiento de esta semana; la mensual, la ejecución contra el plan; la trimestral, el plan. Cuando se mezclan, la lectura de cifras en voz alta se come el tiempo de lo único que solo puede hacerse juntos.</li>
+    <li><strong>Falta el foro que más dinero mueve.</strong> La aportación y la cesión de equipo por punto de venta comprometen años de margen y hoy no tienen sitio propio: se cuelan en la reunión de equipo o se resuelven por mensajería sin expediente.</li>
+    <li><strong>No sabemos dónde se va el tiempo.</strong> Nadie lo ha medido. Y la sospecha razonable es que la reunión no es el primer ladrón.</li>
+  </ol>
+</section>
+
+<!-- 2 -->
+<section id="diagnostico">
+  <p class="sec-kicker">02 · El diagnóstico</p>
+  <h2>Tres cosas que están mal en la premisa, y hay que decirlas</h2>
+
+  <h3>La reunión probablemente no es el primer ladrón de tiempo</h3>
+  <p>Por delante suelen ir la conducción y una sectorización heredada —clientes asignados por historia y no por potencial, rutas que cruzan provincias—, las incidencias que deberían tener otro circuito (avería de instalación de barril en agosto, rotura de servicio del distribuidor, abono, cobro), el reporting duplicado, y el tiempo que se quema persiguiendo material prometido que no ha llegado.</p>
+  <div class="callout warn">
+    <span class="callout-label">Consecuencia</span>
+    <p>Si atacamos la reunión primero y en seis meses no sube el volumen, habremos optimizado el tercer problema. Y el plan será tuyo.</p>
+  </div>
+
+  <h3>La reunión existe por una razón, y no es la inercia</h3>
+  <p>El comercial de zona pasa el día solo en el coche y todas sus interacciones son transaccionales, a menudo conflictivas: le piden nevera, toldo, aportación, o le reclaman una avería. La reunión de ciclo es con frecuencia su único contacto con iguales de su propia empresa. Es además el único canal por el que el novato aprende lo que no está escrito en ningún sitio —hasta dónde se llega en una aportación, cómo se argumenta ante un hostelero que amenaza con cambiarse, qué se promete y qué no en una caseta de feria— y es el canal de reconocimiento.</p>
+  <p>Quitarla sin sustituto no ahorra tiempo: lo devuelve por WhatsApp, fragmentado, fuera de jornada, sin registro —y el registro de jornada es obligatorio también para comerciales en movilidad— y escuchado al volante, que es un problema de prevención.</p>
+
+  <h3>Ya tenemos montadas las palancas que liberan tiempo. No las estamos usando como palancas de tiempo</h3>
+  <p>El pedido digital existe y funciona: la plataforma B2B del grupo (FuerzaBar, hoy <em class="term">eazle</em>) ya gestionaba en España más de 25.000 clientes hosteleros y distribuidores. La pregunta incómoda no es cómo crear herramientas nuevas: es <strong>por qué el comercial sigue haciendo de tomapedidos en las cuentas donde el pedido ya se toma solo</strong>. Ese es el tiempo que hay que reasignar, y hoy nadie tiene el dato de penetración por cartera.</p>
+
+  <h3>Y una idea que está delante de nosotros y nadie usa: la cartera de vencimientos</h3>
+  <p>Qué contrato de suministro vence en los próximos doce meses, con qué competidor enfrente y con qué inversión pendiente de amortizar. Eso, mucho más que la frecuencia teórica de visita, dice adónde tiene que ir el tiempo del comercial cada mes. <strong>Un cuadro de mando de zona sin esa cartera es ciego para lo que más dinero mueve.</strong></p>
+
+  <h3>Tu riesgo personal, que es real</h3>
+  <p>Cómo se reúne la organización de ventas no es competencia de Trade Marketing. Un documento que diga «hay que reunirse menos» lo lee el jefe de ventas regional como <em class="term">mis reuniones son malas</em> y <em class="term">me estás quitando el control</em>. Peor: la reunión de ciclo es literalmente tu canal de distribución hacia el campo. Si la matas sin sustituto, cada comercial ejecutará su propia versión del ciclo y el primer perjudicado serás tú.</p>
+  <div class="callout">
+    <span class="callout-label">El encuadre correcto</span>
+    <p>No es «reunámonos menos». Es <strong>«cómo hago que lo que manda Trade consuma menos reunión y produzca más ejecución»</strong>. Con ese título, el plan es tuyo y no invade a nadie.</p>
+  </div>
+</section>
+
+<!-- 3 -->
+<section id="mapa">
+  <p class="sec-kicker">03 · El mapa de foros</p>
+  <h2>No sobran reuniones: sobra parte informativa y falta arquitectura</h2>
+  <p>Cada foro debe producir <strong>una decisión distinta</strong>. Si dos foros producen la misma decisión, sobra uno. Si ninguno produce decisión, era un correo.</p>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Foro</th><th class="mono">Cadencia</th><th class="mono">Duración</th><th>Formato</th><th>Decisión que produce</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Cuadro de zona</strong><br>Parte escrito</td><td class="mono">Lunes 18:00</td><td class="mono">0 min</td><td>Automático, una cara</td><td>Ninguna. Sustituye la lectura de cifras en voz alta</td></tr>
+        <tr><td><strong>Punto semanal de zona</strong></td><td class="mono">Semanal</td><td class="mono">40 min</td><td>Videollamada (plan B: audio)</td><td>A qué 3-5 PDV ataca cada uno esta semana y con qué palanca</td></tr>
+        <tr><td><strong>1:1 de negocio</strong></td><td class="mono">Quincenal</td><td class="mono">25 min</td><td>Teléfono, coche parado</td><td>Prioridades de cartera, cuentas en riesgo, vencimientos que se trabajan</td></tr>
+        <tr><td><strong>1:1 de desarrollo</strong></td><td class="mono">Trimestral</td><td class="mono">45 min</td><td>Presencial o vídeo, sin cifras</td><td>Un objetivo de competencia para el trimestre</td></tr>
+        <tr><td><strong>Comité de inversión en PDV</strong><br><span class="chip chip-dir">nuevo</span></td><td class="mono">Quincenal</td><td class="mono">45→30 min</td><td>Vídeo, solo decisores<br>Preside Ventas</td><td>Sí / no / condicionada a cada expediente de aportación o cesión</td></tr>
+        <tr><td><strong>Briefing de ciclo</strong></td><td class="mono">Ciclo fijo de 6 semanas<br>8 al año</td><td class="mono">90 min</td><td><strong>Presencial</strong>, 4 nodos</td><td>Ninguna: es entrenamiento, entrega de material y retorno del campo</td></tr>
+        <tr><td><strong>Revisión mensual (MBR)</strong></td><td class="mono">Mensual</td><td class="mono">90 min</td><td>Videollamada</td><td>Dónde se mueve material e inversión, qué se para, quién necesita acompañamiento</td></tr>
+        <tr><td><strong>Revisión trimestral (QBR)</strong></td><td class="mono">Trimestral</td><td class="mono">Media jornada</td><td><strong>2 presenciales + 2 en vídeo</strong> al año, sede rotatoria</td><td>3-5 decisiones vinculantes escritas: rutas, cartera, objetivos por provincia</td></tr>
+        <tr><td><strong>Acompañamiento en ruta</strong></td><td class="mono">Mensual (bloque medio)<br>Trimestral (resto)</td><td class="mono">½ o 1 jornada</td><td><strong>Campo. No es reunión</strong></td><td>Un compromiso de comportamiento, no una cifra</td></tr>
+        <tr><td><strong>Enlace operativo de pico</strong></td><td class="mono">Diario, solo en ventana</td><td class="mono">15 min</td><td>Llamada, 08:00</td><td>Reposición, roturas, instalaciones, capacidad de frío</td></tr>
+        <tr><td><strong>Plan de negocio con distribuidor</strong></td><td class="mono">Trimestral</td><td class="mono">2 h</td><td>Presencial, en su almacén</td><td>Surtido, cobertura de ruta, objetivos conjuntos del trimestre</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout decide">
+    <span class="callout-label">Los cuatro nodos del briefing presencial</span>
+    <p>Dos ejes para ocho provincias no aguantan la cuenta de kilómetros: Almería–Málaga son unos 220 km, Ayamonte–Sevilla unos 150. Si usamos los kilómetros como argumento contra la reunión mensual, no podemos ignorarlos en nuestro propio diseño. <strong>Cuatro nodos: Sevilla–Huelva · Cádiz–Córdoba · Málaga–Granada · Jaén–Almería.</strong> Y publicamos la cuenta de jornadas de nuestro diseño, no solo la del actual.</p>
+  </div>
+
+  <h3>Lo que este diseño cuesta, dicho antes de que lo pregunten</h3>
+  <p>Pedir recursos a cinco departamentos sin una sola cifra de esfuerzo es la forma más rápida de que te digan que no.</p>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Quién</th><th>Esfuerzo</th><th>Qué deja de hacer para hacerlo</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Trade Marketing</strong></td><td>Producir el kit de 5 piezas por ciclo · mapa competitivo · auditoría de uso del kit anterior</td><td>Piezas sueltas fuera de ciclo y respuesta a peticiones ad-hoc, que pasan a vía única con plazo</td></tr>
+        <tr><td><strong>Data / Sistemas</strong></td><td>Parte de Zona automatizado (proyecto de meses, no de una semana)</td><td>Arranca con versión degradada a mano mientras tanto</td></tr>
+        <tr><td><strong>Jefe de zona</strong></td><td>Acompañamientos + 1:1 + preparación de la semanal</td><td>Reporting ascendente, preparación de presentaciones, comités internos</td></tr>
+        <tr><td><strong>Control de Gestión</strong></td><td>45 min quincenales en el comité + validar la calculadora de margen</td><td>Revisiones caso a caso por correo</td></tr>
+        <tr><td><strong>RRHH / RRLL / Legal</strong></td><td>Una revisión previa</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>La aritmética del jefe de zona, que es el recurso escaso de todo el plan</h3>
+  <p>Con diez o doce reportes, un acompañamiento mensual a cada uno más la semanal más el 1:1 quincenal consume bastante más de la mitad de su mes. <strong>Por eso la dosis es diferenciada:</strong> acompañamiento mensual solo al bloque medio del equipo, trimestral al resto. Y hay que decir de dónde sale ese tiempo —reporting, preparación de reuniones, comités internos— en vez de darlo por supuesto. Si nadie hace esa cuenta, el programa muere al tercer mes.</p>
+
+  <div class="callout">
+    <span class="callout-label">Qué de esto vale para el resto de España</span>
+    <p><strong>Replicable:</strong> la arquitectura de foros, el comité de inversión y el kit de cinco piezas. <strong>Andaluz:</strong> el calendario de ventanas, los cuatro nodos geográficos y la dosis de acompañamiento.</p>
+  </div>
+</section>
+
+<!-- 4 -->
+<section id="que-ver">
+  <p class="sec-kicker">04 · La tercera parte de la pregunta</p>
+  <h2>Qué debe verse en cada reunión</h2>
+
+  <h3>Punto semanal · se ven excepciones, no la semana</h3>
+  <p>Sin umbral escrito, «la ronda de excepciones» vuelve a ser la ronda, que es justo lo que queremos matar. <strong>Umbral impreso:</strong></p>
+  <ul>
+    <li>Desviación superior a X puntos sobre el <strong>objetivo semanal</strong> —nunca el acumulado del mes—</li>
+    <li>Cualquier grifo perdido, con nombre del bar</li>
+    <li>Cuenta A sin pedido durante más de N días</li>
+    <li>Incidencia técnica abierta más de 48 horas</li>
+    <li>Vencimiento a menos de 90 días sin visita registrada</li>
+    <li>Rotura de referencia</li>
+  </ul>
+  <p>Lo que no cumple un umbral, no entra. La <strong>decisión</strong> que sale: los 3-5 puntos de venta que cada uno ataca esta semana y con qué palanca —grifo, visibilidad, acuerdo, recuperación—. Y <strong>un solo caso</strong> rotativo: la autopsia de un grifo ganado o perdido contada por quien lo vivió, o un role-play de cuatro minutos del argumento del ciclo.</p>
+
+  <div class="callout warn">
+    <span class="callout-label">El grifo perdido no lo declara el comercial</span>
+    <p>Si lo declara él, hay incentivo a no declararlo. Lo declara la <strong>retirada de instalación del servicio técnico</strong> o la caída de pedido a cero durante N semanas.</p>
+  </div>
+
+  <h3>1:1 de negocio · se ve una cuenta atascada y la cartera de vencimientos</h3>
+  <p>Aquí va todo lo individual que hoy alarga la reunión de equipo. La cifra se confirma, no se discute.</p>
+
+  <h3>Comité de inversión · se ve el expediente, no la anécdota</h3>
+  <p>Por cada cuenta, una cara: PDV y ubicación, volumen histórico y potencial, competidor actual y hasta cuándo tiene contrato <em class="term">—según lo declarado por el hostelero y marcado como tal—</em>, inversión solicitada, años de compromiso, hectolitros comprometidos, retorno por hl, fecha de vencimiento. <strong>No se presenta: se pregunta y se decide.</strong> Sale por escrito al comercial en 48 horas por el canal corporativo, nunca por WhatsApp.</p>
+
+  <h3>Briefing de ciclo · se ve el argumento, no la mecánica</h3>
+  <p>La mecánica va en vídeo de 3-4 minutos enviado tres días antes. En la sala solo entra lo que no cabe en una pantalla: el ensayo con las tres objeciones reales del hostelero andaluz —<em class="term">«no me cabe en cámara»</em>, <em class="term">«no me rota»</em>, <em class="term">«¿cuánto me das?»</em>—, la conversación de margen y la entrega física del material. Y los últimos diez minutos son <strong>de vuelta</strong>: qué no funcionó del ciclo anterior, qué objeción nueva ha aparecido, qué está haciendo la competencia en tu zona.</p>
+
+  <h3>MBR mensual · se ven mix, ejecución, inversión, precio y competencia</h3>
+  <ul>
+    <li>Peso de premium y 0,0 sobre total hl, <strong>diferenciado por litoral, interior y capital</strong>. El mix objetivo no puede ser el mismo en Nerja que en Écija.</li>
+    <li>Brecha entre distribución <strong>ponderada</strong> y <strong>numérica</strong> de la marca foco: estar en muchos bares no es estar en los que facturan.</li>
+    <li>Perfect Store por provincia <strong>contra la línea base propia</strong>, no contra un umbral importado.</li>
+    <li><strong>Precio y condiciones:</strong> realización de precio por provincia, erosión por descuento y rappel. Si esto no tiene sitio, será la excusa perfecta para que vuelva una reunión.</li>
+    <li>Inversión gastada por PDV y su retorno. Qué activación se para. Qué material se mueve de una provincia a otra.</li>
+    <li><strong>Penetración de pedido digital</strong> sobre cartera activa, por comercial. Es la palanca que más tiempo libera y hoy no la mira nadie.</li>
+    <li>Mapa competitivo por provincia: qué grifos han cambiado de mano y por qué causa real.</li>
+    <li>Distribuidor: cobertura de ruta del repartidor, surtido en almacén, roturas, stock de 0,0 y premium. Un solo panel con el sell-in y la ejecución en el bar; mirar un solo lado lleva a decisiones falsas.</li>
+    <li>Dos minutos de cartera vencida.</li>
+  </ul>
+
+  <h3>QBR trimestral · se ve el plan</h3>
+  <p>Segmentación de ruta —qué PDV pasan a visita mensual, cuáles a trimestral, cuáles a atención digital—, cartera de vencimientos a seis meses y objetivos por provincia. Más tres bloques que no son negociables: formación, reconocimiento con casos contados por quien los hizo, y el momento social.</p>
+
+  <h3 style="color:var(--danger)">Qué no debe entrar nunca en la reunión semanal</h3>
+  <ol>
+    <li><strong>El acumulado del mes leído en voz alta.</strong> Va en el parte escrito. Si alguien lo lee, se le corta.</li>
+    <li><strong>La negociación de una aportación concreta.</strong> Delante de ocho personas se convierte en subasta. Eso es Comité.</li>
+    <li><strong>Novedades de producto y explicación de mecánicas.</strong> Vídeo y one-pager.</li>
+    <li><strong>Rentabilidad por punto de venta y retorno de promoción.</strong> Cuando alguien lo saque, la respuesta es literal: <em class="term">eso es MBR</em>.</li>
+    <li><strong>Reconciliación de cifras entre departamentos.</strong> Se elimina congelando un universo único por ciclo.</li>
+    <li><strong>Incidencias técnicas individuales.</strong> Circuito propio, no foro de equipo.</li>
+    <li><strong>Quejas genéricas sobre material que no llega.</strong> Van al canal de Trade con nombre de PDV y fecha, y con plazo de respuesta.</li>
+    <li><strong>Rankings individuales basados en actividad.</strong> Producen visitas fantasma.</li>
+    <li><strong>Condiciones de la competencia que no vengan de fuente pública o del propio hostelero.</strong> Esa conversación tiene filtro legal o no se tiene.</li>
+    <li><strong>Cifras de terceros sin fuente.</strong> <em class="term">«Dicen que el mercado…»</em> no entra.</li>
+  </ol>
+</section>
+
+<!-- 5 -->
+<section id="agendas">
+  <p class="sec-kicker">05 · Las agendas</p>
+  <h2>Fichas para imprimir y colgar en la pared de la delegación</h2>
+  <p>Los minutos son literales. Cada ficha tiene convocante y dueño del acta, porque una reunión sin dueño del acta no produce seguimiento.</p>
+
+  <div class="ficha">
+    <div class="ficha-head">
+      <span class="t">A · Punto semanal de zona</span>
+      <span class="m">Martes 08:15–08:55 · 40 min · videollamada, cámara encendida · plan B por audio<br>Convoca y escribe el acta: jefe de zona · Asisten: comerciales de la zona</span>
+    </div>
+    <div class="ficha-body">
+      <div class="row"><span class="tm">08:15–08:18</span><span class="bd"><b>Titular</b>Una frase del jefe de zona: dónde estamos contra el objetivo del ciclo y qué es lo único que importa esta semana. Sin diapositivas.</span></div>
+      <div class="row"><span class="tm">08:18–08:21</span><span class="bd"><b>Compromisos de la semana pasada</b>Se leen y se marcan. Es la primera línea, no la última.</span></div>
+      <div class="row"><span class="tm">08:21–08:37</span><span class="bd"><b>Ronda de excepciones</b>90 segundos por comercial. Solo lo que supera un umbral escrito, y qué necesita del equipo esta semana. Prohibido narrar la semana visita a visita.</span></div>
+      <div class="row"><span class="tm">08:37–08:48</span><span class="bd"><b>Un solo caso</b>Alternando: autopsia de un grifo ganado o perdido, contada por quien lo vivió y nombrando la causa real —aportación, servicio, calidad de tiraje, relación, decisión de cadena—; o role-play de 4 minutos del argumento del ciclo, dos personas, el resto observa.</span></div>
+      <div class="row"><span class="tm">08:48–08:55</span><span class="bd"><b>Compromisos</b>Uno por persona: nombre del PDV, acción concreta, fecha. Escritos en directo en el <strong>canal corporativo</strong>. Nunca en WhatsApp.</span></div>
+    </div>
+    <div class="ficha-rules">
+      <span class="callout-label">Reglas impresas debajo</span>
+      <ol>
+        <li>El Parte de Zona llega el lunes a las 18:00 y <strong>se lee antes de conectarse</strong>. La llamada arranca directamente en excepciones. Quien no lo ha leído, escucha pero no interviene.</li>
+        <li>No se proyectan diapositivas. Nunca.</li>
+        <li>Todo tema de más de 3 minutos va al <em class="term">aparcadero</em>, que vive en el canal corporativo y lo vacía el jefe de zona antes del viernes.</li>
+        <li>Se cierra a las 08:55 aunque queden temas. Si sobran temas cada semana, pertenecen a otro foro.</li>
+        <li>Se conecta uno desde casa o con el coche parado, y cuenta como jornada iniciada.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="ficha">
+    <div class="ficha-head">
+      <span class="t">B · 1:1 de negocio</span>
+      <span class="m">Quincenal · 25 min · teléfono, coche parado o al terminar ruta<br>Convoca: jefe de zona</span>
+    </div>
+    <div class="ficha-body">
+      <div class="row"><span class="tm">0–5</span><span class="bd"><b>Cifra</b>Hectolitros, mix, cobertura. Se confirma que la ha leído, no se comenta.</span></div>
+      <div class="row"><span class="tm">5–15</span><span class="bd"><b>Una cuenta atascada</b>La elige el comercial. Qué ha pasado, qué ha intentado, qué decisión necesita de arriba.</span></div>
+      <div class="row"><span class="tm">15–22</span><span class="bd"><b>Riesgo y vencimientos</b>Qué contrato vence, qué grifo está en juego, qué competidor aprieta y con qué oferta.</span></div>
+      <div class="row"><span class="tm">22–25</span><span class="bd"><b>Cierre</b>Qué hace él, qué hace el jefe, para cuándo.</span></div>
+    </div>
+    <div class="ficha-rules">
+      <span class="callout-label">Reglas</span>
+      <ol><li>Sin acumulados del mes.</li><li>Sin desarrollo personal: eso va al 1:1 de desarrollo, que es otro foro.</li><li>Sin repaso general de cartera.</li><li>Nunca conduciendo.</li></ol>
+    </div>
+  </div>
+
+  <div class="ficha">
+    <div class="ficha-head">
+      <span class="t">C · Comité de inversión en punto de venta</span>
+      <span class="m">Quincenal, miércoles 09:00 · <strong>45 min los tres primeros meses, 30 después</strong> · videollamada<br><strong>Preside: Jefatura de Ventas.</strong> Asisten: Trade Marketing y Control de Gestión. El campo no asiste.</span>
+    </div>
+    <div class="ficha-body">
+      <div class="row"><span class="tm">09:00–09:06</span><span class="bd"><b>Seguimiento</b>Decisiones del comité anterior: cuáles se han ejecutado y cuáles no, y por qué.</span></div>
+      <div class="row"><span class="tm">09:06–09:38</span><span class="bd"><b>Expedientes</b>Casos de 4-5 minutos. No se presentan: se pregunta y se decide.</span></div>
+      <div class="row"><span class="tm">09:38–09:45</span><span class="bd"><b>Precedentes</b>Qué hemos aprobado que siente precedente y qué línea no cruzamos este trimestre.</span></div>
+    </div>
+    <div class="ficha-rules">
+      <span class="callout-label">Diseño que evita el cuello de botella</span>
+      <ol>
+        <li><strong>Umbral delegado en euros, escrito:</strong> por debajo decide el jefe de zona con plantilla; por encima, el comité.</li>
+        <li><strong>Vía rápida de 24 horas</strong> para igualar una oferta con plazo, ratificada en el siguiente comité. Sin ella, el campo vuelve a WhatsApp en la segunda semana.</li>
+        <li>Expediente de una cara enviado 24 horas antes. Decisión escrita al comercial en 48 horas.</li>
+        <li>Legal define qué se documenta del competidor y qué no, <strong>antes</strong> del primer comité: es un acta que algún día puede leer una autoridad.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="ficha">
+    <div class="ficha-head">
+      <span class="t">D · Briefing de ciclo</span>
+      <span class="m">Ciclo fijo de 6 semanas, 8 al año, con calendario anual publicado · 90 min · <strong>presencial</strong><br>Cuatro nodos: Sevilla–Huelva · Cádiz–Córdoba · Málaga–Granada · Jaén–Almería<br>Convoca: Trade Marketing con el jefe de zona · Envío previo: vídeo de 3-4 min + one-pager, 3 días antes</span>
+    </div>
+    <div class="ficha-body">
+      <div class="row"><span class="tm">00–08</span><span class="bd"><b>Comprobación</b>Cinco preguntas rápidas sobre el vídeo. Quien no lo ha visto lo ve ahí mismo en 4 minutos mientras el resto arranca. No se cancela la sesión: tirar 90 minutos de ocho personas más el desplazamiento es un castigo que se aplica una vez y nunca la segunda.</span></div>
+      <div class="row"><span class="tm">08–38</span><span class="bd"><b>Role-play</b>Por parejas, dos rondas con cambio de rol. Las tres objeciones escritas en la pared. Una tercera pareja observa y da un solo apunte.</span></div>
+      <div class="row"><span class="tm">38–53</span><span class="bd"><b>Conversación de margen</b>Cañas por barril, merma, margen por caña y por barril, impacto de subir diez céntimos, impacto de sustituir X cañas al día por premium o por 0,0. Con la calculadora abierta en el móvil.</span></div>
+      <div class="row"><span class="tm">53–68</span><span class="bd"><b>Material y lista nominal</b>Entrega física. Ficha de PLV: qué llega, cuándo, a qué almacén, y el teléfono al que se llama si no llega. Cada comercial sale con sus PDV objetivo del ciclo escritos, extraídos del sistema y no de opinión.</span></div>
+      <div class="row"><span class="tm">68–78</span><span class="bd"><b>Retorno del campo a Trade</b>Qué no funcionó del ciclo anterior, qué objeción nueva ha aparecido, qué hace la competencia en tu zona. Lo recoge Trade con compromiso de respuesta en el kit siguiente. <strong>Sin esto, el briefing es solo de ida y Trade se queda más ciego que antes.</strong></span></div>
+      <div class="row"><span class="tm">78–90</span><span class="bd"><b>Cierre</b>La métrica del ciclo y su umbral de éxito. Una sola.</span></div>
+    </div>
+    <div class="ficha-rules">
+      <span class="callout-label">Regla dura</span>
+      <ol><li>Máximo <strong>tres mensajes por ciclo y como mucho una innovación</strong>. Si entran cinco, el comercial no cuenta bien ninguno.</li></ol>
+    </div>
+  </div>
+
+  <div class="ficha">
+    <div class="ficha-head">
+      <span class="t">E · Revisión mensual de negocio</span>
+      <span class="m">Primer martes tras cierre · 90 min · videollamada<br>Convoca: Jefatura de Ventas · Escribe el acta y persigue las decisiones: Trade Marketing</span>
+    </div>
+    <div class="ficha-body">
+      <div class="row"><span class="tm">00–10</span><span class="bd"><b>Lectura silenciosa</b>Dosier de tres caras, enviado 24 horas antes. Nadie presenta.</span></div>
+      <div class="row"><span class="tm">10–28</span><span class="bd"><b>Mix y ejecución</b>Premium y 0,0 por ruta, separando litoral, interior y capital. Brecha DP–DN de la marca foco. Perfect Store por provincia contra la línea base propia.</span></div>
+      <div class="row"><span class="tm">28–40</span><span class="bd"><b>Precio y condiciones</b>Realización de precio por provincia, erosión por descuento y rappel, cartera vencida.</span></div>
+      <div class="row"><span class="tm">40–55</span><span class="bd"><b>Inversión</b>Gasto por PDV y retorno. Qué activación se para. Qué material se mueve de provincia.</span></div>
+      <div class="row"><span class="tm">55–66</span><span class="bd"><b>Competencia</b>Por provincia: quién ocupa el segundo grifo. Grifos que han cambiado de mano y causa real de cada uno.</span></div>
+      <div class="row"><span class="tm">66–80</span><span class="bd"><b>Distribuidor y pedido digital</b>Cobertura de ruta del repartidor, surtido, roturas, stock de 0,0 y premium. Sell-in y ejecución en el bar en el mismo panel. Penetración de pedido digital por cartera.</span></div>
+      <div class="row"><span class="tm">80–90</span><span class="bd"><b>Decisiones</b>Máximo cinco, cada una con responsable, fecha y métrica. <strong>Si no salen tres, el MBR sobraba.</strong></span></div>
+    </div>
+  </div>
+
+  <div class="ficha">
+    <div class="ficha-head">
+      <span class="t">F · Revisión trimestral + convención de zona</span>
+      <span class="m">Trimestral · media jornada · <strong>dos presenciales y dos en vídeo al año</strong>, sede rotatoria<br>La pernocta de Almería y Huelva entra en el coste. Convoca: Jefatura de Ventas</span>
+    </div>
+    <div class="ficha-body">
+      <div class="row"><span class="tm">09:00–09:45</span><span class="bd"><b>Lectura silenciosa</b>Dosier de trimestre. Nadie presenta.</span></div>
+      <div class="row"><span class="tm">09:45–11:00</span><span class="bd"><b>Las tres decisiones</b>(1) Segmentación de ruta: qué PDV pasan a mensual, trimestral o atención digital. (2) Cartera de vencimientos a seis meses y a quién se asigna cada uno. (3) Objetivos por provincia. <strong>Salida obligatoria: 3-5 decisiones escritas con responsable, fecha y métrica.</strong></span></div>
+      <div class="row"><span class="tm">11:00–11:30</span><span class="bd"><b>Café</b></span></div>
+      <div class="row"><span class="tm">11:30–12:30</span><span class="bd"><b>Formación</b>Calidad de servicio y tiraje con el estándar vigente <strong>de cada marca</strong>, producto o negociación. La imparte quien sabe, no el jefe.</span></div>
+      <div class="row"><span class="tm">12:30–13:15</span><span class="bd"><b>Reconocimiento</b>Casos del trimestre contados por quien los hizo: el grifo recuperado, la cadena cerrada, la ruta rediseñada.</span></div>
+      <div class="row"><span class="tm">13:15–14:00</span><span class="bd"><b>Preguntas abiertas</b>A Jefatura de Ventas y a Trade Marketing. Sin guion.</span></div>
+      <div class="row"><span class="tm">14:00</span><span class="bd"><b>Comida de equipo</b>No es un extra. Es la parte del paquete de un puesto solitario que ningún cuadro de mando sustituye.</span></div>
+    </div>
+  </div>
+
+  <div class="ficha">
+    <div class="ficha-head">
+      <span class="t">G · Acompañamiento en ruta</span>
+      <span class="m">No es reunión · Dos formatos según densidad de ruta<br><strong>Capital y litoral denso:</strong> media jornada, 5-7 visitas · <strong>Ruta dispersa</strong> (Almería interior, Andévalo, Sierra de Cádiz, Alpujarra): jornada completa, 3-4 visitas</span>
+    </div>
+    <div class="ficha-body">
+      <div class="row"><span class="tm">Día antes</span><span class="bd"><b>Un solo foco</b>Se pacta un único foco observable, alineado con el ciclo. Y se dice en voz alta si la jornada es de <strong>coaching</strong> o de <strong>evaluación</strong>. Nunca las dos.</span></div>
+      <div class="row"><span class="tm">08:30</span><span class="bd"><b>Encuentro y ruta</b>La ruta la elige el jefe desde el sistema, e incluye PDV difíciles y PDV perdidos. Si la elige el comercial, te lleva a sus tres mejores clientes y la jornada no informa de nada.</span></div>
+      <div class="row"><span class="tm">En la visita</span><span class="bd"><b>Observar, no vender</b>Al entrar: <em class="term">«hoy vengo a aprender; el responsable sigue siendo [nombre]»</em>. El jefe no interviene, no cierra la operación, no corrige. Toma notas literales de lo que dice cada uno.</span></div>
+      <div class="row"><span class="tm">En el coche</span><span class="bd"><b>Feedback en caliente</b>Primero: <em class="term">«¿cómo lo has visto tú?»</em>. Después, Situación–Comportamiento–Impacto: <em class="term">«En el bar de la calle Feria, a las 11:40 (S), has abierto hablando de la promoción antes de preguntarle cómo le había ido la feria (C), y ha seguido secando vasos y no te ha mirado hasta el minuto tres (I)»</em>.</span></div>
+      <div class="row"><span class="tm">Al cerrar</span><span class="bd"><b>Una cosa que mantener y una que cambiar</b>Una. Si salen cinco, no cambia ninguna.</span></div>
+      <div class="row"><span class="tm">&lt; 24 h</span><span class="bd"><b>Nota escrita</b>En la app: lo que se mantiene, lo que se cambia, y qué número se mira dentro de 30 días. <strong>Sin registro no hay coaching formal; hay una charla en el coche.</strong></span></div>
+    </div>
+  </div>
+
+  <div class="ficha">
+    <div class="ficha-head">
+      <span class="t">H · Enlace operativo de pico</span>
+      <span class="m">Diario, solo dentro de la ventana de pico · 08:00 · 15 min · llamada<br>Convoca: jefe de zona · <strong>Tiene fecha de finalización escrita el día que se crea</strong></span>
+    </div>
+    <div class="ficha-body">
+      <div class="row"><span class="tm">1</span><span class="bd"><b>Stock y roturas</b>Qué falta hoy y dónde.</span></div>
+      <div class="row"><span class="tm">2</span><span class="bd"><b>Instalaciones</b>Altas urgentes, casetas, terrazas de temporada.</span></div>
+      <div class="row"><span class="tm">3</span><span class="bd"><b>Incidencias abiertas</b>Solo las que bloquean venta hoy.</span></div>
+      <div class="row"><span class="tm">4</span><span class="bd"><b>Capacidad de frío y previsión</b>Con la previsión de temperatura a siete días: en Andalucía el pico es térmico además de festivo.</span></div>
+    </div>
+    <div class="ficha-rules">
+      <span class="callout-label">Regla</span>
+      <ol><li>Cero contenido estratégico. Dentro de la ventana de pico no se briefea nada.</li></ol>
+    </div>
+  </div>
+
+  <div class="ficha">
+    <div class="ficha-head">
+      <span class="t">I · Reunión de arranque con el equipo</span>
+      <span class="m">Una sola vez, al empezar el piloto · 45 min · presencial<br>La convocan juntos Jefatura de Ventas y Trade Marketing. <strong>Aquí se gana o se pierde el plan con el campo.</strong></span>
+    </div>
+    <div class="ficha-body">
+      <div class="row"><span class="tm">0–10</span><span class="bd"><b>Qué cambia</b>El mapa nuevo, enseñado entero.</span></div>
+      <div class="row"><span class="tm">10–18</span><span class="bd"><b>Qué NO se toca</b>El briefing de ciclo, el reconocimiento, la comida de equipo, la formación. Se dice primero y explícito.</span></div>
+      <div class="row"><span class="tm">18–28</span><span class="bd"><b>Qué gana cada uno</b>Jornadas de calle, respuesta en 48 h a una aportación, material con fecha comprometida, una sola vía de peticiones.</span></div>
+      <div class="row"><span class="tm">28–38</span><span class="bd"><b>Qué se le pide</b>Parte el lunes a las 18:00, vídeo visto antes del briefing, compromisos escritos.</span></div>
+      <div class="row"><span class="tm">38–45</span><span class="bd"><b>Cuándo se revisa</b>Fecha de la lectura de resultados y quién decide. Y que se puede revertir.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section id="elimina">
+  <p class="sec-kicker">06 · El recorte</p>
+  <h2>Qué desaparece, qué pasa a asíncrono y qué no se toca</h2>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Qué se elimina</th><th>Con qué se sustituye</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Reunión mensual presencial de toda la red andaluza</strong></td><td>MBR mensual en vídeo + presencial trimestral + briefings agrupados en cuatro nodos</td></tr>
+        <tr><td><strong>Lectura de cifras en voz alta</strong> en cualquier foro</td><td>Parte de Zona escrito de una cara, leído antes de conectarse</td></tr>
+        <tr><td><strong>Reunión de «novedades de producto»</strong></td><td>Vídeo de 3-4 minutos + one-pager, con comprobación de cinco preguntas al inicio del briefing</td></tr>
+        <tr><td><strong>«Presentación de la promoción»</strong></td><td>Es un documento. El ensayo del argumento sí requiere sala; la explicación de la mecánica no</td></tr>
+        <tr><td><strong>Repaso de cartera individual delante del equipo</strong></td><td>1:1 de negocio quincenal de 25 minutos</td></tr>
+        <tr><td><strong>La negociación de aportación dentro de la reunión de equipo</strong></td><td>Comité de inversión, con expediente de una cara y vía rápida de 24 h</td></tr>
+        <tr><td><strong>Reunión de reconciliación de cifras entre departamentos</strong></td><td>Universo único de PDV congelado por ciclo, con fuente, fecha de corte y criterio de «activo»</td></tr>
+        <tr><td><strong>Petición ad-hoc por WhatsApp al trade marketer</strong></td><td>Vía única con plazo comprometido. Lo que llega fuera de ciclo entra en el siguiente</td></tr>
+        <tr><td><strong>Convocatoria de más de 5 personas sin orden del día ni material 24 h antes</strong></td><td>No se celebra. Se reprograma</td></tr>
+        <tr><td><strong>Contenido estratégico dentro de la ventana de pico</strong></td><td>Enlace operativo diario de 15 minutos</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Pasa a asíncrono, con diseño específico para campo</h3>
+  <p>Un comercial en ruta lee poco, en móvil, entre visitas y a veces con mala conexión —la Alpujarra, la Sierra de Segura, la Sierra de Cádiz y el Andévalo no tienen 4G estable—. Lo asíncrono solo funciona si se diseña para eso:</p>
+  <ul>
+    <li><strong>Tarjeta en la app</strong>, no PDF adjunto en un correo.</li>
+    <li><strong>One-pager de una cara imprimible</strong>, para el que prefiere papel en la guantera.</li>
+    <li><strong>Vídeo vertical de 3-4 minutos</strong>, que se ve aparcado, no conduciendo.</li>
+    <li><strong>Confirmación de recepción en la app</strong>, y medición de qué se abre de verdad.</li>
+    <li><strong>Nada de audio operativo para escuchar al volante</strong> hasta que Prevención lo valide. Es tentador —hay muchas horas de coche en Andalucía— y es exactamente el tipo de recomendación que genera un problema de seguridad vial atribuible a la organización.</li>
+  </ul>
+
+  <div class="callout keep">
+    <span class="callout-label">Lo que no se toca, y hay que decirlo por escrito</span>
+    <ol style="margin-bottom:0">
+      <li><strong>Las reuniones de ciclo con distribuidores.</strong> No son internas: son compromiso con un tercero. Y si baja la presencia propia, el distribuidor rellena el hueco con su criterio de margen, no con el nuestro.</li>
+      <li><strong>La formación obligatoria con trazabilidad de asistencia:</strong> prevención y seguridad vial, código de conducta, marketing responsable, derecho de la competencia. Recortar calendario sin reasignar esas horas a un formato con registro crea una exposición de compliance, y responde quien firma el calendario.</li>
+      <li><strong>Los hitos de forecast, S&amp;OP y cierre</strong> que alimentan el reporting nacional.</li>
+      <li><strong>El bloque de reconocimiento y el momento social del QBR.</strong> Recortar horas de reunión y no decir dónde se reubica el reconocimiento es recortar retribución sin decirlo.</li>
+      <li><strong>El briefing de ciclo.</strong> Cambia su contenido —de explicar a ensayar—, no su existencia.</li>
+    </ol>
+  </div>
+  <p>Enseñar por escrito lo que no se toca es lo que da credibilidad a lo que sí se propone tocar.</p>
+</section>
+
+<!-- 7 -->
+<section id="trade">
+  <p class="sec-kicker">07 · Tus palancas</p>
+  <h2>Lo que puedes hacer el lunes, y lo que tiene que decidir el director</h2>
+
+  <h3><span class="chip chip-you">Puedes hacerlo ya</span> Doce cosas que no dependen de nadie</h3>
+  <ol>
+    <li><strong>Kit de ciclo de cinco piezas, siempre las mismas.</strong> One-pager con la prioridad del ciclo (máximo tres mensajes, una innovación) · lista nominal de PDV objetivo por comercial, sacada del sistema · argumentario de 90 segundos por SKU foco con las tres objeciones andaluzas · ficha de PLV con fecha comprometida, almacén de destino y teléfono de incidencias · la métrica del ciclo y su umbral. <strong>Si una pieza no cabe ahí, no entra en el ciclo.</strong></li>
+    <li><strong>Compromiso de servicio de Trade hacia el campo, publicado y con fecha.</strong> Briefing cerrado a T−4 semanas del arranque. Material físico en almacén a T−2, <strong>contado contra la fecha de carga del distribuidor, no contra el arranque del ciclo</strong>. Una sola vía de peticiones con plazo de respuesta. Esto es lo que te da autoridad moral para pedirle después a Ventas que cambie su calendario. Si no cumples esto, no pidas nada.</li>
+    <li><strong>Cadencia de ciclo fija:</strong> seis semanas, ocho ciclos al año, calendario anual publicado con fechas. Con cadencia variable, el briefing del ciclo siguiente cae dentro del anterior y el compromiso T−4/T−2 es imposible.</li>
+    <li><strong>Propuesta de universo único de PDV</strong> con fuente, fecha de corte y criterio de «cliente activo». <em class="term">Ojo:</em> no lo congelas tú por tu cuenta —eso solo crea un tercer universo—. Lo llevas a firmar por Ventas y Control de Gestión. Es la medida de mayor retorno inmediato.</li>
+    <li><strong>Distribución numérica y ponderada publicadas por separado, y gestión de la brecha.</strong> Se puede tener una DN altísima en barrio y una DP pobre por no estar en las terrazas de plaza, los ejes turísticos de costa, las cuentas de feria y los locales de tardeo. Esa brecha, publicada por provincia, convierte la conversación de ciclo en diagnóstico en lugar de opinión.</li>
+    <li><strong>Perfect Store andaluz con pesos propios:</strong> distribución, grifo, visibilidad en barra y terraza, cristalería y ritual de servicio, precio, activación. Seis ítems en la app, con foto. <strong>El primer ciclo mide la línea base; no fija umbral.</strong></li>
+    <li><strong>Calculadora de margen de una sola pantalla.</strong> Entradas: precio del barril, tamaño de caña servida, merma, PVP de la caña. Salidas: cañas por barril, margen por caña y por barril, impacto de subir diez céntimos, impacto de sustituir X cañas al día por premium o por 0,0. <strong>Con cifras propias validadas por Control de Gestión.</strong> No publiques horquillas tomadas de blogs de gestión hostelera: una cifra equivocada delante de un hostelero quema al comercial en la primera visita. Esto convierte la negociación de descuento en negociación de margen, que es donde ganas.</li>
+    <li><strong>Auditoría de uso del kit anterior antes de producir el siguiente.</strong> Qué one-pager se abrió, qué PLV se colocó de verdad, con evidencia fotográfica. Es la única forma de defender que «menos piezas y mejor cumplidas» es más ventas. Y es un dato tuyo.</li>
+    <li><strong>Mapa competitivo por provincia, una cara, cada ciclo.</strong> Quién ocupa el segundo grifo y con qué contrato. <em class="term">Cuidado con dos errores que se ven en argumentarios:</em> Alhambra no es nuestra, es de Mahou-San Miguel, y es precisamente la marca premium con credenciales granadinas que nos ataca en el sur; y las marcas de raíz andaluza del portafolio son Cruzcampo y El Alcázar —El Águila es de origen madrileño, y atribuirla a Andalucía en un documento que se lee en Sevilla te resta autoridad—.</li>
+    <li><strong>Ficha de PLV con compromiso de fecha y responsable de incidencia.</strong> El mayor destructor silencioso de tiempo de visita es gestionar una promesa incumplida. Cada visita que se quema explicando por qué no ha llegado el toldo es una visita perdida que no aparece en ningún informe.</li>
+    <li><strong>Verificar el modelo económico de cada servicio al hostelero antes de empaquetarlo como argumentario:</strong> qué es gratis, qué está subvencionado, qué es de pago y con qué tarifa. Si el comercial promete gratuidad y luego hay cuota, el daño va directo a la relación con el bar.</li>
+    <li><strong>Reglas de calendario que son puro formato:</strong> duración por defecto de 25 y 50 minutos en lugar de 30 y 60; «sin orden del día y sin material 24 h antes, no hay reunión»; franja de calle intocable de martes a viernes de 10:30 a 13:30 y de 17:00 a 19:00; cláusula de caducidad a 90 días para toda reunión recurrente nueva.</li>
+  </ol>
+
+  <div class="callout decide">
+    <span class="callout-label">Versión B, si el jefe de ventas regional dice que no</span>
+    <p>El plan se reescribe para quedarse dentro del perímetro de Trade Marketing, y <strong>la versión B es exactamente esta lista de doce</strong>. Sigue siendo un entregable valioso, sigue liberando tiempo de venta, y no depende de nadie.</p>
+  </div>
+
+  <h3><span class="chip chip-dir">Decide el director</span> Seis cosas que no puedes hacer tú</h3>
+  <p>Y pedirlas sin haber hecho las doce anteriores es pedir de gorra.</p>
+  <ol>
+    <li><strong>Suprimir o cambiar de formato cualquier reunión que convoque Ventas.</strong> Es su calendario. Tú propones arquitectura y datos; él decide.</li>
+    <li><strong>Crear el Comité de inversión en PDV</strong>, presidido por Ventas, con umbral de aprobación delegado y vía rápida de 24 horas.</li>
+    <li><strong>Autorizar el piloto en una delegación</strong>, co-firmado por el jefe de ventas regional.</li>
+    <li><strong>Proteger tiempo del jefe de zona para acompañamiento</strong>, diciendo de dónde sale.</li>
+    <li><strong>Revisar la retribución variable.</strong> Si el variable paga hectolitros, el cuadro de mando de mix convivirá con la hoja de Excel de siempre y el equipo atenderá a la que le paga. Suele estar cerrado por ejercicio: hay que plantearlo para el siguiente. <em class="term">Y esto se dice en la conversación, no en un documento reenviable.</em></li>
+    <li><strong>Que RRHH, Relaciones Laborales, Prevención y Privacidad validen antes</strong> cualquier cambio de calendario, registro de jornada, dietas y kilometraje, control de ruta o captura fotográfica en local ajeno. Un plan que se firma en una tarde puede acabar en el comité de empresa en dos semanas.</li>
+  </ol>
+</section>
+
+<!-- 8 -->
+<section id="coche">
+  <p class="sec-kicker">08 · La sustitución</p>
+  <h2>Cambiar sala por coche</h2>
+  <p>Si vas a quitar horas de sala, el destino natural no es «más visitas»: es <strong>acompañamiento estructurado del jefe de zona</strong>. Es más supervisión que la reunión, no menos, y además es desarrollo. El mensaje al equipo no es <em class="term">menos contacto</em>, es <em class="term">otro contacto</em>.</p>
+
+  <div class="callout warn">
+    <span class="callout-label">Advertencia antes de desplegarlo</span>
+    <p>Un acompañamiento mal ejecutado <strong>empeora el rendimiento respecto a no hacer nada</strong>, porque el comercial deja de comportarse con normalidad y se pone a la defensiva. Primero se entrena al jefe de zona, después se sube la frecuencia. No al revés.</p>
+  </div>
+
+  <h3>A quién, y con qué dosis</h3>
+  <p><strong>Concentra el esfuerzo en el bloque medio del equipo.</strong> El retorno del coaching es marginal sobre los mejores —venden igual con o sin jefe— y sobre los que llevan mucho tiempo por debajo, donde el problema suele ser de encaje y se resuelve con un plan de mejora, no con coaching. Segmenta la red en tres grupos, asigna explícitamente y <strong>comunícalo abiertamente</strong>, para que nadie lo lea como castigo ni como premio.</p>
+  <p><strong>Sobre el retorno del coaching no hay cifra pública fiable</strong> aplicable a HORECA. Lo que hay es consenso de práctica de dirección. Se mide en el piloto, con datos propios. Si alguien te trae un porcentaje, pídele el estudio.</p>
+
+  <h3>Los cuatro errores que lo matan</h3>
+  <ol>
+    <li><strong>El jefe vende por el comercial.</strong> En cuanto el hostelero pone una objeción de precio, el jefe toma la palabra y cierra. El comercial aprende que si viene el jefe él se calla, y el hostelero aprende que hay un interlocutor por encima al que pedirle más.</li>
+    <li><strong>El acompañamiento se convierte en auditoría.</strong> Revisar neveras, PLV y caducidades es legítimo, pero es otra cosa. Separa en el calendario los días de auditoría de los de coaching, y di cuál es cuál al convocar.</li>
+    <li><strong>La ruta la elige el comercial.</strong> Te lleva a sus tres mejores clientes y la jornada no informa de nada.</li>
+    <li><strong>Se mezcla coaching con evaluación.</strong> Si el mismo acto sirve para desarrollar y para puntuar, nunca verás el bar donde se está perdiendo el grifo. Ficha distinta, anuncio explícito, y el registro de coaching no entra en la valoración anual.</li>
+  </ol>
+
+  <h3>El 1:1, separado en dos</h3>
+  <p><strong>De negocio:</strong> quincenal, 25 minutos, teléfono. Cartera, cuentas en riesgo, vencimientos. Es el foro que descarga la reunión semanal de todo lo individual, que es justo lo que hoy la alarga.<br>
+  <strong>De desarrollo:</strong> trimestral, 45 minutos, <strong>sin cifras delante</strong>, alimentado solo por lo observado en los acompañamientos. Objetivo – Realidad – Opciones – Voluntad. Si se mezcla con el de negocio, el desarrollo pierde siempre: en cuanto hay una cifra encima de la mesa, la conversación se va al número.</p>
+
+  <h3>Acompañamiento cruzado entre comerciales</h3>
+  <p>El que mejor ejecuta una competencia concreta acompaña una mañana al que peor la ejecuta, con la misma ficha de un solo foco. Cuesta cero, funciona como reconocimiento real para el veterano, y es <strong>el único mecanismo que transmite el conocimiento tácito</strong> que no está en ningún manual: hasta dónde se llega en una negociación, cómo se maneja la amenaza de cambio de grifo, qué se promete y qué no en una caseta de feria. En un puesto donde la gente trabaja sola, es también la mejor defensa contra el aislamiento.</p>
+
+  <div class="callout warn">
+    <span class="callout-label">Un límite jurídico</span>
+    <p>Si parte de la cobertura la ejecuta personal del <strong>distribuidor</strong> y no de la compañía, acompañarlo, evaluarlo con ficha, fijarle objetivos de comportamiento y darle feedback correctivo puede rozar la cesión ilegal de trabajadores. <strong>Coaching a red propia; apoyo técnico-comercial al distribuidor.</strong> Dos formatos, dos nombres, y consultado con Relaciones Laborales antes de empezar.</p>
+  </div>
+</section>
+
+<!-- 9 -->
+<section id="distribuidor">
+  <p class="sec-kicker">09 · El agujero que hay que tapar</p>
+  <h2>El distribuidor</h2>
+  <p>Un plan de eficiencia comercial en HORECA andaluza que asume venta directa sin decirlo está mal desde la primera página. Si en buena parte del territorio quien pisa el bar es el repartidor del distribuidor, cambia el diseño del acompañamiento, el acceso al dato de salida, el contenido del parte semanal y hasta el marco jurídico de lo que se puede hacer.</p>
+
+  <div class="callout decide">
+    <span class="callout-label">Primera petición de datos, no la séptima</span>
+    <p><strong>¿Qué porcentaje del volumen HORECA de Andalucía va por venta directa y cuál vía distribuidor, provincia a provincia?</strong> Sin ese número, todo lo demás es diseño sobre un supuesto.</p>
+  </div>
+
+  <h3>Lo que hay que añadir</h3>
+  <ul>
+    <li><strong>Un foro propio:</strong> plan de negocio conjunto trimestral por distribuidor, dos horas, en su almacén. Surtido, cobertura de ruta del repartidor, objetivos conjuntos del trimestre, roturas.</li>
+    <li><strong>Versión del kit para la red del distribuidor:</strong> one-pager, argumentario de 90 segundos y ficha de PLV en su formato. El kit de cinco piezas está diseñado para el comercial propio; si no llega al repartidor, no llega al bar.</li>
+    <li><strong>Doble formato del Parte de Zona.</strong> En zona indirecta la venta semanal es sell-in de almacén: se mueve por compras de stock, no por ejecución. Meterlo en la semanal genera exactamente la discusión estéril que queremos matar. La zona indirecta se lee con <strong>surtido en almacén, cobertura de ruta del repartidor y roturas</strong>, no con hectolitros semanales.</li>
+    <li><strong>El ciclo de pedido y reparto del distribuidor manda sobre el calendario de activación.</strong> El compromiso T−2 se cuenta contra su fecha de carga.</li>
+    <li><strong>El comercial que gestiona tres distribuidores tiene otra agenda.</strong> Su «3-5 PDV de la semana» no aplica tal cual; su palanca es el almacén y la ruta del repartidor.</li>
+  </ul>
+
+  <div class="callout warn">
+    <span class="callout-label">El límite de medición que hay que nombrar antes de que lo nombren ellos</span>
+    <p>En hostelería no existe sell-out con escáner: en los PDV servidos por distribuidor vemos <strong>sell-in al distribuidor, no salida real al bar</strong>, salvo que haya intercambio de datos. Eso introduce ruido y retraso de semanas. Por eso el piloto debe leerse preferentemente sobre PDV de venta directa o sobre distribuidores con datos compartidos, y apoyarse en <strong>métricas de ejecución auditables en el bar</strong> —grifo, material, carta de cervezas, cristalería, calidad de tiraje—, que se observan directamente. Si no lo dices tú, lo dirá alguien del comité.</p>
+  </div>
+</section>
+
+<!-- 10 -->
+<section id="metricas">
+  <p class="sec-kicker">10 · La medición</p>
+  <h2>Qué medir, qué no sumar nunca, y cómo probarlo</h2>
+
+  <h3>Cuadro de mando del comercial: nueve indicadores visibles, ni uno más</h3>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Tipo</th><th>Indicador</th><th>Por qué</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">RESULTADO<br>se retribuye</td><td><strong>hl contra objetivo</strong> del ciclo</td><td>—</td></tr>
+        <tr><td class="mono">RESULTADO</td><td><strong>hl por PDV activo</strong> (rotación)</td><td>Cuando eres líder, el crecimiento está en vender más en el bar que ya tienes, no en abrir bares nuevos</td></tr>
+        <tr><td class="mono">RESULTADO</td><td><strong>Mix de valor:</strong> % premium + 0,0 sobre total hl</td><td>Diferenciado por litoral, interior y capital. Un objetivo único para toda Andalucía es un error</td></tr>
+        <tr><td class="mono">RESULTADO</td><td><strong>Grifos netos</strong> (ganados − perdidos)</td><td>Un hectolitro se recupera; un grifo tarda años</td></tr>
+        <tr><td class="mono">CAUSA<br>se gestiona en el 1:1<br>NO se retribuye</td><td><strong>Perfect Store</strong> contra línea base propia</td><td>—</td></tr>
+        <tr><td class="mono">CAUSA</td><td><strong>Cobertura efectiva</strong> sobre ruta planificada</td><td>—</td></tr>
+        <tr><td class="mono">CAUSA</td><td><strong>Brecha DP–DN</strong> de la marca foco</td><td>Estar en muchos bares no es estar en los que facturan</td></tr>
+        <tr><td class="mono">CAUSA</td><td><strong>Vencimientos trabajados en plazo</strong></td><td>La mejor lista de prioridades de visita que existe</td></tr>
+        <tr><td class="mono">CAUSA</td><td><strong>% de cartera activa pidiendo en digital</strong></td><td>Es la palanca que más tiempo libera. Sin objetivo por comercial, no se mueve</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>Salud</strong> —tablero del jefe de zona y del director, no del comercial—: horas de reunión interna por comercial y mes · jornadas de acompañamiento realizadas y registradas · rotación no deseada y antigüedad media por provincia · días entre promesa de material y entrega real.</p>
+
+  <h3>Regla anti-Goodhart: la actividad se gestiona, el resultado se retribuye</h3>
+  <p>En el momento en que se paga por visitas aparecen visitas de cuatro minutos para hacer el fichaje, visitas a los PDV fáciles y cercanos, y abandono de la cuenta difícil, que es justo donde está el crecimiento.</p>
+  <ul>
+    <li><strong>Métricas siempre emparejadas:</strong> visitas junto a hl por visita; altas junto a bajas y a rotación por PDV.</li>
+    <li><strong>Validar la visita</strong> por duración mínima y acción registrada, no solo por geolocalización.</li>
+    <li><strong>Auditoría muestral</strong> de ejecución sobre una muestra aleatoria.</li>
+    <li><strong>No publicar rankings individuales</strong> basados solo en actividad.</li>
+    <li><strong>Sustituir «visitas/día» por «% de visitas con resultado»</strong> —subida de grifo, alta de referencia, mejora de mix, colocación de material—. Es el KPI que alinea el tiempo con la premiumización en lugar de enfrentarlos.</li>
+  </ul>
+
+  <h3>Coste de una reunión: dos líneas que nunca se suman</h3>
+  <p>Este es el punto donde la mayoría de los planes se caen ante un director comercial que sabe leer una cuenta.</p>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Línea</th><th>Cómo se calcula</th><th>Cuidado</th></tr></thead>
+      <tbody>
+        <tr><td><strong>(a) Caja recuperable</strong></td><td class="mono">kilometraje real + dietas + sala</td><td>Es lo único que devuelve dinero al P&amp;L. Pide a RRHH el coste realmente aplicable. <strong>No uses el importe exento de IRPF como si fuera coste de empresa:</strong> es un techo fiscal para vehículo propio, y si el equipo va en coche de empresa ese kilometraje ni siquiera existe como coste directo</td></tr>
+        <tr><td><strong>(b) Capacidad comercial liberada</strong></td><td class="mono">nº comerciales × ediciones/año<br>= jornadas de comercial</td><td>El comercial de Almería que hace trece horas puerta a puerta pierde <strong>una</strong> jornada de venta, no 1,6. No dividas horas entre ocho. Las jornadas de jefe de ventas van aparte: no son visitas a bares</td></tr>
+        <tr><td><strong>(c) Euros de venta perdida</strong></td><td class="mono">NO SE PRESENTA</td><td>Dividir hl totales entre visitas totales y multiplicar por visitas perdidas está mal y se detecta en diez segundos: la mayor parte del volumen de un bar es recurrente y se produce se visite o no</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>Sobre el «cuánto de eso acaba en la calle»:</strong> no inventes un factor de conversión. Presenta el bruto y dos escenarios —30 % y 60 %— y di que el factor real se mide en el piloto comparando horas liberadas contra visitas efectivas realizadas. Explicar el ajuste antes de que lo pregunte el director da mucha más credibilidad que presentar el bruto.</p>
+
+  <h3>Medir el antes: seis a ocho semanas, sin encuestas de opinión</h3>
+  <p><strong>Paso 0 — legal, antes de nada.</strong> Consulta a Privacidad y a Relaciones Laborales antes de exportar calendarios individuales, activar geolocalización de ruta <strong>o capturar fotografía de activación</strong> —que es imagen dentro del local de un tercero y, con sello de hora y posición, control de actividad del trabajador—. El registro de jornada es obligatorio también para comerciales en movilidad, y la geolocalización laboral exige proporcionalidad e información previa expresa a los trabajadores y a su representación. Si el equipo la lee como vigilancia, deja de fichar visitas reales y el cuadro de mando se llena de basura.</p>
+
+  <h4>Paso 1 · Inventario de reuniones recurrentes</h4>
+  <p>Una ficha por reunión: nombre, convocante, cadencia, duración, asistentes, <strong>horas puerta a puerta</strong> —no horas de agenda—, qué decisión produce, qué pasaría si se suspendiera ocho semanas, y coste anual en jornadas y en caja. <strong>Ordenar por coste descendente y llevar solo las cinco primeras.</strong> La intuición del equipo casi siempre señala la reunión equivocada. <em class="term">El calendario de Outlook es el suelo de la carga real, no la medida: no recoge desplazamiento, ni convocatorias por teléfono, ni llamadas de seguimiento.</em></p>
+
+  <h4>Paso 2 · Estudio de tiempos</h4>
+  <p>Jornadas completas de observación repartidas en tres perfiles de ruta —capital, litoral, interior—, con registro cada 30 minutos en categorías cerradas: conducción, aparcar y esperar, venta activa con el hostelero, ejecución y material, incidencias técnicas, cobro y administrativo en PDV, reporting, reuniones internas, descansos.</p>
+  <div class="callout warn">
+    <span class="callout-label">No presumas de precisión estadística</span>
+    <p>Las observaciones dentro de una misma jornada están autocorrelacionadas: si conduce a las 10:00, conduce a las 10:30. Cualquiera de Data lo verá. O subes a 12-15 jornadas, o lo presentas honestamente como <em class="term">«doce jornadas observadas en tres perfiles de ruta»</em> y hablas en rango, nunca en un porcentaje único. Y no lo preguntes en una encuesta: el tiempo autodeclarado es sistemáticamente optimista.</p>
+  </div>
+
+  <h4>Paso 3 · Encuesta post-reunión de tres preguntas y treinta segundos</h4>
+  <p>Anónima, en el móvil, solo a asistentes: <strong>1.</strong> ¿Qué decisión concreta ha salido de aquí? (texto libre) · <strong>2.</strong> ¿Ha merecido la pena tu tiempo? (0-10) · <strong>3.</strong> ¿Podrías haber recibido esto por escrito? (sí/no).</p>
+  <p>El porcentaje de respuestas en blanco o «ninguna» en la primera pregunta es el mejor detector de reunión puramente informativa. Y reporta el <strong>gap entre cómo la puntúa quien la convoca y cómo la puntúan los asistentes</strong>: quien convoca la valora sistemáticamente mejor, y ese hueco es la prueba objetiva más limpia de que hay un problema. Exige un 70 % de respuesta para que la lectura sea válida.</p>
+
+  <h4>Paso 4 · Preguntar al equipo, que es gratis</h4>
+  <p>Dos líneas anónimas en la semana 1: <em class="term">¿qué reunión salvarías y cuál eliminarías mañana, y por qué?</em> Llevar la respuesta a la reunión con el director. Da legitimidad y desactiva la lectura de «esto lo impone Trade».</p>
+
+  <h3>Medir el después: piloto con control, y criterio escrito antes de empezar</h3>
+  <p><strong>Unidad de asignación:</strong> el equipo bajo un mismo jefe de zona —no el comercial individual, que se contaminan, ni la provincia sin más, que deja muy pocas unidades—. Estratificar por provincia. Emparejar con datos —volumen base, serie mensual de estacionalidad, % de venta directa frente a distribuidor, nº de PDV, antigüedad del equipo—, nunca a ojo. Comprobar que las tendencias eran paralelas en los 24 meses anteriores.</p>
+  <p><strong>Duración:</strong> 2-4 semanas de rodaje que no cuentan, más 12 semanas de régimen. Análisis comparando la <strong>variación</strong> del piloto contra la del control, siempre <strong>en índice frente al control</strong>, nunca en valores absolutos. El control concurrente es lo único que neutraliza Semana Santa, feria y el pico de costa.</p>
+
+  <h4>Criterio de decisión, por escrito y antes de arrancar</h4>
+  <ul>
+    <li><strong>(a) Superioridad</strong> —donde sí hay dato de sobra—: horas de reunión interna por comercial y mes; jornadas de acompañamiento registradas; % de PDV del ciclo con la activación colocada; % de visitas con resultado. <em class="term">El objetivo numérico de reducción se fija en la semana 5, con la línea base delante. Fijarlo antes es hacer trampa en las dos direcciones.</em></li>
+    <li><strong>(b) Guardarraíl, no contraste estadístico:</strong> si el índice de volumen o de mix del piloto cae más de X puntos frente al control dos meses seguidos, se para. <strong>Y hay que decirle al director, antes de empezar: con las unidades disponibles esto no va a demostrar estadísticamente un +2 % de volumen, y prometérselo sería mentirle.</strong> Si sale «no significativo» y nadie lo advirtió, se interpretará como «no funciona».</li>
+    <li><strong>(c) Cualitativo y de personas:</strong> 6-8 entrevistas estructuradas sobre qué información se ha echado de menos; rotación y absentismo <strong>como alerta de lectura, no como criterio vinculante de fracaso</strong> —con doce semanas, dos bajas son ruido, y convertirlas en criterio escrito es entregar un arma—.</li>
+  </ul>
+
+  <h4>Cuándo se ve cada cosa, dicho como hipótesis y no como promesa</h4>
+  <div class="tscroll">
+    <table>
+      <thead><tr><th class="mono">Horizonte</th><th>Qué debería moverse</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">Semanas 1-12</td><td>Horas de reunión, jornadas de acompañamiento, % de PDV con activación colocada, % de visitas con resultado</td></tr>
+        <tr><td class="mono">3-6 meses</td><td>Grifos netos y vencimientos trabajados en plazo</td></tr>
+        <tr><td class="mono">6-12 meses</td><td>Mix de valor</td></tr>
+        <tr><td class="mono">12 meses</td><td>Volumen</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-label">Trampa específica de Andalucía</span>
+    <p>Las altas y bajas de PDV en costa son estacionales y masivas —aperturas y cierres de temporada—. «Altas netas» medirá calendario turístico, no acción comercial. <strong>Se sacan del cuadro de lectura del piloto en las cuatro provincias de litoral, sin más.</strong></p>
+  </div>
+</section>
+
+<!-- 11 -->
+<section id="calendario">
+  <p class="sec-kicker">11 · La restricción que manda sobre todo</p>
+  <h2>El calendario andaluz</h2>
+  <p>No existe un calendario único válido para toda Andalucía, y una reunión regional en la ventana equivocada destruye valor. La regla se aplica <strong>provincia a provincia</strong>, no por bloque costa/interior.</p>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Provincia</th><th>Ventana prohibida</th><th>Eventos que la definen</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Sevilla</strong></td><td class="mono">Mediados mar → mediados may</td><td>Semana Santa · Feria de Abril · Rocío (may-jun)</td></tr>
+        <tr><td><strong>Córdoba</strong></td><td class="mono">Abr → jun</td><td>Semana Santa · Cruces y Patios (may) · Feria de Córdoba (may)</td></tr>
+        <tr><td><strong>Cádiz</strong></td><td class="mono">Feb → mar · jun → sep</td><td>Carnaval · Semana Santa · Feria de Jerez (may) · temporada de costa</td></tr>
+        <tr><td><strong>Huelva</strong></td><td class="mono">May → jun · jul → sep</td><td>Rocío · Colombinas (ago) · temporada de costa</td></tr>
+        <tr><td><strong>Málaga</strong></td><td class="mono">Jun → mediados sep</td><td>Temporada de costa · Feria de Málaga (ago)</td></tr>
+        <tr><td><strong>Granada</strong></td><td class="mono">Jun · jul → sep (costa)</td><td>Corpus (jun) · temporada de costa</td></tr>
+        <tr><td><strong>Almería</strong></td><td class="mono">Jun → sep</td><td>Temporada de costa · Feria de Almería (ago)</td></tr>
+        <tr><td><strong>Jaén</strong></td><td class="mono">Mar → abr · oct</td><td>Semana Santa · Feria de San Lucas (oct)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Ventanas buenas, corregidas</h3>
+  <p><strong>Septiembre</strong> y <strong>enero-febrero</strong>. Nada más. Y ahí van el QBR y la formación densa.</p>
+  <div class="callout warn">
+    <span class="callout-label">Error que hay que evitar</span>
+    <p>«Interior en pleno verano» parece una ventana buena sobre el papel y no lo es: en julio y agosto en Sevilla, Córdoba y Jaén se van de vacaciones el equipo y buena parte del hostelero, y hace cuarenta grados. <strong>Superpón el calendario de vacaciones del propio equipo a todo el mapa de ventanas</strong> antes de fijar una fecha. Y ojo con octubre-noviembre como ventana de formación: la Feria de San Lucas de Jaén cae dentro.</p>
+  </div>
+
+  <h3>Cinco reglas de calendario</h3>
+  <ol>
+    <li><strong>Las fechas móviles se tratan como móviles.</strong> Semana Santa se mueve entre finales de marzo y finales de abril y arrastra a la Feria. La regla de cierre no es «antes del 1 de marzo»: es <strong>T−4 semanas del primer evento del año en esa provincia</strong>, recalculada cada año.</li>
+    <li><strong>El pico de pedido es anterior al pico de consumo, y el del distribuidor antes todavía.</strong> El compromiso T−2 se cuenta contra <strong>la fecha de carga del distribuidor</strong>, no contra el arranque del ciclo.</li>
+    <li><strong>Franja de calle intocable:</strong> martes a viernes, de 10:30 a 13:30 y de 17:00 a 19:00. Es cuando el hostelero está disponible. Todo lo interno cabe a primera hora o el lunes por la mañana.</li>
+    <li><strong>Diciembre-enero también existen:</strong> pico de capital, cierre de ejercicio, presupuesto y negociación anual de contratos. No es ventana de reuniones internas largas.</li>
+    <li><strong>El personal temporal de temporada en costa entra en el briefing de ciclo de verano.</strong> Si hay refuerzos, se les briefea; si no, ejecutan lo que les parece.</li>
+  </ol>
+</section>
+
+<!-- 12 -->
+<section id="noventa">
+  <p class="sec-kicker">12 · La ejecución</p>
+  <h2>Plan de 90 días, con una puerta de decisión en medio</h2>
+
+  <h3>Semana 0 · Antes de escribir una línea</h3>
+  <p>Conversación a solas con el jefe de ventas regional. Encuadre: <em class="term">«cómo hago que lo que manda Trade consuma menos reunión y produzca más ejecución»</em>. Nunca <em class="term">«hay que reunirse menos»</em>. <strong>Si dice que no, se ejecuta la versión B y no se avanza más.</strong></p>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th class="mono">Semanas</th><th>Acción</th><th>Entregable</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="mono">1–2</td>
+          <td>Consulta a RRHH, RRLL, Privacidad y Prevención: convenio, registro de jornada, geolocalización, <strong>fotografía de activación</strong>, dietas y kilometraje, horas de formación obligatoria que hoy dependen del presencial · Mapa de foros actual, marcando cuáles son nacionales y no tocables desde Andalucía · <strong>Petición del reparto directo/indirecto por provincia</strong> y del resto de datos · Pregunta anónima de dos líneas al equipo · Propuesta de universo único de PDV</td>
+          <td>Nota de una cara: qué se puede y qué no · Inventario ordenado por coste en jornadas de comercial</td>
+        </tr>
+        <tr>
+          <td class="mono">3–4</td>
+          <td>Doce jornadas de observación (capital, litoral, interior), registro cada 30 min · Encuesta post-reunión activada en todas las recurrentes · Publicar DN y DP por marca y provincia · <strong>Redactar y publicar el compromiso de servicio de Trade, y empezar a cumplirlo ya</strong> · Arrancar la <strong>cartera de vencimientos</strong>: si no está digitalizada, inventario manual de los 200 contratos de mayor volumen, no de toda Andalucía</td>
+          <td>Reparto de jornada en rango por perfil de ruta · Gap convocante-asistente · Cartera de vencimientos v.1</td>
+        </tr>
+        <tr style="background:var(--amber-soft)">
+          <td class="mono"><strong>5</strong></td>
+          <td><strong>PUERTA DE DECISIÓN.</strong> Si el reparto de jornada señala <strong>sectorización, incidencias técnicas o material</strong> como partida dominante, el piloto es de <strong>rutas o de circuito de incidencias</strong>, no de reuniones. Escrito antes de medir, para no comprometerse con la conclusión antes del dato</td>
+          <td>Decisión escrita sobre qué se pilota · Objetivo numérico de reducción, fijado ahora con la línea base delante</td>
+        </tr>
+        <tr>
+          <td class="mono">5–6</td>
+          <td>Reunión con el director comercial y el jefe de ventas regional, <strong>presencial y con el documento en mano</strong> · Petición de las tres cosas: co-firma, comité de inversión, validación de RRHH · Diseñar el comité y su expediente · Revisión con Legal de las cláusulas de exclusividad y de qué se documenta del competidor</td>
+          <td><strong>Acta de una cara con el criterio de éxito, los guardarraíles y la fecha de lectura, firmada por el director comercial y por el jefe de ventas regional.</strong> Es lo único que impide que en la semana 13 se renegocien los criterios según el resultado</td>
+        </tr>
+        <tr>
+          <td class="mono">7–8</td>
+          <td>Reunión de arranque con el equipo (ficha I) · Puesta en marcha en una delegación: mapa nuevo, agendas impresas, duraciones 25/50, regla de «sin orden del día no hay reunión» · <strong>Parte de Zona en versión degradada</strong>: las cuatro líneas que se pueden hacer a mano el lunes, con hoja de ruta separada para automatizar el resto · Primer kit de ciclo · Formación de medio día a jefes de zona sobre acompañamiento</td>
+          <td>Calendario publicado · Kit entregado a T−4 · Ficha de acompañamiento, y dos acompañamientos del jefe de zona acompañado a su vez</td>
+        </tr>
+        <tr>
+          <td class="mono">9–12</td>
+          <td>Ciclo completo en piloto · Primer Perfect Store: <strong>línea base, no umbral</strong> · Primer MBR y primer comité con el formato nuevo · Acompañamiento registrado al bloque medio · Lectura intermedia en semana 10: <strong>solo horas y ejecución, nunca volumen</strong></td>
+          <td>Briefing ejecutado por nodo · Score por provincia · Decisiones escritas con responsable y fecha</td>
+        </tr>
+        <tr>
+          <td class="mono">13</td>
+          <td>Comparativa contra el control, en índice, leída contra el acta firmada de la semana 5-6 · 6-8 entrevistas cualitativas + rotación y absentismo · Decisión: extender, ajustar o revertir · Cláusula de caducidad a 90 días para toda reunión recurrente nueva · <strong>Dueño del calendario comercial, que es de Ventas, por escrito</strong></td>
+          <td>Decisión escrita del director · «Horas de reunión por comercial y mes» en el mismo tablero donde están los hl. <em>Si no aparece en el tablero del director, en tres meses deja de existir</em></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-label">Ajuste de calendario obligatorio</span>
+    <p>Si el arranque cae cerca de marzo, se desplaza el piloto entero. Nada de esto se lanza entre mediados de marzo y mediados de mayo en interior, ni entre junio y mediados de septiembre en costa. Ventanas limpias: septiembre y enero-febrero.</p>
+  </div>
+</section>
+
+<!-- 13 -->
+<section id="riesgos">
+  <p class="sec-kicker">13 · Lo que puede salir mal</p>
+  <h2>Riesgos, y cómo se mitigan</h2>
+
+  <div class="tscroll">
+    <table>
+      <thead><tr><th>Riesgo</th><th>Mitigación</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1 · Político, el mayor de todos.</strong> Un documento que diga «hay que reunirse menos» se lee como <em class="term">tus reuniones son malas</em> y <em class="term">me quitas el control</em></td><td>Titularlo «cómo hago que el input de Trade consuma menos reunión y produzca más ejecución». Conversación previa a solas y co-firma. Piloto en una delegación, nunca política regional. Y <strong>enseñar primero lo que Trade se recorta a sí mismo</strong> antes de pedir nada</td></tr>
+        <tr><td><strong>2 · Amputarte tu propio canal.</strong> La reunión de ciclo es la distribución del trabajo de Trade hacia el PDV</td><td>El briefing no se toca: cambia su contenido, no su existencia. Y se cierra el bucle de retorno con los últimos diez minutos y la evidencia fotográfica</td></tr>
+        <tr><td><strong>3 · Efecto WhatsApp.</strong> El tiempo no desaparece, se refinancia peor: grupo permanente, consultas a las 22:30, audios de seis minutos, sin registro y al volante</td><td>Regla de canal explícita <strong>antes</strong> de tocar nada: qué se pregunta dónde, ventana horaria, prohibición de audio operativo. Punto único de consulta con plazo. Validación de Prevención</td></tr>
+        <tr><td><strong>4 · Aislamiento, aprendizaje y rotación.</strong> Perder a un veterano con cartera consolidada es perder acceso durante meses frente a Mahou-San Miguel, Damm y Estrella Galicia</td><td>Proteger reconocimiento y momento social del QBR. Institucionalizar el acompañamiento cruzado. Medir rotación y absentismo dentro del piloto</td></tr>
+        <tr><td><strong>5 · Contradicción frecuencia / mix.</strong> «Más visitas por día» produce más visitas cortas de reposición</td><td>«% de visitas con resultado» en lugar de «visitas/día». Proteger en la ruta el tiempo para las cuentas de mix. <strong>Decirlo en la primera página, no en la última</strong></td></tr>
+        <tr><td><strong>6 · Que el cuello de botella no sea la reunión</strong></td><td>La puerta de decisión de la semana 5. Y llevar rutas, circuito de incidencias y plazo de material dentro de la misma propuesta, no en un anexo</td></tr>
+        <tr><td><strong>7 · Incentivos: el variable gana siempre</strong></td><td>Plantearlo al director en conversación, sabiendo que la ventana es el próximo ejercicio. Mientras tanto, no fingir que el cuadro de mando nuevo cambia comportamientos por sí solo</td></tr>
+        <tr><td><strong>8 · Las reuniones vuelven</strong> porque quien las convoca responde de algo hacia arriba</td><td>Cláusula de caducidad a 90 días. Dueño del calendario nombrado <strong>dentro de Ventas</strong>, con autoridad para cancelar. Y «horas de reunión por comercial y mes» publicado junto a los hl</td></tr>
+        <tr><td><strong>9 · Jurídico y compliance.</strong> Registro de jornada, geolocalización, fotografía en local ajeno, información a la representación legal, modificación sustancial de condiciones, prevención y seguridad vial, horas de formación obligatoria, y límites de las cláusulas de exclusividad en contratos de suministro</td><td>RRHH, RRLL, Prevención, Privacidad y Legal validan <strong>antes</strong> de que el director vea el documento. Quien firma el calendario responde de esas horas</td></tr>
+        <tr><td><strong>10 · El distribuidor</strong></td><td>Conocer el reparto directo/indirecto <strong>antes</strong> de diseñar nada. Separar por escrito coaching a red propia de apoyo técnico-comercial al distribuidor. No tocar unilateralmente su ciclo de reuniones</td></tr>
+        <tr><td><strong>11 · Que se caiga una cifra</strong> y se lleve por delante lo que sí es sólido</td><td>Ninguna cifra externa en la presentación: solo datos propios. Y las poquísimas referencias externas, con la fuente primaria abierta, fechada y con página. Preferible decir «en la práctica del sector» que citar un porcentaje que no aguanta la pregunta <em class="term">«¿de dónde sale?»</em></td></tr>
+        <tr><td><strong>12 · Sobrevender el piloto</strong></td><td>Decir por escrito, antes de arrancar, qué va a demostrar y qué no. La honestidad previa convierte un resultado neutro en una decisión informada en lugar de en una derrota</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 14 -->
+<section id="carta">
+  <p class="sec-kicker">14 · El mensaje</p>
+  <h2>La carta al director comercial</h2>
+
+  <div class="callout warn">
+    <span class="callout-label">Dos reglas antes de usarla</span>
+    <p><strong>Nada por escrito al director antes del sí del jefe de ventas regional.</strong> Un correo es reenviable: si el director lo reenvía, has quemado el flanco que tu propio plan identifica como riesgo número uno y has forzado públicamente la mano del regional. <strong>Se entrega en mano, en la reunión.</strong></p>
+  </div>
+
+  <div class="letter">
+    <p class="subject"><strong>Asunto:</strong> tu pregunta sobre reuniones — te propongo reformularla antes de contestarla</p>
+
+    <p>[Nombre],</p>
+
+    <p>Le he dado una vuelta a lo que me planteaste. Creo que la pregunta hay que reformularla, porque tal y como está nos puede llevar a un sitio malo.</p>
+
+    <p><strong>«Reunirnos menos» no produce por sí solo «vender más». Y «más tiempo en la calle» tampoco, si lo traducimos a más visitas por día.</strong> En bar tradicional andaluz nuestra cobertura ya es muy alta: el crecimiento no está en entrar en bares nuevos, está en el segundo grifo, en el mix de valor y en la ejecución. Y esa conversación con el hostelero —margen por barril, precio de la caña, sitio en cámara, ritual de servicio— dura media hora, no ocho minutos. Si premiamos frecuencia, tendremos más visitas cortas de reposición y menos conversaciones de mix. Que es exactamente lo contrario de lo que la compañía necesita, y más en un canal que el año pasado cayó.</p>
+
+    <p>Dicho eso, creo que sí tenemos tres problemas reales:</p>
+
+    <p><strong>1. Nuestras reuniones mezclan tres niveles de decisión.</strong> La semanal debería cambiar el comportamiento de esta semana; la mensual, la ejecución contra el plan; la trimestral, el plan. Cuando se mezclan, la lectura de cifras en voz alta se come el tiempo de lo único que solo se puede hacer juntos: ensayar un argumento, hacer la autopsia de un grifo perdido y decidir una inversión.</p>
+
+    <p><strong>2. Nos falta el foro que más dinero mueve.</strong> La aportación y la cesión de equipo por punto de venta es una decisión irreversible que compromete años de margen, y hoy no tiene sitio propio: se cuela en la reunión de equipo, donde ocho personas escuchan la negociación de la novena, o se resuelve por mensajería sin expediente. Y la cartera de vencimientos de contrato de los próximos doce meses, que es la mejor lista de prioridades de visita que existe, no la está usando nadie para decidir dónde va el tiempo del equipo.</p>
+
+    <p><strong>3. No sabemos dónde se va el tiempo.</strong> Sospecho que la reunión no es el primer ladrón: por delante van la conducción y una sectorización heredada, las incidencias técnicas que deberían tener otro circuito, y el tiempo que se quema persiguiendo material prometido que no ha llegado. Si atacamos la reunión primero y dentro de seis meses no sube el volumen, habremos optimizado el tercer problema.</p>
+
+    <hr>
+
+    <p><strong>Lo que propongo:</strong></p>
+
+    <p><strong>En seis semanas te pongo encima de la mesa tres números que hoy no tenemos.</strong> El inventario de nuestras reuniones recurrentes ordenado por coste en jornadas de calle. El reparto real de la jornada de un comercial, medido en doce jornadas de observación en capital, litoral e interior. Y la diferencia entre cómo puntúa cada reunión quien la convoca y quien asiste.</p>
+
+    <p>Y con eso delante decidimos qué se pilota. <strong>Si los datos dicen que el ladrón de tiempo son las rutas o las incidencias y no las reuniones, pilotamos eso.</strong> No quiero comprometerme con la conclusión antes de tener el dato.</p>
+
+    <p><strong>Después, un piloto en una delegación durante un trimestre</strong>, con el resto de Andalucía como control y el criterio de éxito escrito y firmado antes de empezar. Te lo digo ya para que no haya sorpresas: <strong>con las unidades que tenemos, el piloto no va a demostrar estadísticamente un +2 % de volumen, y prometértelo sería mentirte.</strong> Lo que sí va a demostrar, con margen, es si liberamos jornadas de calle, si sube el porcentaje de puntos de venta con la activación del ciclo colocada, y si volumen y mix se mantienen frente al control. Y si se degradan dos meses seguidos, lo paramos.</p>
+
+    <p><strong>Y de mi lado, sin pedirte nada a cambio y empezando esta semana:</strong> reduzco el kit de ciclo a cinco piezas fijas con un máximo de tres mensajes y una sola innovación; me comprometo a cerrar el briefing cuatro semanas antes del arranque y a tener el material en almacén dos semanas antes de la carga del distribuidor; propongo un universo único de puntos de venta para que dejemos de gastar reuniones reconciliando cifras; y cierro la vía de peticiones sueltas al equipo por una sola con plazo de respuesta. Si no cumplo eso, no tengo autoridad ninguna para pedirte que cambies el calendario.</p>
+
+    <hr>
+
+    <p><strong>Lo que necesito de ti son tres cosas pequeñas:</strong></p>
+
+    <p><strong>Una.</strong> Que [jefe de ventas regional] co-firme el piloto. Esto no es un plan de Trade Marketing sobre cómo se reúne Ventas; si lo fuera, no funcionaría y además no sería mío.</p>
+
+    <p><strong>Dos.</strong> Que autorices crear un comité quincenal de inversión por punto de venta, <strong>presidido por Ventas</strong>: cuarenta y cinco minutos al principio, expediente de una cara enviado el día antes, respuesta escrita al comercial en cuarenta y ocho horas, umbral delegado para que el jefe de zona decida por debajo, y una vía rápida de veinticuatro horas para igualar una oferta con plazo. La gracia no es el control: es la velocidad. Hoy la respuesta a una aportación es «depende».</p>
+
+    <p><strong>Tres.</strong> Que RRHH y Relaciones Laborales revisen antes cualquier cambio de calendario, de registro de jornada o de control de ruta. No quiero que esto acabe en el comité de empresa en la segunda semana.</p>
+
+    <p>Si te parece, te llevo el inventario y el reparto de jornada el [fecha] y decidimos con datos nuestros, no con opiniones.</p>
+
+    <p>Un saludo,<br>[Nombre]</p>
+  </div>
+
+  <div class="callout">
+    <span class="callout-label">Lo que se dice en voz alta y no se pone por escrito</span>
+    <p>El párrafo sobre la retribución variable. Es competencia suya, probablemente la firmó él, y en un documento reenviable se lee como tercera corrección en una sola página. En la conversación, dicho al final y sin insistir, se escucha.</p>
+  </div>
+</section>
+
+<!-- 15 -->
+<section id="preguntas">
+  <p class="sec-kicker">15 · Antes de proponer nada</p>
+  <h2>Veinte preguntas que hay que responder primero</h2>
+  <p>Ordenadas por lo que más cambia el diseño si la respuesta es distinta de la esperada.</p>
+
+  <ol class="qlist">
+    <li><div><span class="qt">¿Qué porcentaje del volumen HORECA de Andalucía va por venta directa y cuál vía distribuidor, provincia a provincia?</span><span class="qw">Es la primera, no la séptima. Si quien pisa el bar es personal del distribuidor, cambia el acompañamiento, el acceso al dato y el marco jurídico de lo que se puede hacer.</span></div></li>
+    <li><div><span class="qt">¿Cuántos comerciales hay en Andalucía, cómo se reparten por provincia, cuántos PDV lleva cada uno y cuántos reportan a cada jefe de zona?</span><span class="qw">Sin el span of control, la dosis de acompañamiento mensual puede ser matemáticamente imposible, y el debate real pasa a ser de estructura, no de reuniones.</span></div></li>
+    <li><div><span class="qt">¿Cuáles son exactamente las reuniones recurrentes que hoy consumen tiempo del comercial andaluz, quién las convoca, y cuántas puede cancelar Andalucía por sí sola?</span><span class="qw">Sin este mapa se puede acabar proponiendo suprimir algo que no es tuyo.</span></div></li>
+    <li><div><span class="qt">¿Cuál es la cartera de vencimientos de contratos de suministro de los próximos 12 meses por provincia, con la inversión pendiente de amortizar y el competidor enfrente?</span><span class="qw">Es la mejor lista de prioridades de visita que existe. Si no está digitalizada, construirla es el proyecto de mayor retorno y de plazo más largo de todo el plan.</span></div></li>
+    <li><div><span class="qt">¿Quién aprueba hoy cada euro de aportación o cesión de equipo, en qué foro y con qué plazo de respuesta al comercial?</span><span class="qw">Si la respuesta es «depende» o «por WhatsApp», ya tienes justificada la creación del comité.</span></div></li>
+    <li><div><span class="qt">¿Qué penetración real tiene el pedido digital en la cartera de cada comercial andaluz, con una definición única y fecha de corte?</span><span class="qw">El dato nacional no dice cuánta toma de pedido sigue consumiendo visita en el sur, y de eso depende dimensionar el tiempo que hay que reasignar.</span></div></li>
+    <li><div><span class="qt">¿Cuál es el universo oficial de PDV de la compañía en Andalucía y cómo se define «cliente activo»?</span><span class="qw">Congelarlo por ciclo es la medida de mayor retorno inmediato. Pero se firma con Ventas y Control de Gestión: hacerlo solo crea un tercer universo.</span></div></li>
+    <li><div><span class="qt">¿Existe ya un estándar corporativo de ejecución perfecta con pesos y umbrales para España? ¿Y cuál es el estándar de servido vigente para cada marca?</span><span class="qw">El ritual de la marca internacional no es el mismo que el de la marca que defendemos en Andalucía. Auditar contra el estándar equivocado lo detecta cualquier jefe de zona en la primera visita.</span></div></li>
+    <li><div><span class="qt">¿Qué SFA usa la red, qué campos captura por visita y cuánto tiempo de grabación manual exige?</span><span class="qw">Sin el campo «referencias propuestas frente a aceptadas» no existe el KPI de «% de visitas con resultado» y toda la medición se queda en percepción.</span></div></li>
+    <li><div><span class="qt">¿Cuál es el lead time real de la cadena de PLV en Andalucía: diseño, aprobación de marca, producción, entrega a almacén?</span><span class="qw">Sin ese número no puedes comprometer de forma creíble T−4 y T−2, y ese compromiso es la base de tu credibilidad ante Ventas.</span></div></li>
+    <li><div><span class="qt">¿Cómo está construido el variable del comercial y el del jefe de zona?</span><span class="qw">Si el del comercial es volumen puro y el del jefe no pondera desarrollo de equipo, ningún calendario de acompañamientos sobrevive al primer mes de presión comercial.</span></div></li>
+    <li><div><span class="qt">¿Hay autopsia por causa de los grifos perdidos en los últimos 12 meses frente a Mahou-San Miguel, Damm y Estrella Galicia?</span><span class="qw">Si la causa dominante es aportación o condiciones, el problema no es de tiempo comercial y este plan no lo va a arreglar.</span></div></li>
+    <li><div><span class="qt">¿Cuál es la rotación real y la antigüedad media del equipo por provincia?</span><span class="qw">Un equipo veterano necesita coaching de refinamiento; uno con entrada constante de gente nueva necesita onboarding estructurado. Y donde ya se pierde gente, recortar contacto es acelerar la sangría.</span></div></li>
+    <li><div><span class="qt">¿Qué convenio aplica realmente a la red andaluza y qué dice sobre jornada, desplazamientos, dietas y kilometraje?</span><span class="qw">Y qué margen deja para mover el calendario sin entrar en modificación sustancial de condiciones.</span></div></li>
+    <li><div><span class="qt">¿Qué servicios al hostelero son gratuitos, cuáles están subvencionados y cuáles son de pago y con qué tarifa?</span><span class="qw">Si el comercial promete gratuidad y hay cuota, el daño va directo a la relación con el bar.</span></div></li>
+    <li><div><span class="qt">¿Cuántas instalaciones con telemetría hay en Andalucía, y ve ese dato el comercial en su herramienta de visita?</span><span class="qw">Si la cobertura es baja o el dato se queda en el departamento técnico, es una palanca de medio plazo para cuentas top, no la columna vertebral del cuadro de mando de este ciclo.</span></div></li>
+    <li><div><span class="qt">¿De dónde ha salido la pregunta del director: una queja del equipo, un dato de coste, o una directriz de arriba?</span><span class="qw">La respuesta correcta es distinta en cada caso. Si viene de arriba, el margen de rediseño es mucho menor de lo que parece.</span></div></li>
+    <li><div><span class="qt">¿Se ha intentado antes reducir reuniones en la compañía o en otro país del grupo, y qué pasó?</span><span class="qw">Un intento fallido previo es el mejor predictor de las resistencias que van a aparecer y de qué argumentos ya están quemados.</span></div></li>
+    <li><div><span class="qt">¿Está el jefe de ventas regional dispuesto a co-firmar esto?</span><span class="qw">Si la respuesta es no, se ejecuta la versión B: las doce palancas de Trade, que siguen siendo valiosas y no dependen de nadie.</span></div></li>
+    <li><div><span class="qt">¿Qué ventana permite doce semanas de piloto limpias, y quién arbitra el criterio de éxito ANTES de arrancar?</span><span class="qw">Para que en la semana 13 no se renegocien los criterios según el resultado.</span></div></li>
+  </ol>
+</section>
+
+<!-- 16 -->
+<section id="fuentes">
+  <p class="sec-kicker">16 · Procedencia</p>
+  <h2>Fuentes</h2>
+
+  <div class="callout warn">
+    <span class="callout-label">Regla de uso</span>
+    <p><strong>Ninguna cifra externa entra en la presentación al director.</strong> Solo datos propios. Las referencias de abajo sirven para que tú entiendas el terreno y para las poquísimas veces que necesites una cifra de mercado: en ese caso, abre la fuente primaria, cita edición y página, y fecha el dato. La primera cifra que el director reconozca como equivocada arrastra todo lo demás, incluido lo que es sólido.</p>
+  </div>
+
+  <h3>Verificadas para este documento</h3>
+  <ul class="src">
+    <li><b>Informe Socioeconómico del Sector de la Cerveza en España</b> — Cerveceros de España y Ministerio de Agricultura, Pesca y Alimentación. <a href="https://cerveceros.org">cerveceros.org</a><span class="note">Origen de todas las cifras de mercado de este documento: ventas 2025 de 38,2 M hl (−1 %), hostelería −2,4 % frente a alimentación +0,4 %, consumo por persona −4,4 %, producción 41,5 M hl, y el 44 % de las bebidas consumidas en hostelería. <strong>Descarga la edición vigente y cita página.</strong></span></li>
+    <li><b>Anuario de la Hostelería de España</b> — Hostelería de España. <a href="https://www.hosteleriadeespana.es">hosteleriadeespana.es</a><span class="note">Andalucía como comunidad con más establecimientos de España (49.271). Las cifras públicas del parque hostelero divergen según la definición y el operador estadístico: esa divergencia es en sí misma el argumento para congelar un universo único por ciclo.</span></li>
+    <li><b>Rogelberg, S. G. (2019), <em>The Surprising Science of Meetings</em></b> — Oxford University Press. <a href="https://global.oup.com/academic/product/the-surprising-science-of-meetings-9780190689216">global.oup.com</a><span class="note">Base del principio de que en torno a la mitad del tiempo de reunión no está bien empleado, y del gap entre cómo puntúa la reunión quien la convoca y quien asiste.</span></li>
+    <li><b>Salesforce, <em>State of Sales</em></b> — <a href="https://www.salesforce.com/news/stories/sales-research-2023/">salesforce.com</a><span class="note"><strong>Úsala con cuidado o no la uses.</strong> Es encuesta autodeclarada de venta B2B, no medición de fuerza de ventas de campo en gran consumo, y sus propias ediciones dan cifras distintas. Vale como orden de magnitud del problema, nunca como dato que defender ante un comité.</span></li>
+  </ul>
+
+  <h3>Marco de referencia, para entender el terreno</h3>
+  <ul class="src">
+    <li><b>Bluedorn, Turban y Love (1999)</b>, «The effects of stand-up and sit-down meeting formats on meeting outcomes», <em>Journal of Applied Psychology</em> 84(2). <a href="https://doi.org/10.1037/0021-9010.84.2.277">doi.org/10.1037/0021-9010.84.2.277</a><span class="note">Las reuniones sentadas duran sensiblemente más sin producir mejores decisiones. Estudio de laboratorio: usa la dirección del efecto, no la magnitud.</span></li>
+    <li><b>Yang, Holtz, Jaffe, Suri et al. (2022)</b>, «The effects of remote work on collaboration among information workers», <em>Nature Human Behaviour</em> 6. <a href="https://doi.org/10.1038/s41562-021-01196-4">doi.org/10.1038/s41562-021-01196-4</a><span class="note">Menos comunicación síncrona produce redes de colaboración más estáticas y siloizadas. Es la evidencia que sostiene el riesgo nº 4.</span></li>
+    <li><b>Dixon, M. y Adamson, B. (2011)</b>, «The Dirty Secret of Effective Sales Coaching», <em>Harvard Business Review</em>. <a href="https://hbr.org/2011/01/the-dirty-secret-of-effective">hbr.org</a><span class="note">El retorno del coaching se concentra en el tramo medio del equipo. No traslades el porcentaje a hectolitros: la base es venta B2B compleja.</span></li>
+    <li><b>Albers, Mantrala y Sridhar (2010)</b>, «Personal Selling Elasticities: A Meta-Analysis», <em>Journal of Marketing Research</em> 47(5). <a href="https://doi.org/10.1509/jmkr.47.5.840">doi.org/10.1509/jmkr.47.5.840</a><span class="note">Rendimientos decrecientes del esfuerzo comercial. Mide esfuerzo agregado, no frecuencia de visita, y procede de contextos B2B industriales.</span></li>
+    <li><b>Center for Creative Leadership</b> — modelo de feedback SBI (Situación–Comportamiento–Impacto). <a href="https://www.ccl.org/articles/leading-effectively-articles/sbi-feedback-model-a-quick-win-to-improve-talent-conversations-development/">ccl.org</a><span class="note">Marco práctico consolidado; no es un instrumento con validación empírica publicada.</span></li>
+  </ul>
+
+  <h3>Lo que tiene que mirar Legal y Relaciones Laborales, no tú</h3>
+  <ul class="src">
+    <li><b>Estatuto de los Trabajadores, art. 34.9</b> — registro diario de jornada. <a href="https://www.boe.es/buscar/act.php?id=BOE-A-2015-11430">boe.es</a><span class="note">Comprobar el texto consolidado vigente.</span></li>
+    <li><b>Ley Orgánica 3/2018, art. 90</b> — geolocalización en el ámbito laboral. <a href="https://www.boe.es/buscar/act.php?id=BOE-A-2018-16673">boe.es</a></li>
+    <li><b>Ley 31/1995 de Prevención de Riesgos Laborales</b> <a href="https://www.boe.es/buscar/act.php?id=BOE-A-1995-24292">boe.es</a><span class="note">El accidente del comercial en jornada es accidente de trabajo en misión. Base del veto al consumo de contenido operativo al volante.</span></li>
+    <li><b>STJUE de 10 de septiembre de 2015, asunto C-266/14</b> (Tyco). <a href="https://eur-lex.europa.eu/legal-content/ES/TXT/?uri=CELEX:62014CJ0266">eur-lex.europa.eu</a><span class="note">Para trabajadores sin centro de trabajo fijo, el desplazamiento domicilio–primer cliente es tiempo de trabajo a efectos de la Directiva 2003/88. Su aplicación a una convocatoria interna la valora Relaciones Laborales.</span></li>
+    <li><b>CNMC</b> — resoluciones sobre distribución cervecera y acuerdos de suministro en exclusiva. <a href="https://www.cnmc.es">cnmc.es</a><span class="note">Consultar antes de estandarizar duración o alcance de las condiciones de contrato de suministro, y antes de documentar por escrito las condiciones del competidor.</span></li>
+  </ul>
+</section>
+
+<footer>
+  <p>Documento de trabajo de Trade Marketing Andalucía. No es una publicación corporativa ni representa la posición oficial de ninguna compañía.<br>
+  Las cifras de mercado proceden de fuentes públicas citadas y deben verificarse contra la edición vigente antes de usarse.<br>
+  Los datos internos —reparto directo/indirecto, cartera de vencimientos, penetración de pedido digital, estructura del equipo— están pendientes de solicitar: son las preguntas 1, 2, 4 y 6.</p>
+</footer>
+
+</div>
