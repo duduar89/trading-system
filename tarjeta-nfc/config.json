@@ -1,0 +1,21 @@
+{
+  "_comentario": "Reglas del programa. Se leen al arrancar. Ver docs/02-como-funcionan-los-puntos.md",
+
+  "modo": "sellos",
+  "sellos": { "objetivo": 10, "importe_minimo_cents": 500 },
+
+  "puntos_por_euro": 1,
+  "redondeo": "abajo",
+  "puntos_bienvenida": 1,
+
+  "antipassback_minutos": 90,
+  "max_acumulaciones_dia": 2,
+  "tope_puntos_por_operacion": 200,
+  "importe_maximo_cents": 30000,
+  "caducidad_meses": 12,
+
+  "multiplicadores": [
+    { "tipo": "cumpleanos", "margen_dias": 3, "factor": 2, "etiqueta": "Cumpleanos x2" },
+    { "tipo": "dia_semana", "dia": 2, "factor": 2, "etiqueta": "Martes x2" }
+  ]
+}

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alta de tarjeta</title>
+<link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+<main>
+  <nav><a href="/staff.html">Mostrador</a><a href="/alta.html">Alta de tarjeta</a></nav>
+  <h1>Nueva tarjeta</h1>
+
+  <div class="lector" id="lector">
+    <span class="onda" aria-hidden="true">((•))</span>
+    <strong id="lectorTexto">Acerca la tarjeta en blanco</strong>
+    <p class="suave" id="lectorPista">Primero se lee el chip, luego se piden los datos</p>
+  </div>
+
+  <div class="tarjeta" id="formulario" hidden>
+    <p class="suave">Tarjeta leída: <code id="uidLeido"></code></p>
+
+    <label for="nombre">Nombre *</label>
+    <input id="nombre" autocomplete="name" placeholder="Ana Ruiz">
+
+    <label for="telefono">Teléfono (para recuperar la tarjeta si la pierde)</label>
+    <input id="telefono" type="tel" inputmode="tel" autocomplete="tel" placeholder="600 11 22 33">
+
+    <label for="email">Email (opcional)</label>
+    <input id="email" type="email" autocomplete="email" placeholder="ana@ejemplo.com">
+
+    <label for="nacimiento">Cumpleaños (opcional, para puntos dobles)</label>
+    <input id="nacimiento" type="date">
+
+    <label style="display:flex; gap:10px; align-items:flex-start; margin-top:16px">
+      <input type="checkbox" id="consentimiento" style="width:auto; margin-top:4px">
+      <span>Quiere recibir ofertas por email o SMS.
+        <span class="suave">Si no lo marca, solo usamos sus datos para el programa de puntos.</span></span>
+    </label>
+
+    <button id="guardar">Dar de alta</button>
+    <div id="resultado"></div>
+  </div>
+
+  <div class="tarjeta" id="manual" hidden>
+    <label for="uidManual">Sin NFC: teclea el número de la tarjeta</label>
+    <input id="uidManual" placeholder="04A1B2C3D4E5F6">
+    <button class="secundario" id="usarManual">Continuar</button>
+  </div>
+</main>
+
+<script type="module">
+import { $, api, sesion, escuchar, hayNfc } from '/comun.js';
+
+if (!sesion.token) location.href = '/staff.html';
+
+let uid = new URLSearchParams(location.search).get('uid');
+let parar = () => {};
+
+function conTarjeta(leido) {
+  uid = leido;
+  parar();
+  $('#lector').hidden = true;
+  $('#formulario').hidden = false;
+  $('#manual').hidden = true;
+  $('#uidLeido').textContent = leido;
+  $('#nombre').focus();
+}
+
+$('#guardar').onclick = async () => {
+  const nombre = $('#nombre').value.trim();
+  if (!nombre) return ($('#resultado').innerHTML = '<div class="estado error">El nombre hace falta.</div>');
+  $('#guardar').disabled = true;
+
+  const r = await api('POST', '/api/tarjetas', {
+    uid, nombre,
+    telefono: $('#telefono').value.trim() || null,
+    email: $('#email').value.trim() || null,
+    fecha_nacimiento: $('#nacimiento').value || null,
+    consentimiento_marketing: $('#consentimiento').checked,
+  });
+  $('#guardar').disabled = false;
+
+  if (!r.ok) return ($('#resultado').innerHTML = `<div class="estado error">${r.datos.error}</div>`);
+  $('#resultado').innerHTML = `
+    <div class="estado ok">Tarjeta dada de alta${r.datos.saldo ? ` con ${r.datos.saldo} punto(s) de bienvenida` : ''}.</div>
+    <h2>Graba esta dirección en el chip</h2>
+    <p class="suave">Con la app <strong>NFC Tools</strong> → Escribir → URL. Así, cuando el cliente
+       acerque la tarjeta a su propio móvil, verá sus puntos.</p>
+    <input readonly value="${r.datos.url_ndef}" onclick="this.select()">
+    <button class="secundario" onclick="location.href='/staff.html'">Volver al mostrador</button>`;
+};
+
+$('#usarManual').onclick = () => {
+  const v = $('#uidManual').value.trim();
+  if (v) conTarjeta(v);
+};
+
+if (uid) {
+  conTarjeta(uid);
+} else if (!hayNfc()) {
+  $('#lector').classList.remove('escuchando');
+  $('#lectorTexto').textContent = 'Este móvil no lee NFC';
+  $('#lectorPista').textContent = 'Teclea el número impreso en la tarjeta.';
+  $('#manual').hidden = false;
+} else {
+  $('#lector').classList.add('escuchando');
+  parar = await escuchar(
+    (t) => { navigator.vibrate?.(40); conTarjeta(t.uid); },
+    (e) => { $('#lectorTexto').textContent = 'Lector no disponible';
+             $('#lectorPista').textContent = e.message;
+             $('#manual').hidden = false; });
+}
+</script>
+</body>
+</html>

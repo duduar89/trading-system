@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mis puntos</title>
+<link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+<main>
+  <div id="contenido" class="tarjeta">
+    <p class="centro suave">Cargando…</p>
+  </div>
+</main>
+
+<script type="module">
+import { $, fecha } from '/comun.js';
+
+const token = location.pathname.split('/t/')[1] ?? new URLSearchParams(location.search).get('t');
+
+const sellos = (n, objetivo) => `<div class="sellos">${
+  Array.from({ length: objetivo }, (_, i) =>
+    `<span class="sello ${i < n ? 'lleno' : ''}">${i < n ? '✓' : ''}</span>`).join('')}</div>`;
+
+const etiqueta = { acumular: 'Visita', canjear: 'Premio', alta: 'Bienvenida',
+                   ajuste: 'Ajuste', caducidad: 'Caducado' };
+
+async function pintar() {
+  if (!token) return ($('#contenido').innerHTML = '<div class="estado error">Falta el código de la tarjeta.</div>');
+  const res = await fetch(`/api/tarjeta/${encodeURIComponent(token)}`);
+  if (!res.ok) return ($('#contenido').innerHTML =
+    '<div class="estado error">Esta tarjeta no existe o ya no está activa. Pregunta en el mostrador.</div>');
+  const d = await res.json();
+
+  const premio = d.recompensas.find((r) => d.saldo >= r.coste_puntos);
+  const siguiente = d.recompensas.find((r) => d.saldo < r.coste_puntos);
+
+  $('#contenido').innerHTML = `
+    <h1 class="centro">Hola, ${d.nombre}</h1>
+    ${d.modo === 'sellos'
+      ? `${sellos(d.sellos, d.objetivo)}<p class="centro suave">${d.sellos} de ${d.objetivo} sellos</p>`
+      : `<p class="grande">${d.saldo}</p><p class="centro suave">puntos</p>`}
+    ${premio
+      ? `<div class="estado ok">Tienes premio esperando: <strong>${premio.nombre}</strong>. Pídelo en el mostrador.</div>`
+      : siguiente
+        ? `<p class="centro suave">Te faltan <strong>${siguiente.coste_puntos - d.saldo}</strong> para ${siguiente.nombre}</p>`
+        : ''}
+    ${d.movimientos.length ? `<h2>Últimos movimientos</h2><table>${d.movimientos.map((m) => `
+      <tr><td>${etiqueta[m.tipo] ?? m.tipo}${m.concepto ? ` · ${m.concepto}` : ''}</td>
+          <td>${fecha(m.ts)}</td>
+          <td class="${m.puntos >= 0 ? 'mas' : 'menos'}">${m.puntos >= 0 ? '+' : ''}${m.puntos}</td></tr>`).join('')}
+      </table>` : ''}
+    <p class="suave centro" style="margin-top:20px">Guarda esta página en tu pantalla de inicio
+       o vuelve a acercar la tarjeta al móvil cuando quieras.</p>`;
+}
+pintar();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "tarjeta-nfc",
+  "version": "0.1.0",
+  "description": "Tarjeta de fidelizacion NFC: acumular y canjear puntos con un tap",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node servidor/servidor.js",
+    "test": "node --test servidor/test/*.js",
+    "semilla": "node servidor/semilla.js"
+  },
+  "engines": { "node": ">=22.5" }
+}

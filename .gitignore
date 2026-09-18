@@ -1,2 +1,6 @@
 dispositivo-pluma/simulacion/test_movimiento
 *.o
+
+# base de datos local del programa de puntos
+tarjeta-nfc/tarjetas.db
+tarjeta-nfc/tarjetas.db-*
