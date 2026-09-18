@@ -3,55 +3,84 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Mis puntos</title>
-<link rel="stylesheet" href="/estilo.css">
+<title>Mi tarjeta</title>
+<meta name="theme-color" content="#1f5f63">
+<!-- Si el manual de marca trae tipografías, el <link> de Google Fonts o el
+     @font-face va aquí, y los nombres se ponen en marca.css. -->
+<link rel="stylesheet" href="/tarjeta.css">
 </head>
 <body>
-<main>
-  <div id="contenido" class="tarjeta">
-    <p class="centro suave">Cargando…</p>
-  </div>
-</main>
+<div class="carnet" id="carnet">
+  <p class="aviso">Cargando…</p>
+</div>
 
 <script type="module">
-import { $, fecha } from '/comun.js';
+import { fecha } from '/comun.js';
 
 const token = location.pathname.split('/t/')[1] ?? new URLSearchParams(location.search).get('t');
+const raiz = document.getElementById('carnet');
 
-const sellos = (n, objetivo) => `<div class="sellos">${
+const leerMarca = (v, def) =>
+  getComputedStyle(document.documentElement).getPropertyValue(v).trim().replace(/^"|"$/g, '') || def;
+
+const cabecera = () => `
+  <header class="cabecera">
+    <span class="simbolo" aria-hidden="true"></span>
+    <span>
+      <span class="marca-nombre">${leerMarca('--marca-nombre', 'Tu marca')}</span><br>
+      <span class="marca-bajada">${leerMarca('--marca-bajada', '')}</span>
+    </span>
+  </header>`;
+
+const sellos = (n, objetivo) => `<div class="sellos" role="img"
+    aria-label="${n} de ${objetivo} sellos conseguidos">${
   Array.from({ length: objetivo }, (_, i) =>
-    `<span class="sello ${i < n ? 'lleno' : ''}">${i < n ? '✓' : ''}</span>`).join('')}</div>`;
+    `<span class="sello ${i < n ? 'lleno' : ''}"><span class="marca-sello"></span></span>`).join('')
+}</div>`;
 
 const etiqueta = { acumular: 'Visita', canjear: 'Premio', alta: 'Bienvenida',
                    ajuste: 'Ajuste', caducidad: 'Caducado' };
 
 async function pintar() {
-  if (!token) return ($('#contenido').innerHTML = '<div class="estado error">Falta el código de la tarjeta.</div>');
+  if (!token) return (raiz.innerHTML = cabecera() +
+    '<p class="aviso">Falta el código de la tarjeta.</p>');
+
   const res = await fetch(`/api/tarjeta/${encodeURIComponent(token)}`);
-  if (!res.ok) return ($('#contenido').innerHTML =
-    '<div class="estado error">Esta tarjeta no existe o ya no está activa. Pregunta en el mostrador.</div>');
+  if (!res.ok) return (raiz.innerHTML = cabecera() +
+    '<p class="aviso">Esta tarjeta no existe o ya no está activa.<br>Pregunta en el mostrador.</p>');
   const d = await res.json();
 
   const premio = d.recompensas.find((r) => d.saldo >= r.coste_puntos);
   const siguiente = d.recompensas.find((r) => d.saldo < r.coste_puntos);
 
-  $('#contenido').innerHTML = `
-    <h1 class="centro">Hola, ${d.nombre}</h1>
-    ${d.modo === 'sellos'
-      ? `${sellos(d.sellos, d.objetivo)}<p class="centro suave">${d.sellos} de ${d.objetivo} sellos</p>`
-      : `<p class="grande">${d.saldo}</p><p class="centro suave">puntos</p>`}
-    ${premio
-      ? `<div class="estado ok">Tienes premio esperando: <strong>${premio.nombre}</strong>. Pídelo en el mostrador.</div>`
-      : siguiente
-        ? `<p class="centro suave">Te faltan <strong>${siguiente.coste_puntos - d.saldo}</strong> para ${siguiente.nombre}</p>`
-        : ''}
-    ${d.movimientos.length ? `<h2>Últimos movimientos</h2><table>${d.movimientos.map((m) => `
-      <tr><td>${etiqueta[m.tipo] ?? m.tipo}${m.concepto ? ` · ${m.concepto}` : ''}</td>
-          <td>${fecha(m.ts)}</td>
-          <td class="${m.puntos >= 0 ? 'mas' : 'menos'}">${m.puntos >= 0 ? '+' : ''}${m.puntos}</td></tr>`).join('')}
-      </table>` : ''}
-    <p class="suave centro" style="margin-top:20px">Guarda esta página en tu pantalla de inicio
-       o vuelve a acercar la tarjeta al móvil cuando quieras.</p>`;
+  raiz.innerHTML = cabecera() + `
+    <div class="cuerpo">
+      <h1 class="saludo">Hola, ${d.nombre}</h1>
+      ${d.modo === 'sellos'
+        ? sellos(d.sellos, d.objetivo) +
+          `<p class="progreso"><strong>${d.sellos}</strong> de ${d.objetivo} sellos</p>`
+        : `<p class="puntos-grande">${d.saldo}</p><p class="progreso">puntos</p>`}
+      ${premio
+        ? `<p class="premio">Tienes premio esperando:<br><strong>${premio.nombre}</strong><br>
+             <span style="opacity:.75">Pídelo en el mostrador</span></p>`
+        : siguiente
+          ? `<p class="progreso">Te ${siguiente.coste_puntos - d.saldo === 1 ? 'falta' : 'faltan'}
+               <strong>${siguiente.coste_puntos - d.saldo}</strong> para ${siguiente.nombre}</p>`
+          : ''}
+    </div>
+    ${d.movimientos.length ? `
+      <div class="movimientos">
+        <h2>Últimos movimientos</h2>
+        <table><tbody>${d.movimientos.map((m) => `
+          <tr>
+            <td>${etiqueta[m.tipo] ?? m.tipo}</td>
+            <td>${fecha(m.ts)}</td>
+            <td class="${m.puntos >= 0 ? 'mas' : 'menos'}">${m.puntos >= 0 ? '+' : ''}${m.puntos}</td>
+          </tr>`).join('')}
+        </tbody></table>
+      </div>` : ''}
+    <p class="pie">Guarda esta página en tu pantalla de inicio, o vuelve a acercar
+       la tarjeta al móvil cuando quieras.</p>`;
 }
 pintar();
 </script>

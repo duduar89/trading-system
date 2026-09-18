@@ -1,0 +1,71 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   MARCA — el único fichero que hay que tocar para aplicar el manual de marca.
+   Nada de esto es estructura: son colores, tipos, logo y textos. Cambia estos
+   valores y toda la tarjeta cambia con ellos. Ver docs/07-marca.md
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── 1 · Identidad ─────────────────────────────────────────────────────── */
+  --marca-nombre:   "Correlimos";
+  --marca-bajada:   "tarjeta de la casa";
+
+  /* ── 2 · Color ─────────────────────────────────────────────────────────── */
+  /* PROVISIONAL: paleta de costa (arena, marea, coral) puesta a ojo a partir
+     del nombre. Sustituir por los Pantone/HEX del manual.                    */
+  --marca-primario:  #1f5f63;   /* verde marea — cabecera, sellos, botones    */
+  --marca-acento:    #e2703a;   /* coral — avisos de premio, énfasis          */
+  --marca-tinta:     #1c2a2b;   /* texto principal                            */
+  --marca-papel:     #fbf6ee;   /* fondo — arena muy clara                    */
+  --marca-papel-2:   #ffffff;   /* superficie de la tarjeta                   */
+  --marca-linea:     #e3dacb;   /* separadores y sellos vacíos                */
+  --marca-suave:     #6f7a76;   /* texto secundario                           */
+
+  /* Modo oscuro: el manual debería decir qué hace la marca de noche.
+     Si no lo dice, esto es una traducción conservadora.                      */
+  --marca-primario-osc: #67c2b8;
+  --marca-acento-osc:   #ff9463;
+  --marca-tinta-osc:    #eef2ef;
+  --marca-papel-osc:    #10181a;
+  --marca-papel-2-osc:  #182325;
+  --marca-linea-osc:    #2d3c3e;
+  --marca-suave-osc:    #93a39f;
+
+  /* ── 3 · Tipografía ────────────────────────────────────────────────────── */
+  /* Para usar las del manual: añade el <link> de Google Fonts (o un @font-face
+     con los .woff2 que te pasen) en tarjeta.html y cámbialas aquí.           */
+  --marca-tipo-titulo: "Georgia", "Iowan Old Style", serif;
+  --marca-tipo-texto:  ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --marca-titulo-peso: 600;
+  --marca-titulo-track: -0.01em;
+
+  /* ── 4 · Forma ─────────────────────────────────────────────────────────── */
+  --marca-radio:       18px;    /* esquinas. 0 = marca seca; 24px = amable    */
+  --marca-radio-sello: 50%;     /* 50% = sello redondo; 8px = sello cuadrado  */
+
+  /* ── 5 · Logotipo ──────────────────────────────────────────────────────── */
+  /* Símbolo en SVG, de un solo color, que hereda --marca-primario. Sustituir
+     el contenido de marca-simbolo.svg por el del manual (mejor monocromo:
+     así funciona en claro, en oscuro y dentro de los sellos).                */
+  --marca-simbolo: url("marca-simbolo.svg");
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --marca-primario: var(--marca-primario-osc);
+    --marca-acento:   var(--marca-acento-osc);
+    --marca-tinta:    var(--marca-tinta-osc);
+    --marca-papel:    var(--marca-papel-osc);
+    --marca-papel-2:  var(--marca-papel-2-osc);
+    --marca-linea:    var(--marca-linea-osc);
+    --marca-suave:    var(--marca-suave-osc);
+  }
+}
+:root[data-tema="oscuro"] {
+  --marca-primario: var(--marca-primario-osc);
+  --marca-acento:   var(--marca-acento-osc);
+  --marca-tinta:    var(--marca-tinta-osc);
+  --marca-papel:    var(--marca-papel-osc);
+  --marca-papel-2:  var(--marca-papel-2-osc);
+  --marca-linea:    var(--marca-linea-osc);
+  --marca-suave:    var(--marca-suave-osc);
+}

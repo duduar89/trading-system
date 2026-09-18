@@ -1,0 +1,118 @@
+/* Estructura de la tarjeta del cliente. El color, los tipos y el logo NO están
+   aquí: están en marca.css. Este fichero solo dice dónde va cada cosa. */
+
+@import url("marca.css");
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0; padding: 20px 16px 40px;
+  background: var(--marca-papel);
+  color: var(--marca-tinta);
+  font-family: var(--marca-tipo-texto);
+  font-size: 16px; line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+.carnet {
+  max-width: 26rem; margin: 0 auto;
+  background: var(--marca-papel-2);
+  border: 1px solid var(--marca-linea);
+  border-radius: var(--marca-radio);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .05), 0 12px 32px rgb(0 0 0 / .07);
+}
+
+/* ── Cabecera de marca ─────────────────────────────────────────────────── */
+.cabecera {
+  background: var(--marca-primario);
+  color: var(--marca-papel-2);
+  padding: 18px 20px;
+  display: flex; align-items: center; gap: 12px;
+}
+.simbolo {
+  width: 34px; height: 34px; flex: none;
+  background-color: currentColor;
+  -webkit-mask: var(--marca-simbolo) center / contain no-repeat;
+          mask: var(--marca-simbolo) center / contain no-repeat;
+}
+.marca-nombre {
+  font-family: var(--marca-tipo-titulo);
+  font-weight: var(--marca-titulo-peso);
+  letter-spacing: var(--marca-titulo-track);
+  font-size: 1.25rem; line-height: 1.1;
+}
+.marca-bajada { font-size: .72rem; opacity: .8; letter-spacing: .06em; text-transform: uppercase; }
+
+/* ── Cuerpo ────────────────────────────────────────────────────────────── */
+.cuerpo { padding: 26px 20px 22px; text-align: center; }
+
+.saludo {
+  font-family: var(--marca-tipo-titulo);
+  font-weight: var(--marca-titulo-peso);
+  letter-spacing: var(--marca-titulo-track);
+  font-size: 1.6rem; margin: 0 0 18px;
+}
+
+/* ── Sellos ────────────────────────────────────────────────────────────── */
+.sellos {
+  display: grid; grid-template-columns: repeat(5, 46px);
+  gap: 12px; justify-content: center; margin: 0 auto 16px;
+}
+.sello {
+  width: 46px; height: 46px;
+  border: 2px dashed var(--marca-linea);
+  border-radius: var(--marca-radio-sello);
+  display: grid; place-items: center;
+}
+.sello.lleno {
+  border: 2px solid var(--marca-primario);
+  background: color-mix(in srgb, var(--marca-primario) 12%, transparent);
+}
+.sello .marca-sello {
+  width: 26px; height: 26px;
+  background-color: var(--marca-primario);
+  -webkit-mask: var(--marca-simbolo) center / contain no-repeat;
+          mask: var(--marca-simbolo) center / contain no-repeat;
+  transform: rotate(-8deg);            /* como un tampón puesto a mano */
+}
+.sello:not(.lleno) .marca-sello { display: none; }
+
+.progreso { color: var(--marca-suave); font-size: .92rem; margin: 0 0 4px; }
+.progreso strong { color: var(--marca-tinta); }
+
+.puntos-grande {
+  font-family: var(--marca-tipo-titulo);
+  font-size: 3rem; font-weight: var(--marca-titulo-peso);
+  line-height: 1; margin: 6px 0 2px;
+}
+
+/* ── Aviso de premio ───────────────────────────────────────────────────── */
+.premio {
+  margin: 18px 0 0; padding: 14px 16px;
+  background: color-mix(in srgb, var(--marca-acento) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--marca-acento) 40%, transparent);
+  border-radius: calc(var(--marca-radio) - 6px);
+  color: var(--marca-tinta); font-size: .95rem;
+}
+.premio strong { color: var(--marca-acento); }
+
+/* ── Movimientos ───────────────────────────────────────────────────────── */
+.movimientos { border-top: 1px solid var(--marca-linea); padding: 18px 20px 4px; }
+.movimientos h2 {
+  font-family: var(--marca-tipo-titulo); font-size: .95rem;
+  font-weight: var(--marca-titulo-peso); margin: 0 0 8px; color: var(--marca-suave);
+  text-transform: uppercase; letter-spacing: .08em;
+}
+table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+td { padding: 9px 0; border-bottom: 1px solid var(--marca-linea); }
+tr:last-child td { border-bottom: 0; }
+td + td { padding-left: 12px; white-space: nowrap; text-align: right; color: var(--marca-suave); }
+td:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+.mas { color: var(--marca-primario); } .menos { color: var(--marca-acento); }
+
+.pie {
+  text-align: center; color: var(--marca-suave);
+  font-size: .8rem; padding: 16px 24px 20px; line-height: 1.45;
+}
+.aviso { padding: 26px 20px; text-align: center; color: var(--marca-suave); }
