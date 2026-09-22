@@ -61,11 +61,14 @@ Se usaron solo datos verificables. Las fuentes:
 - **Email:** info@iosistemasaudiovisuales.com, de la web actual.
 - **Facebook:** «I/O Sistemas Audiovisuales», Madrid. Es la misma foto de perfil que el logotipo de la web. De ahí sale la descripción «Dinámicos y constructivos…».
 - **LinkedIn:** «I/O Sistemas Audiovisuales». Enlaza a este dominio.
+- **Teléfono:** +34 630 90 46 49. Aparece como «Móvil» en la sección de contacto de la página de Facebook de la empresa.
+- **«En marcha desde 2015»:** la página de Facebook se creó el 15 de enero de 2015 y el dominio se registró el 7 de enero de 2015.
+- **Agradecimientos:** la empresa aparece en los créditos del videoclip «Máscaras del alma» de Maganía (2025) y de tres sesiones de QSessions Project (2017). Todo está comprobado en las descripciones de YouTube.
 
 ## Pendiente de confirmar por la empresa
 
 - **Aviso legal:** NIF y dirección completa del titular. Están marcados con `[completar]` en `aviso-legal.html`. La base de datos de eInforma recoge «I/O SISTEMAS AUDIOVISUALES C.B.» en Brunete (Madrid). Hay que confirmar que es el titular.
-- **Teléfono:** no se ha publicado porque no se ha podido verificar en una fuente primaria. Si queréis mostrarlo, se añade en la sección de contacto.
+- **Teléfono:** se ha publicado el de Facebook. Ese mismo número figura en Páginas Amarillas para otro negocio, así que conviene confirmar que sigue siendo el de contacto.
 - **Textos de servicios y proceso:** son descriptivos y no incluyen cifras ni clientes inventados. Conviene revisarlos por si hay algún servicio que no ofrecéis o queréis destacar.
 
 ## Estructura
