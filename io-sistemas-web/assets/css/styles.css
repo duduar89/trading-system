@@ -568,13 +568,16 @@ ul {
   width: min(640px, calc(100% - 2 * var(--gutter) - 70px));
   opacity: 0;
   transform: translateY(calc(-50% + 36px));
-  transition: opacity 0.6s ease, transform 0.8s var(--ease-out);
+  /* Salida rápida… */
+  transition: opacity 0.22s ease, transform 0.4s ease;
 }
 
 .chapter.is-active {
   opacity: 1;
   transform: translateY(-50%);
   pointer-events: auto;
+  /* …y entrada con un pequeño retardo: nunca se solapan dos textos */
+  transition: opacity 0.55s ease 0.2s, transform 0.8s var(--ease-out) 0.2s;
 }
 
 /* Al subir, el texto sale hacia abajo (dirección coherente con el scroll) */
