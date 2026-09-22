@@ -1,0 +1,83 @@
+# IO Sistemas Audiovisuales — nueva web
+
+Rediseño de [iosistemasaudiovisuales.com](https://www.iosistemasaudiovisuales.com/), que hoy solo muestra la página «Próximamente».
+
+Es una web estática (HTML, CSS y JavaScript sin dependencias). Funciona en cualquier hosting: el WordPress actual, GitHub Pages, Netlify, un servidor Apache o Nginx, etc.
+
+## Verla en local
+
+```bash
+cd io-sistemas-web
+python3 -m http.server 8080
+# abre http://localhost:8080
+```
+
+También se puede abrir `index.html` con doble clic, pero algunas funciones del navegador (copiar el email) solo van con `http://` o `https://`.
+
+## Qué incluye
+
+| Sección | Qué hace |
+|---|---|
+| **Portada con película** | Una película de 7 s (de escenario a oscuras a show completo) que avanza al bajar y retrocede al subir. Cuatro capítulos de texto: Inicio, Sonido, Luz y Show. El fader «MASTER» de la derecha muestra el progreso, y sus botones saltan a cada capítulo. |
+| **Quiénes somos** | La descripción de la propia empresa en Facebook. Sus palabras se van encendiendo con el scroll y se apagan al subir. |
+| **Cinta** | Texto en movimiento que cambia de sentido según se baje o se suba. |
+| **Servicios** | Sonido, iluminación y técnica y producción, con imágenes en parallax. |
+| **Eventos** | En escritorio, galería horizontal que se desplaza con el scroll vertical (en ambos sentidos). En móvil, carrusel táctil. |
+| **Cómo trabajamos** | Cuatro pasos. La línea se llena al bajar y se vacía al subir. |
+| **Trabajos** | Fotos reales de la empresa, sacadas de su propia biblioteca de medios. |
+| **Contacto** | Email, botón para copiarlo, redes sociales y un formulario. El formulario abre el programa de correo del visitante con el mensaje ya redactado, así que no necesita servidor ni guarda datos. |
+| **Aviso legal** | `aviso-legal.html`: aviso legal, privacidad y cookies. La web no usa cookies. |
+
+También funciona con **«reducir movimiento»** activado (se muestra todo el contenido sin película) y **sin JavaScript**.
+
+## Marca
+
+- **Logotipo:** los archivos originales `io1.png` (color) e `io2.png` (blanco) de la web actual.
+- **Colores:** muestreados del degradado del logotipo.
+  - Ciruela `#863B50`
+  - Frambuesa `#D34B6F`
+  - Coral `#FB6870`
+  - Mandarina `#FF916C`
+  - Melocotón `#FFA777`
+  - Fondo pizarra `#1A242E`, el de la web actual.
+- **Tipografías:** Dela Gothic One y Poppins, las mismas de la web actual. Van alojadas en la propia web: no hay llamadas a Google Fonts.
+
+## Imágenes y película (Higgsfield)
+
+- **Imágenes:** generadas con **GPT Image 2.5**.
+  - Fotograma final del show y fotograma inicial a oscuras. El inicial se hizo editando el final para que coincida exactamente.
+  - Sonido, iluminación, mesa de control, evento corporativo, boda y montaje.
+- **Película:** **Seedance 2.0**, de fotograma inicial a fotograma final, 720p y 7 s. Se exportó a secuencias WebP:
+  - `assets/frames/d/`: 169 fotogramas para escritorio.
+  - `assets/frames/m/`: 85 fotogramas, recorte vertical para móvil.
+
+  La secuencia se dibuja en un `<canvas>`. Así el avance y el retroceso son fluidos en todos los navegadores, incluido Safari en iOS.
+- **Fotos reales:** `real-concierto-acueducto.webp` y `real-cabezas-moviles.webp`, de la biblioteca de medios de la web actual.
+
+## Datos reales usados
+
+Se usaron solo datos verificables. Las fuentes:
+
+- **Email:** info@iosistemasaudiovisuales.com, de la web actual.
+- **Facebook:** «I/O Sistemas Audiovisuales», Madrid. Es la misma foto de perfil que el logotipo de la web. De ahí sale la descripción «Dinámicos y constructivos…».
+- **LinkedIn:** «I/O Sistemas Audiovisuales». Enlaza a este dominio.
+
+## Pendiente de confirmar por la empresa
+
+- **Aviso legal:** NIF y dirección completa del titular. Están marcados con `[completar]` en `aviso-legal.html`. La base de datos de eInforma recoge «I/O SISTEMAS AUDIOVISUALES C.B.» en Brunete (Madrid). Hay que confirmar que es el titular.
+- **Teléfono:** no se ha publicado porque no se ha podido verificar en una fuente primaria. Si queréis mostrarlo, se añade en la sección de contacto.
+- **Textos de servicios y proceso:** son descriptivos y no incluyen cifras ni clientes inventados. Conviene revisarlos por si hay algún servicio que no ofrecéis o queréis destacar.
+
+## Estructura
+
+```
+io-sistemas-web/
+├── index.html
+├── aviso-legal.html
+└── assets/
+    ├── css/styles.css
+    ├── js/main.js
+    ├── fonts/          (woff2 autoalojadas)
+    ├── img/            (logos, favicon, imágenes WebP, og-image.jpg)
+    └── frames/d|m/     (secuencia de la película)
+```
