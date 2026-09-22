@@ -15,7 +15,8 @@
 
   var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (reducedMotion) root.classList.add("reduced-motion");
-  var isMobile = window.matchMedia("(max-width: 767px)").matches;
+  // Versión "móvil" de los vídeos (recorte vertical 4:5) solo en móvil en vertical
+  var mobileQuery = window.matchMedia("(max-width: 767px) and (orientation: portrait)");
 
   // H.264 (MP4) donde se pueda —Safari/iOS lo necesita—; si no, VP9 (WebM)
   var probe = document.createElement("video");
@@ -37,33 +38,51 @@
     this.duration = 0;
     this.ready = false;
     this.loading = false;
+    this.mobile = null;   // variante cargada
+    this.token = 0;       // invalida cargas antiguas al cambiar de variante
+    this.objectUrl = null;
+    this.posterDesktop = video.getAttribute("poster");
 
-    if (isMobile && video.dataset.posterMobile) video.poster = video.dataset.posterMobile;
+    video.addEventListener("seeked", requestTick);
+    this.applyPoster(mobileQuery.matches);
   }
+
+  ScrubVideo.prototype.applyPoster = function (mobile) {
+    var v = this.video;
+    var poster = mobile && v.dataset.posterMobile ? v.dataset.posterMobile : this.posterDesktop;
+    if (poster && v.getAttribute("poster") !== poster) v.setAttribute("poster", poster);
+  };
 
   ScrubVideo.prototype.load = function () {
     if (this.loading || reducedMotion) return;
     this.loading = true;
+    this.mobile = mobileQuery.matches;
+    var token = ++this.token;
     var self = this;
     var v = this.video;
-    var src = isMobile && v.dataset.srcMobile ? v.dataset.srcMobile : v.dataset.src;
+    var src = this.mobile && v.dataset.srcMobile ? v.dataset.srcMobile : v.dataset.src;
     if (useWebm) src = src.replace(/\.mp4$/, ".webm");
 
     function attach(url) {
+      if (token !== self.token) {
+        if (url.indexOf("blob:") === 0) URL.revokeObjectURL(url);
+        return;
+      }
+      if (url.indexOf("blob:") === 0) self.objectUrl = url;
       v.addEventListener("loadedmetadata", function () {
+        if (token !== self.token) return;
         self.duration = v.duration || 0;
         self.ready = self.duration > 0;
         // Prepara el decodificador (iOS) sin reproducir de verdad
         var p = v.play();
         if (p && p.then) {
-          p.then(function () { v.pause(); self.video.currentTime = self.current; requestTick(); })
+          p.then(function () { v.pause(); v.currentTime = self.current; requestTick(); })
            .catch(function () { requestTick(); });
         } else {
           v.pause();
         }
         requestTick();
       }, { once: true });
-      v.addEventListener("seeked", requestTick);
       v.preload = "auto";
       v.src = url;
       v.load();
@@ -78,6 +97,20 @@
     } else {
       attach(src);
     }
+  };
+
+  // Al girar el móvil cambia la variante (vertical 4:5 / horizontal 16:9)
+  ScrubVideo.prototype.refresh = function () {
+    var mobile = mobileQuery.matches;
+    this.applyPoster(mobile);
+    if (!this.loading || mobile === this.mobile) return;
+    this.token++;
+    this.ready = false;
+    this.loading = false;
+    if (this.objectUrl) { URL.revokeObjectURL(this.objectUrl); this.objectUrl = null; }
+    this.video.removeAttribute("src");
+    this.video.load();
+    this.load();
   };
 
   // Devuelve true mientras siga necesitando fotogramas (suavizado o búsqueda)
@@ -207,6 +240,14 @@
     cards.forEach(function (c) { c.visible = true; c.scrub.load(); });
     parallaxEls.forEach(function (p) { p.visible = true; });
   }
+
+  function onVariantChange() {
+    if (hero) hero.scrub.refresh();
+    cards.forEach(function (c) { c.scrub.refresh(); });
+    requestTick();
+  }
+  if (mobileQuery.addEventListener) mobileQuery.addEventListener("change", onVariantChange);
+  else if (mobileQuery.addListener) mobileQuery.addListener(onVariantChange);
 
   /* ------------------------------------------------------------------
      Bucle de animación (solo corre cuando hace falta)
