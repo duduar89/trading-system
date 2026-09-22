@@ -355,7 +355,7 @@ body.menu-open .site-header {
 .hero-media {
   position: absolute;
   inset: 0;
-  background: var(--bg-deep);
+  background: #01060f; /* mismo tono que el fondo de la película */
   overflow: hidden;
 }
 .hero-video,
@@ -505,12 +505,12 @@ body.menu-open .site-header {
    texto a la izquierda sobre fondo oscuro */
 @media (orientation: landscape) {
   .hero-video,
-  .hero-endframe { transform: translate(17%, 3.5%) scale(1.04); }
-  .chapter { max-width: min(35rem, 44vw); }
+  .hero-endframe { transform: translate(20%, 3.5%) scale(1.04); }
+  .chapter { max-width: min(35rem, 42vw); }
 }
 @media (orientation: landscape) and (min-width: 1280px) {
   .hero-video,
-  .hero-endframe { transform: translate(13%, 3.5%) scale(1.04); }
+  .hero-endframe { transform: translate(18%, 3.5%) scale(1.04); }
 }
 @media (orientation: landscape) and (min-aspect-ratio: 21/9) {
   .hero-video,
@@ -525,6 +525,8 @@ body.menu-open .site-header {
       linear-gradient(180deg, rgba(4, 9, 18, 0.6) 0%, rgba(4, 9, 18, 0) 26%),
       linear-gradient(90deg, rgba(4, 9, 18, 0.97) 0%, rgba(4, 9, 18, 0.86) 38%, rgba(4, 9, 18, 0.15) 58%, rgba(4, 9, 18, 0) 66%);
   }
+  .hero-video,
+  .hero-endframe { object-fit: contain; transform: translate(20%, 8%) scale(0.86); }
   .hero-copy { padding-top: calc(var(--header-h) - 6px); }
   .chapter { max-width: min(30rem, 48vw); }
   .eyebrow { display: none; }
@@ -541,9 +543,10 @@ body.menu-open .site-header {
 /* Vertical (móvil, tablet en vertical, monitor girado): película arriba,
    texto debajo */
 @media (orientation: portrait) {
+  /* La película empieza bajo la cabecera para que no tape ninguna pieza */
   .hero-media {
-    inset: 0 0 auto 0;
-    height: 56%;
+    inset: var(--header-h) 0 auto 0;
+    height: calc(56% - var(--header-h));
   }
   .hero-shade {
     background:
@@ -582,8 +585,12 @@ body.menu-open .site-header {
   .hero-rail { bottom: calc(76px + env(safe-area-inset-bottom)); }
 }
 @media (max-width: 767px) and (orientation: portrait) and (max-height: 700px) {
-  .hero-media { height: 48%; }
+  .hero-media { height: calc(48% - var(--header-h)); }
+  .hero-video,
+  .hero-endframe { object-fit: contain; }
   .hero-copy { top: 42%; }
+  /* En pantallas bajas solo cabe el botón principal (la barra inferior ya ofrece llamar) */
+  .chapter .btn-ghost { display: none; }
   .lead { font-size: 0.98rem; }
 }
 

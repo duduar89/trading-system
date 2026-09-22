@@ -176,7 +176,8 @@
       }
       if (hero.rail) hero.rail.style.setProperty("--p", p.toFixed(4));
       if (hero.cue) hero.cue.classList.toggle("is-hidden", p > 0.04);
-      if (reducedMotion) heroEl.classList.toggle("show-end", p > 0.5);
+      // Sin animación: se muestra el móvil desmontado durante el segundo capítulo
+      if (reducedMotion) heroEl.classList.toggle("show-end", p > 0.33 && p < 0.67);
       return hero.scrub.tick();
     };
 
