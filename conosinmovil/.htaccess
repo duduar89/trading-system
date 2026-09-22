@@ -1,0 +1,29 @@
+# Con o sin móvil — reglas para el hosting (Apache / IONOS)
+
+# Redirecciones permanentes de las direcciones de la web anterior
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^reparacion-movil/?$ /#precios [R=301,NE,L]
+  RewriteRule ^contacto/?$ /#contacto [R=301,NE,L]
+  RewriteRule ^wp-sitemap(-.*)?\.xml$ /sitemap.xml [R=301,L]
+</IfModule>
+
+# Tipos de archivo
+AddType video/mp4 .mp4
+AddType video/webm .webm
+AddType image/webp .webp
+AddType font/woff2 .woff2
+AddType application/manifest+json .webmanifest
+
+# Caché larga para vídeos, imágenes y tipografías
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType video/mp4 "access plus 1 month"
+  ExpiresByType video/webm "access plus 1 month"
+  ExpiresByType image/webp "access plus 1 month"
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType image/jpeg "access plus 1 month"
+  ExpiresByType font/woff2 "access plus 1 year"
+  ExpiresByType text/css "access plus 1 week"
+  ExpiresByType application/javascript "access plus 1 week"
+</IfModule>

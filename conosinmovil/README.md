@@ -40,9 +40,15 @@ python3 -m http.server 8080
 
 ## Publicar
 
-1. Sube **todo el contenido** de la carpeta `conosinmovil/` a la raíz del dominio (donde ahora está el WordPress de IONOS).
-2. Comprueba que el servidor sirve `.webm`, `.mp4`, `.webp` y `.woff2` con su tipo MIME correcto (lo normal en cualquier hosting).
-3. Opcional: en Google Search Console, envía `https://www.conosinmovil.com/sitemap.xml`.
+1. Sube **todo el contenido** de la carpeta `conosinmovil/` a la raíz del dominio (donde ahora está el WordPress de IONOS), incluido el archivo oculto `.htaccess`.
+2. `.htaccess` (servidores Apache, como IONOS) hace redirecciones permanentes 301 de las direcciones antiguas (`/reparacion-movil/`, `/contacto/`, `/wp-sitemap.xml`), declara los tipos de archivo de vídeo, imagen y tipografía y activa la caché. En otros hostings, las carpetas `reparacion-movil/` y `contacto/` redirigen igualmente desde el navegador.
+3. En Google Search Console, retira el sitemap antiguo de WordPress y envía `https://www.conosinmovil.com/sitemap.xml`.
+
+## Formulario y privacidad
+
+- El formulario no necesita servidor: al enviarlo se abre la aplicación de correo del cliente con el mensaje ya escrito para `conosinmovil@gmail.com` (y se ofrece copiarlo si no tiene correo configurado). Si más adelante quieres recibirlo directamente, se puede conectar a un servicio de formularios.
+- La web no usa cookies de seguimiento ni analítica. El mapa de Google solo se carga si el visitante lo pide, y puede ocultarlo de nuevo.
+- La política de privacidad conserva el texto de la web anterior, que cita la antigua LOPD 15/1999. Conviene que un asesor la actualice al RGPD y a la LOPDGDD 3/2018; ya se ha añadido un apartado con los derechos del usuario.
 
 ## Editar contenidos
 

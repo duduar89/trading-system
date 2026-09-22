@@ -166,7 +166,13 @@
         var c = hero.chapters[i];
         if (p >= c.from && p < c.to) { idx = i; break; }
       }
-      if (idx !== hero.active) {
+      // La "región" distingue también los huecos entre capítulos, para que el
+      // siguiente mensaje entre siempre por el lado correcto
+      var passed = 0;
+      for (var k = 0; k < hero.chapters.length; k++) if (p >= hero.chapters[k].to) passed++;
+      var region = idx + ":" + passed;
+      if (region !== hero.region) {
+        hero.region = region;
         hero.active = idx;
         hero.chapters.forEach(function (c, j) {
           var on = j === idx;
@@ -181,7 +187,39 @@
       return hero.scrub.tick();
     };
 
+    // En vertical la película ocupa el hueco que deja el texto: se mide aquí
+    var copyEl = $(".hero-copy", heroEl);
+    hero.measureCopy = function () {
+      if (copyEl) heroEl.style.setProperty("--copy-h", copyEl.offsetHeight + "px");
+    };
+
+    // Al girar el móvil o cambiar el ancho de la ventana se mantiene el mismo
+    // punto de la película (no el mismo número de píxeles)
+    var lastWidth = window.innerWidth;
+    hero.relayout = function () {
+      var prevP = hero.progress;
+      var prevTop = hero.top;
+      var prevHeight = hero.height;
+      hero.measure();
+      hero.measureCopy();
+      var widthChanged = window.innerWidth !== lastWidth;
+      lastWidth = window.innerWidth;
+      if (widthChanged && prevP > 0 && prevP < 1 && (hero.height !== prevHeight || hero.top !== prevTop)) {
+        window.scrollTo({ top: hero.scrollFor(prevP), behavior: "instant" });
+      }
+      requestTick();
+    };
+
     hero.measure();
+    hero.measureCopy();
+    if ("ResizeObserver" in window) {
+      var heroObserver = new ResizeObserver(function () { hero.relayout(); });
+      heroObserver.observe(heroEl);
+      if (copyEl) heroObserver.observe(copyEl);
+    }
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () { hero.measureCopy(); });
+    }
 
     // La película se descarga cuando la página ya ha cargado (o al primer gesto),
     // para no competir con tipografías e imágenes en el primer pintado
@@ -211,7 +249,7 @@
     hero.chapters.forEach(function (c) {
       c.el.addEventListener("focusin", function () {
         if (!c.el.classList.contains("is-active")) {
-          window.scrollTo({ top: hero.scrollFor((c.from + Math.min(c.to, 1)) / 2), behavior: "auto" });
+          window.scrollTo({ top: hero.scrollFor((c.from + Math.min(c.to, 1)) / 2), behavior: "instant" });
         }
       });
     });
@@ -316,11 +354,11 @@
 
   window.addEventListener("scroll", requestTick, { passive: true });
   window.addEventListener("resize", function () {
-    if (hero) hero.measure();
+    if (hero) hero.relayout();
     requestTick();
   });
   window.addEventListener("load", function () {
-    if (hero) hero.measure();
+    if (hero) { hero.measure(); hero.measureCopy(); }
     requestTick();
   });
   requestTick();
@@ -332,8 +370,15 @@
   var menu = $("[data-menu]");
   var toggleLabel = toggle ? $(".visually-hidden", toggle) : null;
 
+  // Mientras el menú está abierto, el resto de la página no recibe foco
+  var behindMenu = ["main", ".site-footer", "[data-action-bar]"].map(function (sel) { return $(sel); })
+    .filter(Boolean);
+
   function setMenu(open, returnFocus) {
     if (!toggle || !menu) return;
+    behindMenu.forEach(function (el) {
+      if (open) el.setAttribute("inert", ""); else el.removeAttribute("inert");
+    });
     toggle.setAttribute("aria-expanded", String(open));
     if (toggleLabel) toggleLabel.textContent = open ? "Cerrar menú" : "Abrir menú";
     document.body.classList.toggle("menu-open", open);
@@ -358,11 +403,22 @@
     $$("[data-menu-link]", menu).forEach(function (a) {
       a.addEventListener("click", function () { setMenu(false); });
     });
+    var brandLink = $(".site-header .brand");
+    if (brandLink) {
+      brandLink.addEventListener("click", function () {
+        if (toggle.getAttribute("aria-expanded") === "true") setMenu(false);
+      });
+    }
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") setMenu(false, true);
     });
     window.addEventListener("resize", function () {
-      if (window.innerWidth > 1080 && toggle.getAttribute("aria-expanded") === "true") setMenu(false);
+      if (window.innerWidth > 1080 && toggle.getAttribute("aria-expanded") === "true") {
+        var hadFocus = menu.contains(document.activeElement);
+        setMenu(false);
+        var navFirst = $(".main-nav a");
+        if (hadFocus && navFirst) navFirst.focus({ preventScroll: true });
+      }
     });
   }
 
@@ -441,10 +497,38 @@
   var panels = $$(".price-panel");
   var search = $("[data-price-search]");
   var empty = $("[data-price-empty]");
+  var status = $("[data-price-status]");
   var selectedTab = tabs[0];
 
+  function fold(s) {
+    return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
   function normalize(s) {
-    return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+    return fold(s).replace(/[^a-z0-9]/g, "");
+  }
+  function tokens(s) {
+    return fold(s).split(/[^a-z0-9]+/).filter(Boolean);
+  }
+  // Palabras que la gente usa y que no aparecen tal cual en la lista
+  var ALIASES = { galaxy: "samsung", apple: "iphone" };
+
+  // "iPhone 8 / SE 2020" -> ["iPhone 8", "iPhone SE 2020"];
+  // "Redmi 12 4G / 5G" -> ["Redmi 12 4G", "Redmi 12 5G"]
+  function modelNames(model) {
+    var parts = model.split("/").map(function (x) { return x.trim(); }).filter(Boolean);
+    var stem = parts[0].replace(/\s+\S+$/, "");
+    return [parts[0]].concat(parts.slice(1).map(function (x) { return stem + " " + x; }));
+  }
+
+  function cardMatches(brand, model, qTokens, qFlat) {
+    return modelNames(model).some(function (name) {
+      var nameTokens = tokens(brand + " " + name);
+      var byWords = qTokens.every(function (t) {
+        return nameTokens.some(function (c) { return c.indexOf(t) === 0; });
+      });
+      var flat = normalize(name);
+      return byWords || flat.indexOf(qFlat) !== -1 || normalize(brand + name).indexOf(qFlat) !== -1;
+    }) || normalize(model).indexOf(qFlat) !== -1;
   }
 
   function selectTab(tab, focus) {
@@ -459,6 +543,7 @@
       $$(".price-card", p).forEach(function (card) { card.hidden = false; });
     });
     if (empty) empty.hidden = true;
+    if (status) status.textContent = "";
     if (focus) tab.focus();
   }
 
@@ -483,20 +568,22 @@
 
   if (search) {
     search.addEventListener("input", function () {
-      var q = normalize(search.value);
-      if (!q) {
+      var qFlat = normalize(search.value);
+      if (!qFlat) {
         tablist.classList.remove("is-searching");
         selectTab(selectedTab);
         return;
       }
+      var qTokens = tokens(search.value).map(function (t) { return ALIASES[t] || t; });
       tablist.classList.add("is-searching");
+      // Mientras se busca se muestran todas las marcas: ninguna pestaña queda seleccionada
+      tabs.forEach(function (t) { t.setAttribute("aria-selected", "false"); });
       var total = 0;
       panels.forEach(function (p) {
-        var brand = normalize(p.dataset.brand || "");
+        var brand = p.dataset.brand || "";
         var count = 0;
         $$(".price-card", p).forEach(function (card) {
-          var text = normalize(brand + " " + $(".model", card).textContent);
-          var match = text.indexOf(q) !== -1 || normalize($(".model", card).textContent).indexOf(q) !== -1;
+          var match = cardMatches(brand, $(".model", card).textContent, qTokens, qFlat);
           card.hidden = !match;
           if (match) count++;
         });
@@ -504,6 +591,10 @@
         total += count;
       });
       if (empty) empty.hidden = total !== 0;
+      if (status) {
+        status.textContent = total === 0 ? "No hay modelos con ese nombre" :
+          total === 1 ? "1 modelo encontrado" : total + " modelos encontrados";
+      }
     });
     search.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && search.value) {
@@ -524,6 +615,17 @@
     var copyBtn = $("[data-copy-message]", form);
     var againLink = $("[data-mailto-again]", form);
     var lastMessage = "";
+    var pressingSubmit = false;
+    var submitBtn = $("[type=submit]", form);
+    if (submitBtn) {
+      // Si el campo pierde el foco porque se pulsa «Enviar», no se valida en el blur:
+      // así el botón no se desplaza bajo el dedo y el primer clic no se pierde
+      submitBtn.addEventListener("pointerdown", function () { pressingSubmit = true; });
+      document.addEventListener("pointerup", function () {
+        window.setTimeout(function () { pressingSubmit = false; }, 0);
+      });
+    }
+    function hideResult() { if (result) result.hidden = true; }
 
     var rules = {
       nombre: function (el) { return el.value.trim().length > 1; },
@@ -551,9 +653,11 @@
       if (!el) return;
       var ev = el.type === "checkbox" ? "change" : "input";
       el.addEventListener(ev, function () {
+        hideResult(); // el mensaje preparado ya no coincide con lo escrito
         if (el.getAttribute("aria-invalid") === "true") setError(el, !rules[name](el));
       });
-      el.addEventListener("blur", function () {
+      el.addEventListener("blur", function (e) {
+        if (pressingSubmit || (e.relatedTarget && e.relatedTarget.type === "submit")) return;
         if (el.type !== "checkbox" && el.value.trim()) setError(el, !rules[name](el));
       });
     });
@@ -567,18 +671,18 @@
         setError(el, !ok);
         if (!ok && !firstInvalid) firstInvalid = el;
       });
-      if (firstInvalid) { firstInvalid.focus(); return; }
+      if (firstInvalid) { hideResult(); firstInvalid.focus(); return; }
 
       var nombre = form.elements.nombre.value.trim();
       var contacto = form.elements.contacto.value.trim();
       var dispositivo = form.elements.dispositivo.value;
       var mensaje = form.elements.mensaje.value.trim();
 
-      var subject = "Solicitud de reparación: " + dispositivo + " (" + nombre + ")";
+      var subject = dispositivo + " — " + nombre;
       lastMessage =
         "Nombre: " + nombre + "\r\n" +
         "Contacto: " + contacto + "\r\n" +
-        "Dispositivo: " + dispositivo + "\r\n\r\n" +
+        "Consulta: " + dispositivo + "\r\n\r\n" +
         mensaje + "\r\n\r\n" +
         "Enviado desde la web conosinmovil.com";
 
@@ -587,19 +691,21 @@
       if (result) {
         result.hidden = false;
         result.focus({ preventScroll: true });
-        result.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "nearest" });
+        result.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
       }
       window.location.href = href;
     });
 
     if (copyBtn) {
+      var copyTimer = 0;
       copyBtn.addEventListener("click", function () {
         var text = "Para: " + EMAIL + "\r\n" + lastMessage;
         var label = $("span", copyBtn);
         function done(ok) {
           if (!label) return;
           label.textContent = ok ? "¡Copiado!" : "No se pudo copiar";
-          window.setTimeout(function () { label.textContent = "Copiar mensaje"; }, 2200);
+          window.clearTimeout(copyTimer);
+          copyTimer = window.setTimeout(function () { label.textContent = "Copiar mensaje"; }, 2200);
         }
         if (navigator.clipboard && window.isSecureContext) {
           navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallbackCopy(text)); });
@@ -642,6 +748,16 @@
     map.appendChild(iframe);
     var consent = $("[data-map-consent]", map);
     if (consent) consent.remove();
+
+    var off = document.createElement("button");
+    off.type = "button";
+    off.className = "btn btn-ghost btn-sm map-off";
+    off.textContent = "Ocultar mapa";
+    off.addEventListener("click", function () {
+      try { localStorage.removeItem(MAP_KEY); } catch (e) { /* sin almacenamiento */ }
+      window.location.reload();
+    });
+    map.appendChild(off);
   }
 
   if (map) {
@@ -650,6 +766,8 @@
       mapBtn.addEventListener("click", function () {
         try { localStorage.setItem(MAP_KEY, "1"); } catch (e) { /* almacenamiento no disponible */ }
         loadMap();
+        map.focus({ preventScroll: true }); // el botón pulsado ya no existe
+
       });
     }
     try { if (localStorage.getItem(MAP_KEY) === "1") loadMap(); } catch (e) { /* sin almacenamiento */ }
