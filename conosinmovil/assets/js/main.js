@@ -181,7 +181,23 @@
     };
 
     hero.measure();
-    hero.scrub.load();
+
+    // La película se descarga cuando la página ya ha cargado (o al primer gesto),
+    // para no competir con tipografías e imágenes en el primer pintado
+    var startHero = function () {
+      ["scroll", "pointerdown", "touchstart", "keydown"].forEach(function (ev) {
+        window.removeEventListener(ev, startHero);
+      });
+      hero.scrub.load();
+    };
+    if (document.readyState === "complete") {
+      startHero();
+    } else {
+      window.addEventListener("load", startHero, { once: true });
+      ["scroll", "pointerdown", "touchstart", "keydown"].forEach(function (ev) {
+        window.addEventListener(ev, startHero, { passive: true });
+      });
+    }
 
     // El aviso "Desliza" recorre la película en lugar de saltársela
     if (hero.cue) {
