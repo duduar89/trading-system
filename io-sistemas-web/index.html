@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>IO Sistemas Audiovisuales · Sonido e iluminación para eventos en Madrid</title>
-  <meta name="description" content="Sonido, iluminación y técnica audiovisual para conciertos, eventos corporativos, bodas y fiestas. IO Sistemas Audiovisuales, Madrid. Pide presupuesto en info@iosistemasaudiovisuales.com.">
+  <title>IO Sistemas Audiovisuales · Sonido e iluminación en Madrid</title>
+  <meta name="description" content="Sonido, iluminación y técnica audiovisual para conciertos, empresas, bodas y fiestas en Madrid. Pide presupuesto a IO Sistemas Audiovisuales.">
   <link rel="canonical" href="https://www.iosistemasaudiovisuales.com/">
   <meta name="theme-color" content="#0b0d12">
   <meta name="color-scheme" content="dark">
@@ -18,8 +18,10 @@
   <meta property="og:image" content="https://www.iosistemasaudiovisuales.com/assets/img/og-image.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="IO Sistemas Audiovisuales: escenario iluminado durante un concierto">
   <meta name="twitter:card" content="summary_large_image">
 
+  <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
   <link rel="icon" type="image/png" sizes="512x512" href="assets/img/favicon-512.png">
   <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
@@ -30,7 +32,15 @@
   <link rel="preload" as="image" href="assets/frames/m/f001.webp" media="(max-aspect-ratio: 9/10)">
   <link rel="stylesheet" href="assets/css/styles.css">
 
-  <script>document.documentElement.classList.replace("no-js", "js");</script>
+  <script>
+    /* Activa el modo con JS; si main.js no llega a ejecutarse, se vuelve a la versión sin JS */
+    (function (d) {
+      d.classList.replace("no-js", "js");
+      setTimeout(function () {
+        if (!window.__ioReady) d.classList.replace("js", "no-js");
+      }, 5000);
+    })(document.documentElement);
+  </script>
 
   <script type="application/ld+json">
   {
@@ -47,9 +57,10 @@
     "image": "https://www.iosistemasaudiovisuales.com/assets/img/og-image.jpg",
     "address": {
       "@type": "PostalAddress",
-      "addressLocality": "Madrid",
+      "addressRegion": "Madrid",
       "addressCountry": "ES"
     },
+    "areaServed": "Madrid",
     "sameAs": [
       "https://www.facebook.com/iosistemasaudiovisuales/",
       "https://es.linkedin.com/company/i-o-sistemas-audiovisuales"
@@ -130,13 +141,13 @@
           </article>
         </div>
 
-        <div class="fader" role="group" aria-label="Capítulos de la presentación">
+        <div class="fader">
           <div class="fader__track" aria-hidden="true">
             <div class="fader__fill"></div>
             <div class="fader__knob"></div>
             <span class="fader__caption">MASTER <span class="fader__value">0%</span></span>
           </div>
-          <ul class="fader__labels">
+          <ul class="fader__labels" aria-label="Capítulos de la presentación">
             <li style="bottom: 0%"><button type="button" data-go="0">Inicio</button></li>
             <li style="bottom: 20%"><button type="button" data-go="0.24">Sonido</button></li>
             <li style="bottom: 45%"><button type="button" data-go="0.5">Luz</button></li>
@@ -514,7 +525,8 @@
           </ul>
         </div>
 
-        <form id="form-presupuesto" class="form reveal" style="--delay:.1s" novalidate data-mailto="info@iosistemasaudiovisuales.com" aria-describedby="form-note">
+        <form id="form-presupuesto" class="form reveal" style="--delay:.1s" novalidate data-mailto="info@iosistemasaudiovisuales.com" aria-describedby="form-note"
+          action="mailto:info@iosistemasaudiovisuales.com" method="post" enctype="text/plain">
           <div class="field">
             <label for="f-nombre">Nombre <span class="req" aria-hidden="true">*</span></label>
             <input id="f-nombre" name="nombre" type="text" autocomplete="name" required aria-describedby="e-nombre">
@@ -609,7 +621,6 @@
       </div>
       <div class="footer__bottom">
         <p>© <span data-year>2026</span> IO Sistemas Audiovisuales. Todos los derechos reservados.</p>
-        <p><a href="#inicio">Volver arriba</a></p>
       </div>
     </div>
   </footer>

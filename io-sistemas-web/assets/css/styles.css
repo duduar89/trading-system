@@ -599,6 +599,22 @@ ul {
   font-size: clamp(2.3rem, 1.3rem + 4.2vw, 5rem);
 }
 
+/* En pantallas poco altas el titular no debe desbordar */
+.chapter__title {
+  font-size: min(clamp(2.6rem, 1.4rem + 5.2vw, 6rem), 12vh);
+}
+
+.chapter__title--sm {
+  font-size: min(clamp(2.3rem, 1.3rem + 4.2vw, 5rem), 10vh);
+}
+
+/* La sombra del titular no debe oscurecer el degradado de la marca */
+.chapter__title .gradient-text,
+.band__title .gradient-text {
+  text-shadow: none;
+  filter: drop-shadow(0 4px 22px rgba(0, 0, 0, 0.45));
+}
+
 .chapter__text {
   margin-top: 22px;
   max-width: 34ch;
@@ -677,6 +693,17 @@ ul {
 }
 
 /* Fader "MASTER": muestra el progreso y permite saltar entre capítulos */
+.fader::before {
+  content: "";
+  position: absolute;
+  inset: -16px -12px -52px -14px;
+  z-index: -1;
+  border-radius: 14px;
+  background: rgba(6, 7, 10, 0.5);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
 .fader {
   position: absolute;
   right: clamp(14px, 3vw, 40px);
@@ -754,8 +781,8 @@ ul {
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.6);
-  font: 600 0.7rem/1 var(--font-body);
+  color: rgba(255, 255, 255, 0.85);
+  font: 600 0.75rem/1 var(--font-body);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   cursor: pointer;
@@ -782,7 +809,7 @@ ul {
   font-size: 0.66rem;
   font-weight: 600;
   letter-spacing: 0.2em;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.85);
   white-space: nowrap;
 }
 
@@ -838,6 +865,11 @@ ul {
     transform: translateY(-36px);
   }
 
+  /* Antes de empezar a bajar, la portada deja sitio al aviso de scroll */
+  html.js:not(.reduced-motion):not(.hero-static) .hero:not(.is-scrolled) .chapter[data-index="0"].is-active {
+    transform: translateY(-26px);
+  }
+
   .chapter__text {
     margin-top: 14px;
   }
@@ -857,6 +889,10 @@ ul {
     transform: none;
   }
 
+  .fader::before {
+    display: none;
+  }
+
   .fader__knob {
     width: 26px;
     margin-left: -13px;
@@ -870,6 +906,11 @@ ul {
 
   .scroll-hint {
     bottom: 18px;
+    font-size: 0.68rem;
+  }
+
+  .scroll-hint__line {
+    height: 36px;
   }
 
   .hero.is-scrolled .scroll-hint,
@@ -881,27 +922,105 @@ ul {
     opacity: 1;
   }
 
-  .hero:not(.is-scrolled) .chapter[data-index="0"] {
-    bottom: calc(118px + env(safe-area-inset-bottom, 0px));
-  }
+  /* En móviles, parte del escenario queda bajo la barra del navegador: se compensa */
+  @supports (height: 100svh) {
+    .chapter {
+      bottom: calc(92px + 100lvh - 100svh + env(safe-area-inset-bottom, 0px));
+    }
 
-  .scroll-hint {
-    font-size: 0.68rem;
-  }
-
-  .scroll-hint__line {
-    height: 36px;
+    .scroll-hint {
+      bottom: calc(18px + 100lvh - 100svh);
+    }
   }
 }
 
-/* Sin JavaScript o con "reducir movimiento": la historia se lee completa, sin película */
+@media (max-width: 340px) {
+  .chapter__eyebrow {
+    display: none;
+  }
+}
+
+/* Pantallas bajas: sin aviso de scroll */
+@media (max-height: 620px) {
+  .scroll-hint {
+    display: none;
+  }
+}
+
+/* Móviles en horizontal y ventanas muy bajas: textos compactos bajo la cabecera */
+@media (max-height: 500px) and (orientation: landscape) {
+  .chapter,
+  .chapter.is-active,
+  .chapter.is-before {
+    top: calc(var(--header-h) + 4px);
+    bottom: auto;
+    width: min(560px, calc(100% - 2 * var(--gutter) - 90px));
+  }
+
+  .chapter {
+    transform: translateY(24px);
+  }
+
+  .chapter.is-active {
+    transform: none;
+  }
+
+  .chapter.is-before {
+    transform: translateY(-24px);
+  }
+
+  .chapter__eyebrow,
+  .chapter__num {
+    display: none;
+  }
+
+  .chapter__title,
+  .chapter__title--sm {
+    font-size: clamp(1.5rem, 8.5vh, 2.4rem);
+  }
+
+  .chapter__text {
+    margin-top: 8px;
+    max-width: 46ch;
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+
+  .chapter__actions {
+    margin-top: 12px;
+  }
+
+  .chapter__actions .btn {
+    flex: 0 0 auto;
+    min-height: 44px;
+    --btn-pad-y: 10px;
+  }
+
+  .fader__labels,
+  .fader__caption {
+    display: none;
+  }
+
+  .fader::before {
+    display: none;
+  }
+
+  html.js:not(.reduced-motion):not(.hero-static) .hero:not(.is-scrolled) .chapter[data-index="0"].is-active {
+    transform: none;
+  }
+}
+
+/* Sin JavaScript, con "reducir movimiento" o en pantallas muy bajas (zoom alto):
+   la historia se lee completa y apilada, sin película */
 .no-js .hero,
-.reduced-motion .hero {
+.reduced-motion .hero,
+.hero-static .hero {
   height: auto;
 }
 
 .no-js .hero__stage,
-.reduced-motion .hero__stage {
+.reduced-motion .hero__stage,
+.hero-static .hero__stage {
   position: relative;
   height: auto;
   min-height: 100vh;
@@ -909,23 +1028,29 @@ ul {
 }
 
 .no-js .hero__poster,
-.reduced-motion .hero__poster {
+.reduced-motion .hero__poster,
+.hero-static .hero__poster {
   position: absolute;
 }
 
 .no-js .hero__canvas,
 .reduced-motion .hero__canvas,
+.hero-static .hero__canvas,
 .no-js .fader,
 .reduced-motion .fader,
+.hero-static .fader,
 .no-js .scroll-hint,
 .reduced-motion .scroll-hint,
+.hero-static .scroll-hint,
 .no-js .hero__loader,
-.reduced-motion .hero__loader {
+.reduced-motion .hero__loader,
+.hero-static .hero__loader {
   display: none;
 }
 
 .no-js .hero__chapters,
-.reduced-motion .hero__chapters {
+.reduced-motion .hero__chapters,
+.hero-static .hero__chapters {
   position: relative;
   display: grid;
   gap: 72px;
@@ -933,7 +1058,14 @@ ul {
 }
 
 .no-js .chapter,
-.reduced-motion .chapter {
+.reduced-motion .chapter,
+.hero-static .chapter,
+.no-js .chapter.is-active,
+.reduced-motion .chapter.is-active,
+.hero-static .chapter.is-active,
+.no-js .chapter.is-before,
+.reduced-motion .chapter.is-before,
+.hero-static .chapter.is-before {
   position: relative;
   inset: auto;
   width: auto;
@@ -981,7 +1113,7 @@ ul {
 }
 
 .statement__text .w {
-  color: rgba(246, 242, 238, 0.16);
+  color: rgba(246, 242, 238, 0.3);
   transition: color 0.35s ease;
 }
 
@@ -1120,6 +1252,8 @@ ul {
 }
 
 .service__media img {
+  position: relative;
+  top: -9%;
   width: 100%;
   height: 118%;
   object-fit: cover;
@@ -1230,7 +1364,10 @@ ul {
 .events__track {
   display: flex;
   gap: clamp(16px, 2vw, 28px);
+  margin: 0;
   padding: 8px var(--gutter) clamp(88px, 12vw, 140px);
+  padding-left: max(var(--gutter), calc((100vw - var(--maxw)) / 2 + var(--gutter)));
+  list-style: none;
 }
 
 .event-card {
@@ -1265,6 +1402,7 @@ ul {
 }
 
 .event-card__body {
+  container-type: inline-size;
   position: absolute;
   left: 0;
   right: 0;
@@ -1288,12 +1426,15 @@ ul {
 
 .event-card h3 {
   font-size: clamp(1.5rem, 1.2rem + 1vw, 2.1rem);
+  /* El titular se adapta al ancho real de la tarjeta */
+  font-size: min(clamp(1.5rem, 1.2rem + 1vw, 2.1rem), 11cqi);
 }
 
 .event-card p {
   margin-top: 8px;
   color: var(--text-soft);
   font-size: 0.98rem;
+  font-size: min(0.98rem, 6.4cqi);
 }
 
 .events__hint {
@@ -1339,6 +1480,7 @@ ul {
   gap: 14px;
   margin-top: 28px;
   padding-inline: var(--gutter);
+  padding-left: max(var(--gutter), calc((100vw - var(--maxw)) / 2 + var(--gutter)));
   color: var(--muted);
   font-size: 0.85rem;
   letter-spacing: 0.12em;
@@ -1362,21 +1504,32 @@ ul {
   transform: scaleX(var(--hp, 0));
 }
 
-/* Móvil y tabletas: carrusel nativo con deslizamiento */
+/* Sin anclar (móvil, pantallas bajas, "reducir movimiento" o sin JS): carrusel nativo */
+.events:not(.is-pinned) .events__viewport {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: max(var(--gutter), calc((100vw - var(--maxw)) / 2 + var(--gutter)));
+  scrollbar-width: thin;
+  scrollbar-color: rgba(251, 104, 112, 0.6) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.events:not(.is-pinned) .event-card {
+  scroll-snap-align: start;
+}
+
+.events:not(.is-pinned) .events__track {
+  padding-bottom: 20px;
+  margin-bottom: clamp(68px, 10vw, 120px);
+}
+
 @media (max-width: 899px) {
-  .events__viewport {
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
+  .events:not(.is-pinned) .events__viewport {
     scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
   }
 
-  .events__viewport::-webkit-scrollbar {
+  .events:not(.is-pinned) .events__viewport::-webkit-scrollbar {
     display: none;
-  }
-
-  .event-card {
-    scroll-snap-align: center;
   }
 }
 
@@ -1520,6 +1673,12 @@ ul {
   z-index: -1;
   background:
     linear-gradient(180deg, rgba(11, 13, 18, 0.9) 0%, rgba(11, 13, 18, 0) 30%, rgba(11, 13, 18, 0.25) 55%, rgba(11, 13, 18, 0.94) 100%);
+}
+
+@media (max-width: 760px) {
+  .band::before {
+    background: linear-gradient(180deg, rgba(11, 13, 18, 0.9) 0%, rgba(11, 13, 18, 0.35) 28%, rgba(11, 13, 18, 0.72) 55%, rgba(11, 13, 18, 0.94) 100%);
+  }
 }
 
 .band__content {
@@ -1680,6 +1839,24 @@ ul {
   }
 }
 
+/* En móvil el pie de foto va debajo para no tapar la imagen real */
+@media (max-width: 640px) {
+  .work figcaption {
+    position: static;
+    padding: 14px 18px 18px;
+    background: var(--ink-2);
+  }
+
+  .work figcaption strong {
+    margin-bottom: 4px;
+    font-size: 1.05rem;
+  }
+
+  .work img {
+    height: auto;
+  }
+}
+
 /* ==========================================================================
    Contacto
    ========================================================================== */
@@ -1703,13 +1880,18 @@ ul {
   }
 }
 
+.contact__grid > div:first-child {
+  container-type: inline-size;
+}
+
 .contact__mail {
   display: inline-block;
   margin-top: 28px;
   font-family: var(--font-display);
   font-size: clamp(1.05rem, 0.55rem + 1.9vw, 1.45rem);
+  font-size: min(clamp(1.05rem, 0.55rem + 1.9vw, 1.45rem), 5.4cqi);
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
   text-decoration: none;
 }
 
@@ -2035,6 +2217,20 @@ ul {
   }
 }
 
+/* Sin JavaScript: el menú desplegable y copiar el email no están disponibles */
+.no-js .menu-toggle,
+.no-js .copy-btn,
+.no-js .to-top {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .no-js .header-cta {
+    display: inline-flex;
+    margin-left: auto;
+  }
+}
+
 /* Botón volver arriba */
 .to-top {
   position: fixed;
@@ -2133,6 +2329,7 @@ ul {
 }
 
 .page a {
+  overflow-wrap: anywhere;
   color: var(--peach);
   text-underline-offset: 3px;
 }

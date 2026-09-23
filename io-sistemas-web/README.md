@@ -20,15 +20,17 @@ También se puede abrir `index.html` con doble clic, pero algunas funciones del 
 |---|---|
 | **Portada con película** | Una película de 7 s (de escenario a oscuras a show completo) que avanza al bajar y retrocede al subir. Cuatro capítulos de texto: Inicio, Sonido, Luz y Show. El fader «MASTER» de la derecha muestra el progreso, y sus botones saltan a cada capítulo. |
 | **Quiénes somos** | La descripción de la propia empresa en Facebook. Sus palabras se van encendiendo con el scroll y se apagan al subir. |
-| **Cinta** | Texto en movimiento que cambia de sentido según se baje o se suba. |
+| **Cinta** | Texto que se desplaza al hacer scroll y cambia de sentido según se baje o se suba. Se para sola cuando no hay scroll. |
 | **Servicios** | Sonido, iluminación y técnica y producción, con imágenes en parallax. |
-| **Eventos** | En escritorio, galería horizontal que se desplaza con el scroll vertical (en ambos sentidos). En móvil, carrusel táctil. |
+| **Eventos** | En pantallas grandes, galería horizontal que se desplaza con el scroll vertical (en ambos sentidos). En móvil, en pantallas bajas o sin animaciones, carrusel deslizable. |
 | **Cómo trabajamos** | Cuatro pasos. La línea se llena al bajar y se vacía al subir. |
 | **Trabajos** | Fotos reales de la empresa, sacadas de su propia biblioteca de medios. |
 | **Contacto** | Email, botón para copiarlo, redes sociales y un formulario. El formulario abre el programa de correo del visitante con el mensaje ya redactado, así que no necesita servidor ni guarda datos. |
 | **Aviso legal** | `aviso-legal.html`: aviso legal, privacidad y cookies. La web no usa cookies. |
 
-También funciona con **«reducir movimiento»** activado (se muestra todo el contenido sin película) y **sin JavaScript**.
+También funciona con **«reducir movimiento»** activado (se muestra todo el contenido sin película), en pantallas muy bajas o con mucho zoom (texto apilado) y **sin JavaScript** (el formulario usa `mailto:` directamente).
+
+Incluye `robots.txt`, `sitemap.xml`, `favicon.ico`, datos estructurados (JSON-LD) e imagen para compartir en redes (`og-image.jpg`).
 
 ## Marca
 
@@ -67,7 +69,7 @@ Se usaron solo datos verificables. Las fuentes:
 
 ## Pendiente de confirmar por la empresa
 
-- **Aviso legal:** NIF y dirección completa del titular. Están marcados con `[completar]` en `aviso-legal.html`. La base de datos de eInforma recoge «I/O SISTEMAS AUDIOVISUALES C.B.» en Brunete (Madrid). Hay que confirmar que es el titular.
+- **Aviso legal:** falta el NIF y la dirección completa del titular. Hay un comentario `PENDIENTE` en `aviso-legal.html` que indica dónde añadirlos. La base de datos de eInforma recoge «I/O SISTEMAS AUDIOVISUALES C.B.» en Brunete (Madrid); hay que confirmar que es el titular.
 - **Teléfono:** se ha publicado el de Facebook. Ese mismo número figura en Páginas Amarillas para otro negocio, así que conviene confirmar que sigue siendo el de contacto.
 - **Textos de servicios y proceso:** son descriptivos y no incluyen cifras ni clientes inventados. Conviene revisarlos por si hay algún servicio que no ofrecéis o queréis destacar.
 
