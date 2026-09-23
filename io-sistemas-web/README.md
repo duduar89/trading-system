@@ -30,7 +30,7 @@ También se puede abrir `index.html` con doble clic, pero algunas funciones del 
 
 También funciona con **«reducir movimiento»** activado (se muestra todo el contenido sin película), en pantallas muy bajas o con mucho zoom (texto apilado) y **sin JavaScript** (el formulario usa `mailto:` directamente).
 
-Incluye `robots.txt`, `sitemap.xml`, `favicon.ico`, datos estructurados (JSON-LD) e imagen para compartir en redes (`og-image.jpg`).
+Incluye `robots.txt`, `sitemap.xml`, `favicon.ico`, datos estructurados (JSON-LD), `.htaccess` para Apache y una tarjeta Open Graph/Twitter de 1200×630 (`assets/img/og-image.jpg`), que es la que aparece al compartir el enlace en WhatsApp, Facebook, LinkedIn, X o Telegram.
 
 ## Marca
 
@@ -69,7 +69,7 @@ Se usaron solo datos verificables. Las fuentes:
 
 ## Pendiente de confirmar por la empresa
 
-- **Aviso legal:** falta el NIF y la dirección completa del titular. Se añaden en el apartado «1. Titular del sitio web» de `aviso-legal.html` (art. 10 de la LSSI). La base de datos de eInforma recoge «I/O SISTEMAS AUDIOVISUALES C.B.» en Brunete (Madrid); hay que confirmar que es el titular.
+- **NIF del aviso legal:** se ha puesto el facilitado por la empresa (E87123456), pero no cuadra con el dígito de control de los NIF de entidades: con esos dígitos, el control correcto sería 1. Conviene revisarlo por si hay una errata.
 - **Teléfono:** se ha publicado el de Facebook. Ese mismo número figura en Páginas Amarillas para otro negocio, así que conviene confirmar que sigue siendo el de contacto.
 - **Textos de servicios, tipos de evento y proceso:** son descriptivos y no incluyen cifras, clientes ni garantías inventadas. Las fuentes públicas solo documentan conciertos y música en directo. Conviene confirmar los tipos de evento (bodas, empresa, teatro…) y los servicios que queréis destacar.
 - **Nitidez de la película en móviles y tablets de alta densidad:** la película es 720p. Para máxima nitidez se puede generar otra versión vertical a 1080×1920 (requiere créditos de Higgsfield; a día de hoy quedan ~2).
