@@ -1,2 +1,3 @@
 dispositivo-pluma/simulacion/test_movimiento
 *.o
+__pycache__/
