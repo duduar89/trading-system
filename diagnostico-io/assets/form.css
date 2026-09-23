@@ -93,7 +93,8 @@ a { color: var(--peach); text-underline-offset: 3px; }
 /* Formulario */
 .form-wrap { padding-bottom: 80px; }
 .progress { position: sticky; top: 0; z-index: 10; padding: 14px 0 12px; background: rgba(11, 13, 18, 0.92); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
-.progress-row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem; color: var(--muted); }
+.progress-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 0.85rem; color: var(--muted); }
+.progress-row span { white-space: nowrap; }
 .progress-row strong { color: var(--text); font-weight: 600; }
 .bar { margin-top: 8px; height: 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
 .bar span { display: block; height: 100%; width: 0; border-radius: 6px; background: var(--grad-brand); transition: width 0.4s ease; }
@@ -134,6 +135,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--c
 .choice:hover { border-color: rgba(251, 104, 112, 0.6); }
 .choice input { flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--coral); }
 .choice span { line-height: 1.4; }
+.choice:has(input:disabled) { opacity: 0.45; cursor: not-allowed; }
 .choice:has(input:checked) { border-color: var(--coral); background: rgba(251, 104, 112, 0.1); }
 .other-input { margin-top: 8px; }
 

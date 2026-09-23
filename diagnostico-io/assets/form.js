@@ -81,6 +81,7 @@
 
   function labelFor(q, isGroup) {
     var kids = [q.label];
+    if (q.max) kids.push(el("span", { class: "opt", text: "(máximo " + q.max + ")" }));
     if (q.required) kids.push(el("span", { class: "req", "aria-hidden": "true", text: "*" }));
     else kids.push(el("span", { class: "opt", text: "(opcional)" }));
     return isGroup ? el("legend", null, kids) : el("label", { class: "q-label", for: qId(q) }, kids);
@@ -155,6 +156,9 @@
       var v = multi ? [] : "";
       Array.prototype.forEach.call(inputs, function (i) { if (i.checked) { if (multi) v.push(i.value); else v = i.value; } });
       setAnswer(q, v);
+      if (multi && q.max) {
+        Array.prototype.forEach.call(inputs, function (i) { i.disabled = !i.checked && v.length >= q.max; });
+      }
       if (otherInput) {
         var on = multi ? v.indexOf("Otro") !== -1 : v === "Otro";
         otherInput.hidden = !on;
@@ -169,6 +173,9 @@
       inp.addEventListener("change", update);
       wrap.appendChild(el("label", { class: "choice", for: id }, [inp, el("span", { text: o })]));
     });
+    if (multi && q.max && current.length >= q.max) {
+      Array.prototype.forEach.call(wrap.querySelectorAll("input"), function (i) { i.disabled = !i.checked; });
+    }
     if (q.allow_other) {
       otherInput = el("input", { type: "text", class: "other-input", "aria-label": "Especifica «Otro»", placeholder: "Especifica…" });
       otherInput.value = state.answers[otherKey] || "";
@@ -218,6 +225,8 @@
     var msg = "";
     if (q.required && isEmpty(q, v)) {
       msg = q.type === "matrix" ? "Responde todas las filas, por favor." : (q.type === "multi" ? "Elige al menos una opción." : "Esta pregunta es obligatoria.");
+    } else if (q.type === "multi" && q.max && Array.isArray(v) && v.length > q.max) {
+      msg = "Elige como máximo " + q.max + ".";
     } else if (q.type === "email" && v && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v).trim())) {
       msg = "Revisa el correo (por ejemplo, nombre@empresa.com).";
     } else if (q.type === "tel" && v && !/^[0-9+()\s.\-]{9,20}$/.test(String(v).trim())) {

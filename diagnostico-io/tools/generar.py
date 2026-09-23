@@ -20,8 +20,8 @@ CONFIG = {
     "title": "IO Sistemas Audiovisuales",
     "study_url": "estudio.html",
     "consent_text": (
-        "Acepto que Brain Stormers use estas respuestas solo para estudiar cómo ayudaros "
-        "y preparar una propuesta. Podéis pedir que las borremos cuando queráis."
+        "He leído la información de protección de datos del paso «Contacto» y acepto que "
+        "Brain Stormers use estas respuestas solo para preparar una propuesta para IO."
     ),
 }
 
@@ -118,7 +118,7 @@ def write_study(data):
     </header>
     <main>
       <section class="hero">
-        <p class="eyebrow">Estudio preliminar</p>
+        <p class="eyebrow">Estudio preliminar · IO Sistemas Audiovisuales</p>
         <h1>{e(st['title'])}</h1>
         <p class="lead">{e(st['summary'])}</p>
         <div class="start"><a class="btn btn-primary" href="index.html">Rellenar el cuestionario</a><button class="btn btn-ghost" type="button" onclick="window.print()">Imprimir o guardar en PDF</button></div>

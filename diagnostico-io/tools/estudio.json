@@ -1,0 +1,898 @@
+{
+ "study": {
+  "title": "Dónde os pueden ayudar la IA, el software y la electrónica a medida",
+  "summary": "En temporada alta, a una empresa técnica como IO no suele faltarle trabajo. Lo que falta es tiempo: presupuestos, riders, material controlado, técnicos, papeles y cobros se comen muchas horas. Te proponemos 12 ideas. Las 5 primeras son las principales y ahorran tiempo en la oficina y en el almacén. Las otras 7 son complementarias, y varias usan aparatos pequeños hechos a medida con ESP32 o Raspberry Pi (placas electrónicas baratas que se pueden programar). Todo lo que tiene que ver con viento, electricidad, estructuras o ruido solo sirve para avisar o informar. Nunca sustituye a un sistema de seguridad, a una medición oficial ni a la persona responsable. Con el formulario sabremos por qué idea empezar.",
+  "opportunities": [
+   {
+    "id": "inventario",
+    "category": "Mixto",
+    "title": "Inventario y calendario del material, con códigos QR en el móvil",
+    "problem": "Cuando el material no está apuntado en un solo sitio junto a un calendario de eventos, pasan cosas como estas: se reserva un equipo que ya estaba comprometido para otro bolo, en el montaje falta algo, o un equipo vuelve roto, nadie lo apunta y vuelve a salir. Casi todas las demás ideas (presupuestos con IA, avisos de lo que falta, mantenimiento, rentabilidad) necesitan antes esta base.",
+    "solution": "Una lista de todo vuestro material (cantidad, número de serie, peso, consumo eléctrico, valor y precio de alquiler), unida a un calendario de eventos. El sistema avisa si reservas algo que ya está cogido. Cada case y cada equipo caro lleva una etiqueta QR (un código cuadrado que se lee con la cámara del móvil). Se escanea al cargar y al descargar. Al volver se marca cómo viene: bien, a reparar o perdido. Lo que está 'a reparar' no se puede reservar. Hay dos caminos. (1) Usar un programa de alquiler ya hecho. Rentman está pensado para empresas audiovisuales, tiene versión en español y módulo de Verifactu; para 2 usuarios saldría por unos 100-130 € al mes sin IVA, según los módulos (es un cálculo nuestro con sus tarifas públicas, no una oferta). HireHop tiene un plan gratuito para 1 usuario, y Andròmina Rent es un programa español del sector. (2) Una herramienta ligera a medida (una hoja de cálculo y una app sencilla en el móvil), si tenéis poco material. Opcional: un puesto fijo de escaneo en la puerta del almacén, con una Raspberry Pi y un lector.",
+    "what_we_need": "Una idea de cuánto material tenéis. Lo que ya tengáis apuntado (Excel, papel o fotos de los cases). De uno a tres días para cargarlo todo, según el volumen (estimación orientativa). Y el compromiso de escanear en cada salida y en cada entrada.",
+    "effort": "Medio",
+    "impact": "Alto",
+    "caveats": "Si no se escanea siempre, el sistema deja de reflejar la realidad y deja de servir. Los chips RFID (etiquetas que se leen a distancia) no compensan a vuestra escala: son más caros, necesitan lectores y, por los herrajes metálicos, hacen falta etiquetas especiales. El precio de Rentman es un cálculo nuestro con sus tarifas públicas, no una oferta.",
+    "sources": [
+     "https://rentman.io/pricing",
+     "https://rentman.io/es/actualizaciones-de-producto/veri-factu-y-ticketbai-sistemas",
+     "https://rentman.io/blog/12-causes-of-unreliable-av-inventory-tracking-and-how-to-fix-them",
+     "https://rentman.io/blog/barcode-vs-rfid-vs-qr-for-av-rental-inventory-tracking",
+     "https://hirehop.biz/pricing/",
+     "http://androminarent.com/wordpress/"
+    ]
+   },
+   {
+    "id": "rider",
+    "category": "IA",
+    "title": "La IA lee el rider y prepara un borrador de presupuesto",
+    "problem": "El rider técnico es el documento en el que el artista pide lo que necesita: canales y micros, monitores, backline, luces y plano del escenario. Convertirlo en lista de material, contrarider y presupuesto lleva tiempo. Además, es fácil olvidar las cosas pequeñas que luego salen caras: cajas DI, pies, cableado o monitores de más.",
+    "solution": "Nos mandas el rider en PDF, en foto o por WhatsApp. La IA saca la lista de canales, los monitores, el backline, las luces y lo que pide de electricidad. Después lo compara con vuestro inventario y con una tabla de equivalencias (por ejemplo, 'SM58 o similar') y marca varias cosas: lo que tenéis, lo que habría que subalquilar, si esa fecha choca con otro evento y qué preguntas quedan pendientes para el cliente. Con eso prepara un BORRADOR de presupuesto y de contrarider. La IA nunca decide sola: no se envía nada sin que un socio lo revise.",
+    "what_we_need": "El inventario con precios y equivalencias (ver la idea 'inventario'). Entre 10 y 20 riders antiguos con el presupuesto que hicisteis para cada uno. Vuestros 'paquetes tipo', si los tenéis (boda, empresa, concierto pequeño). Plazo orientativo: prototipo en 1-2 semanas; unido al inventario y a la facturación, 3-4 semanas.",
+    "effort": "Medio",
+    "impact": "Alto",
+    "caveats": "La IA puede equivocarse: inventar un canal, leer mal un plano dibujado a mano o quedarse corta de cableado. Por eso cada dato indica de qué página del rider sale, lo dudoso queda marcado y siempre revisa una persona. Si el rider se usa para estimar potencia eléctrica o cargas, el resultado es SOLO orientativo: el dimensionado eléctrico y el rigging los valida una persona cualificada con las tablas del fabricante. Los riders llevan nombres y teléfonos, así que hay que cumplir la protección de datos: contrato con el proveedor de IA y borrar lo que no haga falta.",
+    "sources": [
+     "https://es.wikipedia.org/wiki/Rider_t%C3%A9cnico",
+     "https://sonidonorte.es/blog/que-incluir-rider-tecnico-artistas-promotores",
+     "https://www.aepd.es/guias/adecuacion-rgpd-ia.pdf"
+    ]
+   },
+   {
+    "id": "rentabilidad",
+    "category": "Mixto",
+    "title": "Tickets por WhatsApp, avisos de cobro y ganancia real de cada evento",
+    "problem": "En una empresa de eventos cuesta saber cuánto se gana de verdad en cada bolo después de pagar técnicos, gasoil, peajes, dietas y subalquileres. Los tickets se pierden, y algunas agencias y ayuntamientos pagan tarde.",
+    "solution": "Haces una foto al ticket o a la factura y la mandas por WhatsApp o por email. La IA la lee y la asigna a un evento. Con eso tienes un panel con: la ganancia por evento y por tipo de evento; lo que gastáis en subalquilar cada equipo, para ver si compensa comprarlo; y los equipos que casi no salen. También hay recordatorios de cobro automáticos por WhatsApp o email cuando vence una factura. Por defecto son recordatorios amables. Si quieres, cliente a cliente, pueden incluir el cálculo de los intereses de demora y los 40 € de gastos de cobro que marca la ley cuando una empresa paga tarde. Las facturas se siguen haciendo con un programa preparado para Verifactu, el sistema de Hacienda para los programas de facturación (por ejemplo Holded, o el de vuestra gestoría). Nosotros nos conectamos a ese programa; no lo sustituimos.",
+    "what_we_need": "Qué programa usáis para facturar y si permite exportar datos o conectarse con otros programas. Quién os lleva la contabilidad. Cómo pagáis a los técnicos y los subalquileres. Si queréis, extractos del banco para cruzar los cobros.",
+    "effort": "Medio",
+    "impact": "Alto",
+    "caveats": "La fecha de Verifactu depende de vuestra forma jurídica. Si tributáis por el Impuesto de Sociedades, es el 1 de enero de 2027. Si sois C.B. o autónomos, el 1 de julio de 2027. Que lo confirme vuestra gestoría. Los importes dudosos se revisan a mano, porque la IA puede leer mal un ticket arrugado. El plazo máximo de pago entre empresas es de 60 días, y las administraciones públicas tienen 30. Más adelante llegará la factura electrónica obligatoria entre empresas (Real Decreto 238/2026, con plazos según la facturación), así que conviene un programa que ya la soporte. Con ayuntamientos o clientes habituales, los recordatorios con intereses pueden molestar: por eso se activan solo donde tú decidas.",
+    "sources": [
+     "https://www.holded.com/es/precios",
+     "https://sede.agenciatributaria.gob.es/Sede/iva/sistemas-informaticos-facturacion-verifactu/nota-informativa-ampliacion-plazo-adaptacion-facturacion.html",
+     "https://sede.agenciatributaria.gob.es/Sede/iva/sistemas-informaticos-facturacion-verifactu/preguntas-frecuentes/cuestiones-generales-ambitos-aplicacion.html",
+     "https://www.boe.es/buscar/act.php?id=BOE-A-2004-21830",
+     "https://legia.es/guias/morosidad-operaciones-comerciales-ley-3-2004",
+     "https://www.boe.es/buscar/act.php?id=BOE-A-2026-7295"
+    ]
+   },
+   {
+    "id": "parte",
+    "category": "IA",
+    "title": "Parte de fin de evento dictado con un audio",
+    "problem": "Después de desmontar nadie tiene ganas de rellenar formularios. Así se pierden las incidencias, el material roto o perdido, las horas reales y lo que hubo que subalquilar. Y eso es justo lo que hace falta para mantener el equipo, saber cuánto se gana y ajustar precios.",
+    "solution": "El técnico manda desde la furgoneta un audio y unas fotos por WhatsApp. El sistema pasa el audio a texto y la IA lo ordena en un parte con las incidencias, el material dañado (que pasa directamente a 'a reparar' en el inventario), las horas reales, los subalquileres, los contactos del recinto y notas para la próxima vez. Si queréis, también saca un resumen limpio para el cliente.",
+    "what_we_need": "Una plantilla con lo que os interesa apuntar en el parte y una lista de vuestras palabras técnicas habituales, para que la transcripción las entienda. Plazo orientativo: alrededor de una semana (estimación nuestra).",
+    "effort": "Bajo",
+    "impact": "Medio",
+    "caveats": "Con mucho ruido de fondo o mucha jerga, la transcripción puede fallar, pero siempre se puede corregir. El audio se borra en cuanto está transcrito. Si preferís que no salga de casa, la transcripción puede hacerse en un ordenador vuestro con un programa gratuito (Whisper). Si en las fotos sale público o artistas, no se publican sin su permiso.",
+    "sources": [
+     "https://github.com/openai/whisper",
+     "https://www.aepd.es/prensa-y-comunicacion/notas-de-prensa/la-agencia-publica-unas-orientaciones-sobre-inteligencia"
+    ]
+   },
+   {
+    "id": "whatsapp",
+    "category": "IA",
+    "title": "Web con formulario y asistente de WhatsApp que recoge los datos del evento",
+    "problem": "Las peticiones llegan por WhatsApp o por teléfono mientras estáis montando, de noche o en fin de semana. Y casi siempre les faltan datos: horario de carga, potencia disponible, acceso para la furgoneta, aforo. Además, la web nueva que os hemos preparado ya está lista, pero todavía no está publicada.",
+    "solution": "Primer paso: publicar la web nueva con un formulario 'Pide presupuesto', con opción de subir el rider, y un botón de WhatsApp. Segundo paso: un asistente que hace las primeras preguntas por WhatsApp (fecha, lugar, interior o exterior, aforo, tipo de evento, potencia, accesos, si hay rider y presupuesto aproximado), deja una ficha preparada y os pasa la conversación. Desde el 2 de agosto de 2026 la ley obliga a que se presente como asistente automático. No da precios cerrados. Podéis seguir contestando desde el móvil con el mismo número, aunque con algunas limitaciones (por ejemplo, las listas de difusión) que revisaremos antes.",
+    "what_we_need": "Cuántas peticiones os llegan y por dónde. El número de WhatsApp que usáis. Las preguntas que hacéis siempre y el tono con el que habláis a los clientes. Para publicar la web: vuestro NIF y el nombre legal exacto de la empresa.",
+    "effort": "Bajo",
+    "impact": "Medio",
+    "caveats": "Solo compensa si os llegan bastantes peticiones, o muchas a deshoras. WhatsApp (Meta) cobra por los mensajes que envía el asistente, y desde el 1 de octubre de 2026 cobra también las respuestas a clientes, así que calcularemos el coste real antes de arrancar. El asistente nunca promete disponibilidad ni precio, y siempre puede pasar la conversación a una persona. Hacen falta cláusulas de protección de datos.",
+    "sources": [
+     "https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing",
+     "https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages",
+     "https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users",
+     "https://respond.io/blog/whatsapp-general-purpose-chatbots-ban",
+     "https://digital-strategy.ec.europa.eu/en/faqs/transparency-obligations-under-article-50-ai-act"
+    ]
+   },
+   {
+    "id": "papeles",
+    "category": "Software",
+    "title": "Carpeta de papeles con avisos de caducidad y QR en motores y truss",
+    "problem": "Cada recinto y cada organizador os pide papeles: seguro de responsabilidad civil, prevención de riesgos y coordinación con las otras empresas del montaje (lo que se llama CAE), formación, Seguridad Social... IFEMA, por ejemplo, pide un formulario online antes de montar. Además, la ley pide que los equipos sujetos a revisiones periódicas, cuando se usan fuera de la empresa, lleven una prueba de su última revisión.",
+    "solution": "Una carpeta digital con todos vuestros documentos, sus fechas de caducidad y avisos antes de que caduquen. Con un clic se prepara el 'paquete CAE' para cada recinto, y la IA ayuda a rellenar los formularios que os mandan. Motores, accesorios de elevación y, si el fabricante o vuestra evaluación de riesgos lo piden, tramos de truss llevan un QR: al escanearlo, cualquiera ve su historial y su último certificado de revisión.",
+    "what_we_need": "La lista de documentos que os suelen pedir y sus fechas. Quién es vuestro servicio de prevención. La lista de motores, truss y accesorios de elevación, con sus certificados.",
+    "effort": "Bajo",
+    "impact": "Medio",
+    "caveats": "Es SOLO un registro. Las revisiones, los cálculos de carga y la firma los hace una persona competente siguiendo al fabricante. Si la IA redacta una evaluación de riesgos, es solo un borrador que tiene que revisar vuestro servicio de prevención.",
+    "sources": [
+     "https://www.boe.es/buscar/act.php?id=BOE-A-1997-17824",
+     "https://www.boe.es/buscar/act.php?id=BOE-A-2004-1848",
+     "https://www.ifema.es/general/doc/normas-generales-participacion/normas-generales-de-participacion.pdf",
+     "https://www.en-standard.eu/une-en-17206-2021-entertainment-technology-machinery-for-stages-and-other-production-areas-safety-requirements-and-inspections/"
+    ]
+   },
+   {
+    "id": "exterior",
+    "category": "Mixto",
+    "title": "Avisos de viento, lluvia y consumo eléctrico en eventos al aire libre (solo aviso)",
+    "problem": "En exterior el viento es muy local, y las estaciones meteorológicas suelen quedar lejos. Los fabricantes marcan límites. Por ejemplo, el manual del L-Acoustics K2 (un sistema de line array; lo usamos solo como ejemplo, y os pediremos los manuales de vuestro PA y de vuestras estructuras) pide bajar o asegurar el array cuando el viento pasa de fuerza 6 en la escala Beaufort (39-49 km/h). A eso se suman los generadores al límite y las fases desequilibradas.",
+    "solution": "Tres piezas que se pueden usar por separado. (1) Un aviso automático con la previsión de AEMET 48 y 24 horas antes de cada evento al aire libre de vuestro calendario: viento, rachas, lluvia y tormenta. (2) Un anemómetro (medidor de viento) en el recinto, conectado a un ESP32 con 4G, que manda avisos por niveles y deja un registro con fecha y hora. Lo fija quien monta la estructura, con elementos certificados y cable de seguridad. Si eso no es posible, va en un mástil propio a nivel de suelo y se indica la altura real a la que mide. Los avisos solo van a la persona responsable que figure en el plan de seguridad del evento. (3) Un medidor eléctrico comercial con marcado CE (por ejemplo, Shelly Pro 3EM), montado por un electricista habilitado en un cuadro preparado para ello. El ESP32 o la Raspberry solo leen sus datos. Así se ve la carga de cada fase, los picos y el consumo de cada evento, lo que ayuda a elegir el generador y a calcular el gasoil.",
+    "what_we_need": "Cuántos eventos al aire libre hacéis. Quién monta y firma los escenarios y las estructuras. Los límites de viento que dan los fabricantes de vuestro PA y de vuestras estructuras. El tamaño de los generadores y cuadros, y quién los instala.",
+    "effort": "Medio",
+    "impact": "Medio",
+    "caveats": "SEGURIDAD: es SOLO información y aviso, NUNCA un sistema de seguridad. Los límites los fijan el fabricante y el ingeniero de la estructura. La decisión de bajar el PA o parar es de la organización y de la autoridad. Ningún aparato nuestro actuará solo sobre motores ni estructuras. No ponemos electrónica casera en contacto con la tensión de red. Esto no sustituye a diferenciales, magnetotérmicos ni a la firma del instalador. Si preferís un producto comercial para el viento, existen WindPro y Wireless Wind. Si hacéis muchos eventos al aire libre, el impacto es alto.",
+    "sources": [
+     "https://static.rt-events.fr/document/l-acoustics_k2_manuel_accroche.pdf",
+     "https://es.wikipedia.org/wiki/Escala_de_Beaufort",
+     "https://www.thepurpleguide.co.uk/temporary-demountable-structures",
+     "https://www.eventoplus.com/articulos/como-gestionar-un-riesgo-meteorologico-y-la-evacuacion-de-un-evento-masivo/",
+     "https://opendata.aemet.es/",
+     "https://scarlet-tech.com/products/windpro-wireless-wind-monitor-system/",
+     "https://wirelesswind.com/entertainment/",
+     "https://thepihut.com/products/shelly-pro-3em-120a",
+     "https://www.plcmadrid.es/rebt/itc-bt-34-ferias-y-stands/",
+     "https://www.boe.es/buscar/act.php?id=BOE-A-2002-18099"
+    ]
+   },
+   {
+    "id": "ruido",
+    "category": "IoT (ESP32/Raspberry)",
+    "title": "Medidor de nivel de sonido con avisos al móvil (orientativo, no oficial)",
+    "problem": "En muchos eventos el límite de sonido lo fija la autorización del ayuntamiento, y las reglas cambian según el municipio y la comunidad: no es lo mismo Madrid que Segovia. Pasarse puede acabar en problemas con el promotor o con los vecinos.",
+    "solution": "Un pequeño aparato con ESP32 y un micrófono de calidad en FOH (la mesa de control del público), y otro en el perímetro o en la fachada más cercana. Miden el nivel medio minuto a minuto y en ventanas de 5 y 15 minutos, y avisan al móvil del técnico cuando os acercáis al límite. Al terminar sale un PDF con la evolución del nivel, marcado en la cabecera y el pie como 'ORIENTATIVO – NO VÁLIDO COMO MEDICIÓN OFICIAL'. Es información extra para el técnico y para el promotor, no una medición oficial. Lo que mide en FOH es el nivel en esa posición, no el ruido que recibe cada persona.",
+    "what_we_need": "Dónde os ponen límites y cómo se mide. Si tenéis un sonómetro de referencia para ajustar el aparato. En qué tipo de eventos lo usaríais.",
+    "effort": "Medio",
+    "impact": "Medio",
+    "caveats": "NO vale como prueba legal. Para una medición oficial hace falta un sonómetro de la clase que exija la norma (normalmente clase 1) con verificación periódica anual, o contratar a una empresa acústica. El micrófono se satura hacia 120 dB, así que no sirve pegado al PA, y en exterior necesita protección contra el viento. Si queréis algo comercial para giras, existe 10EaZy (un distribuidor europeo lo vende entre 1.899 y 2.350 €). En locales fijos se usan limitadores homologados, que ya se venden hechos. Sobre el oído de los técnicos: cuando hay trabajadores expuestos a 80 dB(A) o más de media en la jornada (8 horas), o a picos de 135 dB(C), la empresa tiene que informarles, formarles y ofrecerles protectores (RD 286/2006). Eso lo mide el servicio de prevención, con sus propios aparatos; este medidor no sirve para eso.",
+    "sources": [
+     "https://www.bocm.es/boletin/CM_Orden_BOCM/2011/03/14/BOCM-20110314-56.PDF",
+     "https://www.boe.es/buscar/pdf/2009/BOE-A-2009-11125-consolidado.pdf",
+     "https://www.boe.es/buscar/act.php?id=BOE-A-2007-18397",
+     "https://www.boe.es/buscar/act.php?id=BOE-A-2020-2573",
+     "https://www.boe.es/buscar/act.php?id=BOE-A-2006-4414",
+     "https://www.10eazy.com/",
+     "https://www.tzaudio.no/product/10eazy-spl-monitoring-system/",
+     "https://github.com/ikostoski/esp32-i2s-slm",
+     "https://www.mouser.com/datasheet/2/400/ds_000069_ics_43434_v1_2-2581173.pdf"
+    ]
+   },
+   {
+    "id": "licitaciones",
+    "category": "IA",
+    "title": "Avisos de concursos públicos de sonido e iluminación, con resumen",
+    "problem": "Los ayuntamientos de la Comunidad de Madrid contratan sonido e iluminación para fiestas y actos culturales. Por ejemplo, Boadilla del Monte sacó en 2026 un contrato de asistencia técnica de luz, sonido y maquinaria escénica. En una prueba del 23 de septiembre de 2026, la primera página de avisos de la Plataforma de Contratación ya traía 4 concursos de este tipo en municipios madrileños. Vigilar todas las webs y leerse los pliegos lleva mucho tiempo.",
+    "solution": "Primer paso, gratis: darse de alta en las alertas de la Plataforma de Contratación del Sector Público, filtrando por códigos de actividad (por ejemplo 92370000, 'Técnico de sonido', y los de eventos, equipos de sonido e iluminación, que confirmaremos). Segundo paso: un aviso diario por WhatsApp filtrado por tipo de servicio, zona e importe. La IA resume cada pliego (plazos, requisitos, seguros, material exigido, penalizaciones) y dice cómo encaja con vuestro material y vuestro calendario. Los contratos pequeños (menos de 15.000 € sin IVA) se publican después de adjudicarse, a veces solo de forma agrupada. No sirven para presentarse, pero enseñan qué ayuntamientos contratan sonido y a qué precio. También existe el Sistema Dinámico de Adquisición de Madrid Destino (la empresa cultural del Ayuntamiento de Madrid) para alquiler de sonido, luz, escenario y audiovisual, con transporte, montaje y desmontaje. Mientras está abierto, pueden pedir entrar las empresas que cumplan los requisitos.",
+    "what_we_need": "Si tenéis certificado digital. Qué zonas e importes os interesan. Vuestra forma jurídica. Si os interesa presentaros o preferís trabajar para la productora que gana el concurso. Plazo orientativo: 3-5 días.",
+    "effort": "Bajo",
+    "impact": "Medio",
+    "caveats": "IMPORTANTE: los tribunales de contratación han excluido a comunidades de bienes por no tener personalidad jurídica, y lo previsible es que el sistema de Madrid Destino tenga el mismo problema. Si seguís siendo C.B., las opciones son tres. Que se presente cada socio como autónomo, pero entonces cada uno tiene que demostrar por su cuenta la solvencia que pida el pliego. Formar una UTE (unión temporal de empresas: asociarse con otra empresa solo para ese contrato). O crear una S.L. Confirmadlo con vuestro asesor. Todo lo que redacte la IA para un concurso lo revisa un socio con el inventario real delante: atribuirse medios o experiencia que no se tienen puede acabar en una prohibición de contratar con la Administración.",
+    "sources": [
+     "https://contrataciondelsectorpublico.gob.es/wps/portal/DatosAbiertos",
+     "https://www.hacienda.gob.es/es-ES/GobiernoAbierto/Datos%20Abiertos/Paginas/LicitacionesContratante.aspx",
+     "https://contratos.gobierto.es/cpv/92370000",
+     "https://licitron.com/licitaciones/madrid/ec372026servicio-de-asistencia-tecnica-en-materi-ac6f9d96",
+     "https://contratacion.madrid-destino.com/",
+     "https://tramitando.net/recibir-alertas-de-la-plataforma-de-contratacion-del-estado/",
+     "https://www.boe.es/buscar/act.php?id=BOE-A-2017-12902",
+     "https://emmaramos.net/2023/03/30/puede-una-comunidad-de-bienes-contratar-con-la-administracion-publica/"
+    ]
+   },
+   {
+    "id": "mantenimiento",
+    "category": "IoT (ESP32/Raspberry)",
+    "title": "Focos que avisan de sus revisiones y micros que avisan de su batería",
+    "problem": "Una cabeza móvil que falla en pleno bolo es un mal rato, y la limpieza y las revisiones hechas a tiempo ayudan a evitarlo. Un micro inalámbrico que se queda sin batería en directo es de los peores sustos.",
+    "solution": "(1) Un puesto de revisión en el almacén, con una Raspberry Pi o un ESP32. Conectas un grupo de focos y, por el propio cable de control, lee las horas de uso, las horas de lámpara, los errores y, si el foco lo ofrece, las temperaturas. Para eso usa RDM, una función de muchos focos modernos para comunicarse por el cable DMX. Con esos datos salen avisos de limpieza y de revisión por horas. Es mantenimiento preventivo: con los datos de una empresa pequeña no se pueden 'predecir' averías. (2) Si vuestros receptores de micros se conectan a red (por ejemplo Shure ULX-D o SLX-D, o Sennheiser EW-DX), una Raspberry en el rack de FOH enseña en una tablet la batería de cada micro y avisa cuando baja. Con baterías recargables del fabricante se ve el tiempo que queda en minutos ('Micro 3: 40 min'); con pilas AA solo se ve el nivel aproximado.",
+    "what_we_need": "Marcas y modelos de vuestras cabezas móviles y de vuestros micros inalámbricos. Si sabéis si tienen RDM o conexión de red. Si los micros van con pilas AA o con baterías recargables de la marca.",
+    "effort": "Medio",
+    "impact": "Medio",
+    "caveats": "Cada fabricante aplica RDM a su manera, así que hay que probar modelo a modelo. Los splitters (repartidores de señal) tienen que ser compatibles con RDM, y los enlaces DMX inalámbricos normalmente no lo dejan pasar. Si los micros no tienen red, la parte de baterías no se puede hacer. Los avisos solo recuerdan: la revisión de eslingas, truss y material eléctrico la hace una persona competente según el manual del fabricante.",
+    "sources": [
+     "https://wiki.openlighting.org/index.php/RDM_PID_Definitions",
+     "https://github.com/someweisguy/esp_dmx",
+     "https://www.openlighting.org/ola/tutorials/ola-on-raspberry-pi/",
+     "https://www.shure.com/en-US/docs/commandstrings/SLXD",
+     "https://content-files.shure.com/Pubs/ulx/ulx-d-network-string-commands.pdf",
+     "https://docs.cloud.sennheiser.com/en-us/control-cockpit/control-cockpit/ssc-protocols.html"
+    ]
+   },
+   {
+    "id": "furgoneta",
+    "category": "IoT (ESP32/Raspberry)",
+    "title": "Una furgoneta que avisa si falta un case, y GPS antirrobo",
+    "problem": "Olvidarse un case en el almacén o en el recinto, o que roben una furgoneta cargada de equipo, sale muy caro. También está el peso. La carga útil es la masa máxima autorizada (MMA) de vuestra furgoneta menos lo que pesa en orden de marcha, con conductor y depósito lleno. Con carnet B, esa MMA es como mucho de 3.500 kg.",
+    "solution": "(1) Un ESP32 en la furgoneta detecta unas pequeñas balizas Bluetooth pegadas en los cases más importantes y, antes de salir o al recoger, avisa por WhatsApp de lo que falta según la lista del evento. (2) Un localizador GPS comercial con un servidor gratuito (Traccar), para antirrobo y para saber a qué hora se llega al montaje. (3) La suma de pesos de la carga de cada evento, comparada con la carga útil de cada furgoneta, sale directamente del inventario.",
+    "what_we_need": "Cuántos vehículos tenéis y de qué tipo, su MMA y su tara, quién conduce y qué cases son los más valiosos.",
+    "effort": "Medio",
+    "impact": "Medio",
+    "caveats": "El metal de los flight cases debilita la señal Bluetooth y las pilas de las balizas hay que cambiarlas, así que esto complementa al escaneo QR; no lo sustituye. Si conducen trabajadores, hay que informarles antes, por escrito y con claridad, del GPS (LOPDGDD, la ley española de protección de datos, art. 90). Como buena práctica, se desactiva fuera de la jornada. Un AirTag escondido es barato, pero avisa al móvil de quien lo lleve encima, sea iPhone o Android.",
+    "sources": [
+     "https://www.minew.com/solutions/smart-warehouse/",
+     "https://hubble.com/community/guides/how-to-build-a-ble-asset-tracker-with-esp32/",
+     "https://www.traccar.org/",
+     "https://www.teltonika-gps.com/products/trackers/basic/fmc920",
+     "https://www.iberley.es/legislacion/articulo-90-ley-organica-proteccion-datos-personales-garantia-derechos-digitales-lopdgdd",
+     "https://support.apple.com/en-us/119874",
+     "https://www.motor16.com/las-ultimas-noticias/carga-util-furgoneta-permiso-b"
+    ]
+   },
+   {
+    "id": "escenas",
+    "category": "IoT (ESP32/Raspberry)",
+    "title": "Caja de escenas para clientes que repiten y probador DMX de bolsillo",
+    "problem": "Algunos clientes usan el mismo sitio una y otra vez (una sala, un restaurante, una iglesia, un evento anual) y necesitan un técnico solo para cambiar las luces. Y en el montaje, encontrar por qué un foco no responde puede llevar mucho tiempo.",
+    "solution": "(1) 'Caja de escenas': una Raspberry Pi con QLC+ (un programa gratuito de control de luces) y una interfaz USB-DMX, que se maneja desde una tablet con botones como 'Cena', 'Baile' o 'Discurso' (con Bitfocus Companion). El cliente cambia de ambiente sin técnico, e IO lo cobra como instalación más mantenimiento. (2) Probador de bolsillo: un ESP32 que enseña en el móvil los valores de los 512 canales de una línea DMX (la señal que controla los focos) y detecta errores o señal inestable, por ejemplo cuando hay dos emisores en la misma línea. Conectado en lugar de la mesa, también lista los aparatos compatibles con RDM.",
+    "what_we_need": "Si tenéis clientes que repiten en el mismo sitio. Qué mesa o programa de luces usáis. Cuántos universos (líneas de 512 canales) movéis en un bolo típico.",
+    "effort": "Bajo",
+    "impact": "Bajo",
+    "caveats": "Para nada importante del show recomendamos DMX inalámbrico comercial (CRMX), no casero. Un aparato hecho a medida nunca debe manejar pirotecnia, efectos de llama ni motores. En recintos llenos es mejor cable de red que WiFi. En instalaciones fijas, la parte eléctrica la hace un instalador y se pacta un contrato de mantenimiento. Si os entregamos aparatos, tienen que llevar marcado CE.",
+    "sources": [
+     "https://github.com/mcallegari/qlcplus",
+     "https://bitfocus.io/companion-pi",
+     "https://www.enttec.com/product/lighting-communication-protocols/dmx512/open-dmx-usb",
+     "https://github.com/tombueng/LuxDMX",
+     "https://github.com/someweisguy/esp_dmx",
+     "https://lumenradio.com/wireless-dmx/"
+    ]
+   }
+  ],
+  "quick_wins": [
+   "Publicar la web nueva, que ya está hecha, y añadirle un botón de WhatsApp y la opción de adjuntar el rider en el formulario de presupuesto. Antes hay que confirmar el NIF y el nombre legal exactos de la empresa.",
+   "Poner etiquetas QR en los cases y en los equipos caros y probar durante dos semanas a escanear en cada salida y en cada entrada, con una hoja sencilla en el móvil o con la prueba gratuita de 30 días de Rentman. Así sabremos si os encaja antes de gastar dinero.",
+   "Avisos automáticos por WhatsApp con la previsión de AEMET (viento, rachas y lluvia) 48 y 24 horas antes de cada evento al aire libre. Es barato y fácil, y es SOLO un aviso: la decisión sigue siendo de la persona responsable.",
+   "Una carpeta de papeles (seguro, prevención, certificados de motores y truss) con avisos antes de que caduquen. Si tenéis certificado digital, también el alta en las alertas gratuitas de la Plataforma de Contratación del Sector Público."
+  ]
+ },
+ "questionnaire": {
+  "intro": "¡Hola! Este formulario sirve para entender cómo trabajáis en IO y encontrar dónde la inteligencia artificial, algún programa sencillo o algún aparato hecho a medida os pueden ahorrar tiempo y disgustos. Se contesta en unos 10-12 minutos desde el móvil, y casi todo es marcar opciones. Solo hay 5 preguntas obligatorias; el resto te las puedes saltar sin problema. No hay respuestas buenas ni malas, y 'No lo sé' es una respuesta perfectamente válida. Si tienes a mano el resumen de ideas que te hemos mandado, mejor, pero no hace falta: cada idea va explicada en una línea.",
+  "estimated_minutes": 11,
+  "sections": [
+   {
+    "id": "perfil",
+    "title": "1. Vuestra empresa y vuestros trabajos",
+    "description": "Para hacernos una idea de cómo es IO por dentro.",
+    "questions": [
+     {
+      "id": "forma_juridica",
+      "label": "¿Qué forma jurídica tiene hoy la empresa?",
+      "type": "single",
+      "required": true,
+      "options": [
+       "Comunidad de bienes (C.B.)",
+       "Sociedad limitada (S.L.)",
+       "Cada socio como autónomo",
+       "Otra",
+       "No lo sé"
+      ],
+      "help": "Sirve para saber qué fechas de Hacienda os tocan en facturación y si podéis presentaros a concursos públicos.",
+      "maps_to_opportunities": [
+       "rentabilidad",
+       "licitaciones"
+      ]
+     },
+     {
+      "id": "eventos_anio",
+      "label": "Más o menos, ¿cuántos eventos o trabajos hacéis al año?",
+      "type": "single",
+      "required": true,
+      "options": [
+       "Menos de 25",
+       "25-50",
+       "51-100",
+       "101-200",
+       "Más de 200",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "inventario",
+       "rider",
+       "whatsapp",
+       "rentabilidad",
+       "parte"
+      ]
+     },
+     {
+      "id": "tipos_trabajo",
+      "label": "Marca hasta 3 tipos de trabajo que más hacéis",
+      "type": "multi",
+      "required": false,
+      "options": [
+       "Conciertos y música en directo",
+       "Fiestas de pueblos y actos de ayuntamientos",
+       "Eventos de empresa",
+       "Bodas y celebraciones",
+       "Teatro y artes escénicas",
+       "Vídeo, pantallas LED, proyección o streaming",
+       "Alquiler de equipo sin técnico",
+       "Instalaciones fijas (salas, restaurantes, iglesias...)"
+      ],
+      "maps_to_opportunities": [
+       "rider",
+       "licitaciones",
+       "escenas",
+       "ruido",
+       "whatsapp",
+       "exterior"
+      ],
+      "max": 3
+     },
+     {
+      "id": "aire_libre",
+      "label": "¿Qué parte de vuestros eventos es al aire libre?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Casi ninguno",
+       "Menos de la mitad",
+       "La mitad o más",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "exterior",
+       "ruido"
+      ]
+     },
+     {
+      "id": "horas_oficina",
+      "label": "Entre los socios, ¿cuántas horas a la semana se os van en trabajo de oficina (presupuestos, WhatsApp, facturas, papeles)?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Menos de 5",
+       "5-10",
+       "11-20",
+       "Más de 20",
+       "No lo sé"
+      ],
+      "help": "Nos sirve para calcular cuánto tiempo os podríamos ahorrar de verdad.",
+      "maps_to_opportunities": [
+       "rider",
+       "whatsapp",
+       "rentabilidad",
+       "papeles",
+       "parte"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "peticiones",
+    "title": "2. Cómo os llegan los trabajos y cómo presupuestáis",
+    "questions": [
+     {
+      "id": "canales",
+      "label": "Marca las 2 o 3 vías por las que os llegan más peticiones de presupuesto",
+      "type": "multi",
+      "required": false,
+      "options": [
+       "WhatsApp",
+       "Llamada",
+       "Email",
+       "Formulario de la web",
+       "Recomendación de otros clientes",
+       "Productoras o agencias",
+       "Ayuntamientos u organismos públicos",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "whatsapp",
+       "licitaciones"
+      ],
+      "max": 3
+     },
+     {
+      "id": "peticiones_mes",
+      "label": "En temporada alta, ¿cuántas peticiones de presupuesto os llegan al mes?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Menos de 5",
+       "5-15",
+       "16-30",
+       "Más de 30",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "whatsapp",
+       "rider"
+      ]
+     },
+     {
+      "id": "como_presupuestais",
+      "label": "¿Cómo hacéis hoy los presupuestos?",
+      "type": "multi",
+      "required": false,
+      "options": [
+       "Con una plantilla de Word o Excel",
+       "Con un programa",
+       "Tenemos precios o paquetes tipo (boda, empresa, concierto pequeño)",
+       "Cada presupuesto desde cero",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "rider",
+       "inventario",
+       "rentabilidad"
+      ]
+     },
+     {
+      "id": "tiempo_rider",
+      "label": "Cuando os llega un rider técnico, ¿cuánto os cuesta convertirlo en lista de material y presupuesto?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Casi nunca nos llegan riders",
+       "Menos de 30 minutos",
+       "Entre 30 minutos y 1 hora",
+       "1-3 horas",
+       "Más de 3 horas",
+       "No lo sé"
+      ],
+      "help": "El rider es el documento del artista o del cliente con lo que necesita: canales, micros, monitores, luces, plano del escenario...",
+      "maps_to_opportunities": [
+       "rider"
+      ]
+     },
+     {
+      "id": "compartir_riders",
+      "label": "Si hiciéramos una prueba, ¿podríais pasarnos unos 10-20 riders antiguos con el presupuesto que hicisteis para cada uno?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Sí",
+       "Algunos",
+       "No",
+       "Prefiero hablarlo en la llamada",
+       "No aplica, casi no nos llegan riders"
+      ],
+      "help": "Solo se usarían para la prueba, con confidencialidad.",
+      "maps_to_opportunities": [
+       "rider"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "material",
+    "title": "3. Material, almacén y furgonetas",
+    "questions": [
+     {
+      "id": "tamano_inventario",
+      "label": "Más o menos, ¿cuántas piezas de equipo tenéis?",
+      "type": "single",
+      "required": true,
+      "options": [
+       "Menos de 100",
+       "100-300",
+       "301-1.000",
+       "Más de 1.000",
+       "No lo sé"
+      ],
+      "help": "Cuenta cajas, subgraves, micros, focos, mesas, truss, mangueras... sin contar cables sueltos.",
+      "maps_to_opportunities": [
+       "inventario",
+       "rider",
+       "furgoneta"
+      ]
+     },
+     {
+      "id": "inventario_donde",
+      "label": "¿Dónde tenéis apuntado hoy vuestro material?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "En un Excel o una hoja de Google",
+       "En un programa",
+       "En papel",
+       "En la cabeza",
+       "Una mezcla de lo anterior",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "inventario",
+       "rider"
+      ]
+     },
+     {
+      "id": "incidencias_material",
+      "label": "¿Con qué frecuencia os pasa...?",
+      "type": "matrix",
+      "required": false,
+      "rows": [
+       "Comprometer un equipo que ya estaba reservado para otro evento",
+       "Darnos cuenta en el bolo de que falta algo",
+       "Material que se queda olvidado o se pierde",
+       "Equipo que vuelve roto y nadie lo anota",
+       "Tener que subalquilar a última hora"
+      ],
+      "options": [
+       "Nunca",
+       "Alguna vez al año",
+       "Cada mes",
+       "Casi cada semana",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "inventario",
+       "furgoneta",
+       "parte",
+       "rider"
+      ]
+     },
+     {
+      "id": "vehiculos",
+      "label": "¿Cuántas furgonetas o camiones usáis?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Ninguno propio (alquilamos cuando hace falta)",
+       "1",
+       "2",
+       "3 o más"
+      ],
+      "maps_to_opportunities": [
+       "furgoneta"
+      ]
+     },
+     {
+      "id": "certificados_rigging",
+      "label": "¿Os ayudaría tener en el móvil los certificados de motores y truss para enseñarlos en el montaje?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Sí",
+       "Ya lo tenemos resuelto",
+       "No usamos motores ni truss colgado",
+       "Prefiero hablarlo en la llamada"
+      ],
+      "maps_to_opportunities": [
+       "papeles",
+       "mantenimiento"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "numeros",
+    "title": "4. Papeles, facturas y cobros",
+    "questions": [
+     {
+      "id": "herramienta_facturacion",
+      "label": "¿Con qué hacéis las facturas?",
+      "type": "single",
+      "required": false,
+      "allow_other": true,
+      "options": [
+       "Word o Excel",
+       "Holded",
+       "El programa de la gestoría",
+       "Otro programa",
+       "Lo hace todo la gestoría",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "rentabilidad"
+      ]
+     },
+     {
+      "id": "tiempo_cobro",
+      "label": "¿Cuánto tardan de media en pagaros?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Menos de 30 días",
+       "30-60 días",
+       "60-90 días",
+       "Más de 90 días",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "rentabilidad"
+      ]
+     },
+     {
+      "id": "margen_evento",
+      "label": "¿Sabéis cuánto ganáis en cada evento después de pagar técnicos, gasoil, subalquiler y dietas?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Sí, evento a evento",
+       "Tenemos una idea aproximada",
+       "No",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "rentabilidad",
+       "parte"
+      ]
+     },
+     {
+      "id": "papeles_tiempo",
+      "label": "Cuando un recinto o un cliente os pide papeles (seguro, prevención de riesgos, formación, Seguridad Social...), ¿cuánto os cuesta reunirlos?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Casi nada, lo tenemos a mano",
+       "Un rato cada vez",
+       "Mucho rato cada vez",
+       "No nos los piden",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "papeles"
+      ]
+     },
+     {
+      "id": "sector_publico",
+      "label": "Con ayuntamientos y concursos públicos...",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Nos presentamos a concursos",
+       "Solo hacemos trabajos pequeños que nos encargan directamente",
+       "Trabajamos para ellos a través de una productora",
+       "No trabajamos con ellos, pero nos interesaría",
+       "No nos interesa",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "licitaciones",
+       "papeles"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "tecnica",
+    "title": "5. Vuestro equipo técnico y los eventos al aire libre",
+    "description": "Si no sabes algo, marca 'No lo sé'. Si te es más fácil, mándanos por WhatsApp una foto del listado de material o del rack y nos ahorramos preguntas.",
+    "questions": [
+     {
+      "id": "ecosistema",
+      "label": "¿Qué de esto tenéis o usáis?",
+      "type": "multi",
+      "required": false,
+      "options": [
+       "DMX por cable (control de luces)",
+       "Luces por red (Art-Net o sACN)",
+       "DMX inalámbrico",
+       "Audio por red (Dante)",
+       "Cabezas móviles (focos robotizados)",
+       "Micros inalámbricos con pilas AA",
+       "Micros inalámbricos con baterías recargables de la marca",
+       "Sonómetro profesional (clase 1 o 2)",
+       "No lo sé"
+      ],
+      "help": "DMX es la señal que manda la mesa de luces a los focos. Art-Net, sACN y Dante son formas de llevar luces o audio por cable de red.",
+      "maps_to_opportunities": [
+       "escenas",
+       "mantenimiento",
+       "ruido"
+      ]
+     },
+     {
+      "id": "limites_sonido",
+      "label": "¿Os han puesto límites de sonido (ayuntamiento, promotor, vecinos)?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Nunca",
+       "Alguna vez",
+       "A menudo",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "ruido"
+      ]
+     },
+     {
+      "id": "viento_lluvia",
+      "label": "En eventos al aire libre, ¿qué hacéis con el viento y la lluvia? (marca lo que corresponda)",
+      "type": "multi",
+      "required": false,
+      "allow_other": true,
+      "options": [
+       "Llevamos anemómetro (medidor de viento) propio",
+       "Tenemos un criterio o protocolo por escrito",
+       "Miramos la previsión en el móvil",
+       "Lo decide el promotor o la empresa del escenario",
+       "No tenemos un criterio fijo",
+       "No hacemos eventos al aire libre",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "exterior"
+      ]
+     },
+     {
+      "id": "electricidad_quien",
+      "label": "En los eventos, ¿quién se encarga de la electricidad (generador, cuadros)?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Nosotros ponemos el generador o los cuadros",
+       "Un electricista o una empresa instaladora",
+       "El recinto o el promotor",
+       "Depende del evento",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "exterior"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "prioridades",
+    "title": "6. Lo que más te interesa",
+    "questions": [
+     {
+      "id": "top3_ideas",
+      "label": "Marca como máximo 3 ideas que te quitarían más dolores de cabeza",
+      "type": "multi",
+      "required": true,
+      "options": [
+       "Tener todo el material y sus reservas en el móvil, con códigos QR en los cases",
+       "Que la IA lea el rider y prepare un borrador de presupuesto que tú revisas",
+       "Saber cuánto ganáis en cada evento: fotos de tickets por WhatsApp y avisos de cobro",
+       "Hacer el parte de fin de evento mandando un audio desde la furgoneta",
+       "Un asistente de WhatsApp que pida los datos del evento y luego te pase la conversación",
+       "Tener los papeles (seguros, prevención, certificados) al día y con avisos",
+       "Avisos de viento y lluvia antes y durante los eventos al aire libre (solo aviso)",
+       "Enterarte de los concursos de ayuntamientos de sonido y luces, ya resumidos",
+       "Un medidor que avise cuando os acercáis al límite de sonido (orientativo)",
+       "Que los focos avisen de sus revisiones y los micros de su batería",
+       "Que la furgoneta avise si falta un case, y GPS antirrobo",
+       "Una tablet con botones para que un cliente que repite cambie las luces sin técnico",
+       "Ninguna me convence",
+       "No lo tengo claro, prefiero que me lo expliquéis"
+      ],
+      "maps_to_opportunities": [
+       "inventario",
+       "rider",
+       "rentabilidad",
+       "parte",
+       "whatsapp",
+       "papeles",
+       "exterior",
+       "licitaciones",
+       "ruido",
+       "mantenimiento",
+       "furgoneta",
+       "escenas"
+      ],
+      "max": 3
+     },
+     {
+      "id": "una_tarea",
+      "label": "Si mañana pudieras quitarte UNA tarea de encima, ¿cuál sería? (opcional)",
+      "type": "textarea",
+      "required": false,
+      "maps_to_opportunities": [
+       "inventario",
+       "rider",
+       "rentabilidad",
+       "parte",
+       "whatsapp",
+       "papeles",
+       "exterior",
+       "licitaciones",
+       "ruido",
+       "mantenimiento",
+       "furgoneta",
+       "escenas"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "preferencias",
+    "title": "7. Cómo te gustaría hacerlo",
+    "questions": [
+     {
+      "id": "inversion_inicio",
+      "label": "Para empezar, ¿qué prefieres?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Algo pequeño para probar (unos cientos de euros)",
+       "Un proyecto más completo, si se ve el ahorro",
+       "Primero quiero ver la propuesta",
+       "Prefiero no decirlo"
+      ],
+      "maps_to_opportunities": [
+       "inventario",
+       "rider",
+       "whatsapp",
+       "rentabilidad",
+       "ruido",
+       "exterior"
+      ]
+     },
+     {
+      "id": "plazo",
+      "label": "¿Cuándo te gustaría tener algo funcionando?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Este otoño-invierno (antes de marzo de 2027)",
+       "Antes del verano de 2027",
+       "Sin prisa",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "inventario",
+       "rider",
+       "whatsapp",
+       "rentabilidad",
+       "exterior"
+      ]
+     },
+     {
+      "id": "ia_con_clientes",
+      "label": "Con los clientes, ¿qué prefieres que haga la inteligencia artificial?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Que conteste sola las primeras preguntas (avisando de que es automática) y luego nos pase la conversación",
+       "Que solo prepare borradores y nosotros revisemos y enviemos",
+       "Prefiero no usarla con clientes",
+       "No lo sé"
+      ],
+      "maps_to_opportunities": [
+       "whatsapp",
+       "rider"
+      ]
+     },
+     {
+      "id": "socio_acuerdo",
+      "label": "¿Tu socio está al tanto y con ganas de probar algo así?",
+      "type": "single",
+      "required": false,
+      "options": [
+       "Sí, lo hemos hablado",
+       "Aún no lo hemos hablado",
+       "Tiene dudas",
+       "Prefiero no decirlo"
+      ],
+      "maps_to_opportunities": [
+       "inventario",
+       "rider",
+       "rentabilidad",
+       "parte",
+       "whatsapp"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "contacto",
+    "title": "8. Contacto",
+    "description": "Protección de datos. Responsable: Brain Stormers (CIFRA), Madrid. Para qué: preparar una propuesta para IO y llamarte para comentarla. Base legal: tu consentimiento, que marcarás en el último paso. No cedemos tus datos a nadie. Se guardan en nuestro alojamiento web y en nuestro correo, y los borramos cuando dejen de hacer falta. Puedes pedir verlos, corregirlos o borrarlos escribiendo a info@brainstormersagency.es.",
+    "questions": [
+     {
+      "id": "nombre",
+      "label": "Tu nombre",
+      "type": "text",
+      "required": true
+     },
+     {
+      "id": "contacto",
+      "label": "Teléfono o correo electrónico (opcional)",
+      "type": "text",
+      "required": false
+     },
+     {
+      "id": "mejor_hora",
+      "label": "¿Cuándo te viene mejor una llamada de unos 30 minutos?",
+      "type": "multi",
+      "required": false,
+      "options": [
+       "Mañanas entre semana",
+       "Tardes entre semana",
+       "Fines de semana",
+       "Mejor por WhatsApp primero"
+      ]
+     }
+    ]
+   }
+  ],
+  "closing": "¡Gracias por tu tiempo! Con tus respuestas prepararemos una propuesta corta con las 2 o 3 ideas que más os pueden ayudar: en qué orden hacerlas y cuánto costarían. Te la enseñaremos en una llamada tranquila. Solo usaremos tus respuestas para preparar esa propuesta. Y si te apetece, mándanos por WhatsApp una foto del listado de material o del rack: nos ahorra muchas preguntas."
+ }
+}
