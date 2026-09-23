@@ -74,6 +74,20 @@ Se usaron solo datos verificables. Las fuentes:
 - **Textos de servicios, tipos de evento y proceso:** son descriptivos y no incluyen cifras, clientes ni garantías inventadas. Las fuentes públicas solo documentan conciertos y música en directo. Conviene confirmar los tipos de evento (bodas, empresa, teatro…) y los servicios que queréis destacar.
 - **Nitidez de la película en móviles y tablets de alta densidad:** la película es 720p. Para máxima nitidez se puede generar otra versión vertical a 1080×1920 (requiere créditos de Higgsfield; a día de hoy quedan ~2).
 
+## Publicar desde cPanel con Git
+
+El repositorio incluye `.cpanel.yml` y `deploy/cpanel-deploy.sh`. cPanel los usa para copiar esta carpeta a la carpeta pública del dominio.
+
+Configuración (una sola vez), en **cPanel » Archivos » Git Version Control » Create**:
+
+1. **Clone URL:** `https://github.com/duduar89/trading-system.git`
+2. **Repository Path:** `repositories/trading-system`. No debe ser la carpeta pública.
+3. En **Manage**, elige la rama `claude/ios-sistemas-redesign-1f3ckf` en **Checked-Out Branch**.
+
+Para cada actualización, en **Manage » Pull or Deploy** pulsa **Update from Remote** y después **Deploy HEAD Commit**.
+
+`SITE_URL` en `.cpanel.yml` indica dónde se publica la web. El script cambia a esa dirección las URL absolutas de la tarjeta para compartir, canonical, sitemap y JSON-LD. Si no es el dominio definitivo, añade además `noindex`. Para pasar a `https://www.iosistemasaudiovisuales.com` basta con cambiar esa línea.
+
 ## Estructura
 
 ```
