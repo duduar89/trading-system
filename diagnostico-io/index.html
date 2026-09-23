@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Diagnóstico IA y tecnología · IO Sistemas Audiovisuales</title>
+  <meta name="description" content="Cuestionario para estudiar cómo la inteligencia artificial, el software y la electrónica a medida pueden ayudar a IO Sistemas Audiovisuales.">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0b0d12">
+  <link rel="icon" type="image/png" href="assets/img/favicon-32.png">
+  <link rel="preload" href="assets/fonts/DelaGothicOne-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/form.css?v=1">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <img src="assets/img/logo-io-blanco.webp" width="600" height="461" alt="IO Sistemas Audiovisuales">
+      <span class="x" aria-hidden="true">×</span>
+      <span class="bs">Brain Stormers</span>
+    </header>
+
+    <main>
+      <section id="portada" class="hero" aria-labelledby="titulo">
+        <p class="eyebrow">Diagnóstico · IA, software y electrónica</p>
+        <h1 id="titulo">¿Dónde os puede ayudar <span class="gradient-text">la tecnología?</span></h1>
+        <p class="lead" id="intro"></p>
+        <div class="meta-row">
+          <span class="chip" id="minutes"></span>
+          <span class="chip" id="qcount"></span>
+          <span class="chip">Se guarda solo</span>
+        </div>
+
+        <details class="ideas">
+          <summary>Ver las <span id="ideas-count"></span> ideas que hemos preparado</summary>
+          <div class="ideas-body" id="ideas-list"></div>
+        </details>
+
+        <div class="start">
+          <button class="btn btn-primary" type="button" id="start">Empezar el cuestionario</button>
+          <button class="btn btn-ghost" type="button" id="restart" hidden>Empezar de cero</button>
+        </div>
+        <p class="restore-note" id="restore-note" hidden>Hemos recuperado las respuestas que dejaste a medias en este dispositivo.</p>
+      </section>
+
+      <section id="form" class="form-wrap" hidden aria-label="Cuestionario">
+        <div class="progress" aria-live="polite">
+          <div class="progress-row"><strong id="step-title"></strong><span id="step-label"></span></div>
+          <div class="bar" aria-hidden="true"><span id="bar"></span></div>
+        </div>
+        <div id="steps"></div>
+        <p class="saved" id="saved" aria-live="polite"></p>
+      </section>
+
+      <section id="done" class="done" hidden aria-labelledby="done-title">
+        <p class="eyebrow">Recibido</p>
+        <h2 id="done-title" tabindex="-1">¡Gracias! <span class="gradient-text">Ya lo tenemos.</span></h2>
+        <p>Vamos a estudiar tus respuestas y te preparamos una propuesta concreta, con prioridades y costes orientativos. Te escribimos en unos días para comentarla.</p>
+        <p><button class="btn btn-ghost" type="button" id="done-copy">Descargar una copia de mis respuestas</button></p>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>Cuestionario preparado por Brain Stormers para IO Sistemas Audiovisuales. Tus respuestas solo se usan para preparar la propuesta; puedes pedir que las borremos escribiendo a <a href="mailto:info@brainstormersagency.es">info@brainstormersagency.es</a>.</p>
+    </footer>
+  </div>
+
+  <script src="preguntas.js?v=1"></script>
+  <script src="assets/form.js?v=1"></script>
+</body>
+</html>
