@@ -1,0 +1,11 @@
+---
+# Publicación desde cPanel » Archivos » Git Version Control:
+# pulsa «Update from Remote» y después «Deploy HEAD Commit».
+#
+# SITE_URL es la dirección donde se publica la web (tarjeta para compartir,
+# canonical y sitemap). Para el dominio definitivo, cámbiala por:
+#   https://www.iosistemasaudiovisuales.com
+deployment:
+  tasks:
+    - export SITE_URL=https://iosistemasaudiovisuales.brainstormersagency.es
+    - /bin/bash deploy/cpanel-deploy.sh
