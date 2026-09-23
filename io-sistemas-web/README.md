@@ -69,9 +69,10 @@ Se usaron solo datos verificables. Las fuentes:
 
 ## Pendiente de confirmar por la empresa
 
-- **Aviso legal:** falta el NIF y la dirección completa del titular. Hay un comentario `PENDIENTE` en `aviso-legal.html` que indica dónde añadirlos. La base de datos de eInforma recoge «I/O SISTEMAS AUDIOVISUALES C.B.» en Brunete (Madrid); hay que confirmar que es el titular.
+- **Aviso legal:** falta el NIF y la dirección completa del titular. Se añaden en el apartado «1. Titular del sitio web» de `aviso-legal.html` (art. 10 de la LSSI). La base de datos de eInforma recoge «I/O SISTEMAS AUDIOVISUALES C.B.» en Brunete (Madrid); hay que confirmar que es el titular.
 - **Teléfono:** se ha publicado el de Facebook. Ese mismo número figura en Páginas Amarillas para otro negocio, así que conviene confirmar que sigue siendo el de contacto.
-- **Textos de servicios y proceso:** son descriptivos y no incluyen cifras ni clientes inventados. Conviene revisarlos por si hay algún servicio que no ofrecéis o queréis destacar.
+- **Textos de servicios, tipos de evento y proceso:** son descriptivos y no incluyen cifras, clientes ni garantías inventadas. Las fuentes públicas solo documentan conciertos y música en directo. Conviene confirmar los tipos de evento (bodas, empresa, teatro…) y los servicios que queréis destacar.
+- **Nitidez de la película en móviles y tablets de alta densidad:** la película es 720p. Para máxima nitidez se puede generar otra versión vertical a 1080×1920 (requiere créditos de Higgsfield; a día de hoy quedan ~2).
 
 ## Estructura
 

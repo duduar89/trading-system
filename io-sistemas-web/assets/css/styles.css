@@ -231,7 +231,15 @@ ul {
 }
 
 .section-title {
-  font-size: clamp(2.1rem, 1.3rem + 3.6vw, 4.25rem);
+  font-size: clamp(1.8rem, 1.05rem + 4vw, 4.25rem);
+  overflow-wrap: break-word;
+}
+
+/* Las columnas de rejilla no deben ensancharse por una palabra larga */
+.process > *,
+.contact__grid > *,
+.section__head > * {
+  min-width: 0;
 }
 
 .section-lead {
@@ -562,6 +570,7 @@ ul {
 }
 
 .chapter {
+  --chapter-anchor: center;
   position: absolute;
   left: var(--gutter);
   top: 50%;
@@ -851,6 +860,7 @@ ul {
   }
 
   .chapter {
+    --chapter-anchor: bottom;
     top: auto;
     bottom: calc(92px + env(safe-area-inset-bottom, 0px));
     width: calc(100% - 2 * var(--gutter) - 40px);
@@ -935,7 +945,7 @@ ul {
 }
 
 @media (max-width: 340px) {
-  .chapter__eyebrow {
+  html.js:not(.reduced-motion):not(.hero-static) .chapter__eyebrow {
     display: none;
   }
 }
@@ -952,6 +962,7 @@ ul {
   .chapter,
   .chapter.is-active,
   .chapter.is-before {
+    --chapter-anchor: top;
     top: calc(var(--header-h) + 4px);
     bottom: auto;
     width: min(560px, calc(100% - 2 * var(--gutter) - 90px));
@@ -969,8 +980,8 @@ ul {
     transform: translateY(-24px);
   }
 
-  .chapter__eyebrow,
-  .chapter__num {
+  html.js:not(.reduced-motion):not(.hero-static) .chapter__eyebrow,
+  html.js:not(.reduced-motion):not(.hero-static) .chapter__num {
     display: none;
   }
 
@@ -1366,7 +1377,7 @@ ul {
   gap: clamp(16px, 2vw, 28px);
   margin: 0;
   padding: 8px var(--gutter) clamp(88px, 12vw, 140px);
-  padding-left: max(var(--gutter), calc((100vw - var(--maxw)) / 2 + var(--gutter)));
+  padding-left: max(var(--gutter), calc((100% - var(--maxw)) / 2 + var(--gutter)));
   list-style: none;
 }
 
@@ -1480,7 +1491,7 @@ ul {
   gap: 14px;
   margin-top: 28px;
   padding-inline: var(--gutter);
-  padding-left: max(var(--gutter), calc((100vw - var(--maxw)) / 2 + var(--gutter)));
+  padding-left: max(var(--gutter), calc((100% - var(--maxw)) / 2 + var(--gutter)));
   color: var(--muted);
   font-size: 0.85rem;
   letter-spacing: 0.12em;
@@ -1508,7 +1519,7 @@ ul {
 .events:not(.is-pinned) .events__viewport {
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  scroll-padding-left: max(var(--gutter), calc((100vw - var(--maxw)) / 2 + var(--gutter)));
+  scroll-padding-left: max(var(--gutter), calc((100% - var(--maxw)) / 2 + var(--gutter)));
   scrollbar-width: thin;
   scrollbar-color: rgba(251, 104, 112, 0.6) transparent;
   -webkit-overflow-scrolling: touch;
@@ -1519,8 +1530,63 @@ ul {
 }
 
 .events:not(.is-pinned) .events__track {
-  padding-bottom: 20px;
+  padding-bottom: 14px;
+}
+
+.events:not(.is-pinned) .events__viewport {
   margin-bottom: clamp(68px, 10vw, 120px);
+}
+
+/* Botones anterior / siguiente: solo con ratón y cuando la galería es un carrusel */
+.events__nav {
+  display: none;
+  justify-content: flex-end;
+  gap: 10px;
+  max-width: var(--maxw);
+  margin: -8px auto 14px;
+  padding-inline: var(--gutter);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .events:not(.is-pinned) .events__nav {
+    display: flex;
+  }
+}
+
+.no-js .events__nav {
+  display: none !important;
+}
+
+.events__btn {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: rgba(11, 13, 18, 0.6);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+.events__btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.events__btn:hover:not(:disabled) {
+  background: #fff;
+  color: #000;
+}
+
+.events__btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.events.is-fit .events__hint {
+  display: none;
 }
 
 @media (max-width: 899px) {
@@ -1941,6 +2007,9 @@ ul {
 .copy-btn {
   display: flex;
   width: max-content;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
   --btn-pad-y: 6px;
   --btn-pad-x: 14px;
   min-height: 40px;

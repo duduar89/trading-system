@@ -240,13 +240,35 @@
       });
     });
 
+    // ¿Cabe cada capítulo entre la cabecera y el borde inferior? Si no, texto apilado.
+    // El CSS indica cómo se ancla cada diseño con --chapter-anchor (center, bottom o top).
+    function needsStatic() {
+      var vh = window.innerHeight;
+      if (vh < STATIC_MAX_HEIGHT) return true;
+      var was = doc.classList.contains("hero-static");
+      if (was) doc.classList.remove("hero-static");
+      var hh = header ? header.offsetHeight : 0;
+      var anchor = (getComputedStyle(chapters[0]).getPropertyValue("--chapter-anchor") || "center").trim();
+      var bad = false;
+      chapters.forEach(function (c, i) {
+        var h = c.offsetHeight;
+        var top = c.offsetTop; // offsetTop no incluye las transformaciones de la animación
+        if (anchor === "center") top -= h / 2;
+        else if (anchor === "bottom" && i === 0) top -= 26; // desplazamiento inicial de la portada
+        if (top < hh - 1 || top + h > vh + 1) bad = true;
+      });
+      if (was) doc.classList.add("hero-static");
+      return bad;
+    }
+
     function applyStaticMode() {
-      var s = window.innerHeight < STATIC_MAX_HEIGHT;
+      var s = needsStatic();
       if (s === staticMode) return;
       staticMode = s;
       doc.classList.toggle("hero-static", s);
       measure();
       setChapter(progressToChapter(currentProgress()), true);
+      if (!s) pump();
     }
 
     /* --- Correspondencia scroll → fotograma (tramos lineales, en fracción de la película) --- */
@@ -271,6 +293,7 @@
     var decodingCount = 0;
     var S = null; // estado del juego de fotogramas activo
     var started = false;
+    var heroNear = true; // se pausa la descarga cuando el visitante está lejos de la película
 
     function isPortrait() {
       return window.innerWidth / window.innerHeight < 0.9;
@@ -362,7 +385,7 @@
     }
 
     function pump() {
-      if (!started) return;
+      if (!started || !S || staticMode || !heroNear) return;
       var s = S;
       while (s.inflight < MAX_INFLIGHT) {
         var idx = pickNext();
@@ -404,7 +427,7 @@
         pump();
       }
       if (useBitmaps) {
-        fetch(url)
+        fetch(url, { priority: "low" })
           .then(function (r) {
             if (!r.ok) throw new Error("HTTP " + r.status);
             return r.blob();
@@ -576,9 +599,19 @@
       pump();
     }
 
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(
+        function (entries) {
+          heroNear = entries[0].isIntersecting;
+          if (heroNear) pump();
+        },
+        { rootMargin: "100% 0px" }
+      ).observe(hero);
+    }
+
     measure();
-    applyStaticMode();
     newSet(isPortrait());
+    applyStaticMode();
     scrollHandlers.push(onScroll);
     resizeHandlers.push(onResize);
     sizeCanvas();
@@ -723,16 +756,16 @@
     function setup() {
       var enable = canPin.matches && !reduceMotion;
       section.classList.toggle("is-pinned", enable);
-      if (enable) {
-        distance = measureDistance();
-        if (distance <= 0) enable = false;
-      }
       if (!enable) {
-        section.classList.remove("is-pinned");
+        section.classList.remove("is-fit");
         track.style.transform = "";
         pin.style.removeProperty("--pin-h");
+        updateButtons();
         return;
       }
+      distance = measureDistance();
+      // Si todas las tarjetas caben, la fila se queda quieta (sin recorrido horizontal)
+      section.classList.toggle("is-fit", distance <= 0);
       pin.style.setProperty("--pin-h", window.innerHeight + distance + "px");
       update();
     }
@@ -750,12 +783,36 @@
 
     // Teclado: con la galería anclada y enfocada, las flechas recorren las tarjetas
     viewport.addEventListener("keydown", function (e) {
-      if (!section.classList.contains("is-pinned")) return;
+      if (!section.classList.contains("is-pinned") || distance <= 0) return;
       if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-      e.preventDefault();
+      var pinTop = pin.getBoundingClientRect().top + window.scrollY;
       var step = viewport.clientWidth * 0.45 * (e.key === "ArrowRight" ? 1 : -1);
-      window.scrollTo({ top: window.scrollY + step, behavior: reduceMotion ? "auto" : "smooth" });
+      var target = clamp(window.scrollY + step, pinTop, pinTop + distance);
+      if (Math.abs(target - window.scrollY) < 1) return; // en los extremos, la tecla sigue su curso
+      e.preventDefault();
+      window.scrollTo({ top: target, behavior: reduceMotion ? "auto" : "smooth" });
     });
+
+    // Botones anterior / siguiente cuando la galería es un carrusel (ratón)
+    var buttons = Array.prototype.slice.call(section.querySelectorAll(".events__btn"));
+    function updateButtons() {
+      if (!buttons || !buttons.length) return;
+      var max = viewport.scrollWidth - viewport.clientWidth;
+      buttons.forEach(function (b) {
+        var dir = +b.getAttribute("data-dir");
+        b.disabled = dir < 0 ? viewport.scrollLeft <= 1 : viewport.scrollLeft >= max - 1;
+      });
+    }
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var card = track.querySelector(".event-card");
+        var gap = parseFloat(getComputedStyle(track).columnGap) || 0;
+        var step = card ? card.offsetWidth + gap : viewport.clientWidth * 0.8;
+        viewport.scrollBy({ left: step * +b.getAttribute("data-dir"), behavior: reduceMotion ? "auto" : "smooth" });
+      });
+    });
+    viewport.addEventListener("scroll", updateButtons, { passive: true });
+    updateButtons();
   }
 
   /* ======================================================================
@@ -916,11 +973,14 @@
       btn.addEventListener("click", function () {
         var value = btn.getAttribute("data-copy");
         function done(ok) {
-          label.textContent = ok ? "¡Copiado!" : "Copia: " + value;
+          label.textContent = ok ? "¡Copiado!" : "No se ha podido copiar: " + value;
           clearTimeout(timer);
-          timer = setTimeout(function () {
-            label.textContent = original;
-          }, 2200);
+          timer = setTimeout(
+            function () {
+              label.textContent = original;
+            },
+            ok ? 2200 : 8000
+          );
         }
         if (navigator.clipboard && window.isSecureContext) {
           navigator.clipboard.writeText(value).then(
@@ -944,6 +1004,7 @@
   function initForm() {
     var form = document.getElementById("form-presupuesto");
     if (!form) return;
+    form.noValidate = true; // con JS usamos nuestros propios mensajes; sin JS valida el navegador
     var status = form.querySelector(".form__status");
     var to = form.getAttribute("data-mailto");
 
@@ -955,7 +1016,7 @@
 
     var messages = {
       valueMissing: "Este campo es obligatorio.",
-      typeMismatch: "Revisa el formato (ejemplo: nombre@correo.com).",
+      typeMismatch: "Revisa el formato (por ejemplo, nombre@correo.com).",
       patternMismatch: "Revisa el formato del teléfono.",
       rangeUnderflow: "La fecha no puede ser anterior a hoy.",
       rangeOverflow: "Revisa el número indicado.",
@@ -966,6 +1027,7 @@
 
     function fieldError(input) {
       var v = input.validity;
+      if (v.rangeUnderflow && input.type !== "date") return "Indica al menos 1 asistente.";
       for (var key in messages) if (v[key]) return messages[key];
       return input.validationMessage || "";
     }
@@ -1023,18 +1085,18 @@
         "Tipo de evento: " + get("tipo"),
         "Fecha: " + (fecha || "Por concretar"),
         "Lugar: " + (get("lugar") || "Por concretar"),
-        "Asistentes aproximados: " + (get("asistentes") || "Por concretar"),
+        "Asistentes (aprox.): " + (get("asistentes") || "Por concretar"),
         "",
         "— Contacto —",
         "Nombre: " + get("nombre"),
-        "Email: " + get("email"),
+        "Correo electrónico: " + get("email"),
         "Teléfono: " + (get("telefono") || "—")
       ];
 
       var href = "mailto:" + to + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(lines.join("\n"));
       status.classList.remove("is-error");
       status.textContent =
-        "Abriendo tu aplicación de correo con el mensaje preparado… Si no se abre, escríbenos directamente a " + to + ".";
+        "Abriendo tu programa de correo con el mensaje preparado… Si no se abre, escríbenos directamente a " + to + ".";
       form.setAttribute("data-last-mailto", href);
       window.location.href = href;
     });
