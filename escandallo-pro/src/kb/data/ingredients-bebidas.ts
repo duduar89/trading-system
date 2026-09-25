@@ -7,9 +7,9 @@ import { ing } from './build';
  */
 export const KB_BEBIDAS: KbIngredient[] = [
   // ── Vinos ──
-  ing('Vino tinto crianza', 'bebida', 'l', 0, 0, 6, { aka: ['crianza', 'vino crianza', 'rioja crianza', 'ribera del duero crianza', 'tinto crianza', 'vino tinto reserva'], alg: ['sulfitos'], dens: 0.99 }),
+  ing('Vino tinto crianza', 'bebida', 'l', 0, 0, 6, { aka: ['crianza', 'vino crianza', 'rioja crianza', 'ribera del duero crianza', 'tinto crianza', 'vino tinto reserva', 'ribera del duero', 'rioja', 'vino de rioja', 'vino de toro', 'priorat', 'bierzo', 'mencia', 'somontano'], alg: ['sulfitos'], dens: 0.99 }),
   ing('Vino tinto joven', 'bebida', 'l', 0, 0, 3.2, { aka: ['vino tinto', 'tinto', 'vino', 'vino tinto de cocina', 'vino tinto para cocinar', 'vino de mesa', 'tinto joven', 'vino tinto roble'], alg: ['sulfitos'], dens: 0.99 }),
-  ing('Vino blanco', 'bebida', 'l', 0, 0, 4.5, { aka: ['vino blanco verdejo', 'vino blanco seco', 'vino blanco para cocinar', 'verdejo', 'vino blanco de cocina', 'blanco verdejo', 'rueda verdejo'], alg: ['sulfitos'], dens: 0.99 }),
+  ing('Vino blanco', 'bebida', 'l', 0, 0, 4.5, { aka: ['vino blanco verdejo', 'vino blanco seco', 'vino blanco para cocinar', 'verdejo', 'vino blanco de cocina', 'blanco verdejo', 'rueda verdejo', 'rueda', 'godello', 'txakoli', 'chardonnay', 'sauvignon blanc'], alg: ['sulfitos'], dens: 0.99 }),
   ing('Albariño', 'bebida', 'l', 0, 0, 9, { aka: ['albarino', 'rias baixas', 'vino albariño'], alg: ['sulfitos'], dens: 0.99 }),
   ing('Vino rosado', 'bebida', 'l', 0, 0, 4, { aka: ['rosado', 'vino rosado de navarra'], alg: ['sulfitos'], dens: 0.99 }),
   ing('Cava', 'bebida', 'l', 0, 0, 6, { aka: ['cava brut', 'cava brut nature', 'espumoso', 'prosecco', 'vino espumoso'], alg: ['sulfitos'], dens: 0.99 }),
@@ -33,6 +33,7 @@ export const KB_BEBIDAS: KbIngredient[] = [
   ing('Whisky', 'bebida', 'l', 0, 0, 17, { aka: ['whiskey', 'bourbon', 'whisky escoces', 'scotch'], dens: 0.94 }),
   ing('Vodka', 'bebida', 'l', 0, 0, 13, { aka: ['vodka premium'], dens: 0.95 }),
   ing('Tequila', 'bebida', 'l', 0, 0, 18, { aka: ['tequila blanco', 'tequila reposado', 'mezcal'], dens: 0.95 }),
+  ing('Cachaza', 'bebida', 'l', 0, 0, 14, { aka: ['cachaca', 'aguardiente de caña', 'cachaça'], dens: 0.95 }),
   ing('Brandy', 'bebida', 'l', 0, 0, 12, { aka: ['coñac', 'conac', 'brandy de jerez', 'cognac', 'armañac'], dens: 0.95 }),
   ing('Licor de hierbas', 'bebida', 'l', 0, 0, 10, { aka: ['orujo', 'orujo de hierbas', 'licor de orujo', 'aguardiente', 'hierbas ibicencas', 'chupito'], dens: 1 }),
   ing('Pacharán', 'bebida', 'l', 0, 0, 11, { aka: ['pacharan', 'patxaran'], dens: 1.05 }),
@@ -62,6 +63,7 @@ export const KB_BEBIDAS: KbIngredient[] = [
   ing('Mosto', 'bebida', 'l', 0, 0, 1.6, { aka: ['mosto de uva', 'zumo de uva', 'mosto tinto', 'mosto blanco'], dens: 1.06 }),
   ing('Bebida de soja', 'bebida', 'l', 0, 0, 1.3, { aka: ['leche de soja', 'bebida vegetal de soja'], alg: ['soja'], dens: 1.02 }),
   ing('Bebida de avena', 'bebida', 'l', 0, 0, 1.5, { aka: ['leche de avena', 'bebida vegetal de avena'], alg: ['gluten'], dens: 1.02 }),
+  ing('Bebida de almendra', 'bebida', 'l', 0, 0, 1.9, { aka: ['leche de almendra', 'leche de almendras', 'bebida vegetal de almendra'], alg: ['frutos_cascara'], dens: 1.02 }),
 
   // ── Café e infusiones ──
   ing('Café en grano', 'bebida', 'kg', 0, 0, 16, { aka: ['cafe', 'cafe en grano', 'cafe molido', 'cafe natural', 'cafe mezcla', 'cafe descafeinado', 'descafeinado', 'cafe espresso'] }),

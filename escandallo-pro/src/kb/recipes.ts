@@ -2,6 +2,7 @@ import type { QtyBasis, QtyUnit } from '../types';
 import { KB_RECIPES_TAPAS } from './data/recipes-tapas';
 import { KB_RECIPES_PRINCIPALES } from './data/recipes-principales';
 import { KB_RECIPES_VARIOS } from './data/recipes-varios';
+import { KB_RECIPES_CARTA } from './data/recipes-carta';
 
 /** Línea de una receta tipo. Los nombres de ingrediente coinciden con fichas de KB_INGREDIENTS. */
 export interface KbRecipeItem {
@@ -29,4 +30,4 @@ export interface KbRecipe {
   procedure?: string;
 }
 
-export const KB_RECIPES: KbRecipe[] = [...KB_RECIPES_TAPAS, ...KB_RECIPES_PRINCIPALES, ...KB_RECIPES_VARIOS];
+export const KB_RECIPES: KbRecipe[] = [...KB_RECIPES_TAPAS, ...KB_RECIPES_PRINCIPALES, ...KB_RECIPES_VARIOS, ...KB_RECIPES_CARTA];

@@ -45,7 +45,7 @@ export const KB_PREPARATIONS: KbPreparation[] = [
     ['Mantequilla', 15, 'g'],
     ['Leche entera', 40, 'ml'],
     ['Nuez moscada', 0.1, 'g'],
-  ], ['pure de patata', 'pure de patatas', 'parmentier', 'parmentier de patata', 'pure de patata trufado', 'pure casero', 'pure de patata casero']),
+  ], ['pure de patata', 'pure de patatas', 'parmentier', 'parmentier de patata', 'pure de patata trufado', 'pure de patata casero']),
   prep('Cachelos', 'guarnicion', [['Patata', 150, 'g', 'neta', { cook: 0 }], [AOVE, 5, 'ml'], ['Pimentón dulce', 0.5, 'g']], [
     'cachelo', 'patata cocida', 'patatas cocidas', 'patatas a la gallega',
   ]),
@@ -144,9 +144,12 @@ export const KB_PREPARATIONS: KbPreparation[] = [
   prep('Salsa vizcaína', 'salsa', [['Pimiento choricero', 20, 'g'], ['Cebolla', 80, 'g'], ['Tomate triturado', 20, 'g'], [AOVE, 20, 'ml']], [
     'a la vizcaina', 'salsa vizcaina',
   ]),
+  prep('Refrito', 'salsa', [[AOVE, 30, 'ml'], ['Ajo', 6, 'g'], ['Cayena', 0.2, 'g'], ['Vinagre de vino', 5, 'ml']], [
+    'refrito de ajos', 'refrito de ajo', 'donostiarra', 'a la donostiarra', 'refrito donostiarra', 'ajada',
+  ]),
   prep('Pil pil', 'salsa', [[AOVE, 60, 'ml'], ['Ajo', 6, 'g'], ['Cayena', 0.2, 'g']], ['pilpil', 'al pil pil', 'salsa pil pil']),
   prep('Salsa de tomate casera', 'salsa', [['Tomate triturado', 80, 'g'], ['Cebolla', 20, 'g'], [AOVE, 10, 'ml'], ['Azúcar', 2, 'g']], [
-    'salsa de tomate', 'tomate casero', 'salsa pomodoro', 'salsa de tomate natural',
+    'salsa de tomate', 'salsa pomodoro', 'salsa de tomate natural',
   ]),
   prep('Salsa brava', 'salsa', [
     ['Tomate triturado', 30, 'g'],
@@ -204,6 +207,14 @@ export const KB_PREPARATIONS: KbPreparation[] = [
   ]),
   prep('Salsa de curry', 'salsa', [['Leche de coco', 60, 'ml'], ['Curry', 2, 'g'], ['Cebolla', 20, 'g']], ['al curry', 'salsa curry']),
   prep('Salsa de mostaza', 'salsa', [['Nata para cocinar', 50, 'ml'], ['Mostaza antigua', 10, 'g']], ['a la mostaza', 'salsa mostaza', 'salsa de mostaza antigua']),
+  prep('Salsa de azafrán', 'salsa', [
+    ['Nata para cocinar', 50, 'ml'],
+    ['Fumet de pescado', 30, 'ml'],
+    ['Chalota', 10, 'g'],
+    ['Vino blanco', 15, 'ml'],
+    ['Azafrán', 0.05, 'g'],
+  ], ['salsa azafran', 'crema de azafran', 'salsa de azafran y nata']),
+  prep('Salsa de cava', 'salsa', [['Nata para cocinar', 40, 'ml'], ['Cava', 40, 'ml'], ['Chalota', 10, 'g'], ['Mantequilla', 10, 'g']], ['salsa al cava', 'al cava', 'salsa de champan', 'salsa de cava y nata']),
   prep('Salsa de trufa', 'salsa', [['Nata para cocinar', 50, 'ml'], ['Aceite de trufa', 2, 'ml'], ['Trufa negra', 1, 'g']], ['crema de trufa', 'salsa trufada']),
   prep('Salsa de naranja', 'salsa', [['Zumo de naranja', 60, 'ml'], ['Azúcar', 5, 'g'], ['Fondo oscuro', 30, 'ml'], ['Licor de naranja', 5, 'ml']], [
     'a la naranja', 'salsa a la naranja',

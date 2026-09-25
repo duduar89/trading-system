@@ -126,6 +126,12 @@ function titleBlock(ws: Worksheet, title: string, subtitle: string, span: number
   s.font = { name: 'Calibri', size: 10, color: { argb: MUTED } };
 }
 
+/** Pie de página para imprimir: origen a la izquierda y "Página X de N" a la derecha ("&" es un código en Excel). */
+function pageFooter(ws: Worksheet, left: string): void {
+  const text = left.replace(/&/g, '&&');
+  ws.headerFooter = { oddFooter: `&L&8${text}&R&8Página &P de &N`, evenFooter: `&L&8${text}&R&8Página &P de &N` };
+}
+
 function styleHeader(ws: Worksheet, rowNumber: number, labels: string[]): void {
   const row = ws.getRow(rowNumber);
   labels.forEach((label, i) => {
@@ -152,10 +158,15 @@ function setWidths(ws: Worksheet, widths: number[]): void {
   });
 }
 
-/** Semáforo de food cost como formato condicional (se recalcula si se editan los valores en Excel). */
-function foodCostRules(ws: Worksheet, ref: string, firstCell: string, business: BusinessSettings): void {
-  const target = business.targetFoodCostPct / 100;
-  const warning = Math.max(business.warningFoodCostPct, business.targetFoodCostPct) / 100;
+/**
+ * Semáforo de food cost como formato condicional (se recalcula si se editan los valores en Excel), con los mismos
+ * umbrales que la app (core/costing.foodCostStatus): verde ≤ objetivo, ámbar ≤ umbral de atención, rojo por encima.
+ * `target` es el objetivo en tanto por uno o una referencia relativa a la primera fila del rango (p. ej. "J5").
+ */
+function foodCostRules(ws: Worksheet, ref: string, firstCell: string, target: number | string, warningPct: number): void {
+  const t = typeof target === 'number' ? String(Math.round(target * 1e6) / 1e6) : target;
+  const w = String(Math.round((warningPct / 100) * 1e6) / 1e6);
+  const upper = `MAX(${t},${w})`;
   const style = (s: Exclude<FoodCostStatus, 'none'>) => ({
     fill: { type: 'pattern' as const, pattern: 'solid' as const, bgColor: { argb: STATUS_COLORS[s].fill } },
     font: { bold: true, color: { argb: STATUS_COLORS[s].font } },
@@ -163,11 +174,16 @@ function foodCostRules(ws: Worksheet, ref: string, firstCell: string, business: 
   ws.addConditionalFormatting({
     ref,
     rules: [
-      { type: 'expression', priority: 1, formulae: [`AND(ISNUMBER(${firstCell}),${firstCell}<=${target})`], style: style('ok') },
-      { type: 'expression', priority: 2, formulae: [`AND(ISNUMBER(${firstCell}),${firstCell}>${target},${firstCell}<=${warning})`], style: style('warn') },
-      { type: 'expression', priority: 3, formulae: [`AND(ISNUMBER(${firstCell}),${firstCell}>${warning})`], style: style('bad') },
+      { type: 'expression', priority: 1, formulae: [`AND(ISNUMBER(${firstCell}),${firstCell}<=${t})`], style: style('ok') },
+      { type: 'expression', priority: 2, formulae: [`AND(ISNUMBER(${firstCell}),${firstCell}>${t},${firstCell}<=${upper})`], style: style('warn') },
+      { type: 'expression', priority: 3, formulae: [`AND(ISNUMBER(${firstCell}),${firstCell}>${upper})`], style: style('bad') },
     ],
   });
+}
+
+/** Enlace interno a otra hoja del libro. */
+function sheetLink(sheet: string, text: string, tooltip: string): Cell['value'] {
+  return { text, hyperlink: `#${sheetRef(sheet)}!A1`, tooltip };
 }
 
 function allergenText(list: readonly string[]): string {
@@ -232,14 +248,25 @@ const LINE_HEADERS = [
 ];
 const LINE_WIDTHS = [30, 26, 10, 9, 10, 11, 11, 11, 8, 10, 10, 10, 13, 12, 10, 12, 18, 44];
 
-function refName(dishItem: Dish['items'][number], ctx: CostingContext): string {
+/** "Vinculado a": producto o elaboración (con enlace a su ficha si está en el libro). */
+function refValue(dishItem: Dish['items'][number], ctx: CostingContext, sheets: Map<string, string>): Cell['value'] {
   if (!dishItem.ref) return '';
   if (dishItem.ref.type === 'product') return ctx.products.get(dishItem.ref.id)?.name ?? '';
   const d = ctx.dishes.get(dishItem.ref.id);
-  return d ? `${d.name} (elaboración)` : '';
+  if (!d) return '';
+  const text = `${d.name} (elaboración)`;
+  const sheet = sheets.get(d.id);
+  return sheet ? sheetLink(sheet, text, 'Abrir la ficha de la elaboración') : text;
 }
 
-function addDishSheet(wb: Workbook, info: DishSheetInfo, workspace: Workspace, ctx: CostingContext, business: BusinessSettings): void {
+function addDishSheet(
+  wb: Workbook,
+  info: DishSheetInfo,
+  workspace: Workspace,
+  ctx: CostingContext,
+  business: BusinessSettings,
+  sheets: Map<string, string>,
+): void {
   const { dish, cost } = info;
   const status = foodCostStatus(cost.foodCostPct, cost.targetFoodCostPct, business.warningFoodCostPct);
   const ws = wb.addWorksheet(info.sheet, {
@@ -247,6 +274,7 @@ function addDishSheet(wb: Workbook, info: DishSheetInfo, workspace: Workspace, c
     pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
   setWidths(ws, LINE_WIDTHS);
+  pageFooter(ws, `${dish.name} · ${workspace.name} · Escandallo Pro`);
   const kindLabel = dish.kind === 'plato' ? 'Ficha técnica' : 'Elaboración (sub-receta)';
   titleBlock(ws, dish.name, `${kindLabel} · ${workspace.name} · ${fmtDate(todayIso())}`, LINE_HEADERS.length);
 
@@ -307,7 +335,7 @@ function addDishSheet(wb: Workbook, info: DishSheetInfo, workspace: Workspace, c
     label(ws.getCell(r, 5), l);
     value(ws.getCell(r, 8), v, fmt, bold);
   });
-  foodCostRules(ws, 'H4', 'H4', { ...business, targetFoodCostPct: cost.targetFoodCostPct });
+  foodCostRules(ws, 'H4', 'H4', 'H5', business.warningFoodCostPct);
 
   // Alérgenos y rendimiento
   label(ws.getCell(11, 1), 'Alérgenos');
@@ -356,7 +384,7 @@ function addDishSheet(wb: Workbook, info: DishSheetInfo, workspace: Workspace, c
     const row = ws.getRow(r);
     const values: [Cell['value'], string?][] = [
       [ic.name || it?.name || ''],
-      [it ? refName(it, ctx) : ''],
+      [it ? refValue(it, ctx, sheets) : ''],
       [num(it?.quantity) ?? '', FMT_NUM],
       [it ? UNIT_LABELS[it.unit] : ''],
       [it ? BASIS_LABELS[it.basis].label : ''],
@@ -379,6 +407,7 @@ function addDishSheet(wb: Workbook, info: DishSheetInfo, workspace: Workspace, c
       c.value = v;
       styleBody(c, fmt);
     });
+    if (it?.ref?.type === 'dish' && sheets.has(it.ref.id)) row.getCell(2).font = { name: 'Calibri', size: 10, color: { argb: BRAND }, underline: true };
     // Coste: fórmula bruto × precio salvo con prueba de rendimiento (coste real por kg útil, ya calculado).
     const costCell = row.getCell(14);
     const plain = ic.pricePerBase != null && Math.abs(ic.grossQty * ic.pricePerBase - ic.cost) <= Math.max(1e-6, Math.abs(ic.cost) * 1e-6);
@@ -460,6 +489,7 @@ export async function exportEscandallosXlsx(args: {
     'PVP sin IVA',
     'Coste ración',
     'Food cost',
+    'FC objetivo',
     'Margen bruto',
     'Margen %',
     'PVP sugerido',
@@ -470,9 +500,11 @@ export async function exportEscandallosXlsx(args: {
     'Estado',
     'Alérgenos',
   ];
-  setWidths(summary, [34, 12, 18, 9, 12, 7, 12, 12, 10, 12, 10, 12, 12, 9, 12, 12, 11, 40]);
+  setWidths(summary, [34, 12, 18, 9, 12, 7, 12, 12, 10, 10, 12, 10, 12, 12, 9, 12, 12, 11, 40]);
+  pageFooter(summary, `Escandallos · ${workspace.name} · Escandallo Pro`);
   const platos = infos.filter((i) => i.dish.kind === 'plato');
-  const withPrice = platos.filter((i) => i.cost.foodCostPct != null);
+  // Misma población que la fórmula AVERAGE de la fila de medias (las filas sin PVP no cuentan).
+  const withPrice = infos.filter((i) => i.cost.foodCostPct != null);
   const avgFc = withPrice.length ? withPrice.reduce((s, i) => s + (i.cost.foodCostPct ?? 0), 0) / withPrice.length : undefined;
   titleBlock(
     summary,
@@ -490,7 +522,7 @@ export async function exportEscandallosXlsx(args: {
     const ref = sheetRef(info.sheet);
     const vat = (dish.saleVatPct ?? business.defaultSaleVatPct) / 100;
     const values: [Cell['value'], string?][] = [
-      [{ text: dish.name, hyperlink: `#${ref}!A1`, tooltip: 'Abrir la ficha del plato' }],
+      [sheetLink(info.sheet, dish.name, dish.kind === 'plato' ? 'Abrir la ficha del plato' : 'Abrir la ficha de la elaboración')],
       [dish.kind === 'plato' ? 'Plato' : 'Elaboración'],
       [dish.section ?? ''],
       [dish.portions > 0 ? dish.portions : 1, FMT_NUM],
@@ -499,6 +531,7 @@ export async function exportEscandallosXlsx(args: {
       [formula(`IF(AND(ISNUMBER(E${r}),E${r}>0),E${r}/(1+F${r}),"")`, num(cost.netPrice)), FMT_EUR],
       [formula(`${ref}!${info.costCell}`, cost.costPerPortion), FMT_EUR],
       [formula(`IF(AND(ISNUMBER(G${r}),G${r}>0),H${r}/G${r},"")`, cost.foodCostPct != null ? cost.foodCostPct / 100 : undefined), FMT_PCT],
+      [cost.targetFoodCostPct / 100, FMT_PCT],
       [formula(`IF(ISNUMBER(G${r}),G${r}-H${r},"")`, num(cost.grossMargin)), FMT_EUR],
       [formula(`IF(AND(ISNUMBER(G${r}),G${r}>0),(G${r}-H${r})/G${r},"")`, cost.grossMarginPct != null ? cost.grossMarginPct / 100 : undefined), FMT_PCT],
       [formula(`${ref}!${info.suggestedCell}`, num(cost.suggestedPrice)), FMT_EUR],
@@ -517,27 +550,31 @@ export async function exportEscandallosXlsx(args: {
     });
     row.getCell(1).font = { name: 'Calibri', size: 10, bold: true, color: { argb: INK }, underline: false };
     row.getCell(9).font = { name: 'Calibri', size: 10, bold: true, color: { argb: INK } };
-    if (cost.completeness < 1 && cost.items.length) row.getCell(16).font = { name: 'Calibri', size: 10, color: { argb: STATUS_COLORS.warn.font } };
+    row.getCell(10).font = { name: 'Calibri', size: 10, color: { argb: MUTED } };
+    if (cost.completeness < 1 && cost.items.length) row.getCell(17).font = { name: 'Calibri', size: 10, color: { argb: STATUS_COLORS.warn.font } };
   });
   const lastRow = headerRow + Math.max(infos.length, 1);
   if (!infos.length) summary.getCell(headerRow + 1, 1).value = 'No hay platos que exportar';
   summary.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: lastRow, column: headers.length } };
-  foodCostRules(summary, `I${headerRow + 1}:I${lastRow}`, `I${headerRow + 1}`, business);
+  // Cada plato se compara con su propio objetivo (columna J), que puede diferir del general del negocio.
+  foodCostRules(summary, `I${headerRow + 1}:I${lastRow}`, `I${headerRow + 1}`, `J${headerRow + 1}`, business.warningFoodCostPct);
   if (infos.length) {
     const avgRow = summary.getRow(lastRow + 2);
     avgRow.getCell(1).value = 'Media de la carta';
     avgRow.getCell(9).value = formula(`IFERROR(AVERAGE(I${headerRow + 1}:I${lastRow}),"")`, avgFc != null ? avgFc / 100 : undefined);
     avgRow.getCell(9).numFmt = FMT_PCT;
-    const margins = platos.map((p) => p.cost.grossMargin).filter((m): m is number => m != null);
-    avgRow.getCell(10).value = formula(`IFERROR(AVERAGE(J${headerRow + 1}:J${lastRow}),"")`, margins.length ? margins.reduce((a, b) => a + b, 0) / margins.length : undefined);
-    avgRow.getCell(10).numFmt = FMT_EUR;
+    avgRow.getCell(10).value = business.targetFoodCostPct / 100;
+    avgRow.getCell(10).numFmt = FMT_PCT;
+    const margins = infos.map((p) => p.cost.grossMargin).filter((m): m is number => m != null);
+    avgRow.getCell(11).value = formula(`IFERROR(AVERAGE(K${headerRow + 1}:K${lastRow}),"")`, margins.length ? margins.reduce((a, b) => a + b, 0) / margins.length : undefined);
+    avgRow.getCell(11).numFmt = FMT_EUR;
     for (let c = 1; c <= headers.length; c++) {
       const cell = avgRow.getCell(c);
       cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: INK } };
       cell.fill = solid(SOFT);
       cell.border = { top: { style: 'thin', color: { argb: LINE } } };
     }
-    foodCostRules(summary, `I${lastRow + 2}`, `I${lastRow + 2}`, business);
+    foodCostRules(summary, `I${lastRow + 2}`, `I${lastRow + 2}`, `J${lastRow + 2}`, business.warningFoodCostPct);
   }
 
   // ── Ingredientes ──
@@ -560,6 +597,7 @@ export async function exportEscandallosXlsx(args: {
     'Platos que lo usan',
   ];
   setWidths(ing, [34, 18, 10, 14, 14, 13, 11, 11, 14, 30, 10, 60]);
+  pageFooter(ing, `Ingredientes · ${workspace.name} · Escandallo Pro`);
   const allDishes = [...ctx.dishes.values()];
   const products = [...ctx.products.values()].sort((a, b) => collator.compare(a.name, b.name));
   titleBlock(ing, `Ingredientes · ${workspace.name}`, `${products.length} ingredientes con su precio vigente (sin IVA) y sus mermas`, ingHeaders.length);
@@ -594,7 +632,8 @@ export async function exportEscandallosXlsx(args: {
   ing.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: headerRow + Math.max(products.length, 1), column: ingHeaders.length } };
 
   // ── Una hoja por plato ──
-  for (const info of infos) addDishSheet(wb, info, workspace, ctx, business);
+  const sheets = new Map(infos.map((i) => [i.dish.id, i.sheet]));
+  for (const info of infos) addDishSheet(wb, info, workspace, ctx, business, sheets);
 
   return toBlob(wb);
 }
@@ -630,6 +669,7 @@ export async function exportProductsXlsx(products: Product[], suppliers: Supplie
     'Notas',
   ];
   setWidths(ws, [34, 18, 24, 10, 14, 14, 13, 10, 11, 11, 12, 12, 30, 44, 36]);
+  pageFooter(ws, 'Productos y precios · Escandallo Pro');
   const priced = sorted.filter((p) => p.pricePerBase > 0).length;
   titleBlock(
     ws,

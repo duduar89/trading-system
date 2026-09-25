@@ -223,6 +223,10 @@ function emitThrottled(): void {
   else emitTimer ??= setTimeout(emitNow, wait);
 }
 
+/**
+ * Suscribe `fn` al estado de la cola del espacio activo: se llama al momento con el estado actual y después con cada
+ * cambio (el progreso del OCR se limita a ~10 avisos por segundo). Devuelve la función para cancelar la suscripción.
+ */
 export function subscribeInvoiceQueue(fn: (s: QueueState) => void): () => void {
   listeners.add(fn);
   fn(snapshot());
@@ -388,6 +392,7 @@ export async function addInvoiceFiles(files: File[]): Promise<ID[]> {
  * Procesa una factura: status 'procesando' → extracción (extract/index) → líneas emparejadas con productos
  * (matchInvoiceLines) → status 'revision'. En error: status 'error' y mensaje legible.
  * `forceLocal` obliga a no usar IA. Pasa por la cola (una lectura a la vez) y se resuelve al terminar.
+ * Si la factura estaba confirmada, al empezar a leerla se retiran sus precios del histórico (hay que volver a confirmarla).
  */
 export async function processInvoice(id: ID, opts?: { forceLocal?: boolean }): Promise<void> {
   const wsId = getCurrentWorkspaceId();
@@ -474,7 +479,11 @@ async function processInvoiceIn(wdb: WorkspaceDB, id: ID, opts: { forceLocal?: b
   const inv = await wdb.invoices.get(id);
   if (!inv) throw new Error('La factura ya no existe');
   if (!inv.file) throw new Error('Esta factura no tiene archivo original: introdúcela a mano');
-  await wdb.invoices.update(id, { status: 'procesando', error: undefined });
+  await wdb.transaction('rw', [wdb.invoices, wdb.pricePoints, wdb.products], async () => {
+    await wdb.invoices.update(id, { status: 'procesando', error: undefined, confirmedAt: undefined });
+    // Una factura confirmada que se vuelve a leer deja de estarlo: sus precios salen del histórico hasta que se confirme de nuevo.
+    await retractInvoicePricesIn(wdb, id);
+  });
   try {
     const settings = await getAppSettings();
     const file = namedFile(inv);
@@ -711,15 +720,25 @@ export async function createManualInvoice(): Promise<ID> {
   return inv.id;
 }
 
+/**
+ * Retira del histórico los precios que aportó una factura y recalcula el precio vigente de sus productos
+ * (dentro de una transacción ya abierta sobre invoices/pricePoints/products). Devuelve cuántos precios retira.
+ */
+async function retractInvoicePricesIn(wdb: WorkspaceDB, id: ID): Promise<number> {
+  const points = await wdb.pricePoints.where('invoiceId').equals(id).toArray();
+  if (!points.length) return 0;
+  await wdb.pricePoints.bulkDelete(points.map((p) => p.id));
+  for (const pid of new Set(points.map((p) => p.productId))) await recomputeCurrentPrice(pid, wdb);
+  return points.length;
+}
+
 /** Borra la factura. Si estaba confirmada, elimina sus PricePoints y recalcula el precio vigente de los productos afectados. */
 export async function deleteInvoice(id: ID): Promise<void> {
   const wdb = db();
   dropQueued(getCurrentWorkspaceId(), id);
   await wdb.transaction('rw', [wdb.invoices, wdb.pricePoints, wdb.products], async () => {
-    const points = await wdb.pricePoints.where('invoiceId').equals(id).toArray();
-    if (points.length) await wdb.pricePoints.bulkDelete(points.map((p) => p.id));
     await wdb.invoices.delete(id);
-    for (const pid of new Set(points.map((p) => p.productId))) await recomputeCurrentPrice(pid, wdb);
+    await retractInvoicePricesIn(wdb, id);
   });
 }
 

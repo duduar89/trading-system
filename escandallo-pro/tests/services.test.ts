@@ -1,20 +1,37 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Dish, DishProposal, ExtractedInvoice, ExtractedMenu, Invoice, InvoiceLine, MenuScan, Product, ProposedIngredient, YieldTest } from '../src/types';
-import { createWorkspace, db, getCurrentWorkspaceId, setCurrentWorkspaceId, updateAppSettings, updateBusinessSettings } from '../src/db';
+import type {
+  Dish,
+  DishProposal,
+  ExtractedInvoice,
+  ExtractedMenu,
+  Invoice,
+  InvoiceLine,
+  MenuScan,
+  Product,
+  ProposedIngredient,
+  QtyBasis,
+  QtyUnit,
+  YieldTest,
+} from '../src/types';
+import { createWorkspace, db, getCurrentWorkspaceId, setCurrentWorkspaceId, updateAppSettings, updateBusinessSettings, workspaceDb } from '../src/db';
 import { toSearchKey, AUTO_LINK_THRESHOLD, SUGGEST_THRESHOLD } from '../src/core/matching';
 import { normalizeInvoiceLine } from '../src/core/pack';
 import { buildCostingContext, costAllDishes } from '../src/core/costing';
+import { priceAlerts } from '../src/core/analytics';
 import { uid } from '../src/lib/id';
 import * as extract from '../src/extract/index';
+import * as ocr from '../src/extract/ocr';
 import * as kbIngredients from '../src/kb/ingredients';
 import * as kbPropose from '../src/kb/propose';
 import * as aiRecipes from '../src/ai/recipes';
 import {
+  ESTIMATED_PRICE_NOTE,
   addProductAlias,
   createProduct,
   deleteProduct,
   findOrCreateSupplier,
   mergeProducts,
+  nextPricePointId,
   priceConversionFactor,
   recomputeCurrentPrice,
   setProductPrice,
@@ -64,6 +81,7 @@ const extractMenu = vi.mocked(extract.extractMenuFromFiles);
 const findKb = vi.mocked(kbIngredients.findKbIngredient);
 const proposeLocal = vi.mocked(kbPropose.proposeDishLocal);
 const aiDetailed = vi.mocked(aiRecipes.aiProposeRecipesDetailed);
+const preprocess = vi.mocked(ocr.preprocessImage);
 
 // ───────────────────────────── Utilidades ─────────────────────────────
 
@@ -127,6 +145,24 @@ function exLine(description: string, quantity: number, unit: string, unitPrice: 
   return rest;
 }
 
+function pdfFile(name: string): File {
+  return new File([new Uint8Array([37, 80, 68, 70, 45])], name, { type: 'application/pdf' });
+}
+
+/** Promesa que se resuelve a mano (para simular lecturas lentas). */
+function deferred(): { promise: Promise<void>; release: () => void } {
+  let release: () => void = () => undefined;
+  const promise = new Promise<void>((r) => {
+    release = r;
+  });
+  return { promise, release };
+}
+
+async function enableAI(): Promise<void> {
+  vi.stubGlobal('navigator', { onLine: true });
+  await updateAppSettings({ aiEnabled: true, apiKey: 'sk-ant-prueba' });
+}
+
 function proposal(name: string, ingredients: ProposedIngredient[], extra: Partial<DishProposal> = {}): DishProposal {
   return { dishName: name, portions: 1, ingredients, source: 'plantilla', confidence: 0.9, ...extra };
 }
@@ -146,6 +182,7 @@ beforeEach(async () => {
   aiDetailed.mockReset();
   proposeLocal.mockClear();
   findKb.mockClear();
+  preprocess.mockClear();
 });
 
 afterEach(async () => {
@@ -998,6 +1035,621 @@ describe('exportación a Excel', () => {
     const sup = wb.getWorksheet('Proveedores')!;
     expect(sup.getRow(5).getCell(1).value).toBe('Frutas García S.L.');
     expect(sup.getRow(5).getCell(5).value).toBe(1);
+  });
+});
+
+// ───────────────────────────── Casos avanzados: productos ─────────────────────────────
+
+describe('precios estimados, histórico y recálculo', () => {
+  it('un precio estimado no entra en el histórico y la primera factura real retira la nota sin alerta falsa', async () => {
+    const p = await createProduct({ name: 'Rúcula', pricePerBase: 12, notes: ESTIMATED_PRICE_NOTE }, { estimated: true });
+    expect(p.pricePerBase).toBe(12);
+    expect(p.lastPurchaseDate).toBeUndefined();
+    expect(await db().pricePoints.count()).toBe(0);
+
+    const inv = rawInvoice({ lines: [line('RUCULA BANDEJA 125G', 8, 'ud', 1.9, 15.2, { productId: p.id, matchStatus: 'vinculado' })] });
+    await db().invoices.add(inv);
+    expect(await confirmInvoice(inv.id)).toEqual({ created: 0, updated: 1, skipped: 0 });
+    const after = (await db().products.get(p.id)) as Product;
+    expect(after).toMatchObject({ pricePerBase: 15.2, priceSource: 'factura', lastPurchaseDate: '2026-02-01' });
+    expect(after.notes).toBeUndefined();
+    const points = await db().pricePoints.toArray();
+    expect(points).toHaveLength(1);
+    expect(priceAlerts([after], points, 5)).toEqual([]);
+  });
+
+  it('un precio manual también retira la nota de precio estimado', async () => {
+    const p = await createProduct({ name: 'Queso de cabra', pricePerBase: 11, notes: ESTIMATED_PRICE_NOTE }, { estimated: true });
+    await setProductPrice(p.id, 13.4, 'manual', { date: '2026-03-01' });
+    const after = await db().products.get(p.id);
+    expect(after).toMatchObject({ pricePerBase: 13.4, lastPurchaseDate: '2026-03-01' });
+    expect(after?.notes).toBeUndefined();
+  });
+
+  it('recomputeCurrentPrice conserva el origen demo si no hay histórico y tolera productos inexistentes', async () => {
+    const demo = rawProduct({ name: 'Pimentón de la Vera', pricePerBase: 14, priceSource: 'demo', lastPurchaseDate: '2026-01-20' });
+    await db().products.add(demo);
+    expect(await recomputeCurrentPrice(demo.id)).toBe(14);
+    expect(await db().products.get(demo.id)).toMatchObject({ priceSource: 'demo', lastPurchaseDate: '2026-01-20', pricePerBase: 14 });
+    expect(await recomputeCurrentPrice('no-existe')).toBeUndefined();
+  });
+
+  it('los ids de precio son estrictamente crecientes aunque se generen en el mismo milisegundo', () => {
+    const ids = Array.from({ length: 200 }, () => nextPricePointId());
+    for (let i = 1; i < ids.length; i++) expect(ids[i] > ids[i - 1]).toBe(true);
+    expect(new Set(ids.map((id) => id.length)).size).toBe(1);
+  });
+});
+
+describe('fusión y borrado: casos límite', () => {
+  it('el producto conservado sin precio hereda el del duplicado (convertido) y sus datos físicos', async () => {
+    const keep = rawProduct({ name: 'Aguacate', baseUnit: 'kg' });
+    const remove = rawProduct({ name: 'Aguacate Hass unidad', baseUnit: 'ud', unitWeightKg: 0.25, pricePerBase: 0.5, priceSource: 'demo', supplierId: 'prov-1' });
+    await db().products.bulkAdd([keep, remove]);
+    await mergeProducts(keep.id, remove.id);
+    const k = await db().products.get(keep.id);
+    expect(k).toMatchObject({ unitWeightKg: 0.25, priceSource: 'demo', supplierId: 'prov-1' });
+    expect(k?.pricePerBase).toBeCloseTo(2, 6);
+    expect(k?.aliases).toEqual(['Aguacate Hass unidad']);
+  });
+
+  it('relinka líneas sugeridas y recetas que usan ambos productos; el histórico real retira la nota de estimado', async () => {
+    const keep = await createProduct({ name: 'Aceite de oliva virgen extra', baseUnit: 'l', pricePerBase: 8.5, notes: ESTIMATED_PRICE_NOTE }, { estimated: true });
+    const remove = await createProduct({ name: 'AOVE garrafa', baseUnit: 'l', pricePerBase: 4.5, lastPurchaseDate: '2026-02-01' });
+    const dish = rawDish({
+      name: 'Tostada',
+      items: [
+        { ...newRecipeItem({ name: 'AOVE', quantity: 10, unit: 'ml' }), ref: { type: 'product', id: keep.id } },
+        { ...newRecipeItem({ name: 'Aceite para freír', quantity: 5, unit: 'ml' }), ref: { type: 'product', id: remove.id } },
+      ],
+    });
+    await db().dishes.add(dish);
+    const inv = rawInvoice({ lines: [line('AOVE GARRAFA 5L', 1, 'ud', 22.5, 22.5, { productId: remove.id, matchStatus: 'sugerido', matchScore: 0.7 })] });
+    await db().invoices.add(inv);
+
+    await mergeProducts(keep.id, remove.id);
+    const k = await db().products.get(keep.id);
+    expect(k).toMatchObject({ pricePerBase: 4.5, lastPurchaseDate: '2026-02-01' });
+    expect(k?.notes).toBeUndefined();
+    expect((await db().dishes.get(dish.id))?.items.map((i) => i.ref)).toEqual([
+      { type: 'product', id: keep.id },
+      { type: 'product', id: keep.id },
+    ]);
+    expect((await db().invoices.get(inv.id))?.lines[0]).toMatchObject({ productId: keep.id, matchStatus: 'sugerido' });
+  });
+
+  it('deleteProduct desvincula las pruebas de rendimiento y respeta las líneas ignoradas', async () => {
+    const p = await createProduct({ name: 'Merluza del pincho', pricePerBase: 16 });
+    const test: YieldTest = {
+      id: uid(),
+      name: 'Despiece de merluza',
+      productId: p.id,
+      date: '2026-02-01',
+      grossWeightKg: 2.4,
+      purchasePricePerKg: 16,
+      outputs: [],
+      cookingLossPct: 12,
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    await db().yieldTests.add(test);
+    const inv = rawInvoice({ lines: [line('MERLUZA PINCHO', 2.4, 'kg', 16, 38.4, { productId: p.id, matchStatus: 'ignorado' })] });
+    await db().invoices.add(inv);
+    await deleteProduct(p.id);
+    expect((await db().yieldTests.get(test.id))?.productId).toBeUndefined();
+    const l = (await db().invoices.get(inv.id))?.lines[0];
+    expect(l?.matchStatus).toBe('ignorado');
+    expect(l?.productId).toBeUndefined();
+  });
+});
+
+// ───────────────────────────── Casos avanzados: facturas ─────────────────────────────
+
+describe('emparejamiento de líneas: casos límite', () => {
+  it('vuelve a emparejar vínculos a productos borrados y desempata por proveedor', () => {
+    const deA = rawProduct({ name: 'Tomate pera', supplierId: 'prov-a' });
+    const deB = rawProduct({ name: 'Tomate pera', supplierId: 'prov-b' });
+    const lines = [line('TOMATE PERA CAT.I CAJA 6KG', 1, 'caja', 10.8, 10.8, { matchStatus: 'vinculado', productId: 'borrado' })];
+    expect(matchInvoiceLines(lines, [deA, deB], { supplierId: 'prov-b' })[0]).toMatchObject({ productId: deB.id, matchStatus: 'vinculado' });
+    expect(matchInvoiceLines(lines, [deA, deB], { supplierId: 'prov-a' })[0].productId).toBe(deA.id);
+    expect(matchInvoiceLines(lines, [])[0]).toMatchObject({ matchStatus: 'nuevo' });
+    expect(matchInvoiceLines(lines, [])[0].productId).toBeUndefined();
+  });
+});
+
+describe('confirmInvoice: casos límite', () => {
+  it('abonos, vínculos rotos, líquidos sin densidad y el mismo producto en varias líneas', async () => {
+    const vinagre = rawProduct({ name: 'Vinagre de Jerez', baseUnit: 'kg', pricePerBase: 3, lastPurchaseDate: '2026-01-01' });
+    await db().products.add(vinagre);
+    const inv = rawInvoice({
+      supplierName: 'Ultramarinos Pepe',
+      supplierTaxId: 'B11111111',
+      lines: [
+        line('VINAGRE JEREZ 1L', 6, 'ud', 3.2, 19.2, { productId: vinagre.id, matchStatus: 'vinculado' }),
+        line('ABONO TOMATE PERA', -2, 'kg', 1.8, -3.6, { suggestedName: 'Tomate pera' }),
+        line('ALCAPARRAS 100G', 10, 'ud', 1.2, 12, { productId: 'borrado', matchStatus: 'sugerido', suggestedName: 'Alcaparras' }),
+        line('ARROZ BOMBA 1KG', 5, 'ud', 2.4, 12, { suggestedName: 'Arroz bomba' }),
+        line('ARROZ BOMBA SACO 5KG', 1, 'ud', 11, 11, { suggestedName: 'Arroz bomba' }),
+      ],
+    });
+    await db().invoices.add(inv);
+    expect(await confirmInvoice(inv.id)).toEqual({ created: 2, updated: 2, skipped: 1 });
+
+    const saved = (await db().invoices.get(inv.id)) as Invoice;
+    // Litros → kg asumiendo densidad 1 (con aviso en la línea)
+    expect((await db().products.get(vinagre.id))?.pricePerBase).toBeCloseTo(3.2, 6);
+    expect(saved.lines[0].warnings).toContain('Precio convertido de €/l a €/kg: se asume densidad 1 kg/l');
+    // El abono no toca precios ni crea productos
+    expect(saved.lines[1].productId).toBeUndefined();
+    const products = await db().products.toArray();
+    expect(products.map((p) => p.name).sort()).toEqual(['Alcaparras', 'Arroz bomba', 'Vinagre de Jerez']);
+    const alcaparras = products.find((p) => p.name === 'Alcaparras');
+    expect(alcaparras).toMatchObject({ baseUnit: 'kg', pricePerBase: 12 });
+    expect(saved.lines[2]).toMatchObject({ productId: alcaparras?.id, matchStatus: 'vinculado' });
+    // Mismo producto en dos líneas: un solo producto, dos precios; manda la última línea
+    const arroz = products.find((p) => p.name === 'Arroz bomba') as Product;
+    expect(arroz.pricePerBase).toBeCloseTo(2.2, 6);
+    expect(arroz.aliases).toEqual(expect.arrayContaining(['ARROZ BOMBA 1KG', 'ARROZ BOMBA SACO 5KG']));
+    expect(await db().pricePoints.where('productId').equals(arroz.id).count()).toBe(2);
+    expect(await db().suppliers.toArray()).toMatchObject([{ name: 'Ultramarinos Pepe', taxId: 'B11111111' }]);
+
+    // Re-confirmar: mismo resultado, sin avisos repetidos
+    await confirmInvoice(inv.id);
+    const again = (await db().invoices.get(inv.id)) as Invoice;
+    expect(again.lines[0].warnings?.filter((w) => w.startsWith('Precio convertido'))).toHaveLength(1);
+    expect((await db().products.get(arroz.id))?.pricePerBase).toBeCloseTo(2.2, 6);
+    expect(await db().pricePoints.count()).toBe(4);
+  });
+
+  it('una factura antigua no cambia el precio vigente pero sí queda en el histórico', async () => {
+    const p = await createProduct({ name: 'Harina de trigo', baseUnit: 'kg', pricePerBase: 0.9, lastPurchaseDate: '2026-03-01' });
+    const old = rawInvoice({ date: '2026-01-10', lines: [line('HARINA TRIGO SACO 25KG', 1, 'ud', 17.5, 17.5, { productId: p.id, matchStatus: 'vinculado' })] });
+    await db().invoices.add(old);
+    await confirmInvoice(old.id);
+    expect(await db().products.get(p.id)).toMatchObject({ pricePerBase: 0.9, lastPurchaseDate: '2026-03-01' });
+    expect(await db().pricePoints.where('productId').equals(p.id).count()).toBe(2);
+  });
+});
+
+describe('cola de lectura: concurrencia e idempotencia', () => {
+  it('lee las facturas de una en una, en orden, e informa de lo que queda en cola', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const order: string[] = [];
+    extractInvoices.mockImplementation(async (file) => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      order.push(file.name ?? '');
+      await new Promise((r) => setTimeout(r, 10));
+      active--;
+      return [extracted([exLine('SAL MARINA 1KG', 10, 'ud', 0.4, 4)], { number: file.name })];
+    });
+    const states: QueueState[] = [];
+    const unsub = subscribeInvoiceQueue((s) => states.push({ ...s, queued: [...s.queued] }));
+    const files = [pdfFile('a.pdf'), new File([new Uint8Array([255, 216])], 'b.jpg', { type: 'image/jpeg' }), pdfFile('c.pdf')];
+    const ids = await addInvoiceFiles(files);
+    await vi.waitFor(async () => expect((await db().invoices.toArray()).every((i) => i.status === 'revision')).toBe(true));
+    await vi.waitFor(() => expect(states[states.length - 1]).toEqual({ running: null, queued: [] }));
+    unsub();
+    expect(maxActive).toBe(1);
+    expect(order).toEqual(['a.pdf', 'b.jpg', 'c.pdf']);
+    expect(states.some((s) => s.running === ids[0] && s.queued.join() === [ids[1], ids[2]].join())).toBe(true);
+    expect(states.some((s) => s.running === ids[2] && s.queued.length === 0)).toBe(true);
+    expect((await db().invoices.get(ids[1]))?.number).toBe('b.jpg');
+  });
+
+  it('processInvoice sobre una factura que ya está en cola no la lee dos veces y respeta forceLocal', async () => {
+    const gate = deferred();
+    extractInvoices.mockImplementation(async (file) => {
+      if (file.name === 'primera.pdf') await gate.promise;
+      return [extracted([exLine('LECHE ENTERA 1L', 12, 'ud', 0.9, 10.8)], { number: file.name })];
+    });
+    const [first, second] = await addInvoiceFiles([pdfFile('primera.pdf'), pdfFile('segunda.pdf')]);
+    const reread = processInvoice(second, { forceLocal: true });
+    await new Promise((r) => setTimeout(r, 30));
+    gate.release();
+    await reread;
+    await vi.waitFor(async () => expect((await db().invoices.get(first))?.status).toBe('revision'));
+    expect(extractInvoices).toHaveBeenCalledTimes(2);
+    expect(extractInvoices.mock.calls[1][0].name).toBe('segunda.pdf');
+    expect(extractInvoices.mock.calls[1][1].forceLocal).toBe(true);
+    expect((await db().invoices.get(second))?.status).toBe('revision');
+  });
+
+  it('resumePendingInvoices lanzado varias veces a la vez no duplica lecturas', async () => {
+    extractInvoices.mockImplementation(async (file) => [extracted([exLine('NATA 35% BRIK 1L', 6, 'ud', 3.2, 19.2)], { number: file.name })]);
+    const a = rawInvoice({ status: 'pendiente', file: new Blob(['a'], { type: 'application/pdf' }), fileName: 'a.pdf' });
+    const b = rawInvoice({ status: 'procesando', file: new Blob(['b'], { type: 'application/pdf' }), fileName: 'b.pdf' });
+    const done = rawInvoice({ status: 'revision', file: new Blob(['c'], { type: 'application/pdf' }), fileName: 'c.pdf' });
+    await db().invoices.bulkAdd([a, b, done]);
+    await Promise.all([resumePendingInvoices(), resumePendingInvoices(), resumePendingInvoices()]);
+    await vi.waitFor(async () => {
+      expect((await db().invoices.get(a.id))?.status).toBe('revision');
+      expect((await db().invoices.get(b.id))?.status).toBe('revision');
+    });
+    await resumePendingInvoices();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(extractInvoices).toHaveBeenCalledTimes(2);
+    expect(extractInvoices.mock.calls.map((c) => c[0].name).sort()).toEqual(['a.pdf', 'b.pdf']);
+  });
+
+  it('borrar una factura que espera en la cola la saca sin leerla', async () => {
+    const gate = deferred();
+    extractInvoices.mockImplementation(async (file) => {
+      await gate.promise;
+      return [extracted([exLine('HIELO CUBITO 2KG', 10, 'ud', 1.1, 11)], { number: file.name })];
+    });
+    const [first, second] = await addInvoiceFiles([pdfFile('uno.pdf'), pdfFile('dos.pdf')]);
+    await deleteInvoice(second);
+    gate.release();
+    await vi.waitFor(async () => expect((await db().invoices.get(first))?.status).toBe('revision'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(extractInvoices).toHaveBeenCalledTimes(1);
+    expect(await db().invoices.get(second)).toBeUndefined();
+    expect(await db().invoices.count()).toBe(1);
+  });
+
+  it('cada factura se lee en su restaurante aunque cambies de espacio de trabajo mientras espera', async () => {
+    const gate = deferred();
+    extractInvoices.mockImplementation(async () => {
+      await gate.promise;
+      return [extracted([exLine('CERVEZA BARRIL 30L', 2, 'ud', 60, 120)])];
+    });
+    const [id] = await addInvoiceFiles([pdfFile('barril.pdf')]);
+    const other = await createWorkspace({ name: `Otro ${Math.random()}` });
+    setCurrentWorkspaceId(other.id);
+    const states: QueueState[] = [];
+    const unsub = subscribeInvoiceQueue((s) => states.push(s));
+    // La cola de otro restaurante no se muestra en este
+    expect(states[0]).toEqual({ running: null, queued: [] });
+    gate.release();
+    await vi.waitFor(async () => expect((await workspaceDb(wsId).invoices.get(id))?.status).toBe('revision'));
+    unsub();
+    expect(await workspaceDb(other.id).invoices.count()).toBe(0);
+    setCurrentWorkspaceId(wsId);
+  });
+
+  it('volver a leer sobrescribe la cabecera, empareja con los productos actuales y reconoce al proveedor por su CIF', async () => {
+    const supplier = await findOrCreateSupplier('Lácteos Asturianos S.A.', 'A33111222');
+    const leche = await createProduct({ name: 'Leche entera', baseUnit: 'l', pricePerBase: 0.9 });
+    const inv = rawInvoice({
+      status: 'revision',
+      method: 'ocr',
+      supplierName: 'LACTEOS ASTURIAN0S',
+      number: 'X',
+      date: '2026-01-01',
+      total: 1,
+      file: new Blob(['foto'], { type: 'image/jpeg' }),
+      fileName: 'ticket.jpg',
+      lines: [line('LECHE', 1, 'ud', 1, 1)],
+    });
+    await db().invoices.add(inv);
+    extractInvoices.mockResolvedValue([
+      extracted([exLine('LECHE ENTERA BRIK 1L', 12, 'ud', 0.92, 11.04)], {
+        supplierName: 'Distribuciones Lácteas',
+        supplierTaxId: 'ES-A33111222',
+        number: 'FA-2026-0042',
+        date: '2026-02-14',
+        subtotal: 11.04,
+        vatTotal: 1.1,
+        total: 12.14,
+        method: 'pdf-texto',
+        rawText: 'FACTURA FA-2026-0042',
+        warnings: ['Aviso del lector'],
+      }),
+    ]);
+    await processInvoice(inv.id);
+    const saved = (await db().invoices.get(inv.id)) as Invoice;
+    expect(saved).toMatchObject({
+      status: 'revision',
+      method: 'pdf-texto',
+      supplierName: 'Distribuciones Lácteas',
+      supplierId: supplier.id,
+      number: 'FA-2026-0042',
+      date: '2026-02-14',
+      subtotal: 11.04,
+      total: 12.14,
+      rawText: 'FACTURA FA-2026-0042',
+      warnings: ['Aviso del lector'],
+    });
+    expect(saved.error).toBeUndefined();
+    expect(saved.file).toBeInstanceOf(Blob);
+    expect(saved.lines).toHaveLength(1);
+    expect(saved.lines[0]).toMatchObject({ productId: leche.id, matchStatus: 'vinculado', baseUnit: 'l', baseQuantity: 12, pricePerBase: 0.92 });
+    expect(saved.lines[0].id).not.toBe(inv.lines[0].id);
+  });
+
+  it('volver a leer una factura confirmada retira sus precios hasta que se confirme de nuevo', async () => {
+    const tomate = await createProduct({ name: 'Tomate pera', baseUnit: 'kg', pricePerBase: 1.5, lastPurchaseDate: '2026-01-10' });
+    const inv = rawInvoice({
+      file: new Blob(['pdf'], { type: 'application/pdf' }),
+      fileName: 'garcia.pdf',
+      method: 'pdf-texto',
+      lines: [line('TOMATE PERA CAT.I CAJA 6KG', 2, 'caja', 10.8, 21.6, { productId: tomate.id, matchStatus: 'vinculado' })],
+    });
+    await db().invoices.add(inv);
+    await confirmInvoice(inv.id);
+    expect((await db().products.get(tomate.id))?.pricePerBase).toBe(1.8);
+
+    extractInvoices.mockResolvedValue([extracted([exLine('TOMATE PERA CAT.I CAJA 6KG', 2, 'caja', 10.8, 21.6)], { date: '2026-02-01' })]);
+    await processInvoice(inv.id, { forceLocal: true });
+    const saved = (await db().invoices.get(inv.id)) as Invoice;
+    expect(saved.status).toBe('revision');
+    expect(saved.confirmedAt).toBeUndefined();
+    expect(await db().pricePoints.where('invoiceId').equals(inv.id).count()).toBe(0);
+    expect(await db().products.get(tomate.id)).toMatchObject({ pricePerBase: 1.5, lastPurchaseDate: '2026-01-10' });
+
+    // Al confirmar otra vez vuelven sus precios
+    await confirmInvoice(inv.id);
+    expect((await db().products.get(tomate.id))?.pricePerBase).toBe(1.8);
+  });
+
+  it('addInvoiceFiles valida los archivos y descarta los formatos no admitidos', async () => {
+    extractInvoices.mockResolvedValue([extracted([exLine('SAL MARINA 1KG', 10, 'ud', 0.4, 4)])]);
+    await expect(addInvoiceFiles([])).rejects.toThrow('vacíos');
+    await expect(addInvoiceFiles([new File([], 'vacio.pdf', { type: 'application/pdf' })])).rejects.toThrow('vacíos');
+    await expect(addInvoiceFiles([new File(['x'], 'contrato.docx')])).rejects.toThrow('Formato no admitido');
+    const ids = await addInvoiceFiles([new File(['x'], 'contrato.docx'), pdfFile('buena.pdf')]);
+    expect(ids).toHaveLength(1);
+    await vi.waitFor(async () => expect((await db().invoices.get(ids[0]))?.status).toBe('revision'));
+    expect(await db().invoices.count()).toBe(1);
+  });
+});
+
+// ───────────────────────────── Casos avanzados: platos ─────────────────────────────
+
+describe('propuestas: precisión y seguridad', () => {
+  it('escala con precisión (cifras significativas), normaliza unidades y bases no válidas y limita las mermas', () => {
+    const prop = proposal(
+      'Tarta de queso',
+      [
+        ing('Mantequilla', 0.05, 'kg'),
+        ing('Huevo', 1, 'ud'),
+        ing('Azúcar', 100, 'onza' as QtyUnit, { basis: 'cruda' as QtyBasis, wastePct: 150, cookingLossPct: -5 }),
+        ing('Sal', 0.5, 'g', { quantity: Number.NaN }),
+      ],
+      { portions: 4 },
+    );
+    const items = proposalToItems(prop, [], [], { portions: 1 });
+    expect(items[0].quantity).toBe(0.0125);
+    expect(items[1].quantity).toBe(0.25);
+    expect(items[2]).toMatchObject({ unit: 'g', basis: 'neta', quantity: 25, wastePct: 99, cookingLossPct: 0 });
+    expect(items[3].quantity).toBe(0);
+    const thirds = proposalToItems(proposal('Flan', [ing('Huevo', 1, 'ud'), ing('Leche entera', 500, 'ml')], { portions: 3 }), [], [], { portions: 1 });
+    expect(thirds.map((i) => i.quantity)).toEqual([0.3333, 166.7]);
+    // Sin raciones de destino se conservan las de la propuesta
+    expect(proposalToItems(prop, [], [])[0].quantity).toBe(0.05);
+  });
+
+  it('forceLocal no usa la IA aunque esté activada', async () => {
+    await enableAI();
+    const d = await createDish({ name: 'Gazpacho andaluz' });
+    proposeLocal.mockImplementation((name) => proposal(name, [ing('Tomate pera', 250, 'g', { basis: 'bruta' })]));
+    const res = await proposeForDishes([d.id], { forceLocal: true });
+    expect(aiDetailed).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ usedAI: false, proposed: 1 });
+  });
+
+  it('no pisa una receta que el usuario escribe mientras se propone (salvo replace)', async () => {
+    await enableAI();
+    const d = await createDish({ name: 'Pisto manchego', procedure: 'Pochar a fuego lento.' });
+    aiDetailed.mockImplementation(async () => {
+      await updateDish(d.id, { items: [newRecipeItem({ name: 'Calabacín', quantity: 150 })] });
+      return { proposals: new Map([[d.id, proposal('Pisto manchego', [ing('Pimiento rojo', 100)], { source: 'ia', procedure: 'Otra' })]]), warnings: [], failed: [] };
+    });
+    const res = await proposeForDishes([d.id], {});
+    expect(res.proposed).toBe(0);
+    expect((await db().dishes.get(d.id))?.items.map((i) => i.name)).toEqual(['Calabacín']);
+
+    // Con replace se sustituyen las líneas, pero la elaboración escrita por el usuario se conserva
+    const res2 = await proposeForDishes([d.id], { replace: true });
+    expect(res2.proposed).toBe(1);
+    const after = await db().dishes.get(d.id);
+    expect(after?.items.map((i) => i.name)).toEqual(['Pimiento rojo']);
+    expect(after?.procedure).toBe('Pochar a fuego lento.');
+    expect(after?.status).toBe('borrador');
+  });
+
+  it('createMissing: crea con la ficha de referencia (sin histórico) y deja sin vincular lo que no conoce', async () => {
+    const d = await createDish({ name: 'Ensalada de rúcula' });
+    proposeLocal.mockImplementation(() => proposal('Ensalada de rúcula', [ing('Rúcula', 60), ing('Polvo de hadas', 1)]));
+    const res = await proposeForDishes([d.id], { createMissing: true });
+    expect(res.proposed).toBe(1);
+    const products = await db().products.toArray();
+    expect(products).toHaveLength(1);
+    const kb = kbIngredients.findKbIngredient('Rúcula');
+    const rucula = products[0];
+    expect(rucula).toMatchObject({ name: kb?.name ?? 'Rúcula', priceSource: 'manual', notes: ESTIMATED_PRICE_NOTE });
+    if (kb) expect(rucula).toMatchObject({ baseUnit: kb.baseUnit, category: kb.category, wastePct: kb.wastePct, pricePerBase: kb.refPricePerBase ?? 0 });
+    expect(rucula.lastPurchaseDate).toBeUndefined();
+    expect(await db().pricePoints.count()).toBe(0);
+    const items = (await db().dishes.get(d.id))?.items ?? [];
+    expect(items[0]).toMatchObject({ ref: { type: 'product', id: rucula.id }, matchScore: 1, suggested: true });
+    expect(items[1].name).toBe('Polvo de hadas');
+    expect(items[1].ref).toBeUndefined();
+  });
+
+  it('si la base de recetas no encuentra nada lo avisa sin tocar el plato', async () => {
+    const d = await createDish({ name: 'Plato sorpresa del chef' });
+    proposeLocal.mockImplementation((name) => proposal(name, []));
+    const res = await proposeForDishes([d.id], {});
+    expect(res.proposed).toBe(0);
+    expect(res.warnings.some((w) => w.includes('Plato sorpresa del chef'))).toBe(true);
+    expect((await db().dishes.get(d.id))?.items).toEqual([]);
+  });
+});
+
+// ───────────────────────────── Casos avanzados: cartas ─────────────────────────────
+
+describe('cartas: casos límite', () => {
+  it('guarda las fotos preprocesadas y los PDF tal cual, con el nombre indicado', async () => {
+    const processed = new Blob([new Uint8Array([255, 216, 255, 224])], { type: 'image/jpeg' });
+    preprocess.mockResolvedValueOnce(processed);
+    extractMenu.mockResolvedValue({ method: 'ocr', entries: [{ name: 'Tortilla de patatas', price: 8 }], warnings: [] });
+    const photo = new File([new Uint8Array(64)], 'carta.png', { type: 'image/png' });
+    const pdf = pdfFile('postres.pdf');
+    const id = await addMenuScan([photo, pdf], '  Carta de verano  ');
+    await vi.waitFor(async () => expect((await db().menuScans.get(id))?.status).toBe('revision'));
+    const scan = (await db().menuScans.get(id)) as MenuScan;
+    expect(scan.name).toBe('Carta de verano');
+    expect(scan.images).toHaveLength(2);
+    expect(scan.images[0]).toMatchObject({ type: 'image/jpeg', size: 4 });
+    expect(scan.images[1]).toMatchObject({ type: 'application/pdf', size: pdf.size });
+    expect(preprocess).toHaveBeenCalledTimes(1);
+    expect(preprocess).toHaveBeenCalledWith(photo, { maxSide: 2000, mime: 'image/jpeg' });
+    const passed = extractMenu.mock.calls[0][0];
+    expect(passed[0].name).toMatch(/\.jpg$/);
+    expect(passed[1].name).toMatch(/\.pdf$/);
+    expect(scan.entries).toMatchObject([{ name: 'Tortilla de patatas', price: 8, selected: true }]);
+
+    const named = await addMenuScan([new File([new Uint8Array(8)], 'carta_de_invierno.jpg', { type: 'image/jpeg' })]);
+    await vi.waitFor(async () => expect((await db().menuScans.get(named))?.status).toBe('revision'));
+    expect((await db().menuScans.get(named))?.name).toBe('Carta de invierno');
+  });
+
+  it('si la IA opcional falla, la carta se lee gratis en el dispositivo', async () => {
+    await enableAI();
+    extractMenu.mockImplementation(async (_files, opts) => {
+      if (!opts.forceLocal) throw Object.assign(new Error('Límite de uso alcanzado'), { name: 'AIError' });
+      return { method: 'ocr', entries: [{ name: 'Tortilla de patatas', price: 8.5 }], warnings: [] };
+    });
+    const scan: MenuScan = { id: uid(), name: 'Carta', images: [new Blob(['x'], { type: 'image/jpeg' })], status: 'error', entries: [], createdAt: NOW };
+    await db().menuScans.add(scan);
+    await processMenuScan(scan.id);
+    const saved = (await db().menuScans.get(scan.id)) as MenuScan & { warnings?: string[] };
+    expect(saved).toMatchObject({ status: 'revision', method: 'ocr' });
+    expect(saved.error).toBeUndefined();
+    expect(saved.warnings?.some((w) => w.includes('gratis en tu dispositivo'))).toBe(true);
+    expect(extractMenu).toHaveBeenCalledTimes(2);
+  });
+
+  it('reimportar respeta los platos ya creados aunque se hayan renombrado y pasa createMissing a la propuesta', async () => {
+    const scan: MenuScan = {
+      id: uid(),
+      name: 'Carta',
+      images: [],
+      status: 'revision',
+      method: 'ocr',
+      createdAt: NOW,
+      entries: [{ id: uid(), name: 'Bravas', section: 'Tapas', price: 6, selected: true }],
+    };
+    await db().menuScans.add(scan);
+    const [id] = await importMenuEntries(scan.id);
+    await updateDish(id, { name: 'Patatas bravas de la casa' });
+    const imported = (await db().menuScans.get(scan.id)) as MenuScan;
+    await db().menuScans.update(scan.id, { entries: [{ ...imported.entries[0], price: 6.5 }] });
+    proposeLocal.mockImplementation(() => proposal('Bravas', [ing('Patata', 250, 'g', { basis: 'bruta' }), ing('Rúcula', 5)]));
+
+    const again = await importMenuEntries(scan.id, { propose: true, createMissing: true });
+    expect(again).toEqual([id]);
+    expect(await db().dishes.count()).toBe(1);
+    const dish = await db().dishes.get(id);
+    expect(dish).toMatchObject({ name: 'Patatas bravas de la casa', menuPrice: 6.5, section: 'Tapas' });
+    expect(dish?.items).toHaveLength(2);
+    expect(dish?.items.every((i) => i.ref?.type === 'product')).toBe(true);
+    expect((await db().products.toArray()).every((p) => p.notes === ESTIMATED_PRICE_NOTE)).toBe(true);
+  });
+});
+
+// ───────────────────────────── Casos avanzados: exportación ─────────────────────────────
+
+describe('exportación: semáforo, enlaces y casos límite', () => {
+  async function loadWorkbook(blob: Blob) {
+    const mod = (await import('exceljs')) as typeof import('exceljs') & { default?: typeof import('exceljs') };
+    const ExcelJS = mod.default ?? mod;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await blob.arrayBuffer());
+    return wb;
+  }
+  type CF = { ref: string; rules: { formulae: string[]; style: { fill?: { bgColor?: { argb?: string } } } }[] };
+
+  it('cada plato se compara con su objetivo, las elaboraciones enlazan a su ficha y los nombres de hoja no se repiten', async () => {
+    await updateBusinessSettings({ targetFoodCostPct: 30, warningFoodCostPct: 35 });
+    const gamba = await createProduct({ name: 'Gamba roja', baseUnit: 'kg', pricePerBase: 60, wastePct: 45 });
+    const girasol = await createProduct({ name: 'Aceite de girasol', baseUnit: 'l', pricePerBase: 1.6 });
+    const alioli = await createDish({
+      name: 'Alioli',
+      kind: 'elaboracion',
+      yieldQty: 0.5,
+      yieldUnit: 'kg',
+      items: [{ ...newRecipeItem({ name: 'Aceite de girasol', quantity: 450, unit: 'ml' }), ref: { type: 'product', id: girasol.id } }],
+    });
+    const ajillo = await createDish({
+      name: 'Gambas al ajillo',
+      menuPrice: 16,
+      targetFoodCostPct: 38,
+      items: [
+        { ...newRecipeItem({ name: 'Gamba', quantity: 150, unit: 'g', basis: 'neta' }), ref: { type: 'product', id: gamba.id } },
+        { ...newRecipeItem({ name: 'Alioli', quantity: 30, unit: 'g' }), ref: { type: 'dish', id: alioli.id } },
+      ],
+    });
+    const racion = await createDish({
+      name: 'Gambas al ajillo',
+      section: 'Raciones',
+      menuPrice: 26,
+      portions: 2,
+      items: [{ ...newRecipeItem({ name: 'Gamba', quantity: 300, unit: 'g' }), ref: { type: 'product', id: gamba.id } }],
+    });
+    const products = await db().products.toArray();
+    const dishes = await db().dishes.toArray();
+    const business = { ...(await db().business.get('business'))!, targetFoodCostPct: 30, warningFoodCostPct: 35 };
+    const ctx = buildCostingContext(products, dishes, [], business);
+    const costs = costAllDishes(ctx);
+    const workspace = { id: wsId, name: 'Casa Pepe & Hijos', createdAt: NOW, updatedAt: NOW };
+    const wb = await loadWorkbook(await exportEscandallosXlsx({ workspace, dishes, costs, ctx, business }));
+
+    const names = wb.worksheets.map((w) => w.name);
+    expect(names.filter((n) => n.startsWith('Gambas al ajillo'))).toEqual(['Gambas al ajillo', 'Gambas al ajillo (2)']);
+    // Pie de impresión con el restaurante ("&" escapado) y la paginación
+    expect(wb.getWorksheet('Resumen')!.headerFooter.oddFooter).toBe('&L&8Escandallos · Casa Pepe && Hijos · Escandallo Pro&R&8Página &P de &N');
+    expect(new Set(names.map((n) => n.toLowerCase())).size).toBe(names.length);
+
+    const summary = wb.getWorksheet('Resumen')!;
+    expect(summary.getRow(4).getCell(10).value).toBe('FC objetivo');
+    const rows = [5, 6, 7].map((r) => summary.getRow(r));
+    const ajilloRow = rows.find((r) => (r.getCell(1).value as { text: string }).text === 'Gambas al ajillo' && r.getCell(5).value === 16)!;
+    expect(ajilloRow.getCell(10).value).toBeCloseTo(0.38, 6);
+    expect(ajilloRow.getCell(10).numFmt).toBe('0.0%');
+    const margin = ajilloRow.getCell(11).value as { formula: string; result: number };
+    expect(margin.formula).toBe(`IF(ISNUMBER(G${ajilloRow.number}),G${ajilloRow.number}-H${ajilloRow.number},"")`);
+    expect(margin.result).toBeCloseTo(costs.get(ajillo.id)!.grossMargin!, 6);
+    expect((ajilloRow.getCell(1).value as { hyperlink: string }).hyperlink).toMatch(/^#'Gambas al ajillo( \(2\))?'!A1$/);
+    const racionRow = rows.find((r) => r.getCell(5).value === 26)!;
+    expect(racionRow.getCell(10).value).toBeCloseTo(0.3, 6);
+
+    const cfs = (summary as unknown as { conditionalFormattings: CF[] }).conditionalFormattings;
+    const main = cfs.find((c) => c.ref === 'I5:I7')!;
+    expect(main.rules.map((r) => r.formulae[0])).toEqual(['AND(ISNUMBER(I5),I5<=J5)', 'AND(ISNUMBER(I5),I5>J5,I5<=MAX(J5,0.35))', 'AND(ISNUMBER(I5),I5>MAX(J5,0.35))']);
+    expect(main.rules.map((r) => r.style.fill?.bgColor?.argb)).toEqual(['FFDCFCE7', 'FFFEF3C7', 'FFFEE2E2']);
+
+    const ajilloSheet = wb.getWorksheet((ajilloRow.getCell(1).value as { hyperlink: string }).hyperlink.match(/'(.+)'/)![1])!;
+    expect(ajilloSheet.getCell('H5').value).toBeCloseTo(0.38, 6);
+    const dishCfs = (ajilloSheet as unknown as { conditionalFormattings: CF[] }).conditionalFormattings;
+    expect(dishCfs.find((c) => c.ref === 'H4')?.rules[0].formulae[0]).toBe('AND(ISNUMBER(H4),H4<=H5)');
+    const link = ajilloSheet.getRow(17).getCell(2).value as { text: string; hyperlink: string };
+    expect(link).toMatchObject({ text: 'Alioli (elaboración)', hyperlink: "#'Alioli'!A1" });
+    expect(ajilloSheet.views[0]).toMatchObject({ state: 'frozen', ySplit: 15 });
+    expect(ajilloSheet.autoFilter).toBeTruthy();
+    expect(ajilloSheet.getCell('B6').numFmt).toContain('€');
+    expect(ajilloSheet.getCell('H9').numFmt).toBe('#,##0.000');
+    expect((ajilloSheet.getCell('H9').value as number) ?? 0).toBeCloseTo(costs.get(ajillo.id)!.wasteKgPerPortion, 6);
+    expect(racion.portions).toBe(2);
+  });
+
+  it('libros vacíos: sin platos ni productos siguen siendo válidos', async () => {
+    const business = { ...(await db().business.get('business'))! };
+    const ctx = buildCostingContext([], [], [], business);
+    const blob = await exportEscandallosXlsx({ workspace: { id: wsId, name: 'Vacío', createdAt: NOW, updatedAt: NOW }, dishes: [], costs: new Map(), ctx, business });
+    const wb = await loadWorkbook(blob);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Resumen', 'Ingredientes']);
+    expect(wb.getWorksheet('Resumen')!.getCell('A5').value).toBe('No hay platos que exportar');
+    const products = await loadWorkbook(await exportProductsXlsx([], []));
+    expect(products.getWorksheet('Productos')!.getCell('A5').value).toBe('Todavía no hay productos');
+  });
+
+  it('toCsv: filas vacías, espacios en los extremos y separadores', () => {
+    expect(toCsv([])).toBe('﻿');
+    expect(toCsv([[], [' Tomate ', 'a;b', 1234567.5, -0.25]])).toBe('﻿\r\n" Tomate ";"a;b";1234567,5;-0,25');
   });
 });
 

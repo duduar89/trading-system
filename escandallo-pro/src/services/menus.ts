@@ -228,9 +228,9 @@ async function readScan(wdb: WorkspaceDB, id: ID, opts: { forceLocal?: boolean }
 
 /**
  * Crea platos a partir de las entradas seleccionadas (nombre, sección, descripción, PVP), evita duplicados por nombre
- * (si ya existe un plato con ese nombre, actualiza PVP/sección; la descripción sólo si faltaba) y marca la carta como
- * 'importada'. Si `propose`, lanza proposeForDishes sobre los platos importados (sólo rellena los que no tienen receta).
- * Devuelve ids de platos (creados y actualizados).
+ * (si ya existe un plato con ese nombre, o el que la entrada ya creó, actualiza PVP/sección; la descripción sólo si
+ * faltaba) y marca la carta como 'importada'. Si `propose`, lanza proposeForDishes sobre los platos importados (sólo
+ * rellena los que no tienen receta). Devuelve ids de platos (creados y actualizados).
  */
 export async function importMenuEntries(
   scanId: ID,
@@ -243,6 +243,7 @@ export async function importMenuEntries(
     if (!scan) throw new Error('La carta ya no existe');
     const source: Dish['source'] = scan.method === 'ia' ? 'carta-ia' : 'carta-ocr';
     const dishes = await wdb.dishes.toArray();
+    const byId = new Map<ID, Dish>(dishes.map((d) => [d.id, d]));
     const byName = new Map<string, Dish>();
     for (const d of dishes) if (d.kind === 'plato' && !byName.has(dishNameKey(d.name))) byName.set(dishNameKey(d.name), d);
 
@@ -258,7 +259,8 @@ export async function importMenuEntries(
       const price = positivePrice(entry.price);
       const section = cleanStr(entry.section);
       const description = cleanStr(entry.description);
-      const existing = byName.get(key);
+      // Una entrada ya importada sigue apuntando a su plato aunque el usuario lo haya renombrado después.
+      const existing = (entry.dishId ? byId.get(entry.dishId) : undefined) ?? byName.get(key);
       if (existing) {
         if (!createdNow.has(existing.id)) {
           // Plato ya existente: se actualiza el PVP y la sección de la carta nueva; la descripción, sólo si faltaba.

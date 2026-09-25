@@ -22,7 +22,8 @@ let kbFinderPromise: Promise<KbFinder> | undefined;
 
 /**
  * Carga (una vez) la base de ingredientes con import dinámico y devuelve una búsqueda segura: si la base aún no está
- * disponible o falla, devuelve undefined y el producto se crea con valores neutros.
+ * disponible o falla, devuelve undefined y el producto se crea con valores neutros. Si la carga falla (p. ej. sin
+ * conexión antes de que el service worker la tenga en caché) no se memoriza el fallo: se reintenta en la siguiente llamada.
  */
 export function loadKbFinder(): Promise<KbFinder> {
   kbFinderPromise ??= import('../kb/ingredients')
@@ -33,7 +34,10 @@ export function loadKbFinder(): Promise<KbFinder> {
         return undefined;
       }
     })
-    .catch((): KbFinder => () => undefined);
+    .catch((): KbFinder => {
+      kbFinderPromise = undefined;
+      return () => undefined;
+    });
   return kbFinderPromise;
 }
 
@@ -62,6 +66,33 @@ export function dedupeAliases(aliases: readonly (string | undefined | null)[], n
   return out.length > MAX_ALIASES ? out.slice(out.length - MAX_ALIASES) : out;
 }
 
+let lastPointId = '';
+
+/** Suma 1 al último carácter base 36 de un id (con acarreo), conservando su longitud. */
+function bumpId(id: string): string {
+  const chars = id.split('');
+  for (let i = chars.length - 1; i >= 0; i--) {
+    const v = parseInt(chars[i], 36);
+    if (v < 35) {
+      chars[i] = (v + 1).toString(36);
+      return chars.join('');
+    }
+    chars[i] = '0';
+  }
+  return `${id}0`;
+}
+
+/**
+ * Id de PricePoint estrictamente creciente en esta sesión. Los ids son ordenables por tiempo al milisegundo; así, dos
+ * precios del mismo día registrados en el mismo milisegundo (p. ej. dos líneas del mismo producto en una factura) se
+ * ordenan por orden de registro y el precio vigente es siempre el de la última línea, no uno al azar.
+ */
+export function nextPricePointId(): string {
+  const id = uid();
+  lastPointId = id > lastPointId ? id : bumpId(lastPointId);
+  return lastPointId;
+}
+
 function positive(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined;
 }
@@ -70,11 +101,19 @@ function pctOr(v: unknown, def: number): number {
   return typeof v === 'number' && Number.isFinite(v) ? Math.min(99, Math.max(0, v)) : def;
 }
 
+/** Nota de los productos creados con el precio orientativo de la base de conocimiento (se retira al registrar un precio real). */
+export const ESTIMATED_PRICE_NOTE = 'Precio estimado de referencia: actualízalo con una factura';
+
 /** Datos del primer precio al crear un producto (factura de origen, descripción original…). */
 export interface FirstPriceInfo {
   date?: string;
   invoiceId?: ID;
   rawDescription?: string;
+  /**
+   * Precio orientativo (no observado en una compra): no se registra en el histórico ni fija fecha de compra, para que la
+   * primera factura real no dispare una alerta de subida falsa.
+   */
+  estimated?: boolean;
 }
 
 /**
@@ -112,17 +151,17 @@ export function buildProduct(data: Partial<Product> & { name: string }, kbFind: 
   if (data.yieldTestId) product.yieldTestId = data.yieldTestId;
   const notes = data.notes?.trim();
   if (notes) product.notes = notes;
-  const date = data.lastPurchaseDate ?? (pricePerBase > 0 ? (firstPrice?.date ?? todayIso()) : undefined);
+  const date = data.lastPurchaseDate ?? (pricePerBase > 0 && !firstPrice?.estimated ? (firstPrice?.date ?? todayIso()) : undefined);
   if (date) product.lastPurchaseDate = date;
   return product;
 }
 
-/** Guarda un producto ya construido y, si tiene precio, su primer PricePoint. */
+/** Guarda un producto ya construido y, si tiene precio (no estimado), su primer PricePoint. */
 export async function insertProductIn(wdb: WorkspaceDB, product: Product, firstPrice?: FirstPriceInfo): Promise<Product> {
   await wdb.products.add(product);
-  if (product.pricePerBase > 0) {
+  if (product.pricePerBase > 0 && !firstPrice?.estimated) {
     const point: PricePoint = {
-      id: uid(),
+      id: nextPricePointId(),
       productId: product.id,
       date: product.lastPurchaseDate ?? firstPrice?.date ?? todayIso(),
       pricePerBase: product.pricePerBase,
@@ -144,8 +183,8 @@ function comparePoints(a: PricePoint, b: PricePoint): number {
 
 /**
  * Recalcula el precio vigente de un producto a partir de su PricePoint más reciente (por fecha).
- * Si no le queda histórico conserva el último precio conocido, pero deja de atribuirlo a una compra
- * (priceSource 'manual' y sin fecha de compra). Devuelve el precio vigente o undefined si el producto no existe.
+ * Si no le queda histórico conserva el último precio conocido; si venía de una compra (factura o tarifa) deja de
+ * atribuírselo (priceSource 'manual' y sin fecha de compra). Devuelve el precio vigente o undefined si el producto no existe.
  */
 export async function recomputeCurrentPrice(productId: ID, wdb: WorkspaceDB = db()): Promise<number | undefined> {
   return wdb.transaction('rw', wdb.products, wdb.pricePoints, async () => {
@@ -154,7 +193,7 @@ export async function recomputeCurrentPrice(productId: ID, wdb: WorkspaceDB = db
     const points = await wdb.pricePoints.where('productId').equals(productId).toArray();
     const valid = points.filter((p) => p.pricePerBase > 0 && Number.isFinite(p.pricePerBase));
     if (!valid.length) {
-      if (product.priceSource === 'factura' || product.priceSource === 'hoja' || product.lastPurchaseDate) {
+      if (product.priceSource === 'factura' || product.priceSource === 'hoja') {
         await wdb.products.update(productId, { priceSource: 'manual', lastPurchaseDate: undefined, updatedAt: nowIso() });
       }
       return product.pricePerBase;
@@ -167,10 +206,13 @@ export async function recomputeCurrentPrice(productId: ID, wdb: WorkspaceDB = db
       lastPurchaseDate: latest.date,
     };
     if (latest.supplierId) patch.supplierId = latest.supplierId;
+    // Con un precio real registrado, la nota de "precio estimado" deja de ser cierta.
+    if (product.notes === ESTIMATED_PRICE_NOTE) patch.notes = undefined;
     const changed =
       product.pricePerBase !== patch.pricePerBase ||
       product.priceSource !== patch.priceSource ||
       product.lastPurchaseDate !== patch.lastPurchaseDate ||
+      'notes' in patch ||
       (patch.supplierId !== undefined && product.supplierId !== patch.supplierId);
     if (changed) await wdb.products.update(productId, { ...patch, updatedAt: nowIso() });
     return latest.pricePerBase;
@@ -182,7 +224,8 @@ export async function recomputeCurrentPrice(productId: ID, wdb: WorkspaceDB = db
 /**
  * Crea un producto. Completa lo que falte con la base de conocimiento (kb/findKbIngredient): categoría, unidad base,
  * mermas por defecto, peso por unidad, densidad y alérgenos. Calcula searchKey. Si trae pricePerBase > 0 registra
- * también el primer PricePoint (con los datos opcionales de `firstPrice`: fecha, factura de origen, descripción).
+ * también el primer PricePoint (con los datos opcionales de `firstPrice`: fecha, factura de origen, descripción),
+ * salvo que sea un precio orientativo (`firstPrice.estimated`).
  */
 export async function createProduct(data: Partial<Product> & { name: string }, firstPrice?: FirstPriceInfo): Promise<Product> {
   const kbFind = await loadKbFinder();
@@ -231,7 +274,7 @@ export async function setProductPriceIn(
   const product = await wdb.products.get(id);
   if (!product) throw new Error('El producto ya no existe');
   const date = opts.date || todayIso();
-  const point: PricePoint = { id: uid(), productId: id, date, pricePerBase, source };
+  const point: PricePoint = { id: nextPricePointId(), productId: id, date, pricePerBase, source };
   if (opts.supplierId) point.supplierId = opts.supplierId;
   if (opts.invoiceId) point.invoiceId = opts.invoiceId;
   if (opts.rawDescription) point.rawDescription = opts.rawDescription;
@@ -239,7 +282,10 @@ export async function setProductPriceIn(
   if (!product.lastPurchaseDate || date >= product.lastPurchaseDate) {
     const patch: Partial<Product> = { pricePerBase, priceSource: source, lastPurchaseDate: date, updatedAt: nowIso() };
     if (opts.supplierId) patch.supplierId = opts.supplierId;
+    if (product.notes === ESTIMATED_PRICE_NOTE) patch.notes = undefined;
     await wdb.products.update(id, patch);
+  } else if (product.notes === ESTIMATED_PRICE_NOTE) {
+    await wdb.products.update(id, { notes: undefined, updatedAt: nowIso() });
   }
 }
 

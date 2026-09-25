@@ -760,7 +760,7 @@ export const KB_RECIPES_PRINCIPALES: KbRecipe[] = [
     ['Sal en escamas', 1, 'g'],
     ['Patata', 150, 'g', 'neta', PANADERA],
   ], {
-    aka: ['magret de pato con frutos rojos', 'pechuga de pato', 'magret', 'magret de pato a la naranja', 'magret de pato con salsa de oporto'],
+    aka: ['magret de pato con frutos rojos', 'pechuga de pato', 'magret', 'magret de pato con salsa de oporto'],
     proc: ['Hacer cortes en la grasa y marcar el magret piel abajo a fuego medio 8 min; dar la vuelta 3 min y reposar.', 'Reducir el Oporto con el fondo, los frutos rojos y el azúcar.', 'Lonchear y servir con la salsa y patatas.'],
   }),
   rec('Confit de pato', 'Carnes', 1, [

@@ -5,7 +5,7 @@ import { SUGGEST_THRESHOLD, normalizeText, rankMatches, toSearchKey } from '../c
 import { QTY_UNITS } from '../core/units';
 import { aiAvailable } from '../extract/index';
 import { nowIso, uid } from '../lib/id';
-import { createProduct, loadKbFinder, type KbFinder } from './products';
+import { ESTIMATED_PRICE_NOTE, createProduct, loadKbFinder, type KbFinder } from './products';
 
 /**
  * Platos, elaboraciones y propuesta semiautomática de escandallos.
@@ -30,9 +30,15 @@ function optionalPct(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? Math.min(99, Math.max(0, v)) : undefined;
 }
 
-/** Redondeo de cantidades de receta (hasta milésimas: 0,125 kg, 2,5 ud…). */
+/**
+ * Redondeo de cantidades de receta a 4 cifras significativas (máx. 6 decimales): 83,33 g, 0,0125 kg, 0,1667 ud…
+ * Con decimales fijos, 0,05 kg ÷ 4 raciones quedaría en 0,013 kg (un 4 % de error en el coste).
+ */
 function roundQty(v: number): number {
-  return Math.round(v * 1000) / 1000;
+  if (!(v > 0) || !Number.isFinite(v)) return 0;
+  const decimals = Math.min(6, Math.max(0, 3 - Math.floor(Math.log10(v))));
+  const f = 10 ** decimals;
+  return Math.round(v * f) / f;
 }
 
 function sanitizeItem(it: Partial<RecipeItem>): RecipeItem {
@@ -261,8 +267,6 @@ function elaborationsFor(dish: Dish, all: Dish[]): Dish[] {
   return all.filter((d) => d.kind === 'elaboracion' && d.id !== dish.id && !d.items.some((it) => it.ref?.type === 'dish' && it.ref.id === dish.id));
 }
 
-const ESTIMATED_NOTE = 'Precio estimado de referencia: actualízalo con una factura';
-
 /**
  * Propone ingredientes para varios platos: IA (ai/recipes, en lotes, con el catálogo de productos) si está disponible;
  * si no o si falla, base de conocimiento local (kb/propose). Sustituye sólo los platos sin líneas o si `replace`.
@@ -356,9 +360,12 @@ export async function proposeForDishes(
   let createdCount = 0;
   let proposed = 0;
 
-  for (const dish of targets) {
-    const proposal = proposals.get(dish.id);
+  for (const target of targets) {
+    const proposal = proposals.get(target.id);
     if (!proposal) continue;
+    // La propuesta puede tardar (IA): si mientras tanto el usuario ha escrito la receta, no se pisa (salvo `replace`).
+    const dish = await wdb.dishes.get(target.id);
+    if (!dish || (!opts.replace && dish.items.length)) continue;
     const elaborations = elaborationsFor(dish, allDishes);
     const items = proposalToItems(proposal, products, elaborations, { portions: dish.portions });
 
@@ -412,15 +419,20 @@ async function ensureEstimatedProduct(
     createdByKb.set(key, reused);
     return reused;
   }
-  const product = await createProduct({
-    name: kb.name,
-    category: kb.category ?? ing?.category,
-    baseUnit: kb.baseUnit,
-    pricePerBase: kb.refPricePerBase && kb.refPricePerBase > 0 ? kb.refPricePerBase : 0,
-    priceSource: 'manual',
-    notes: ESTIMATED_NOTE,
-    aliases: normalizeText(name) !== normalizeText(kb.name) ? [name] : [],
-  });
+  const refPrice = kb.refPricePerBase && kb.refPricePerBase > 0 ? kb.refPricePerBase : 0;
+  const product = await createProduct(
+    {
+      name: kb.name,
+      category: kb.category ?? ing?.category,
+      baseUnit: kb.baseUnit,
+      pricePerBase: refPrice,
+      priceSource: 'manual',
+      notes: ESTIMATED_PRICE_NOTE,
+      aliases: normalizeText(name) !== normalizeText(kb.name) ? [name] : [],
+    },
+    // Precio orientativo: sin histórico, para que la primera factura real no cuente como "subida".
+    { estimated: true },
+  );
   createdByKb.set(key, product);
   return product;
 }

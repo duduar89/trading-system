@@ -26,7 +26,7 @@ export const KB_RECIPES_VARIOS: KbRecipe[] = [
     ['Pimienta negra molida', 0.3, 'g'],
     ...PATATAS_GUARNICION,
   ], {
-    aka: ['hamburguesa de vaca madurada', 'burger de buey', 'hamburguesa de buey con queso', 'hamburguesa gourmet', 'cheeseburger', 'hamburguesa de buey con patatas', 'smash burger'],
+    aka: ['hamburguesa de vaca madurada', 'burger de buey', 'hamburguesa de buey con queso', 'cheeseburger', 'hamburguesa de buey con patatas', 'smash burger'],
     proc: ['Formar la hamburguesa de 180 g sin apretar y salpimentar justo antes de cocinar.', 'Marcar en plancha muy caliente, fundir el cheddar y tostar el pan.', 'Montar con lechuga, tomate, cebolla, pepinillo y salsas; servir con patatas.'],
   }),
   rec('Hamburguesa clásica', 'Bocadillos y hamburguesas', 1, [
@@ -220,7 +220,7 @@ export const KB_RECIPES_VARIOS: KbRecipe[] = [
     [AOVE, 5, 'ml'],
     ['Orégano', 0.3, 'g'],
   ], {
-    aka: ['pizza 4 quesos', 'cuatro quesos', 'pizza quattro formaggi', '4 quesos'],
+    aka: ['pizza 4 quesos', 'cuatro quesos', 'pizza quattro formaggi'],
     proc: ['Estirar la masa y cubrir con tomate.', 'Repartir los cuatro quesos y hornear.'],
   }),
   rec('Pizza de jamón y rúcula', 'Pizzas', 1, [
@@ -560,24 +560,59 @@ export const KB_RECIPES_VARIOS: KbRecipe[] = [
   // ───────────── Bebidas ─────────────
   rec('Caña de cerveza', 'Bebidas', 1, [['Cerveza de barril', 200, 'ml']], {
     aka: ['caña', 'cana de cerveza', 'cerveza de barril', 'una caña', 'caña de barril', 'cerveza', 'caña de cerveza de barril'],
+    proc: ['Tirar en vaso de caña frío y mojado (20 cl), inclinado al principio.', 'Terminar con dos dedos de espuma cremosa.'],
   }),
-  rec('Doble de cerveza', 'Bebidas', 1, [['Cerveza de barril', 330, 'ml']], { aka: ['doble', 'tubo de cerveza', 'cerveza doble', 'doble de barril'] }),
-  rec('Jarra de cerveza', 'Bebidas', 1, [['Cerveza de barril', 500, 'ml']], { aka: ['pinta', 'pinta de cerveza', 'jarra de cerveza de medio litro', 'jarra'] }),
-  rec('Tercio de cerveza', 'Bebidas', 1, [['Cerveza en botella', 330, 'ml']], { aka: ['tercio', 'botella de cerveza', 'cerveza de botella', 'cerveza en botella'] }),
-  rec('Botellín de cerveza', 'Bebidas', 1, [['Cerveza en botella', 200, 'ml']], { aka: ['quinto', 'botellin', 'quinto de cerveza', 'botellines'] }),
-  rec('Cerveza sin alcohol', 'Bebidas', 1, [['Cerveza sin alcohol', 330, 'ml']], { aka: ['sin alcohol', 'cerveza sin', 'cerveza tostada sin alcohol'] }),
+  rec('Doble de cerveza', 'Bebidas', 1, [['Cerveza de barril', 330, 'ml']], {
+    aka: ['doble', 'tubo de cerveza', 'cerveza doble', 'doble de barril'],
+    proc: ['Tirar en vaso de tubo frío (33 cl) y terminar con dos dedos de espuma.'],
+  }),
+  rec('Jarra de cerveza', 'Bebidas', 1, [['Cerveza de barril', 500, 'ml']], {
+    aka: ['pinta', 'pinta de cerveza', 'jarra de cerveza de medio litro', 'jarra'],
+    proc: ['Tirar en jarra helada de medio litro y terminar con dos dedos de espuma.'],
+  }),
+  rec('Tercio de cerveza', 'Bebidas', 1, [['Cerveza en botella', 330, 'ml']], {
+    aka: ['tercio', 'botella de cerveza', 'cerveza de botella', 'cerveza en botella'],
+    proc: ['Servir el tercio muy frío (4–6 °C) con vaso helado.'],
+  }),
+  rec('Botellín de cerveza', 'Bebidas', 1, [['Cerveza en botella', 200, 'ml']], {
+    aka: ['quinto', 'botellin', 'quinto de cerveza', 'botellines'],
+    proc: ['Servir el botellín muy frío (4–6 °C), abierto en la mesa.'],
+  }),
+  rec('Cerveza sin alcohol', 'Bebidas', 1, [['Cerveza sin alcohol', 330, 'ml']], {
+    aka: ['sin alcohol', 'cerveza sin', 'cerveza tostada sin alcohol'],
+    proc: ['Servir muy fría con vaso helado.'],
+  }),
   rec('Clara con limón', 'Bebidas', 1, [
     ['Cerveza de barril', 100, 'ml'],
     ['Refresco de limón', 100, 'ml'],
-  ], { aka: ['clara', 'clara de limon', 'cerveza con limon', 'clara con casera', 'clara con gaseosa'] }),
+  ], {
+    aka: ['clara', 'clara de limon', 'cerveza con limon', 'clara con casera', 'clara con gaseosa'],
+    proc: ['Tirar la cerveza hasta la mitad del vaso frío y completar con el refresco de limón sin remover.'],
+  }),
   rec('Copa de vino tinto', 'Bebidas', 1, [['Vino tinto crianza', 150, 'ml']], {
     aka: ['copa de vino', 'copa de tinto', 'copa de crianza', 'vino tinto', 'copa de rioja', 'copa de ribera', 'chato de vino', 'copa de vino tinto crianza'],
+    proc: ['Servir 15 cl a 16–18 °C en copa de cristal fino (5 copas por botella).'],
   }),
-  rec('Copa de vino blanco', 'Bebidas', 1, [['Vino blanco', 150, 'ml']], { aka: ['copa de blanco', 'copa de verdejo', 'vino blanco', 'copa de rueda'] }),
-  rec('Copa de albariño', 'Bebidas', 1, [['Albariño', 150, 'ml']], { aka: ['albariño', 'copa de rias baixas', 'albarino'] }),
-  rec('Copa de vino rosado', 'Bebidas', 1, [['Vino rosado', 150, 'ml']], { aka: ['copa de rosado', 'vino rosado'] }),
-  rec('Copa de cava', 'Bebidas', 1, [['Cava', 120, 'ml']], { aka: ['cava', 'copa de cava brut', 'copa de espumoso', 'copa de prosecco'] }),
-  rec('Copa de fino', 'Bebidas', 1, [['Vino fino', 100, 'ml']], { aka: ['fino', 'copa de manzanilla', 'catavino de fino', 'copa de jerez', 'fino de jerez'] }),
+  rec('Copa de vino blanco', 'Bebidas', 1, [['Vino blanco', 150, 'ml']], {
+    aka: ['copa de blanco', 'copa de verdejo', 'vino blanco', 'copa de rueda'],
+    proc: ['Servir 15 cl a 8–10 °C en copa fría (5 copas por botella).'],
+  }),
+  rec('Copa de albariño', 'Bebidas', 1, [['Albariño', 150, 'ml']], {
+    aka: ['albariño', 'copa de rias baixas', 'albarino'],
+    proc: ['Servir 15 cl a 8–10 °C en copa fría (5 copas por botella).'],
+  }),
+  rec('Copa de vino rosado', 'Bebidas', 1, [['Vino rosado', 150, 'ml']], {
+    aka: ['copa de rosado', 'vino rosado'],
+    proc: ['Servir 15 cl a 8–10 °C en copa fría (5 copas por botella).'],
+  }),
+  rec('Copa de cava', 'Bebidas', 1, [['Cava', 120, 'ml']], {
+    aka: ['cava', 'copa de cava brut', 'copa de espumoso', 'copa de prosecco'],
+    proc: ['Servir 12 cl a 6–8 °C en copa flauta (6 copas por botella).'],
+  }),
+  rec('Copa de fino', 'Bebidas', 1, [['Vino fino', 100, 'ml']], {
+    aka: ['fino', 'copa de manzanilla', 'catavino de fino', 'copa de jerez', 'fino de jerez'],
+    proc: ['Servir 10 cl muy frío (6–8 °C) en catavino.'],
+  }),
   rec('Vermut', 'Bebidas', 1, [
     ['Vermut rojo', 90, 'ml'],
     ['Hielo', 60, 'g', 'bruta'],
@@ -660,13 +695,16 @@ export const KB_RECIPES_VARIOS: KbRecipe[] = [
     ['Vino tinto joven', 150, 'ml'],
     ['Refresco de cola', 150, 'ml'],
     ['Hielo', 100, 'g', 'bruta'],
-  ], { aka: ['calimocho', 'vino con cola'] }),
+  ], { aka: ['calimocho', 'vino con cola'], proc: ['Servir a partes iguales vino tinto y refresco de cola sobre hielo.'] }),
   rec('Rebujito', 'Bebidas', 1, [
     ['Vino fino', 100, 'ml'],
     ['Refresco de limón', 150, 'ml'],
     ['Hierbabuena', 1, 'g'],
     ['Hielo', 150, 'g', 'bruta'],
-  ], { aka: ['rebujito de manzanilla', 'rebujito de feria'] }),
+  ], {
+    aka: ['rebujito de manzanilla', 'rebujito de feria'],
+    proc: ['Llenar el vaso de hielo, añadir el fino o la manzanilla y completar con refresco de limón y hierbabuena.'],
+  }),
   rec('Sangría', 'Bebidas', 1, [
     ['Vino tinto joven', 750, 'ml'],
     ['Refresco de limón', 300, 'ml'],
@@ -685,32 +723,41 @@ export const KB_RECIPES_VARIOS: KbRecipe[] = [
   rec('Café solo', 'Cafés', 1, [
     ['Café en grano', 7, 'g'],
     ['Azúcar', 8, 'g', 'bruta', { note: 'Sobre' }],
-  ], { aka: ['cafe solo', 'expreso', 'espresso', 'cafe expreso', 'solo', 'cafe corto', 'cafe'] }),
+  ], {
+    aka: ['cafe solo', 'expreso', 'espresso', 'cafe expreso', 'solo', 'cafe corto', 'cafe'],
+    proc: ['Moler al momento 7 g de café y extraer 25–30 ml en 25 s a 9 bar.'],
+  }),
   rec('Café con leche', 'Cafés', 1, [
     ['Café en grano', 7, 'g'],
     ['Leche entera', 150, 'ml'],
     ['Azúcar', 8, 'g', 'bruta', { note: 'Sobre' }],
-  ], { aka: ['cafe con leche', 'cafe latte', 'latte', 'cafe con leche grande', 'manchado'] }),
+  ], {
+    aka: ['cafe con leche', 'cafe latte', 'latte', 'cafe con leche grande', 'manchado'],
+    proc: ['Extraer un expreso y completar con la leche texturizada a 60–65 °C.'],
+  }),
   rec('Cortado', 'Cafés', 1, [
     ['Café en grano', 7, 'g'],
     ['Leche entera', 40, 'ml'],
     ['Azúcar', 8, 'g', 'bruta', { note: 'Sobre' }],
-  ], { aka: ['cafe cortado', 'cortado de leche'] }),
+  ], { aka: ['cafe cortado', 'cortado de leche'], proc: ['Extraer un expreso y cortar con un chorro de leche caliente texturizada.'] }),
   rec('Capuchino', 'Cafés', 1, [
     ['Café en grano', 7, 'g'],
     ['Leche entera', 150, 'ml'],
     ['Cacao en polvo', 1, 'g'],
     ['Azúcar', 8, 'g', 'bruta', { note: 'Sobre' }],
-  ], { aka: ['cappuccino', 'capuccino'] }),
+  ], { aka: ['cappuccino', 'capuccino'], proc: ['Extraer un expreso, añadir la leche con espuma densa y espolvorear cacao.'] }),
   rec('Carajillo', 'Cafés', 1, [
     ['Café en grano', 7, 'g'],
     ['Brandy', 30, 'ml'],
     ['Azúcar', 8, 'g', 'bruta'],
-  ], { aka: ['carajillo de brandy', 'carajillo de ron', 'carajillo quemado'] }),
+  ], { aka: ['carajillo de brandy', 'carajillo de ron', 'carajillo quemado'], proc: ['Calentar el brandy con el azúcar (o quemarlo) y añadir el expreso recién hecho.'] }),
   rec('Infusión', 'Cafés', 1, [
     ['Té', 1, 'ud', 'bruta'],
     ['Azúcar', 8, 'g', 'bruta', { note: 'Sobre' }],
-  ], { aka: ['infusion', 'te', 'te verde', 'te negro', 'poleo menta', 'infusion de manzanilla', 'rooibos', 'te con limon'] }),
+  ], {
+    aka: ['infusion', 'te', 'te verde', 'te negro', 'poleo menta', 'infusion de manzanilla', 'rooibos', 'te con limon'],
+    proc: ['Servir el agua a 80–95 °C según la infusión, con la bolsita aparte y el azúcar.'],
+  }),
   rec('Zumo de naranja natural', 'Bebidas', 1, [['Naranja', 450, 'g', 'bruta', { waste: 55 }]], {
     aka: ['zumo natural', 'zumo de naranja', 'zumo de naranja recien exprimido', 'zumo natural de naranja'],
     proc: ['Exprimir al momento y servir sin colar.'],
@@ -719,7 +766,16 @@ export const KB_RECIPES_VARIOS: KbRecipe[] = [
     ['Refresco de cola', 200, 'ml'],
     ['Hielo', 80, 'g', 'bruta'],
     ['Limón', 5, 'g'],
-  ], { aka: ['coca cola', 'refresco de cola', 'cola', 'fanta', 'refrescos', 'coca cola zero', 'pepsi'] }),
-  rec('Agua mineral', 'Bebidas', 1, [['Agua mineral', 500, 'ml']], { aka: ['agua', 'botella de agua', 'agua sin gas', 'agua mineral 50 cl'] }),
-  rec('Chupito de orujo', 'Bebidas', 1, [['Licor de hierbas', 40, 'ml']], { aka: ['chupito', 'orujo', 'licor de hierbas', 'chupito de hierbas', 'orujo de hierbas', 'chupito de licor'] }),
+  ], {
+    aka: ['coca cola', 'refresco de cola', 'cola', 'fanta', 'refrescos', 'coca cola zero', 'pepsi'],
+    proc: ['Servir en vaso con hielo y una rodaja de limón, con la botella o lata aparte.'],
+  }),
+  rec('Agua mineral', 'Bebidas', 1, [['Agua mineral', 500, 'ml']], {
+    aka: ['agua', 'botella de agua', 'agua sin gas', 'agua mineral 50 cl'],
+    proc: ['Servir la botella de 50 cl fresca, abierta en la mesa, con vaso.'],
+  }),
+  rec('Chupito de orujo', 'Bebidas', 1, [['Licor de hierbas', 40, 'ml']], {
+    aka: ['chupito', 'orujo', 'licor de hierbas', 'chupito de hierbas', 'orujo de hierbas', 'chupito de licor'],
+    proc: ['Servir 4 cl muy frío en vaso de chupito.'],
+  }),
 ];

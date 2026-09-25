@@ -122,10 +122,11 @@ export type QtySpec = [quantity: number, unit: QtyUnit, basis?: QtyBasis];
 export function mainQty(ing: KbIngredient, group: RoleGroup): QtySpec {
   const o = MAIN_OVERRIDES[ing.name];
   if (o) return o;
+  // Huevos: 2 por ración; los pasteurizados (a granel) en gramos
+  if (ing.category === 'huevo') return ing.baseUnit === 'ud' ? [2, 'ud', 'bruta'] : [100, 'g'];
   if (ing.baseUnit === 'ud') return [1, 'ud', 'bruta'];
   switch (group) {
     case 'protein':
-      if (ing.category === 'huevo') return [2, 'ud', 'bruta'];
       if (ing.category === 'charcuteria') return [80, 'g'];
       if (ing.category === 'pescado' || (ing.category === 'conserva' && ing.allergens.includes('pescado'))) return [170, 'g'];
       if (ing.category === 'marisco' || ing.allergens.some((a) => a === 'crustaceos' || a === 'moluscos')) return [150, 'g'];
@@ -150,10 +151,10 @@ export function secondaryQty(ing: KbIngredient, group: RoleGroup): QtySpec {
   const o = SECONDARY_OVERRIDES[ing.name];
   if (o) return o;
   const liquid = ing.baseUnit === 'l';
+  if (ing.category === 'huevo') return ing.baseUnit === 'ud' ? [1, 'ud', 'bruta'] : [20, 'g'];
   if (ing.baseUnit === 'ud') return [1, 'ud', 'bruta'];
   switch (group) {
     case 'protein':
-      if (ing.category === 'huevo') return [1, 'ud', 'bruta'];
       if (ing.category === 'charcuteria') return [30, 'g'];
       return [60, 'g'];
     case 'cheese':
@@ -638,6 +639,21 @@ export const DISH_FRAMES: DishFrame[] = [
     label: 'tacos',
   },
   {
+    id: 'bao',
+    triggers: ['bao', 'baos', 'bao bun'],
+    kind: 'salado',
+    base: [
+      ['Pan bao', 2, 'ud', 'bruta'],
+      ['Pepino', 15, 'g'],
+      ['Cebolleta', 5, 'g'],
+      ['Cilantro', 1, 'g'],
+      ['Mayonesa', 10, 'g'],
+      ['Sriracha', 3, 'ml'],
+    ],
+    mainScale: 0.45,
+    label: 'bao',
+  },
+  {
     id: 'wrap',
     triggers: ['wrap', 'burrito', 'fajita', 'quesadilla'],
     kind: 'salado',
@@ -670,7 +686,7 @@ export const DISH_FRAMES: DishFrame[] = [
   },
   {
     id: 'risotto',
-    triggers: ['risotto', 'risoto', 'arroz meloso'],
+    triggers: ['risotto', 'risoto'],
     kind: 'salado',
     base: [
       ['Arroz carnaroli', 90, 'g'],

@@ -191,7 +191,7 @@ export const KB_RECIPES_TAPAS: KbRecipe[] = [
     ['Limón', 20, 'g'],
     ['Sal', 1, 'g'],
   ], {
-    aka: ['calamares fritos a la andaluza', 'calamar frito', 'calamares enharinados', 'calamar a la andaluza'],
+    aka: ['calamares fritos a la andaluza', 'calamares enharinados', 'calamar a la andaluza'],
     proc: ['Limpiar el calamar y cortar en anillas; salar y enharinar con harina de freír, sacudiendo el exceso.', 'Freír a 190 °C poco a poco y servir con limón.'],
   }),
   rec('Chipirones a la andaluza', 'Raciones', 1, [
@@ -297,7 +297,7 @@ export const KB_RECIPES_TAPAS: KbRecipe[] = [
     ['Uva', 30, 'g', 'neta', G],
     ['Picos de pan', 20, 'g', 'neta', G],
   ], {
-    aka: ['surtido de quesos', 'tabla de quesos nacionales', 'plato de quesos', 'quesos variados', 'tabla de quesos artesanos', 'seleccion de quesos'],
+    aka: ['surtido de quesos', 'tabla de quesos nacionales', 'quesos variados', 'tabla de quesos artesanos'],
     proc: ['Atemperar los quesos 30 min y cortar en cuñas o lascas.', 'Montar de más suave a más intenso con mermelada, nueces, uva y picos.'],
   }),
   rec('Queso manchego', 'Raciones', 1, [
@@ -560,7 +560,7 @@ export const KB_RECIPES_TAPAS: KbRecipe[] = [
     ['Sal', 1, 'g'],
     ['Totopos', 60, 'g'],
   ], {
-    aka: ['guacamole', 'guacamole casero', 'guacamole con nachos'],
+    aka: ['guacamole', 'guacamole casero'],
     proc: ['Machacar el aguacate con lima y sal.', 'Incorporar tomate, cebolla, guindilla y cilantro picados; servir con totopos.'],
   }),
   rec('Alitas de pollo', 'Raciones', 1, [

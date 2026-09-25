@@ -106,6 +106,7 @@ export const KB_MAR: KbIngredient[] = [
   ing('Pulpo crudo congelado', 'marisco', 'kg', 10, 45, 16, { aka: ['pulpo', 'pulpo crudo', 'pulpo congelado', 'pulpo entero', 'pulpo gallego', 'pulpo fresco'], alg: ['moluscos'] }),
   ing('Pulpo cocido', 'marisco', 'kg', 0, 5, 32, { aka: ['pata de pulpo cocida', 'patas de pulpo cocido', 'pulpo cocido en pata', 'pata de pulpo', 'tentaculo de pulpo'], alg: ['moluscos'] }),
   ing('Calamar', 'marisco', 'kg', 25, 25, 14, { aka: ['calamares', 'calamar fresco', 'calamar de potera', 'calamar nacional', 'calamar limpio'], alg: ['moluscos'] }),
+  ing('Pota', 'marisco', 'kg', 20, 25, 6, { aka: ['pota limpia', 'tiras de pota', 'calamar gigante', 'pota del pacifico'], alg: ['moluscos'] }),
   ing('Anillas de calamar', 'congelado', 'kg', 0, 25, 8, { aka: ['rabas', 'aros de calamar', 'tubo de calamar', 'calamar patagonico', 'calamar congelado', 'tiras de calamar'], alg: ['moluscos'] }),
   ing('Chipirón', 'marisco', 'kg', 20, 20, 12, { aka: ['chipiron', 'chipirones', 'chopitos', 'puntillitas', 'puntillas', 'chipiron de anzuelo'], alg: ['moluscos'] }),
   ing('Sepia', 'marisco', 'kg', 30, 25, 10, { aka: ['sepia fresca', 'choco', 'chocos', 'jibia', 'sepia limpia'], alg: ['moluscos'] }),

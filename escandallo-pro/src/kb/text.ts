@@ -53,8 +53,12 @@ export const CULINARY_WORDS = new Set([
   'chupito', 'pinta', 'doble', 'triple', 'grande', 'pequeno', 'pequena', 'mini', 'maxi', 'suave', 'intenso', 'intensa',
 ]);
 
-/** Abreviaturas de proveedor frecuentes (se aplican sobre el texto ya normalizado). */
+/**
+ * Abreviaturas de proveedor y expresiones fijas de carta (se aplican sobre el texto ya normalizado).
+ * Las expresiones fijas llevan palabras que en otro contexto son relleno ("de la abuela") y aquí identifican el plato.
+ */
 const ABBREVIATIONS: [RegExp, string][] = [
+  [/\btarta de la abuela\b/g, 'tarta de galletas y chocolate'],
   [/\ba o v e\b/g, 'aove'],
   [/\bac(?:eit)?\s+(?:de\s+)?ol(?:iva)?\s+v\s*e\b/g, 'aceite de oliva virgen extra'],
   [/\boliva\s+v\s+e\b/g, 'oliva virgen extra'],

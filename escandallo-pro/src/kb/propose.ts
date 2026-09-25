@@ -21,16 +21,20 @@ import {
   roleGroup,
   secondaryQty,
 } from './data/roles';
+import { normalizeText } from '../core/matching';
 import { CULINARY_WORDS, STOPWORDS, type Token, allowedTypos, contentTokens, editDistance, rawWords } from './text';
 
 /**
  * Propuesta de escandallo 100 % local (sin IA):
  *  1. Receta tipo: emparejamiento por tokens ponderados (IDF) del nombre y la descripción con los nombres y alias
  *     de KB_RECIPES, tolerante a erratas y variantes ("Pulpo a feira", "Bravas", "Croquetas caseras de jamón ibérico").
- *     Después se ajusta a la carta: sustituye variantes ("tomate raf", "guanciale"), el ingrediente que da nombre
- *     a la receta ("croquetas de gambas" sobre croquetas de jamón), la guarnición si la carta menciona otra y añade extras.
- *  2. Heurística: detecta ingredientes y elaboraciones (n-gramas de 1–6 palabras contra nombres y alias), el tipo de plato
- *     (hamburguesa, arroz, ensalada, crema…) y el método de cocción, y asigna gramajes profesionales por rol.
+ *     Penaliza recetas que no explican el producto principal del nombre, el tipo de plato o el método de cocción
+ *     ("Vieiras a la plancha" no son "Vieiras gratinadas"). Después se ajusta a la carta: sustituye variantes ("tomate raf",
+ *     "guanciale"), el ingrediente que da nombre a la receta, la guarnición si la carta menciona otra (conservando la que
+ *     nombra), retira lo excluido con "sin…", añade extras y escala botellas, medias raciones, tapas y copas de jarra.
+ *  2. Heurística: detecta ingredientes y elaboraciones (n-gramas de 1–6 palabras contra nombres y alias, sin cruzar
+ *     conectores como "con" o "y"), el tipo de plato (hamburguesa, arroz, ensalada, crema…) y el método de cocción, y asigna
+ *     gramajes profesionales por rol (principal según categoría, guarniciones, salsas, hierbas, pan…) más AOVE y sal.
  */
 
 /** Umbral a partir del cual se usa la receta tipo. */
@@ -53,7 +57,19 @@ interface DishToken extends Token {
   inName: boolean;
   /** Negado con "sin". */
   negated: boolean;
+  /** Entre este token y el anterior hay un conector ("con", "y", "sobre"…): ninguna frase puede cruzarlo. */
+  brk: boolean;
+  /** Va precedido de "al" o "a la" ("a la naranja", "al curry"): suele nombrar una salsa o un estilo. */
+  marker: boolean;
+  /** Va tras "puré de", "crema de"… ("puré de boniato"). */
+  puree: boolean;
 }
+
+/** Palabras que convierten el ingrediente siguiente en un puré o una crema de guarnición. */
+const PUREE_WORDS = new Set(['pure', 'crema', 'parmentier', 'veloute', 'mousseline', 'muselina']);
+
+/** Conectores que separan ingredientes: "helado con nata" no es "helado de nata". */
+const PHRASE_BREAKERS = new Set(['con', 'y', 'e', 'o', 'u', 'sobre', 'sin', 'ni', 'mas', 'junto']);
 
 function tokenizeDishText(text: string, inName: boolean, segOffset = 0): DishToken[] {
   const out: DishToken[] = [];
@@ -73,22 +89,32 @@ function tokenizeDishText(text: string, inName: boolean, segOffset = 0): DishTok
       for (let j = i + 1; j < raw.length; j++) {
         if (STOPWORDS.has(raw[j])) continue;
         negatedPos.add(j);
-        // "sin gluten ni lactosa": también lo encadenado con "ni" / "y"
-        if (raw[j + 1] === 'ni' || raw[j + 1] === 'y') {
-          i = j + 1;
+        // "sin gluten ni lactosa", "sin cebolla y pepinillo": también lo encadenado (pero no "sin cebolla y con queso")
+        const next = raw[j + 1];
+        if (next === 'ni' || (next === 'y' && raw[j + 2] !== undefined && !STOPWORDS.has(raw[j + 2]))) {
+          j++;
           continue;
         }
         break;
       }
     });
+    let prevPos = -1;
     for (const tk of contentTokens(segment)) {
       if (UNIT_WORDS.has(tk.raw) || tk.raw === 'ni' || tk.raw === 'sin') continue;
+      const brk = prevPos >= 0 && raw.slice(prevPos + 1, tk.pos).some((w) => PHRASE_BREAKERS.has(w));
+      const marker = raw[tk.pos - 1] === 'al' || (raw[tk.pos - 1] === 'la' && raw[tk.pos - 2] === 'a');
+      const before = raw[tk.pos - 1] === 'de' || raw[tk.pos - 1] === 'del' ? raw[tk.pos - 2] : raw[tk.pos - 1];
+      const puree = !!before && PUREE_WORDS.has(before);
+      prevPos = tk.pos;
       out.push({
         ...tk,
         seg,
         head: inName && seg === segOffset && tk.pos < connectorAt,
         inName,
         negated: negatedPos.has(tk.pos),
+        brk,
+        marker,
+        puree,
       });
     }
     seg++;
@@ -113,6 +139,8 @@ interface RecipeIndex {
   vocabByInitial: Map<string, string[]>;
   /** Tokens de nombre + alias de cada receta. */
   recipeTokens: Set<string>[];
+  /** Tokens del nombre de cada receta (sin alias). */
+  recipeNameTokens: Set<string>[];
 }
 
 let RECIPE_INDEX: RecipeIndex | undefined;
@@ -123,7 +151,9 @@ function recipeIndex(): RecipeIndex {
   const byToken = new Map<string, number[]>();
   const df = new Map<string, number>();
   const recipeTokens: Set<string>[] = [];
+  const recipeNameTokens: Set<string>[] = [];
   KB_RECIPES.forEach((r, ri) => {
+    recipeNameTokens.push(new Set(contentTokens(r.name).map((t) => t.t)));
     const all = new Set<string>();
     const seen = new Set<string>();
     for (const text of [r.name, ...(r.aliases ?? [])]) {
@@ -162,7 +192,7 @@ function recipeIndex(): RecipeIndex {
     b.push(t);
     vocabByInitial.set(t[0], b);
   }
-  RECIPE_INDEX = { variants, byToken, idf, maxIdf, vocab, vocabByInitial, recipeTokens };
+  RECIPE_INDEX = { variants, byToken, idf, maxIdf, vocab, vocabByInitial, recipeTokens, recipeNameTokens };
   return RECIPE_INDEX;
 }
 
@@ -203,8 +233,42 @@ function normalizeQuery(tokens: DishToken[], idx: RecipeIndex): QueryToken[] {
 interface MatchContext {
   /** Tokens de la primera detección principal de la cabeza del nombre (p. ej. "merluza"). */
   headMain?: string[];
+  /** El principal de la cabeza es una fruta (en bebidas y postres sólo aporta sabor). */
+  headMainFruit?: boolean;
+  /** Familias de método de cocción nombradas en el plato. */
+  methods: Set<string>;
   /** Palabras de tipo de plato o de método "fuerte" presentes en la cabeza del nombre. */
   contextWords: Set<string>;
+}
+
+/** Secciones en las que una fruta es un sabor y no el producto principal. */
+const SWEET_SECTIONS = new Set(['Postres', 'Bebidas', 'Cócteles', 'Cafés']);
+
+/** Familias de métodos de cocción mutuamente excluyentes (tokens ya singularizados). */
+const METHOD_FAMILIES: Record<string, string[]> = {
+  parrilla: ['plancha', 'brasa', 'parrilla', 'grill', 'braseado', 'braseada', 'josper'],
+  fritura: ['frito', 'frita', 'romana', 'andaluza', 'tempura', 'rebozado', 'rebozada', 'empanado', 'gabardina', 'orly'],
+  gratinado: ['gratinado', 'gratinada', 'graten'],
+  vapor: ['vapor'],
+  crudo: ['tartar', 'carpaccio', 'tataki', 'ceviche', 'sashimi'],
+};
+const METHOD_OF = new Map<string, string>(Object.entries(METHOD_FAMILIES).flatMap(([fam, words]) => words.map((w) => [w, fam] as [string, string])));
+
+function methodFamilies(tokens: Iterable<string>): Set<string> {
+  const out = new Set<string>();
+  for (const t of tokens) {
+    const fam = METHOD_OF.get(t);
+    if (fam) out.add(fam);
+  }
+  return out;
+}
+
+/** La receta nombra un método de otra familia y ninguno de los del plato. */
+function methodConflict(dish: Set<string>, recipeTokens: Set<string>): boolean {
+  const rec = methodFamilies(recipeTokens);
+  if (!rec.size) return false;
+  for (const f of dish) if (rec.has(f)) return false;
+  return true;
 }
 
 function scoreVariant(v: RecipeVariant, name: QueryToken[], desc: QueryToken[], idx: RecipeIndex, ctx: MatchContext): number {
@@ -249,8 +313,12 @@ function scoreVariant(v: RecipeVariant, name: QueryToken[], desc: QueryToken[], 
   let score = 0.7 * rc + 0.3 * qc;
   if (hasHead && !headMatched) score *= 0.75;
   if (v.tokens.length === 1) score *= 0.85 + 0.15 * qc;
-  // El producto principal del nombre ("merluza" en "Merluza a la plancha con verduras") debe estar en la receta
-  if (ctx.headMain && !ctx.headMain.some((t) => v.set.has(t)) && !ctx.headMain.every((t) => idx.recipeTokens[v.recipe].has(t))) score *= 0.7;
+  // El producto principal del nombre ("merluza" en "Merluza a la plancha con verduras") debe estar en la receta,
+  // salvo que sea la fruta que da sabor a una bebida o un postre ("Mojito de fresa")
+  const flavourOnly = ctx.headMainFruit && SWEET_SECTIONS.has(KB_RECIPES[v.recipe].section);
+  if (ctx.headMain && !flavourOnly && !ctx.headMain.some((t) => v.set.has(t)) && !ctx.headMain.every((t) => idx.recipeTokens[v.recipe].has(t))) score *= 0.7;
+  // Método de cocción incompatible ("Vieiras a la plancha" no son "Vieiras gratinadas", aunque un alias diga sólo "vieiras")
+  if (ctx.methods.size && methodConflict(ctx.methods, new Set([...v.set, ...idx.recipeNameTokens[v.recipe]]))) score *= 0.8;
   // Tipo de plato o método que la receta no contempla ("pizza de burrata", "chipirones encebollados")
   for (const w of ctx.contextWords) {
     if (!v.set.has(w) && !idx.recipeTokens[v.recipe].has(w)) {
@@ -311,6 +379,8 @@ function computeRecipeMatch(nameToks: DishToken[], descToks: DishToken[], dets: 
   const headMainDet = dets.find((d) => d.inName && d.head && d.target.kind === 'ing' && swapFamily(roleGroup(d.target.ing)) !== undefined);
   const ctx: MatchContext = {
     headMain: headMainDet?.tokens,
+    headMainFruit: headMainDet?.target.kind === 'ing' && headMainDet.target.ing.category === 'fruta',
+    methods: methodFamilies(name.map((q) => q.t)),
     contextWords: new Set(name.filter((q) => q.head && ctxWords.has(q.t)).map((q) => q.t)),
   };
   const candidates = new Set<number>();
@@ -337,10 +407,17 @@ interface Detection {
   head: boolean;
   /** Orden de aparición (nombre antes que descripción). */
   order: number;
+  /** Va tras "puré de", "crema de", "parmentier de"…: se sirve en puré (lleva mantequilla y nata). */
+  puree?: boolean;
 }
 
 interface DetectIndex {
   map: Map<string, DetectTarget>;
+  /**
+   * Elaboraciones cuyo alias "al…"/"a la…" coincide con un ingrediente ("a la naranja", "al curry"): sólo cuentan si en la carta
+   * van precedidas de "al" o "a la"; si no, manda el ingrediente ("Ensalada de naranja" lleva naranja, no salsa de naranja).
+   */
+  markerMap: Map<string, DetectTarget>;
   maxLen: number;
   singleByInitial: Map<string, { key: string; target: DetectTarget }[]>;
   vocabulary: Set<string>;
@@ -360,12 +437,17 @@ function detectIndex(): DetectIndex {
     if (DETECTION_BLOCKLIST.has(key)) continue;
     map.set(key, { kind: 'ing', ing });
   }
+  const markerMap = new Map<string, DetectTarget>();
   for (const prep of KB_PREPARATIONS) {
     for (const text of [prep.name, ...prep.aliases]) {
       const toks = contentTokens(text.replace(/\(.*?\)/g, '')).map((t) => t.t);
       if (!toks.length) continue;
       const key = toks.join(' ');
       if (DETECTION_BLOCKLIST.has(key)) continue;
+      if (/^(al|a la) /.test(normalizeText(text)) && map.get(key)?.kind === 'ing') {
+        markerMap.set(key, { kind: 'prep', prep });
+        continue;
+      }
       map.set(key, { kind: 'prep', prep });
       if (toks.length > maxLen) maxLen = toks.length;
     }
@@ -381,7 +463,7 @@ function detectIndex(): DetectIndex {
   for (const k of map.keys()) for (const t of k.split(' ')) vocabulary.add(t);
   for (const f of DISH_FRAMES) for (const tr of f.triggers) for (const t of contentTokens(tr)) vocabulary.add(t.t);
   for (const m of COOKING_METHODS) for (const tr of m.triggers) for (const t of contentTokens(tr)) vocabulary.add(t.t);
-  DETECT_INDEX = { map, maxLen, singleByInitial, vocabulary };
+  DETECT_INDEX = { map, markerMap, maxLen, singleByInitial, vocabulary };
   return DETECT_INDEX;
 }
 
@@ -406,17 +488,24 @@ function detectInTokens(tokens: DishToken[], orderBase: number): DetectResult {
   for (const seg of [...segs.keys()].sort((a, b) => a - b)) {
     const list = segs.get(seg) ?? [];
     const covered = new Array<boolean>(list.length).fill(false);
-    const hits = scanPhrases(list, idx.map, idx.maxLen);
+    const hits = scanPhrases(list, idx.map, idx.maxLen, undefined, (k) => list[k].brk);
     for (const h of hits) {
       for (let k = h.start; k < h.start + h.length; k++) covered[k] = true;
+      const marked = list[h.start].marker ? idx.markerMap.get(h.key) : undefined;
       const det: Detection = {
-        target: h.item,
+        target: marked ?? h.item,
         key: h.key,
         tokens: h.key.split(' '),
         inName: list[h.start].inName,
         head: list[h.start].head,
         order: order + h.start,
       };
+      if (list[h.start].puree && det.target.kind === 'ing' && ['veg', 'legume'].includes(roleGroup(det.target.ing))) {
+        det.puree = true;
+        // "Parmentier de boniato": el puré es de boniato, no el puré de patata genérico
+        const prev = found[found.length - 1];
+        if (prev && prev.target.kind === 'prep' && prev.target.prep.name.startsWith('Puré') && !prev.key.includes(' ')) found.pop();
+      }
       if (list.slice(h.start, h.start + h.length).some((t) => t.negated)) negated.push(det);
       else found.push(det);
     }
@@ -550,6 +639,17 @@ function ingredientTokens(ing: KbIngredient): Set<string> {
   return s;
 }
 
+/** Tokens del nombre (sin alias) de una ficha, cacheados. */
+const NAME_TOKENS = new Map<string, string[]>();
+function nameTokens(ing: KbIngredient): string[] {
+  let t = NAME_TOKENS.get(ing.name);
+  if (!t) {
+    t = contentTokens(ing.name).map((x) => x.t);
+    NAME_TOKENS.set(ing.name, t);
+  }
+  return t;
+}
+
 /** Palabras genéricas de corte/formato que no identifican al producto. */
 const GENERIC_TOKENS = new Set([
   'lomo', 'filete', 'carne', 'cola', 'pieza', 'loncheado', 'loncheada', 'fresco', 'fresca', 'congelado', 'congelada', 'entero', 'entera', 'crudo', 'cocido',
@@ -574,6 +674,26 @@ function swapFamily(g: RoleGroup): SwapFamily | undefined {
   return undefined;
 }
 
+/**
+ * ¿Retira la carta este ingrediente con "sin…"? Mismo producto, mismo grupo intercambiable ("sin pan" quita el pan brioche),
+ * una palabra distintiva común ("sin cebolla" quita la cebolla morada) o un ingrediente de la elaboración negada.
+ */
+function isNegated(kb: KbIngredient, negated: Detection[]): boolean {
+  const toks = new Set(nameTokens(kb));
+  return negated.some((d) => {
+    if (d.target.kind === 'prep') return d.target.prep.items.some((it) => it.name === kb.name);
+    const n = d.target.ing;
+    if (n.name === kb.name || groupOf(n.name)?.includes(kb.name)) return true;
+    return d.tokens.some((t) => toks.has(t) && (!GENERIC_TOKENS.has(t) || n.category === kb.category));
+  });
+}
+
+/** Un puré o una crema de guarnición ("puré de boniato", "crema de coliflor") se liga con mantequilla y nata. */
+function pureeExtras(d: Detection, factor = 1): ProposedIngredient[] {
+  if (!d.puree || d.head) return [];
+  return [toProposed('Mantequilla', roundQty(10 * factor, 'g'), 'g', 'neta'), toProposed('Nata para cocinar', roundQty(20 * factor, 'ml'), 'ml', 'neta')];
+}
+
 // ───────────────────────────── Receta tipo + ajustes a la carta ─────────────────────────────
 
 const VEGGIE_WORDS = new Set(['vegano', 'vegana', 'veganos', 'veganas', 'vegetariano', 'vegetariana', 'vegetarianos', 'vegetarianas', 'vegan', 'veggie']);
@@ -589,12 +709,27 @@ function hasAnimalProtein(recipe: KbRecipe): boolean {
   });
 }
 
-/** "Media ración de…" = 2 medias por receta; "Tapa de…" ≈ un tercio de ración. */
-function portionFactor(rawName: string[], dets: Detection[]): number {
+/**
+ * Raciones que salen de la receta tipo según cómo la vende la carta: "Media ración de…" = 2 medias por receta;
+ * "Tapa de…" ≈ un tercio de ración; "Copa de sangría" = la jarra de la receta da 6 copas.
+ */
+function portionFactor(rawName: string[], dets: Detection[], recipe: KbRecipe): number {
   const first = rawName[0];
   if (first === 'media' && (rawName[1] === 'racion' || rawName[1] === 'raciones')) return 2;
   if (first === 'tapa' && !dets.some((d) => d.inName && d.tokens[0] === 'tapa')) return 3;
+  if ((first === 'copa' || first === 'vaso') && recipe.name === 'Sangría') return 6;
   return 1;
+}
+
+/** Botella de 75 cl (o media botella) de un vino que la receta tipo sirve por copas: escala las cantidades. */
+function servingScale(rawName: string[], recipe: KbRecipe): number {
+  const bottle = rawName.indexOf('botella');
+  if (bottle < 0 || !recipe.name.startsWith('Copa de') || recipe.items.length !== 1) return 1;
+  const it = recipe.items[0];
+  const ml = it.unit === 'ml' ? it.quantity : it.unit === 'cl' ? it.quantity * 10 : it.unit === 'l' ? it.quantity * 1000 : 0;
+  if (!ml) return 1;
+  const half = bottle > 0 && rawName[bottle - 1] === 'media';
+  return (half ? 375 : 750) / ml;
 }
 
 /**
@@ -602,21 +737,29 @@ function portionFactor(rawName: string[], dets: Detection[]): number {
  * "Taquitos de jamón" + "jamón ibérico" → "Taquitos de jamón ibérico" (y no el loncheado).
  */
 function refineSubstitute(templateIng: KbIngredient, detected: KbIngredient): KbIngredient {
-  const tTok = contentTokens(templateIng.name).map((t) => t.t);
-  const dTok = new Set(contentTokens(detected.name).map((t) => t.t));
+  const tTok = nameTokens(templateIng);
+  const dTok = new Set(nameTokens(detected));
   let best: KbIngredient | undefined;
-  for (const k of KB_INGREDIENTS_LIST()) {
+  for (const k of kbIngredientIndex().byName.values()) {
     if (k.name === templateIng.name || k.name === detected.name) continue;
-    const kTok = contentTokens(k.name).map((t) => t.t);
+    const kTok = nameTokens(k);
     if (!tTok.every((t) => kTok.includes(t))) continue;
     const extra = kTok.filter((t) => !tTok.includes(t));
-    if (extra.length && extra.every((t) => dTok.has(t)) && (!best || kTok.length > contentTokens(best.name).length)) best = k;
+    if (extra.length && extra.every((t) => dTok.has(t)) && (!best || kTok.length > nameTokens(best).length)) best = k;
   }
   return best ?? detected;
 }
 
-function KB_INGREDIENTS_LIST(): KbIngredient[] {
-  return [...kbIngredientIndex().byName.values()];
+/**
+ * Línea equivalente con otro producto, en una unidad que ese producto admite: si la receta lo pedía por unidades
+ * y el sustituto se compra a peso sin peso por unidad, se pasa a gramos con el peso de la unidad original.
+ */
+function substituteQty(p: ProposedIngredient, from: KbIngredient | undefined, to: KbIngredient, keepAdjustments = false): ProposedIngredient {
+  const extra: Partial<ProposedIngredient> = keepAdjustments ? { wastePct: p.wastePct, cookingLossPct: p.cookingLossPct, note: p.note } : {};
+  if (p.unit === 'ud' && to.baseUnit !== 'ud' && !to.unitWeightKg) {
+    return toProposed(to.name, roundQty(p.quantity * (from?.unitWeightKg ?? 0.05) * 1000, 'g'), 'g', 'neta', extra);
+  }
+  return toProposed(to.name, p.quantity, p.unit, p.basis, extra);
 }
 
 interface TemplateItem {
@@ -629,24 +772,18 @@ interface TemplateItem {
  * Receta tipo ajustada a lo que dice la carta. Devuelve undefined si la receta no explica el producto principal
  * del plato (p. ej. "Ensalada de gambas" contra una ensalada mixta genérica): entonces manda la heurística.
  */
-function proposeFromTemplate(name: string, match: RecipeMatch, found: Detection[], negated: Detection[], factor: number): DishProposal | undefined {
+function proposeFromTemplate(name: string, match: RecipeMatch, found: Detection[], negated: Detection[]): DishProposal | undefined {
   const { recipe, score } = match;
+  const rawName = rawWords(name);
+  const factor = portionFactor(rawName, found, recipe);
+  const scale = servingScale(rawName, recipe);
   const nameTokens = new Set<string>();
   for (const t of contentTokens(recipe.name)) nameTokens.add(t.t);
-  let items: TemplateItem[] = recipe.items.map((it) => ({ src: it, p: fromRecipeItem(it), kb: kbByName(it.name) }));
+  let items: TemplateItem[] = recipe.items.map((it) => ({ src: it, p: fromRecipeItem(it, scale), kb: kbByName(it.name) }));
   const portions = recipe.portions;
 
   // "Sin cebolla", "sin pan", "sin queso": se retira de la receta
-  if (negated.length) {
-    const negTokens = new Set(negated.flatMap((d) => (d.target.kind === 'ing' ? d.tokens : [])));
-    const negNames = new Set(negated.map((d) => (d.target.kind === 'ing' ? d.target.ing.name : '')));
-    items = items.filter((it) => {
-      if (!it.kb) return true;
-      if (negNames.has(it.kb.name)) return false;
-      const toks = ingredientTokens(it.kb);
-      return ![...negTokens].some((t) => toks.has(t) && !GENERIC_TOKENS.has(t));
-    });
-  }
+  if (negated.length) items = items.filter((it) => !it.kb || !isNegated(it.kb, negated));
 
   // Ingredientes que dan nombre a la receta (p. ej. el jamón de "croquetas de jamón") y no aparecen en la carta
   const dishTokenSet = new Set(found.flatMap((d) => d.tokens));
@@ -670,12 +807,14 @@ function proposeFromTemplate(name: string, match: RecipeMatch, found: Detection[
     if (d.target.kind === 'prep') {
       const prep = d.target.prep;
       const prepItems = prep.items.map((it) => fromRecipeItem(it, portions));
-      const missing = prepItems.filter((p) => !items.some((it) => it.src.name === p.name));
-      if (!missing.length) continue;
+      // "Entrecot con patatas fritas": la guarnición de la carta sustituye a la de la receta tipo (aunque compartan ingredientes)
       if (prep.role === 'guarnicion' && items.some((it) => it.src.garnish)) {
         replaceGarnish = true;
         newSides.push(...prepItems);
-      } else extras.push(...missing);
+        continue;
+      }
+      const missing = prepItems.filter((p) => !items.some((it) => it.src.name === p.name));
+      if (missing.length) extras.push(...missing);
       continue;
     }
     const ing = d.target.ing;
@@ -691,11 +830,7 @@ function proposeFromTemplate(name: string, match: RecipeMatch, found: Detection[
       if (si != null) {
         const old = items[si];
         const target = old.kb ? refineSubstitute(old.kb, ing) : ing;
-        let p: ProposedIngredient;
-        if (old.p.unit === 'ud' && target.baseUnit !== 'ud') {
-          p = toProposed(target.name, roundQty(old.p.quantity * (old.kb?.unitWeightKg ?? 0.05) * 1000, 'g'), 'g', 'neta');
-        } else p = toProposed(target.name, old.p.quantity, old.p.unit, old.p.basis);
-        items[si] = { src: { ...old.src, name: target.name }, p, kb: target };
+        items[si] = { src: { ...old.src, name: target.name }, p: substituteQty(old.p, old.kb, target), kb: target };
         swappable.delete(si);
         continue;
       }
@@ -705,29 +840,33 @@ function proposeFromTemplate(name: string, match: RecipeMatch, found: Detection[
     if (variants.length === 1) {
       const { it, i } = variants[0];
       const target = it.kb ? refineSubstitute(it.kb, ing) : ing;
-      items[i] = { src: { ...it.src, name: target.name }, p: { ...it.p, name: target.name, category: target.category }, kb: target };
+      items[i] = { src: { ...it.src, name: target.name }, p: substituteQty(it.p, it.kb, target, true), kb: target };
       continue;
     }
     if (variants.length > 1) continue;
     // 3) Guarnición distinta mencionada en la carta
     if ((group === 'veg' || group === 'legume' || group === 'starch') && !d.head && items.some((it) => it.src.garnish)) {
       replaceGarnish = true;
-      newSides.push(fromSpec(ing, secondaryQty(ing, group), portions));
+      newSides.push(fromSpec(ing, secondaryQty(ing, group), portions), ...pureeExtras(d, portions));
       continue;
     }
     if (d.inName && d.head && fam === 'protein') unexplainedMain = true;
     // 4) Extra
     if (ing.name === 'Sal') continue;
-    extras.push(fromSpec(ing, secondaryQty(ing, group), portions));
+    extras.push(fromSpec(ing, secondaryQty(ing, group), portions), ...pureeExtras(d, portions));
   }
 
   // Una receta genérica de una sola palabra ("ensalada", "hamburguesa") no explica "de gambas": mejor la heurística
   if (unexplainedMain && match.variant.length === 1) return undefined;
 
-  if (replaceGarnish) items = items.filter((it) => !it.src.garnish);
+  if (replaceGarnish) {
+    // Se conserva la guarnición de la receta que la carta nombra expresamente ("… con patatas fritas y pimientos de Padrón")
+    const mentioned = new Set(found.flatMap((d) => (d.target.kind === 'ing' ? [d.target.ing.name] : [])));
+    items = items.filter((it) => !it.src.garnish || mentioned.has(it.src.name));
+  }
   const list = new ItemList();
   for (const it of items) list.add(it.p);
-  for (const p of newSides) list.add(p);
+  for (const p of newSides) list.add(p, false);
   for (const p of extras.slice(0, 8)) list.add(p);
 
   const proposal: DishProposal = {
@@ -745,22 +884,30 @@ function proposeFromTemplate(name: string, match: RecipeMatch, found: Detection[
 
 // ───────────────────────────── Heurística ─────────────────────────────
 
-function detectFrame(nameToks: DishToken[]): DishFrame | undefined {
-  let best: { frame: DishFrame; pos: number; len: number } | undefined;
-  const toks = nameToks.filter((t) => !t.negated).map((t) => t.t);
+interface FrameHit {
+  frame: DishFrame;
+  /** Palabras del disparador encontrado en el nombre ("arroz", "hamburguesa"…). */
+  trigger: string[];
+}
+
+function detectFrame(nameToks: DishToken[]): FrameHit | undefined {
+  let best: { frame: DishFrame; pos: number; len: number; trigger: string[] } | undefined;
+  // El tipo de plato está en la cabeza del nombre: "Vieiras con crema de coliflor" no es una crema
+  const head = nameToks.filter((t) => !t.negated && t.head);
+  const toks = (head.length ? head : nameToks.filter((t) => !t.negated)).map((t) => t.t);
   for (const frame of DISH_FRAMES) {
     for (const trig of frame.triggers) {
       const tt = contentTokens(trig).map((t) => t.t);
       if (!tt.length) continue;
       for (let i = 0; i + tt.length <= toks.length; i++) {
         if (tt.every((t, k) => toks[i + k] === t)) {
-          if (!best || i < best.pos || (i === best.pos && tt.length > best.len)) best = { frame, pos: i, len: tt.length };
+          if (!best || i < best.pos || (i === best.pos && tt.length > best.len)) best = { frame, pos: i, len: tt.length, trigger: tt };
           break;
         }
       }
     }
   }
-  return best?.frame;
+  return best ? { frame: best.frame, trigger: best.trigger } : undefined;
 }
 
 function detectMethods(tokens: DishToken[]): CookingMethod[] {
@@ -778,8 +925,33 @@ function formatQty(p: ProposedIngredient): string {
   return `${q} ${p.unit}`;
 }
 
-function proposeHeuristic(name: string, nameToks: DishToken[], descToks: DishToken[], dets: Detection[]): DishProposal {
-  const frame = detectFrame(nameToks);
+/** Hortalizas aromáticas o de aderezo (ajo, guindilla, limón…): nunca son el principal de un plato. */
+function canBeVegMain(ing: KbIngredient): boolean {
+  const [q, unit] = secondaryQty(ing, roleGroup(ing));
+  return unit !== 'g' || q >= 30;
+}
+
+const SHAKE_WORDS = new Set(['batido', 'batidos', 'smoothie', 'smoothies', 'licuado', 'licuados', 'frappe']);
+const JUICE_WORDS = new Set(['zumo', 'zumos', 'jugo', 'jugos']);
+
+/** Palabras que piden la pieza entera del ave. */
+const WHOLE_BIRD_WORDS = new Set(['entero', 'entera', 'corral', 'campero', 'asado', 'asada', 'ast', 'rustido', 'rustit']);
+
+/**
+ * La carta dice "pollo" a secas: la pieza que se compra depende del plato. Arroces y guisos → pollo troceado;
+ * asados → pollo entero; el resto (bocadillos, baos, ensaladas, plancha, rebozados…) → pechuga.
+ */
+function genericCut(d: Detection & { target: { kind: 'ing'; ing: KbIngredient } }, frame: DishFrame | undefined, methods: CookingMethod[], tokens: DishToken[]): KbIngredient {
+  const ing = d.target.ing;
+  if (ing.name !== 'Pollo entero' || d.tokens.join(' ') !== 'pollo') return ing;
+  if (tokens.some((t) => WHOLE_BIRD_WORDS.has(t.raw)) || methods.some((m) => m.id === 'horno')) return ing;
+  const stew = frame?.id === 'arroz' || frame?.id === 'guiso' || frame?.id === 'fideua' || methods.some((m) => m.id === 'guiso');
+  return kbByName(stew ? 'Pollo troceado' : 'Pechuga de pollo') ?? ing;
+}
+
+function proposeHeuristic(name: string, nameToks: DishToken[], descToks: DishToken[], dets: Detection[], negated: Detection[] = []): DishProposal {
+  const frameHit = detectFrame(nameToks);
+  const frame = frameHit?.frame;
   const methods = detectMethods([...nameToks, ...descToks]);
   const kind = frame?.kind ?? 'salado';
   const list = new ItemList();
@@ -794,14 +966,31 @@ function proposeHeuristic(name: string, nameToks: DishToken[], descToks: DishTok
   if (isDrink) {
     let spirit = false;
     let mixer = false;
+    const rawName = nameToks.map((t) => t.raw);
+    const shake = rawName.some((w) => SHAKE_WORDS.has(w));
+    const juice = !shake && rawName.some((w) => JUICE_WORDS.has(w));
     for (const d of ingDets) {
       const ing = d.target.ing;
-      if (roleGroup(ing) !== 'drink' && ing.name !== 'Lima' && ing.name !== 'Limón' && ing.name !== 'Hierbabuena') continue;
-      if (roleGroup(ing) === 'drink') {
-        list.add(fromSpec(ing, drinkQty(ing)));
+      const g = roleGroup(ing);
+      if (g === 'drink') {
+        const [q, unit, basis] = drinkQty(ing);
+        const bottle = rawName.includes('botella') && unit === 'ml' && (ing.name.startsWith('Vino') || ['Albariño', 'Cava', 'Champán'].includes(ing.name));
+        list.add(fromSpec(ing, bottle ? [rawName.includes('media') ? 375 : 750, 'ml', basis] : [q, unit, basis]));
         if (isSpirit(ing)) spirit = true;
         if (isMixer(ing)) mixer = true;
-      } else list.add(fromSpec(ing, secondaryQty(ing, roleGroup(ing))));
+      } else if ((shake || juice) && (ing.category === 'fruta' || ing.category === 'verdura' || ing.name === 'Frutos rojos congelados')) {
+        // Zumo natural: ~400 g de fruta en bruto por vaso; batido: ~150 g de fruta limpia
+        list.add(fromSpec(ing, juice ? [400, 'g', 'bruta'] : [150, 'g']));
+      } else if (shake && (g === 'sweet' || g === 'nut')) {
+        list.add(fromSpec(ing, [25, 'g']));
+      } else if (ing.name === 'Lima' || ing.name === 'Limón' || ing.name === 'Hierbabuena') {
+        list.add(fromSpec(ing, secondaryQty(ing, g)));
+      }
+    }
+    if (shake && list.items.length) {
+      list.ensure(toProposed('Leche entera', 200, 'ml', 'neta'));
+      list.ensure(toProposed('Azúcar', 10, 'g', 'neta'));
+      list.ensure(toProposed('Hielo', 50, 'g', 'bruta'));
     }
     const hielo = kbByName('Hielo');
     if ((spirit || mixer) && hielo) list.ensure(fromSpec(hielo, [150, 'g', 'bruta']));
@@ -822,9 +1011,11 @@ function proposeHeuristic(name: string, nameToks: DishToken[], descToks: DishTok
     ingDets.find((d) => d.inName && isMainCandidate(roleGroup(d.target.ing))) ??
     (kind === 'postre'
       ? ingDets.find((d) => d.inName && ['veg', 'sweet', 'nut', 'cheese', 'dairy'].includes(roleGroup(d.target.ing)))
-      : ingDets.find((d) => d.inName && d.head && ['veg', 'legume'].includes(roleGroup(d.target.ing)) && !(frame && frame.id === 'crema'))) ??
+      : ingDets.find(
+          (d) => d.inName && d.head && ['veg', 'legume'].includes(roleGroup(d.target.ing)) && canBeVegMain(d.target.ing) && !(frame && frame.id === 'crema'),
+        )) ??
     ingDets.find((d) => isMainCandidate(roleGroup(d.target.ing)));
-  const main = mainPick?.target.ing;
+  const main = mainPick ? genericCut(mainPick, frame, methods, [...nameToks, ...descToks]) : undefined;
   const scale = frame?.mainScale ?? 1;
   const sideScale = frame?.sideScale ?? 1;
 
@@ -848,10 +1039,14 @@ function proposeHeuristic(name: string, nameToks: DishToken[], descToks: DishTok
       continue;
     }
     const ing = d.target.ing;
-    if (main && ing.name === main.name) continue;
+    if (main && (ing.name === main.name || d === mainPick)) continue;
     const g = roleGroup(ing);
     if (frame?.id === 'pasta' && PASTAS.has(ing.name)) {
       list.add(fromSpec(ing, [ing.name === 'Raviolis rellenos' || ing.name === 'Gnocchi' ? 180 : 110, 'g']));
+      continue;
+    }
+    // La palabra que da tipo al plato ("arroz" en "Arroz con pollo") ya la aporta la base del tipo de plato con su gramaje
+    if (frameHit && d.inName && d.tokens.every((t) => frameHit.trigger.includes(t)) && frameHit.frame.base.some(([n]) => n === ing.name || !!groupOf(n)?.includes(ing.name))) {
       continue;
     }
     let f = 1;
@@ -859,7 +1054,9 @@ function proposeHeuristic(name: string, nameToks: DishToken[], descToks: DishTok
     if (frame?.id === 'crema' && (g === 'veg' || g === 'legume') && !list.items.some((i) => roleGroup(kbByName(i.name) ?? ing) === 'veg')) f = 2;
     if ((g === 'protein' || g === 'cheese') && main) f = Math.min(1, scale * 1.5);
     list.add(fromSpec(ing, secondaryQty(ing, g), f));
-    if (g === 'veg' || g === 'legume' || g === 'starch' || g === 'sauce') sides.push(lower(ing.name));
+    const puree = pureeExtras(d);
+    for (const p of puree) list.add(p);
+    if (g === 'veg' || g === 'legume' || g === 'starch' || g === 'sauce') sides.push(puree.length ? `puré de ${lower(ing.name)}` : lower(ing.name));
   }
 
   // ── Base del tipo de plato ──
@@ -879,6 +1076,15 @@ function proposeHeuristic(name: string, nameToks: DishToken[], descToks: DishTok
     return !!kb && roleGroup(kb) === 'protein' && kb.allergens.some((a) => a === 'pescado' || a === 'crustaceos' || a === 'moluscos');
   });
   const meat = !!main && (main.category === 'carne' || main.category === 'charcuteria');
+  if (frame?.id === 'pasta' && seafood) {
+    // La pasta con pescado o marisco no lleva queso (salvo que la carta lo diga) y se liga con ajo, vino blanco y perejil
+    const cheeseNamed = new Set(ingDets.map((d) => d.target.ing.name));
+    list.items = list.items.filter((i) => !['Parmesano', 'Grana padano', 'Pecorino'].includes(i.name) || cheeseNamed.has(i.name));
+    list.ensure(toProposed('Ajo', 5, 'g', 'neta'));
+    list.ensure(toProposed('Vino blanco', 30, 'ml', 'neta'));
+    list.ensure(toProposed('Perejil', 2, 'g', 'neta'));
+    list.ensure(toProposed('Cayena', 0.2, 'g', 'neta'));
+  }
   const rawAll = [...nameToks, ...descToks].map((t) => t.raw);
   const brothy = rawAll.includes('caldoso') || rawAll.includes('meloso');
   if (frame?.id === 'arroz') {
@@ -886,6 +1092,10 @@ function proposeHeuristic(name: string, nameToks: DishToken[], descToks: DishTok
     if (!list.items.some((i) => ['Fumet de pescado', 'Caldo de pollo', 'Caldo de verduras', 'Fondo oscuro'].includes(i.name))) {
       list.add(toProposed(stock, brothy ? 450 : 350, 'ml', 'neta'));
     }
+  }
+  if (frame?.id === 'crema' && (seafood || meat)) {
+    const idxStock = list.items.findIndex((i) => i.name === 'Caldo de verduras');
+    if (idxStock >= 0) list.items[idxStock] = toProposed(seafood ? 'Fumet de pescado' : 'Caldo de pollo', list.items[idxStock].quantity, 'ml', 'neta');
   }
   if (frame?.id === 'risotto' && (seafood || meat)) {
     const idxStock = list.items.findIndex((i) => i.name === 'Caldo de verduras');
@@ -909,8 +1119,11 @@ function proposeHeuristic(name: string, nameToks: DishToken[], descToks: DishTok
 
   // ── Método de cocción ──
   const fry = methods.find((m) => ['romana', 'tempura', 'empanado', 'frito'].includes(m.id));
+  const prepKeys = new Set(dets.filter((d) => d.target.kind === 'prep').map((d) => d.key));
   for (const m of methods) {
     if (['romana', 'tempura', 'empanado', 'frito'].includes(m.id) && m !== fry) continue;
+    // "Pil pil de hongos": la elaboración ya aporta el aceite y el ajo del método
+    if (m.triggers.some((tr) => prepKeys.has(contentTokens(tr).map((t) => t.t).join(' ')))) continue;
     for (const t of m.add) list.add(fromTuple(t));
   }
   const coating = list.items.some((i) => {
@@ -925,6 +1138,13 @@ function proposeHeuristic(name: string, nameToks: DishToken[], descToks: DishTok
   if (kind === 'salado') {
     if (!list.items.some((i) => i.name.startsWith('Aceite de oliva'))) list.add(toProposed('Aceite de oliva virgen extra', 10, 'ml', 'neta'));
     if (!list.items.some((i) => i.name === 'Sal' || i.name === 'Sal en escamas' || i.name === 'Sal gruesa')) list.add(toProposed('Sal', 1, 'g', 'neta'));
+  }
+
+  if (negated.length) {
+    list.items = list.items.filter((i) => {
+      const kb = kbByName(i.name);
+      return !kb || !isNegated(kb, negated);
+    });
   }
 
   let confidence = 0.35 + Math.min(0.15, 0.05 * detectedCount);
@@ -959,6 +1179,7 @@ const FRAME_STEPS: Record<string, string> = {
   crema: 'Pochar las verduras, mojar con el caldo, cocer 25 min y triturar con la nata.',
   crudo: 'Cortar el principal muy frío (el pescado crudo, previamente congelado) y aliñar al momento.',
   croquetas: 'Hacer una bechamel espesa con el relleno, enfriar, formar, empanar y freír a 180 °C.',
+  bao: 'Calentar el pan bao al vapor 3 min y rellenar con el principal, las verduras y la salsa.',
   revuelto: 'Cuajar los huevos a fuego suave con el resto de ingredientes, dejándolos jugosos.',
   guiso: 'Dorar el principal, añadir el sofrito, mojar con el vino y el caldo y guisar a fuego suave hasta que esté tierno.',
   brocheta: 'Ensartar el principal marinado y asar a la brasa o plancha.',
@@ -1009,6 +1230,25 @@ function minimalProposal(name: string): DishProposal {
   return { dishName: name.trim(), portions: 1, ingredients, allergens: [], source: 'heuristica', confidence: 0.1 };
 }
 
+/** "Sin gluten", "sin lactosa": la carta pide la versión sin ese alérgeno de los productos que lo llevan. */
+const FREE_FROM: Record<string, { allergen: Allergen; label: string }> = {
+  gluten: { allergen: 'gluten', label: 'sin gluten' },
+  lactosa: { allergen: 'lacteos', label: 'sin lactosa' },
+  lacteo: { allergen: 'lacteos', label: 'sin lactosa' },
+};
+
+function markFreeFrom(proposal: DishProposal, tokens: DishToken[]): void {
+  const wanted = tokens.filter((t) => t.negated && FREE_FROM[t.t]).map((t) => FREE_FROM[t.t]);
+  if (!wanted.length) return;
+  for (const it of proposal.ingredients) {
+    const kb = kbByName(it.name);
+    const hit = wanted.find((w) => kb?.allergens.includes(w.allergen));
+    if (!hit) continue;
+    const note = `Usar versión ${hit.label}`;
+    it.note = it.note ? `${it.note}. ${note}` : note;
+  }
+}
+
 // ───────────────────────────── API pública ─────────────────────────────
 
 const PROPOSAL_CACHE = new Map<string, DishProposal>();
@@ -1034,11 +1274,12 @@ export function proposeDishLocal(name: string, description?: string): DishPropos
   let proposal: DishProposal | undefined;
   const match = nameToks.length ? matchRecipe(name, description, { nameToks, descToks, dets: found }) : undefined;
   if (match && match.score >= KB_TEMPLATE_THRESHOLD && !(isVeggie(nameToks, descToks) && hasAnimalProtein(match.recipe))) {
-    proposal = proposeFromTemplate(name, match, found, negated, portionFactor(rawWords(name), found));
+    proposal = proposeFromTemplate(name, match, found, negated);
   }
   if (!proposal) {
-    proposal = nameToks.length || descToks.length ? proposeHeuristic(name, nameToks, descToks, found) : minimalProposal(name);
+    proposal = nameToks.length || descToks.length ? proposeHeuristic(name, nameToks, descToks, found, negated) : minimalProposal(name);
   }
+  markFreeFrom(proposal, [...nameToks, ...descToks]);
   if (PROPOSAL_CACHE.size > 2000) PROPOSAL_CACHE.clear();
   PROPOSAL_CACHE.set(key, proposal);
   return cloneProposal(proposal);
