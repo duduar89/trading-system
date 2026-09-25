@@ -295,7 +295,10 @@ export function normalizeInvoiceLine<T extends LineInput>(line: T): T & Pick<Inv
 
   let pricePerBase: number | undefined;
   if (baseQuantity && Number.isFinite(baseQuantity) && baseQuantity !== 0 && amount !== 0 && Number.isFinite(amount)) {
-    const p = amount / baseQuantity;
+    // Si cantidad × precio sólo difiere del importe por el redondeo a céntimos, el precio unitario impreso
+    // es más exacto que importe ÷ cantidad (evita 28,5015 €/kg cuando la factura dice 28,50 €/kg).
+    const exact = total !== 0 && unitPrice > 0 && Math.abs(computed - total) <= 0.0101 ? computed : amount;
+    const p = exact / baseQuantity;
     if (p > 0) pricePerBase = round6(p);
   }
   if (pricePerBase === undefined) {

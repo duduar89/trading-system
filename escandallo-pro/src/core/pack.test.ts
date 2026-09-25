@@ -236,3 +236,21 @@ describe('normalizeInvoiceLine', () => {
     expect(r.pricePerBase).toBeCloseTo(0.5, 6);
   });
 });
+
+describe('normalizeInvoiceLine: redondeo a céntimos', () => {
+  it('usa el precio impreso cuando cantidad × precio sólo difiere del importe por el redondeo', () => {
+    const r = normalizeInvoiceLine({ description: 'SOLOMILLO TERNERA', quantity: 3.35, unit: 'KG', unitPrice: 28.5, total: 95.48 });
+    expect(r.pricePerBase).toBe(28.5);
+    expect(r.warnings ?? []).toHaveLength(0);
+  });
+  it('con descuento redondeado también conserva el precio neto exacto', () => {
+    const r = normalizeInvoiceLine({ description: 'ACEITE OLIVA V.E. GARRAFA 5L', quantity: 4, unit: 'UD', unitPrice: 44.5, discountPct: 5, total: 169.1 });
+    expect(r.baseUnit).toBe('l');
+    expect(r.pricePerBase).toBeCloseTo(8.455, 6);
+  });
+  it('si el importe no cuadra con cantidad × precio, manda el importe', () => {
+    const r = normalizeInvoiceLine({ description: 'PATATA AGRIA', quantity: 25, unit: 'KG', unitPrice: 0.89, total: 20 });
+    expect(r.pricePerBase).toBeCloseTo(0.8, 6);
+    expect((r.warnings ?? []).some((w) => /no cuadra/.test(w))).toBe(true);
+  });
+});
