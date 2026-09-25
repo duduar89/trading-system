@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { NavLink, useNavigate } from 'react-router';
+import { NavLink, useLocation, useNavigate } from 'react-router';
 import clsx from 'clsx';
 import {
   LayoutDashboard,
@@ -163,7 +163,10 @@ function MobileBottomNav() {
 /** Botón flotante de acción rápida (escritorio). */
 function QuickActions() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
+  // En las pantallas de detalle/edición el botón taparía acciones de las tablas: se oculta.
+  if (/^\/(platos|facturas|ingredientes|carta|mermas)\/[^/]+/.test(pathname)) return null;
   return (
     <div className="no-print fixed bottom-6 right-6 z-30 hidden lg:block">
       {open && (
