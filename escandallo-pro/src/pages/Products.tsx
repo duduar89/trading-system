@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import clsx from 'clsx';
-import { Carrot, Download, FileSpreadsheet, FileText, Merge, PackageSearch, Plus, Scale, Tag, Trash2, TrendingUp, X } from 'lucide-react';
+import { Carrot, CircleDashed, Download, FileSpreadsheet, FileText, Merge, PackageSearch, Plus, Scale, Tag, Trash2, TrendingUp, X } from 'lucide-react';
 import type { ID, Product } from '../types';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, PageHeader, SearchInput, Select, Stat, Table, Td, Th } from '../components/ui';
 import { AllergenChips } from '../components/Allergens';
@@ -12,7 +12,8 @@ import { CATEGORIES, CATEGORY_LABELS } from '../lib/labels';
 import { fmtDate, fmtEurPrecise, fmtNum, fmtPct } from '../lib/format';
 import { todayIso } from '../lib/id';
 import { CategoryBadge } from '../components/purchases/CategoryBadge';
-import { PriceTrendChip } from '../components/purchases/badges';
+import { EstimatedBadge, PriceTrendChip } from '../components/purchases/badges';
+import { isEstimatedPrice } from '../components/purchases/estimated';
 import { NewProductModal } from '../components/purchases/NewProductModal';
 import { MergeProductsModal } from '../components/purchases/MergeProductsModal';
 import { ImportPriceListModal } from '../components/purchases/ImportPriceListModal';
@@ -79,6 +80,7 @@ export default function Products() {
   }, [products]);
   const risingCount = useMemo(() => (products ?? []).filter((p) => (trends.get(p.id)?.changePct ?? 0) > 0).length, [products, trends]);
   const yieldCount = useMemo(() => (products ?? []).filter((p) => p.yieldTestId).length, [products]);
+  const estimatedCount = useMemo(() => (products ?? []).filter((p) => isEstimatedPrice(p)).length, [products]);
 
   const setF = (patch: Partial<ProductFilters>) => {
     setFilters((f) => ({ ...f, ...patch }));
@@ -125,7 +127,7 @@ export default function Products() {
 
   const loading = products === undefined;
   const empty = !loading && products.length === 0;
-  const filtered = filters.query || filters.category !== 'todas' || filters.noPrice || filters.withYield || filters.rising;
+  const filtered = filters.query || filters.category !== 'todas' || filters.noPrice || filters.estimated || filters.withYield || filters.rising;
 
   return (
     <div className="animate-fade-in">
@@ -197,7 +199,13 @@ export default function Products() {
               value={loading ? '—' : fmtNum(stats.withPrice, 0)}
               icon={<Tag className="size-4" />}
               tone="ok"
-              hint={stats.total ? `${fmtPct((stats.withPrice / stats.total) * 100, 0)} de la base` : undefined}
+              hint={
+                estimatedCount > 0
+                  ? `${fmtNum(estimatedCount, 0)} con precio estimado`
+                  : stats.total
+                    ? `${fmtPct((stats.withPrice / stats.total) * 100, 0)} de la base`
+                    : undefined
+              }
             />
             <Stat
               label="Sin precio"
@@ -260,6 +268,17 @@ export default function Products() {
               >
                 Sin precio
               </FilterChip>
+              {(estimatedCount > 0 || filters.estimated) && (
+                <FilterChip
+                  active={filters.estimated}
+                  onClick={() => setF({ estimated: !filters.estimated })}
+                  icon={<CircleDashed className="size-3.5" />}
+                  count={estimatedCount}
+                  title="Ingredientes creados con un precio de referencia: sube sus facturas para tener el precio real"
+                >
+                  Precio estimado
+                </FilterChip>
+              )}
               <FilterChip
                 active={filters.withYield}
                 onClick={() => setF({ withYield: !filters.withYield })}
@@ -425,12 +444,14 @@ function FilterChip({
   onClick,
   icon,
   count,
+  title,
   children,
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   count?: number;
+  title?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -438,6 +459,7 @@ function FilterChip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
+      title={title}
       className={clsx(
         'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition',
         active
@@ -476,8 +498,8 @@ function PriceCell({ p, trend }: { p: Product; trend?: PriceTrend }) {
     );
   return (
     <span className="inline-flex items-center justify-end gap-2">
-      <PriceTrendChip trend={trend} baseUnit={p.baseUnit} />
-      <span className="tabular font-semibold text-ink">
+      {isEstimatedPrice(p) ? <EstimatedBadge short /> : <PriceTrendChip trend={trend} baseUnit={p.baseUnit} />}
+      <span className={clsx('tabular font-semibold', isEstimatedPrice(p) ? 'text-ink-2' : 'text-ink')}>
         {fmtEurPrecise(p.pricePerBase)}
         <span className="ml-0.5 text-xs font-medium text-muted">/{p.baseUnit}</span>
       </span>
@@ -605,22 +627,20 @@ function ProductCard({
                 )}
               </span>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-              <PriceTrendChip trend={trend} baseUnit={p.baseUnit} />
-              {p.lastPurchaseDate && <span>{fmtDate(p.lastPurchaseDate)}</span>}
-              {supplier && <span className="max-w-[140px] truncate">· {supplier}</span>}
-              {p.wastePct > 0 && <span>· merma {fmtPct(p.wastePct, 0)}</span>}
+            <div className="mt-0.5 truncate text-xs text-muted">
+              {[p.lastPurchaseDate ? fmtDate(p.lastPurchaseDate) : undefined, supplier].filter(Boolean).join(' · ') ||
+                (p.pricePerBase > 0 ? 'Sin compras registradas' : 'Sube una factura o ponle precio')}
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 empty:hidden">
+              {isEstimatedPrice(p) ? <EstimatedBadge /> : <PriceTrendChip trend={trend} baseUnit={p.baseUnit} />}
+              {p.wastePct > 0 && <Badge className="tabular">merma {fmtPct(p.wastePct, 0)}</Badge>}
               {p.yieldTestId && (
                 <Badge tone="info" icon={<Scale className="size-3" />}>
                   prueba
                 </Badge>
               )}
+              {p.allergens.length > 0 && <AllergenChips allergens={p.allergens} size="sm" empty={null} />}
             </div>
-            {p.allergens.length > 0 && (
-              <div className="mt-2">
-                <AllergenChips allergens={p.allergens} size="sm" empty={null} />
-              </div>
-            )}
           </div>
         </Link>
       </div>

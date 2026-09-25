@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
-import { ExternalLink, FileQuestion, FileText, ImageOff, Maximize2, Minimize2, ScanText } from 'lucide-react';
+import { ExternalLink, EyeOff, FileQuestion, FileText, ImageOff, Maximize2, Minimize2, ScanText } from 'lucide-react';
 import { Segmented, Spinner } from '../ui';
 import { fileKind } from '../../extract/index';
 import { useObjectUrl } from './hooks';
@@ -44,12 +44,15 @@ export function FilePreview({
   fileType,
   rawText,
   className,
+  onHide,
 }: {
   file?: Blob;
   fileName?: string;
   fileType?: string;
   rawText?: string;
   className?: string;
+  /** Si se indica, muestra un botón para ocultar el visor (p. ej. para dar más ancho a las líneas). */
+  onHide?: () => void;
 }) {
   const url = useObjectUrl(file);
   const kind = file ? fileKind({ name: fileName, type: fileType || file.type }) : 'unknown';
@@ -60,6 +63,8 @@ export function FilePreview({
   const [imgError, setImgError] = useState(false);
   const current = viewable ? tab : 'text';
   const pdf = usePdfPages(file, kind === 'pdf');
+  // Visor de PDF integrado del navegador (no existe en Android ni en algunos navegadores): sólo entonces se usa un iframe.
+  const inlinePdf = typeof navigator === 'undefined' || navigator.pdfViewerEnabled !== false;
   const zoomable = current === 'doc' && ((kind === 'image' && !imgError) || (kind === 'pdf' && pdf.pages.length > 0));
 
   return (
@@ -109,6 +114,17 @@ export function FilePreview({
               <ExternalLink className="size-4" />
             </a>
           )}
+          {onHide && (
+            <button
+              type="button"
+              onClick={onHide}
+              className="inline-flex size-9 items-center justify-center rounded-xl text-muted transition hover:bg-surface-2 hover:text-ink"
+              aria-label="Ocultar documento"
+              title="Ocultar documento"
+            >
+              <EyeOff className="size-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -133,8 +149,17 @@ export function FilePreview({
             </div>
           </div>
         )}
-        {current === 'doc' && url && kind === 'pdf' && pdf.failed && (
+        {current === 'doc' && url && kind === 'pdf' && pdf.failed && inlinePdf && (
           <iframe src={`${url}#view=FitH`} title={`Factura original ${fileName ?? ''}`} className="absolute inset-0 size-full border-0 bg-surface-2" />
+        )}
+        {current === 'doc' && url && kind === 'pdf' && pdf.failed && !inlinePdf && (
+          <Placeholder icon={<FileText className="size-6" />} title="Abre el PDF para verlo">
+            Este navegador no muestra PDF dentro de la página.{' '}
+            <a href={url} target="_blank" rel="noreferrer" className="font-semibold text-brand-600 underline dark:text-brand-400">
+              Ábrelo en una pestaña nueva
+            </a>
+            {hasText ? ' o compara con el texto leído.' : '.'}
+          </Placeholder>
         )}
         {current === 'doc' && url && kind === 'image' && !imgError && (
           <div

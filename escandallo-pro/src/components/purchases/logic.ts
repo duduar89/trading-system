@@ -6,6 +6,7 @@ import type { BaseUnit, Dish, DishCost, ID, IngredientCategory, Invoice, Invoice
 import type { Cell, ColumnMapping } from '../../extract/spreadsheet';
 import { approxEqual, round } from '../../core/numbers';
 import { fmtNum } from '../../lib/format';
+import { isEstimatedPrice } from './estimated';
 
 // ───────────────────────────── Texto ─────────────────────────────
 
@@ -322,6 +323,8 @@ export interface ProductFilters {
   query: string;
   category: IngredientCategory | 'todas';
   noPrice: boolean;
+  /** Sólo los que tienen un precio estimado de referencia (aún sin factura). */
+  estimated: boolean;
   withYield: boolean;
   rising: boolean;
   sort: ProductSort;
@@ -331,6 +334,7 @@ export const DEFAULT_PRODUCT_FILTERS: ProductFilters = {
   query: '',
   category: 'todas',
   noPrice: false,
+  estimated: false,
   withYield: false,
   rising: false,
   sort: 'nombre',
@@ -340,6 +344,7 @@ export function filterProducts(products: Product[], f: ProductFilters, trends: M
   const list = products.filter((p) => {
     if (f.category !== 'todas' && p.category !== f.category) return false;
     if (f.noPrice && p.pricePerBase > 0) return false;
+    if (f.estimated && !isEstimatedPrice(p)) return false;
     if (f.withYield && !p.yieldTestId) return false;
     if (f.rising && !((trends.get(p.id)?.changePct ?? 0) > 0)) return false;
     return matchesQuery(f.query, p.name, ...(p.aliases ?? []));

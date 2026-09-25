@@ -256,7 +256,7 @@ export default function DishEditor() {
             <Button variant={aiOn ? 'ai' : 'primary'} icon={<Sparkles className="size-4" />} onClick={openPropose}>
               Proponer ingredientes
             </Button>
-            <Button variant="outline" icon={<Printer className="size-4" />} onClick={doPrint}>
+            <Button variant="outline" icon={<Printer className="size-4" />} onClick={doPrint} title="Imprimir o guardar en PDF la ficha técnica">
               Ficha técnica
             </Button>
             <Button variant="outline" icon={<Copy className="size-4" />} onClick={doDuplicate} loading={busy === 'dup'} className="max-sm:px-3" aria-label="Duplicar">

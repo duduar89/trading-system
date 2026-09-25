@@ -153,6 +153,41 @@ export function filterDishes(dishes: Dish[], f: DishFilters): Dish[] {
   });
 }
 
+// ───────────────────────────── Semáforo de food cost ─────────────────────────────
+
+/** Filtro por semáforo: 'sin' = platos sin food cost calculable (sin PVP o sin ingredientes con precio). */
+export type FoodCostFilter = 'bad' | 'warn' | 'ok' | 'sin';
+const FC_FILTERS: readonly FoodCostFilter[] = ['bad', 'warn', 'ok', 'sin'];
+
+/** Lee el filtro de la URL (`?fc=bad|warn|ok|sin`, p. ej. los enlaces del panel). Valores desconocidos se ignoran. */
+export function parseFoodCostFilter(v: string | null | undefined): FoodCostFilter | undefined {
+  const s = v?.trim().toLowerCase();
+  return s && (FC_FILTERS as readonly string[]).includes(s) ? (s as FoodCostFilter) : undefined;
+}
+
+/** Semáforo con el que se clasifica un plato en los filtros (las elaboraciones no tienen food cost). */
+export function dishFcBucket(dish: Dish, cost: DishCost | undefined, business: BusinessSettings): FoodCostFilter | undefined {
+  if (dish.kind !== 'plato') return undefined;
+  const st = dishFoodCostStatus(shownFoodCost(cost), dish, business);
+  return st === 'none' ? 'sin' : st;
+}
+
+/** Platos que cumplen el filtro de semáforo (sin filtro devuelve la misma lista). */
+export function filterByFoodCost(dishes: Dish[], costs: Map<ID, DishCost>, business: BusinessSettings, fc: FoodCostFilter | undefined): Dish[] {
+  if (!fc) return dishes;
+  return dishes.filter((d) => dishFcBucket(d, costs.get(d.id), business) === fc);
+}
+
+/** Recuento de platos de carta por semáforo (para los chips del listado). */
+export function foodCostCounts(dishes: Dish[], costs: Map<ID, DishCost>, business: BusinessSettings): Record<FoodCostFilter, number> {
+  const out: Record<FoodCostFilter, number> = { bad: 0, warn: 0, ok: 0, sin: 0 };
+  for (const d of dishes) {
+    const b = dishFcBucket(d, costs.get(d.id), business);
+    if (b) out[b]++;
+  }
+  return out;
+}
+
 /** Ordena (copia). `dir` = 'desc' pone primero los valores mayores; los platos sin dato siempre al final. */
 export function sortDishes(dishes: Dish[], costs: Map<ID, DishCost>, sort: DishSort, dir: 'asc' | 'desc' = defaultDir(sort)): Dish[] {
   const sign = dir === 'desc' ? -1 : 1;
@@ -346,6 +381,20 @@ export function searchIngredients(query: string, products: Product[], elaboratio
   }
 
   return [...out.values()].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'es')).slice(0, limit);
+}
+
+/**
+ * true si lo escrito en la línea es sólo el texto de búsqueda con el que se ha encontrado el ingrediente
+ * ("calabac" → «Calabacín», "aceite gir" → «Aceite de girasol»): al elegirlo se sustituye por el nombre completo y
+ * no se aprende como alias. Un nombre de receta distinto ("Pimientos de Padrón (fritos)") se conserva.
+ */
+export function isSearchFragment(typed: string, name: string): boolean {
+  const t = normalize(typed);
+  const n = normalize(name);
+  if (!t) return true;
+  if (t === n || t.length >= n.length) return false;
+  const words = n.split(' ');
+  return t.split(' ').every((tok) => words.some((w) => w.startsWith(tok)));
 }
 
 // ───────────────────────────── Edición de líneas ─────────────────────────────

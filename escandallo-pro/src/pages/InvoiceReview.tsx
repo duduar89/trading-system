@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   ChevronDown,
   Eye,
-  EyeOff,
   FileSearch,
   PencilLine,
   RefreshCw,
@@ -366,18 +365,11 @@ export default function InvoiceReview() {
         actions={
           <>
             <SaveIndicator state={saveState} />
-            <div className="hidden xl:block">
-              {hasDoc && (
-                <Button
-                  variant="ghost"
-                  size="md"
-                  icon={showDoc ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  onClick={() => setShowDoc((s) => !s)}
-                >
-                  {showDoc ? 'Ocultar documento' : 'Ver documento'}
-                </Button>
-              )}
-            </div>
+            {hasDoc && wide && !showDoc && (
+              <Button variant="ghost" size="md" icon={<Eye className="size-4" />} onClick={() => setShowDoc(true)}>
+                Ver documento
+              </Button>
+            )}
             <DropdownMenu
               label="Más acciones"
               items={reprocessItems}
@@ -466,6 +458,7 @@ export default function InvoiceReview() {
                 fileType={invoice.fileType}
                 rawText={invoice.rawText}
                 className="h-[calc(100dvh-6rem)]"
+                onHide={() => setShowDoc(false)}
               />
             </div>
           </div>

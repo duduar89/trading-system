@@ -24,14 +24,16 @@ import { QTY_UNITS, UNIT_LABELS, convertToBase, defaultRecipeUnit } from '../../
 import { AUTO_LINK_THRESHOLD } from '../../core/matching';
 import { BASIS_LABELS, CATEGORY_LABELS } from '../../lib/labels';
 import { fmtBaseQty, fmtEur, fmtKg, fmtNum, perUnitLabel } from '../../lib/format';
+import { EstimatedBadge } from '../purchases/badges';
+import { isEstimatedPrice } from '../purchases/estimated';
 import { newRecipeItem } from '../../services/dishes';
-import { addProductAlias, createProduct } from '../../services/products';
+import { ESTIMATED_PRICE_NOTE, addProductAlias, createProduct, loadKbFinder } from '../../services/products';
 import { errorMessage, toast } from '../../state/store';
 import { Button, EmptyState, IconButton, NumberInput, Select } from '../ui';
 import { IngredientPicker } from './IngredientPicker';
 import { MenuItem, Popover } from './Popover';
 import { useMediaQuery } from './hooks';
-import { fmtPrice, moveItem, normalize, patchItem, targetOf, type IngredientOption, fmtPctNb } from './logic';
+import { fmtPrice, isSearchFragment, moveItem, normalize, patchItem, targetOf, type IngredientOption, fmtPctNb } from './logic';
 
 const BASES: QtyBasis[] = ['neta', 'bruta', 'cocinada'];
 
@@ -130,14 +132,16 @@ export function EscandalloTable({ dish, cost, ctx, products, business, onItemsCh
 
   const pick = (item: RecipeItem, opt: IngredientOption) => {
     const patch: Partial<RecipeItem> = { ref: { type: opt.kind, id: opt.id }, matchScore: 1, suggested: false };
-    if (!item.name.trim()) patch.name = opt.name;
+    // Lo tecleado para buscar ("calabac") se sustituye por el nombre completo; un nombre de receta propio se conserva.
+    const fragment = isSearchFragment(item.name, opt.name);
+    if (fragment) patch.name = opt.name;
     if (opt.kind === 'product' && opt.product) {
       const p = opt.product;
       const probe = convertToBase(1, item.unit, p.baseUnit, { unitWeightKg: p.unitWeightKg, densityKgPerL: p.densityKgPerL });
       if (!probe.ok) patch.unit = defaultRecipeUnit(p.baseUnit);
       // Aprende el nombre de la receta como alias del producto para próximos emparejamientos.
       const typed = item.name.trim();
-      if (typed && normalize(typed) !== normalize(p.name) && !p.aliases.some((a) => normalize(a) === normalize(typed))) {
+      if (!fragment && typed && normalize(typed) !== normalize(p.name) && !p.aliases.some((a) => normalize(a) === normalize(typed))) {
         addProductAlias(p.id, typed).catch(() => undefined);
       }
     } else if (opt.kind === 'dish' && opt.dish) {
@@ -153,7 +157,13 @@ export function EscandalloTable({ dish, cost, ctx, products, business, onItemsCh
 
   const create = async (item: RecipeItem, name: string) => {
     try {
-      const p = await createProduct({ name });
+      // Ficha de la base de conocimiento (mermas, alérgenos, unidad) y, si la tiene, su precio orientativo marcado como
+      // "estimado" para que el escandallo tenga coste desde ya; la primera factura lo sustituye por el real.
+      const kb = (await loadKbFinder())(name);
+      const ref = kb?.refPricePerBase && kb.refPricePerBase > 0 ? kb.refPricePerBase : 0;
+      const p = ref
+        ? await createProduct({ name, pricePerBase: ref, priceSource: 'manual', notes: ESTIMATED_PRICE_NOTE }, { estimated: true })
+        : await createProduct({ name });
       pick({ ...item, name: item.name || name }, { kind: 'product', id: p.id, name: p.name, score: 1, product: p });
       if (p.pricePerBase > 0) toast.success(`Ingrediente «${p.name}» creado`, `Precio de referencia ${fmtPrice(p.pricePerBase)} ${perUnitLabel(p.baseUnit)}: se actualizará con tu próxima factura.`);
       else toast.info(`Ingrediente «${p.name}» creado`, 'Indica su precio en Ingredientes o sube una factura donde aparezca.');
@@ -391,9 +401,17 @@ function Picker(p: RowProps) {
   );
 }
 
+/** Línea recién añadida y aún vacía: no se le muestran avisos hasta que el usuario escriba algo. */
+function isBlankItem(item: RecipeItem): boolean {
+  return !item.ref && !item.name.trim();
+}
+
 /** Chip con el ingrediente vinculado (o aviso si falta). */
 function LinkChip({ item, info, setItem }: Pick<RowProps, 'item' | 'info' | 'setItem'>) {
   const { product, sub } = info;
+  if (!item.ref && !item.name.trim()) {
+    return <span className="text-xs text-muted">Escribe para buscar en tus ingredientes y elaboraciones</span>;
+  }
   if (!item.ref) {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-medium text-warn">
@@ -534,9 +552,16 @@ function PriceCell({ info }: { info: LineInfo }) {
   const { ic, product, sub } = info;
   if (ic?.pricePerBase && ic.pricePerBase > 0) {
     return (
-      <span className="whitespace-nowrap">
-        <span className="font-medium text-ink-2">{fmtPrice(ic.pricePerBase)}</span>
-        <span className="text-xs text-muted"> /{ic.baseUnit}</span>
+      <span className="inline-flex flex-col items-end gap-0.5 whitespace-nowrap">
+        <span>
+          <span className="font-medium text-ink-2">{fmtPrice(ic.pricePerBase)}</span>
+          <span className="text-xs text-muted"> /{ic.baseUnit}</span>
+        </span>
+        {isEstimatedPrice(product) && (
+          <Link to={`/ingredientes/${product?.id}`} className="rounded-full hover:opacity-80">
+            <EstimatedBadge short />
+          </Link>
+        )}
       </span>
     );
   }
@@ -728,7 +753,7 @@ function DesktopRow(p: RowProps) {
       <td className="border-b border-line py-2 pl-1 pr-3">
         <div className="flex items-center justify-end gap-0.5">
           <AcceptButton item={item} setItem={p.setItem} />
-          <WarningsButton warnings={ic?.warnings ?? []} />
+          <WarningsButton warnings={isBlankItem(item) ? [] : (ic?.warnings ?? [])} />
           <RowMenu {...p} />
         </div>
       </td>
@@ -750,7 +775,7 @@ function MobileRow(p: RowProps) {
           </div>
         </div>
         <AcceptButton item={item} setItem={p.setItem} />
-        <WarningsButton warnings={ic?.warnings ?? []} />
+        <WarningsButton warnings={isBlankItem(item) ? [] : (ic?.warnings ?? [])} />
         <RowMenu {...p} />
       </div>
       <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] gap-2">

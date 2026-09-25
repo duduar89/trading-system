@@ -18,6 +18,7 @@ export function Popover({
   minWidth = 220,
   role,
   id,
+  keepFocus,
 }: {
   anchor: RefObject<HTMLElement | null>;
   open: boolean;
@@ -29,6 +30,8 @@ export function Popover({
   minWidth?: number;
   role?: string;
   id?: string;
+  /** Pulsar dentro de la capa no quita el foco al campo que la abrió (combobox que se cierra al perder el foco). */
+  keepFocus?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number; width?: number; maxHeight: number; placement: 'down' | 'up' } | null>(null);
@@ -91,6 +94,7 @@ export function Popover({
       ref={ref}
       id={id}
       role={role}
+      onMouseDown={keepFocus ? (e) => e.preventDefault() : undefined}
       style={{
         position: 'fixed',
         top: pos?.top ?? -9999,

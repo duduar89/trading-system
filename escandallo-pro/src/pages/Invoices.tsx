@@ -294,13 +294,18 @@ export default function Invoices() {
           title="Lectura gratuita en tu dispositivo"
           className="relative mb-6 pr-12"
         >
-          Tus facturas se leen aquí mismo, sin coste y sin enviar tus datos a nadie: comprobamos que cantidad × precio cuadra con cada
-          importe y que la suma coincide con la base imponible. Antes de confirmar, echa un vistazo a las líneas marcadas en ámbar. Si algún
-          día quieres una segunda opinión, puedes activar la IA opcional en{' '}
-          <Link to="/ajustes" className="font-semibold text-ink underline decoration-ok/50 underline-offset-2 hover:decoration-ok">
-            Ajustes
-          </Link>
-          .
+          <span className="sm:hidden">
+            Se leen aquí mismo, sin coste y sin enviar tus datos a nadie. Antes de confirmar, revisa las líneas en ámbar.
+          </span>
+          <span className="max-sm:hidden">
+            Tus facturas se leen aquí mismo, sin coste y sin enviar tus datos a nadie: comprobamos que cantidad × precio cuadra con cada
+            importe y que la suma coincide con la base imponible. Antes de confirmar, echa un vistazo a las líneas marcadas en ámbar. Si algún
+            día quieres una segunda opinión, puedes activar la IA opcional en{' '}
+            <Link to="/ajustes" className="font-semibold text-ink underline decoration-ok/50 underline-offset-2 hover:decoration-ok">
+              Ajustes
+            </Link>
+            .
+          </span>
           <button
             type="button"
             onClick={dismissCallout}

@@ -59,7 +59,7 @@ export default function Menu() {
               <ShieldCheck className="size-3.5" /> Gratis, en tu dispositivo, sin enviar tus datos a nadie
             </div>
             <h2 className="mt-3 font-display text-[26px] font-extrabold leading-tight text-ink sm:text-4xl">
-              Fotografía tu carta y <span className="text-gradient-brand">te proponemos los escandallos</span>
+              Fotografía tu carta y <span className="text-gradient-brand inline-block">te proponemos los escandallos</span>
             </h2>
             <p className="mt-3 max-w-lg text-sm text-ink-2 max-sm:hidden sm:text-[15px]">
               Leemos platos, secciones y precios; tú revisas en un minuto y creamos cada plato con su receta tipo, gramajes y mermas, cruzada con los precios de tus facturas.
@@ -236,7 +236,7 @@ function HowItWorks() {
       <ol className="grid gap-4 md:grid-cols-3">
         {steps.map((s) => (
           <li key={s.n} className="relative overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-card">
-            <span className="absolute -right-2 -top-5 font-display text-[88px] font-extrabold leading-none text-brand-500/10" aria-hidden>
+            <span className="absolute right-4 top-3 font-display text-[64px] font-extrabold leading-none text-brand-500/12" aria-hidden>
               {s.n}
             </span>
             <span className="flex size-10 items-center justify-center rounded-xl bg-brand-500/12 text-brand-500">{s.icon}</span>

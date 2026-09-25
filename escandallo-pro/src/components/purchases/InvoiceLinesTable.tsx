@@ -93,7 +93,7 @@ export function InvoiceLinesTable({
   };
 
   return (
-    <div ref={rootRef} onKeyDown={onKeyDown} className="space-y-3">
+    <div ref={rootRef} onKeyDown={onKeyDown} className="@container space-y-3">
       <datalist id="invoice-unit-suggestions">
         {UNIT_SUGGESTIONS.map((u) => (
           <option key={u} value={u} />
@@ -163,9 +163,11 @@ const LineCard = memo(function LineCard({
         accent[line.matchStatus],
       )}
     >
-      <div className="flex items-start gap-2">
-        <ConfidenceDot value={line.confidence} className="mt-[15px]" />
-        <div className="min-w-0 flex-1">
+      {/* Tarjeta en móvil y columna estrecha; en pantallas anchas, descripción y cifras en una sola fila. */}
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2 @4xl:grid-cols-[auto_minmax(0,2fr)_minmax(0,3.4fr)_auto] @4xl:gap-x-3">
+        <ConfidenceDot value={line.confidence} className="col-start-1 row-start-1 mt-[15px] @4xl:mt-[34px]" />
+        <div className="col-start-2 row-start-1 min-w-0">
+          <span className="mb-1 hidden truncate text-[10px] font-bold uppercase tracking-wide text-muted @4xl:block">Descripción</span>
           <Input
             value={line.description}
             onChange={(e) => patch({ description: e.target.value })}
@@ -178,7 +180,7 @@ const LineCard = memo(function LineCard({
           />
           {line.code && <div className="mt-1 pl-1 text-[11px] text-muted">Código {line.code}</div>}
         </div>
-        <div className="flex shrink-0 items-center pt-1.5">
+        <div className="col-start-3 row-start-1 flex shrink-0 items-center pt-1.5 @4xl:col-start-4 @4xl:pt-[25px]">
           {(warnings.length > 0 || unitMismatch) && (
             <Hint label={`Avisos de la línea ${index + 1}`} tone={unitMismatch ? 'bad' : 'warn'}>
               <ul className="list-disc space-y-1 pl-4">
@@ -206,71 +208,75 @@ const LineCard = memo(function LineCard({
             </button>
           )}
         </div>
-      </div>
-
-      <div className={clsx('mt-2.5 grid grid-cols-3 gap-2 sm:grid-cols-6', ignored && 'opacity-60')}>
-        <MiniField label="Cantidad">
-          <AmountInput
-            value={line.quantity}
-            onValue={(v) => patch({ quantity: v ?? 0 })}
-            decimals={3}
-            data-line={index}
-            data-field="quantity"
-            aria-label={`Cantidad de la línea ${index + 1}`}
-            disabled={readOnly}
-          />
-        </MiniField>
-        <MiniField label="Unidad">
-          <Input
-            value={line.unit}
-            onChange={(e) => patch({ unit: e.target.value })}
-            list="invoice-unit-suggestions"
-            data-line={index}
-            data-field="unit"
-            aria-label={`Unidad de la línea ${index + 1}`}
-            disabled={readOnly}
-          />
-        </MiniField>
-        <MiniField label="Formato">
-          <PackInput pack={line.packSize} index={index} disabled={readOnly} onPack={(p) => patch({ packSize: p }, { packManual: true })} />
-        </MiniField>
-        <MiniField label="Precio ud. €">
-          <AmountInput
-            value={line.unitPrice}
-            onValue={(v) => patch({ unitPrice: v ?? 0 })}
-            decimals={4}
-            minDecimals={2}
-            data-line={index}
-            data-field="unitPrice"
-            aria-label={`Precio unitario de la línea ${index + 1}`}
-            disabled={readOnly}
-          />
-        </MiniField>
-        <MiniField label="Dto. %">
-          <AmountInput
-            value={line.discountPct}
-            onValue={(v) => patch({ discountPct: v != null && v > 0 ? Math.min(v, 100) : undefined })}
-            decimals={2}
-            placeholder="0"
-            data-line={index}
-            data-field="discountPct"
-            aria-label={`Descuento de la línea ${index + 1}`}
-            disabled={readOnly}
-          />
-        </MiniField>
-        <MiniField label="Importe €">
-          <AmountInput
-            value={line.total}
-            onValue={(v) => patch({ total: v ?? 0 })}
-            decimals={2}
-            minDecimals={2}
-            data-line={index}
-            data-field="total"
-            aria-label={`Importe de la línea ${index + 1}`}
-            disabled={readOnly}
-            className="font-semibold"
-          />
-        </MiniField>
+        <div
+          className={clsx(
+            'col-span-3 col-start-1 row-start-2 mt-2.5 grid grid-cols-3 gap-2 sm:grid-cols-6 @4xl:col-span-1 @4xl:col-start-3 @4xl:row-start-1 @4xl:mt-0',
+            ignored && 'opacity-60',
+          )}
+        >
+          <MiniField label="Cantidad">
+            <AmountInput
+              value={line.quantity}
+              onValue={(v) => patch({ quantity: v ?? 0 })}
+              decimals={3}
+              data-line={index}
+              data-field="quantity"
+              aria-label={`Cantidad de la línea ${index + 1}`}
+              disabled={readOnly}
+            />
+          </MiniField>
+          <MiniField label="Unidad">
+            <Input
+              value={line.unit}
+              onChange={(e) => patch({ unit: e.target.value })}
+              list="invoice-unit-suggestions"
+              data-line={index}
+              data-field="unit"
+              aria-label={`Unidad de la línea ${index + 1}`}
+              disabled={readOnly}
+            />
+          </MiniField>
+          <MiniField label="Formato">
+            <PackInput pack={line.packSize} index={index} disabled={readOnly} onPack={(p) => patch({ packSize: p }, { packManual: true })} />
+          </MiniField>
+          <MiniField label="Precio ud. €">
+            <AmountInput
+              value={line.unitPrice}
+              onValue={(v) => patch({ unitPrice: v ?? 0 })}
+              decimals={4}
+              minDecimals={2}
+              data-line={index}
+              data-field="unitPrice"
+              aria-label={`Precio unitario de la línea ${index + 1}`}
+              disabled={readOnly}
+            />
+          </MiniField>
+          <MiniField label="Dto. %">
+            <AmountInput
+              value={line.discountPct}
+              onValue={(v) => patch({ discountPct: v != null && v > 0 ? Math.min(v, 100) : undefined })}
+              decimals={2}
+              placeholder="0"
+              data-line={index}
+              data-field="discountPct"
+              aria-label={`Descuento de la línea ${index + 1}`}
+              disabled={readOnly}
+            />
+          </MiniField>
+          <MiniField label="Importe €">
+            <AmountInput
+              value={line.total}
+              onValue={(v) => patch({ total: v ?? 0 })}
+              decimals={2}
+              minDecimals={2}
+              data-line={index}
+              data-field="total"
+              aria-label={`Importe de la línea ${index + 1}`}
+              disabled={readOnly}
+              className="font-semibold"
+            />
+          </MiniField>
+        </div>
       </div>
 
       <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3 sm:flex-row sm:items-center">
@@ -370,7 +376,7 @@ function RealPrice({ line, product, conversion }: { line: InvoiceLine; product?:
   const comparable = !!product && product.pricePerBase > 0 && inProductUnit != null && inProductUnit > 0;
   const change = comparable ? pctChange(product.pricePerBase, inProductUnit) : undefined;
   return (
-    <div className="shrink-0 sm:w-56">
+    <div className="shrink-0 sm:w-56 @4xl:w-80">
       <div className="text-[10px] font-bold uppercase tracking-wide text-muted">Precio real</div>
       {ppb != null && ppb > 0 ? (
         <>

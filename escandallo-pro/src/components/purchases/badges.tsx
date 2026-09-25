@@ -1,11 +1,12 @@
 import { useId, useState, type ReactNode } from 'react';
 import clsx from 'clsx';
-import { AlertTriangle, Check, Loader2 } from 'lucide-react';
+import { AlertTriangle, Check, CircleDashed, Loader2 } from 'lucide-react';
 import type { BaseUnit, ExtractionMethod, InvoiceStatus } from '../../types';
 import { Badge } from '../ui';
 import { INVOICE_STATUS_LABELS, METHOD_LABELS } from '../../lib/labels';
 import { fmtDate, fmtEurPrecise, fmtPct, perUnitLabel } from '../../lib/format';
 import type { PriceTrend } from './logic';
+import { ESTIMATED_PRICE_HINT } from './estimated';
 
 /** Estado de una factura; los estados en curso llevan un punto animado. */
 export function InvoiceStatusBadge({ status, className }: { status: InvoiceStatus; className?: string }) {
@@ -166,6 +167,22 @@ export function SaveIndicator({ state }: { state: 'idle' | 'saving' | 'saved' | 
           <AlertTriangle className="size-3.5 text-bad" /> No se pudo guardar
         </>
       )}
+    </span>
+  );
+}
+
+/** Aviso discreto de "precio estimado" (precio orientativo sin compra real) para listas, selectores y escandallos. */
+export function EstimatedBadge({ className, short }: { className?: string; short?: boolean }) {
+  return (
+    <span
+      title={ESTIMATED_PRICE_HINT}
+      className={clsx(
+        'inline-flex shrink-0 cursor-help items-center gap-1 whitespace-nowrap rounded-full border border-dashed border-info/50 bg-info-soft px-1.5 py-px font-sans text-[10px] font-semibold text-info',
+        className,
+      )}
+    >
+      <CircleDashed className="size-2.5" aria-hidden />
+      {short ? 'estimado' : 'precio estimado'}
     </span>
   );
 }

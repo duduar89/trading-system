@@ -6,6 +6,8 @@ import type { ID, IngredientCategory, Product } from '../../types';
 import { Modal, Select } from '../ui';
 import { CATEGORIES, CATEGORY_LABELS } from '../../lib/labels';
 import { fmtEurPrecise, perUnitLabel } from '../../lib/format';
+import { isEstimatedPrice } from './estimated';
+import { EstimatedBadge } from './badges';
 import { CategoryBadge } from './CategoryBadge';
 import { searchProducts, suggestProducts, type ProductHit } from './search';
 import { useMediaQuery } from './hooks';
@@ -390,6 +392,7 @@ function PickerPanel({
                   <span className={clsx('tabular block text-xs font-semibold', p.pricePerBase > 0 ? 'text-ink-2' : 'text-muted')}>
                     {p.pricePerBase > 0 ? `${fmtEurPrecise(p.pricePerBase)}/${p.baseUnit}` : `sin precio (${perUnitLabel(p.baseUnit)})`}
                   </span>
+                  {isEstimatedPrice(p) && <EstimatedBadge short className="mt-0.5" />}
                   {o.section === 'match' && !query.trim() && o.hit.score > 0 && (
                     <span className="tabular block text-[10px] font-semibold text-muted">coincide {Math.round(o.hit.score * 100)} %</span>
                   )}

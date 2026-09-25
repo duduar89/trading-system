@@ -42,7 +42,11 @@ import {
   type DishSort,
   type KindFilter,
   type StatusFilter,
+  type FoodCostFilter,
   fmtPctNb,
+  filterByFoodCost,
+  foodCostCounts,
+  parseFoodCostFilter,
 } from '../components/dishes/logic';
 
 const SORTS: { value: DishSort; label: string }[] = [
@@ -75,6 +79,8 @@ export default function Dishes() {
 
   const recent = params.get('recientes') === '1';
   const proposedCount = params.get('propuestos');
+  // ?fc=bad|warn|ok|sin → semáforo de food cost (lo usan los enlaces del panel). Vive en la URL para que «atrás» lo respete.
+  const fc = parseFoodCostFilter(params.get('fc'));
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<KindFilter>('plato');
   const [status, setStatus] = useState<StatusFilter>('todos');
@@ -121,10 +127,12 @@ export default function Dishes() {
   const sections = useMemo(() => sectionsOf(all.filter((d) => kind === 'todos' || d.kind === kind)), [all, kind]);
   const hasNoSection = useMemo(() => all.some((d) => (kind === 'todos' || d.kind === kind) && !d.section?.trim()), [all, kind]);
   const stats = useMemo(() => (costs ? dishListStats(all, costs, business) : undefined), [all, costs, business]);
+  const fcCounts = useMemo(() => (costs ? foodCostCounts(all, costs, business) : undefined), [all, costs, business]);
   const visible = useMemo(() => {
     if (!costs) return [];
-    return sortDishes(filterDishes(all, { query, kind, status, section }), costs, sort, dir);
-  }, [all, costs, query, kind, status, section, sort, dir]);
+    const filtered = filterByFoodCost(filterDishes(all, { query, kind: fc ? 'plato' : kind, status, section }), costs, business, fc);
+    return sortDishes(filtered, costs, sort, dir);
+  }, [all, costs, business, fc, query, kind, status, section, sort, dir]);
 
   // Si cambia el filtro, la selección se queda sólo con lo visible.
   useEffect(() => {
@@ -150,6 +158,14 @@ export default function Dishes() {
       else next.add(id);
       return next;
     });
+  const setFc = (next: FoodCostFilter | undefined) => {
+    const p = new URLSearchParams(params);
+    if (next) {
+      p.set('fc', next);
+      setKind('plato');
+    } else p.delete('fc');
+    setParams(p, { replace: true });
+  };
   const toggleAll = () => setSelected((cur) => (visible.every((d) => cur.has(d.id)) ? new Set() : new Set(visible.map((d) => d.id))));
   const dismissRecent = () => {
     const next = new URLSearchParams(params);
@@ -258,13 +274,26 @@ export default function Dishes() {
               tone={avgStatus === 'none' ? 'default' : avgStatus}
               hint={`Objetivo ${fmtPctNb(business.targetFoodCostPct, 0)}`}
             />
-            <Stat
-              label="En rojo"
-              value={stats ? stats.red : '—'}
-              icon={<AlertOctagon className="size-4" />}
-              tone={stats?.red ? 'bad' : 'ok'}
-              hint={stats?.warn ? `y ${stats.warn} en ámbar` : `Por encima del ${fmtPctNb(business.warningFoodCostPct, 0)}`}
-            />
+            <button
+              type="button"
+              onClick={() => setFc(fc === 'bad' ? undefined : 'bad')}
+              aria-pressed={fc === 'bad'}
+              disabled={!stats?.red && fc !== 'bad'}
+              title={stats?.red ? (fc === 'bad' ? 'Ver todos los platos' : 'Ver sólo los platos en rojo') : undefined}
+              className={clsx(
+                'rounded-2xl text-left transition enabled:hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500',
+                fc === 'bad' && 'ring-2 ring-bad/60 ring-offset-2 ring-offset-bg',
+              )}
+            >
+              <Stat
+                label="En rojo"
+                value={stats ? stats.red : '—'}
+                icon={<AlertOctagon className="size-4" />}
+                tone={stats?.red ? 'bad' : 'ok'}
+                className="h-full"
+                hint={stats?.warn ? `y ${stats.warn} en ámbar` : `Por encima del ${fmtPctNb(business.warningFoodCostPct, 0)}`}
+              />
+            </button>
             <Stat
               label="Sin PVP"
               value={stats ? stats.noPrice : '—'}
@@ -280,10 +309,11 @@ export default function Dishes() {
               <SearchInput value={query} onChange={setQuery} placeholder="Buscar plato, sección o ingrediente…" className="md:max-w-sm md:flex-1" />
               <div className="flex flex-wrap items-center gap-2">
                 <Segmented<KindFilter>
-                  value={kind}
+                  value={fc ? 'plato' : kind}
                   onChange={(k) => {
                     setKind(k);
                     setSection(undefined);
+                    if (k !== 'plato' && fc) setFc(undefined);
                   }}
                   options={[
                     { value: 'plato', label: 'Platos' },
@@ -302,7 +332,7 @@ export default function Dishes() {
                 />
               </div>
               <div className="flex items-center gap-2 md:ml-auto">
-                <Select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} aria-label="Estado" className="w-auto max-sm:min-w-0 max-sm:flex-1">
+                <Select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} aria-label="Estado" className="w-auto max-sm:min-w-0 max-sm:flex-1 sm:min-w-[11.5rem]">
                   <option value="todos">{wide ? 'Todos los estados' : 'Todos'}</option>
                   <option value="borrador">Borradores</option>
                   <option value="revisado">Revisados</option>
@@ -349,6 +379,9 @@ export default function Dishes() {
                 )}
               </div>
             )}
+            {fcCounts && (kind !== 'elaboracion' || fc) && fcCounts.bad + fcCounts.warn + fcCounts.ok + fcCounts.sin > 0 && (
+              <FoodCostFilterBar value={fc} counts={fcCounts} business={business} onChange={setFc} />
+            )}
           </div>
 
           {/* ── Listado ── */}
@@ -371,6 +404,7 @@ export default function Dishes() {
                     setStatus('todos');
                     setSection(undefined);
                     setKind('todos');
+                    if (fc) setFc(undefined);
                   }}
                 >
                   Quitar filtros
@@ -444,6 +478,61 @@ export default function Dishes() {
         title={`¿Eliminar ${selected.size} ${selected.size === 1 ? 'escandallo' : 'escandallos'}?`}
         message="Se borrarán por completo. Si alguno es una elaboración usada en otros platos, esas líneas quedarán sin vincular. No se puede deshacer."
       />
+    </div>
+  );
+}
+
+const FC_CHIPS: { value: FoodCostFilter; label: string; dot: string; active: string }[] = [
+  { value: 'bad', label: 'En rojo', dot: 'bg-bad', active: 'border-bad/50 bg-bad-soft text-bad' },
+  { value: 'warn', label: 'En ámbar', dot: 'bg-warn', active: 'border-warn/50 bg-warn-soft text-warn' },
+  { value: 'ok', label: 'En verde', dot: 'bg-ok', active: 'border-ok/50 bg-ok-soft text-ok' },
+  { value: 'sin', label: 'Sin food cost', dot: 'bg-line-strong', active: 'border-line-strong bg-surface-2 text-ink' },
+];
+
+/** Filtro por semáforo de food cost con el recuento de cada color (enlazable con `?fc=`). */
+function FoodCostFilterBar({
+  value,
+  counts,
+  business,
+  onChange,
+}: {
+  value: FoodCostFilter | undefined;
+  counts: Record<FoodCostFilter, number>;
+  business: { targetFoodCostPct: number; warningFoodCostPct: number };
+  onChange: (v: FoodCostFilter | undefined) => void;
+}) {
+  const hints: Record<FoodCostFilter, string> = {
+    bad: `Food cost por encima del ${fmtPctNb(business.warningFoodCostPct, 0)}`,
+    warn: `Entre el ${fmtPctNb(business.targetFoodCostPct, 0)} y el ${fmtPctNb(business.warningFoodCostPct, 0)}`,
+    ok: `Hasta el ${fmtPctNb(business.targetFoodCostPct, 0)} (tu objetivo)`,
+    sin: 'Sin PVP o sin ingredientes con precio',
+  };
+  return (
+    <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Filtrar por food cost">
+      <span className="shrink-0 pr-1 text-xs font-bold uppercase tracking-wide text-muted">Food cost</span>
+      {FC_CHIPS.filter((c) => c.value !== 'sin' || counts.sin > 0 || value === 'sin').map((c) => {
+        const active = value === c.value;
+        const n = counts[c.value];
+        return (
+          <button
+            key={c.value}
+            type="button"
+            aria-pressed={active}
+            title={hints[c.value]}
+            disabled={!n && !active}
+            onClick={() => onChange(active ? undefined : c.value)}
+            className={clsx(
+              'inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-sm font-semibold transition disabled:opacity-45',
+              active ? c.active : 'border-line bg-surface text-ink-2 enabled:hover:border-line-strong enabled:hover:text-ink',
+            )}
+          >
+            <span className={clsx('size-2 rounded-full', c.dot)} aria-hidden />
+            {c.label}
+            <span className={clsx('tabular text-xs', active ? 'opacity-80' : 'text-muted')}>{n}</span>
+            {active && <X className="-mr-1 size-3.5" aria-hidden />}
+          </button>
+        );
+      })}
     </div>
   );
 }

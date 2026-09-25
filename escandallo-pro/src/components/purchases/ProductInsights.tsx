@@ -205,11 +205,15 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
   const rows = sim.rows;
   const base = product.pricePerBase;
   const bump = (pct: number) => base > 0 && setPrice(Math.round(base * (1 + pct / 100) * 10000) / 10000);
-  const overLimit = rows.filter(
-    (r) =>
-      r.after.foodCostPct != null && foodCostStatus(r.after.foodCostPct, r.after.targetFoodCostPct, business.warningFoodCostPct) === 'bad',
-  ).length;
+  const band = Math.max(0, business.warningFoodCostPct - business.targetFoodCostPct);
+  const statusOf = (c: { foodCostPct?: number; targetFoodCostPct: number }) =>
+    foodCostStatus(c.foodCostPct, c.targetFoodCostPct, c.targetFoodCostPct + band);
+  const changed = deferred != null && Math.abs(deferred - base) >= 1e-9;
+  // Platos que pasarían a rojo con el precio simulado (los que ya estaban en rojo no cuentan como "nuevos").
+  const newlyOver = rows.filter((r) => r.after.foodCostPct != null && statusOf(r.after) === 'bad' && statusOf(r.before) !== 'bad').length;
+  const backInRange = rows.filter((r) => r.before.foodCostPct != null && statusOf(r.before) === 'bad' && statusOf(r.after) !== 'bad').length;
   const extraCost = rows.reduce((s, r) => s + (r.after.costPerPortion - r.before.costPerPortion), 0);
+  const isElaboration = (dishId: string) => ctx?.dishes.get(dishId)?.kind === 'elaboracion';
 
   return (
     <Card>
@@ -249,10 +253,13 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
         <p className="mt-4 text-sm text-muted">No hay escandallos que dependan de este ingrediente.</p>
       ) : (
         <>
-          <div className={clsx('mt-4 rounded-xl px-3 py-2.5 text-sm', overLimit ? 'bg-bad-soft' : 'bg-surface-2')}>
-            {deferred != null && Math.abs(deferred - base) < 1e-9 ? (
+          <div
+            className={clsx('mt-4 rounded-xl px-3 py-2.5 text-sm', changed && newlyOver ? 'bg-bad-soft' : changed && backInRange ? 'bg-ok-soft' : 'bg-surface-2')}
+            aria-live="polite"
+          >
+            {!changed ? (
               <span className="text-muted">
-                Cambia el precio para ver el impacto en {rows.length === 1 ? 'el plato' : `los ${rows.length} platos`}.
+                Cambia el precio para ver el impacto en {rows.length === 1 ? 'el escandallo' : `los ${rows.length} escandallos`}.
               </span>
             ) : (
               <span className="text-ink-2">
@@ -261,11 +268,19 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
                   {fmtEur(Math.abs(extraCost))}
                 </span>{' '}
                 de coste sumando una ración de cada plato
-                {overLimit > 0 && (
+                {newlyOver > 0 && (
                   <>
                     {' · '}
                     <span className="font-semibold text-bad">
-                      {overLimit} {overLimit === 1 ? 'superaría' : 'superarían'} tu límite de food cost
+                      {newlyOver} {newlyOver === 1 ? 'pasaría' : 'pasarían'} a rojo
+                    </span>
+                  </>
+                )}
+                {backInRange > 0 && (
+                  <>
+                    {' · '}
+                    <span className="font-semibold text-ok">
+                      {backInRange} {backInRange === 1 ? 'saldría' : 'saldrían'} del rojo
                     </span>
                   </>
                 )}
@@ -273,8 +288,47 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
               </span>
             )}
           </div>
-          <div className="mt-3 overflow-x-auto">
-            <table className="tabular w-full min-w-[460px] text-sm">
+
+          {/* Móvil: una fila apilada por plato */}
+          <ul className="mt-3 divide-y divide-line sm:hidden">
+            {rows.map((r) => {
+              const elab = isElaboration(r.dishId);
+              return (
+                <li key={r.dishId} className="py-2.5">
+                  <Link to={`/platos/${r.dishId}`} className="block">
+                    <span className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate text-sm font-semibold text-ink">{r.name}</span>
+                      <span className="tabular shrink-0 text-sm">
+                        <span className="text-muted">{fmtEur(r.before.costPerPortion)} →</span>{' '}
+                        <span className="font-semibold text-ink">{fmtEur(r.after.costPerPortion)}</span>
+                      </span>
+                    </span>
+                    <span className="mt-1 flex items-center justify-between gap-3 text-xs text-muted">
+                      {elab ? (
+                        <span>Elaboración · coste por ración</span>
+                      ) : r.after.foodCostPct != null ? (
+                        <span className="inline-flex items-center gap-1">
+                          <FoodCostBadge pct={r.before.foodCostPct} status={statusOf(r.before)} />
+                          <ArrowRight className="size-3" />
+                          <FoodCostBadge pct={r.after.foodCostPct} status={statusOf(r.after)} />
+                        </span>
+                      ) : (
+                        <span>Sin PVP</span>
+                      )}
+                      {!elab && r.after.suggestedPrice != null && (
+                        <span className="tabular">
+                          PVP sugerido <span className="font-semibold text-ink">{fmtEur(r.after.suggestedPrice)}</span>
+                        </span>
+                      )}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="mt-3 hidden sm:block">
+            <table className="tabular w-full text-sm">
               <thead>
                 <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-muted">
                   <th className="py-2 pr-2">Plato</th>
@@ -285,7 +339,7 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
               </thead>
               <tbody>
                 {rows.map((r) => {
-                  const dishTarget = r.after.targetFoodCostPct;
+                  const elab = isElaboration(r.dishId);
                   return (
                     <tr key={r.dishId} className="border-t border-line">
                       <td className="max-w-[200px] py-2 pr-2">
@@ -295,29 +349,26 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
                         >
                           {r.name}
                         </Link>
+                        {elab && <span className="text-[11px] text-muted">Elaboración</span>}
                       </td>
                       <td className="whitespace-nowrap px-2 py-2 text-right">
                         <span className="text-muted">{fmtEur(r.before.costPerPortion)}</span> <span className="text-muted">→</span>{' '}
                         <span className="font-semibold text-ink">{fmtEur(r.after.costPerPortion)}</span>
                       </td>
                       <td className="whitespace-nowrap px-2 py-2 text-right">
-                        {r.after.foodCostPct != null ? (
+                        {!elab && r.after.foodCostPct != null ? (
                           <span className="inline-flex items-center gap-1">
-                            <FoodCostBadge
-                              pct={r.before.foodCostPct}
-                              status={foodCostStatus(r.before.foodCostPct, dishTarget, business.warningFoodCostPct)}
-                            />
+                            <FoodCostBadge pct={r.before.foodCostPct} status={statusOf(r.before)} />
                             <ArrowRight className="size-3 text-muted" />
-                            <FoodCostBadge
-                              pct={r.after.foodCostPct}
-                              status={foodCostStatus(r.after.foodCostPct, dishTarget, business.warningFoodCostPct)}
-                            />
+                            <FoodCostBadge pct={r.after.foodCostPct} status={statusOf(r.after)} />
                           </span>
                         ) : (
-                          <span className="text-xs text-muted">sin PVP</span>
+                          <span className="text-xs text-muted">{elab ? '—' : 'sin PVP'}</span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap py-2 pl-2 text-right font-semibold text-ink">{fmtEur(r.after.suggestedPrice)}</td>
+                      <td className="whitespace-nowrap py-2 pl-2 text-right font-semibold text-ink">
+                        {elab ? <span className="font-normal text-muted">—</span> : fmtEur(r.after.suggestedPrice)}
+                      </td>
                     </tr>
                   );
                 })}

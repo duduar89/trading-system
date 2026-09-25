@@ -12,7 +12,8 @@ import { deleteProduct, updateProduct } from '../services/products';
 import { CATEGORIES, CATEGORY_LABELS } from '../lib/labels';
 import { fmtDate, fmtEurPrecise, fmtNum } from '../lib/format';
 import { CategoryBadge } from '../components/purchases/CategoryBadge';
-import { ChangePct, PriceTrendChip, SaveIndicator } from '../components/purchases/badges';
+import { ChangePct, EstimatedBadge, PriceTrendChip, SaveIndicator } from '../components/purchases/badges';
+import { isEstimatedPrice, userNotes } from '../components/purchases/estimated';
 import { PriceHistoryChart, SOURCE_LABELS } from '../components/purchases/PriceHistoryChart';
 import { AliasEditor, ChangePriceModal } from '../components/purchases/ProductEditors';
 import { PriceSimulator, UsageCard, YieldCard } from '../components/purchases/ProductInsights';
@@ -38,6 +39,8 @@ type FormDraft = Pick<
 >;
 type SaveState = 'idle' | 'saving' | 'saved' | 'dirty' | 'error';
 
+const UNIT_WORD: Record<BaseUnit, string> = { kg: 'kilo', l: 'litro', ud: 'unidad' };
+
 const PRICE_SOURCE_TEXT: Record<Product['priceSource'], string> = {
   factura: 'De tu última factura',
   manual: 'Precio introducido a mano',
@@ -56,7 +59,7 @@ function toForm(p: Product): FormDraft {
     cookingLossPct: p.cookingLossPct,
     purchaseVatPct: p.purchaseVatPct,
     supplierId: p.supplierId,
-    notes: p.notes,
+    notes: userNotes(p),
     allergens: p.allergens ?? [],
   };
 }
@@ -164,6 +167,7 @@ export default function ProductDetail() {
   const unit = form.baseUnit;
   const unitChanged = initialUnit.current != null && unit !== initialUnit.current && product.pricePerBase > 0;
   const shownHistory = showAllHistory ? history : history.slice(0, 6);
+  const estimated = isEstimatedPrice(product);
 
   return (
     <div className="animate-fade-in">
@@ -176,7 +180,7 @@ export default function ProductDetail() {
       <PageHeader
         eyebrow={<CategoryBadge category={form.category} className="normal-case tracking-normal" />}
         title={form.name || product.name}
-        subtitle={`Se compra por ${product.baseUnit}${product.supplierId && supplierNames.get(product.supplierId) ? ` · ${supplierNames.get(product.supplierId)}` : ''}${product.aliases.length ? ` · ${product.aliases.length} ${product.aliases.length === 1 ? 'nombre alternativo' : 'nombres alternativos'}` : ''}`}
+        subtitle={`Se compra por ${UNIT_WORD[product.baseUnit]}${product.supplierId && supplierNames.get(product.supplierId) ? ` · ${supplierNames.get(product.supplierId)}` : ''}${product.aliases.length ? ` · ${product.aliases.length} ${product.aliases.length === 1 ? 'nombre alternativo' : 'nombres alternativos'}` : ''}`}
         actions={<SaveIndicator state={saveState} />}
       />
 
@@ -198,10 +202,17 @@ export default function ProductDetail() {
                   ) : (
                     <div className="mt-1 font-display text-3xl font-extrabold text-warn">Sin precio</div>
                   )}
-                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted">
-                    <span>{product.pricePerBase > 0 ? PRICE_SOURCE_TEXT[product.priceSource] : 'Sube una factura o indícalo a mano'}</span>
-                    {product.lastPurchaseDate && <span>· Última compra {fmtDate(product.lastPurchaseDate)}</span>}
-                  </div>
+                  {estimated ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
+                      <EstimatedBadge className="px-2 py-0.5 text-[11px]" />
+                      <span>Precio de referencia: sube una factura de este ingrediente y tendrás el real.</span>
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+                      <span>{product.pricePerBase > 0 ? PRICE_SOURCE_TEXT[product.priceSource] : 'Sube una factura o indícalo a mano'}</span>
+                      {product.lastPurchaseDate && <span>Última compra: {fmtDate(product.lastPurchaseDate)}</span>}
+                    </div>
+                  )}
                 </div>
                 <Button
                   variant={product.pricePerBase > 0 ? 'outline' : 'primary'}
@@ -239,14 +250,14 @@ export default function ProductDetail() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="tabular w-full min-w-[480px] text-sm">
+                  <table className="tabular w-full text-sm sm:min-w-[480px]">
                     <thead>
                       <tr className="text-left text-[11px] font-bold uppercase tracking-wide text-muted">
                         <th className="py-2 pr-2">Fecha</th>
                         <th className="px-2 py-2 text-right">Precio</th>
                         <th className="px-2 py-2 text-right">Variación</th>
                         <th className="px-2 py-2">Origen</th>
-                        <th className="py-2 pl-2">Proveedor</th>
+                        <th className="hidden py-2 pl-2 sm:table-cell">Proveedor</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -270,16 +281,16 @@ export default function ProductDetail() {
                               {pt.invoiceId ? (
                                 <Link
                                   to={`/facturas/${pt.invoiceId}`}
-                                  className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline dark:text-brand-400"
-                                  title={pt.rawDescription}
+                                  className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline max-sm:-my-2 max-sm:size-10 max-sm:justify-center dark:text-brand-400"
+                                  title={pt.rawDescription ? `Ver factura · ${pt.rawDescription}` : 'Ver factura'}
                                 >
-                                  <Receipt className="size-3.5" /> Factura
+                                  <Receipt className="size-3.5" /> <span className="max-sm:sr-only">Factura</span>
                                 </Link>
                               ) : (
                                 <span className="text-ink-2">{SOURCE_LABELS[pt.source]}</span>
                               )}
                             </td>
-                            <td className="max-w-[180px] truncate py-2 pl-2 text-ink-2">
+                            <td className="hidden max-w-[180px] truncate py-2 pl-2 text-ink-2 sm:table-cell">
                               {pt.supplierId ? (supplierNames.get(pt.supplierId) ?? '—') : '—'}
                             </td>
                           </tr>

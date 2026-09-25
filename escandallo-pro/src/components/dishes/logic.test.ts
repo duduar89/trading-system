@@ -7,8 +7,12 @@ import {
   dishListStats,
   editablePatch,
   entriesSummary,
+  filterByFoodCost,
   filterDishes,
+  foodCostCounts,
   groupEntries,
+  parseFoodCostFilter,
+  isSearchFragment,
   moveItem,
   normalize,
   patchItem,
@@ -210,6 +214,27 @@ describe('filtros y orden del listado', () => {
     expect(st.suggestedLines).toBe(1);
   });
 
+  it('filtra por semáforo de food cost (enlaces ?fc= del panel)', () => {
+    expect(parseFoodCostFilter('bad')).toBe('bad');
+    expect(parseFoodCostFilter(' WARN ')).toBe('warn');
+    expect(parseFoodCostFilter('rojo')).toBeUndefined();
+    expect(parseFoodCostFilter(null)).toBeUndefined();
+    const amber = dish({ id: 'm', name: 'Ámbar', menuPrice: 10 });
+    const withAmber = new Map(costs);
+    withAmber.set('m', { foodCostPct: 32, grossMargin: 6, costPerPortion: 3, wastePct: 0, grossKgPerPortion: 0 } as unknown as import('../../types').DishCost);
+    const all = [a, b, c, e, amber];
+    expect(filterByFoodCost(all, withAmber, business, 'bad').map((d) => d.id)).toEqual(['b']);
+    expect(filterByFoodCost(all, withAmber, business, 'warn').map((d) => d.id)).toEqual(['m']);
+    expect(filterByFoodCost(all, withAmber, business, 'ok').map((d) => d.id)).toEqual(['a']);
+    // Sin PVP no hay food cost; las elaboraciones nunca entran en el semáforo.
+    expect(filterByFoodCost(all, withAmber, business, 'sin').map((d) => d.id)).toEqual(['e']);
+    expect(filterByFoodCost(all, withAmber, business, undefined)).toBe(all);
+    expect(foodCostCounts(all, withAmber, business)).toEqual({ bad: 1, warn: 1, ok: 1, sin: 1 });
+    // El objetivo propio del plato desplaza el semáforo (40 % con objetivo 38 % → ámbar).
+    const own = dish({ id: 'b', name: 'Ñoquis', menuPrice: 14, targetFoodCostPct: 38 });
+    expect(filterByFoodCost([own], withAmber, business, 'warn').map((d) => d.id)).toEqual(['b']);
+  });
+
   it('agrupa secciones sin duplicados y detecta usos de elaboraciones', () => {
     expect(sectionsOf([a, b, c, e])).toEqual(['Entrantes', 'Principales']);
     const user = dish({ id: 'u', name: 'U', items: [item({ id: 'i', name: 'Alioli', ref: { type: 'dish', id: 'c' } })] });
@@ -231,6 +256,18 @@ describe('searchIngredients', () => {
   it('excluye el propio plato y devuelve sugerencias sin consulta', () => {
     expect(searchIngredients('salsa', products, [elab], 8, 'el').some((o) => o.id === 'el')).toBe(false);
     expect(searchIngredients('', products, [elab]).length).toBeGreaterThan(0);
+  });
+});
+
+describe('texto de búsqueda frente a nombre de receta', () => {
+  it('sustituye fragmentos de búsqueda y conserva nombres propios', () => {
+    expect(isSearchFragment('calabac', 'Calabacín')).toBe(true);
+    expect(isSearchFragment('aceite gir', 'Aceite de girasol alto oleico')).toBe(true);
+    expect(isSearchFragment('  ', 'Sal')).toBe(true);
+    expect(isSearchFragment('Pimientos de Padrón', 'Pimiento de Padrón')).toBe(false);
+    expect(isSearchFragment('Aceite de girasol (fritura)', 'Aceite de girasol alto oleico')).toBe(false);
+    expect(isSearchFragment('Calabacín', 'Calabacín')).toBe(false);
+    expect(isSearchFragment('tomate', 'Tomate')).toBe(false);
   });
 });
 

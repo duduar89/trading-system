@@ -4,6 +4,7 @@ import { CheckCircle2, AlertTriangle, Wand2 } from 'lucide-react';
 import type { BaseUnit, BusinessSettings, Dish, DishCost } from '../../types';
 import { fmtEur, fmtKg, fmtNum } from '../../lib/format';
 import { Button, FoodCostBadge, NumberInput, Select } from '../ui';
+import { AmountInput } from '../purchases/AmountInput';
 import { dishFoodCostStatus, fmtPctNb, fmtPrice, shownFoodCost, shownMargin, targetOf, yieldUnitLabel } from './logic';
 
 /** Tarjeta de KPI con el lenguaje visual de Stat, pero admitiendo controles dentro. */
@@ -104,7 +105,11 @@ export function KpiStrip({
         <Tile label="Merma receta" hint={cost.grossKgPerPortion > 0 ? `${fmtPctNb(cost.wastePct)} del bruto · ${fmtEur(cost.wasteCostPerPortion * portions)}` : undefined}>
           <div className="font-display text-2xl font-extrabold text-ink">{fmtKg(cost.totalWasteKg)}</div>
         </Tile>
-        <Tile label="Se usa en" hint={usedInCount ? 'Si cambias su coste, se actualizan todos' : 'Vincúlala desde el escandallo de un plato'}>
+        <Tile
+          label="Se usa en"
+          className="col-span-2 md:col-span-1"
+          hint={usedInCount ? 'Si cambias su coste, se actualizan todos' : 'Vincúlala desde el escandallo de un plato'}
+        >
           <div className="font-display text-2xl font-extrabold text-ink">
             {usedInCount} <span className="text-base font-bold text-muted">{usedInCount === 1 ? 'plato' : 'platos'}</span>
           </div>
@@ -135,10 +140,11 @@ export function KpiStrip({
         <div className="font-display text-3xl font-extrabold text-ink sm:text-4xl">{fmtEur(cost.costPerPortion)}</div>
       </Tile>
       <Tile label="PVP carta (IVA incl.)" hint={cost.netPrice != null ? `Sin IVA ${fmtEur(cost.netPrice)} · IVA ${fmtNum(vat, 1)} %` : 'El precio tal y como sale en tu carta'}>
-        <NumberInput
+        <AmountInput
           value={dish.menuPrice}
           onValue={(v) => onChange({ menuPrice: v != null && v > 0 ? v : undefined })}
           decimals={2}
+          minDecimals={2}
           min={0}
           placeholder="0,00"
           suffix="€"
@@ -167,7 +173,11 @@ export function KpiStrip({
           )}
         </div>
       </Tile>
-      <Tile label="Merma por ración" hint={cost.grossKgPerPortion > 0 ? `${fmtPctNb(cost.wastePct)} de lo comprado` : 'Sin datos de peso'}>
+      <Tile
+        label="Merma por ración"
+        className="col-span-2 md:col-span-1"
+        hint={cost.grossKgPerPortion > 0 ? `${fmtPctNb(cost.wastePct)} de lo comprado` : 'Sin datos de peso'}
+      >
         <div className="font-display text-2xl font-extrabold text-ink">{fmtKg(cost.wasteKgPerPortion)}</div>
         <div className="text-xs font-semibold text-ink-2">{fmtEur(cost.wasteCostPerPortion)} que no llegan al plato</div>
       </Tile>

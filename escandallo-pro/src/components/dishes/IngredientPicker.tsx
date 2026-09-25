@@ -4,6 +4,8 @@ import { Plus, CornerDownLeft, Loader2 } from 'lucide-react';
 import type { Dish, ID, Product } from '../../types';
 import { CATEGORY_LABELS } from '../../lib/labels';
 import { perUnitLabel } from '../../lib/format';
+import { EstimatedBadge } from '../purchases/badges';
+import { isEstimatedPrice } from '../purchases/estimated';
 import { Popover } from './Popover';
 import { fmtPrice, normalize, searchIngredients, type IngredientOption } from './logic';
 
@@ -91,6 +93,10 @@ export function IngredientPicker({
           setOpen(true);
           setActive(0);
         }}
+        onBlur={() => {
+          // Se cierra al salir del campo (la lista mantiene el foco en el input al pulsarla); mientras se crea, sigue abierta.
+          if (!creating) setOpen(false);
+        }}
         onChange={(e) => {
           onChangeText(e.target.value);
           setOpen(true);
@@ -118,7 +124,7 @@ export function IngredientPicker({
           invalid ? 'border-warn/60' : 'border-line-strong',
         )}
       />
-      <Popover anchor={anchor} open={open && count > 0} onClose={() => setOpen(false)} matchWidth minWidth={300} role="listbox" id={listId}>
+      <Popover anchor={anchor} open={open && count > 0} onClose={() => setOpen(false)} matchWidth minWidth={300} role="listbox" id={listId} keepFocus>
         {options.map((o, i) => (
           <OptionRow key={`${o.kind}:${o.id}`} id={`${listId}-${i}`} option={o} active={i === active} onHover={() => setActive(i)} onChoose={() => void choose(i)} dishPriceLabel={dishPriceLabel} />
         ))}
@@ -197,9 +203,12 @@ function OptionRow({
         {option.kind === 'dish' && option.dish ? (
           <span className="text-ink-2">{dishPriceLabel?.(option.dish)}</span>
         ) : p && p.pricePerBase > 0 ? (
-          <span className="font-semibold text-ink-2">
-            {fmtPrice(p.pricePerBase)}
-            <span className="font-normal text-muted"> {perUnitLabel(p.baseUnit).replace('€', '')}</span>
+          <span className="flex flex-col items-end gap-0.5">
+            <span className="font-semibold text-ink-2">
+              {fmtPrice(p.pricePerBase)}
+              <span className="font-normal text-muted"> {perUnitLabel(p.baseUnit).replace('€', '')}</span>
+            </span>
+            {isEstimatedPrice(p) && <EstimatedBadge short />}
           </span>
         ) : (
           <span className="rounded-full bg-warn-soft px-1.5 py-0.5 font-semibold text-warn">sin precio</span>

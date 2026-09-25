@@ -23,6 +23,8 @@ import {
   totalsCheck,
   type PriceSnapshot,
 } from './logic';
+import { isEstimatedPrice, userNotes } from './estimated';
+import { ESTIMATED_PRICE_NOTE } from '../../services/products';
 
 const line = (p: Partial<InvoiceLine> = {}): InvoiceLine => ({
   id: p.id ?? 'l1',
@@ -285,6 +287,18 @@ describe('productos', () => {
     expect(filterProducts(products, { ...DEFAULT_PRODUCT_FILTERS, withYield: true }, trends).map((p) => p.id)).toEqual(['b']);
     expect(filterProducts(products, { ...DEFAULT_PRODUCT_FILTERS, rising: true }, trends).map((p) => p.id)).toEqual(['b']);
     expect(filterProducts(products, { ...DEFAULT_PRODUCT_FILTERS, query: 'nora' }, trends).map((p) => p.id)).toEqual(['d']);
+  });
+
+  it('distingue los precios estimados de referencia (sin factura todavía)', () => {
+    const est = product({ id: 'e', name: 'Pimentón de la Vera', pricePerBase: 18, notes: ESTIMATED_PRICE_NOTE });
+    const zero = product({ id: 'z', name: 'Comino', pricePerBase: 0, notes: ESTIMATED_PRICE_NOTE });
+    const all = [...products, est, zero];
+    expect(isEstimatedPrice(est)).toBe(true);
+    expect(isEstimatedPrice(zero)).toBe(false);
+    expect(isEstimatedPrice(products[0])).toBe(false);
+    expect(filterProducts(all, { ...DEFAULT_PRODUCT_FILTERS, estimated: true }, trends).map((p) => p.id)).toEqual(['e']);
+    expect(userNotes(est)).toBeUndefined();
+    expect(userNotes({ notes: 'Calibre 3' })).toBe('Calibre 3');
   });
 
   it('ordena por nombre (es), precio, compra y variación', () => {

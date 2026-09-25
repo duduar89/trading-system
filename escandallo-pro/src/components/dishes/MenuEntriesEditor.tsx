@@ -3,7 +3,8 @@ import { Link } from 'react-router';
 import clsx from 'clsx';
 import { AlertTriangle, CheckSquare, ExternalLink, Plus, Square, Trash2 } from 'lucide-react';
 import type { ID, MenuEntry } from '../../types';
-import { Button, IconButton, Input, NumberInput } from '../ui';
+import { Button, IconButton, Input } from '../ui';
+import { AmountInput } from '../purchases/AmountInput';
 import { SelectBox } from './DishCard';
 import { entriesSummary, groupEntries, normalize } from './logic';
 import { newMenuEntry } from './menuScanStore';
@@ -139,14 +140,20 @@ function EntryRow({
 }) {
   const low = entry.confidence != null && entry.confidence < 0.6;
   return (
-    <li className={clsx('grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-1 gap-y-2 py-2.5 pl-1.5 pr-2 transition sm:grid-cols-[auto_minmax(0,1fr)_7.5rem_auto]', !entry.selected && 'opacity-55')}>
+    <li
+      className={clsx(
+        'grid grid-cols-[auto_minmax(0,1fr)_6.75rem_auto] items-start gap-x-1 gap-y-1 py-2.5 pl-1.5 pr-2 transition sm:grid-cols-[auto_minmax(0,1fr)_7.5rem_auto] sm:gap-x-1.5',
+        !entry.selected && 'opacity-55',
+      )}
+    >
       <SelectBox
         checked={entry.selected}
         onChange={() => onPatch({ selected: !entry.selected })}
         label={`Importar ${entry.name || 'plato sin nombre'}`}
         className="col-start-1 row-start-1"
       />
-      <div className="col-start-2 row-start-1 min-w-0 space-y-1">
+      {/* Móvil: nombre a lo ancho y, debajo, descripción/sección junto al precio. Escritorio: precio al lado del nombre. */}
+      <div className="col-span-2 col-start-2 row-start-1 min-w-0 sm:col-span-1">
         <Input
           ref={nameRef}
           value={entry.name}
@@ -155,11 +162,14 @@ function EntryRow({
           aria-label="Nombre del plato"
           className={clsx('font-semibold', !entry.name.trim() && entry.selected && 'border-warn/60')}
         />
+      </div>
+      <div className="col-start-2 row-start-2 min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
           <input
             value={entry.description ?? ''}
             onChange={(e) => onPatch({ description: e.target.value || undefined })}
-            placeholder="Descripción (ayuda a proponer la receta)"
+            placeholder="Descripción del plato"
+            title="La descripción ayuda a proponer una receta más fiel"
             aria-label="Descripción del plato"
             className="h-8 min-w-0 flex-1 basis-40 rounded-lg border border-transparent bg-transparent px-2 text-xs text-ink-2 placeholder:text-muted/70 hover:border-line focus:border-brand-500 focus:outline-none"
           />
@@ -183,11 +193,12 @@ function EntryRow({
           )}
         </div>
       </div>
-      <div className="col-start-2 row-start-2 sm:col-start-3 sm:row-start-1">
-        <NumberInput
+      <div className="col-start-3 row-start-2 sm:row-start-1">
+        <AmountInput
           value={entry.price}
           onValue={(v) => onPatch({ price: v != null && v > 0 ? v : undefined })}
           decimals={2}
+          minDecimals={2}
           min={0}
           suffix="€"
           placeholder="PVP"
@@ -195,7 +206,7 @@ function EntryRow({
           className={clsx('[&_input]:text-right [&_input]:font-semibold [&_input]:pr-8', !entry.price && entry.selected && '[&_input]:border-warn/60')}
         />
       </div>
-      <div className="col-start-3 row-start-1 flex items-start justify-end sm:col-start-4">
+      <div className="col-start-4 row-start-1 flex items-start justify-end">
         <IconButton label={`Quitar ${entry.name || 'plato'}`} onClick={onRemove} className="size-10 hover:text-bad">
           <Trash2 className="size-4" />
         </IconButton>
