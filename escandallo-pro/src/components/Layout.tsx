@@ -64,12 +64,12 @@ function SideNav() {
       <div className="m-3 rounded-2xl border border-line bg-surface-2 p-3.5">
         <div className="flex items-center gap-2 text-xs font-bold text-ink">
           <Sparkles className={clsx('size-4', aiOn ? 'text-ai' : 'text-muted')} />
-          {aiOn ? 'IA activada' : 'Modo local'}
+          {aiOn ? 'IA opcional activada' : 'Lectura gratis'}
         </div>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">
           {aiOn
-            ? 'Facturas, cartas y recetas se leen con Claude para máxima precisión.'
-            : 'OCR y base de recetas en tu dispositivo. Añade tu clave de IA en Ajustes para máxima precisión.'}
+            ? 'Los documentos más difíciles se refuerzan con Claude. Todo lo demás, en tu dispositivo.'
+            : 'Facturas y cartas se leen gratis en tu dispositivo, sin enviar tus datos a nadie.'}
         </p>
       </div>
     </aside>
