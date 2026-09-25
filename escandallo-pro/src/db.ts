@@ -66,7 +66,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   id: 'app',
   aiModel: 'claude-opus-5',
   aiEffort: 'medium',
-  aiEnabled: true,
+  aiEnabled: false,
   theme: 'system',
   onboardingDone: false,
 };

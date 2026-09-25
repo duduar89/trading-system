@@ -103,7 +103,7 @@ export interface AppSettings {
   apiKey?: string;
   aiModel: AIModel;
   aiEffort: AIEffort;
-  /** Si es false nunca se llama a la IA aunque haya clave (modo 100 % local). */
+  /** IA opcional (desactivada por defecto): la extracción local es gratuita. Si es false nunca se llama a la IA. */
   aiEnabled: boolean;
   theme: 'system' | 'light' | 'dark';
   currentWorkspaceId?: ID;
