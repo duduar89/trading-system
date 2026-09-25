@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Link } from 'react-router';
 import { ChevronRight, Link2, Scale } from 'lucide-react';
 import type { Product, YieldResult, YieldTest } from '../../types';
 import { Badge, SearchInput, Segmented, Table, Td, Th, cx } from '../ui';
@@ -107,7 +107,13 @@ export function YieldTestList({ rows }: { rows: YieldRow[] }) {
                         {r.product ? (CATEGORY_LABELS[r.product.category]?.emoji ?? '⚖️') : '⚖️'}
                       </span>
                       <div className="min-w-0">
-                        <div className="truncate font-semibold text-ink">{r.test.name}</div>
+                        <Link
+                          to={`/mermas/${r.test.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="block truncate font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400"
+                        >
+                          {r.test.name}
+                        </Link>
                         <div className="truncate text-xs text-muted">{r.product?.name ?? 'Sin producto'}</div>
                       </div>
                     </div>
@@ -143,10 +149,9 @@ export function YieldTestList({ rows }: { rows: YieldRow[] }) {
           <ul className="space-y-2.5 md:hidden">
             {filtered.map((r) => (
               <li key={r.test.id}>
-                <button
-                  type="button"
-                  onClick={() => open(r.test.id)}
-                  className="w-full rounded-2xl border border-line bg-surface p-4 text-left shadow-card transition active:scale-[0.99]"
+                <Link
+                  to={`/mermas/${r.test.id}`}
+                  className="block w-full rounded-2xl border border-line bg-surface p-4 text-left shadow-card transition active:scale-[0.99]"
                 >
                   <div className="flex items-start gap-3">
                     <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-xl" aria-hidden>
@@ -177,7 +182,7 @@ export function YieldTestList({ rows }: { rows: YieldRow[] }) {
                       strong
                     />
                   </div>
-                </button>
+                </Link>
               </li>
             ))}
           </ul>
