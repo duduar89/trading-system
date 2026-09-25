@@ -1,0 +1,15 @@
+{
+  "image": "public/samples/carta-el-fogon.jpg",
+  "entries": [
+    { "section": "Para picar", "name": "Patatas bravas", "price": 6.5 },
+    { "section": "Para picar", "name": "Croquetas caseras de jamón (6 uds)", "price": 9 },
+    { "section": "Para picar", "name": "Pulpo a la gallega", "price": 19.5, "description": "Con cachelos, pimentón de la Vera y aceite de oliva virgen extra" },
+    { "section": "Para picar", "name": "Gambas al ajillo", "price": 14 },
+    { "section": "Principales", "name": "Solomillo de ternera a la pimienta", "price": 24, "description": "Con patatas panaderas" },
+    { "section": "Principales", "name": "Secreto ibérico a la brasa", "price": 18.5 },
+    { "section": "Principales", "name": "Merluza en salsa verde", "price": 21, "description": "Con almejas y espárragos" },
+    { "section": "Principales", "name": "Arroz negro con alioli", "price": 17 },
+    { "section": "Postres", "name": "Tarta de queso al horno", "price": 6.5 },
+    { "section": "Postres", "name": "Torrija caramelizada con helado", "price": 7 }
+  ]
+}

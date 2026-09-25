@@ -1,0 +1,81 @@
+{
+  "invoices": {
+    "factura-fruteria-garcia.pdf": {
+      "header": {
+        "supplierName": "Frutas y Verduras Hermanos García S.L.",
+        "supplierTaxId": "B28123456",
+        "number": "FV-2026/0913",
+        "date": "2026-09-18",
+        "subtotal": 96.48,
+        "vatTotal": 3.86,
+        "total": 100.34
+      },
+      "lines": [
+        { "description": "PATATA AGRIA SACO 25KG", "quantity": 25, "unit": "kg", "unitPrice": 0.89, "total": 22.25 },
+        { "description": "CEBOLLA DULCE MALLA", "quantity": 10, "unit": "kg", "unitPrice": 1.15, "total": 11.5 },
+        { "description": "TOMATE PERA CAT.I", "quantity": 12.4, "unit": "kg", "unitPrice": 1.85, "total": 22.94 },
+        { "description": "PIMIENTO ROJO", "quantity": 5.25, "unit": "kg", "unitPrice": 2.4, "total": 12.6 },
+        { "description": "AJO MORADO LAS PEDROÑERAS", "quantity": 2, "unit": "kg", "unitPrice": 5.9, "total": 11.8 },
+        { "description": "LIMONES MALLA 1KG", "quantity": 3, "unit": "ud", "unitPrice": 1.95, "total": 5.85 },
+        { "description": "PEREJIL MANOJO", "quantity": 6, "unit": "ud", "unitPrice": 0.55, "total": 3.3 },
+        { "description": "LECHUGA ROMANA", "quantity": 8, "unit": "ud", "unitPrice": 0.78, "total": 6.24 }
+      ]
+    },
+    "factura-carnes-guadarrama.pdf": {
+      "header": {
+        "supplierName": "Carnes Selectas Guadarrama S.L.",
+        "supplierTaxId": "B78456123",
+        "number": "CSG-26-004187",
+        "date": "2026-09-19",
+        "subtotal": 596.58,
+        "vatTotal": 59.66,
+        "total": 656.24
+      },
+      "lines": [
+        { "description": "SOLOMILLO TERNERA NAC. ENTERO", "quantity": 4.62, "unit": "kg", "unitPrice": 33.5, "total": 154.77 },
+        { "description": "LOMO ALTO VACA MADURADA 30D", "quantity": 6.1, "unit": "kg", "unitPrice": 29.9, "total": 182.39 },
+        { "description": "SECRETO IBERICO CEBO", "quantity": 3.4, "unit": "kg", "unitPrice": 16.8, "total": 57.12 },
+        { "description": "CARRILLERA IBERICA", "quantity": 5, "unit": "kg", "unitPrice": 11.2, "total": 56 },
+        { "description": "PECHUGA POLLO CAMPERO", "quantity": 4.25, "unit": "kg", "unitPrice": 7.6, "total": 32.3 },
+        { "description": "JAMON IBERICO BELLOTA LONCHEADO 100G", "quantity": 10, "unit": "ud", "unitPrice": 11.4, "total": 114 }
+      ]
+    },
+    "factura-distribuciones-centro.pdf": {
+      "header": {
+        "supplierName": "Distribuciones Hosteleras Centro S.L.",
+        "supplierTaxId": "B86345678",
+        "number": "A/2026/15542",
+        "date": "2026-09-20",
+        "subtotal": 292.68,
+        "vatTotal": 29.27,
+        "total": 321.95
+      },
+      "lines": [
+        { "description": "ACEITE OLIVA V.E. GARRAFA 5L", "quantity": 4, "unit": "ud", "unitPrice": 44.5, "discountPct": 5, "total": 169.1 },
+        { "description": "HARINA TRIGO FUERZA SACO 10KG", "quantity": 1, "unit": "ud", "unitPrice": 9.8, "total": 9.8 },
+        { "description": "LECHE ENTERA 6X1L", "quantity": 3, "unit": "caja", "unitPrice": 5.94, "total": 17.82 },
+        { "description": "NATA 35% MG 1L", "quantity": 6, "unit": "ud", "unitPrice": 3.85, "discountPct": 3, "total": 22.41 },
+        { "description": "HUEVOS M 30 UDS", "quantity": 4, "unit": "ud", "unitPrice": 6.9, "total": 27.6 },
+        { "description": "ARROZ BOMBA 1KG", "quantity": 5, "unit": "ud", "unitPrice": 3.95, "total": 19.75 },
+        { "description": "MANTEQUILLA SIN SAL 250G", "quantity": 8, "unit": "ud", "unitPrice": 2.45, "total": 19.6 },
+        { "description": "PIMENTON DULCE DE LA VERA 75G", "quantity": 3, "unit": "ud", "unitPrice": 2.2, "total": 6.6 }
+      ]
+    }
+  },
+  "menus": {
+    "carta-el-fogon.jpg": {
+      "entries": [
+        { "section": "Para picar", "name": "Patatas bravas", "price": 6.5 },
+        { "section": "Para picar", "name": "Croquetas caseras de jamón (6 uds)", "price": 9 },
+        { "section": "Para picar", "name": "Pulpo a la gallega", "price": 19.5, "description": "Con cachelos, pimentón de la Vera y aceite de oliva virgen extra" },
+        { "section": "Para picar", "name": "Gambas al ajillo", "price": 14 },
+        { "section": "Principales", "name": "Solomillo de ternera a la pimienta", "price": 24, "description": "Con patatas panaderas" },
+        { "section": "Principales", "name": "Secreto ibérico a la brasa", "price": 18.5 },
+        { "section": "Principales", "name": "Merluza en salsa verde", "price": 21, "description": "Con almejas y espárragos" },
+        { "section": "Principales", "name": "Arroz negro con alioli", "price": 17 },
+        { "section": "Postres", "name": "Tarta de queso al horno", "price": 6.5 },
+        { "section": "Postres", "name": "Torrija caramelizada con helado", "price": 7 }
+      ]
+    }
+  }
+}
