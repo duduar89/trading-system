@@ -1,0 +1,83 @@
+{
+  "method": "pdf-texto",
+  "header": {
+    "supplierName": "DISTRIBUCIONES DE BEBIDAS LA RIOJANA, S.L.",
+    "supplierTaxId": "B26334455",
+    "number": "R-26-0912",
+    "date": "2026-09-09",
+    "subtotal": 528.57,
+    "vatTotal": 111,
+    "total": 639.57
+  },
+  "lines": [
+    {
+      "description": "VINO TINTO RIOJA CRIANZA 75CL",
+      "code": "V101",
+      "quantity": 12,
+      "unit": "bot",
+      "unitPrice": 6.8,
+      "discountPct": 5,
+      "total": 77.52,
+      "vatPct": 21,
+      "pricePerBase": 8.6133,
+      "baseUnit": "l"
+    },
+    {
+      "description": "VINO BLANCO RUEDA VERDEJO 75CL",
+      "code": "V205",
+      "quantity": 12,
+      "unit": "bot",
+      "unitPrice": 5.4,
+      "total": 64.8,
+      "vatPct": 21,
+      "pricePerBase": 7.2,
+      "baseUnit": "l"
+    },
+    {
+      "description": "CERVEZA BARRIL 30L",
+      "code": "C010",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 89,
+      "discountPct": 10,
+      "total": 160.2,
+      "vatPct": 21,
+      "pricePerBase": 2.67,
+      "baseUnit": "l"
+    },
+    {
+      "description": "REFRESCO COLA 24X33CL",
+      "code": "R020",
+      "quantity": 3,
+      "unit": "caja",
+      "unitPrice": 14.4,
+      "total": 43.2,
+      "vatPct": 21,
+      "pricePerBase": 1.8182,
+      "baseUnit": "l"
+    },
+    {
+      "description": "AGUA MINERAL 12X1L",
+      "code": "A030",
+      "quantity": 5,
+      "unit": "caja",
+      "unitPrice": 4.4,
+      "discountPct": 2.5,
+      "total": 21.45,
+      "vatPct": 21,
+      "pricePerBase": 0.3575,
+      "baseUnit": "l"
+    },
+    {
+      "description": "GINEBRA PREMIUM 70CL",
+      "code": "G040",
+      "quantity": 6,
+      "unit": "bot",
+      "unitPrice": 16.9,
+      "total": 101.4,
+      "vatPct": 21,
+      "pricePerBase": 24.1429,
+      "baseUnit": "l"
+    }
+  ]
+}

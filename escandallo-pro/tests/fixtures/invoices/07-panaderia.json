@@ -1,0 +1,74 @@
+{
+  "method": "pdf-texto",
+  "header": {
+    "supplierName": "Hnos. Gil Rubio, C.B.",
+    "supplierTaxId": "E87332211",
+    "number": "3321",
+    "date": "2026-09-20",
+    "subtotal": 148.7,
+    "vatTotal": 14.87,
+    "total": 163.57
+  },
+  "lines": [
+    {
+      "description": "BARRA DE PAN RÚSTICA 250G",
+      "quantity": 40,
+      "unit": "ud",
+      "unitPrice": 0.55,
+      "total": 22,
+      "vatPct": 10,
+      "pricePerBase": 2.2,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "PAN DE HOGAZA 1KG",
+      "quantity": 20,
+      "unit": "ud",
+      "unitPrice": 2.1,
+      "total": 42,
+      "vatPct": 10,
+      "pricePerBase": 2.1,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "CRUASÁN DE MANTEQUILLA",
+      "quantity": 60,
+      "unit": "ud",
+      "unitPrice": 0.48,
+      "total": 28.8,
+      "vatPct": 10,
+      "pricePerBase": 0.48,
+      "baseUnit": "ud"
+    },
+    {
+      "description": "TARTA DE QUESO RACIÓN",
+      "quantity": 12,
+      "unit": "ud",
+      "unitPrice": 2.9,
+      "total": 34.8,
+      "vatPct": 10,
+      "pricePerBase": 2.9,
+      "baseUnit": "ud"
+    },
+    {
+      "description": "BIZCOCHO CASERO 1KG",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 8.5,
+      "total": 8.5,
+      "vatPct": 10,
+      "pricePerBase": 8.5,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "PAN DE HAMBURGUESA BRIOCHE",
+      "quantity": 30,
+      "unit": "ud",
+      "unitPrice": 0.42,
+      "total": 12.6,
+      "vatPct": 10,
+      "pricePerBase": 0.42,
+      "baseUnit": "ud"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "method": "ocr",
+  "entries": [
+    { "section": "Ensaladas", "name": "Ensalada César", "price": 9.5 },
+    { "section": "Ensaladas", "name": "Ensalada de queso de cabra", "price": 11, "description": "Con nueces y vinagreta de miel" },
+    { "section": "Ensaladas", "name": "Ensalada de pasta", "price": 8.5 },
+    { "section": "Arroces", "name": "Paella valenciana", "price": 14 },
+    { "section": "Arroces", "name": "Arroz negro", "price": 13.5 },
+    { "section": "Arroces", "name": "Arroz con bogavante", "price": 24 }
+  ]
+}

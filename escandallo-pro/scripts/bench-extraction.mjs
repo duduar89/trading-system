@@ -11,7 +11,7 @@
  *
  * Verdad de referencia: tests/fixtures/bench/expected.json.
  *
- * Uso:  node scripts/bench-extraction.mjs [--only=<texto>] [--no-ocr] [--no-menus] [--keep=<dir>] [--json=<archivo>] [--verbose]
+ * Uso:  node scripts/bench-extraction.mjs [--only=<texto>] [--no-ocr] [--no-menus] [--menu-text-only] [--keep=<dir>] [--json=<archivo>] [--verbose]
  */
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -62,7 +62,7 @@ mkdirSync(workDir, { recursive: true });
 // ───────────────────────────── Adaptadores de Node (equivalentes a pdf.ts / ocr.ts) ─────────────────────────────
 
 async function openPdf(bytes) {
-  return pdfjs.getDocument({ data: new Uint8Array(bytes), isEvalSupported: false, useSystemFonts: true, verbosity: 0 }).promise;
+  return pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true, verbosity: 0 }).promise;
 }
 
 /** Igual que extractPdfText del navegador. */
@@ -140,12 +140,15 @@ const INVOICE_VARIANTS = [
   { id: 'foto-perspectiva', rotate: -1.4, tiltX: 7, tiltY: -3, blur: 0.45, noise: 0.05, jpeg: 62, pageWidth: 1600, margin: 0.1, background: '#6b5b4b', shade: true },
   { id: 'escaneo-baja-resolución', rotate: 0.8, blur: 0.7, noise: 0.07, jpeg: 55, pageWidth: 1000, margin: 0, background: '#ffffff' },
   { id: 'pdf-escaneado', rotate: 1.1, blur: 0.35, noise: 0.05, jpeg: 80, pageWidth: 1654, margin: 0, background: '#ffffff', grayscale: true, pdf: true },
+  { id: 'foto-sombra-fuerte', rotate: -2.6, tiltX: 4, blur: 0.5, noise: 0.06, jpeg: 50, pageWidth: 1400, margin: 0.07, background: '#2f2a26', shade: true },
+  { id: 'fax-150ppp-ruido', rotate: 0.5, blur: 0.3, noise: 0.12, jpeg: 60, pageWidth: 1240, margin: 0, background: '#ffffff', grayscale: true },
 ];
 
 const MENU_VARIANTS = [
   { id: 'foto-girada-3º', rotate: 3, blur: 0.3, noise: 0.04, jpeg: 70, pageWidth: 900, margin: 0, background: '#6a5b4a', fromPhoto: true },
   { id: 'ruido-desenfoque', rotate: -1, blur: 0.6, noise: 0.08, jpeg: 60, pageWidth: 900, margin: 0, background: '#6a5b4a', fromPhoto: true },
   { id: 'baja-resolución', rotate: 0, blur: 0.2, noise: 0.03, jpeg: 70, pageWidth: 650, margin: 0, background: '#6a5b4a', fromPhoto: true },
+  { id: 'móvil-perspectiva-sombra', rotate: -2, tiltX: 8, tiltY: 4, blur: 0.4, noise: 0.05, jpeg: 55, pageWidth: 900, margin: 0.06, background: '#2b2622', shade: true, fromPhoto: true },
 ];
 
 let browser;
@@ -298,7 +301,9 @@ async function runMenuImage(name, bytes, variant) {
   const t0 = Date.now();
   const gray = await loadGray(bytes);
   const pages = pipeline.preparePages([gray]);
-  const outcome = await pipeline.ocrMenu(pages, backend, (t) => menuParser.parseMenuText(t, 'ocr'));
+  // Mismo camino que la app (index.ts): texto por columnas + cajas de palabras y combinación de pasadas del parser
+  const parse = args['menu-text-only'] ? (t) => menuParser.parseMenuText(t, 'ocr') : extractIndex.parseMenuOcr;
+  const outcome = await pipeline.ocrMenu(pages, backend, parse, { merge: menuParser.mergeMenuPasses, quality: menuParser.menuQuality });
   return { name, variant, method: 'ocr (foto)', ms: Date.now() - t0, menu: outcome.menu, passes: outcome.passes, prep: pages[0].info, rawText: outcome.ocr.text };
 }
 

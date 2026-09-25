@@ -1,0 +1,21 @@
+GRUPO ALIMENTARIO SURESTE, S.L.U.
+Avda. de Europa 22 · 30007 Murcia
+CIF B30998877 · www.gasureste.es
+FACTURA                  Serie A     Nº 002391
+Fecha de emisión: 21/09/2026
+Facturar a:  Restaurante El Olivo S.L. · B73112233
+
+Código    Descripción                             Cant.    Precio    Dto%      Base    IVA%
+A-100     ARROZ BOMBA CALASPARRA 1KG                 10      3,85               38,50      4
+A-210     PASTA ESPAGUETI 5KG                         2     11,40               22,80      4
+B-305     ACEITUNA MANZANILLA LATA 5KG                3      9,80      5,00     27,93     10
+B-410     ATÚN CLARO EN ACEITE LATA 1KG               6      8,25               49,50     10
+C-500     DETERGENTE LAVAVAJILLAS 10L                 2     18,90     10,00     34,02     21
+C-520     PAPEL SECAMANOS ZIGZAG CAJA 20              1     26,40               26,40     21
+
+Desglose de IVA
+Base          %IVA        Cuota
+61,30            4         2,45
+77,43           10         7,74
+60,42           21        12,69
+Total base imponible  199,15      Total IVA  22,88      TOTAL FACTURA  222,03 €

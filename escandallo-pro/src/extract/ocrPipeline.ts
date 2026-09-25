@@ -1,18 +1,19 @@
 import type { ExtractedInvoice, ExtractedMenu, ProgressFn } from '../types';
-import { approxEqual } from '../core/numbers';
 import { prepareForOcr, resample, sauvola, type GrayImage, type OcrPrepInfo, type OcrPrepOptions } from './imageOps';
 import { ocrPagesToResult, type LayoutMode, type TessPage } from './ocrLayout';
-import { invoiceQuality, mergeInvoiceReadings, parseInvoiceReading, type InvoiceReading } from './invoiceParser';
+import { invoiceQuality, mergeInvoiceReadings, parseInvoiceReading, sumMatches, type InvoiceReading } from './invoiceParser';
 import type { OcrResult } from './ocr';
 
 /**
  * Orquestación del OCR local (lógica pura con el motor inyectado): la usan el navegador (tesseract.js en un worker)
  * y el banco de pruebas en Node (tesseract.js de Node), para que la calidad medida sea la que obtiene el usuario.
  *
- * Facturas: primera lectura con PSM 6 (bloque uniforme, ideal para tablas) sobre la imagen normalizada; si la
- * validación aritmética no cuadra (líneas sin validar o suma ≠ base imponible), segunda lectura con PSM 4 sobre la
- * imagen binarizada con Sauvola y, si aún hace falta, tercera con segmentación automática (PSM 3). Se combinan las
- * lecturas línea a línea quedándose con las que la aritmética valida.
+ * Facturas: primera lectura con PSM 6 (bloque uniforme, ideal para tablas) sobre la imagen normalizada. Si la
+ * validación aritmética no cuadra (líneas sin validar o suma ≠ base imponible) se hacen lecturas de rescate que dan
+ * errores DISTINTOS: la misma imagen reducida al 80 % (el modelo LSTM es sensible al tamaño), PSM 4 sobre la imagen
+ * binarizada con Sauvola y segmentación automática (PSM 3) ampliada. Tras cada pasada se combinan todas las lecturas
+ * (`mergeInvoiceReadings`): línea a línea gana la que valida la aritmética y, si la suma no cuadra, las lecturas
+ * alternativas que la hacen cuadrar con la base imponible. Se para en cuanto la factura cuadra.
  * Cartas: PSM 3 (cartas a varias columnas) y, si se leen pocos platos, PSM 4 binarizada y PSM 11 (texto disperso).
  */
 
@@ -106,13 +107,16 @@ function validatedCount(inv: ExtractedInvoice): number {
   return inv.lines.filter((l) => (l.confidence ?? 0) >= 0.8).length;
 }
 
-/** ¿La lectura cuadra? Todas las líneas validadas y, si hay base imponible, la suma coincide. */
+/**
+ * ¿La lectura cuadra? Todas las líneas validadas y, si hay base imponible, la suma coincide. Sin base imponible
+ * (albaranes sin totales) basta con que todas las líneas estén validadas: otra pasada no aportaría más comprobación.
+ */
 export function invoiceLooksComplete(inv: ExtractedInvoice): boolean {
   if (!inv.lines.length) return false;
   if (validatedCount(inv) < inv.lines.length) return false;
-  if (inv.subtotal === undefined) return inv.total !== undefined;
+  if (inv.subtotal === undefined) return true;
   const sum = inv.lines.reduce((s, l) => s + l.total, 0);
-  return approxEqual(sum, inv.subtotal, 0.05, 0.002) || (inv.total !== undefined && approxEqual(sum, inv.total, 0.05, 0.002));
+  return sumMatches(sum, inv.subtotal) || (inv.total !== undefined && sumMatches(sum, inv.total));
 }
 
 export interface InvoiceOcrOutcome {
@@ -187,15 +191,24 @@ export function menuQuality(menu: ExtractedMenu): number {
 export async function ocrMenu(
   pages: PreparedPage[],
   backend: OcrBackend,
-  parse: (text: string) => ExtractedMenu,
-  opts: PipelineOptions & { minEntries?: number } = {},
+  parse: (text: string, ocr: OcrResult) => ExtractedMenu,
+  opts: PipelineOptions & {
+    minEntries?: number;
+    /** Combina las lecturas de varias pasadas (p. ej. `mergeMenuPasses` del parser de cartas). */
+    merge?: (menus: ExtractedMenu[]) => ExtractedMenu;
+    /** Calidad de una lectura (por defecto `menuQuality` de este módulo). */
+    quality?: (menu: ExtractedMenu) => number;
+  } = {},
 ): Promise<MenuOcrOutcome> {
   const passes = (opts.passes ?? MENU_PASSES).slice(0, Math.max(1, opts.maxPasses ?? Infinity));
   const now = opts.now ?? (() => Date.now());
   const base = opts.stage ?? 'Leyendo texto (OCR)…';
   const minEntries = opts.minEntries ?? 4;
+  const quality = opts.quality ?? menuQuality;
   const reports: PassReport[] = [];
+  const menus: ExtractedMenu[] = [];
   let best: { menu: ExtractedMenu; ocr: OcrResult; q: number } | undefined;
+  let result: ExtractedMenu | undefined;
   for (let k = 0; k < passes.length; k++) {
     const pass = passes[k];
     const t0 = now();
@@ -203,14 +216,17 @@ export async function ocrMenu(
     const from = k === 0 ? 0 : 0.8 + (0.2 * (k - 1)) / Math.max(1, passes.length - 1);
     const to = k === 0 ? 0.8 : 0.8 + (0.2 * k) / Math.max(1, passes.length - 1);
     const ocr = await recognizePages(pages, backend, pass, 'columns', (f) => opts.onProgress?.({ stage, progress: from + (to - from) * f }));
-    const menu = parse(ocr.text);
-    const q = menuQuality(menu);
+    const menu = parse(ocr.text, ocr);
+    menus.push(menu);
+    const q = quality(menu);
     const priced = menu.entries.filter((e) => e.price !== undefined && e.price > 0);
     reports.push({ id: pass.id, psm: pass.psm, binarize: pass.binarize, lines: menu.entries.length, validated: priced.length, quality: q, ms: now() - t0 });
     if (!best || q > best.q) best = { menu, ocr, q };
-    const avgConf = priced.length ? priced.reduce((s, e) => s + (e.confidence ?? 0.7), 0) / priced.length : 0;
-    if (priced.length >= minEntries && avgConf >= 0.6) break;
+    result = opts.merge && menus.length > 1 ? opts.merge(menus) : best.menu;
+    const pricedAll = result.entries.filter((e) => e.price !== undefined && e.price > 0);
+    const avgConf = pricedAll.length ? pricedAll.reduce((s, e) => s + (e.confidence ?? 0.7), 0) / pricedAll.length : 0;
+    if (pricedAll.length >= minEntries && avgConf >= 0.6) break;
   }
-  if (!best) throw new Error('No se ha podido leer la carta');
-  return { menu: { ...best.menu, method: 'ocr', rawText: best.ocr.text }, ocr: best.ocr, passes: reports };
+  if (!best || !result) throw new Error('No se ha podido leer la carta');
+  return { menu: { ...result, method: 'ocr', rawText: best.ocr.text }, ocr: best.ocr, passes: reports };
 }

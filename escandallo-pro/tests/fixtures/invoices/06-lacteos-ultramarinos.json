@@ -1,0 +1,102 @@
+{
+  "method": "pdf-texto",
+  "header": {
+    "supplierName": "LÁCTEOS Y ULTRAMARINOS SIERRA NORTE S.L.",
+    "supplierTaxId": "B28990011",
+    "number": "SN-2026-1187",
+    "date": "2026-09-10",
+    "subtotal": 175.27,
+    "vatTotal": 13.03,
+    "total": 188.3
+  },
+  "lines": [
+    {
+      "description": "LECHE ENTERA BRIK 6X1L",
+      "code": "L100",
+      "quantity": 4,
+      "unit": "caja",
+      "unitPrice": 5.88,
+      "total": 23.52,
+      "vatPct": 4,
+      "pricePerBase": 0.98,
+      "baseUnit": "l"
+    },
+    {
+      "description": "YOGUR NATURAL 12X125G",
+      "code": "L210",
+      "quantity": 3,
+      "unit": "paquete",
+      "unitPrice": 3.6,
+      "total": 10.8,
+      "vatPct": 10,
+      "pricePerBase": 2.4,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "NATA PARA COCINAR 35% 1L",
+      "code": "L305",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 3.45,
+      "total": 20.7,
+      "vatPct": 10,
+      "pricePerBase": 3.45,
+      "baseUnit": "l"
+    },
+    {
+      "description": "QUESO RALLADO 12X200G",
+      "code": "Q110",
+      "quantity": 1,
+      "unit": "caja",
+      "unitPrice": 21.6,
+      "total": 21.6,
+      "vatPct": 4,
+      "pricePerBase": 9,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "MANTEQUILLA SIN SAL 250G",
+      "code": "M020",
+      "quantity": 10,
+      "unit": "ud",
+      "unitPrice": 2.39,
+      "total": 23.9,
+      "vatPct": 10,
+      "pricePerBase": 9.56,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "HUEVOS CAMPEROS L 30 UDS",
+      "code": "H001",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 7.5,
+      "total": 15,
+      "vatPct": 4,
+      "pricePerBase": 0.25,
+      "baseUnit": "ud"
+    },
+    {
+      "description": "ATÚN EN ACEITE DE OLIVA LATA 900G",
+      "code": "U040",
+      "quantity": 4,
+      "unit": "ud",
+      "unitPrice": 11.25,
+      "total": 45,
+      "vatPct": 10,
+      "pricePerBase": 12.5,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "GARBANZO PEDROSILLANO 1KG",
+      "code": "U050",
+      "quantity": 5,
+      "unit": "ud",
+      "unitPrice": 2.95,
+      "total": 14.75,
+      "vatPct": 4,
+      "pricePerBase": 2.95,
+      "baseUnit": "kg"
+    }
+  ]
+}

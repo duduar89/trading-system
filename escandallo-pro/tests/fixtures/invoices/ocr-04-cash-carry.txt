@@ -1,0 +1,22 @@
+MAKRO AUTOSERVICIO MAYORISTA S.A.U.
+CENTRO: 015 MADRID - VALLECAS
+CIF: A28647451
+FACTURA SIMPLIFICADA
+N°: 015/0023/448812         FECHA: 18/09/2026   HORA: 10:42
+CLIENTE: 1234567  RESTAURANTE CASA PACO S.L.  NIF: B80011223
+ARTICULO  DESCRIPCION                            CANT     PRECIO    IMPORTE   IVA
+2345678   LECHE ENTERA 6X1L                         4       5,4O      2l,60    C
+          DTO PROMO                                                   -2,l6
+1122334   ACEITE OLIVA V.E. 5L                      2      28,95      S7,90    C
+5566778   CERVEZA MAHOU 5 ESTRELLAS 24X33CL         3      16,2O      48,60    A
+9988776   AGUA MINERAL 6X1,5L                       5       2,34      11,7O    B
+4433221   TOMATE TRITURADO LATA 3KG                 6       3,1S      18,90    B
+7766554   SERVILLETAS PAPEL 40X40 PACK 6            2      12,5O      25,0O    A
+3322110   QUESO MANCHEGO CURADO                3,l20 KG    14,95      46,64    B
+TIPO         BASE       CUOTA
+A 2l%       73,6O       15,46
+B 10%       77,24        7,72
+C  4%       77,34        3,09
+TOTAL BASE     228,18     TOTAL IVA     26,27
+TOTAL A PAGAR       254,45
+A: IVA 21%  B: IVA 10%  C: IVA 4%

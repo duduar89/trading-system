@@ -1,0 +1,124 @@
+{
+  "method": "ocr",
+  "header": {
+    "supplierName": "HORTOFRUTICOLA HERMANOS MARTIN, S.L.",
+    "supplierTaxId": "B84512397",
+    "number": "HM-2026/004512",
+    "date": "2026-09-03",
+    "subtotal": 124.11,
+    "vatTotal": 4.96,
+    "total": 129.07
+  },
+  "lines": [
+    {
+      "description": "TOMATE PERA CAT. I CAJA 6KG",
+      "code": "T001",
+      "quantity": 18,
+      "unit": "kg",
+      "unitPrice": 1.65,
+      "total": 29.7,
+      "vatPct": 4,
+      "pricePerBase": 1.65,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "CEBOLLA DULCE MALLA 5KG",
+      "code": "C004",
+      "quantity": 10,
+      "unit": "kg",
+      "unitPrice": 0.98,
+      "total": 9.8,
+      "vatPct": 4,
+      "pricePerBase": 0.98,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "PATATA AGRIA SACO 25KG",
+      "code": "P010",
+      "quantity": 25,
+      "unit": "kg",
+      "unitPrice": 0.72,
+      "total": 18,
+      "vatPct": 4,
+      "pricePerBase": 0.72,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "LECHUGA ROMANA",
+      "code": "L020",
+      "quantity": 12,
+      "unit": "ud",
+      "unitPrice": 0.65,
+      "total": 7.8,
+      "vatPct": 4,
+      "pricePerBase": 0.65,
+      "baseUnit": "ud"
+    },
+    {
+      "description": "PIMIENTO ROJO LAMUYO",
+      "code": "P032",
+      "quantity": 4.35,
+      "unit": "kg",
+      "unitPrice": 2.89,
+      "total": 12.57,
+      "vatPct": 4,
+      "pricePerBase": 2.8897,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "CALABACIN VERDE",
+      "code": "C051",
+      "quantity": 6.2,
+      "unit": "kg",
+      "unitPrice": 1.45,
+      "total": 8.99,
+      "vatPct": 4,
+      "pricePerBase": 1.45,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "LIMON MALLA 1KG",
+      "code": "L060",
+      "quantity": 5,
+      "unit": "malla",
+      "unitPrice": 1.35,
+      "total": 6.75,
+      "vatPct": 4,
+      "pricePerBase": 1.35,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "PEREJIL MANOJO",
+      "code": "P070",
+      "quantity": 10,
+      "unit": "manojo",
+      "unitPrice": 0.45,
+      "total": 4.5,
+      "vatPct": 4,
+      "pricePerBase": 0.45,
+      "baseUnit": "ud"
+    },
+    {
+      "description": "AJO MORADO LAS PEDRONERAS",
+      "code": "A080",
+      "quantity": 2,
+      "unit": "kg",
+      "unitPrice": 5.6,
+      "total": 11.2,
+      "vatPct": 4,
+      "pricePerBase": 5.6,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "FRESON HUELVA BANDEJA 500G",
+      "code": "F090",
+      "quantity": 8,
+      "unit": "bandeja",
+      "unitPrice": 1.85,
+      "total": 14.8,
+      "vatPct": 4,
+      "pricePerBase": 3.7,
+      "baseUnit": "kg"
+    }
+  ]
+}

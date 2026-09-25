@@ -20,6 +20,8 @@ export interface MenuBox {
   confidence?: number;
   /** Línea base de la línea OCR a la que pertenece la caja (tesseract la da por línea): mide la inclinación de la foto. */
   baseline?: { x0: number; y0: number; x1: number; y1: number };
+  /** Página / foto (1, 2…) si se juntan cajas de varias imágenes: cada una se reconstruye por separado. */
+  page?: number;
 }
 
 /** Fila visual de la carta: texto unido de izquierda a derecha (huecos grandes → 3 espacios). */
@@ -72,7 +74,11 @@ export function normalizeMenuLine(raw: string): string {
     .replace(SUPERSCRIPTS, ' ')
     .replace(DIET_CODES, ' ')
     .replace(ALLERGEN_LETTER_LIST, ' ')
-    .replace(ALLERGEN_NUM_LIST, (m) => (m.match(/\d+/g) ?? []).every((d) => Number(d) >= 1 && Number(d) <= 14) ? ' ' : m)
+    .replace(ALLERGEN_NUM_LIST, (m) => {
+      // Raciones fraccionadas ("Pollo asado (1/2)", "Cochinillo (1/4)") no son alérgenos
+      if (/^\(\s*\d\s*\/\s*\d\s*\)$/.test(m)) return m;
+      return (m.match(/\d+/g) ?? []).every((d) => Number(d) >= 1 && Number(d) <= 14) ? ' ' : m;
+    })
     .replace(ALLERGEN_TAIL, '')
     .replace(VAT_NOTE, ' ')
     .replace(/\(\s*\*+\s*\)|(?<=\p{L})\*+|\*+(?=\s|$)/gu, ' ')
@@ -177,6 +183,8 @@ export function extractTailPrices(line: string): TailPrices {
     const parsed = tokenValue(raw);
     if (!parsed) break;
     let head = s.slice(0, s.length - raw.length);
+    // Fracciones ("Cerveza 1/3", "Pollo (1/2)"): no son precios
+    if (!parsed.hasDecimals && /\d\s?\/\s?$/.test(head)) break;
     // Moneda delante: "€ 12,50", "€12"
     const pre = /(?:€|eur)\s?$/i.exec(head);
     if (pre) {
@@ -215,8 +223,8 @@ export interface PickedPrice {
 function plausible(t: PriceToken): boolean {
   if (t.value <= 0) return false;
   if (t.hasDecimals) return t.value >= 0.2 && t.value <= 5000;
-  // Enteros: 1–999, sin años (1990–2035 son añadas de vino) y sin "nº 2", "para 2"
-  if (t.value < 1 || t.value > 999) return false;
+  // Enteros: 1–999 (hasta 9999 con €: coma perdida por el OCR, se corrige después), sin añadas ni "nº 2", "para 2"
+  if (t.value < 1 || t.value > (t.currency ? 9999 : 999)) return false;
   if (QUALIFIER_WORDS.has(t.wordBefore)) return false;
   return true;
 }
@@ -235,25 +243,27 @@ export function pickPrice(tail: TailPrices, multiContext = false): (PickedPrice 
   const n = toks.length;
   if (n >= 2) {
     const prev = toks[n - 2];
-    // "6 50" → 6,50 (coma perdida)
-    if (!prev.hasDecimals && !last.hasDecimals && !last.gapBefore && !prev.currency && /^\d{1,2}$/.test(prev.raw) && /^\d{2}$/.test(last.raw) && !tail.labels.length) {
+    // "6 50" / "16 50" → 6,50 / 16,50 (el OCR perdió la coma): dos enteros juntos con proporción imposible para media/ración
+    if (!prev.hasDecimals && !last.hasDecimals && !last.gapBefore && !prev.currency && plausible(prev) && /^\d{1,2}$/.test(prev.raw) && /^\d{2}$/.test(last.raw) && !tail.labels.length && !multiContext) {
       const merged = Number(`${prev.raw}.${last.raw}`);
-      const ratio = prev.value / last.value;
-      if (ratio < 0.2 && merged >= 0.5) return { price: merged, used: 2, multi: false, corrected: true, merged: true, dropped: 0 };
+      if (prev.value / last.value < 0.5 && merged >= 0.5) return { price: merged, used: 2, multi: false, corrected: true, merged: true, dropped: 0 };
     }
-    const candidates = toks.filter(plausible);
-    const sameStyle = candidates.every((t) => t.hasDecimals === candidates[0].hasDecimals);
-    if (candidates.length >= 2 && candidates.includes(last)) {
-      const values = candidates.map((t) => t.value);
+    // Precios verosímiles contiguos al final (una añada "2016" o un "nº 2" delante vuelven al nombre)
+    let used = 0;
+    while (used < n && plausible(toks[n - 1 - used])) used++;
+    const cands = toks.slice(n - used);
+    if (cands.length >= 2) {
+      const values = cands.map((t) => t.value);
       const max = Math.max(...values);
-      const min = Math.min(...values);
-      const ratio = min / max;
-      if ((tail.labels.length > 0 || multiContext || sameStyle) && ratio >= 0.2 && ratio < 1) {
-        return { price: max, used: n, multi: true, corrected: candidates.some((t) => t.corrected), merged: false, dropped: 0 };
+      const ratio = Math.min(...values) / max;
+      const decimals = cands.every((t) => t.hasDecimals || t.currency);
+      const context = tail.labels.length > 0 || multiContext;
+      // Media / ración, tapa / ración, copa / botella: se queda el de la ración completa (el mayor)
+      if ((context && ratio >= 0.1 && ratio <= 1) || (decimals && ratio >= 0.2 && ratio <= 1) || (!decimals && ratio >= 0.5 && ratio <= 0.95)) {
+        return { price: max, used, multi: true, corrected: cands.some((t) => t.corrected), merged: false, dropped: 0 };
       }
-      if (ratio === 1 && sameStyle) return { price: max, used: n, multi: true, corrected: candidates.some((t) => t.corrected), merged: false, dropped: 0 };
     }
-    // Alérgenos numerados delante del precio
+    // Alérgenos numerados delante del precio ("1 3 7   9,50")
     if (last.hasDecimals || last.currency) {
       const before = toks.slice(0, -1);
       if (before.every((t) => !t.hasDecimals && t.value >= 1 && t.value <= 14 && !t.currency)) {
@@ -262,7 +272,6 @@ export function pickPrice(tail: TailPrices, multiContext = false): (PickedPrice 
     }
   }
   if (!plausible(last)) return undefined;
-  // Un entero pegado al nombre sin moneda ni hueco sólo vale si hay algo de nombre delante
   return { price: last.value, used: 1, multi: false, corrected: last.corrected, merged: false, dropped: 0 };
 }
 
@@ -271,13 +280,15 @@ export function pickPrice(tail: TailPrices, multiContext = false): (PickedPrice 
 const RE_WEB = /(www\.|https?:\/\/|\.(?:com|es|net|org|eu|cat|info)\b|@[a-z0-9_.]{3,}|\b[\w.-]+@[\w.-]+\.\w+|instagram|facebook|tiktok|twitter|tripadvisor|s[ií]guenos|google\s+maps)/i;
 const RE_TEL_WORD = /\b(?:tel[eé]fonos?|tel[fs]?\.?|tlfno?\.?|m[oó]vil|whatsapp|fax)\b/i;
 const RE_ADDRESS = /(?:^|[\s,])(?:c\/\s?\S|calle\s|avda\.?\s|av\.\s|avenida\s|plaza\s|pza\.?\s|paseo\s|p[º°o]\.?\s|ctra\.?\s|carretera\s|pol[ií]gono\s|urb\.\s|local\s+\d)/i;
-const RE_POSTCODE = /\b(?:0[1-9]|[1-4]\d|5[0-2])\d{3}\b\s+[A-ZÁÉÍÓÚ][a-záéíóúñ]+/;
+const RE_POSTCODE = /\b(?:0[1-9]|[1-4]\d|5[0-2])\d{3}\b\s+(?:[A-Z]\s)?[A-ZÁÉÍÓÚ][a-záéíóúñ]+/;
 const RE_TIME = /\b\d{1,2}[:h]\d{2}\s*h?\b|\b\d{1,2}[.:]\d{2}\s*(?:-|–|a|y)\s*\d{1,2}[.:]\d{2}\b|\bde\s+\d{1,2}\s*(?:a|-|–)\s*\d{1,2}\s*h\b/i;
 const RE_HOURS_WORD = /\b(?:horarios?|abierto|abrimos|cerrado|cerramos|descanso\s+semanal|cocina\s+(?:abierta|ininterrumpida|non\s+stop))\b/i;
 const RE_WEEKDAYS = /\b(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bados?|domingos?|festivos|l\s?-\s?[vd]|de\s+l\s+a\s+[vd])\b/i;
 const RE_INFO =
-  /\b(?:precios?\s+(?:en\s+euros|con\s+iva|iva|incluyen)|consulte|consultar\s+(?:al|la\s+carta\s+de)\s+al[eé]rgenos|informaci[oó]n\s+(?:sobre|de)\s+al[eé]rgenos|al[eé]rgenos|intoleranci|gracias\s+por|buen\s+provecho|bienvenid[oa]s?|wi-?fi|p[aá]gina\s+\d|p[aá]g\.\s?\d|servicio\s+(?:de\s+mesa|no\s+incluido)|no\s+se\s+(?:admiten|sirven)|reservas\s*:|reserv[ae]\s+(?:su|tu)\s+mesa|haga\s+su\s+reserva|hoja\s+de\s+reclamaciones|disponemos\s+de|a\s+su\s+disposici[oó]n|pan\s+y\s+servicio|todos\s+nuestros\s+precios)\b/i;
+  /\b(?:precios?\s+(?:en\s+euros|con\s+iva|iva|incluyen)|i\.?v\.?a\.?\s+incl\w*|impuestos\s+incluidos|consulte|consultar\s+(?:al|la\s+carta\s+de)\s+al[eé]rgenos|informaci[oó]n\s+(?:sobre|de)\s+al[eé]rgenos|al[eé]rgenos|intoleranci|gracias\s+por|buen\s+provecho|bienvenid[oa]s?|wi-?fi|p[aá]gina\s+\d|p[aá]g\.\s?\d|servicio\s+(?:de\s+mesa|no\s+incluido)|no\s+se\s+(?:admiten|sirven)|reservas\s*:|reserv[ae]\s+(?:su|tu)\s+mesa|haga\s+su\s+reserva|hoja\s+de\s+reclamaciones|disponemos\s+de|a\s+su\s+disposici[oó]n|pan\s+y\s+servicio|todos\s+nuestros\s+precios)\b/i;
 const ALLERGEN_WORDS = /\b(?:gluten|crust[aá]ceos?|huevos?|pescados?|cacahuetes?|soja|l[aá]cteos|leche|frutos\s+(?:secos|de\s+c[aá]scara)|apio|mostaza|s[eé]samo|sulfitos|altramuces|moluscos)\b/gi;
+/** Cargos que no son platos: servicio de pan, cubierto, suplementos. */
+export const RE_CHARGE = /^(?:servicio\s+de\s+(?:pan|mesa)|pan\s+y\s+(?:aperitivo|servicio)|cubierto|suplementos?\b|supl\.|extra\s+de\b)/i;
 /** Precio de mercado / sin precio fijo. */
 export const RE_MARKET_PRICE = /\b(?:s\s?\/\s?m|s\.m\.|seg[uú]n\s+mercado|precio\s+(?:de|seg[uú]n)\s+mercado|p\.?\s?m\.?\s+mercado|consultar(?:\s+precio)?|seg[uú]n\s+(?:peso|pieza|tama[ñn]o)|a\s+peso|p\.?v\.?p\.?\s+seg[uú]n\s+\w+)\b\.?/i;
 
@@ -388,12 +399,12 @@ function vocabMatch(folded: string): { exact: boolean; canonical?: string } | un
 /** Analiza una línea sin precio como posible cabecera de sección. undefined si no puede serlo. */
 export function sectionInfo(line: string): SectionInfo | undefined {
   let s = line.trim();
-  const decorated = /^[\s\-–~*=·•#_|:.«»"]{1,}\S/.test(s) && /\S[\s\-–~*=·•#_|:.«»"]{1,}$/.test(s) && /^[-–~*=·•#_|]/.test(s);
+  const decorated = /^[\s\-–—―~*=·•#_|:.«»"]{1,}\S/.test(s) && /\S[\s\-–—―~*=·•#_|:.«»"]{1,}$/.test(s) && /^[-–—―~*=·•#_|]/.test(s);
   const colon = /:\s*$/.test(s);
   const spaced = collapseSpacedLetters(s) !== s;
   s = collapseSpacedLetters(s)
-    .replace(/^[\s\-–~*=·•#_|:.«»"]+/, '')
-    .replace(/[\s\-–~*=·•#_|:.«»"]+$/, '')
+    .replace(/^[\s\-–—―~*=·•#_|:.«»"]+/, '')
+    .replace(/[\s\-–—―~*=·•#_|:.«»"]+$/, '')
     .replace(/\s*\([^)]*\)\s*$/, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -613,6 +624,22 @@ const MENU_ACCENTS: Record<string, string> = {
   atun: 'atún', champinon: 'champiñón', calabacin: 'calabacín', pina: 'piña', lechon: 'lechón', melon: 'melón',
 };
 
+/** "jamán" → "jamón": el OCR puso la tilde en otra vocal; sólo si la forma corregida es una palabra conocida. */
+function accentSwap(word: string): string {
+  const bare = word.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
+  if (!/[áéíóú]/i.test(bare) || isKnownFoodWord(bare)) return word;
+  const plain = fold(bare);
+  for (let i = 0; i < bare.length; i++) {
+    if (!/[áéíóúÁÉÍÓÚ]/.test(bare[i])) continue;
+    for (const v of 'aeiou') {
+      const cand = plain.slice(0, i) + v + plain.slice(i + 1);
+      const form = DISPLAY_FORMS[cand] ?? MENU_ACCENTS[cand];
+      if (cand !== plain && form) return word.replace(bare, withShape(bare, form));
+    }
+  }
+  return word;
+}
+
 /** Sustituciones típicas del OCR dentro de una palabra: "homo" → "horno" (rn ↔ m), "cl" ↔ "d", "li" ↔ "h". */
 const LETTER_CONFUSIONS: [string, string][] = [['m', 'rn'], ['rn', 'm'], ['cl', 'd'], ['d', 'cl'], ['h', 'li'], ['li', 'h'], ['vv', 'w']];
 
@@ -623,6 +650,14 @@ const LETTER_CONFUSIONS: [string, string][] = [['m', 'rn'], ['rn', 'm'], ['cl', 
  */
 export function fixOcrWord(w: string): string {
   let word = w;
+  // "¡amón" → "jamón": la jota cursiva se lee como "¡" dentro de un nombre
+  if (/^¡\p{Ll}{2,}/u.test(word)) {
+    const j = `j${word.slice(1)}`;
+    if (isKnownFoodWord(j) || accentSwap(j) !== j) word = j;
+  }
+  // Tilde en la vocal equivocada ("jamán" → "jamón")
+  const swapped = accentSwap(word);
+  if (swapped !== word) return swapped;
   if (/^[\p{L}]+[0-9][\p{L}]+$/u.test(word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ''))) {
     const tries = [word.replace(/0/g, 'o').replace(/1/g, 'l').replace(/5/g, 's').replace(/6/g, 'o').replace(/3/g, 'e').replace(/8/g, 'b'), word.replace(/1/g, 'i').replace(/0/g, 'o').replace(/6/g, 'o')];
     word = tries.find((t) => isKnownFoodWord(t)) ?? word.replace(/0/g, 'o').replace(/1/g, 'l').replace(/5/g, 's');
@@ -913,7 +948,9 @@ function groupRows(items: Item[]): MenuRow[] {
       const x = (seg.x0 + seg.x1) / 2;
       const dist = Math.abs(yAt(seg, x) - yAt(ref, x));
       const small = seg.h < 0.6 * ref.h;
-      const tol = 0.5 * (small ? ref.h : Math.min(seg.h, ref.h));
+      // Un precio alineado a la derecha está lejos del nombre: la inclinación residual pesa más → más tolerancia
+      const priceSeg = seg.items.every((i) => i.price || /^[€$]$/.test(i.text));
+      const tol = priceSeg && !ref.items.every((i) => i.price) ? 0.75 * ref.h : 0.5 * (small ? ref.h : Math.min(seg.h, ref.h));
       if (dist > tol || dist >= bestDist) continue;
       const collides = row.segs.some((o) => {
         const ov = Math.min(o.x1, seg.x1) - Math.max(o.x0, seg.x0);
@@ -983,17 +1020,29 @@ function groupRows(items: Item[]): MenuRow[] {
  * Devuelve una lista de filas por columna, en orden de lectura.
  */
 export function boxesToStreams(boxes: readonly MenuBox[]): MenuRow[][] {
-  const items = toItems(boxes);
-  if (!items.length) return [];
-  const slope = skewOf(items);
-  if (slope) {
-    const xRef = Math.min(...items.map((i) => i.x0));
-    for (const it of items) {
-      const d = slope * (it.cx - xRef);
-      it.y0 -= d;
-      it.y1 -= d;
-      it.cy -= d;
-    }
+  // Cada página / foto tiene sus propias coordenadas: se reconstruye por separado y en orden
+  const pages = new Map<number, MenuBox[]>();
+  for (const b of boxes) {
+    const p = Number.isFinite(b.page) ? (b.page as number) : 1;
+    const list = pages.get(p) ?? [];
+    list.push(b);
+    pages.set(p, list);
   }
-  return splitColumns(items).map(groupRows);
+  const out: MenuRow[][] = [];
+  for (const p of [...pages.keys()].sort((a, b) => a - b)) {
+    const items = toItems(pages.get(p) ?? []);
+    if (!items.length) continue;
+    const slope = skewOf(items);
+    if (slope) {
+      const xRef = Math.min(...items.map((i) => i.x0));
+      for (const it of items) {
+        const d = slope * (it.cx - xRef);
+        it.y0 -= d;
+        it.y1 -= d;
+        it.cy -= d;
+      }
+    }
+    out.push(...splitColumns(items).map(groupRows));
+  }
+  return out;
 }

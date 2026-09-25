@@ -77,7 +77,9 @@ export function fixOcrNumber(token: string): string | undefined {
   if (/^\d+[lgG]$/.test(body)) return undefined;
   const digits = (body.match(/\d/g) ?? []).length;
   const letters = body.replace(/[\d.,]/g, '').length;
-  if (letters > digits || letters > 2) return undefined;
+  // "18,OOO", "1O,OOO": ceros leídos como letra O (muy habitual en cantidades con 3 decimales)
+  const zeros = /^[\dOo]{1,4}[.,][\dOo]{1,3}$/.test(body) && /\d/.test(body) && !/[^\dOo.,]/.test(body);
+  if (!zeros && (letters > digits || letters > 2)) return undefined;
   // Un separador en el borde no es un decimal ("S." no es "5.")
   if (/^[.,]|[.,]$/.test(body)) return undefined;
   let fixed = '';

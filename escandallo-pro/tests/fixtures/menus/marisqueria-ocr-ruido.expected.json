@@ -1,0 +1,19 @@
+{
+  "method": "ocr",
+  "entries": [
+    { "section": "Pescados", "name": "Merluza de pincho a la gallega", "price": 18.5 },
+    { "section": "Pescados", "name": "Lubina salvaje a la espalda", "price": 20 },
+    { "section": "Pescados", "name": "Rodaballo al horno", "description": "Para 2" },
+    { "section": "Pescados", "name": "Lenguado a la meunière", "price": 24.5 },
+    { "section": "Mariscos", "name": "Zamburiñas a la plancha (6 uds)", "price": 14.5 },
+    { "section": "Mariscos", "name": "Navajas con ajo y perejil", "price": 16.5 },
+    { "section": "Mariscos", "name": "Gambas de Huelva cocidas", "price": 65 },
+    { "section": "Mariscos", "name": "Nécoras", "price": 5.5 },
+    { "section": "Mariscos", "name": "Almejas a la marinera", "price": 22 },
+    { "section": "Mariscos", "name": "Pulpo á feira", "price": 19, "description": "Con cachelos y aceite de oliva" },
+    { "section": "Postres", "name": "Filloas rellenas de crema", "price": 6.5 },
+    { "section": "Postres", "name": "Tarta de Santiago", "price": 5.9 },
+    { "section": "Postres", "name": "Queso de tetilla con membrillo", "price": 7 }
+  ],
+  "warningsInclude": ["por kg", "mal leídos por el OCR", "1 plato no tiene precio"]
+}

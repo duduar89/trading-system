@@ -1,0 +1,17 @@
+OBRADOR SAN JOSÉ · PANADERÍA Y PASTELERÍA
+Hnos. Gil Rubio, C.B.  ·  NIF E87332211
+C/ del Horno 7, 28004 Madrid  ·  Tel. 915 223 344
+ALBARÁN-FACTURA  Nº 3321                              FECHA  20/09/2026
+Cliente: Bar Cafetería Los Arcos
+
+Cant.   Concepto                                 P. Unit.      Total
+40      BARRA DE PAN RÚSTICA 250G                    0,55      22,00
+20      PAN DE HOGAZA 1KG                            2,10      42,00
+60      CRUASÁN DE MANTEQUILLA                       0,48      28,80
+12      TARTA DE QUESO RACIÓN                        2,90      34,80
+1       BIZCOCHO CASERO 1KG                          8,50       8,50
+30      PAN DE HAMBURGUESA BRIOCHE                   0,42      12,60
+
+                               Base imponible      148,70
+                               IVA 10%              14,87
+                               TOTAL               163,57

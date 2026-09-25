@@ -1,0 +1,19 @@
+{
+  "method": "ocr",
+  "entries": [
+    { "section": "Raciones", "name": "Croquetas de boletus", "price": 10.5 },
+    { "section": "Raciones", "name": "Calamares a la andaluza", "price": 15 },
+    { "section": "Raciones", "name": "Pulpo a la gallega", "price": 19.5 },
+    { "section": "Raciones", "name": "Oreja a la plancha", "price": 9 },
+    { "section": "Raciones", "name": "Pimientos de Padrón", "price": 7.5 },
+    { "section": "Ensaladas", "name": "Ensalada mixta", "price": 9 },
+    { "section": "Ensaladas", "name": "Ensalada de burrata con tomate raf", "price": 13.5 },
+    { "section": "Carnes a la brasa", "name": "Chuletón de vaca madurada (1 kg)", "price": 65 },
+    { "section": "Carnes a la brasa", "name": "Entrecot de añojo 350 g", "price": 24 },
+    { "section": "Carnes a la brasa", "name": "Secreto ibérico de bellota", "price": 19 },
+    { "section": "Carnes a la brasa", "name": "Cochinillo asado (1/4)", "price": 26 },
+    { "section": "Postres caseros", "name": "Tarta de queso al horno", "price": 6 },
+    { "section": "Postres caseros", "name": "Torrija con helado de vainilla", "price": 7 }
+  ],
+  "warningsInclude": ["por kg"]
+}

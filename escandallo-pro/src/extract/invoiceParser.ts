@@ -36,6 +36,8 @@ interface NumInfo {
   perUnit?: string;
   /** Corregido por confusión letra/cifra del OCR. */
   fixed?: string;
+  /** Corrección que cambia el valor (decimales perdidos, cifra mal leída): se avisa al usuario. Las letras por cifras ("1O,5O") no. */
+  repaired?: boolean;
 }
 
 interface Word {
@@ -87,6 +89,8 @@ interface NumTok {
   inDesc: boolean;
   lead: boolean;
   col?: ColKind;
+  /** La palabra anterior es texto (p. ej. "SACO 25KG"). */
+  afterText?: boolean;
 }
 
 interface Solution {
@@ -179,7 +183,7 @@ const NOISE_PREFIX = new Set(
 const HEADER_VOCAB: [ColKind, string[]][] = [
   ['desc', ['descripcion', 'descripcio', 'descrip', 'concepto', 'producto', 'productos', 'denominacion', 'detalle', 'designacion', 'mercancia', 'material', 'description', 'item', 'articulos']],
   ['code', ['codigo', 'cod', 'ref', 'referencia', 'ean', 'codi', 'code', 'sku', 'plu']],
-  ['qty', ['cantidad', 'cant', 'cantid', 'uds', 'unidades', 'unids', 'kilos', 'kgs', 'peso', 'piezas', 'nuds', 'quantitat', 'qty', 'quantity', 'cantidades']],
+  ['qty', ['cantidad', 'cant', 'cantid', 'uds', 'unidades', 'unids', 'kilos', 'kgs', 'kg', 'litros', 'lts', 'peso', 'piezas', 'nuds', 'quantitat', 'qty', 'quantity', 'cantidades']],
   ['bultos', ['bultos', 'bulto', 'cajas', 'bult', 'envases']],
   ['unit', ['ud', 'um', 'unidad', 'medida', 'formato', 'unit', 'u']],
   ['price', ['precio', 'preciounit', 'preciounitario', 'punit', 'pu', 'pvp', 'tarifa', 'unitario', 'prunit', 'precunit', 'pud', 'preu', 'price', 'prec', 'precioud', 'preciokg', 'eurud', 'eurkg']],
@@ -255,7 +259,9 @@ function parseWordNumber(raw: string, allowOcr: boolean): NumInfo | undefined {
     perUnit = UNIT_WORDS[per[2].toLowerCase()] ?? per[2].toLowerCase();
   } else {
     const gl = RE_GLUED_UNIT.exec(s);
-    if (gl && !pct) {
+    // OCR: "124,1l" es 124,11 (una "l" minúscula tras un solo decimal es un 1, no litros)
+    const ocrOne = allowOcr && gl && gl[2] === 'l' && /[.,]\d$/.test(gl[1]);
+    if (gl && !pct && !ocrOne) {
       s = gl[1];
       unit = UNIT_WORDS[gl[2].toLowerCase()] ?? gl[2].toLowerCase();
     }
@@ -489,6 +495,11 @@ function numTokens(row: Row, startWord: number, header?: TableHeader): NumTok[] 
   }
   for (let wi = startWord; wi < words.length; wi++) {
     const w = words[wi];
+    if (!w.num && row.ocr && wi > lastText && lastText >= 0 && /^[SOlIB]$/.test(w.raw)) {
+      // OCR: cifra suelta leída como letra en la zona numérica ("S  MALLA  1,35  6,75")
+      const digit = ({ S: '5', O: '0', l: '1', I: '1', B: '8' } as Record<string, string>)[w.raw];
+      w.num = { value: Number(digit), dec: 0, pct: false, cur: false, fixed: digit };
+    }
     if (!w.num) continue;
     const prev = words[wi - 1];
     if (prev && !prev.num && NOISE_PREFIX.has(prev.f.replace(/[^a-z]/g, ''))) continue;
@@ -499,7 +510,7 @@ function numTokens(row: Row, startWord: number, header?: TableHeader): NumTok[] 
     const inDesc = lastText > wi;
     const lead = firstText === -1 || wi < firstText;
     const col = header ? columnOf(w, header, row.cw) : undefined;
-    out.push({ wi, w, n: w.num, value: w.num.value, inDesc: inDesc && !lead, lead: lead && firstText !== -1, col });
+    out.push({ wi, w, n: w.num, value: w.num.value, inDesc: inDesc && !lead, lead: lead && firstText !== -1, col, afterText: !!prev && !prev.num && /\p{L}{2,}/u.test(prev.raw) });
   }
   return out;
 }
@@ -578,8 +589,9 @@ function solveTokens(toks: NumTok[], opts: SolveOpts): Solution | undefined {
     if (q.n.unit) score += 1.5;
     if (p.n.perUnit) score += 1.5;
     if (Math.abs(q.value) >= 10000) score -= 5;
-    // "SACO 25KG  25,000 KG": el formato de la descripción repite la cantidad; la buena es la de más a la derecha
-    if (cands.some((o) => o !== q && o !== p && o.wi > q.wi && o.wi < t.wi && Math.abs(o.value - q.value) < 1e-9)) score -= 4;
+    // "SACO 25KG  25,000 KG" / "1  BIZCOCHO 1KG": un formato pegado a la descripción que repite el valor de otro número
+    // es parte de la descripción; la cantidad es el otro
+    if (q.n.unit && q.afterText && cands.some((o) => o !== q && o !== p && o !== t && Math.abs(o.value - q.value) < 1e-9)) score -= 4;
     if (q.n.fixed) score -= 1.5;
     if (p.n.fixed) score -= 1.5;
     if (t.n.fixed) score -= 1.5;
@@ -648,13 +660,13 @@ function repairVariants(toks: NumTok[], row: Row): NumTok[][] {
         const v = round(t.value / div, 4);
         const dec = div === 100 ? 2 : div === 1000 ? 3 : 1;
         const fixed = `${Math.trunc(v)},${String(Math.round((v % 1) * div)).padStart(dec, '0')}`;
-        variants.push(toks.map((x, i) => (i === k ? { ...x, value: v, n: { ...x.n, value: v, dec, fixed } } : x)));
+        variants.push(toks.map((x, i) => (i === k ? { ...x, value: v, n: { ...x.n, value: v, dec, fixed, repaired: true } } : x)));
       }
     }
     // "1.250" leído como miles cuando era 1,250 kg
     if (t.n.dec === 0 && /^\d{1,3}[.]\d{3}$/.test(raw)) {
       const v = t.value / 1000;
-      variants.push(toks.map((x, i) => (i === k ? { ...x, value: v, n: { ...x.n, value: v, dec: 3, fixed: raw.replace('.', ',') } } : x)));
+      variants.push(toks.map((x, i) => (i === k ? { ...x, value: v, n: { ...x.n, value: v, dec: 3, fixed: raw.replace('.', ','), repaired: true } } : x)));
     }
     // Dos tokens contiguos "12" "50" → 12,50
     const nx = toks[k + 1];
@@ -663,7 +675,7 @@ function repairVariants(toks: NumTok[], row: Row): NumTok[][] {
       const b = nx.w.raw.replace(/[^\d]/g, '');
       if (/^\d{1,4}$/.test(a) && /^\d{2,3}$/.test(b) && row.words[t.wi].x1 <= row.words[nx.wi].x0) {
         const v = Number(`${a}.${b}`);
-        const merged: NumTok = { ...t, value: v, n: { ...t.n, value: v, dec: b.length, fixed: `${a},${b}`, cur: t.n.cur || nx.n.cur } };
+        const merged: NumTok = { ...t, value: v, n: { ...t.n, value: v, dec: b.length, fixed: `${a},${b}`, cur: t.n.cur || nx.n.cur, repaired: true } };
         variants.push([...toks.slice(0, k), merged, ...toks.slice(k + 2)]);
       }
     }
@@ -745,7 +757,7 @@ function digitRepairAll(toks: NumTok[], opts: RepairOpts): { sol: Solution; dist
   const push = (q: NumTok, p: NumTok, t: NumTok, d: NumTok[], fixedTok: NumTok, value: number, dist: number) => {
     const dec = fixedTok === t ? 2 : fixedTok.n.dec;
     const fixedStr = value.toFixed(dec).replace('.', ',');
-    const repl: NumTok = { ...fixedTok, value, n: { ...fixedTok.n, value, fixed: fixedStr } };
+    const repl: NumTok = { ...fixedTok, value, n: { ...fixedTok.n, value, fixed: fixedStr, repaired: true } };
     const sol: Solution = {
       q: fixedTok === q ? repl : q,
       p: fixedTok === p ? repl : p,
@@ -827,7 +839,22 @@ function normUnit(u: string): string {
   return mapped || k || 'ud';
 }
 
-function buildLine(row: Row, codeEnd: number, code: string | undefined, sol: Solution, toks: NumTok[], confidence: number, warnings: string[]): ParsedLine {
+/** Unidad indicada en la cabecera de la columna ("Kilos", "Kg", "Uds.", "Cajas", "Precio/kg"). */
+function headerUnit(header: TableHeader | undefined, sol: Solution): string | undefined {
+  if (!header) return undefined;
+  for (const tok of [sol.q, sol.p]) {
+    if (!tok.col) continue;
+    const col = header.cols.find((c) => c.kind === tok.col);
+    if (!col) continue;
+    const m = /(kg|kgs|kilos?|litros?|lts?|uds|unidades|piezas|cajas)$/.exec(col.label);
+    if (!m) continue;
+    const u = UNIT_WORDS[m[1]] ?? (m[1].startsWith('kilo') ? 'kg' : m[1].startsWith('litro') ? 'l' : undefined);
+    if (u) return u;
+  }
+  return undefined;
+}
+
+function buildLine(row: Row, codeEnd: number, code: string | undefined, sol: Solution, toks: NumTok[], confidence: number, warnings: string[], header?: TableHeader): ParsedLine {
   const words = row.words;
   const used = new Set<number>([sol.q.wi, sol.p.wi, sol.t.wi, ...sol.d.map((d) => d.wi)]);
   if (sol.f) used.add(sol.f.wi);
@@ -873,8 +900,8 @@ function buildLine(row: Row, codeEnd: number, code: string | undefined, sol: Sol
   if (!unit && sol.p.n.perUnit) unit = sol.p.n.perUnit;
   if (!unit && qi > 0 && unitOf(words[qi - 1]) !== undefined && !words[qi - 1].num && qi - 1 >= codeEnd) {
     const cand = words[qi - 1];
-    // Sólo si no forma parte de un formato ("SACO 25 KG")
-    if (!words[qi - 2]?.num) {
+    // Sólo si no forma parte de un formato ("SACO 25 KG", "PIEZA 2-3 KG")
+    if (!/\d/.test(words[qi - 2]?.raw ?? '')) {
       unit = unitOf(cand) || fold(cand.raw);
       unitWi = qi - 1;
     }
@@ -908,6 +935,7 @@ function buildLine(row: Row, codeEnd: number, code: string | undefined, sol: Sol
     const u = unitOf(lastW);
     if (u) unit = u;
   }
+  if (!unit) unit = headerUnit(header, sol);
   if (!unit) unit = sol.q.n.dec === 3 && !Number.isInteger(sol.q.value) ? 'kg' : 'ud';
   let description = collapseSpaces(descWords.map((w) => w.raw).join(' ')).replace(/[\s.·:|_-]+$/, '').replace(/^[\s.·:|_-]+/, '');
 
@@ -921,7 +949,7 @@ function buildLine(row: Row, codeEnd: number, code: string | undefined, sol: Sol
   }
   let discountPct: number | undefined;
   if (sol.d.length) discountPct = round((1 - sol.d.reduce((acc, d) => acc * (1 - d.value / 100), 1)) * 100, 2);
-  const fixes = [sol.q, sol.p, sol.t, ...sol.d].filter((t) => t.n.fixed && t.wi < words.length).map((t) => `"${t.w.raw}" → ${t.n.fixed}`);
+  const fixes = [sol.q, sol.p, sol.t, ...sol.d].filter((t) => t.n.repaired && t.wi < words.length).map((t) => `"${t.w.raw}" → ${t.n.fixed}`);
   if (fixes.length) warnings.push(`Lectura corregida por la validación aritmética: ${fixes.join(', ')}`);
   if (sol.t.wi >= words.length) warnings.push('Importe ilegible: calculado a partir de la base imponible');
   quantity = round(quantity, 4);
@@ -956,7 +984,9 @@ function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): 
   const { end: codeEnd, code } = leadingCode(words);
   const toks = numTokens(row, codeEnd, header);
   const hasText = words.some((w, k) => k >= codeEnd && isTexty(w));
-  if (!toks.length || toks.every((t) => t.inDesc)) return { textOnly: hasText };
+  // Para continuaciones cuentan también las palabras de envase ("GARRAFA 5 LITROS")
+  const hasLetters = hasText || words.some((w, k) => k >= codeEnd && !w.num && /\p{L}{3,}/u.test(w.raw));
+  if (!toks.length || toks.every((t) => t.inDesc)) return { textOnly: hasLetters };
 
   let sol = solveTokens(toks, { header });
   let conf = 1;
@@ -997,12 +1027,15 @@ function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): 
   }
   if (sol) {
     if ([sol.q, sol.p, sol.t, ...sol.d].some((t) => t.n.fixed)) conf = Math.min(conf, 0.85);
-    const line = buildLine(row, codeEnd, code, sol, toks, conf, warnings);
+    const line = buildLine(row, codeEnd, code, sol, toks, conf, warnings, header);
     // Sin validar del todo: puede corregirse después con la base imponible o con otra lectura
     if (ocrLoose) line.validated = false;
     return { line };
   }
-  if (!inTable || !hasText) return { textOnly: hasText && toks.every((t) => t.inDesc) };
+  if (!inTable || !hasText) {
+    const loneInt = toks.length === 1 && toks[0].n.dec === 0 && !toks[0].n.cur && Math.abs(toks[0].value) < 1000;
+    return { textOnly: hasLetters && (toks.every((t) => t.inDesc) || loneInt) };
+  }
 
   // Sin validación: asignación plausible por columnas o por orden
   const tail = toks.filter((t) => !t.inDesc && !t.n.pct);
@@ -1043,7 +1076,7 @@ function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): 
     warnings.push('Cantidad calculada a partir del importe y el precio');
   }
   const solution: Solution = { q: q as NumTok, p: p as NumTok, t, d: d ? [d] : [], err: Infinity, validated: false, loose: false, score: 0 };
-  const line = buildLine(row, codeEnd, code, solution, toks, confidence, warnings);
+  const line = buildLine(row, codeEnd, code, solution, toks, confidence, warnings, header);
   line.validated = false;
   return { line };
 }
@@ -1088,10 +1121,18 @@ interface TaxIdHit {
   valid: boolean;
 }
 
+/** OCR: letras leídas en lugar de cifras dentro de un CIF ("B394S6781" → "B39456781"). */
+function fixTaxIdDigits(text: string): string {
+  return text.replace(/\b([ABCDEFGHJKLMNPQRSUVWXYZ])([0-9OSIlB]{7})([0-9A-J])\b/g, (m, a: string, mid: string, c: string) => {
+    if ((mid.match(/\d/g) ?? []).length < 5) return m;
+    return `${a}${mid.replace(/[OSIlB]/g, (ch) => ({ O: '0', S: '5', I: '1', l: '1', B: '8' })[ch] ?? ch)}${c}`;
+  });
+}
+
 function findTaxIds(rows: Row[]): TaxIdHit[] {
   const out: TaxIdHit[] = [];
   for (const row of rows) {
-    const text = row.text.toUpperCase();
+    const text = row.ocr ? fixTaxIdDigits(row.text).toUpperCase() : row.text.toUpperCase();
     const push = (id: string, index: number, valid: boolean) => {
       if (out.some((h) => h.id === id && h.row === row.i)) return;
       const w = row.words.find((wd) => row.positional ? false : wd.x0 <= index && index < wd.x1 + 1);
@@ -1309,7 +1350,14 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
     if (!m) return;
     const x = row.positional ? xAtChar(row, m.index) : m.index;
     customerX = customerX === undefined ? x : Math.min(customerX, x);
-    for (let k = row.i; k <= row.i + 4 && k < allRows.length; k++) customerRows.add(k);
+    customerRows.add(row.i);
+    // El bloque del cliente sigue en las filas de debajo (dirección, CIF) hasta una línea en blanco o la razón social
+    // de otra empresa (el proveedor)
+    for (let k = row.i + 1; k <= row.i + 4 && k < allRows.length; k++) {
+      const next = allRows[k];
+      if (!next.f.trim() || (COMPANY_SUFFIX_RE.test(fold(collapseSpaces(next.text))) && !CUSTOMER_RE.test(next.f))) break;
+      customerRows.add(k);
+    }
   });
   const isCustomerPos = (rowIdx: number, x: number) => {
     if (!customerRows.has(rowIdx)) return false;
@@ -1504,7 +1552,7 @@ function parseTotals(rows: Row[]): Totals {
       for (const V of vatCands) {
         for (const R of reCands) {
           if (V === 0 && R === 0 && S !== T) continue;
-          if (approxEqual(S + V + R, T, 0.021, 0.0005)) {
+          if (Math.abs(S + V + R - T) <= 0.021) {
             subtotal = S;
             vatTotal = V;
             reTotal = R || undefined;
@@ -1521,7 +1569,16 @@ function parseTotals(rows: Row[]): Totals {
     reTotal = triRe ?? labeled.re[0];
     if (subtotal !== undefined && vatTotal !== undefined) {
       const computed = round(subtotal + vatTotal + (reTotal ?? 0), 2);
-      total = totalCands.find((T) => approxEqual(T, computed, 0.05, 0.001)) ?? computed;
+      const S = subtotal;
+      total = totalCands.find((T) => Math.abs(T - computed) <= 0.021);
+      if (total === undefined) {
+        // Cuota mal leída (59,06 por 59,66): si base × tipo cuadra con total − base, manda la aritmética
+        const T = totalCands.find((c) => c > S && rates.length === 1 && approxEqual((S * rates[0]) / 100, c - S - (reTotal ?? 0), 0.02, 0.001));
+        if (T !== undefined) {
+          total = T;
+          vatTotal = round(T - S - (reTotal ?? 0), 2);
+        } else total = computed;
+      }
     } else if (totalCands.length) {
       total = totalCands[0];
       if (subtotal === undefined && vatTotal !== undefined) subtotal = round(total - vatTotal - (reTotal ?? 0), 2);
@@ -1581,8 +1638,8 @@ function repairCandidates(row: Row, header: TableHeader | undefined, target?: nu
  */
 function repairWithSubtotal(parsed: ParsedLine[], rows: Row[], header: TableHeader | undefined, target: number): void {
   const sumNow = () => round(parsed.reduce((s, l) => s + l.total, 0), 2);
-  if (!approxEqual(sumNow(), target, 0.02, 0.001)) combineRepairs(parsed, rows, header, target);
-  if (!approxEqual(sumNow(), target, 0.011, 0.0005)) return;
+  if (!sumMatches(sumNow(), target)) combineRepairs(parsed, rows, header, target);
+  if (!sumMatches(sumNow(), target)) return;
   // La suma ya cuadra: el importe de cada línea débil queda confirmado; se corrige la cantidad o el precio mal leídos
   for (const l of parsed) {
     if (l.validated) continue;
@@ -1592,10 +1649,12 @@ function repairWithSubtotal(parsed: ParsedLine[], rows: Row[], header: TableHead
     const toks = numTokens(row, codeEnd, header);
     const sol = digitRepair(toks, { header, targetTotal: l.total, maxDist: 2, row });
     if (!sol || !approxEqual(sol.t.value, l.total, 0.005, 0)) continue;
-    const fixedLine = buildLine(row, codeEnd, code, sol, toks, 0.8, ['Corregida para cuadrar con la base imponible']);
+    const fixedLine = buildLine(row, codeEnd, code, sol, toks, 0.8, ['Corregida para cuadrar con la base imponible'], header);
     if (l.rows.length > 1) fixedLine.description = l.description;
     fixedLine.rows = l.rows;
     fixedLine.validated = true;
+    fixedLine.vatPct ??= l.vatPct;
+    fixedLine.vatCode ??= l.vatCode;
     Object.assign(l, fixedLine);
   }
 }
@@ -1614,7 +1673,7 @@ function combineRepairs(parsed: ParsedLine[], rows: Row[], header: TableHeader |
   const walk = (i: number, combo: (RepairCand | undefined)[], sum: number, cost: number) => {
     if (i === weak.length) {
       if (combo.every((c) => !c)) return;
-      if (!approxEqual(sum, needed, 0.011, 0.0005)) return;
+      if (Math.abs(sum - needed) > 0.011) return;
       if (!best || cost < best.cost - 1e-9) {
         best = { combo: [...combo], cost };
         tie = false;
@@ -1638,11 +1697,13 @@ function combineRepairs(parsed: ParsedLine[], rows: Row[], header: TableHeader |
     const l = weak[k];
     const row = rows[l.row];
     const { end: codeEnd, code } = leadingCode(row.words);
-    const fixedLine = buildLine(row, codeEnd, code, cand.sol, cand.toks, 0.8, ['Corregida para cuadrar con la base imponible']);
+    const fixedLine = buildLine(row, codeEnd, code, cand.sol, cand.toks, 0.8, ['Corregida para cuadrar con la base imponible'], header);
     // Si la descripción venía de varias filas (continuaciones), se conserva la completa
     if (l.rows.length > 1) fixedLine.description = l.description;
     fixedLine.rows = l.rows;
     fixedLine.validated = true;
+    fixedLine.vatPct ??= l.vatPct;
+    fixedLine.vatCode ??= l.vatCode;
     Object.assign(l, fixedLine);
   });
 }
@@ -1701,12 +1762,17 @@ function isMetaRow(row: Row): boolean {
   return false;
 }
 
+/** ¿La suma de líneas cuadra con la base imponible? (3 céntimos de margen para redondeos por línea). */
+export function sumMatches(sum: number, subtotal: number): boolean {
+  return Math.abs(sum - subtotal) <= 0.03 + 1e-9;
+}
+
 /** Puntuación de calidad de una extracción (para elegir entre pasadas de OCR). */
 export function invoiceQuality(inv: ExtractedInvoice): number {
   const validated = inv.lines.filter((l) => (l.confidence ?? 0) >= 0.8).length;
   const weak = inv.lines.length - validated;
   const sum = inv.lines.reduce((s, l) => s + (l.total || 0), 0);
-  const sumOk = inv.subtotal !== undefined && approxEqual(sum, inv.subtotal, 0.05, 0.005);
+  const sumOk = inv.subtotal !== undefined && sumMatches(sum, inv.subtotal);
   return validated * 10 - weak * 3 + (sumOk ? 25 : 0) + (inv.supplierName ? 2 : 0) + (inv.date ? 2 : 0) + (inv.total !== undefined ? 2 : 0);
 }
 
@@ -1735,8 +1801,12 @@ function summaryWarnings(inv: ExtractedInvoice, r: Pick<InvoiceReading, 'extrasS
   const weakCount = lines.filter((l) => (l.confidence ?? 1) < 0.8).length;
   if (weakCount) out.push(weakCount === 1 ? '1 línea no se ha podido validar (cantidad × precio ≠ importe): revísala' : `${weakCount} líneas no se han podido validar (cantidad × precio ≠ importe): revísalas`);
   const sum = round(lines.reduce((s, l) => s + l.total, 0) + r.extrasSum - r.globalDiscount, 2);
-  if (lines.length && inv.subtotal !== undefined && !approxEqual(sum, inv.subtotal, 0.02, 0.01) && !r.vatIncluded) {
-    out.push(`La suma de las líneas (${eurEs(sum)}) no cuadra con la base imponible (${eurEs(inv.subtotal)}): puede faltar alguna línea`);
+  if (lines.length && inv.subtotal !== undefined && !sumMatches(sum, inv.subtotal) && !r.vatIncluded) {
+    out.push(
+      approxEqual(sum, inv.subtotal, 0.02, 0.01)
+        ? `La suma de las líneas (${eurEs(sum)}) difiere de la base imponible (${eurEs(inv.subtotal)}) en ${eurEs(Math.abs(sum - inv.subtotal))}: revisa los importes`
+        : `La suma de las líneas (${eurEs(sum)}) no cuadra con la base imponible (${eurEs(inv.subtotal)}): puede faltar alguna línea`,
+    );
   }
   if (!inv.date) out.push('No se ha encontrado la fecha de la factura');
   if (!inv.supplierName) out.push('No se ha encontrado el nombre del proveedor');
@@ -1765,6 +1835,50 @@ function descSimilarity(a: string, b: string): number {
 }
 
 const isValidatedLine = (l: Line) => (l.confidence ?? 0) >= 0.8;
+
+/** Cambia hasta 3 líneas por lecturas alternativas (validadas, misma descripción) para que la suma cuadre con `target`. */
+function swapToMatchSum(lines: Line[], alternatives: Line[][], target: number): void {
+  const sumOf = () => round(lines.reduce((s, l) => s + l.total, 0), 2);
+  if (sumMatches(sumOf(), target)) return;
+  const alts: Line[][] = lines.map((l) => {
+    const out: Line[] = [];
+    for (const list of alternatives) {
+      for (const c of list) {
+        if (!isValidatedLine(c) || descSimilarity(l.description, c.description) < 0.6) continue;
+        if (approxEqual(c.total, l.total, 0.005, 0) && approxEqual(c.quantity, l.quantity, 0.0005, 0) && approxEqual(c.unitPrice, l.unitPrice, 0.00005, 0)) continue;
+        if (out.some((o) => o.total === c.total && o.quantity === c.quantity && o.unitPrice === c.unitPrice)) continue;
+        out.push(c);
+      }
+    }
+    return out.slice(0, 4);
+  });
+  const base = sumOf();
+  const idx = lines.map((_, i) => i).filter((i) => alts[i].length);
+  if (!idx.length) return;
+  const found: { swaps: [number, Line][] }[] = [];
+  const maxSwaps = idx.length <= 15 ? 3 : 2;
+  const walk = (start: number, swaps: [number, Line][], delta: number) => {
+    if (swaps.length && Math.abs(base + delta - target) <= 0.011) {
+      found.push({ swaps: [...swaps] });
+      return;
+    }
+    if (swaps.length >= maxSwaps) return;
+    for (let k = start; k < idx.length; k++) {
+      const i = idx[k];
+      for (const c of alts[i]) {
+        swaps.push([i, c]);
+        walk(k + 1, swaps, delta + c.total - lines[i].total);
+        swaps.pop();
+      }
+    }
+  };
+  walk(0, [], 0);
+  if (!found.length) return;
+  const minSwaps = Math.min(...found.map((f) => f.swaps.length));
+  const best = found.filter((f) => f.swaps.length === minSwaps);
+  if (best.length > 1) return;
+  for (const [i, c] of best[0].swaps) lines[i] = { ...c, warnings: [...(c.warnings ?? [])] };
+}
 
 /**
  * Combina varias lecturas del MISMO documento (p. ej. pasadas de OCR con distinta segmentación o binarización).
@@ -1826,6 +1940,13 @@ export function mergeInvoiceReadings(readings: InvoiceReading[]): InvoiceReading
         }
       });
     }
+  }
+
+  // 2b) La suma no cuadra con la base imponible aunque cada línea cuadre (el OCR puede leer mal dos campos de forma
+  //     coherente): se prueban las lecturas alternativas validadas de otras pasadas que hacen cuadrar la suma
+  if (subtotal !== undefined) {
+    const target = round(subtotal - first.extrasSum + first.globalDiscount, 2);
+    swapToMatchSum(lines, others.map((r) => r.invoice.lines), target);
   }
 
   // 3) Cabecera y totales
@@ -1987,7 +2108,7 @@ export function parseInvoiceReading(input: { text: string; lines?: string[] }, m
   }
   if (pending.length && parsed.length) {
     const prev = parsed[parsed.length - 1];
-    const sectionLike = pending.every((r) => isAllCaps(r.text) && r.words.length <= 3);
+    const sectionLike = pending.every((r) => isAllCaps(r.text) && r.words.length <= 3 && !r.words.some((w) => w.num));
     if (!sectionLike && pending[0].i - prev.rows[prev.rows.length - 1] <= 2) flushPendingInto(prev);
     pending = [];
   }

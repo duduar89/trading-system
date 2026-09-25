@@ -1,0 +1,25 @@
+{
+  "headerRow": 3,
+  "mapping": { "description": 4, "quantity": 5, "unit": 6, "unitPrice": 7, "total": 8, "code": 3, "date": 0, "supplier": 1, "invoiceNumber": 2 },
+  "invoices": [
+    {
+      "supplierName": "Frutas García S.L.", "number": "FG-2025/0312", "date": "2025-03-03", "subtotal": 42.9,
+      "lines": [
+        { "description": "TOMATE PERA CAT.I", "code": "00123", "quantity": 12.5, "unit": "kg", "unitPrice": 1.2, "total": 15, "pricePerBase": 1.2 },
+        { "description": "CEBOLLA DULCE MALLA 5KG", "code": "00145", "quantity": 2, "unit": "malla", "unitPrice": 4.5, "total": 9, "pricePerBase": 0.9 },
+        { "description": "LIMÓN \"VERNA\" CAJA 10 KG", "code": "00210", "quantity": 1, "unit": "caja", "unitPrice": 18.9, "total": 18.9, "pricePerBase": 1.89 }
+      ]
+    },
+    {
+      "supplierName": "Carnes Guadarrama", "number": "CG-8841", "date": "2025-03-05", "subtotal": 131.83,
+      "lines": [
+        { "description": "SOLOMILLO TERNERA NAC.", "code": "4455", "quantity": 3.25, "unit": "kg", "unitPrice": 28.5, "total": 92.63, "pricePerBase": 28.501538 },
+        { "description": "CARRILLERA CERDO IBÉRICO", "code": "4460", "quantity": 4, "unit": "kg", "unitPrice": 9.8, "total": 39.2, "pricePerBase": 9.8 }
+      ]
+    },
+    {
+      "supplierName": "Carnes Guadarrama", "number": "CG-8842", "date": "2025-03-05", "subtotal": 13.2,
+      "lines": [{ "description": "HUEVOS M 30 UDS", "code": "4471", "quantity": 2, "unit": "bandeja", "unitPrice": 6.6, "total": 13.2, "pricePerBase": 0.22 }]
+    }
+  ]
+}

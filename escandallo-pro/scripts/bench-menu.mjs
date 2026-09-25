@@ -124,7 +124,7 @@ async function makeVariant(spec) {
  * Preprocesado equivalente al de la app (src/extract/ocr.ts → preprocessImage): escala de grises, estiramiento de
  * contraste por percentiles y ampliación para que el texto tenga altura suficiente para el OCR.
  */
-async function preprocess(buffer, target = Number(option('target') ?? 1800), sharpen = Number(option('sharpen') ?? 0)) {
+async function preprocess(buffer, target = Number(option('target') ?? 2200), sharpen = Number(option('sharpen') ?? 0)) {
   const url = await page.evaluate(
     async ({ src, target, sharpen }) => {
       const img = new Image();
@@ -235,6 +235,7 @@ for (const v of VARIANTS) {
   const raw = v.spec ? await makeVariant(v.spec) : fs.readFileSync(sourceImage);
   fs.writeFileSync(path.join(variantsDir, `${v.name}.jpg`), raw);
   const img = await preprocess(raw);
+  fs.writeFileSync(path.join(variantsDir, `${v.name}.pre.png`), img);
   // Como en la app: varias pasadas de OCR (PSM 6 = bloque uniforme, 11 = texto disperso, 4 = una columna), se elige la de
   // mayor calidad estimada (sin conocer la verdad) y se completa con las demás.
   const passes = [];
@@ -247,6 +248,11 @@ for (const v of VARIANTS) {
     if (passes.length >= 2 && priced >= 8 && passes.some((p) => p !== passes.at(-1) && p.menu.entries.filter((e) => e.price !== undefined).length >= 8)) break;
   }
   passes.sort((a, b) => b.q - a.q);
+  if (flag('passes'))
+    for (const p of passes) {
+      console.log(`   · pasada PSM ${p.psm} (calidad ${p.q})`);
+      for (const e of p.menu.entries) console.log(`       [${e.section ?? '—'}] ${e.name} | ${e.price ?? '—'} | ${e.confidence}`);
+    }
   const merged = mergeMenuPasses(passes.map((p) => p.menu));
   const top = passes[0];
   const best = { psm: passes.map((p) => p.psm).join('+'), menu: merged, s: score(merged), conf: top.o.confidence, ms: Date.now() - tv, text: top.o.text, words: top.o.words };

@@ -1,0 +1,11 @@
+Listado de compras por proveedor;;;;;;;;
+Periodo: 01/03/2025 - 31/03/2025;;;;;;;;
+;;;;;;;;
+Fecha;Proveedor;Nº Factura;Código;Descripción;Cantidad;U.M.;Precio;Importe
+03/03/2025;Frutas García S.L.;FG-2025/0312;00123;TOMATE PERA CAT.I;12,5;kg;1,20;15,00
+;;;00145;CEBOLLA DULCE MALLA 5KG;2;malla;4,50;9,00
+;;;00210;"LIMÓN ""VERNA"" CAJA 10 KG";1;caja;18,90;18,90
+05/03/2025;Carnes Guadarrama;CG-8841;4455;SOLOMILLO TERNERA NAC.;3,250;kg;28,50;92,63
+;;;4460;CARRILLERA CERDO IBÉRICO;4;kg;9,80;39,20
+05/03/2025;Carnes Guadarrama;CG-8842;4471;HUEVOS M 30 UDS;2;bandeja;6,60;13,20
+;;;;Total;;;;145,03

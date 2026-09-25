@@ -1,0 +1,92 @@
+{
+  "method": "pdf-texto",
+  "header": {
+    "supplierName": "MAKRO AUTOSERVICIO MAYORISTA S.A.U.",
+    "supplierTaxId": "A28647451",
+    "number": "015/0023/448812",
+    "date": "2026-09-18",
+    "subtotal": 228.18,
+    "vatTotal": 26.27,
+    "total": 254.45
+  },
+  "lines": [
+    {
+      "description": "LECHE ENTERA 6X1L",
+      "code": "2345678",
+      "quantity": 4,
+      "unit": "ud",
+      "unitPrice": 5.4,
+      "discountPct": 10,
+      "total": 19.44,
+      "vatPct": 4,
+      "pricePerBase": 0.81,
+      "baseUnit": "l"
+    },
+    {
+      "description": "ACEITE OLIVA V.E. 5L",
+      "code": "1122334",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 28.95,
+      "total": 57.9,
+      "vatPct": 4,
+      "pricePerBase": 5.79,
+      "baseUnit": "l"
+    },
+    {
+      "description": "CERVEZA MAHOU 5 ESTRELLAS 24X33CL",
+      "code": "5566778",
+      "quantity": 3,
+      "unit": "ud",
+      "unitPrice": 16.2,
+      "total": 48.6,
+      "vatPct": 21,
+      "pricePerBase": 2.0455,
+      "baseUnit": "l"
+    },
+    {
+      "description": "AGUA MINERAL 6X1,5L",
+      "code": "9988776",
+      "quantity": 5,
+      "unit": "ud",
+      "unitPrice": 2.34,
+      "total": 11.7,
+      "vatPct": 10,
+      "pricePerBase": 0.26,
+      "baseUnit": "l"
+    },
+    {
+      "description": "TOMATE TRITURADO LATA 3KG",
+      "code": "4433221",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 3.15,
+      "total": 18.9,
+      "vatPct": 10,
+      "pricePerBase": 1.05,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "SERVILLETAS PAPEL 40X40 PACK 6",
+      "code": "7766554",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 12.5,
+      "total": 25,
+      "vatPct": 21,
+      "pricePerBase": 2.0833,
+      "baseUnit": "ud"
+    },
+    {
+      "description": "QUESO MANCHEGO CURADO",
+      "code": "3322110",
+      "quantity": 3.12,
+      "unit": "kg",
+      "unitPrice": 14.95,
+      "total": 46.64,
+      "vatPct": 10,
+      "pricePerBase": 14.9487,
+      "baseUnit": "kg"
+    }
+  ]
+}

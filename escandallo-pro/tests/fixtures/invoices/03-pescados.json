@@ -1,0 +1,69 @@
+{
+  "method": "pdf-texto",
+  "header": {
+    "supplierName": "PESCADOS Y MARISCOS DEL CANTÁBRICO, S.L.",
+    "supplierTaxId": "B39456781",
+    "number": "2026/P/7781",
+    "date": "2026-09-15",
+    "subtotal": 422.93,
+    "vatTotal": 42.29,
+    "total": 465.22
+  },
+  "lines": [
+    {
+      "description": "MERLUZA DEL CANTÁBRICO PIEZA 2-3 KG",
+      "code": "1101",
+      "quantity": 8.46,
+      "unit": "kg",
+      "unitPrice": 14.9,
+      "total": 126.05,
+      "vatPct": 10,
+      "pricePerBase": 14.8995,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "RAPE NEGRO LIMPIO",
+      "code": "1102",
+      "quantity": 4.12,
+      "unit": "kg",
+      "unitPrice": 18.5,
+      "total": 76.22,
+      "vatPct": 10,
+      "pricePerBase": 18.5,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "GAMBA ROJA CONGELADA CAJA 1KG 20/30",
+      "code": "2201",
+      "quantity": 3,
+      "unit": "kg",
+      "unitPrice": 42,
+      "total": 126,
+      "vatPct": 10,
+      "pricePerBase": 42,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "MEJILLÓN GALLEGO MALLA 2KG",
+      "code": "2210",
+      "quantity": 10,
+      "unit": "kg",
+      "unitPrice": 2.35,
+      "total": 23.5,
+      "vatPct": 10,
+      "pricePerBase": 2.35,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "PULPO COCIDO PATA",
+      "code": "3001",
+      "quantity": 2.38,
+      "unit": "kg",
+      "unitPrice": 29.9,
+      "total": 71.16,
+      "vatPct": 10,
+      "pricePerBase": 29.8992,
+      "baseUnit": "kg"
+    }
+  ]
+}

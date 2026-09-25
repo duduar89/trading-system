@@ -1,0 +1,19 @@
+{
+  "method": "pdf-texto",
+  "entries": [
+    { "section": "Entrantes", "name": "Hummus de garbanzos", "price": 7.5 },
+    { "section": "Entrantes", "name": "Burrata con tomate", "price": 12 },
+    { "section": "Entrantes", "name": "Tartar de atún", "price": 16.9 },
+    { "section": "Entrantes", "name": "Tataki de salmón", "price": 14.5 },
+    { "section": "Postres", "name": "Coulant de chocolate", "price": 6.5 },
+    { "section": "Postres", "name": "Tiramisú", "price": 6 },
+    { "section": "Postres", "name": "Fruta de temporada", "price": 4.5 },
+    { "section": "Principales", "name": "Risotto de setas", "price": 16.5 },
+    { "section": "Principales", "name": "Magret de pato", "price": 19 },
+    { "section": "Principales", "name": "Lubina a la brasa", "price": 21.5 },
+    { "section": "Principales", "name": "Hamburguesa de wagyu", "price": 17, "description": "Con patatas fritas caseras" },
+    { "section": "Bebidas", "name": "Agua mineral", "price": 2.2 },
+    { "section": "Bebidas", "name": "Refresco", "price": 2.8 },
+    { "section": "Bebidas", "name": "Caña de cerveza", "price": 2.5 }
+  ]
+}

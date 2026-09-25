@@ -1,0 +1,16 @@
+{
+  "method": "ocr",
+  "entries": [
+    { "section": "Desayunos", "name": "Tostada con tomate y aceite", "price": 2.8 },
+    { "section": "Desayunos", "name": "Tostada con jamón serrano", "price": 3.9 },
+    { "section": "Desayunos", "name": "Croissant a la plancha", "price": 2.2 },
+    { "section": "Desayunos", "name": "Zumo de naranja natural", "price": 3 },
+    { "section": "Bocadillos", "name": "Bocadillo de calamares", "price": 6.5, "description": "Con alioli casero" },
+    { "section": "Bocadillos", "name": "Bocadillo de tortilla española", "price": 5.5 },
+    { "section": "Bocadillos", "name": "Pepito de ternera", "price": 7, "description": "Con pimientos verdes" },
+    { "section": "Bocadillos", "name": "Serranito", "price": 6.9 },
+    { "section": "Menú del día", "name": "Menú del día", "price": 14.5, "description": "De lunes a viernes. Primero, segundo, postre, pan y bebida" },
+    { "section": "Postres", "name": "Tarta de la abuela", "price": 4 },
+    { "section": "Postres", "name": "Helado artesano (2 bolas)", "price": 4.5 }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "method": "ocr",
+  "entries": [
+    { "section": "Entrantes", "name": "Ensalada de tomate de temporada", "price": 8.5, "description": "Con ventresca de bonito y cebolleta" },
+    { "section": "Entrantes", "name": "Croquetas caseras de jamón ibérico", "price": 9 },
+    { "section": "Entrantes", "name": "Pimientos de Padrón", "price": 6.5 },
+    { "section": "Entrantes", "name": "Tabla de quesos manchegos", "price": 14, "description": "Selección de tres curaciones, membrillo y nueces" },
+    { "section": "Principales", "name": "Rabo de toro estofado", "price": 19.5, "description": "Con puré de patata trufado" },
+    { "section": "Principales", "name": "Bacalao al pil pil", "price": 21 },
+    { "section": "Principales", "name": "Chuletillas de cordero lechal", "price": 22.5 },
+    { "section": "Principales", "name": "Arroz meloso de boletus y foie", "price": 16, "description": "Mín. 2 personas" },
+    { "section": "Postres", "name": "Tarta de queso casera", "price": 6 },
+    { "section": "Postres", "name": "Flan de huevo con nata", "price": 5.5 },
+    { "section": "Postres", "name": "Arroz con leche asturiano", "price": 5.5 }
+  ]
+}

@@ -1,0 +1,19 @@
+DISTRIBUCIONES DE BEBIDAS LA RIOJANA, S.L.
+Ctra. de Logroño km 3,5 · 26006 Logroño (La Rioja) · CIF B26334455
+Tel. 941 22 33 44 · www.bebidaslariojana.es
+Factura n.º   R-26-0912                              Fecha   09/09/2026
+Cliente:  BAR RESTAURANTE EL CRUCE S.L.   B26112233
+
+Código   Descripción                             Cantidad   Ud.     Precio    % Dto    Importe
+V101     VINO TINTO RIOJA CRIANZA 75CL              12      BOT       6,80     5,00      77,52
+V205     VINO BLANCO RUEDA VERDEJO 75CL             12      BOT       5,40               64,80
+C010     CERVEZA BARRIL 30L                          2      UD       89,00    10,00     160,20
+R020     REFRESCO COLA 24X33CL                       3      CAJA     14,40               43,20
+A030     AGUA MINERAL 12X1L                          5      CAJA      4,40     2,50      21,45
+G040     GINEBRA PREMIUM 70CL                        6      BOT      16,90              101,40
+         ENVASES RETORNABLES (FIANZA BARRIL)         2               30,00               60,00
+
+Base imponible                    528,57
+IVA 21%                           111,00
+Total factura                     639,57 €
+Forma de pago: transferencia. IBAN ES12 2100 0418 4502 0005 1332

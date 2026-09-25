@@ -6,6 +6,7 @@ import { fold } from './textUtils';
  *
  * Son conservadoras: sólo actúan cuando el resultado es claramente mejor que lo leído.
  *  - Formatos con letras en lugar de cifras: "SL" → "5L", "S00G" → "500G", "1O0G" → "100G", "1kKG" → "1KG".
+ *  - Cifras dentro de palabras: "CEB0LLA" → "CEBOLLA" (sólo si sale una palabra conocida).
  *  - Palabra y formato pegados: "MG1L" → "MG 1L", "GARRAFASL" → "GARRAFA 5L".
  *  - Palabras pegadas: "CARRILLERAIBERICA" → "CARRILLERA IBERICA", sólo si todas las piezas son palabras conocidas del
  *    léxico culinario (core/lexicon), para no romper nombres propios o marcas.
@@ -96,7 +97,27 @@ export function fixPackToken(token: string): string | undefined {
 const GLUED_PACK = new RegExp(`^(\\p{L}{2,})(\\d+(?:[.,]\\d+)?${UNIT})$`, 'iu');
 const GLUED_SL = /^(\p{L}{3,})([SI])(l|kg|g)$/iu;
 
+const DIGIT_LETTER: Record<string, string> = { '0': 'O', '1': 'I', '5': 'S', '8': 'B', '4': 'A', '6': 'G' };
+
+/**
+ * "CEB0LLA" → "CEBOLLA", "P1MIENTO" → "PIMIENTO": cifras dentro de una palabra de letras. Sólo si el resultado es una
+ * palabra conocida (con "1" se prueban I y L).
+ */
+export function fixDigitsInWord(token: string): string | undefined {
+  if (!/^\p{L}+[0-9]\p{L}*$|^\p{L}*[0-9]\p{L}+$/u.test(token) || token.replace(/\P{L}/gu, '').length < 3) return undefined;
+  const upper = token === token.toUpperCase();
+  const options = (ch: string) => (ch === '1' ? ['I', 'L'] : DIGIT_LETTER[ch] ? [DIGIT_LETTER[ch]] : []);
+  const at = token.search(/[0-9]/);
+  for (const letter of options(token[at])) {
+    const cand = token.slice(0, at) + (upper ? letter : letter.toLowerCase()) + token.slice(at + 1);
+    if (knownWord(cand)) return cand;
+  }
+  return undefined;
+}
+
 function fixWord(token: string): string[] {
+  const inWord = fixDigitsInWord(token);
+  if (inWord) return [inWord];
   const glued = GLUED_PACK.exec(token);
   if (glued) return [...fixWord(glued[1]), glued[2]];
   const sl = GLUED_SL.exec(token);
@@ -116,3 +137,21 @@ export function fixOcrDescription(desc: string): string {
     .flatMap(fixWord)
     .join(' ');
 }
+
+const GLUE_TAIL = ['a', 'al', 'de', 'del', 'con', 'y', 'en'];
+
+/**
+ * "Pulpoa la gallega" → "Pulpo a la gallega": el OCR pega a veces una preposición corta al final de la palabra
+ * anterior. Sólo si la palabra no es conocida, sin la cola sí lo es (≥ 4 letras) y la siguiente palabra sigue la frase.
+ */
+export function splitGluedTail(word: string, next: string | undefined): string | undefined {
+  if (!next || !/^\p{Ll}/u.test(next) || !/^\p{L}{5,}$/u.test(word) || knownWord(word)) return undefined;
+  for (const tail of GLUE_TAIL) {
+    const f = fold(word);
+    if (!f.endsWith(tail)) continue;
+    const head = word.slice(0, word.length - tail.length);
+    if (head.length >= 4 && knownWord(head)) return `${head} ${word.slice(word.length - tail.length)}`;
+  }
+  return undefined;
+}
+

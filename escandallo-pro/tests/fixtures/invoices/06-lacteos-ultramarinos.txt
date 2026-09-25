@@ -1,0 +1,22 @@
+LÁCTEOS Y ULTRAMARINOS SIERRA NORTE S.L.
+Camino de la Fuente 4 · 28720 Colmenar Viejo (Madrid) · CIF B28990011
+FACTURA
+Número de factura: SN-2026-1187                Fecha: 10/09/2026
+Destinatario: CAFETERÍA LA PLAZA  ·  NIF 50123456K
+
+Código   Descripción                            Uds.   Ud.        Precio     Importe    IVA%
+L100     LECHE ENTERA BRIK 6X1L                    4   CAJA         5,88       23,52       4
+L210     YOGUR NATURAL 12X125G                     3   PACK         3,60       10,80      10
+L305     NATA PARA COCINAR 35% 1L                  6   UD           3,45       20,70      10
+Q110     QUESO RALLADO 12X200G                     1   CAJA        21,60       21,60       4
+M020     MANTEQUILLA SIN SAL 250G                 10   UD           2,39       23,90      10
+H001     HUEVOS CAMPEROS L 30 UDS                  2   UD           7,50       15,00       4
+U040     ATÚN EN ACEITE DE OLIVA LATA 900G         4   UD          11,25       45,00      10
+U050     GARBANZO PEDROSILLANO 1KG                 5   UD           2,95       14,75       4
+
+Tipo IVA      Base imponible      Cuota
+4%                     74,87       2,99
+10%                   100,40      10,04
+Total base imponible    175,27
+Total IVA                13,03
+TOTAL FACTURA           188,30 €

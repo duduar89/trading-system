@@ -1,7 +1,9 @@
 import type { PdfTextLine } from './pdf';
 import type { OcrLine, OcrResult, OcrWord } from './ocr';
+import type { MenuBox } from './menuParser';
 import { buildLines, linesToText, type LayoutLine, type PositionedText } from './layout';
 import { median } from './textUtils';
+import { splitGluedTail } from './ocrFixes';
 
 /**
  * Reconstrucción de filas a partir de las PALABRAS del OCR (lógica pura, compartida con el banco de pruebas).
@@ -114,6 +116,7 @@ export function pageWords(page: TessPage, pageNo = 1): OcrWord[] {
             block: bi,
             baselineY: baseY,
             lineHeight: rowHeight || w.bbox.y1 - w.bbox.y0,
+            ...(b ? { baseline: { ...b } } : {}),
           });
         }
       }
@@ -150,15 +153,23 @@ function toFragments(words: OcrWord[], slope: number): Frag[] {
   const heights = words.map((w) => w.lineHeight ?? w.bbox.y1 - w.bbox.y0).filter((h) => h > 0);
   const typical = median(heights);
   const out: Frag[] = [];
-  for (const w of words) {
-    if (isNoiseWord(w, typical)) continue;
-    const str = stripLeaders(w.text);
-    if (!str) continue;
+  words.forEach((w) => {
+    if (isNoiseWord(w, typical)) return;
+    // Siguiente palabra en la misma fila visual (puede venir en otra "línea" de Tesseract)
+    let next: OcrWord | undefined;
+    for (const o of words) {
+      if (o === w || o.page !== w.page || o.bbox.x0 < w.bbox.x1 - 2) continue;
+      if (Math.abs((o.baselineY ?? o.bbox.y1) - (w.baselineY ?? w.bbox.y1)) >= (w.lineHeight ?? typical) * 0.5) continue;
+      if (!next || o.bbox.x0 < next.bbox.x0) next = o;
+    }
+    const stripped = stripLeaders(w.text);
+    const str = (next ? splitGluedTail(stripped, next.text) : undefined) ?? stripped;
+    if (!str) return;
     const xc = (w.bbox.x0 + w.bbox.x1) / 2;
     let x = w.bbox.x0;
     let width = w.bbox.x1 - w.bbox.x0;
     // Si se han quitado puntos de relleno por un lado, se ajusta la caja proporcionalmente
-    if (str.length < w.text.trim().length) {
+    if (stripped.length < w.text.trim().length) {
       const lead = /^[.·…_\s]*/.exec(w.text)?.[0].length ?? 0;
       const trail = /[.·…_\s]*$/.exec(w.text)?.[0].length ?? 0;
       const cw = width / Math.max(1, w.text.length);
@@ -167,7 +178,7 @@ function toFragments(words: OcrWord[], slope: number): Frag[] {
     }
     const y = (w.baselineY ?? w.bbox.y1) - slope * xc;
     out.push({ str, x, width, y, height: w.lineHeight || w.bbox.y1 - w.bbox.y0, conf: w.confidence, box: w.bbox });
-  }
+  });
   return out;
 }
 
@@ -249,7 +260,7 @@ function findGutter(frags: Frag[], rows: LayoutLine[]): Gutter | undefined {
 }
 
 function linesFrom(frags: Frag[], page: number): LayoutLine[] {
-  return buildLines(frags, page, { yTolerance: 0.5 });
+  return buildLines(frags, page, { yTolerance: 0.5, wholeWords: true });
 }
 
 /** Ordena en lectura por columnas: bandas separadas por filas de ancho completo; en cada banda, columna izquierda y luego derecha. */
@@ -402,4 +413,11 @@ export function columnsReadingOrder(lines: PdfTextLine[]): PdfTextLine[] {
     for (const l of columnLayout(frags, page, 2)) out.push({ page, y: l.y, text: l.text, items: l.items });
   }
   return out;
+}
+
+/** Cajas de palabra para el parser de cartas (coordenadas de la imagen preparada, línea base y página). */
+export function menuBoxesFromOcr(ocr: OcrResult): MenuBox[] {
+  return (ocr.words ?? [])
+    .filter((w) => w.text.trim())
+    .map((w) => ({ text: w.text, bbox: { ...w.bbox }, confidence: w.confidence, page: w.page, ...(w.baseline ? { baseline: { ...w.baseline } } : {}) }));
 }

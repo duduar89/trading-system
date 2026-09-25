@@ -1,0 +1,82 @@
+{
+  "method": "pdf-texto",
+  "header": {
+    "supplierName": "GRUPO ALIMENTARIO SURESTE, S.L.U.",
+    "supplierTaxId": "B30998877",
+    "number": "A-002391",
+    "date": "2026-09-21",
+    "subtotal": 199.15,
+    "vatTotal": 22.88,
+    "total": 222.03
+  },
+  "lines": [
+    {
+      "description": "ARROZ BOMBA CALASPARRA 1KG",
+      "code": "A-100",
+      "quantity": 10,
+      "unit": "ud",
+      "unitPrice": 3.85,
+      "total": 38.5,
+      "vatPct": 4,
+      "pricePerBase": 3.85,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "PASTA ESPAGUETI 5KG",
+      "code": "A-210",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 11.4,
+      "total": 22.8,
+      "vatPct": 4,
+      "pricePerBase": 2.28,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "ACEITUNA MANZANILLA LATA 5KG",
+      "code": "B-305",
+      "quantity": 3,
+      "unit": "ud",
+      "unitPrice": 9.8,
+      "discountPct": 5,
+      "total": 27.93,
+      "vatPct": 10,
+      "pricePerBase": 1.862,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "ATÚN CLARO EN ACEITE LATA 1KG",
+      "code": "B-410",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 8.25,
+      "total": 49.5,
+      "vatPct": 10,
+      "pricePerBase": 8.25,
+      "baseUnit": "kg"
+    },
+    {
+      "description": "DETERGENTE LAVAVAJILLAS 10L",
+      "code": "C-500",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 18.9,
+      "discountPct": 10,
+      "total": 34.02,
+      "vatPct": 21,
+      "pricePerBase": 1.701,
+      "baseUnit": "l"
+    },
+    {
+      "description": "PAPEL SECAMANOS ZIGZAG CAJA 20",
+      "code": "C-520",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 26.4,
+      "total": 26.4,
+      "vatPct": 21,
+      "pricePerBase": 1.32,
+      "baseUnit": "ud"
+    }
+  ]
+}

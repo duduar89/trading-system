@@ -1,0 +1,17 @@
+PESCADOS Y MARISCOS DEL CANTABRICO, S.L.
+Mercado Central de Pescados   Nave 3   28053 Madrid
+CIF B394S6781
+Factura: 2026/P/7781                            Fecha: 15/09/2026
+Cliente: TABERNA EL PUERTO S.L.  (CIF B87001122)
+Ref.   Descripcion                                    Kg        €/Kg      lmporte
+1101   MERLUZA DEL CANTABRICO PIEZA 2-3 KG          8,46O     14,9O      l26,05
+       (Merluccius merluccius) Zona FAO 27 . Arte: arrastre . Lote 150926-0l
+1102   RAPE NEGRO LIMPIO                            4,l20     18,5O       76,22
+       (Lophius budegassa) FAO 27.VIIIc . Lote 150926-02
+2201   GAMBA ROJA CONGELADA CAJA 1KG 20/30          3,OOO     42,OO      126,OO
+       Lote: GR-2209  Cad: 30/03/2027
+2210   MEJILLON GALLEGO MALLA 2KG                  1O,OOO      2,85       23,5O
+3001   PULPO COCIDO PATA                            2,38O     29,9O       7116
+Base imponible      422,93
+IVA 10%              42,29
+TOTAL               465,22 €

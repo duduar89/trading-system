@@ -1,11 +1,11 @@
 import type { AppSettings, ExtractedInvoice, ExtractedMenu, ProgressFn } from '../types';
 import { normalizeText } from '../core/matching';
 import { extractPdfText, pdfToImages, type PdfTextLine } from './pdf';
-import { ocrInvoiceImages, ocrMenuImages, preprocessImage } from './ocr';
+import { ocrInvoiceImages, ocrMenuImages, preprocessImage, type OcrResult } from './ocr';
 import { invoiceQuality, parseInvoiceText } from './invoiceParser';
-import { parseMenuText } from './menuParser';
+import { menuQuality, mergeMenuPasses, parseMenuText } from './menuParser';
 import { guessColumnMapping, readSpreadsheet, sheetToInvoices } from './spreadsheet';
-import { columnsReadingOrder } from './ocrLayout';
+import { columnsReadingOrder, menuBoxesFromOcr } from './ocrLayout';
 import { linesToText } from './layout';
 
 /**
@@ -20,7 +20,8 @@ import { linesToText } from './layout';
  */
 
 export function aiAvailable(settings: AppSettings): boolean {
-  return !!(settings.aiEnabled && settings.apiKey && (typeof navigator === 'undefined' || navigator.onLine));
+  // navigator.onLine sólo es fiable cuando vale false (sin conexión); fuera del navegador puede no existir
+  return !!(settings.aiEnabled && settings.apiKey && (typeof navigator === 'undefined' || navigator.onLine !== false));
 }
 
 export type FileKind = 'pdf' | 'image' | 'sheet' | 'unknown';
@@ -127,10 +128,7 @@ async function invoicesFromSheet(file: Blob & { name?: string }, onProgress?: Pr
     const { headerRow, mapping } = guessColumnMapping(sheet.rows);
     if (mapping.description === undefined || mapping.description < 0) continue;
     const invoices = sheetToInvoices(sheet.rows, mapping, headerRow);
-    for (const inv of invoices) {
-      if (!inv.lines.length) continue;
-      out.push(sheets.length > 1 ? withWarnings(inv, []) : inv);
-    }
+    for (const inv of invoices) if (inv.lines.length) out.push(inv);
   }
   onProgress?.({ stage: 'Hoja leída', progress: 1 });
   if (!out.length) {
@@ -161,7 +159,7 @@ async function ocrInvoiceFrom(images: Blob[], onProgress: ProgressFn | undefined
   // Varias facturas en un mismo PDF escaneado
   if (images.length > 1 && outcome.ocr.rows?.length) {
     const split = parseInvoicePages(outcome.ocr.rows, 'ocr');
-    if (split.length > 1) return split.map((inv) => withWarnings({ ...inv, rawText: inv.rawText }, extra));
+    if (split.length > 1) return split.map((inv) => withWarnings(inv, extra));
   }
   return [withWarnings(outcome.invoice, extra)];
 }
@@ -214,9 +212,17 @@ export async function extractInvoicesFromFile(
   // Foto
   if (useAi) {
     // Enderezada (EXIF) y reducida: la petición es más rápida y barata. Si no se puede abrir, el error es claro (HEIC).
-    const prepared = await preprocessImage(file, { maxSide: 2000, mime: 'image/jpeg' });
-    const inv = await aiInvoice(prepared, 'image/jpeg', settings, scoped(onProgress, 0, 0.5), warnings);
-    if (inv) return [inv];
+    let prepared: Blob | undefined;
+    try {
+      prepared = await preprocessImage(file, { maxSide: 2000, mime: 'image/jpeg' });
+    } catch (err) {
+      if (/HEIC/i.test(reasonOf(err))) throw err;
+      warnings.push(aiFallbackWarning(err));
+    }
+    if (prepared) {
+      const inv = await aiInvoice(prepared, 'image/jpeg', settings, scoped(onProgress, 0, 0.5), warnings);
+      if (inv) return [inv];
+    }
   }
   onProgress?.({ stage: 'Reconociendo texto…', progress: useAi ? 0.5 : 0 });
   const ocr = await ocrInvoiceFrom([file], scoped(onProgress, useAi ? 0.5 : 0, 1));
@@ -245,6 +251,14 @@ export function dedupeMenuEntries(entries: MenuEntryOut[]): MenuEntryOut[] {
     }
   }
   return out;
+}
+
+/**
+ * Interpreta una lectura OCR de carta: el texto ya ordenado por columnas y las cajas de las palabras, con las que el
+ * parser de cartas empareja cada precio con el plato de su misma fila aunque la foto esté algo girada.
+ */
+export function parseMenuOcr(text: string, ocr: OcrResult): ExtractedMenu {
+  return parseMenuText(text, 'ocr', menuBoxesFromOcr(ocr));
 }
 
 /** Extrae los platos de una o varias fotos de carta (o un PDF de carta). */
@@ -306,7 +320,7 @@ export async function extractMenuFromFiles(
   if (images.length) {
     usedOcr = true;
     onProgress?.({ stage: 'Reconociendo texto…', progress: base + span * 0.2 });
-    const outcome = await ocrMenuImages(images, (text) => parseMenuText(text, 'ocr'), scoped(onProgress, base + span * 0.2, 1));
+    const outcome = await ocrMenuImages(images, parseMenuOcr, scoped(onProgress, base + span * 0.2, 1), { merge: mergeMenuPasses, quality: menuQuality });
     entries.push(...outcome.menu.entries);
     warnings.push(...outcome.menu.warnings);
     rawTexts.push(outcome.ocr.text);

@@ -11,8 +11,10 @@ import {
   type MenuOcrOutcome,
   type OcrBackend,
   type OcrPass,
+  type PreparedPage,
   type Psm,
 } from './ocrPipeline';
+import type { PrepRequest, PrepResponse } from './prep.worker';
 
 /**
  * OCR local con tesseract.js (idioma 'spa', modelos LSTM "best_int": los más precisos que admite tesseract.js).
@@ -45,6 +47,8 @@ export interface OcrWord {
   baselineY?: number;
   /** Altura de la línea de texto a la que pertenece. */
   lineHeight?: number;
+  /** Línea base de la línea de Tesseract (mide la inclinación de la foto). */
+  baseline?: { x0: number; y0: number; x1: number; y1: number };
 }
 
 export interface OcrResult {
@@ -149,7 +153,8 @@ function browserBackend(onLoad?: ProgressFn): OcrBackend {
     async recognize(image: GrayImage, psm: Psm, onProgress?: (fraction: number) => void): Promise<TessPage> {
       progressSink = (m) => {
         if (m.status === 'recognizing text') onProgress?.(m.progress);
-        else if (LOAD_STAGES[m.status]) onLoad?.({ stage: LOAD_STAGES[m.status], progress: m.progress });
+        // Carga del motor: sólo el texto de la etapa (la barra sigue donde estaba)
+        else if (LOAD_STAGES[m.status]) onLoad?.({ stage: LOAD_STAGES[m.status] });
       };
       try {
         const worker = await getWorker();
@@ -289,11 +294,42 @@ export interface OcrOptions {
   prep?: OcrPrepOptions;
 }
 
-async function preparedFrom(images: Blob[], onProgress: ProgressFn | undefined, prep: OcrPrepOptions = {}) {
+const DECODE_MAX_SIDE = 3200;
+
+/** Preparación en un Web Worker (no congela la interfaz). undefined si el navegador no lo permite o falla. */
+async function prepareInWorker(images: Blob[], prep: OcrPrepOptions): Promise<PreparedPage[] | undefined> {
+  if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap !== 'function') return undefined;
+  let worker: Worker | undefined;
+  try {
+    const w = new Worker(new URL('./prep.worker.ts', import.meta.url), { type: 'module' });
+    worker = w;
+    const res = await new Promise<PrepResponse>((resolve, reject) => {
+      w.onmessage = (e: MessageEvent<PrepResponse>) => resolve(e.data);
+      w.onerror = (e) => reject(new Error(e.message || 'Error al preparar la imagen'));
+      const req: PrepRequest = { id: 1, blobs: images, maxSide: DECODE_MAX_SIDE, prep };
+      w.postMessage(req);
+    });
+    if (!res.ok) return undefined;
+    return res.pages.map((p) => ({ image: { width: p.width, height: p.height, data: p.data }, info: p.info }));
+  } catch {
+    return undefined;
+  } finally {
+    worker?.terminate();
+  }
+}
+
+async function preparedFrom(images: Blob[], onProgress: ProgressFn | undefined, prep: OcrPrepOptions = {}): Promise<PreparedPage[]> {
+  onProgress?.({ stage: images.length > 1 ? `Preparando ${images.length} imágenes…` : 'Preparando la imagen…', progress: 0 });
+  const viaWorker = await prepareInWorker(images, prep);
+  if (viaWorker) {
+    onProgress?.({ stage: 'Preparando la imagen…', progress: 1 });
+    return viaWorker;
+  }
+  // Hilo principal (navegadores sin OffscreenCanvas o formatos que sólo abre <img>, con mensajes de error claros)
   const grays: GrayImage[] = [];
   for (let i = 0; i < images.length; i++) {
     onProgress?.({ stage: images.length > 1 ? `Preparando la imagen ${i + 1} de ${images.length}…` : 'Preparando la imagen…', progress: i / images.length });
-    grays.push(await loadGrayImage(images[i] as Blob & { name?: string }));
+    grays.push(await loadGrayImage(images[i] as Blob & { name?: string }, DECODE_MAX_SIDE));
     // Cede el hilo entre páginas para que la interfaz siga respondiendo
     await new Promise((r) => setTimeout(r, 0));
   }
@@ -329,17 +365,17 @@ export async function ocrInvoiceImages(images: Blob[], onProgress?: ProgressFn, 
   return enqueue(() => ocrInvoice(pages, browserBackend(p), { onProgress: p, maxPasses: opts.maxPasses }));
 }
 
-/** OCR de una carta con detección de columnas; `parse` interpreta el texto (parser de cartas). */
+/** OCR de una carta con detección de columnas; `parse` interpreta el texto y las cajas (parser de cartas). */
 export async function ocrMenuImages(
   images: Blob[],
-  parse: (text: string) => ExtractedMenu,
+  parse: (text: string, ocr: OcrResult) => ExtractedMenu,
   onProgress?: ProgressFn,
-  opts: { maxPasses?: number; prep?: OcrPrepOptions } = {},
+  opts: { maxPasses?: number; prep?: OcrPrepOptions; merge?: (menus: ExtractedMenu[]) => ExtractedMenu; quality?: (menu: ExtractedMenu) => number } = {},
 ): Promise<MenuOcrOutcome> {
   if (!images.length) throw new Error('No hay imágenes que leer');
   const pages = await preparedFrom(images, slice(onProgress, 0, 0.1), opts.prep);
   const p = slice(onProgress, 0.1, 1);
-  return enqueue(() => ocrMenu(pages, browserBackend(p), parse, { onProgress: p, maxPasses: opts.maxPasses }));
+  return enqueue(() => ocrMenu(pages, browserBackend(p), parse, { onProgress: p, maxPasses: opts.maxPasses, merge: opts.merge, quality: opts.quality }));
 }
 
 /** Convierte una salida de Tesseract ya obtenida en OcrResult (útil para reprocesar sin volver a reconocer). */

@@ -2,8 +2,8 @@ import type { ProgressFn } from '../types';
 import { buildLines, linesToText, looksLikeText, type PositionedText } from './layout';
 
 /**
- * Lectura de PDF con pdf.js (pdfjs-dist) en el navegador. El worker se carga con
- * `import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'` (Vite) y `GlobalWorkerOptions.workerSrc`.
+ * Lectura de PDF con pdf.js (pdfjs-dist, build "legacy" por compatibilidad) en el navegador. El worker se carga con
+ * `import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'` (Vite) y `GlobalWorkerOptions.workerSrc`.
  *
  * Todo se importa bajo demanda: importar este módulo no carga pdf.js (los tests de Node pueden importar los parsers).
  * La reconstrucción de filas es lógica pura compartida (`layout.ts`) para que el banco de pruebas de Node use
@@ -34,7 +34,7 @@ export interface PdfTextResult {
   hasText: boolean;
 }
 
-type PdfJs = typeof import('pdfjs-dist');
+type PdfJs = typeof import('pdfjs-dist/legacy/build/pdf.mjs');
 type PdfDocument = Awaited<ReturnType<PdfJs['getDocument']>['promise']>;
 
 interface PdfJsBundle {
@@ -51,9 +51,11 @@ async function loadPdfJs(): Promise<PdfJsBundle> {
   }
   if (!pdfjsPromise) {
     pdfjsPromise = (async () => {
+      // Build "legacy": el moderno usa APIs de JavaScript muy recientes (Map.getOrInsertComputed…) que aún no tienen
+      // muchos Safari/Chrome de móvil y rompe el render de páginas (PDF escaneados). Sólo pesa ~60 KB más.
       const [pdfjs, worker, jbig2, openjpeg] = await Promise.all([
-        import('pdfjs-dist'),
-        import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+        import('pdfjs-dist/legacy/build/pdf.mjs'),
+        import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'),
         import('pdfjs-dist/wasm/jbig2.wasm?url'),
         import('pdfjs-dist/wasm/openjpeg.wasm?url'),
       ]);

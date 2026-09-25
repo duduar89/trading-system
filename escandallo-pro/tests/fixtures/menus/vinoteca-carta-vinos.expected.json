@@ -1,0 +1,13 @@
+{
+  "method": "pdf-texto",
+  "entries": [
+    { "section": "Vinos tintos · D.O.Ca. Rioja", "name": "Viña Ardanza Reserva 2016", "price": 34 },
+    { "section": "Vinos tintos · D.O.Ca. Rioja", "name": "Marqués de Riscal Reserva 2018", "price": 28 },
+    { "section": "Vinos tintos · D.O. Ribera del Duero", "name": "Protos Roble 2021", "price": 21.5 },
+    { "section": "Vinos tintos · D.O. Ribera del Duero", "name": "Pesquera Crianza 2019", "price": 32 },
+    { "section": "Vinos blancos", "name": "Albariño Pazo de Señoráns 2022", "price": 26 },
+    { "section": "Vinos blancos", "name": "Verdejo José Pariente", "price": 19.9 },
+    { "section": "Cavas y champagnes", "name": "Juvé & Camps Reserva de la Familia", "price": 29 },
+    { "section": "Cavas y champagnes", "name": "Moët & Chandon Brut Impérial", "price": 75 }
+  ]
+}

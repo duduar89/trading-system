@@ -1,0 +1,23 @@
+CÁRNICAS DEL GUADARRAMA S.A.
+Pol. Ind. La Mina, C/ Cobre 8 · 28400 Collado Villalba (Madrid)
+NIF: A28765432        Tel.: 918 512 300        Reg. San. 10.012345/M
+FACTURA                                                          Número:  F26-01873
+                                                                 Fecha factura:  12-09-2026
+Datos del cliente:    ASADOR EL PORTALÓN S.L.      NIF B85123456
+Avda. de la Constitución 21, 28100 Alcobendas
+
+Descripción                                        Cantidad     Ud      Precio/kg        Importe
+SOLOMILLO DE TERNERA ENTERO                           5,240     kg         32,50          170,30
+Lote: 23/456    Cad: 20/09/2026
+LOMO ALTO DE VACA MADURADO 45 DÍAS                    7,815     kg         28,90          225,85
+Lote: 23/457    Cad: 25/09/2026
+CARRILLERA DE CERDO IBÉRICO                           4,000     kg         10,75           43,00
+PRESA IBÉRICA DE BELLOTA                              3,120     kg         24,90           77,69
+Lote: 88/102
+PECHUGA DE POLLO CAMPERO                              6,450     kg          7,20           46,44
+PALETILLA DE CORDERO LECHAL                           2,850     kg         19,80           56,43
+
+Base imponible:       619,71 €
+IVA (10%):             61,97 €
+Total factura:        681,68 €
+Condiciones: pago a 15 días fecha factura. Conservar entre 0 y 4 ºC.

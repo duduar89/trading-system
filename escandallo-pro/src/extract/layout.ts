@@ -41,6 +41,11 @@ export interface BuildLinesOptions {
   columnGap?: number;
   /** Máximo de espacios con que se representa un hueco de columna en el texto. */
   maxGapSpaces?: number;
+  /**
+   * Los fragmentos son palabras completas (OCR): siempre van separados por al menos un espacio aunque las cajas se
+   * toquen. Con pdf.js no: un ítem puede ser un trozo de palabra (kerning) y se une sin espacio.
+   */
+  wholeWords?: boolean;
 }
 
 function median(values: number[]): number {
@@ -127,7 +132,7 @@ export function buildLines(fragments: PositionedText[], page = 1, opts: BuildLin
         text = text.replace(/\s+$/, '') + ' '.repeat(spaces) + str.trim();
         cur = { x: m.x, width: m.width, str: str.trim() };
       } else {
-        const glue = gap > 0.12 * refCw && !/\s$/.test(cur.str) && !/^\s/.test(str) ? ' ' : '';
+        const glue = (opts.wholeWords || gap > 0.12 * refCw) && !/\s$/.test(cur.str) && !/^\s/.test(str) ? ' ' : '';
         cur.str = (cur.str + glue + str).replace(/\s+/g, ' ');
         cur.width = m.x + m.width - cur.x;
         text = text + glue + str;
