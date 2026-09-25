@@ -129,13 +129,30 @@ function fixWord(token: string): string[] {
   return [token];
 }
 
+/** Gramajes habituales de envase: si el OCR lee la «G» final como «6» ("756"), el resto es uno de estos. */
+const COMMON_GRAMS = new Set([10, 15, 20, 25, 30, 40, 45, 50, 60, 70, 75, 80, 90, 100, 110, 120, 125, 130, 140, 150, 160, 170, 180, 200, 220, 225, 230, 240, 250, 280, 300, 320, 330, 350, 370, 380, 390, 400, 420, 425, 450, 480, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000]);
+
+/**
+ * "756" → "75G", "2506" → "250G", "1K6" → "1KG": la «G» de la unidad leída como «6» en el ÚLTIMO token de la
+ * descripción (donde van los formatos). Sólo si el número sin el «6» es un gramaje habitual y el token anterior
+ * no es una referencia/código.
+ */
+export function fixTrailingUnitSix(tokens: string[]): string[] {
+  if (!tokens.length) return tokens;
+  const last = tokens[tokens.length - 1];
+  const prev = (tokens[tokens.length - 2] ?? '').toLowerCase().replace(/[.:º°#]/g, '');
+  if (/^(ref|cod|codigo|código|art|lote|n|nº|no)$/.test(prev)) return tokens;
+  const k6 = /^(\d+(?:[.,]\d+)?)K6$/i.exec(last);
+  if (k6) return [...tokens.slice(0, -1), `${k6[1]}${last[last.length - 2]}G`.replace(/kG$/, 'kg')];
+  const g6 = /^(\d{2,4})6$/.exec(last);
+  if (g6 && COMMON_GRAMS.has(Number(g6[1]))) return [...tokens.slice(0, -1), `${g6[1]}G`];
+  return tokens;
+}
+
 /** Limpia errores típicos del OCR en una descripción de producto (ver cabecera del módulo). */
 export function fixOcrDescription(desc: string): string {
-  return desc
-    .split(/\s+/)
-    .filter(Boolean)
-    .flatMap(fixWord)
-    .join(' ');
+  const tokens = desc.split(/\s+/).filter(Boolean).flatMap(fixWord);
+  return fixTrailingUnitSix(tokens).join(' ');
 }
 
 const GLUE_TAIL = ['a', 'al', 'de', 'del', 'con', 'y', 'en'];

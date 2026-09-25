@@ -30,7 +30,14 @@ src/
     invoiceParser.ts  Parser heurístico de facturas (validación cruzada cantidad×precio=importe)
     menuParser.ts     Parser heurístico de cartas
     spreadsheet.ts    Excel/CSV de facturas o tarifas
-    index.ts          Orquestador: IA → texto PDF → OCR, con caída automática a local
+    layout.ts         Reconstrucción de filas/columnas a partir de posiciones (pdf.js)
+    imageOps.ts       Preprocesado de fotos: papel/perspectiva, iluminación, contraste, enderezado, binarización
+    prep.worker.ts    Preprocesado en un Web Worker (no bloquea la interfaz)
+    ocrPipeline.ts    OCR en varias pasadas (tabla / bloque / binarizado) hasta que las cuentas cuadran
+    ocrLayout.ts      Filas de tabla y columnas de carta a partir de las cajas de palabras del OCR
+    ocrFixes.ts       Correcciones de OCR validadas (O↔0, S↔5, «G» leída como «6», palabras pegadas…)
+    menuUtils.ts      Ayudas del parser de cartas (precios, secciones, ruido)
+    index.ts          Orquestador: texto PDF → OCR (IA opcional, desactivada por defecto) con caída automática a local
   ai/                 Claude: client (salida estructurada), invoice, menu, recipes
   kb/                 Base de conocimiento local: ingredientes (mermas, alérgenos, pesos) y recetas tipo
   services/           Casos de uso sobre la BD: products, invoices, dishes, menus, yieldTests, demo
@@ -39,6 +46,16 @@ src/
   pages/              Una página por ruta (lazy)
   lib/                format (es-ES), id, export (Excel/CSV), useOnline
 ```
+
+## Extracción gratuita y local
+La lectura de facturas y cartas funciona 100 % en el dispositivo y sin coste: capa de texto de pdf.js con
+reconstrucción de columnas, OCR con tesseract.js (modelo español más preciso) tras un preprocesado de imagen,
+y validación aritmética (cantidad × precio × (1 − dto) = importe; suma de líneas = base imponible) que decide entre
+lecturas alternativas y corrige errores típicos del OCR solo cuando las cuentas lo demuestran.
+
+Benchmark (`node scripts/bench-extraction.mjs` y `node scripts/bench-menu.mjs`) sobre `public/samples` y variantes
+degradadas generadas (foto girada, perspectiva, sombra fuerte, baja resolución, PDF escaneado, fax con ruido):
+PDF con texto 100 % de líneas exactas, fotos y escaneos 100 %, cartas 100 % (cabeceras 100 %).
 
 ## Convenciones
 - Importes en EUR **sin IVA**, salvo `Dish.menuPrice` (PVP de carta con IVA). Porcentajes 0–100.

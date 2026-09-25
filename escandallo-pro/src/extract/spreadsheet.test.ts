@@ -223,7 +223,7 @@ describe('sheetToInvoices', () => {
       ['kg', 6.4, undefined, 4, 15.04],
       ['kg', 3, 10, 4, 11.07],
     ]);
-    expect(inv.lines[0].pricePerBase).toBeCloseTo(0.5892, 4);
+    expect(inv.lines[0].pricePerBase).toBeCloseTo(0.589, 6); // 0,62 × (1 − 5 %): precio neto exacto, no 14,73 ÷ 25
     expect(inv.lines.every((l) => l.confidence === 1)).toBe(true);
   });
 

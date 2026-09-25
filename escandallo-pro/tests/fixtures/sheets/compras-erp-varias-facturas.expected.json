@@ -13,7 +13,7 @@
     {
       "supplierName": "Carnes Guadarrama", "number": "CG-8841", "date": "2025-03-05", "subtotal": 131.83,
       "lines": [
-        { "description": "SOLOMILLO TERNERA NAC.", "code": "4455", "quantity": 3.25, "unit": "kg", "unitPrice": 28.5, "total": 92.63, "pricePerBase": 28.501538 },
+        { "description": "SOLOMILLO TERNERA NAC.", "code": "4455", "quantity": 3.25, "unit": "kg", "unitPrice": 28.5, "total": 92.63, "pricePerBase": 28.5 },
         { "description": "CARRILLERA CERDO IBÉRICO", "code": "4460", "quantity": 4, "unit": "kg", "unitPrice": 9.8, "total": 39.2, "pricePerBase": 9.8 }
       ]
     },

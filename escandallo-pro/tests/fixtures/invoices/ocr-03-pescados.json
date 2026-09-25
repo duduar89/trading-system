@@ -18,7 +18,7 @@
       "unitPrice": 14.9,
       "total": 126.05,
       "vatPct": 10,
-      "pricePerBase": 14.8995,
+      "pricePerBase": 14.9,
       "baseUnit": "kg"
     },
     {
@@ -62,7 +62,7 @@
       "unitPrice": 29.9,
       "total": 71.16,
       "vatPct": 10,
-      "pricePerBase": 29.8992,
+      "pricePerBase": 29.9,
       "baseUnit": "kg"
     }
   ]

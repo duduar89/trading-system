@@ -55,3 +55,17 @@ describe('ocrFixes', () => {
     expect(splitGluedTail('Tomate', 'frito')).toBeUndefined();
   });
 });
+
+describe('fixTrailingUnitSix: «G» final leída como «6»', () => {
+  it('corrige gramajes habituales al final de la descripción', () => {
+    expect(fixOcrDescription('PIMENTON DULCE DE LA VERA 756')).toBe('PIMENTON DULCE DE LA VERA 75G');
+    expect(fixOcrDescription('BANDEJA CHAMPIÑON 2506')).toBe('BANDEJA CHAMPIÑON 250G');
+    expect(fixOcrDescription('HARINA TRIGO 1K6')).toBe('HARINA TRIGO 1KG');
+  });
+  it('no toca números que no son gramajes, ni códigos, ni tokens intermedios', () => {
+    expect(fixOcrDescription('CERVEZA PACK 6')).toBe('CERVEZA PACK 6');
+    expect(fixOcrDescription('VINO TINTO COSECHA 2016')).toBe('VINO TINTO COSECHA 2016');
+    expect(fixOcrDescription('ACEITE REF 1256')).toBe('ACEITE REF 1256');
+    expect(fixOcrDescription('LATA 756 TOMATE')).toBe('LATA 756 TOMATE');
+  });
+});
