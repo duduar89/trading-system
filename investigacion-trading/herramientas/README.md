@@ -9,7 +9,7 @@ python3 -m unittest discover -s tests      # 25 tests, sin red
 
 ## `cuotas.py`: apuestas con matemáticas
 
-Para value betting, surebets y matched betting (sección 2 del informe).
+Para value betting, surebets y matched betting (ver [doc 02](../02-apuestas-cuantitativas.md)).
 
 ```bash
 # Quitar el margen a una línea "sharp" (Pinnacle) con 4 métodos
@@ -31,7 +31,7 @@ Métodos de devig: `multiplicativo` (el ingenuo), `aditivo`, `power` y `shin`. S
 
 ## `funding.py`: carry delta-neutral en perpetuos cripto
 
-Para la estrategia de funding (sección 3). Lee OKX, Hyperliquid, Binance y Bybit. Si un exchange bloquea tu IP, se salta.
+Para el carry de funding (ver [doc 03](../03-cripto-delta-neutral.md)). Lee OKX, Hyperliquid, Binance y Bybit. Si un exchange bloquea tu IP, se salta.
 
 ```bash
 python3 funding.py                           # top funding positivo, con neto tras comisiones
@@ -46,7 +46,7 @@ Los números de la tabla "top" son la **foto de ahora mismo** anualizada. Un 300
 
 ## `robustez.py`: ¿tu backtest es suerte?
 
-Para cualquier estrategia que backtestees (secciones 5 y 6). Implementa el Probabilistic Sharpe Ratio, el Deflated Sharpe Ratio y el Minimum Track Record Length (Bailey y López de Prado).
+Para cualquier estrategia que backtestees (ver [doc 04](../04-bolsa-sistematica.md) y [doc 08](../08-repos-y-comunidades.md)). Implementa el Probabilistic Sharpe Ratio, el Deflated Sharpe Ratio y el Minimum Track Record Length (Bailey y López de Prado).
 
 ```bash
 python3 robustez.py retornos.csv --columna ret --ensayos 200 --periodos-anio 252
