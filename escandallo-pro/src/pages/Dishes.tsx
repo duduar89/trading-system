@@ -74,6 +74,7 @@ export default function Dishes() {
   const business = useBusiness();
 
   const recent = params.get('recientes') === '1';
+  const proposedCount = params.get('propuestos');
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<KindFilter>('plato');
   const [status, setStatus] = useState<StatusFilter>('todos');
@@ -98,6 +99,14 @@ export default function Dishes() {
       setParams(next, { replace: true });
     }
   }, [params, setParams]);
+
+  // Al llegar desde la importación de la carta, los recién creados primero.
+  useEffect(() => {
+    if (recent) {
+      setSort('recientes');
+      setDir('desc');
+    }
+  }, [recent]);
 
   useEffect(() => {
     try {
@@ -145,6 +154,7 @@ export default function Dishes() {
   const dismissRecent = () => {
     const next = new URLSearchParams(params);
     next.delete('recientes');
+    next.delete('propuestos');
     setParams(next, { replace: true });
   };
 
@@ -178,7 +188,8 @@ export default function Dishes() {
   const loading = !dishes || !costs;
   const empty = !loading && all.length === 0;
   const avgStatus = foodCostStatus(stats?.avgFoodCost, business.targetFoodCostPct, business.warningFoodCostPct);
-  const selectedDishes = all.filter((d) => selected.has(d.id));
+  const withoutRecipe = all.filter((d) => d.kind === 'plato' && d.items.length === 0);
+  const proposeTargets = proposeIds ? all.filter((d) => proposeIds.includes(d.id)) : [];
 
   return (
     <div className="pb-24">
@@ -199,15 +210,30 @@ export default function Dishes() {
       />
 
       {recent && (
-        <Callout tone="ok" icon={<PartyPopper className="size-4" />} className="mb-5 animate-slide-up" title="Platos importados: revisa las propuestas">
+        <Callout
+          tone="ok"
+          icon={<PartyPopper className="size-4" />}
+          className="mb-5 animate-slide-up"
+          title={proposedCount === '0' ? 'Platos importados' : 'Platos importados: revisa las propuestas'}
+        >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span>
-              Cada plato trae una receta propuesta con gramajes y mermas. Ábrelos, ajusta lo que haga falta y acepta las líneas en violeta
-              {stats?.suggestedLines ? ` (${stats.suggestedLines} por revisar)` : ''}.
+              {proposedCount === '0'
+                ? 'Ya están en tu lista, los más recientes primero. Propón su receta de una vez o ábrelos para añadir los ingredientes.'
+                : `Cada plato trae una receta propuesta con gramajes y mermas. Ábrelos, ajusta lo que haga falta y acepta las líneas en violeta${
+                    stats?.suggestedLines ? ` (${stats.suggestedLines} por revisar)` : ''
+                  }.`}
             </span>
-            <button type="button" onClick={dismissRecent} className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-ink-2 hover:text-ink">
-              <X className="size-3.5" /> Entendido
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {withoutRecipe.length > 0 && (
+                <Button size="sm" variant="ai" icon={<Sparkles className="size-3.5" />} onClick={() => setProposeIds(withoutRecipe.map((d) => d.id))}>
+                  Proponer para {withoutRecipe.length} sin receta
+                </Button>
+              )}
+              <button type="button" onClick={dismissRecent} className="inline-flex h-8 items-center gap-1 px-1 text-xs font-semibold text-ink-2 hover:text-ink">
+                <X className="size-3.5" /> Entendido
+              </button>
+            </div>
           </div>
         </Callout>
       )}
@@ -405,7 +431,7 @@ export default function Dishes() {
       <ProposeModal
         open={proposeIds != null}
         dishIds={proposeIds ?? []}
-        withItems={selectedDishes.filter((d) => d.items.length > 0).length}
+        withItems={proposeTargets.filter((d) => d.items.length > 0).length}
         onClose={() => setProposeIds(null)}
         onDone={() => setSelected(new Set())}
       />

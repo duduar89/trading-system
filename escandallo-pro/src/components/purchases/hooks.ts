@@ -89,7 +89,10 @@ export function useChartColors(): ChartColors {
  * Llama a `fn` tras `delay` ms sin nuevas llamadas. Devuelve [programar, ejecutar ya, cancelar].
  * Al desmontar ejecuta lo pendiente para no perder cambios.
  */
-export function useDebouncedAction<A extends unknown[]>(fn: (...args: A) => void, delay: number): [(...args: A) => void, () => void, () => void] {
+export function useDebouncedAction<A extends unknown[]>(
+  fn: (...args: A) => void,
+  delay: number,
+): [(...args: A) => void, () => void, () => void] {
   const fnRef = useRef(fn);
   useEffect(() => {
     fnRef.current = fn;

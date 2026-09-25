@@ -7,7 +7,10 @@ import { fmtEur } from '../../lib/format';
 import { foldText, type TotalsCheck } from './logic';
 import { AmountInput } from './AmountInput';
 
-export type InvoiceDraft = Pick<Invoice, 'supplierName' | 'supplierTaxId' | 'number' | 'date' | 'subtotal' | 'vatTotal' | 'total' | 'lines'>;
+export type InvoiceDraft = Pick<
+  Invoice,
+  'supplierName' | 'supplierTaxId' | 'number' | 'date' | 'subtotal' | 'vatTotal' | 'total' | 'lines'
+>;
 
 /** Cabecera editable de la factura (proveedor, CIF, nº, fecha e importes). */
 export function InvoiceHeaderForm({
@@ -35,7 +38,14 @@ export function InvoiceHeaderForm({
       </datalist>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
         <Field label="Proveedor" className="col-span-2 sm:col-span-4">
-          <Input value={draft.supplierName} onChange={(e) => onSupplier(e.target.value)} list={listId} placeholder="Nombre del proveedor" disabled={disabled} autoComplete="off" />
+          <Input
+            value={draft.supplierName}
+            onChange={(e) => onSupplier(e.target.value)}
+            list={listId}
+            placeholder="Nombre del proveedor"
+            disabled={disabled}
+            autoComplete="off"
+          />
         </Field>
         <Field label="CIF / NIF" className="col-span-2 sm:col-span-2">
           <Input
@@ -47,19 +57,51 @@ export function InvoiceHeaderForm({
           />
         </Field>
         <Field label="Nº de factura" className="sm:col-span-3">
-          <Input value={draft.number ?? ''} onChange={(e) => onChange({ number: e.target.value || undefined })} placeholder="F-2026/0001" disabled={disabled} />
+          <Input
+            value={draft.number ?? ''}
+            onChange={(e) => onChange({ number: e.target.value || undefined })}
+            placeholder="F-2026/0001"
+            disabled={disabled}
+          />
         </Field>
         <Field label="Fecha" className="sm:col-span-3">
-          <Input type="date" value={draft.date ?? ''} onChange={(e) => e.target.value && onChange({ date: e.target.value })} disabled={disabled} />
+          <Input
+            type="date"
+            value={draft.date ?? ''}
+            onChange={(e) => e.target.value && onChange({ date: e.target.value })}
+            disabled={disabled}
+          />
         </Field>
         <Field label="Base imponible" className="sm:col-span-2">
-          <AmountInput value={draft.subtotal} onValue={(v) => onChange({ subtotal: v })} decimals={2} minDecimals={2} suffix="€" disabled={disabled} />
+          <AmountInput
+            value={draft.subtotal}
+            onValue={(v) => onChange({ subtotal: v })}
+            decimals={2}
+            minDecimals={2}
+            suffix="€"
+            disabled={disabled}
+          />
         </Field>
         <Field label="IVA" className="sm:col-span-2">
-          <AmountInput value={draft.vatTotal} onValue={(v) => onChange({ vatTotal: v })} decimals={2} minDecimals={2} suffix="€" disabled={disabled} />
+          <AmountInput
+            value={draft.vatTotal}
+            onValue={(v) => onChange({ vatTotal: v })}
+            decimals={2}
+            minDecimals={2}
+            suffix="€"
+            disabled={disabled}
+          />
         </Field>
         <Field label="Total factura" className="col-span-2 sm:col-span-2">
-          <AmountInput value={draft.total} onValue={(v) => onChange({ total: v })} decimals={2} minDecimals={2} suffix="€" disabled={disabled} className="font-semibold" />
+          <AmountInput
+            value={draft.total}
+            onValue={(v) => onChange({ total: v })}
+            decimals={2}
+            minDecimals={2}
+            suffix="€"
+            disabled={disabled}
+            className="font-semibold"
+          />
         </Field>
       </div>
     </Card>
@@ -79,7 +121,8 @@ export function TotalsBar({ check, onUseLinesSum, disabled }: { check: TotalsChe
         <div className="min-w-0 flex-1 text-sm text-ink-2">
           {check.status === 'ok' && (
             <>
-              <span className="font-semibold text-ink">Cuadra.</span> La suma de líneas coincide con la base imponible: no falta ninguna línea.
+              <span className="font-semibold text-ink">Cuadra.</span> La suma de líneas coincide con la base imponible: no falta ninguna
+              línea.
             </>
           )}
           {check.status === 'warn' && check.diff != null && (
@@ -109,7 +152,13 @@ export function TotalsBar({ check, onUseLinesSum, disabled }: { check: TotalsChe
             </div>
           )}
           {check.status !== 'ok' && check.linesSum > 0 && !disabled && (
-            <Button size="sm" variant="outline" icon={<Wand2 className="size-3.5" />} onClick={onUseLinesSum} title="Usar la suma de líneas como base imponible">
+            <Button
+              size="sm"
+              variant="outline"
+              icon={<Wand2 className="size-3.5" />}
+              onClick={onUseLinesSum}
+              title="Usar la suma de líneas como base imponible"
+            >
               Usar suma
             </Button>
           )}

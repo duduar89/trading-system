@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router';
 import clsx from 'clsx';
 import { setCurrentWorkspaceId } from '../../db';
@@ -64,15 +64,15 @@ export function useDemoLoader(): [() => Promise<void>, boolean] {
   return [load, loading];
 }
 
-/** Título de sección dentro de una tarjeta. */
-export function SectionLabel({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={clsx('text-[11px] font-bold uppercase tracking-[0.12em] text-muted', className)}>{children}</div>;
-}
+const eur3 = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 3 });
 
-/** Precio por unidad base: 2 decimales desde 1 € (12,40 €) y hasta 4 por debajo (0,0385 €). */
+/** Precio por unidad base legible: 12,40 € · 0,795 € · 0,0385 € (más decimales solo cuando hacen falta). */
 export function fmtUnitPrice(v: number | undefined | null): string {
   if (v == null || !Number.isFinite(v)) return '—';
-  return Math.abs(v) >= 1 ? fmtEur(v) : fmtEurPrecise(v);
+  const a = Math.abs(v);
+  if (a >= 1) return fmtEur(v);
+  if (a >= 0.1) return eur3.format(v);
+  return fmtEurPrecise(v);
 }
 
 /** Variación porcentual con signo: +12,3 % / −4,0 %. */

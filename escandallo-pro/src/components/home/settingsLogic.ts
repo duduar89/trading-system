@@ -147,13 +147,7 @@ export function backupFileName(workspaceName: string, date: Date = new Date(), e
 
 /** Comparación tolerante para confirmar borrados escribiendo el nombre (ignora mayúsculas, tildes y espacios extra). */
 export function confirmNameMatches(input: string, name: string): boolean {
-  const norm = (s: string) =>
-    s
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .toLowerCase()
-      .replace(/\s+/g, ' ')
-      .trim();
+  const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
   return norm(input).length > 0 && norm(input) === norm(name);
 }
 

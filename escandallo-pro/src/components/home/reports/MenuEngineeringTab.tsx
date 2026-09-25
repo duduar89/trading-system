@@ -61,7 +61,12 @@ export function MenuEngineeringTab({ data }: { data: ReportsData }) {
   }
 
   const byClass = new Map<MenuEngineeringClass, MenuEngineeringRow[]>(CLASS_ORDER.map((c) => [c, rows.filter((r) => r.class === c)]));
-  const groups: QuadrantGroup[] = CLASS_ORDER.map((c) => ({ key: c, label: `${MENU_CLASS_LABELS[c].emoji} ${MENU_CLASS_LABELS[c].label}`, color: colors[c], shape: CLASS_SHAPE[c] }));
+  const groups: QuadrantGroup[] = CLASS_ORDER.map((c) => ({
+    key: c,
+    label: `${MENU_CLASS_LABELS[c].emoji} ${MENU_CLASS_LABELS[c].label}`,
+    color: colors[c],
+    shape: CLASS_SHAPE[c],
+  }));
   const totalUnits = rows.reduce((s, r) => s + r.unitsSold, 0);
   const totalMargin = rows.reduce((s, r) => s + r.totalMargin, 0);
   const highMargin = rows.filter((r) => r.contributionMargin >= me.avgMargin).length;
@@ -69,8 +74,19 @@ export function MenuEngineeringTab({ data }: { data: ReportsData }) {
   return (
     <div className="space-y-4 sm:space-y-5">
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Stat label="Platos analizados" value={rows.length} icon={<ChefHat className="size-4" />} hint={me.hasVolumeData ? `${fmtNum(totalUnits, 0)} unidades vendidas` : 'sin datos de ventas'} />
-        <Stat label="Margen medio" value={fmtEur(me.avgMargin)} icon={<Sparkles className="size-4" />} tone="brand" hint={me.hasVolumeData ? 'ponderado por ventas' : 'media por plato'} />
+        <Stat
+          label="Platos analizados"
+          value={rows.length}
+          icon={<ChefHat className="size-4" />}
+          hint={me.hasVolumeData ? `${fmtNum(totalUnits, 0)} unidades vendidas` : 'sin datos de ventas'}
+        />
+        <Stat
+          label="Margen medio"
+          value={fmtEur(me.avgMargin)}
+          icon={<Sparkles className="size-4" />}
+          tone="brand"
+          hint={me.hasVolumeData ? 'ponderado por ventas' : 'media por plato'}
+        />
         {me.hasVolumeData ? (
           <Stat
             label="Estrellas"
@@ -109,8 +125,9 @@ export function MenuEngineeringTab({ data }: { data: ReportsData }) {
 
       {!me.hasVolumeData && (
         <Callout tone="info" icon={<Info className="size-4" />} title="Añade las ventas para completar la matriz">
-          Para saber qué platos son populares necesitamos las <strong>unidades vendidas</strong> de cada plato en un periodo (por ejemplo, el último mes, sacado de tu TPV).
-          Indícalas en el campo «Unidades vendidas» de cada escandallo. Mientras tanto, te mostramos los platos ordenados por margen.
+          Para saber qué platos son populares necesitamos las <strong>unidades vendidas</strong> de cada plato en un periodo (por ejemplo, el último
+          mes, sacado de tu TPV). Indícalas en el campo «Unidades vendidas» de cada escandallo. Mientras tanto, te mostramos los platos ordenados por
+          margen.
         </Callout>
       )}
 
@@ -241,20 +258,30 @@ export function MenuEngineeringTab({ data }: { data: ReportsData }) {
                   <span className="block truncate font-semibold text-ink">{r.name}</span>
                   {r.section && <span className="block truncate text-xs text-muted">{r.section}</span>}
                 </Td>
-                <Td align="right">{me.hasVolumeData ? fmtNum(r.unitsSold, 0) : '—'}</Td>
-                <Td align="right">{me.hasVolumeData ? fmtPct(r.mixPct) : '—'}</Td>
-                <Td align="right" className="font-semibold text-ink">
+                <Td align="right" className="whitespace-nowrap">
+                  {me.hasVolumeData ? fmtNum(r.unitsSold, 0) : '—'}
+                </Td>
+                <Td align="right" className="whitespace-nowrap">
+                  {me.hasVolumeData ? fmtPct(r.mixPct) : '—'}
+                </Td>
+                <Td align="right" className="whitespace-nowrap font-semibold text-ink">
                   {fmtEur(r.contributionMargin)}
                 </Td>
-                <Td align="right">{me.hasVolumeData ? fmtEur(r.totalMargin) : '—'}</Td>
-                <Td align="right">{fmtPct(r.foodCostPct)}</Td>
+                <Td align="right" className="whitespace-nowrap">
+                  {me.hasVolumeData ? fmtEur(r.totalMargin) : '—'}
+                </Td>
+                <Td align="right" className="whitespace-nowrap">
+                  {fmtPct(r.foodCostPct)}
+                </Td>
                 <Td>
                   {me.hasVolumeData ? (
                     <Badge tone={MENU_CLASS_LABELS[r.class].tone}>
                       {MENU_CLASS_LABELS[r.class].emoji} {MENU_CLASS_LABELS[r.class].label}
                     </Badge>
                   ) : (
-                    <Badge tone={r.contributionMargin >= me.avgMargin ? 'ok' : 'warn'}>{r.contributionMargin >= me.avgMargin ? 'Margen alto' : 'Margen bajo'}</Badge>
+                    <Badge tone={r.contributionMargin >= me.avgMargin ? 'ok' : 'warn'}>
+                      {r.contributionMargin >= me.avgMargin ? 'Margen alto' : 'Margen bajo'}
+                    </Badge>
                   )}
                 </Td>
                 <Td className="text-xs text-muted">

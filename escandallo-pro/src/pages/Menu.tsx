@@ -89,7 +89,7 @@ export default function Menu() {
                   icon={<Camera className="size-6" />}
                   title="Hacer foto"
                   description="Con la cámara del móvil. Puedes añadir varias fotos (una por página)."
-                  className={clsx('h-full border-brand-400 bg-brand-500/8 backdrop-blur', highlight && 'border-brand-500')}
+                  className={clsx('h-full border-brand-400! bg-brand-500/8! backdrop-blur', highlight && 'border-brand-500!')}
                 />
               </div>
               <FileDrop

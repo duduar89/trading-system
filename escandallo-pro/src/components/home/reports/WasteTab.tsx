@@ -42,7 +42,9 @@ export function WasteTab({ data }: { data: ReportsData }) {
           label="Merma en el periodo"
           value={withSales.length ? fmtEur(periodWaste) : '—'}
           icon={<Trash2 className="size-4" />}
-          hint={withSales.length ? `según las ventas de ${withSales.length} plato${withSales.length === 1 ? '' : 's'}` : 'añade las unidades vendidas'}
+          hint={
+            withSales.length ? `según las ventas de ${withSales.length} plato${withSales.length === 1 ? '' : 's'}` : 'añade las unidades vendidas'
+          }
         />
         <Link to="/mermas" className="group block rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
           <Stat
@@ -50,7 +52,11 @@ export function WasteTab({ data }: { data: ReportsData }) {
             value={data.yieldTests.length}
             icon={<FlaskConical className="size-4" />}
             tone="ai"
-            hint={<span className="inline-flex items-center gap-1 font-semibold text-brand-600 dark:text-brand-400">Ver mermas <ArrowRight className="size-3" /></span>}
+            hint={
+              <span className="inline-flex items-center gap-1 font-semibold text-brand-600 dark:text-brand-400">
+                Ver mermas <ArrowRight className="size-3" />
+              </span>
+            }
             className="h-full transition group-hover:-translate-y-0.5 group-hover:shadow-pop"
           />
         </Link>
@@ -59,7 +65,11 @@ export function WasteTab({ data }: { data: ReportsData }) {
       {dishRows.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
           <Card>
-            <CardHeader icon={<Coins className="size-5" />} title="Platos que más pierden en euros" subtitle="Coste de la merma por ración: lo que pagas y no llega al plato." />
+            <CardHeader
+              icon={<Coins className="size-5" />}
+              title="Platos que más pierden en euros"
+              subtitle="Coste de la merma por ración: lo que pagas y no llega al plato."
+            />
             <HBarList
               ariaLabel="Platos con mayor coste de merma por ración"
               items={byCost.map((r) => ({
@@ -75,7 +85,11 @@ export function WasteTab({ data }: { data: ReportsData }) {
             />
           </Card>
           <Card>
-            <CardHeader icon={<Scale className="size-5" />} title="Platos con más merma en peso" subtitle="% del peso comprado que no se sirve (limpieza + cocción)." />
+            <CardHeader
+              icon={<Scale className="size-5" />}
+              title="Platos con más merma en peso"
+              subtitle="% del peso comprado que no se sirve (limpieza + cocción)."
+            />
             <HBarList
               ariaLabel="Platos con mayor porcentaje de merma"
               max={100}
@@ -124,18 +138,28 @@ export function WasteTab({ data }: { data: ReportsData }) {
                       <span aria-hidden>{CATEGORY_LABELS[p.category]?.emoji ?? '📦'}</span>
                       <span className="truncate font-semibold text-ink">{p.name}</span>
                     </span>
-                    {p.usedInDishes > 0 && <span className="block text-xs text-muted">en {p.usedInDishes} plato{p.usedInDishes === 1 ? '' : 's'}</span>}
+                    {p.usedInDishes > 0 && (
+                      <span className="block text-xs text-muted">
+                        en {p.usedInDishes} plato{p.usedInDishes === 1 ? '' : 's'}
+                      </span>
+                    )}
                   </Td>
-                  <Td align="right">{fmtPct(p.cleaningPct, 0)}</Td>
-                  <Td align="right">{fmtPct(p.cookingPct, 0)}</Td>
-                  <Td align="right" className="font-semibold text-ink">
+                  <Td align="right" className="whitespace-nowrap">
+                    {fmtPct(p.cleaningPct, 0)}
+                  </Td>
+                  <Td align="right" className="whitespace-nowrap">
+                    {fmtPct(p.cookingPct, 0)}
+                  </Td>
+                  <Td align="right" className="whitespace-nowrap font-semibold text-ink">
                     {fmtPct(p.totalLossPct, 0)}
                   </Td>
-                  <Td align="right">{p.pricePerBase > 0 ? `${fmtUnitPrice(p.pricePerBase)}/${p.baseUnit}` : '—'}</Td>
-                  <Td align="right" className="font-semibold text-ink">
+                  <Td align="right" className="whitespace-nowrap">
+                    {p.pricePerBase > 0 ? `${fmtUnitPrice(p.pricePerBase)}/${p.baseUnit}` : '—'}
+                  </Td>
+                  <Td align="right" className="whitespace-nowrap font-semibold text-ink">
                     {p.pricePerBase > 0 ? `${fmtUnitPrice(p.realPricePerUsable)}/${p.baseUnit}` : '—'}
                   </Td>
-                  <Td align="right" className="font-semibold text-bad">
+                  <Td align="right" className="whitespace-nowrap font-semibold text-bad">
                     {p.lossPerBase > 0 ? `${fmtUnitPrice(p.lossPerBase)}/${p.baseUnit}` : '—'}
                   </Td>
                   <Td>{p.source === 'prueba' ? <Badge tone="ok">Prueba real</Badge> : <Badge tone="neutral">Estimada</Badge>}</Td>
@@ -154,8 +178,8 @@ export function WasteTab({ data }: { data: ReportsData }) {
           <div className="min-w-0 flex-1">
             <div className="font-display text-base font-bold text-ink">Afina tus mermas con una prueba de rendimiento</div>
             <p className="text-sm text-muted">
-              Las mermas de {noTest.map((p) => p.name).join(', ')} son estimadas. Pesa una pieza antes y después de limpiarla y tendrás el coste real por kilo
-              aprovechable.
+              Las mermas de {noTest.map((p) => p.name).join(', ')} son estimadas. Pesa una pieza antes y después de limpiarla y tendrás el coste real
+              por kilo aprovechable.
             </p>
           </div>
           <Button onClick={() => navigate('/mermas?nuevo=1')} icon={<ChefHat className="size-4" />}>

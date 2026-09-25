@@ -22,8 +22,8 @@ export function OnboardingChecklist({ steps, doneCount, workspaceName }: { steps
             Vamos a calcular el food cost {workspaceName ? <>de «{workspaceName}»</> : 'de tu carta'}
           </h2>
           <p className="mt-2 max-w-xl text-sm text-ink-2 sm:text-[15px]">
-            Tres pasos y tendrás el escandallo de cada plato. La lectura de facturas y cartas es gratis, funciona en tu dispositivo y no envía tus datos a
-            nadie.
+            Tres pasos y tendrás el escandallo de cada plato. La lectura de facturas y cartas es gratis, funciona en tu dispositivo y no envía tus
+            datos a nadie.
           </p>
           <div className="mt-5 flex items-center gap-3">
             <ProgressBar value={doneCount / steps.length} className="h-2.5 max-w-xs" />
@@ -59,7 +59,11 @@ export function OnboardingChecklist({ steps, doneCount, workspaceName }: { steps
                         Paso {i + 1}
                         {s.done && <span className="rounded-full bg-ok-soft px-1.5 py-0.5 text-[10px] text-ok">Hecho</span>}
                       </div>
-                      <div className={cx('font-display text-base font-bold sm:text-lg', s.done ? 'text-muted line-through decoration-2' : 'text-ink')}>{s.title}</div>
+                      <div
+                        className={cx('font-display text-base font-bold sm:text-lg', s.done ? 'text-muted line-through decoration-2' : 'text-ink')}
+                      >
+                        {s.title}
+                      </div>
                       <p className="mt-0.5 text-sm text-muted">{s.description}</p>
                     </div>
                   </div>

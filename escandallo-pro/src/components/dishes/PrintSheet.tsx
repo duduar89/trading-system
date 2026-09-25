@@ -1,10 +1,24 @@
 import type { BusinessSettings, Dish, DishCost, Workspace } from '../../types';
-import { LogoMark } from '../Logo';
 import { ALLERGEN_LABELS, BASIS_LABELS } from '../../lib/labels';
 import { UNIT_LABELS } from '../../core/units';
 import { fmtBaseQty, fmtDate, fmtEur, fmtKg, fmtNum } from '../../lib/format';
 import { todayIso } from '../../lib/id';
-import { fmtPrice, targetOf, fmtPctNb } from './logic';
+import { fmtPctNb, fmtPrice, shownFoodCost, shownMargin, targetOf } from './logic';
+
+/**
+ * Marca para impresión con colores planos: los degradados con id de otras copias del logo (ocultas al imprimir)
+ * no se pintan en algunos navegadores.
+ */
+function PrintLogo() {
+  return (
+    <svg viewBox="0 0 64 64" className="size-10 shrink-0" aria-hidden="true">
+      <rect width="64" height="64" rx="16" fill="#ff5a1f" />
+      <circle cx="32" cy="34" r="17" fill="none" stroke="#fff" strokeOpacity="0.35" strokeWidth="3" />
+      <path d="M20 40 L28 32 L34 37 L45 24" fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="45" cy="24" r="3.6" fill="#fff" />
+    </svg>
+  );
+}
 
 /**
  * Ficha técnica imprimible (sólo visible al imprimir). Usa negro sobre blanco explícito
@@ -19,7 +33,7 @@ export function PrintSheet({ dish, cost, business, workspace }: { dish: Dish; co
       <style>{'@page { size: A4; margin: 14mm; }'}</style>
       <header className="flex items-start justify-between border-b-2 border-black pb-3">
         <div className="flex items-center gap-2.5">
-          <LogoMark className="size-10" />
+          <PrintLogo />
           <div>
             <div className="text-[15px] font-extrabold tracking-tight">
               Escandallo<span style={{ color: '#ff5a1f' }}>Pro</span>
@@ -57,11 +71,11 @@ export function PrintSheet({ dish, cost, business, workspace }: { dish: Dish; co
                 </tr>
                 <tr>
                   <td className="pr-3 text-black/60">Food cost (objetivo {fmtPctNb(target, 0)})</td>
-                  <td className="font-bold">{fmtPctNb(cost.foodCostPct)}</td>
+                  <td className="font-bold">{fmtPctNb(shownFoodCost(cost))}</td>
                 </tr>
                 <tr>
                   <td className="pr-3 text-black/60">Margen bruto</td>
-                  <td className="font-bold">{fmtEur(cost.grossMargin)}</td>
+                  <td className="font-bold">{fmtEur(shownMargin(cost))}</td>
                 </tr>
               </>
             )}

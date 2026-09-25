@@ -132,7 +132,7 @@ export function NewDishModal({ open, initialKind = 'plato', sections, onClose }:
             <Field label="Rendimiento" hint="Opcional">
               <div className="flex gap-1.5">
                 <NumberInput value={yieldQty} onValue={setYieldQty} decimals={3} min={0} placeholder="0" className="min-w-0 flex-1" />
-                <Select value={yieldUnit} onChange={(e) => setYieldUnit(e.target.value as BaseUnit)} className="w-[72px] px-2!" aria-label="Unidad de rendimiento">
+                <Select value={yieldUnit} onChange={(e) => setYieldUnit(e.target.value as BaseUnit)} className="w-[72px]! shrink-0 px-2!" aria-label="Unidad de rendimiento">
                   <option value="kg">kg</option>
                   <option value="l">l</option>
                   <option value="ud">ud</option>

@@ -48,7 +48,11 @@ export function BusinessCard({ id }: { id?: string }) {
 
   return (
     <Card id={id} className="scroll-mt-24">
-      <CardHeader icon={<Briefcase className="size-5" />} title="Negocio" subtitle="Tus objetivos. Se aplican a todos los platos de este restaurante (salvo los que tengan un objetivo propio)." />
+      <CardHeader
+        icon={<Briefcase className="size-5" />}
+        title="Negocio"
+        subtitle="Tus objetivos. Se aplican a todos los platos de este restaurante (salvo los que tengan un objetivo propio)."
+      />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Food cost objetivo" error={errors.targetFoodCostPct} hint="Lo habitual en restauración: 25–35 % del PVP sin IVA.">
           <NumberInput value={d.targetFoodCostPct} onValue={(v) => set({ targetFoodCostPct: v })} suffix="%" decimals={1} />
@@ -62,7 +66,12 @@ export function BusinessCard({ id }: { id?: string }) {
         <Field label="Avisar si un ingrediente sube más de" error={errors.priceAlertPct} hint="Aparecerá en «Alertas de precio» del panel.">
           <NumberInput value={d.priceAlertPct} onValue={(v) => set({ priceAlertPct: v })} suffix="%" decimals={1} />
         </Field>
-        <Field label="Redondeo del PVP sugerido" error={errors.priceRounding} className="sm:col-span-2" hint="El precio recomendado se redondea hacia arriba a un importe «de carta».">
+        <Field
+          label="Redondeo del PVP sugerido"
+          error={errors.priceRounding}
+          className="sm:col-span-2"
+          hint="El precio recomendado se redondea hacia arriba a un importe «de carta»."
+        >
           <Select value={String(d.priceRounding ?? '')} onChange={(e) => set({ priceRounding: Number(e.target.value) })}>
             {ROUNDING_OPTIONS.map((o) => (
               <option key={o.value} value={String(o.value)}>

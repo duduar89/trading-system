@@ -14,11 +14,18 @@ export async function downloadWorkspaceBackup(workspaceId: string): Promise<void
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   downloadBlob(blob, backupFileName(backup.workspace.name));
   const s = backupSummary(backup);
-  toast.success('Copia de seguridad descargada', `${s.products} ingredientes, ${s.dishes} platos y ${s.invoices} facturas. Guárdala en un lugar seguro.`);
+  toast.success(
+    'Copia de seguridad descargada',
+    `${s.products} ingredientes, ${s.dishes} platos y ${s.invoices} facturas. Guárdala en un lugar seguro.`,
+  );
 }
 
 /** Botón que descarga la copia de seguridad del espacio indicado. */
-export function ExportBackupButton({ workspaceId, label = 'Descargar copia (JSON)', ...rest }: Omit<ButtonProps, 'onClick'> & { workspaceId: string | undefined; label?: string }) {
+export function ExportBackupButton({
+  workspaceId,
+  label = 'Descargar copia (JSON)',
+  ...rest
+}: Omit<ButtonProps, 'onClick'> & { workspaceId: string | undefined; label?: string }) {
   const [busy, setBusy] = useState(false);
   return (
     <Button

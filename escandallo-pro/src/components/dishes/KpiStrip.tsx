@@ -4,7 +4,7 @@ import { CheckCircle2, AlertTriangle, Wand2 } from 'lucide-react';
 import type { BaseUnit, BusinessSettings, Dish, DishCost } from '../../types';
 import { fmtEur, fmtKg, fmtNum } from '../../lib/format';
 import { Button, FoodCostBadge, NumberInput, Select } from '../ui';
-import { dishFoodCostStatus, fmtPrice, targetOf, yieldUnitLabel, fmtPctNb } from './logic';
+import { dishFoodCostStatus, fmtPctNb, fmtPrice, shownFoodCost, shownMargin, targetOf, yieldUnitLabel } from './logic';
 
 /** Tarjeta de KPI con el lenguaje visual de Stat, pero admitiendo controles dentro. */
 function Tile({ label, children, hint, className, tone }: { label: ReactNode; children: ReactNode; hint?: ReactNode; className?: string; tone?: 'brand' }) {
@@ -66,7 +66,9 @@ export function KpiStrip({
 }) {
   const target = targetOf(dish, business);
   const vat = dish.saleVatPct ?? business.defaultSaleVatPct;
-  const status = dishFoodCostStatus(cost.foodCostPct, dish, business);
+  const fc = shownFoodCost(cost);
+  const margin = shownMargin(cost);
+  const status = dishFoodCostStatus(fc, dish, business);
   const portions = dish.portions > 0 ? dish.portions : 1;
 
   if (dish.kind === 'elaboracion') {
@@ -86,7 +88,7 @@ export function KpiStrip({
               aria-label="Cantidad producida"
               className="min-w-0 flex-1 text-right font-semibold"
             />
-            <Select value={yu} onChange={(e) => onChange({ yieldUnit: e.target.value as BaseUnit })} aria-label="Unidad del rendimiento" className="w-[76px] px-2!">
+            <Select value={yu} onChange={(e) => onChange({ yieldUnit: e.target.value as BaseUnit })} aria-label="Unidad del rendimiento" className="w-[76px]! shrink-0 px-2!">
               <option value="kg">kg</option>
               <option value="l">l</option>
               <option value="ud">ud</option>
@@ -145,14 +147,15 @@ export function KpiStrip({
         />
       </Tile>
       <Tile label="Food cost" hint={`Objetivo ${fmtPctNb(target, 0)}${dish.targetFoodCostPct ? ' (de este plato)' : ''}`}>
-        <FoodCostBadge pct={cost.foodCostPct} status={status} size="lg" />
-        <FoodCostMeter pct={cost.foodCostPct} target={target} status={status} />
+        <FoodCostBadge pct={fc} status={status} size="lg" />
+        <FoodCostMeter pct={fc} target={target} status={status} />
       </Tile>
-      <Tile label="Margen bruto" hint={cost.multiplier != null ? `Multiplicador ×${fmtNum(cost.multiplier, 2)}` : 'Por ración, sin IVA'}>
-        <div className={clsx('font-display text-2xl font-extrabold', cost.grossMargin != null && cost.grossMargin < 0 ? 'text-bad' : 'text-ink')}>
-          {fmtEur(cost.grossMargin)}
-        </div>
-        {cost.grossMarginPct != null && <div className="text-xs font-semibold text-ink-2">{fmtPctNb(cost.grossMarginPct)} del PVP sin IVA</div>}
+      <Tile
+        label="Margen bruto"
+        hint={cost.multiplier != null ? `Multiplicador ×${fmtNum(cost.multiplier, 2)}` : margin == null && cost.netPrice ? 'Añade ingredientes con precio' : 'Por ración, sin IVA'}
+      >
+        <div className={clsx('font-display text-2xl font-extrabold', margin != null && margin < 0 ? 'text-bad' : 'text-ink')}>{fmtEur(margin)}</div>
+        {margin != null && cost.grossMarginPct != null && <div className="text-xs font-semibold text-ink-2">{fmtPctNb(cost.grossMarginPct)} del PVP sin IVA</div>}
       </Tile>
       <Tile label="PVP sugerido" hint={`Para un food cost del ${fmtPctNb(target, 0)}`}>
         <div className="flex flex-wrap items-center gap-2">
@@ -174,7 +177,8 @@ export function KpiStrip({
 
 /** Resumen compacto y fijo para móvil mientras se edita el escandallo. */
 export function KpiMini({ dish, cost, business }: { dish: Dish; cost: DishCost; business: BusinessSettings }) {
-  const status = dishFoodCostStatus(cost.foodCostPct, dish, business);
+  const fc = shownFoodCost(cost);
+  const status = dishFoodCostStatus(fc, dish, business);
   const dot = { ok: 'bg-ok', warn: 'bg-warn', bad: 'bg-bad', none: 'bg-line-strong' }[status];
   return (
     <div className="tabular flex items-center justify-between gap-3 text-xs">
@@ -193,7 +197,7 @@ export function KpiMini({ dish, cost, business }: { dish: Dish; cost: DishCost; 
             <div className="text-[10px] font-bold uppercase tracking-wide text-muted">Food cost</div>
             <div className="inline-flex items-center gap-1.5 font-display text-base font-extrabold text-ink">
               <span className={clsx('size-2 rounded-full', dot)} aria-hidden />
-              {fmtPctNb(cost.foodCostPct)}
+              {fmtPctNb(fc)}
             </div>
           </div>
           <div className="min-w-0 text-right">

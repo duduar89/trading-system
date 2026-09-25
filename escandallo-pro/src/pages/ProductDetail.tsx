@@ -24,7 +24,17 @@ import { AmountInput } from '../components/purchases/AmountInput';
 
 type FormDraft = Pick<
   Product,
-  'name' | 'category' | 'baseUnit' | 'unitWeightKg' | 'densityKgPerL' | 'wastePct' | 'cookingLossPct' | 'purchaseVatPct' | 'supplierId' | 'notes' | 'allergens'
+  | 'name'
+  | 'category'
+  | 'baseUnit'
+  | 'unitWeightKg'
+  | 'densityKgPerL'
+  | 'wastePct'
+  | 'cookingLossPct'
+  | 'purchaseVatPct'
+  | 'supplierId'
+  | 'notes'
+  | 'allergens'
 >;
 type SaveState = 'idle' | 'saving' | 'saved' | 'dirty' | 'error';
 
@@ -66,42 +76,50 @@ export default function ProductDetail() {
   const [form, setForm] = useState<FormDraft | null>(null);
   const loadedId = useRef<ID | null>(null);
   const initialUnit = useRef<BaseUnit | null>(null);
-  const pending = useRef<Partial<Product>>({});
+  // Cambios pendientes de guardar, ligados al producto al que pertenecen.
+  const pending = useRef<{ id: ID; patch: Partial<Product> } | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [priceOpen, setPriceOpen] = useState(false);
   const [mergeWith, setMergeWith] = useState<Product | null>(null);
   const [askDelete, setAskDelete] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
 
-  useEffect(() => {
-    if (product && loadedId.current !== product.id) {
-      loadedId.current = product.id;
-      initialUnit.current = product.baseUnit;
-      setForm(toForm(product));
-    }
-  }, [product]);
-
   const persist = useCallback(async () => {
-    const patch = pending.current;
-    pending.current = {};
-    const pid = loadedId.current;
-    if (!pid || !Object.keys(patch).length) return;
+    const job = pending.current;
+    pending.current = null;
+    if (!job || !Object.keys(job.patch).length) return;
     setSaveState('saving');
     try {
-      await updateProduct(pid, patch);
-      setSaveState(Object.keys(pending.current).length ? 'dirty' : 'saved');
+      await updateProduct(job.id, job.patch);
+      setSaveState(pending.current ? 'dirty' : 'saved');
     } catch (e) {
-      pending.current = { ...patch, ...pending.current };
+      const next = pending.current as { id: ID; patch: Partial<Product> } | null;
+      pending.current = next && next.id === job.id ? { id: job.id, patch: { ...job.patch, ...next.patch } } : (next ?? job);
       setSaveState('error');
       toast.error('No se pudieron guardar los cambios', errorMessage(e));
     }
   }, []);
-  const [schedule] = useDebouncedAction(() => void persist(), 700);
+  const [schedule, flush] = useDebouncedAction(() => void persist(), 700);
+
+  useEffect(() => {
+    if (product && loadedId.current !== product.id) {
+      // Al cambiar de ingrediente (p. ej. tras fusionar), se guarda antes lo pendiente del anterior.
+      if (pending.current) flush();
+      loadedId.current = product.id;
+      initialUnit.current = product.baseUnit;
+      setForm(toForm(product));
+      setSaveState('idle');
+    }
+  }, [product, flush]);
 
   const change = <K extends keyof FormDraft>(key: K, value: FormDraft[K]) => {
     setForm((f) => (f ? { ...f, [key]: value } : f));
+    const pid = loadedId.current;
+    if (!pid) return;
     if (key === 'name' && !String(value ?? '').trim()) return; // un nombre vacío no se guarda
-    pending.current = { ...pending.current, [key]: key === 'name' ? String(value).trim() : value };
+    if (pending.current && pending.current.id !== pid) flush();
+    const prev = pending.current?.patch ?? {};
+    pending.current = { id: pid, patch: { ...prev, [key]: key === 'name' ? String(value).trim() : value } };
     setSaveState('dirty');
     schedule();
   };
@@ -149,7 +167,10 @@ export default function ProductDetail() {
 
   return (
     <div className="animate-fade-in">
-      <Link to="/ingredientes" className="mb-3 inline-flex min-h-10 items-center gap-1.5 rounded-lg text-sm font-semibold text-muted transition hover:text-ink">
+      <Link
+        to="/ingredientes"
+        className="mb-3 inline-flex min-h-10 items-center gap-1.5 rounded-lg text-sm font-semibold text-muted transition hover:text-ink"
+      >
         <ArrowLeft className="size-4" /> Ingredientes
       </Link>
       <PageHeader
@@ -182,7 +203,12 @@ export default function ProductDetail() {
                     {product.lastPurchaseDate && <span>· Última compra {fmtDate(product.lastPurchaseDate)}</span>}
                   </div>
                 </div>
-                <Button variant={product.pricePerBase > 0 ? 'outline' : 'primary'} icon={<PencilLine className="size-4" />} onClick={() => setPriceOpen(true)} className="shrink-0">
+                <Button
+                  variant={product.pricePerBase > 0 ? 'outline' : 'primary'}
+                  icon={<PencilLine className="size-4" />}
+                  onClick={() => setPriceOpen(true)}
+                  className="shrink-0"
+                >
                   Cambiar precio
                 </Button>
               </div>
@@ -197,9 +223,19 @@ export default function ProductDetail() {
 
           {/* Histórico */}
           <Card>
-            <CardHeader icon={<History className="size-5" />} title="Histórico de precios" subtitle={history.length ? `${history.length} ${history.length === 1 ? 'precio registrado' : 'precios registrados'}` : 'Aún sin compras registradas'} />
+            <CardHeader
+              icon={<History className="size-5" />}
+              title="Histórico de precios"
+              subtitle={
+                history.length
+                  ? `${history.length} ${history.length === 1 ? 'precio registrado' : 'precios registrados'}`
+                  : 'Aún sin compras registradas'
+              }
+            />
             {history.length === 0 ? (
-              <p className="text-sm text-muted">Cuando confirmes una factura con este ingrediente, cada compra quedará aquí con su fecha, proveedor y precio.</p>
+              <p className="text-sm text-muted">
+                Cuando confirmes una factura con este ingrediente, cada compra quedará aquí con su fecha, proveedor y precio.
+              </p>
             ) : (
               <>
                 <div className="overflow-x-auto">
@@ -223,17 +259,29 @@ export default function ProductDetail() {
                               {fmtEurPrecise(pt.pricePerBase)}
                               <span className="text-xs font-normal text-muted">/{product.baseUnit}</span>
                             </td>
-                            <td className="whitespace-nowrap px-2 py-2 text-right">{prev ? <ChangePct pct={pctChange(prev.pricePerBase, pt.pricePerBase)} /> : <span className="text-xs text-muted">—</span>}</td>
+                            <td className="whitespace-nowrap px-2 py-2 text-right">
+                              {prev ? (
+                                <ChangePct pct={pctChange(prev.pricePerBase, pt.pricePerBase)} />
+                              ) : (
+                                <span className="text-xs text-muted">—</span>
+                              )}
+                            </td>
                             <td className="px-2 py-2">
                               {pt.invoiceId ? (
-                                <Link to={`/facturas/${pt.invoiceId}`} className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline dark:text-brand-400" title={pt.rawDescription}>
+                                <Link
+                                  to={`/facturas/${pt.invoiceId}`}
+                                  className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                                  title={pt.rawDescription}
+                                >
                                   <Receipt className="size-3.5" /> Factura
                                 </Link>
                               ) : (
                                 <span className="text-ink-2">{SOURCE_LABELS[pt.source]}</span>
                               )}
                             </td>
-                            <td className="max-w-[180px] truncate py-2 pl-2 text-ink-2">{pt.supplierId ? (supplierNames.get(pt.supplierId) ?? '—') : '—'}</td>
+                            <td className="max-w-[180px] truncate py-2 pl-2 text-ink-2">
+                              {pt.supplierId ? (supplierNames.get(pt.supplierId) ?? '—') : '—'}
+                            </td>
                           </tr>
                         );
                       })}
@@ -241,7 +289,11 @@ export default function ProductDetail() {
                   </table>
                 </div>
                 {history.length > 6 && (
-                  <button type="button" onClick={() => setShowAllHistory((s) => !s)} className="mt-2 min-h-10 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllHistory((s) => !s)}
+                    className="mt-2 min-h-10 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                  >
                     {showAllHistory ? 'Ver menos' : `Ver los ${history.length} precios`}
                   </button>
                 )}
@@ -283,7 +335,8 @@ export default function ProductDetail() {
               {unitChanged && (
                 <p className="flex items-start gap-2 rounded-xl bg-warn-soft px-3 py-2 text-xs text-ink-2">
                   <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warn" />
-                  Cambiar la unidad no convierte el precio: {fmtEurPrecise(product.pricePerBase)} pasará a ser por {unit}. Revisa el precio y las recetas que lo usan.
+                  Cambiar la unidad no convierte el precio: {fmtEurPrecise(product.pricePerBase)} pasará a ser por {unit}. Revisa el precio
+                  y las recetas que lo usan.
                 </p>
               )}
               <div className="grid grid-cols-2 gap-3">
@@ -297,16 +350,40 @@ export default function ProductDetail() {
                   />
                 </Field>
                 <Field label="Densidad" hint={unit === 'l' ? 'kg por litro (agua = 1)' : 'Sólo líquidos'}>
-                  <AmountInput value={form.densityKgPerL} onValue={(v) => change('densityKgPerL', v != null && v > 0 ? v : undefined)} decimals={3} suffix="kg/l" min={0} />
+                  <AmountInput
+                    value={form.densityKgPerL}
+                    onValue={(v) => change('densityKgPerL', v != null && v > 0 ? v : undefined)}
+                    decimals={3}
+                    suffix="kg/l"
+                    min={0}
+                  />
                 </Field>
-                <Field label="Merma de limpieza" hint={product.yieldTestId ? 'Manda la prueba de rendimiento' : 'Lo que se tira al limpiar'}>
-                  <AmountInput value={form.wastePct} onValue={(v) => change('wastePct', Math.min(99, Math.max(0, v ?? 0)))} decimals={1} suffix="%" min={0} />
+                <Field
+                  label="Merma de limpieza"
+                  hint={product.yieldTestId ? 'Manda la prueba de rendimiento' : 'Lo que se tira al limpiar'}
+                >
+                  <AmountInput
+                    value={form.wastePct}
+                    onValue={(v) => change('wastePct', Math.min(99, Math.max(0, v ?? 0)))}
+                    decimals={1}
+                    suffix="%"
+                    min={0}
+                  />
                 </Field>
                 <Field label="Merma de cocción" hint="Peso que pierde al cocinarse">
-                  <AmountInput value={form.cookingLossPct} onValue={(v) => change('cookingLossPct', Math.min(99, Math.max(0, v ?? 0)))} decimals={1} suffix="%" min={0} />
+                  <AmountInput
+                    value={form.cookingLossPct}
+                    onValue={(v) => change('cookingLossPct', Math.min(99, Math.max(0, v ?? 0)))}
+                    decimals={1}
+                    suffix="%"
+                    min={0}
+                  />
                 </Field>
                 <Field label="IVA de compra">
-                  <Select value={form.purchaseVatPct ?? ''} onChange={(e) => change('purchaseVatPct', e.target.value === '' ? undefined : Number(e.target.value))}>
+                  <Select
+                    value={form.purchaseVatPct ?? ''}
+                    onChange={(e) => change('purchaseVatPct', e.target.value === '' ? undefined : Number(e.target.value))}
+                  >
                     <option value="">Sin indicar</option>
                     <option value="4">4 %</option>
                     <option value="10">10 %</option>
@@ -332,7 +409,12 @@ export default function ProductDetail() {
                 <span className="mt-1 block text-xs text-muted">Se trasladan automáticamente a la ficha de cada plato que lo lleve.</span>
               </div>
               <Field label="Notas">
-                <Textarea value={form.notes ?? ''} onChange={(e) => change('notes', e.target.value || undefined)} placeholder="Calibre, marca preferida, conservación…" rows={3} />
+                <Textarea
+                  value={form.notes ?? ''}
+                  onChange={(e) => change('notes', e.target.value || undefined)}
+                  placeholder="Calibre, marca preferida, conservación…"
+                  rows={3}
+                />
               </Field>
             </div>
           </Card>
@@ -355,9 +437,16 @@ export default function ProductDetail() {
                   <Merge className="size-4 shrink-0 text-muted" />
                   <span className="flex-1 text-muted">Buscar el duplicado…</span>
                 </ProductPicker>
-                <p className="mt-1 text-xs text-muted">Útil cuando el mismo producto aparece con dos nombres (p. ej. de dos proveedores).</p>
+                <p className="mt-1 text-xs text-muted">
+                  Útil cuando el mismo producto aparece con dos nombres (p. ej. de dos proveedores).
+                </p>
               </div>
-              <Button variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 className="size-4" />} onClick={() => setAskDelete(true)}>
+              <Button
+                variant="ghost"
+                className="text-bad hover:bg-bad-soft hover:text-bad"
+                icon={<Trash2 className="size-4" />}
+                onClick={() => setAskDelete(true)}
+              >
                 Eliminar ingrediente
               </Button>
             </div>

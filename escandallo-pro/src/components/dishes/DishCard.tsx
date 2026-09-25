@@ -5,7 +5,7 @@ import type { BusinessSettings, Dish, DishCost } from '../../types';
 import { fmtEur } from '../../lib/format';
 import { AllergenChips } from '../Allergens';
 import { Badge, FoodCostBadge, ProgressBar } from '../ui';
-import { dishFoodCostStatus, fmtPrice, fmtPctNb } from './logic';
+import { dishFoodCostStatus, fmtPctNb, fmtPrice, shownFoodCost, shownMargin } from './logic';
 
 const STRIPE = { ok: 'bg-ok', warn: 'bg-warn', bad: 'bg-bad', none: 'bg-line-strong' } as const;
 
@@ -52,7 +52,9 @@ export function DishCard({
   selecting: boolean;
   onToggle: () => void;
 }) {
-  const status = dishFoodCostStatus(cost?.foodCostPct, dish, business);
+  const fc = shownFoodCost(cost);
+  const margin = shownMargin(cost);
+  const status = dishFoodCostStatus(fc, dish, business);
   const suggested = dish.items.filter((i) => i.suggested).length;
   const missing = cost ? cost.items.filter((i) => !i.resolved).length : 0;
   const isPlato = dish.kind === 'plato';
@@ -88,7 +90,7 @@ export function DishCard({
           </h3>
         </div>
         <div className="flex items-start gap-1">
-          {isPlato && <FoodCostBadge pct={cost?.foodCostPct} status={status} />}
+          {isPlato && <FoodCostBadge pct={fc} status={status} />}
           <SelectBox
             checked={selected}
             onChange={onToggle}
@@ -105,8 +107,8 @@ export function DishCard({
             <Metric label="Coste" value={cost && cost.costPerPortion > 0 ? fmtEur(cost.costPerPortion) : undefined} />
             <Metric
               label="Margen"
-              value={cost?.grossMargin != null ? fmtEur(cost.grossMargin) : undefined}
-              tone={cost?.grossMargin != null && cost.grossMargin < 0 ? 'bad' : undefined}
+              value={margin != null ? fmtEur(margin) : undefined}
+              tone={margin != null && margin < 0 ? 'bad' : undefined}
             />
           </>
         ) : (

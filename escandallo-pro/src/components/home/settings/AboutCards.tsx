@@ -47,9 +47,17 @@ function useStandalone(): boolean {
 }
 
 const INSTALL_STEPS = [
-  { icon: TabletSmartphone, title: 'iPhone y iPad', text: 'Abre la app en Safari, toca Compartir (el cuadrado con la flecha) y elige «Añadir a pantalla de inicio».' },
+  {
+    icon: TabletSmartphone,
+    title: 'iPhone y iPad',
+    text: 'Abre la app en Safari, toca Compartir (el cuadrado con la flecha) y elige «Añadir a pantalla de inicio».',
+  },
   { icon: Smartphone, title: 'Android', text: 'En Chrome, abre el menú ⋮ y toca «Instalar aplicación» o «Añadir a pantalla de inicio».' },
-  { icon: Laptop, title: 'Ordenador', text: 'En Chrome o Edge, pulsa el icono de instalar en la barra de direcciones (o menú → «Instalar Escandallo Pro»).' },
+  {
+    icon: Laptop,
+    title: 'Ordenador',
+    text: 'En Chrome o Edge, pulsa el icono de instalar en la barra de direcciones (o menú → «Instalar Escandallo Pro»).',
+  },
 ];
 
 /** Versión, estado de conexión e instrucciones de instalación como app. */

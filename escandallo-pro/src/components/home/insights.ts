@@ -206,7 +206,13 @@ export function topWithOther<T extends { total: number }>(items: T[], n: number,
   if (sorted.length <= n) return sorted;
   const head = sorted.slice(0, n - 1);
   const tail = sorted.slice(n - 1);
-  return [...head, makeOther(tail.reduce((s, i) => s + i.total, 0), tail.length)];
+  return [
+    ...head,
+    makeOther(
+      tail.reduce((s, i) => s + i.total, 0),
+      tail.length,
+    ),
+  ];
 }
 
 // ───────────────────────────── Puesta en marcha ─────────────────────────────
@@ -456,7 +462,14 @@ export function priceSeries(points: PricePoint[]): PriceSeriesPoint[] {
     .sort((a, b) => a.p.date.localeCompare(b.p.date) || a.p.id.localeCompare(b.p.id) || a.idx - b.idx);
   for (const { p } of sorted) {
     const day = p.date.slice(0, 10);
-    byDay.set(day, { date: day, price: p.pricePerBase, source: p.source, supplierId: p.supplierId, invoiceId: p.invoiceId, rawDescription: p.rawDescription });
+    byDay.set(day, {
+      date: day,
+      price: p.pricePerBase,
+      source: p.source,
+      supplierId: p.supplierId,
+      invoiceId: p.invoiceId,
+      rawDescription: p.rawDescription,
+    });
   }
   return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -531,16 +544,28 @@ export function simulationRows(
         suggestedAfter: s.after.suggestedPrice,
       };
     })
-    .sort((a, b) => Math.abs(b.deltaCost) - Math.abs(a.deltaCost) || a.name.localeCompare(b.name, 'es'));
+    .sort(
+      (a, b) =>
+        (a.kind === 'plato' ? 0 : 1) - (b.kind === 'plato' ? 0 : 1) ||
+        Math.abs(b.deltaCost) - Math.abs(a.deltaCost) ||
+        a.name.localeCompare(b.name, 'es'),
+    );
 }
 
 /** Resumen del simulador: cuántos platos cambian de semáforo y el impacto medio. */
-export function simulationSummary(rows: SimulationRow[]): { affected: number; worsened: number; improved: number; avgDeltaFc?: number } {
+export function simulationSummary(rows: SimulationRow[]): {
+  affected: number;
+  affectedElaborations: number;
+  worsened: number;
+  improved: number;
+  avgDeltaFc?: number;
+} {
   const rank: Record<FoodCostStatus, number> = { ok: 0, warn: 1, bad: 2, none: -1 };
   let worsened = 0;
   let improved = 0;
   const deltas: number[] = [];
   for (const r of rows) {
+    if (r.kind !== 'plato') continue;
     if (r.statusBefore !== 'none' && r.statusAfter !== 'none') {
       if (rank[r.statusAfter] > rank[r.statusBefore]) worsened++;
       else if (rank[r.statusAfter] < rank[r.statusBefore]) improved++;
@@ -548,7 +573,8 @@ export function simulationSummary(rows: SimulationRow[]): { affected: number; wo
     if (r.fcBefore != null && r.fcAfter != null) deltas.push(r.fcAfter - r.fcBefore);
   }
   return {
-    affected: rows.length,
+    affected: rows.filter((r) => r.kind === 'plato').length,
+    affectedElaborations: rows.filter((r) => r.kind !== 'plato').length,
     worsened,
     improved,
     avgDeltaFc: deltas.length ? deltas.reduce((s, v) => s + v, 0) / deltas.length : undefined,

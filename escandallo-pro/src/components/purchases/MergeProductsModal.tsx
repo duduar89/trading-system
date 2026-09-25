@@ -83,7 +83,12 @@ export function MergeProductsModal({
             >
               <div className="flex items-center justify-between gap-2">
                 <CategoryBadge category={p.category} />
-                <span className={clsx('text-[11px] font-bold uppercase tracking-wide', on ? 'text-brand-600 dark:text-brand-400' : 'text-muted')}>
+                <span
+                  className={clsx(
+                    'text-[11px] font-bold uppercase tracking-wide',
+                    on ? 'text-brand-600 dark:text-brand-400' : 'text-muted',
+                  )}
+                >
                   {on ? 'Se conserva' : 'Se fusiona'}
                 </span>
               </div>
@@ -91,7 +96,9 @@ export function MergeProductsModal({
               <dl className="mt-2 space-y-1 text-xs text-muted">
                 <div className="flex justify-between gap-2">
                   <dt>Precio</dt>
-                  <dd className="tabular font-semibold text-ink-2">{p.pricePerBase > 0 ? `${fmtEurPrecise(p.pricePerBase)}/${p.baseUnit}` : 'sin precio'}</dd>
+                  <dd className="tabular font-semibold text-ink-2">
+                    {p.pricePerBase > 0 ? `${fmtEurPrecise(p.pricePerBase)}/${p.baseUnit}` : 'sin precio'}
+                  </dd>
                 </div>
                 <div className="flex justify-between gap-2">
                   <dt>Última compra</dt>
@@ -108,7 +115,8 @@ export function MergeProductsModal({
       </div>
       {keep.baseUnit !== remove.baseUnit && (
         <p className="mt-3 rounded-xl bg-warn-soft px-3 py-2 text-sm text-ink-2">
-          Ojo: «{keep.name}» se compra por {keep.baseUnit} y «{remove.name}» por {remove.baseUnit}. Revisa las recetas afectadas después de fusionar.
+          Ojo: «{keep.name}» se compra por {keep.baseUnit} y «{remove.name}» por {remove.baseUnit}. Revisa las recetas afectadas después de
+          fusionar.
         </p>
       )}
     </Modal>

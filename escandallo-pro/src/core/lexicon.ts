@@ -46,7 +46,9 @@ export const FOOD_NOUNS = new Set(
     vino cava champan cerveza sidra agua refresco tonica gaseosa zumo licor brandy conac ron whisky ginebra vodka tequila
     vermut pacharan mosto horchata
     pure mermelada confitura compota crema sopa croqueta empanada pizza base hielo aceituna alcaparra banderilla turron mazapan
-    polvoron churro croissant magdalena tarta pastel bollo nacho palomita
+    polvoron churro croissant magdalena tarta pastel bollo nacho palomita tinta panko totopo
+    pisto gazpacho salmorejo paella fideua ensalada guiso estofado fabada hummus guacamole sofrito bechamel romesco pesto tartar
+    carpaccio ceviche brownie tiramisu coulant sorbete mousse
   `),
 );
 
@@ -60,7 +62,7 @@ export const VARIETIES = new Set(
     manchego idiazabal cabrales roquefort parmesano mozzarella burrata cheddar gouda emmental gruyere brie camembert feta
     provolone gorgonzola edam grana pecorino halloumi mascarpone ricotta havarti torta casar tetilla mahon payoyo
     vera modena jerez bellota cebo recebo rioja ribera rueda albarino burgos guijuelo jabugo teruel bruselas maldon
-    confit tempura
+    confit tempura dezumo
   `),
 );
 
@@ -72,7 +74,7 @@ export const WEAK_QUALIFIERS = new Set(
     tierno curado semicurado viejo anejo blanco negro rojo verde amarillo morado moreno tinto rosado crianza reserva joven
     montar cocinar cocina desalado salado maduro casero virgen extra gallego asturiano vasco desnatado semidesnatado desgrasado
     azucarado edulcorado integral deshuesado pasteurizado uht esterilizado crudo lavado listo precortado sinhueso sinpiel
-    sinespina singluten sinlactosa sinsal sinazucar sincascara conhueso conpiel concascara conespina iberico
+    sinespina sinsal sincascara conhueso conpiel concascara conespina iberico
     fileteado tronco rodaja dado tira juliana brunoise
   `),
 );
@@ -93,7 +95,7 @@ export const CUTS = new Set(
     picana secreto presa pluma abanico lagarto papada panceta paleta paletilla pierna codillo manita oreja morro careta lengua
     higado rinon molleja pechuga muslo contramuslo ala alita carcasa magret filete escalope medallon churrasco cinta brazuelo
     espaldilla cuello pecho tapa culata lomito cola cabeza pata cogote ventresca tripa hueva lomo punta tentaculo hamburguesa
-    albondiga
+    albondiga anilla
   `),
 );
 
@@ -290,6 +292,7 @@ export const ABBREVIATIONS: Record<string, string[]> = (() => {
   add('semicur semic', 'semicurado');
   add('pimen', 'pimenton');
   add('nat', 'natural');
+  add('fumet', 'caldo pescado');
   return map;
 })();
 
@@ -358,7 +361,19 @@ export const PHRASES: Record<string, string[]> = {
   'azucar glass': ['azucar', 'glas'],
   'judia verde': ['judia', 'verde'],
   'salsa soja': ['salsa', 'soja'],
+  // "NARANJA ZUMO" en frutería es la naranja para exprimir, no el zumo envasado
+  'naranja zumo': ['naranja', 'dezumo'],
+  'mandarina zumo': ['mandarina', 'dezumo'],
+  'pomelo zumo': ['pomelo', 'dezumo'],
+  'limon zumo': ['limon', 'dezumo'],
 };
+
+/** Hierbas y especias: se compran secas o molidas, así que "seco"/"molido" no las convierte en otro producto. */
+export const HERBS_SPICES = new Set(
+  words(`tomillo oregano romero laurel albahaca perejil eneldo estragon salvia menta hierbabuena cilantro cebollino comino canela
+    clavo pimienta pimenton nuezmoscada curcuma jengibre cardamomo anis azafran guindilla curry vainilla`),
+);
+export const HERB_FORMS = new Set(words('seco deshidratado molido polvo desecado liofilizado'));
 
 /** Sinónimos débiles (similitud 0,8: se sugieren pero no se vinculan solos). */
 export const WEAK_SYNONYMS: [string, string][] = [
@@ -494,6 +509,7 @@ export const GROUP_DEFAULTS: Record<string, Partial<Record<ConflictGroup, string
   yogur: { base: 'vaca', grasa: 'entero' },
   nata: { base: 'vaca' },
   mantequilla: { base: 'vaca' },
+  queso: { base: 'vaca' },
   azucar: { color: 'blanco' },
   vinagre: { base: 'vino' },
   arroz: { color: 'blanco' },
@@ -558,7 +574,7 @@ export const FEMININE_ADJECTIVES: Record<string, string> = (() => {
 })();
 
 /** Sustantivos que no admiten el adjetivo femenino como sustantivo principal cuando van en primera posición. */
-export const NOUN_WHEN_FIRST = new Set(words('empanada tostada asado cocido frito rebozado seco relleno'));
+export const NOUN_WHEN_FIRST = new Set(words('empanada tostada asado cocido frito rebozado seco relleno dulce'));
 
 // ───────────────────────────── Presentación (cleanProductName) ─────────────────────────────
 
@@ -573,10 +589,10 @@ export const DISPLAY_FORMS: Record<string, string> = (() => {
     albariño módena padrón teruel lomito ñora gruyère pequeño añejo ecológico orgánico gallego plátano berenjena apio
     rábano cóctel tomillo ternasco menú canapé paté gnocchi pâté bechamel carbón jengibre cúrcuma cardamomo alcaparra
     medallón escalope magdalena turrón mazapán polvorón croissant nachos fideuá trigueño bogavante centolla múrgula
-    quínoa bulgur tofu seitán tempeh kéfir requesón túnel limón`)) {
+    quínoa bulgur tofu seitán tempeh kéfir requesón túnel limón añojo japónica tiramisú sorbete guacamole fabada`)) {
     const key = w
       .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
+      .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase();
     if (key !== w) map[key] = w;
   }

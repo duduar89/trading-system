@@ -98,7 +98,12 @@ export function NewProductModal({ open, onClose, onCreated }: { open: boolean; o
     >
       <form onSubmit={(e) => void submit(e)} className="space-y-4">
         <Field label="Nombre *">
-          <Input value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder="Ej.: Tomate pera, Solomillo de ternera…" autoFocus />
+          <Input
+            value={f.name}
+            onChange={(e) => set({ name: e.target.value })}
+            placeholder="Ej.: Tomate pera, Solomillo de ternera…"
+            autoFocus
+          />
         </Field>
 
         {kb && (
@@ -107,8 +112,8 @@ export function NewProductModal({ open, onClose, onCreated }: { open: boolean; o
             <div className="min-w-0 text-ink-2">
               <div className="font-semibold text-ink">Lo conocemos: {kb.name}</div>
               <div className="mt-0.5 text-xs">
-                {kbCat?.emoji} {kbCat?.label} · se compra por {kb.baseUnit} · merma de limpieza {fmtNum(kb.wastePct, 1)} % · cocción {fmtNum(kb.cookingLossPct, 1)} %
-                {kb.unitWeightKg ? ` · 1 ud ≈ ${fmtNum(kb.unitWeightKg * 1000, 0)} g` : ''}
+                {kbCat?.emoji} {kbCat?.label} · se compra por {kb.baseUnit} · merma de limpieza {fmtNum(kb.wastePct, 1)} % · cocción{' '}
+                {fmtNum(kb.cookingLossPct, 1)} %{kb.unitWeightKg ? ` · 1 ud ≈ ${fmtNum(kb.unitWeightKg * 1000, 0)} g` : ''}
               </div>
               {kb.allergens.length > 0 && (
                 <div className="mt-1.5">
@@ -146,17 +151,38 @@ export function NewProductModal({ open, onClose, onCreated }: { open: boolean; o
           </Field>
           {unit === 'ud' ? (
             <Field label="Peso de 1 unidad" hint="Para usarlo en recetas por peso">
-              <AmountInput value={f.unitWeightG} onValue={(v) => set({ unitWeightG: v })} decimals={1} suffix="g" min={0} placeholder={kb?.unitWeightKg ? fmtNum(kb.unitWeightKg * 1000, 0) : undefined} />
+              <AmountInput
+                value={f.unitWeightG}
+                onValue={(v) => set({ unitWeightG: v })}
+                decimals={1}
+                suffix="g"
+                min={0}
+                placeholder={kb?.unitWeightKg ? fmtNum(kb.unitWeightKg * 1000, 0) : undefined}
+              />
             </Field>
           ) : unit === 'l' ? (
             <Field label="Densidad" hint="kg por litro (agua = 1)">
-              <AmountInput value={f.densityKgPerL} onValue={(v) => set({ densityKgPerL: v })} decimals={3} suffix="kg/l" min={0} placeholder={kb?.densityKgPerL ? fmtNum(kb.densityKgPerL, 2) : '1'} />
+              <AmountInput
+                value={f.densityKgPerL}
+                onValue={(v) => set({ densityKgPerL: v })}
+                decimals={3}
+                suffix="kg/l"
+                min={0}
+                placeholder={kb?.densityKgPerL ? fmtNum(kb.densityKgPerL, 2) : '1'}
+              />
             </Field>
           ) : (
             <div />
           )}
           <Field label="Merma de limpieza" hint="Lo que se tira al limpiar o pelar">
-            <AmountInput value={f.wastePct} onValue={(v) => set({ wastePct: v == null ? undefined : Math.min(99, v) })} decimals={1} suffix="%" min={0} placeholder={kb ? fmtNum(kb.wastePct, 1) : 'Auto'} />
+            <AmountInput
+              value={f.wastePct}
+              onValue={(v) => set({ wastePct: v == null ? undefined : Math.min(99, v) })}
+              decimals={1}
+              suffix="%"
+              min={0}
+              placeholder={kb ? fmtNum(kb.wastePct, 1) : 'Auto'}
+            />
           </Field>
           <Field label="Merma de cocción" hint="Peso que pierde al cocinarse">
             <AmountInput

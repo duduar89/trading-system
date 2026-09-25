@@ -175,7 +175,7 @@ export function costItem(item: RecipeItem, ctx: CostingContext, stack: Set<ID> =
     if (!yieldQty) {
       // Sin rendimiento declarado: si piden en peso/volumen, estimamos por la suma de lo servido.
       if (dimensionOf(item.unit) !== 'count') {
-        const servedKg = subCost.servedKgPerPortion * Math.max(1, sub.portions || 1);
+        const servedKg = subCost.servedKgPerPortion * (sub.portions > 0 ? sub.portions : 1);
         if (servedKg > 0) {
           yieldQty = servedKg;
           yieldUnit = 'kg';
@@ -395,6 +395,8 @@ export function maxAffordablePrice(dishCost: DishCost, itemId: ID, dish: Dish, b
   const allowedTotal = (dishCost.netPrice * target) / 100 * portions;
   const others = dishCost.totalCost - item.cost;
   const allowedItem = allowedTotal - others;
-  if (allowedItem <= 0) return 0;
-  return allowedItem / item.grossQty;
+  // Con prueba de rendimiento el coste es bruto·precio − abono fijo de subproductos (no depende del precio).
+  const byproductCredit = Math.max(0, item.grossQty * (item.pricePerBase ?? 0) - item.cost);
+  if (allowedItem + byproductCredit <= 0) return 0;
+  return (allowedItem + byproductCredit) / item.grossQty;
 }

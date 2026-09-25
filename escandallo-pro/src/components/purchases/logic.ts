@@ -327,7 +327,14 @@ export interface ProductFilters {
   sort: ProductSort;
 }
 
-export const DEFAULT_PRODUCT_FILTERS: ProductFilters = { query: '', category: 'todas', noPrice: false, withYield: false, rising: false, sort: 'nombre' };
+export const DEFAULT_PRODUCT_FILTERS: ProductFilters = {
+  query: '',
+  category: 'todas',
+  noPrice: false,
+  withYield: false,
+  rising: false,
+  sort: 'nombre',
+};
 
 export function filterProducts(products: Product[], f: ProductFilters, trends: Map<ID, PriceTrend>): Product[] {
   const list = products.filter((p) => {

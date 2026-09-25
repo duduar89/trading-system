@@ -25,7 +25,11 @@ export default function Settings() {
 
   return (
     <div className="animate-fade-in">
-      <PageHeader eyebrow="Ajustes" title="Configuración" subtitle={ws ? `Objetivos y datos de «${ws.name}», y preferencias de la app en este dispositivo.` : 'Preferencias de la app.'} />
+      <PageHeader
+        eyebrow="Ajustes"
+        title="Configuración"
+        subtitle={ws ? `Objetivos y datos de «${ws.name}», y preferencias de la app en este dispositivo.` : 'Preferencias de la app.'}
+      />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         <nav aria-label="Secciones de ajustes" className="hidden lg:block">
           <ul className="sticky top-8 space-y-0.5">

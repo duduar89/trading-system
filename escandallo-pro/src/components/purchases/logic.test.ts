@@ -60,7 +60,13 @@ const product = (p: Partial<Product> & { id: string; name: string }): Product =>
   ...p,
 });
 
-const pp = (id: string, productId: string, date: string, price: number): PricePoint => ({ id, productId, date, pricePerBase: price, source: 'factura' });
+const pp = (id: string, productId: string, date: string, price: number): PricePoint => ({
+  id,
+  productId,
+  date,
+  pricePerBase: price,
+  source: 'factura',
+});
 
 describe('texto', () => {
   it('foldText quita tildes, mayúsculas y signos', () => {
@@ -253,12 +259,24 @@ describe('precios', () => {
 
 describe('productos', () => {
   const products = [
-    product({ id: 'a', name: 'Aceite de oliva virgen extra', category: 'aceite', pricePerBase: 6, lastPurchaseDate: '2026-09-01', aliases: ['AOVE 5L'] }),
+    product({
+      id: 'a',
+      name: 'Aceite de oliva virgen extra',
+      category: 'aceite',
+      pricePerBase: 6,
+      lastPurchaseDate: '2026-09-01',
+      aliases: ['AOVE 5L'],
+    }),
     product({ id: 'b', name: 'Tomate pera', pricePerBase: 1.5, lastPurchaseDate: '2026-09-20', yieldTestId: 'y1' }),
     product({ id: 'c', name: 'Azafrán', category: 'condimento', pricePerBase: 0 }),
     product({ id: 'd', name: 'Ñora', category: 'condimento', pricePerBase: 12, lastPurchaseDate: '2026-07-01' }),
   ];
-  const trends = priceTrends([pp('1', 'b', '2026-08-01', 1.2), pp('2', 'b', '2026-09-20', 1.5), pp('3', 'a', '2026-06-01', 6.5), pp('4', 'a', '2026-09-01', 6)]);
+  const trends = priceTrends([
+    pp('1', 'b', '2026-08-01', 1.2),
+    pp('2', 'b', '2026-09-20', 1.5),
+    pp('3', 'a', '2026-06-01', 6.5),
+    pp('4', 'a', '2026-09-01', 6),
+  ]);
 
   it('filtra por texto (también alias), categoría y marcas', () => {
     expect(filterProducts(products, { ...DEFAULT_PRODUCT_FILTERS, query: 'aove' }, trends).map((p) => p.id)).toEqual(['a']);
@@ -270,7 +288,8 @@ describe('productos', () => {
   });
 
   it('ordena por nombre (es), precio, compra y variación', () => {
-    const ids = (sort: typeof DEFAULT_PRODUCT_FILTERS.sort) => filterProducts(products, { ...DEFAULT_PRODUCT_FILTERS, sort }, trends).map((p) => p.id);
+    const ids = (sort: typeof DEFAULT_PRODUCT_FILTERS.sort) =>
+      filterProducts(products, { ...DEFAULT_PRODUCT_FILTERS, sort }, trends).map((p) => p.id);
     expect(ids('nombre')).toEqual(['a', 'c', 'd', 'b']);
     expect(ids('precio')).toEqual(['d', 'a', 'b', 'c']);
     expect(ids('compra')).toEqual(['b', 'a', 'd', 'c']);
@@ -297,8 +316,18 @@ describe('productUsage', () => {
     ...p,
   });
   const dishes = [
-    dish({ id: 'salsa', name: 'Salsa brava', kind: 'elaboracion', portions: 10, items: [{ id: 's1', name: 'Tomate', ref: { type: 'product', id: 'tom' }, quantity: 1, unit: 'kg', basis: 'neta' }] }),
-    dish({ id: 'bravas', name: 'Patatas bravas', items: [{ id: 'b1', name: 'Salsa', ref: { type: 'dish', id: 'salsa' }, quantity: 50, unit: 'g', basis: 'neta' }] }),
+    dish({
+      id: 'salsa',
+      name: 'Salsa brava',
+      kind: 'elaboracion',
+      portions: 10,
+      items: [{ id: 's1', name: 'Tomate', ref: { type: 'product', id: 'tom' }, quantity: 1, unit: 'kg', basis: 'neta' }],
+    }),
+    dish({
+      id: 'bravas',
+      name: 'Patatas bravas',
+      items: [{ id: 'b1', name: 'Salsa', ref: { type: 'dish', id: 'salsa' }, quantity: 50, unit: 'g', basis: 'neta' }],
+    }),
     dish({
       id: 'ensalada',
       name: 'Ensalada de tomate',
@@ -308,7 +337,11 @@ describe('productUsage', () => {
         { id: 'e2', name: 'Tomate cherry', ref: { type: 'product', id: 'tom' }, quantity: 100, unit: 'g', basis: 'neta' },
       ],
     }),
-    dish({ id: 'otro', name: 'Otro', items: [{ id: 'o1', name: 'Sal', ref: { type: 'product', id: 'sal' }, quantity: 1, unit: 'g', basis: 'neta' }] }),
+    dish({
+      id: 'otro',
+      name: 'Otro',
+      items: [{ id: 'o1', name: 'Sal', ref: { type: 'product', id: 'sal' }, quantity: 1, unit: 'g', basis: 'neta' }],
+    }),
   ];
   const cost = (dishId: string, items: { itemId: string; cost: number; share: number }[], fc?: number): DishCost =>
     ({
@@ -317,7 +350,17 @@ describe('productUsage', () => {
       items: items.map((i) => ({ itemId: i.itemId, cost: i.cost, costSharePct: i.share })),
     }) as unknown as DishCost;
   const costs = new Map<string, DishCost>([
-    ['ensalada', cost('ensalada', [{ itemId: 'e1', cost: 0.6, share: 40 }, { itemId: 'e2', cost: 0.2, share: 13 }], 22)],
+    [
+      'ensalada',
+      cost(
+        'ensalada',
+        [
+          { itemId: 'e1', cost: 0.6, share: 40 },
+          { itemId: 'e2', cost: 0.2, share: 13 },
+        ],
+        22,
+      ),
+    ],
     ['salsa', cost('salsa', [{ itemId: 's1', cost: 2, share: 70 }])],
     ['bravas', cost('bravas', [], 31)],
   ]);
@@ -366,7 +409,15 @@ describe('importar tarifas', () => {
     expect(r[1]).toMatchObject({ description: 'Aceite oliva v.e. garrafa 5L', unit: 'ud', unitPrice: 32.5 });
   });
   it('usa importe / cantidad si no hay precio unitario', () => {
-    const r = parsePriceRows([['Artículo', 'Cant', 'Importe'], ['Queso manchego', '2,5', '37,50']], { description: 0, quantity: 1, total: 2 }, 0, parse);
+    const r = parsePriceRows(
+      [
+        ['Artículo', 'Cant', 'Importe'],
+        ['Queso manchego', '2,5', '37,50'],
+      ],
+      { description: 0, quantity: 1, total: 2 },
+      0,
+      parse,
+    );
     expect(r[0]).toMatchObject({ quantity: 2.5, unitPrice: 15, total: 37.5, unit: 'ud' });
   });
   it('columnLetter', () => {

@@ -25,7 +25,13 @@ describe('validateBusinessDraft', () => {
     expect(e.targetFoodCostPct).toBeUndefined();
   });
   it('detecta campos vacíos y fuera de rango', () => {
-    const e = validateBusinessDraft({ targetFoodCostPct: undefined, warningFoodCostPct: 120, defaultSaleVatPct: 45, priceAlertPct: -1, priceRounding: 0.3 });
+    const e = validateBusinessDraft({
+      targetFoodCostPct: undefined,
+      warningFoodCostPct: 120,
+      defaultSaleVatPct: 45,
+      priceAlertPct: -1,
+      priceRounding: 0.3,
+    });
     expect(e.targetFoodCostPct).toBeTruthy();
     expect(e.warningFoodCostPct).toMatch(/95/);
     expect(e.defaultSaleVatPct).toMatch(/30/);
@@ -50,7 +56,16 @@ describe('parseBackup', () => {
     version: 1,
     exportedAt: '2026-09-25T10:00:00.000Z',
     workspace: { id: 'w1', name: 'Taberna', createdAt: '', updatedAt: '' },
-    data: { products: [{ id: 'p1' }], pricePoints: [], suppliers: [], invoices: [], dishes: [{ id: 'd1' }, { id: 'd2' }], yieldTests: [], menuScans: [], business: [] },
+    data: {
+      products: [{ id: 'p1' }],
+      pricePoints: [],
+      suppliers: [],
+      invoices: [],
+      dishes: [{ id: 'd1' }, { id: 'd2' }],
+      yieldTests: [],
+      menuScans: [],
+      business: [],
+    },
   };
   it('acepta una copia válida (también con BOM) y la resume', () => {
     const b = parseBackup('﻿' + JSON.stringify(valid));

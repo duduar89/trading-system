@@ -24,7 +24,17 @@ interface Result {
  * Importar una tarifa o listado de precios (Excel / CSV): detecta columnas, deja ajustarlas, muestra una vista previa
  * con el precio real por kg / l / ud y actualiza o crea ingredientes (precio con origen "hoja").
  */
-export function ImportPriceListModal({ open, onClose, products, suppliers }: { open: boolean; onClose: () => void; products: Product[]; suppliers: Supplier[] }) {
+export function ImportPriceListModal({
+  open,
+  onClose,
+  products,
+  suppliers,
+}: {
+  open: boolean;
+  onClose: () => void;
+  products: Product[];
+  suppliers: Supplier[];
+}) {
   const [step, setStep] = useState<Step>('pick');
   const [fileName, setFileName] = useState('');
   const [reading, setReading] = useState(false);
@@ -245,7 +255,12 @@ export function ImportPriceListModal({ open, onClose, products, suppliers }: { o
             </Field>
             {mapping.supplier == null && (
               <Field label="Proveedor (opcional)">
-                <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} list={supplierList} placeholder="Ej.: Makro" />
+                <Input
+                  value={supplierName}
+                  onChange={(e) => setSupplierName(e.target.value)}
+                  list={supplierList}
+                  placeholder="Ej.: Makro"
+                />
                 <datalist id={supplierList}>
                   {suppliers.map((s) => (
                     <option key={s.id} value={s.name} />
@@ -287,7 +302,12 @@ export function ImportPriceListModal({ open, onClose, products, suppliers }: { o
               {plan.skips > 0 && <Badge>{fmtNum(plan.skips, 0)} omitidas</Badge>}
             </div>
             <div className="sm:max-w-xs">
-              <Switch checked={createMissing} onChange={setCreateMissing} label="Crear los que no tengas" description="Si lo desactivas, sólo se actualizan tus ingredientes." />
+              <Switch
+                checked={createMissing}
+                onChange={setCreateMissing}
+                label="Crear los que no tengas"
+                description="Si lo desactivas, sólo se actualizan tus ingredientes."
+              />
             </div>
           </div>
 
@@ -353,7 +373,8 @@ export function ImportPriceListModal({ open, onClose, products, suppliers }: { o
               </table>
             </div>
             <p className="mt-2 text-xs text-muted">
-              Si un nombre no encaja del todo con tus ingredientes creamos uno nuevo en vez de arriesgar un precio equivocado. Luego puedes fusionar duplicados.
+              Si un nombre no encaja del todo con tus ingredientes creamos uno nuevo en vez de arriesgar un precio equivocado. Luego puedes
+              fusionar duplicados.
             </p>
           </div>
         </div>
@@ -384,8 +405,12 @@ export function ImportPriceListModal({ open, onClose, products, suppliers }: { o
               <div className="text-xs font-semibold text-muted">ingredientes nuevos</div>
             </div>
           </div>
-          {result.failed > 0 && <p className={clsx('mt-4 text-sm font-semibold text-bad')}>{result.failed} filas no se pudieron importar.</p>}
-          <p className="mx-auto mt-4 max-w-sm text-sm text-muted">Hemos rellenado mermas y alérgenos típicos de los ingredientes nuevos. Tus escandallos ya usan los precios nuevos.</p>
+          {result.failed > 0 && (
+            <p className={clsx('mt-4 text-sm font-semibold text-bad')}>{result.failed} filas no se pudieron importar.</p>
+          )}
+          <p className="mx-auto mt-4 max-w-sm text-sm text-muted">
+            Hemos rellenado mermas y alérgenos típicos de los ingredientes nuevos. Tus escandallos ya usan los precios nuevos.
+          </p>
         </div>
       )}
     </Modal>

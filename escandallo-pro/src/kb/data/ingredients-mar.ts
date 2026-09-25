@@ -56,6 +56,7 @@ export const KB_MAR: KbIngredient[] = [
   ing('Trucha', 'pescado', 'kg', 40, 15, 6.5, { aka: ['trucha arcoiris', 'trucha de rio', 'truchas'], alg: ['pescado'] }),
   ing('Cazón', 'pescado', 'kg', 10, 12, 8.5, { aka: ['cazon', 'cazon en adobo', 'bienmesabe', 'tacos de cazon'], alg: ['pescado'] }),
   ing('Pez espada', 'pescado', 'kg', 5, 15, 17, { aka: ['emperador', 'pez espada en rodajas', 'rodaja de emperador', 'filete de emperador'], alg: ['pescado'] }),
+  ing('Sardina ahumada', 'conserva', 'kg', 0, 0, 30, { aka: ['sardinas ahumadas', 'lomos de sardina ahumada'], alg: ['pescado'] }),
   ing('Mojama', 'pescado', 'kg', 0, 0, 40, { aka: ['mojama de atun', 'mojama de barbate'], alg: ['pescado'] }),
   ing('Huevas de salmón', 'pescado', 'kg', 0, 0, 90, { aka: ['ikura', 'huevas de trucha', 'caviar rojo'], alg: ['pescado'] }),
   ing('Gulas', 'pescado', 'kg', 0, 0, 12, { aka: ['gula', 'gulas del norte', 'sucedaneo de angula', 'la gula del norte'], alg: ['pescado', 'huevo', 'soja'] }),
@@ -66,7 +67,7 @@ export const KB_MAR: KbIngredient[] = [
 
   // ── Crustáceos ──
   ing('Gamba roja', 'marisco', 'kg', 55, 5, 60, { aka: ['gamba roja de denia', 'gamba de palamos', 'gamba roja de huelva', 'gamba roja del mediterraneo', 'alistado'], alg: ['crustaceos'] }),
-  ing('Gamba blanca', 'marisco', 'kg', 55, 5, 30, { aka: ['gamba blanca de huelva', 'gamba de huelva', 'gamba', 'gambas', 'gamba fresca'], alg: ['crustaceos'] }),
+  ing('Gamba blanca', 'marisco', 'kg', 55, 5, 30, { aka: ['gamba blanca de huelva', 'gamba de huelva', 'gamba fresca', 'gamba entera', 'gamba cruda'], alg: ['crustaceos'] }),
   ing('Langostino crudo', 'marisco', 'kg', 50, 5, 11, {
     aka: ['langostino', 'langostinos', 'langostino congelado', 'langostino crudo congelado', 'langostino vannamei', 'langostino entero'],
     alg: ['crustaceos', 'sulfitos'],
@@ -83,7 +84,7 @@ export const KB_MAR: KbIngredient[] = [
   ing('Carne de cangrejo', 'marisco', 'kg', 0, 0, 40, { aka: ['pulpa de cangrejo', 'carne de buey de mar', 'carne de txangurro', 'cangrejo real'], alg: ['crustaceos'] }),
   ing('Percebe', 'marisco', 'kg', 40, 0, 90, { aka: ['percebes', 'percebe gallego'], alg: ['crustaceos'] }),
   ing('Gamba pelada congelada', 'congelado', 'kg', 0, 10, 11, {
-    aka: ['gamba pelada', 'gambas peladas', 'gamba arrocera', 'colas de gamba', 'gambon pelado'],
+    aka: ['gamba', 'gamba pelada', 'gamba arrocera', 'colas de gamba', 'gambon pelado', 'gamba congelada', 'gambas congeladas'],
     alg: ['crustaceos', 'sulfitos'],
   }),
   ing('Cola de langostino pelada', 'congelado', 'kg', 0, 10, 12.5, {

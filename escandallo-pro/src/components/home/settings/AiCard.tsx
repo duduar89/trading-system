@@ -154,7 +154,11 @@ export function AiCard({ id }: { id?: string }) {
                     spellCheck={false}
                     className="pr-11 font-mono"
                   />
-                  <IconButton label={showKey ? 'Ocultar clave' : 'Mostrar clave'} onClick={() => setShowKey((s) => !s)} className="absolute right-0.5 top-0.5">
+                  <IconButton
+                    label={showKey ? 'Ocultar clave' : 'Mostrar clave'}
+                    onClick={() => setShowKey((s) => !s)}
+                    className="absolute right-0.5 top-0.5"
+                  >
                     {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </IconButton>
                 </div>
@@ -164,7 +168,14 @@ export function AiCard({ id }: { id?: string }) {
               </div>
             </Field>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" onClick={test} loading={testing} disabled={(!draftTrim && !hasKey) || !online} icon={<PlugZap className="size-4" />}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={test}
+                loading={testing}
+                disabled={(!draftTrim && !hasKey) || !online}
+                icon={<PlugZap className="size-4" />}
+              >
                 Probar conexión
               </Button>
               {hasKey && (
@@ -190,8 +201,18 @@ export function AiCard({ id }: { id?: string }) {
               </a>
             </div>
             {testResult && (
-              <div className={cx('mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm', testResult.ok ? 'bg-ok-soft text-ink-2' : 'bg-bad-soft text-ink-2')} role="status">
-                {testResult.ok ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok" /> : <XCircle className="mt-0.5 size-4 shrink-0 text-bad" />}
+              <div
+                className={cx(
+                  'mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm',
+                  testResult.ok ? 'bg-ok-soft text-ink-2' : 'bg-bad-soft text-ink-2',
+                )}
+                role="status"
+              >
+                {testResult.ok ? (
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok" />
+                ) : (
+                  <XCircle className="mt-0.5 size-4 shrink-0 text-bad" />
+                )}
                 {testResult.message}
               </div>
             )}
@@ -215,8 +236,8 @@ export function AiCard({ id }: { id?: string }) {
           </div>
 
           <p className="text-xs text-muted">
-            Con la IA activada, los documentos que se procesen con ella se envían a Anthropic para leerlos y el uso se factura en tu propia cuenta de Anthropic. Si
-            la IA falla o no hay conexión, la app vuelve automáticamente a la lectura local gratuita.
+            Con la IA activada, los documentos que se procesen con ella se envían a Anthropic para leerlos y el uso se factura en tu propia cuenta de
+            Anthropic. Si la IA falla o no hay conexión, la app vuelve automáticamente a la lectura local gratuita.
           </p>
         </div>
       )}

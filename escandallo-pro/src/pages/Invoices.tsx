@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { Invoice } from '../types';
 import { Button, Callout, Card, ConfirmDialog, FileDrop, PageHeader, SearchInput, Segmented, Stat, Table, Td, Th } from '../components/ui';
+import { db } from '../db';
 import { useAppSettings, useInvoices } from '../state/hooks';
 import { errorMessage, toast } from '../state/store';
 import * as invoiceService from '../services/invoices';
@@ -67,6 +68,23 @@ export default function Invoices() {
     svc.resumePendingInvoices?.().catch(() => undefined);
   }, []);
 
+  // Aviso al terminar cada lectura en segundo plano.
+  const prevRunning = useRef<string | null>(null);
+  useEffect(() => {
+    const finished = prevRunning.current;
+    prevRunning.current = queue?.running ?? null;
+    if (!finished || finished === queue?.running) return;
+    void db()
+      .invoices.get(finished)
+      .then((inv) => {
+        if (!inv) return;
+        const name = inv.supplierName || inv.fileName || undefined;
+        if (inv.status === 'revision') toast.success('Factura lista para revisar', name);
+        else if (inv.status === 'error') toast.error('No se pudo leer una factura', inv.error ?? name);
+      })
+      .catch(() => undefined);
+  }, [queue?.running]);
+
   useEffect(() => {
     if (!highlight) return;
     const t = setTimeout(() => dropRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
@@ -96,7 +114,8 @@ export default function Invoices() {
     setUploading(true);
     try {
       const ids = await addInvoiceFiles(files);
-      if (ids.length === 1 && files.length === 1) toast.info('Factura en cola', 'La estamos leyendo en tu dispositivo. Te avisamos al terminar.');
+      if (ids.length === 1 && files.length === 1)
+        toast.info('Factura en cola', 'La estamos leyendo en tu dispositivo. Te avisamos al terminar.');
       else toast.info(`${ids.length} facturas en cola`, 'Se leen una tras otra en tu dispositivo. Puedes seguir trabajando.');
     } catch (e) {
       toast.error('No se pudieron añadir las facturas', errorMessage(e));
@@ -119,6 +138,7 @@ export default function Invoices() {
   const onReprocess = async (inv: Invoice) => {
     try {
       toast.info('Leyendo de nuevo…', inv.fileName || inv.supplierName || undefined);
+      // El resultado se avisa al terminar la lectura (ver el seguimiento de la cola).
       await processInvoice(inv.id);
     } catch (e) {
       toast.error('No se pudo volver a leer la factura', errorMessage(e));
@@ -156,16 +176,32 @@ export default function Invoices() {
 
       {!empty && (
         <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <Stat label="Facturas este mes" value={loading ? '—' : fmtNum(stats.monthCount, 0)} icon={<Receipt className="size-4" />} tone="brand"
-            className="lg:order-1" hint={`${fmtNum(invoices?.length ?? 0, 0)} en total`} />
+          <Stat
+            label="Facturas este mes"
+            value={loading ? '—' : fmtNum(stats.monthCount, 0)}
+            icon={<Receipt className="size-4" />}
+            tone="brand"
+            className="lg:order-1"
+            hint={`${fmtNum(invoices?.length ?? 0, 0)} en total`}
+          />
           <Stat
             label="Gasto del mes (sin IVA)"
             value={loading ? '—' : fmtEur(stats.monthSpend)}
             icon={<Wallet className="size-4" />}
             tone="default"
             className="order-first col-span-2 lg:order-2 lg:col-span-1"
-            trend={spendTrend != null ? { value: fmtPct(Math.abs(spendTrend), 0), direction: spendTrend > 0.5 ? 'up' : spendTrend < -0.5 ? 'down' : 'flat' } : undefined}
-            hint={spendTrend != null ? 'frente al mes anterior' : stats.monthPendingSpend > 0 ? `${fmtEur(stats.monthPendingSpend)} por revisar` : 'facturas confirmadas y por revisar'}
+            trend={
+              spendTrend != null
+                ? { value: fmtPct(Math.abs(spendTrend), 0), direction: spendTrend > 0.5 ? 'up' : spendTrend < -0.5 ? 'down' : 'flat' }
+                : undefined
+            }
+            hint={
+              spendTrend != null
+                ? 'frente al mes anterior'
+                : stats.monthPendingSpend > 0
+                  ? `${fmtEur(stats.monthPendingSpend)} por revisar`
+                  : 'facturas confirmadas y por revisar'
+            }
           />
           <Stat
             label="Pendientes de revisar"
@@ -175,9 +211,7 @@ export default function Invoices() {
             className="lg:order-3"
             hint={
               stats.errors > 0 ? (
-                <span className="font-semibold text-bad">
-                  {stats.errors} con error
-                </span>
+                <span className="font-semibold text-bad">{stats.errors} con error</span>
               ) : stats.inProgress > 0 ? (
                 `${stats.inProgress} leyéndose ahora`
               ) : stats.toReview > 0 ? (
@@ -260,9 +294,9 @@ export default function Invoices() {
           title="Lectura gratuita en tu dispositivo"
           className="relative mb-6 pr-12"
         >
-          Tus facturas se leen aquí mismo, sin coste y sin enviar tus datos a nadie: comprobamos que cantidad × precio cuadra con cada importe y
-          que la suma coincide con la base imponible. Antes de confirmar, echa un vistazo a las líneas marcadas en ámbar. Si algún día quieres una
-          segunda opinión, puedes activar la IA opcional en{' '}
+          Tus facturas se leen aquí mismo, sin coste y sin enviar tus datos a nadie: comprobamos que cantidad × precio cuadra con cada
+          importe y que la suma coincide con la base imponible. Antes de confirmar, echa un vistazo a las líneas marcadas en ámbar. Si algún
+          día quieres una segunda opinión, puedes activar la IA opcional en{' '}
           <Link to="/ajustes" className="font-semibold text-ink underline decoration-ok/50 underline-offset-2 hover:decoration-ok">
             Ajustes
           </Link>
@@ -288,17 +322,20 @@ export default function Invoices() {
         <section aria-label="Listado de facturas">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-            <Segmented
-              value={filter}
-              onChange={setFilter}
-              className="w-max"
-              options={[
-                { value: 'todas', label: 'Todas' },
-                { value: 'revisar', label: `Por revisar${stats.toReview + stats.inProgress ? ` · ${stats.toReview + stats.inProgress}` : ''}` },
-                { value: 'confirmadas', label: 'Confirmadas' },
-                { value: 'error', label: `Con error${stats.errors ? ` · ${stats.errors}` : ''}` },
-              ]}
-            />
+              <Segmented
+                value={filter}
+                onChange={setFilter}
+                className="w-max"
+                options={[
+                  { value: 'todas', label: 'Todas' },
+                  {
+                    value: 'revisar',
+                    label: `Por revisar${stats.toReview + stats.inProgress ? ` · ${stats.toReview + stats.inProgress}` : ''}`,
+                  },
+                  { value: 'confirmadas', label: 'Confirmadas' },
+                  { value: 'error', label: `Con error${stats.errors ? ` · ${stats.errors}` : ''}` },
+                ]}
+              />
             </div>
             <SearchInput value={query} onChange={setQuery} placeholder="Buscar proveedor o nº de factura…" className="sm:w-80" />
           </div>
@@ -362,7 +399,15 @@ function invoiceTitle(inv: Invoice): string {
   return inv.supplierName || inv.fileName || 'Proveedor sin identificar';
 }
 
-function RowActions({ invoice, onReprocess, onDelete }: { invoice: Invoice; onReprocess: (i: Invoice) => void; onDelete: (i: Invoice) => void }) {
+function RowActions({
+  invoice,
+  onReprocess,
+  onDelete,
+}: {
+  invoice: Invoice;
+  onReprocess: (i: Invoice) => void;
+  onDelete: (i: Invoice) => void;
+}) {
   const navigate = useNavigate();
   const busy = invoice.status === 'procesando' || invoice.status === 'pendiente';
   return (
@@ -375,9 +420,15 @@ function RowActions({ invoice, onReprocess, onDelete }: { invoice: Invoice; onRe
           description: 'Sustituye las líneas por una lectura nueva',
           icon: <RefreshCw className="size-4" />,
           onSelect: () => onReprocess(invoice),
-          disabled: busy || !invoice.file,
+          disabled: busy || !invoice.file || invoice.method === 'hoja',
         },
-        { label: 'Eliminar', icon: <Trash2 className="size-4" />, tone: 'danger', onSelect: () => onDelete(invoice), disabled: busy && invoice.status === 'procesando' },
+        {
+          label: 'Eliminar',
+          icon: <Trash2 className="size-4" />,
+          tone: 'danger',
+          onSelect: () => onDelete(invoice),
+          disabled: busy && invoice.status === 'procesando',
+        },
       ]}
       trigger={(p) => (
         <button
@@ -393,7 +444,15 @@ function RowActions({ invoice, onReprocess, onDelete }: { invoice: Invoice; onRe
   );
 }
 
-function InvoiceTable({ invoices, onReprocess, onDelete }: { invoices: Invoice[]; onReprocess: (i: Invoice) => void; onDelete: (i: Invoice) => void }) {
+function InvoiceTable({
+  invoices,
+  onReprocess,
+  onDelete,
+}: {
+  invoices: Invoice[];
+  onReprocess: (i: Invoice) => void;
+  onDelete: (i: Invoice) => void;
+}) {
   const navigate = useNavigate();
   return (
     <Table>
@@ -423,7 +482,10 @@ function InvoiceTable({ invoices, onReprocess, onDelete }: { invoices: Invoice[]
           >
             <Td className="whitespace-nowrap">{fmtDate(inv.date)}</Td>
             <Td className="max-w-[280px]">
-              <Link to={`/facturas/${inv.id}`} className="block truncate font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400">
+              <Link
+                to={`/facturas/${inv.id}`}
+                className="block truncate font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400"
+              >
                 {invoiceTitle(inv)}
               </Link>
               {inv.supplierName && inv.fileName && <div className="truncate text-xs text-muted">{inv.fileName}</div>}
@@ -461,7 +523,15 @@ function InvoiceTable({ invoices, onReprocess, onDelete }: { invoices: Invoice[]
   );
 }
 
-function InvoiceCard({ invoice: inv, onReprocess, onDelete }: { invoice: Invoice; onReprocess: (i: Invoice) => void; onDelete: (i: Invoice) => void }) {
+function InvoiceCard({
+  invoice: inv,
+  onReprocess,
+  onDelete,
+}: {
+  invoice: Invoice;
+  onReprocess: (i: Invoice) => void;
+  onDelete: (i: Invoice) => void;
+}) {
   const navigate = useNavigate();
   return (
     <Card padded={false}>
@@ -514,9 +584,21 @@ function ListSkeleton() {
 
 function EmptyInvoices() {
   const ways: { icon: React.ReactNode; title: string; text: string }[] = [
-    { icon: <FileText className="size-5" />, title: 'PDF del proveedor', text: 'Descárgalo del correo o de su web y arrástralo aquí. Es lo más preciso.' },
-    { icon: <Camera className="size-5" />, title: 'Foto de la factura', text: 'Con el móvil, bien encuadrada y con luz. Leemos hasta tickets arrugados.' },
-    { icon: <FileSpreadsheet className="size-5" />, title: 'Excel o CSV', text: 'Tu listado de compras o la tarifa del proveedor, con muchas facturas a la vez.' },
+    {
+      icon: <FileText className="size-5" />,
+      title: 'PDF del proveedor',
+      text: 'Descárgalo del correo o de su web y arrástralo aquí. Es lo más preciso.',
+    },
+    {
+      icon: <Camera className="size-5" />,
+      title: 'Foto de la factura',
+      text: 'Con el móvil, bien encuadrada y con luz. Leemos hasta tickets arrugados.',
+    },
+    {
+      icon: <FileSpreadsheet className="size-5" />,
+      title: 'Excel o CSV',
+      text: 'Tu listado de compras o la tarifa del proveedor, con muchas facturas a la vez.',
+    },
   ];
   return (
     <div className="hero-mesh overflow-hidden rounded-3xl border border-line bg-surface p-6 shadow-card sm:p-10">
@@ -528,8 +610,8 @@ function EmptyInvoices() {
           Tu primera factura, <span className="text-gradient-brand">en 30 segundos</span>
         </h2>
         <p className="mt-2 text-sm text-muted sm:text-[15px]">
-          Leemos proveedor, productos, cantidades y precios, calculamos el precio real por kilo, litro o unidad y tú sólo revisas y confirmas.
-          Cada factura mantiene al día el coste de todos tus platos.
+          Leemos proveedor, productos, cantidades y precios, calculamos el precio real por kilo, litro o unidad y tú sólo revisas y
+          confirmas. Cada factura mantiene al día el coste de todos tus platos.
         </p>
       </div>
       <div className="mx-auto mt-8 grid max-w-4xl gap-3 sm:grid-cols-3">
@@ -551,4 +633,3 @@ function EmptyInvoices() {
     </div>
   );
 }
-

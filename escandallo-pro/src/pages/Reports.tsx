@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import { Calculator, Download, Grid2x2, LineChart, Receipt, Scale } from 'lucide-react';
 import { PageHeader, Segmented } from '../components/ui';
@@ -13,11 +14,21 @@ import { ExportTab } from '../components/home/reports/ExportTab';
 type Tab = 'menu' | 'precios' | 'compras' | 'mermas' | 'simulador' | 'exportar';
 
 const TABS: { value: Tab; label: string; icon: typeof Grid2x2; subtitle: string }[] = [
-  { value: 'menu', label: 'Ingeniería de menú', icon: Grid2x2, subtitle: 'Qué platos son estrellas y cuáles conviene reformular, cruzando popularidad y margen.' },
+  {
+    value: 'menu',
+    label: 'Ingeniería de menú',
+    icon: Grid2x2,
+    subtitle: 'Qué platos son estrellas y cuáles conviene reformular, cruzando popularidad y margen.',
+  },
   { value: 'precios', label: 'Evolución de precios', icon: LineChart, subtitle: 'Cómo cambia lo que pagas por cada ingrediente, factura a factura.' },
   { value: 'compras', label: 'Compras', icon: Receipt, subtitle: 'Cuánto gastas, a quién le compras y en qué productos.' },
   { value: 'mermas', label: 'Mermas', icon: Scale, subtitle: 'Dónde se pierde el dinero entre la compra y el plato.' },
-  { value: 'simulador', label: 'Simulador', icon: Calculator, subtitle: 'Anticípate a las subidas: cambia un precio y mira el efecto en toda la carta.' },
+  {
+    value: 'simulador',
+    label: 'Simulador',
+    icon: Calculator,
+    subtitle: 'Anticípate a las subidas: cambia un precio y mira el efecto en toda la carta.',
+  },
   { value: 'exportar', label: 'Exportar', icon: Download, subtitle: 'Excel de escandallos e ingredientes y copia de seguridad.' },
 ];
 
@@ -31,6 +42,13 @@ export default function Reports() {
   const tab: Tab = isTab(raw) ? raw : 'menu';
   const data = useReportsData();
   const current = TABS.find((t) => t.value === tab)!;
+  const tabsRef = useRef<HTMLDivElement>(null);
+
+  // En móvil la barra de pestañas se desplaza: mantenemos visible la pestaña activa.
+  useEffect(() => {
+    const el = tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    el?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }, [tab]);
 
   const setTab = (t: Tab) => {
     const next = new URLSearchParams();
@@ -42,7 +60,7 @@ export default function Reports() {
     <div className="animate-fade-in">
       <PageHeader eyebrow="Informes" title={current.label} subtitle={current.subtitle} />
 
-      <div className="-mx-4 mb-5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+      <div ref={tabsRef} className="-mx-4 mb-5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
         <Segmented<Tab>
           value={tab}
           onChange={setTab}

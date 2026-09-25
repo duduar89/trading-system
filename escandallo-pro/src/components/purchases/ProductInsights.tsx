@@ -15,7 +15,15 @@ import { productUsage } from './logic';
 import { AmountInput } from './AmountInput';
 
 /** "Usado en": escandallos que dependen del ingrediente, con su peso en el coste y el food cost del plato. */
-export function UsageCard({ product, dishes, costs }: { product: Product; dishes: Dish[] | undefined; costs: Map<ID, DishCost> | undefined }) {
+export function UsageCard({
+  product,
+  dishes,
+  costs,
+}: {
+  product: Product;
+  dishes: Dish[] | undefined;
+  costs: Map<ID, DishCost> | undefined;
+}) {
   const business = useBusiness();
   const navigate = useNavigate();
   const usage = useMemo(() => productUsage(product.id, dishes ?? [], costs), [product.id, dishes, costs]);
@@ -43,7 +51,11 @@ export function UsageCard({ product, dishes, costs }: { product: Product; dishes
       ) : (
         <ul className="-mx-1 divide-y divide-line">
           {usage.map((u) => {
-            const status = foodCostStatus(u.foodCostPct, u.dish.targetFoodCostPct ?? business.targetFoodCostPct, business.warningFoodCostPct);
+            const status = foodCostStatus(
+              u.foodCostPct,
+              u.dish.targetFoodCostPct ?? business.targetFoodCostPct,
+              business.warningFoodCostPct,
+            );
             return (
               <li key={u.dish.id}>
                 <Link to={`/platos/${u.dish.id}`} className="flex items-center gap-3 rounded-xl px-1 py-2.5 transition hover:bg-surface-2">
@@ -74,7 +86,9 @@ export function UsageCard({ product, dishes, costs }: { product: Product; dishes
         </ul>
       )}
       {direct.length > 0 && (
-        <p className="mt-3 text-xs text-muted">Cada vez que confirmes una factura con este ingrediente, estos escandallos se recalculan solos.</p>
+        <p className="mt-3 text-xs text-muted">
+          Cada vez que confirmes una factura con este ingrediente, estos escandallos se recalculan solos.
+        </p>
       )}
     </Card>
   );
@@ -105,7 +119,10 @@ export function YieldCard({ product, tests }: { product: Product; tests: YieldTe
       <CardHeader icon={<Scale className="size-5" />} title="Prueba de rendimiento" subtitle="Lo que de verdad aprovechas de cada pieza" />
       {linked && result ? (
         <>
-          <Link to={`/mermas/${linked.id}`} className="mb-3 block truncate text-sm font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400">
+          <Link
+            to={`/mermas/${linked.id}`}
+            className="mb-3 block truncate text-sm font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400"
+          >
             {linked.name} · {fmtDate(linked.date)}
           </Link>
           <div className="grid grid-cols-2 gap-2">
@@ -120,7 +137,9 @@ export function YieldCard({ product, tests }: { product: Product; tests: YieldTe
                 {fmtEurPrecise(result.costPerUsableKg)}
                 <span className="font-sans text-xs font-semibold text-muted">/kg útil</span>
               </div>
-              <div className="text-xs text-muted">compras a {fmtEurPrecise(result.grossWeightKg > 0 ? result.grossCost / result.grossWeightKg : 0)}/kg</div>
+              <div className="text-xs text-muted">
+                compras a {fmtEurPrecise(result.grossWeightKg > 0 ? result.grossCost / result.grossWeightKg : 0)}/kg
+              </div>
             </div>
           </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
@@ -140,8 +159,8 @@ export function YieldCard({ product, tests }: { product: Product; tests: YieldTe
       ) : (
         <>
           <p className="text-sm text-muted">
-            Pesa la pieza tal cual llega, límpiala y pesa lo que va al plato. Sabrás el coste real por kilo útil y la merma exacta, y tus escandallos la usarán en lugar
-            de la merma estimada{product.wastePct > 0 ? ` (${fmtPct(product.wastePct, 0)})` : ''}.
+            Pesa la pieza tal cual llega, límpiala y pesa lo que va al plato. Sabrás el coste real por kilo útil y la merma exacta, y tus
+            escandallos la usarán en lugar de la merma estimada{product.wastePct > 0 ? ` (${fmtPct(product.wastePct, 0)})` : ''}.
           </p>
           {candidates.length > 0 && (
             <div className="mt-3 space-y-1.5">
@@ -155,7 +174,13 @@ export function YieldCard({ product, tests }: { product: Product; tests: YieldTe
               ))}
             </div>
           )}
-          <Button className="mt-3" variant="primary" size="md" icon={<Plus className="size-4" />} onClick={() => navigate(`/mermas?nuevo=1&producto=${product.id}`)}>
+          <Button
+            className="mt-3"
+            variant="primary"
+            size="md"
+            icon={<Plus className="size-4" />}
+            onClick={() => navigate(`/mermas?nuevo=1&producto=${product.id}`)}
+          >
             Crear prueba de merma
           </Button>
         </>
@@ -181,13 +206,18 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
   const base = product.pricePerBase;
   const bump = (pct: number) => base > 0 && setPrice(Math.round(base * (1 + pct / 100) * 10000) / 10000);
   const overLimit = rows.filter(
-    (r) => r.after.foodCostPct != null && foodCostStatus(r.after.foodCostPct, r.after.targetFoodCostPct, business.warningFoodCostPct) === 'bad',
+    (r) =>
+      r.after.foodCostPct != null && foodCostStatus(r.after.foodCostPct, r.after.targetFoodCostPct, business.warningFoodCostPct) === 'bad',
   ).length;
   const extraCost = rows.reduce((s, r) => s + (r.after.costPerPortion - r.before.costPerPortion), 0);
 
   return (
     <Card>
-      <CardHeader icon={<Calculator className="size-5" />} title="Simulador de precio" subtitle="¿Qué pasa con tus platos si el proveedor cambia el precio?" />
+      <CardHeader
+        icon={<Calculator className="size-5" />}
+        title="Simulador de precio"
+        subtitle="¿Qué pasa con tus platos si el proveedor cambia el precio?"
+      />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <label className="block min-w-0 flex-1">
           <span className="mb-1.5 block text-xs font-semibold text-ink-2">Precio hipotético</span>
@@ -221,7 +251,9 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
         <>
           <div className={clsx('mt-4 rounded-xl px-3 py-2.5 text-sm', overLimit ? 'bg-bad-soft' : 'bg-surface-2')}>
             {deferred != null && Math.abs(deferred - base) < 1e-9 ? (
-              <span className="text-muted">Cambia el precio para ver el impacto en {rows.length === 1 ? 'el plato' : `los ${rows.length} platos`}.</span>
+              <span className="text-muted">
+                Cambia el precio para ver el impacto en {rows.length === 1 ? 'el plato' : `los ${rows.length} platos`}.
+              </span>
             ) : (
               <span className="text-ink-2">
                 <span className="font-semibold text-ink">
@@ -257,7 +289,10 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
                   return (
                     <tr key={r.dishId} className="border-t border-line">
                       <td className="max-w-[200px] py-2 pr-2">
-                        <Link to={`/platos/${r.dishId}`} className="block truncate font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400">
+                        <Link
+                          to={`/platos/${r.dishId}`}
+                          className="block truncate font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400"
+                        >
                           {r.name}
                         </Link>
                       </td>
@@ -268,9 +303,15 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
                       <td className="whitespace-nowrap px-2 py-2 text-right">
                         {r.after.foodCostPct != null ? (
                           <span className="inline-flex items-center gap-1">
-                            <FoodCostBadge pct={r.before.foodCostPct} status={foodCostStatus(r.before.foodCostPct, dishTarget, business.warningFoodCostPct)} />
+                            <FoodCostBadge
+                              pct={r.before.foodCostPct}
+                              status={foodCostStatus(r.before.foodCostPct, dishTarget, business.warningFoodCostPct)}
+                            />
                             <ArrowRight className="size-3 text-muted" />
-                            <FoodCostBadge pct={r.after.foodCostPct} status={foodCostStatus(r.after.foodCostPct, dishTarget, business.warningFoodCostPct)} />
+                            <FoodCostBadge
+                              pct={r.after.foodCostPct}
+                              status={foodCostStatus(r.after.foodCostPct, dishTarget, business.warningFoodCostPct)}
+                            />
                           </span>
                         ) : (
                           <span className="text-xs text-muted">sin PVP</span>

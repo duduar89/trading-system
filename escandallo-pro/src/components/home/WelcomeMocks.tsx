@@ -106,11 +106,14 @@ export function PhoneMenuMock({ className }: { className?: string }) {
           </div>
           {/* Visor de la cámara */}
           <div className="pointer-events-none absolute inset-x-2.5 bottom-12 top-6">
-            {['left-0 top-0 border-l-2 border-t-2 rounded-tl-lg', 'right-0 top-0 border-r-2 border-t-2 rounded-tr-lg', 'bottom-0 left-0 border-b-2 border-l-2 rounded-bl-lg', 'bottom-0 right-0 border-b-2 border-r-2 rounded-br-lg'].map(
-              (c) => (
-                <span key={c} className={clsx('absolute size-5 border-brand-500', c)} />
-              ),
-            )}
+            {[
+              'left-0 top-0 border-l-2 border-t-2 rounded-tl-lg',
+              'right-0 top-0 border-r-2 border-t-2 rounded-tr-lg',
+              'bottom-0 left-0 border-b-2 border-l-2 rounded-bl-lg',
+              'bottom-0 right-0 border-b-2 border-r-2 rounded-br-lg',
+            ].map((c) => (
+              <span key={c} className={clsx('absolute size-5 border-brand-500', c)} />
+            ))}
           </div>
           <div className="ep-w-flash pointer-events-none absolute inset-0 bg-white opacity-0" />
           <div className="absolute inset-x-0 bottom-2.5 flex justify-center">
@@ -163,7 +166,10 @@ export function EscandalloMock({ className, compact }: { className?: string; com
                 </span>
               </div>
               <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-line/70">
-                <div className="ep-w-grow h-full origin-left rounded-r-[4px] bg-brand-500" style={{ width: `${l.share}%`, animationDelay: `${0.2 + i * 0.12}s` }} />
+                <div
+                  className="ep-w-grow h-full origin-left rounded-r-[4px] bg-brand-500"
+                  style={{ width: `${l.share}%`, animationDelay: `${0.2 + i * 0.12}s` }}
+                />
               </div>
             </div>
           ))}

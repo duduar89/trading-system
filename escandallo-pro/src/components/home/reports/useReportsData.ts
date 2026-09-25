@@ -2,7 +2,17 @@ import { useMemo } from 'react';
 import { dashboardStats, type DashboardStats } from '../../../core/analytics';
 import type { CostingContext } from '../../../core/costing';
 import type { BusinessSettings, Dish, DishCost, ID, Invoice, PricePoint, Product, Supplier, Workspace, YieldTest } from '../../../types';
-import { useBusiness, useCurrentWorkspace, useDishCosts, useDishes, useInvoices, usePricePoints, useProducts, useSuppliers, useYieldTests } from '../../../state/hooks';
+import {
+  useBusiness,
+  useCurrentWorkspace,
+  useDishCosts,
+  useDishes,
+  useInvoices,
+  usePricePoints,
+  useProducts,
+  useSuppliers,
+  useYieldTests,
+} from '../../../state/hooks';
 import { safeCompute } from '../shared';
 
 export interface ReportsData {

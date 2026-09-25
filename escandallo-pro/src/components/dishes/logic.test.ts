@@ -268,3 +268,14 @@ describe('carta', () => {
     expect(entriesSummary(entries)).toEqual({ total: 4, selected: 3, withoutPrice: 1, lowConfidence: 1, imported: 1 });
   });
 });
+
+describe('formato', () => {
+  it('precio unitario con 2 decimales desde 1 € y hasta 4 por debajo', async () => {
+    const { fmtPrice, fmtPctNb } = await import('./logic');
+    expect(fmtPrice(12.0263)).toBe('12,03\u00a0€');
+    expect(fmtPrice(0.0385)).toBe('0,0385\u00a0€');
+    expect(fmtPrice(undefined)).toBe('—');
+    expect(fmtPctNb(30, 0)).toBe('30 %');
+    expect(fmtPctNb(undefined)).toBe('—');
+  });
+});

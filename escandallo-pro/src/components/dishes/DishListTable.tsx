@@ -5,7 +5,7 @@ import type { BusinessSettings, Dish, DishCost, ID } from '../../types';
 import { fmtEur } from '../../lib/format';
 import { FoodCostBadge, ProgressBar } from '../ui';
 import { SelectBox } from './DishCard';
-import { dishFoodCostStatus, type DishSort, fmtPctNb } from './logic';
+import { dishFoodCostStatus, fmtPctNb, shownFoodCost, shownMargin, type DishSort } from './logic';
 
 interface Col {
   key: string;
@@ -85,7 +85,9 @@ export function DishListTable({
         <tbody>
           {dishes.map((d) => {
             const c = costs.get(d.id);
-            const st = dishFoodCostStatus(c?.foodCostPct, d, business);
+            const fc = shownFoodCost(c);
+            const margin = shownMargin(c);
+            const st = dishFoodCostStatus(fc, d, business);
             const isPlato = d.kind === 'plato';
             const missing = c ? c.items.filter((i) => !i.resolved).length : 0;
             const sug = d.items.filter((i) => i.suggested).length;
@@ -107,9 +109,9 @@ export function DishListTable({
                   {isPlato ? d.menuPrice ? fmtEur(d.menuPrice) : <span className="text-xs font-semibold text-warn">Sin PVP</span> : <span className="text-muted">—</span>}
                 </td>
                 <td className="border-b border-line px-3 py-2.5 text-right font-semibold text-ink">{c && c.costPerPortion > 0 ? fmtEur(c.costPerPortion) : '—'}</td>
-                <td className="border-b border-line px-3 py-2.5 text-right">{isPlato ? <FoodCostBadge pct={c?.foodCostPct} status={st} /> : <span className="text-muted">—</span>}</td>
-                <td className={clsx('border-b border-line px-3 py-2.5 text-right', c?.grossMargin != null && c.grossMargin < 0 ? 'text-bad' : 'text-ink-2')}>
-                  {c?.grossMargin != null ? fmtEur(c.grossMargin) : '—'}
+                <td className="border-b border-line px-3 py-2.5 text-right">{isPlato ? <FoodCostBadge pct={fc} status={st} /> : <span className="text-muted">—</span>}</td>
+                <td className={clsx('border-b border-line px-3 py-2.5 text-right', margin != null && margin < 0 ? 'text-bad' : 'text-ink-2')}>
+                  {margin != null ? fmtEur(margin) : '—'}
                 </td>
                 <td className="hidden border-b border-line px-3 py-2.5 text-right text-ink-2 lg:table-cell">{c && c.grossKgPerPortion > 0 ? fmtPctNb(c.wastePct, 0) : '—'}</td>
                 <td className="hidden w-40 border-b border-line px-3 py-2.5 xl:table-cell">

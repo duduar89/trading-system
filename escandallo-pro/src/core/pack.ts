@@ -39,7 +39,7 @@ function normalizeDesc(s: string): string {
   return ` ${s
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[×]/g, 'x')
     .replace(/\s+/g, ' ')} `;
 }
@@ -213,7 +213,7 @@ function billedUnit(raw: string | undefined): { kind: BilledKind; factor: number
   const k = raw
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[.\s]/g, '');
   return BILLED[k] ?? { kind: 'unknown', factor: 1 };
 }

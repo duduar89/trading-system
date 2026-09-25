@@ -70,7 +70,11 @@ export function FoodCostHero({
         <p className="mt-2 text-sm text-ink-2">{sentence}</p>
 
         {/* Regla del semáforo */}
-        <div className="mt-5" role="img" aria-label={`Food cost ${fmtPct(pct)} en una escala de 0 a ${scale.max} %: verde hasta ${fmtPct(business.targetFoodCostPct, 0)}, ámbar hasta ${fmtPct(business.warningFoodCostPct, 0)}`}>
+        <div
+          className="mt-5"
+          role="img"
+          aria-label={`Food cost ${fmtPct(pct)} en una escala de 0 a ${scale.max} %: verde hasta ${fmtPct(business.targetFoodCostPct, 0)}, ámbar hasta ${fmtPct(business.warningFoodCostPct, 0)}`}
+        >
           <div className="relative h-3">
             <div className="absolute inset-0 flex gap-0.5 overflow-hidden rounded-full">
               <div className="h-full bg-ok/80" style={{ width: `${scale.targetPos * 100}%` }} />
@@ -78,7 +82,10 @@ export function FoodCostHero({
               <div className="h-full flex-1 bg-bad/80" />
             </div>
             {pct != null && (
-              <div className="absolute -top-1.5 size-6 -translate-x-1/2 transition-[left] duration-700 ease-out" style={{ left: `${scale.pos * 100}%` }}>
+              <div
+                className="absolute -top-1.5 size-6 -translate-x-1/2 transition-[left] duration-700 ease-out"
+                style={{ left: `${scale.pos * 100}%` }}
+              >
                 <div className="size-6 rounded-full border-[3px] border-surface bg-ink shadow-pop" />
               </div>
             )}

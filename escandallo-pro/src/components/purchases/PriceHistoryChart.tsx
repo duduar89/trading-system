@@ -34,7 +34,15 @@ function toTs(date: string): number {
  * Una sola serie en el naranja de marca (validado para fondo claro y oscuro), rejilla discreta y
  * tooltip con cursor que encuentra la fecha. La tabla del histórico acompaña como vista accesible.
  */
-export function PriceHistoryChart({ points, baseUnit, supplierNames }: { points: PricePoint[]; baseUnit: BaseUnit; supplierNames: Map<string, string> }) {
+export function PriceHistoryChart({
+  points,
+  baseUnit,
+  supplierNames,
+}: {
+  points: PricePoint[];
+  baseUnit: BaseUnit;
+  supplierNames: Map<string, string>;
+}) {
   const colors = useChartColors();
   const data: Datum[] = useMemo(
     () =>
@@ -63,7 +71,11 @@ export function PriceHistoryChart({ points, baseUnit, supplierNames }: { points:
   const last = data[data.length - 1];
 
   return (
-    <div className="h-[240px] w-full" role="img" aria-label={`Evolución del precio: de ${fmtEurPrecise(data[0].price)} a ${fmtEurPrecise(last.price)} por ${baseUnit}`}>
+    <div
+      className="h-[240px] w-full"
+      role="img"
+      aria-label={`Evolución del precio: de ${fmtEurPrecise(data[0].price)} a ${fmtEurPrecise(last.price)} por ${baseUnit}`}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 22, right: 16, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} stroke={colors.grid} strokeWidth={1} />

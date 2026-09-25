@@ -115,7 +115,10 @@ export function HBarList({
                 </span>
                 {items.some((i) => i.to) && (
                   <ChevronRight
-                    className={clsx('hidden size-4 shrink-0 text-muted opacity-0 transition sm:block', it.to && 'group-hover:opacity-100 group-focus-visible:opacity-100')}
+                    className={clsx(
+                      'hidden size-4 shrink-0 text-muted opacity-0 transition sm:block',
+                      it.to && 'group-hover:opacity-100 group-focus-visible:opacity-100',
+                    )}
                     aria-hidden
                   />
                 )}

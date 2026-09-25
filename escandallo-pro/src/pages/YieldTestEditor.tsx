@@ -320,7 +320,7 @@ function Editor({ initial, allTests }: { initial: YieldTest; allTests: YieldTest
                       patch({ purchasePricePerKg: Math.round(productPrice * 10000) / 10000 });
                     }}
                     className={cx(
-                      'mt-1.5 inline-flex min-h-8 items-center rounded-lg px-2 text-xs font-semibold transition',
+                      'mt-1 inline-flex min-h-10 items-center rounded-lg px-2 text-left text-xs font-semibold transition',
                       pricePrompt != null ? 'animate-pulse-soft bg-brand-500 text-white' : 'text-brand-600 hover:bg-brand-500/10 dark:text-brand-400',
                     )}
                   >
@@ -482,7 +482,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       onClick={onClick}
       aria-pressed={active}
       className={cx(
-        'inline-flex h-9 items-center gap-1 rounded-full border px-3 text-xs font-semibold transition active:scale-95',
+        'inline-flex h-10 items-center gap-1 rounded-full border px-3 text-xs font-semibold transition active:scale-95',
         active ? 'border-brand-500 bg-brand-500/10 text-brand-700 dark:text-brand-300' : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
       )}
     >

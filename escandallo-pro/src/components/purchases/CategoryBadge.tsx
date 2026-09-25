@@ -11,7 +11,10 @@ export function CategoryBadge({ category, compact, className }: { category: Ingr
         role="img"
         aria-label={c.label}
         title={c.label}
-        className={clsx('inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-base leading-none', className)}
+        className={clsx(
+          'inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-base leading-none',
+          className,
+        )}
       >
         {c.emoji}
       </span>

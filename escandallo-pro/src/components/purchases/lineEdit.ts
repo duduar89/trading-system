@@ -1,6 +1,7 @@
-import type { InvoiceLine } from '../../types';
+import type { InvoiceLine, Product } from '../../types';
 import { normalizeInvoiceLine } from '../../core/pack';
 import { cleanProductName } from '../../core/matching';
+import { priceConversionFactor } from '../../services/products';
 import { applyLinePatch } from './logic';
 
 const PRICE_FIELDS: (keyof InvoiceLine)[] = ['description', 'quantity', 'unit', 'unitPrice', 'discountPct', 'total', 'packSize'];
@@ -42,4 +43,28 @@ export function recomputeLine(line: InvoiceLine, patch: Partial<InvoiceLine>, pa
     if (redetected) return redetected;
   }
   return tryNormalize(next) ?? next;
+}
+
+export type LineConversion =
+  | { kind: 'same' }
+  | { kind: 'convert'; factor: number; pricePerProductUnit?: number; assumption?: string }
+  | { kind: 'incompatible'; reason: string };
+
+/**
+ * Cómo se aplicará el precio de una línea al ingrediente vinculado (misma regla que confirmInvoice):
+ * misma unidad, conversión con peso por unidad / densidad, o imposible (la línea se omitirá al confirmar).
+ */
+export function lineConversion(line: Pick<InvoiceLine, 'baseUnit' | 'pricePerBase'>, product: Product): LineConversion {
+  if (!line.baseUnit || line.baseUnit === product.baseUnit) return { kind: 'same' };
+  const conv = priceConversionFactor(line.baseUnit, product.baseUnit, product);
+  if (!conv) {
+    const reason = line.baseUnit === 'ud' || product.baseUnit === 'ud' ? 'falta el peso por unidad' : 'falta la densidad';
+    return { kind: 'incompatible', reason };
+  }
+  return {
+    kind: 'convert',
+    factor: conv.factor,
+    pricePerProductUnit: line.pricePerBase != null && line.pricePerBase > 0 ? line.pricePerBase * conv.factor : undefined,
+    assumption: conv.assumption,
+  };
 }

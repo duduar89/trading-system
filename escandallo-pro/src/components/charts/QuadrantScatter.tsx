@@ -130,10 +130,46 @@ export function QuadrantScatter({
       <ResponsiveContainer width="100%" height={height}>
         <ScatterChart margin={{ top: 8, right: 12, bottom: 18, left: 4 }}>
           <CartesianGrid stroke={t.line} strokeWidth={1} />
-          <ReferenceArea x1={0} x2={xThreshold} y1={yThreshold} y2={yMax} fill={tint(quadrantGroups.topLeft)} fillOpacity={0.05} stroke="none" label={quadLabel(quadrantLabels.topLeft, 'insideTopLeft')} />
-          <ReferenceArea x1={xThreshold} x2={xMax} y1={yThreshold} y2={yMax} fill={tint(quadrantGroups.topRight)} fillOpacity={0.05} stroke="none" label={quadLabel(quadrantLabels.topRight, 'insideTopRight')} />
-          <ReferenceArea x1={0} x2={xThreshold} y1={yMin} y2={yThreshold} fill={tint(quadrantGroups.bottomLeft)} fillOpacity={0.05} stroke="none" label={quadLabel(quadrantLabels.bottomLeft, 'insideBottomLeft')} />
-          <ReferenceArea x1={xThreshold} x2={xMax} y1={yMin} y2={yThreshold} fill={tint(quadrantGroups.bottomRight)} fillOpacity={0.05} stroke="none" label={quadLabel(quadrantLabels.bottomRight, 'insideBottomRight')} />
+          <ReferenceArea
+            x1={0}
+            x2={xThreshold}
+            y1={yThreshold}
+            y2={yMax}
+            fill={tint(quadrantGroups.topLeft)}
+            fillOpacity={0.05}
+            stroke="none"
+            label={quadLabel(quadrantLabels.topLeft, 'insideTopLeft')}
+          />
+          <ReferenceArea
+            x1={xThreshold}
+            x2={xMax}
+            y1={yThreshold}
+            y2={yMax}
+            fill={tint(quadrantGroups.topRight)}
+            fillOpacity={0.05}
+            stroke="none"
+            label={quadLabel(quadrantLabels.topRight, 'insideTopRight')}
+          />
+          <ReferenceArea
+            x1={0}
+            x2={xThreshold}
+            y1={yMin}
+            y2={yThreshold}
+            fill={tint(quadrantGroups.bottomLeft)}
+            fillOpacity={0.05}
+            stroke="none"
+            label={quadLabel(quadrantLabels.bottomLeft, 'insideBottomLeft')}
+          />
+          <ReferenceArea
+            x1={xThreshold}
+            x2={xMax}
+            y1={yMin}
+            y2={yThreshold}
+            fill={tint(quadrantGroups.bottomRight)}
+            fillOpacity={0.05}
+            stroke="none"
+            label={quadLabel(quadrantLabels.bottomRight, 'insideBottomRight')}
+          />
           <XAxis
             type="number"
             dataKey="x"
@@ -156,11 +192,30 @@ export function QuadrantScatter({
             tick={{ fill: t.muted, fontSize: 11 }}
             tickFormatter={formatY}
             width={62}
-            label={{ value: yLabel, angle: -90, position: 'insideLeft', offset: 8, fill: t.ink2, fontSize: 11, fontWeight: 600, style: { textAnchor: 'middle' } }}
+            label={{
+              value: yLabel,
+              angle: -90,
+              position: 'insideLeft',
+              offset: 8,
+              fill: t.ink2,
+              fontSize: 11,
+              fontWeight: 600,
+              style: { textAnchor: 'middle' },
+            }}
           />
           <ZAxis range={[90, 90]} />
-          <ReferenceLine x={xThreshold} stroke={t.muted} strokeDasharray="4 4" label={{ value: xThresholdLabel, position: 'insideTop', fill: t.muted, fontSize: 10, offset: 22 }} />
-          <ReferenceLine y={yThreshold} stroke={t.muted} strokeDasharray="4 4" label={{ value: yThresholdLabel, position: 'insideBottomRight', fill: t.muted, fontSize: 10 }} />
+          <ReferenceLine
+            x={xThreshold}
+            stroke={t.muted}
+            strokeDasharray="4 4"
+            label={{ value: xThresholdLabel, position: 'insideTop', fill: t.muted, fontSize: 10, offset: 22 }}
+          />
+          <ReferenceLine
+            y={yThreshold}
+            stroke={t.muted}
+            strokeDasharray="4 4"
+            label={{ value: yThresholdLabel, position: 'insideBottomRight', fill: t.muted, fontSize: 10 }}
+          />
           <Tooltip content={renderTooltip} cursor={false} isAnimationActive={false} />
           {groups.map((g) => (
             <Scatter
@@ -173,10 +228,7 @@ export function QuadrantScatter({
                 if (props.cx == null || props.cy == null) return <g />;
                 const id = props.payload?.id;
                 return (
-                  <g
-                    onClick={onSelect && id ? () => onSelect(id) : undefined}
-                    style={{ cursor: onSelect ? 'pointer' : undefined }}
-                  >
+                  <g onClick={onSelect && id ? () => onSelect(id) : undefined} style={{ cursor: onSelect ? 'pointer' : undefined }}>
                     <circle cx={props.cx} cy={props.cy} r={12} fill="transparent" />
                     <Symbols
                       cx={props.cx}

@@ -43,6 +43,17 @@ export function costDraft(ctx: CostingContext, draft: Dish): DishCost {
   return costDish(draft, { ...ctx, dishes, cache: new Map() });
 }
 
+/**
+ * Food cost y margen que tiene sentido enseñar: sin coste (receta vacía o sin precios) el food cost sería 0 %
+ * y el margen todo el PVP, lo que se leería como un plato "en verde" cuando en realidad falta información.
+ */
+export function shownFoodCost(c: DishCost | undefined): number | undefined {
+  return c && c.costPerPortion > 0 ? c.foodCostPct : undefined;
+}
+export function shownMargin(c: DishCost | undefined): number | undefined {
+  return c && c.costPerPortion > 0 ? c.grossMargin : undefined;
+}
+
 /** Food cost objetivo efectivo de un plato. */
 export function targetOf(dish: Pick<Dish, 'targetFoodCostPct'>, business: BusinessSettings): number {
   return dish.targetFoodCostPct != null && dish.targetFoodCostPct > 0 ? dish.targetFoodCostPct : business.targetFoodCostPct;
@@ -150,9 +161,9 @@ export function sortDishes(dishes: Dish[], costs: Map<ID, DishCost>, sort: DishS
     const c = costs.get(d.id);
     switch (sort) {
       case 'foodcost':
-        return c?.foodCostPct;
+        return shownFoodCost(c);
       case 'margen':
-        return c?.grossMargin;
+        return shownMargin(c);
       case 'merma':
         return c && c.grossKgPerPortion > 0 ? c.wastePct : undefined;
       case 'coste':

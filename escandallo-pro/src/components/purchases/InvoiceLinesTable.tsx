@@ -1,6 +1,6 @@
-import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import clsx from 'clsx';
-import { AlertTriangle, Ban, Check, ChevronDown, Plus, RotateCcw, Trash2, Undo2 } from 'lucide-react';
+import { AlertTriangle, Ban, Check, ChevronDown, Link2, Plus, RotateCcw, Trash2, Undo2 } from 'lucide-react';
 import type { ID, IngredientCategory, InvoiceLine, PackSize, Product } from '../../types';
 import { Badge, Button, Input } from '../ui';
 import { CATEGORY_LABELS } from '../../lib/labels';
@@ -8,7 +8,10 @@ import { fmtBaseQty, fmtEurPrecise, perUnitLabel } from '../../lib/format';
 import { parsePackSize } from '../../core/pack';
 import { ChangePct, ConfidenceDot, Hint } from './badges';
 import { ProductPicker } from './ProductPicker';
+import { suggestProducts } from './search';
+import { SUGGEST_THRESHOLD } from '../../core/matching';
 import { formatPack, pctChange } from './logic';
+import { lineConversion, type LineConversion } from './lineEdit';
 import { AmountInput } from './AmountInput';
 
 export interface LinePatchMeta {
@@ -28,14 +31,40 @@ export interface InvoiceLinesTableProps {
   readOnly?: boolean;
 }
 
-const UNIT_SUGGESTIONS = ['kg', 'g', 'l', 'ml', 'ud', 'caja', 'bot', 'paq', 'bandeja', 'docena', 'lata', 'saco', 'garrafa', 'bolsa', 'manojo', 'pieza'];
+const UNIT_SUGGESTIONS = [
+  'kg',
+  'g',
+  'l',
+  'ml',
+  'ud',
+  'caja',
+  'bot',
+  'paq',
+  'bandeja',
+  'docena',
+  'lata',
+  'saco',
+  'garrafa',
+  'bolsa',
+  'manojo',
+  'pieza',
+];
 
 /**
  * Editor de líneas de factura: una tarjeta por línea (se adapta de móvil a escritorio), cálculo en vivo del
  * precio real por kg / l / ud, avisos de validación, confianza de lectura y vínculo con la base de precios.
  * Teclado: Enter baja a la misma casilla de la línea siguiente.
  */
-export function InvoiceLinesTable({ lines, products, productsById, onPatch, onRemove, onAdd, focusLineId, readOnly }: InvoiceLinesTableProps) {
+export function InvoiceLinesTable({
+  lines,
+  products,
+  productsById,
+  onPatch,
+  onRemove,
+  onAdd,
+  focusLineId,
+  readOnly,
+}: InvoiceLinesTableProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const addRef = useRef<HTMLButtonElement>(null);
 
@@ -51,7 +80,9 @@ export function InvoiceLinesTable({ lines, products, productsById, onPatch, onRe
     const t = e.target as HTMLElement;
     if (t.tagName !== 'INPUT' || !t.dataset.field || t.dataset.line == null) return;
     e.preventDefault();
-    const next = rootRef.current?.querySelector<HTMLInputElement>(`[data-line="${Number(t.dataset.line) + 1}"][data-field="${t.dataset.field}"]`);
+    const next = rootRef.current?.querySelector<HTMLInputElement>(
+      `[data-line="${Number(t.dataset.line) + 1}"][data-field="${t.dataset.field}"]`,
+    );
     if (next) {
       next.focus();
       next.select();
@@ -121,7 +152,8 @@ const LineCard = memo(function LineCard({
   const ignored = line.matchStatus === 'ignorado';
   const patch = (p: Partial<InvoiceLine>, meta?: LinePatchMeta) => onPatch(line.id, p, meta);
   const warnings = line.warnings ?? [];
-  const unitMismatch = !ignored && product && line.baseUnit && product.baseUnit !== line.baseUnit;
+  const conversion = !ignored && product && line.matchStatus !== 'nuevo' ? lineConversion(line, product) : undefined;
+  const unitMismatch = conversion?.kind === 'incompatible';
 
   return (
     <div
@@ -150,10 +182,10 @@ const LineCard = memo(function LineCard({
           {(warnings.length > 0 || unitMismatch) && (
             <Hint label={`Avisos de la línea ${index + 1}`} tone={unitMismatch ? 'bad' : 'warn'}>
               <ul className="list-disc space-y-1 pl-4">
-                {unitMismatch && product && (
+                {conversion?.kind === 'incompatible' && product && (
                   <li>
-                    «{product.name}» tiene el precio en {perUnitLabel(product.baseUnit)} y esta línea sale en {perUnitLabel(line.baseUnit)}. Revisa la unidad o el
-                    formato antes de confirmar.
+                    «{product.name}» tiene el precio en {perUnitLabel(product.baseUnit)} y esta línea sale en {perUnitLabel(line.baseUnit)} ({conversion.reason}
+                    ). No se actualizará su precio: revisa el formato o la unidad, o indica el dato en la ficha del ingrediente.
                   </li>
                 )}
                 {warnings.map((w, i) => (
@@ -242,7 +274,7 @@ const LineCard = memo(function LineCard({
       </div>
 
       <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3 sm:flex-row sm:items-center">
-        <RealPrice line={line} product={product} />
+        <RealPrice line={line} product={product} conversion={conversion} />
         <div className="min-w-0 flex-1">
           <MatchCell line={line} product={product} products={products} onPatch={patch} disabled={readOnly} />
         </div>
@@ -261,7 +293,17 @@ function MiniField({ label, children }: { label: string; children: ReactNode }) 
 }
 
 /** Formato de envase editable como texto libre ("6x1 l", "caja 5 kg"), interpretado con core/pack. */
-function PackInput({ pack, index, disabled, onPack }: { pack?: PackSize; index: number; disabled?: boolean; onPack: (p: PackSize | undefined) => void }) {
+function PackInput({
+  pack,
+  index,
+  disabled,
+  onPack,
+}: {
+  pack?: PackSize;
+  index: number;
+  disabled?: boolean;
+  onPack: (p: PackSize | undefined) => void;
+}) {
   const [text, setText] = useState(formatPack(pack));
   const [invalid, setInvalid] = useState(false);
   const focused = useRef(false);
@@ -321,10 +363,12 @@ function PackInput({ pack, index, disabled, onPack }: { pack?: PackSize; index: 
 }
 
 /** Precio real por unidad base (lo que de verdad cuesta 1 kg / 1 l / 1 ud) y comparación con el vigente. */
-function RealPrice({ line, product }: { line: InvoiceLine; product?: Product }) {
+function RealPrice({ line, product, conversion }: { line: InvoiceLine; product?: Product; conversion?: LineConversion }) {
   const ppb = line.pricePerBase;
-  const comparable = product && product.pricePerBase > 0 && product.baseUnit === line.baseUnit && ppb != null && ppb > 0;
-  const change = comparable ? pctChange(product.pricePerBase, ppb) : undefined;
+  // Precio expresado en la unidad del ingrediente (convertido si hace falta) para compararlo con el vigente.
+  const inProductUnit = conversion?.kind === 'convert' ? conversion.pricePerProductUnit : conversion?.kind === 'same' ? ppb : undefined;
+  const comparable = !!product && product.pricePerBase > 0 && inProductUnit != null && inProductUnit > 0;
+  const change = comparable ? pctChange(product.pricePerBase, inProductUnit) : undefined;
   return (
     <div className="shrink-0 sm:w-56">
       <div className="text-[10px] font-bold uppercase tracking-wide text-muted">Precio real</div>
@@ -335,13 +379,25 @@ function RealPrice({ line, product }: { line: InvoiceLine; product?: Product }) 
             <span className="ml-0.5 font-sans text-xs font-semibold text-muted">/{line.baseUnit ?? 'ud'}</span>
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted">
-            {line.baseQuantity != null && line.baseQuantity > 0 && <span className="tabular">{fmtBaseQty(line.baseQuantity, line.baseUnit)} comprados</span>}
+            {line.baseQuantity != null && line.baseQuantity > 0 && (
+              <span className="tabular">{fmtBaseQty(line.baseQuantity, line.baseUnit)} comprados</span>
+            )}
             {comparable && (
               <span className="inline-flex items-center gap-1">
                 · antes <span className="tabular">{fmtEurPrecise(product.pricePerBase)}</span> <ChangePct pct={change} />
               </span>
             )}
           </div>
+          {conversion?.kind === 'convert' && product && inProductUnit != null && (
+            <div className="mt-0.5 text-[11px] text-info" title={conversion.assumption}>
+              = {fmtEurPrecise(inProductUnit)}/{product.baseUnit} al aplicarlo
+            </div>
+          )}
+          {conversion?.kind === 'incompatible' && product && (
+            <div className="mt-0.5 text-[11px] font-semibold text-bad">
+              No se aplicará: {product.name} va en {perUnitLabel(product.baseUnit)}
+            </div>
+          )}
         </>
       ) : (
         <div className="flex items-center gap-1.5 text-sm font-semibold text-warn">
@@ -365,6 +421,16 @@ function MatchCell({
   onPatch: (p: Partial<InvoiceLine>) => void;
   disabled?: boolean;
 }) {
+  const seed = line.suggestedName || line.description;
+  // Evita duplicados: si una línea "nueva" se parece mucho a un ingrediente que ya tienes, lo proponemos.
+  const lookalike = useMemo(
+    () =>
+      line.matchStatus === 'nuevo' && !line.productId && seed.trim()
+        ? suggestProducts(seed, products, 3, SUGGEST_THRESHOLD).find((h) => !line.baseUnit || h.product.baseUnit === line.baseUnit)
+        : undefined,
+    [line.matchStatus, line.productId, line.baseUnit, seed, products],
+  );
+
   if (line.matchStatus === 'ignorado') {
     return (
       <div className="flex min-h-10 items-center justify-between gap-2 rounded-xl bg-surface-2 px-3">
@@ -372,7 +438,12 @@ function MatchCell({
           <Ban className="size-4" /> Línea ignorada: no actualiza precios
         </span>
         {!disabled && (
-          <Button size="sm" variant="ghost" icon={<Undo2 className="size-3.5" />} onClick={() => onPatch({ matchStatus: line.productId ? 'sugerido' : 'nuevo' })}>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Undo2 className="size-3.5" />}
+            onClick={() => onPatch({ matchStatus: line.productId ? 'sugerido' : 'nuevo' })}
+          >
             Recuperar
           </Button>
         )}
@@ -394,7 +465,13 @@ function MatchCell({
         name: createName,
         category: line.suggestedCategory,
         onCreate: (name: string, category?: IngredientCategory) =>
-          onPatch({ matchStatus: 'nuevo', productId: undefined, matchScore: undefined, suggestedName: name, suggestedCategory: category ?? line.suggestedCategory }),
+          onPatch({
+            matchStatus: 'nuevo',
+            productId: undefined,
+            matchScore: undefined,
+            suggestedName: name,
+            suggestedCategory: category ?? line.suggestedCategory,
+          }),
       }}
       onIgnore={() => onPatch({ matchStatus: 'ignorado' })}
     >
@@ -404,17 +481,42 @@ function MatchCell({
 
   if (line.matchStatus === 'nuevo' || !product) {
     const cat = line.suggestedCategory ? CATEGORY_LABELS[line.suggestedCategory] : undefined;
-    return picker(
-      <>
-        <Badge tone="brand" icon={<Plus className="size-3" />}>
-          Nuevo producto
-        </Badge>
-        <span className="min-w-0 flex-1 truncate font-semibold">
-          {cat && <span aria-hidden>{cat.emoji} </span>}
-          {createName || 'Sin nombre'}
-        </span>
-        <ChevronDown className="size-4 shrink-0 text-muted" />
-      </>,
+    return (
+      <div className="space-y-1.5">
+        {picker(
+          <>
+            <Badge tone="brand" icon={<Plus className="size-3" />}>
+              Nuevo producto
+            </Badge>
+            <span className="min-w-0 flex-1 truncate font-semibold">
+              {cat && <span aria-hidden>{cat.emoji} </span>}
+              {createName || 'Sin nombre'}
+            </span>
+            <ChevronDown className="size-4 shrink-0 text-muted" />
+          </>,
+        )}
+        {lookalike && !disabled && (
+          <div className="flex items-center gap-2 rounded-xl bg-warn-soft px-3 py-1.5 text-xs text-ink-2">
+            <span className="min-w-0 flex-1 truncate">
+              ¿Ya lo tienes como <span className="font-semibold text-ink">«{lookalike.product.name}»</span>
+              {lookalike.product.pricePerBase > 0 && (
+                <span className="tabular text-muted">
+                  {' '}
+                  ({fmtEurPrecise(lookalike.product.pricePerBase)}/{lookalike.product.baseUnit})
+                </span>
+              )}
+              ?
+            </span>
+            <button
+              type="button"
+              onClick={() => onPatch({ productId: lookalike.product.id, matchStatus: 'vinculado', matchScore: lookalike.score })}
+              className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg bg-surface px-2.5 font-semibold text-ink shadow-card transition hover:bg-surface-2"
+            >
+              <Link2 className="size-3.5" /> Vincular
+            </button>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -426,14 +528,23 @@ function MatchCell({
             <>
               <Badge tone="warn">¿Es…?</Badge>
               <span className="min-w-0 flex-1 truncate font-semibold">{product.name}</span>
-              {line.matchScore != null && <span className="tabular hidden text-[11px] text-muted sm:inline">{Math.round(line.matchScore * 100)} %</span>}
+              {line.matchScore != null && (
+                <span className="tabular hidden text-[11px] text-muted sm:inline">{Math.round(line.matchScore * 100)} %</span>
+              )}
               <ChevronDown className="size-4 shrink-0 text-muted" />
             </>,
             'border-warn/50',
           )}
         </div>
         {!disabled && (
-          <Button size="md" variant="outline" className="shrink-0 px-3" icon={<Check className="size-4 text-ok" />} onClick={() => onPatch({ matchStatus: 'vinculado' })} aria-label={`Sí, es ${product.name}`}>
+          <Button
+            size="md"
+            variant="outline"
+            className="shrink-0 px-3"
+            icon={<Check className="size-4 text-ok" />}
+            onClick={() => onPatch({ matchStatus: 'vinculado' })}
+            aria-label={`Sí, es ${product.name}`}
+          >
             Sí
           </Button>
         )}

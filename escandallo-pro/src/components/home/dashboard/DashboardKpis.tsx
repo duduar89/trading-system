@@ -11,7 +11,11 @@ const tileCls = 'h-full transition duration-200 group-hover:-translate-y-0.5 gro
 
 function LinkTile({ to, label, children }: { to: string; label: string; children: ReactNode }) {
   return (
-    <Link to={to} aria-label={label} className="group block h-full rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+    <Link
+      to={to}
+      aria-label={label}
+      className="group block h-full rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+    >
       {children}
     </Link>
   );
@@ -69,7 +73,14 @@ export function DashboardKpis({
         />
       </LinkTile>
       <LinkTile to="/informes?tab=mermas" label="Ver informe de mermas">
-        <Stat className={tileCls} label="Merma media" value={fmtPct(avgWastePct)} icon={<Scale className="size-4" />} tone="warn" hint="en peso, de la compra al plato" />
+        <Stat
+          className={tileCls}
+          label="Merma media"
+          value={fmtPct(avgWastePct)}
+          icon={<Scale className="size-4" />}
+          tone="warn"
+          hint="en peso, de la compra al plato"
+        />
       </LinkTile>
       <LinkTile to="/informes?tab=compras" label="Ver informe de compras">
         <Stat
@@ -82,8 +93,12 @@ export function DashboardKpis({
             spend ? (
               <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                 {spend.changePct != null && (
-                  <span className="tabular whitespace-nowrap rounded-md bg-surface-2 px-1.5 py-0.5 font-semibold text-ink-2" title={`Frente a ${monthLabel(spend.previousMonth, 'long')}`}>
-                    {spend.changePct > 0.05 ? '▲' : spend.changePct < -0.05 ? '▼' : '•'} {fmtSignedPct(spend.changePct, Math.abs(spend.changePct) >= 10 ? 0 : 1)}
+                  <span
+                    className="tabular whitespace-nowrap rounded-md bg-surface-2 px-1.5 py-0.5 font-semibold text-ink-2"
+                    title={`Frente a ${monthLabel(spend.previousMonth, 'long')}`}
+                  >
+                    {spend.changePct > 0.05 ? '▲' : spend.changePct < -0.05 ? '▼' : '•'}{' '}
+                    {fmtSignedPct(spend.changePct, Math.abs(spend.changePct) >= 10 ? 0 : 1)}
                   </span>
                 )}
                 <span className="whitespace-nowrap">
@@ -124,7 +139,13 @@ export function DashboardKpis({
           }
           icon={<ChefHat className="size-4" />}
           tone={completeShare >= 1 ? 'ok' : 'ai'}
-          hint={dishCount - completeDishes > 0 ? `${dishCount - completeDishes} con ingredientes sin precio` : dishCount ? 'todos con precio' : 'sin platos todavía'}
+          hint={
+            dishCount - completeDishes > 0
+              ? `${dishCount - completeDishes} con ingredientes sin precio`
+              : dishCount
+                ? 'todos con precio'
+                : 'sin platos todavía'
+          }
         />
       </LinkTile>
     </div>

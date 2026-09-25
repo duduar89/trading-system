@@ -76,7 +76,8 @@ export function useAutosave<T>(save: (value: T) => Promise<void>, delay = 400, o
           setState('saved');
         }
       } catch (e) {
-        pending.current = false;
+        // Se conserva el cambio sin guardar (no se pisa con datos de la BD) para poder reintentar.
+        if (!latest.current) latest.current = job;
         setState('error');
         errRef.current?.(e);
       }
@@ -97,6 +98,7 @@ export function useAutosave<T>(save: (value: T) => Promise<void>, delay = 400, o
     [delay, run],
   );
 
+  /** Guarda ya lo pendiente (también sirve para reintentar tras un error). */
   const flush = useCallback(() => run(), [run]);
   const isPending = useCallback(() => pending.current, []);
 

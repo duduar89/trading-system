@@ -6,6 +6,7 @@ import { useAppSettings, useDishes, useMenuScans } from '../state/hooks';
 import { errorMessage, toast } from '../state/store';
 import { deleteMenuScan, importMenuEntries, processMenuScan } from '../services/menus';
 import { aiAvailable } from '../extract/index';
+import { db } from '../db';
 import { METHOD_LABELS } from '../lib/labels';
 import { fmtDate } from '../lib/format';
 import { Badge, Button, Callout, Card, ConfirmDialog, EmptyState, IconButton, Segmented, Switch } from '../components/ui';
@@ -105,8 +106,14 @@ export default function MenuReview() {
         createMissing: propose && createMissing,
         onProgress: (done, total, stage) => setProgress({ done, total, stage }),
       });
-      toast.success(`${ids.length} ${ids.length === 1 ? 'plato importado' : 'platos importados'}`, propose ? 'Con su receta propuesta: revísalas.' : undefined);
-      navigate('/platos?recientes=1');
+      // Cuántos han salido con receta propuesta (lectura puntual para dar el mensaje exacto).
+      const imported = await db().dishes.bulkGet(ids);
+      const withRecipe = imported.filter((d) => d && d.items.length > 0).length;
+      toast.success(
+        `${ids.length} ${ids.length === 1 ? 'plato importado' : 'platos importados'}`,
+        withRecipe ? `${withRecipe} con receta propuesta: revísalas.` : 'Ábrelos para añadir o proponer su receta.',
+      );
+      navigate(`/platos?recientes=1&propuestos=${withRecipe}`);
     } catch (e) {
       toast.error('No se pudo importar la carta', errorMessage(e));
     } finally {
@@ -138,9 +145,11 @@ export default function MenuReview() {
         </div>
         {scan.status !== 'procesando' && (
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" icon={<RefreshCw className="size-4" />} onClick={() => setReprocess('local')}>
-              Volver a leer
-            </Button>
+            {scan.status !== 'error' && (
+              <Button variant="outline" icon={<RefreshCw className="size-4" />} onClick={() => setReprocess('local')}>
+                Volver a leer
+              </Button>
+            )}
             {aiOn && (
               <Button variant="outline" icon={<Sparkles className="size-4 text-ai" />} onClick={() => setReprocess('ai')}>
                 Leer con IA
@@ -154,7 +163,7 @@ export default function MenuReview() {
       </div>
 
       {scan.status === 'procesando' ? (
-        <ScanningState image={scan.images[0]} pages={scan.images.length} ai={aiOn} startedAt={scan.createdAt} onRetry={() => runReprocess('local')} />
+        <ScanningState scanId={scan.id} image={scan.images[0]} pages={scan.images.length} ai={aiOn} startedAt={scan.createdAt} onRetry={() => runReprocess('local')} />
       ) : scan.status === 'error' ? (
         <Card className="mx-auto max-w-2xl text-center">
           <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-bad-soft text-bad">

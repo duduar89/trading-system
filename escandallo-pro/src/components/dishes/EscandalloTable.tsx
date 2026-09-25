@@ -143,11 +143,7 @@ export function EscandalloTable({ dish, cost, ctx, products, business, onItemsCh
     } else if (opt.kind === 'dish' && opt.dish) {
       const d = opt.dish;
       const yu = d.yieldQty && d.yieldQty > 0 ? d.yieldUnit : undefined;
-      if (yu) {
-        if (!convertToBase(1, item.unit, yu, {}).ok) patch.unit = defaultRecipeUnit(yu);
-      } else if (item.unit !== 'ud' && !(d.items.length && item.quantity > 0)) {
-        patch.unit = 'ud';
-      }
+      if (yu && !convertToBase(1, item.unit, yu, {}).ok) patch.unit = defaultRecipeUnit(yu);
       // En elaboraciones la merma ya va dentro de su escandallo.
       patch.wastePct = undefined;
       patch.cookingLossPct = undefined;
@@ -492,7 +488,7 @@ function QtyControls({ item, setItem, onEnter, index }: Pick<RowProps, 'item' | 
         min={0}
         placeholder="0"
         aria-label={`Cantidad del ingrediente ${index + 1}`}
-        className="w-[76px] px-2! text-right font-semibold"
+        className="w-[76px]! shrink-0 px-2! text-right font-semibold"
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
@@ -504,7 +500,7 @@ function QtyControls({ item, setItem, onEnter, index }: Pick<RowProps, 'item' | 
         value={item.unit}
         onChange={(e) => setItem({ unit: e.target.value as QtyUnit })}
         aria-label={`Unidad del ingrediente ${index + 1}`}
-        className="w-[84px] px-2!"
+        className="w-[84px]! shrink-0 px-2!"
       >
         {QTY_UNITS.map((u) => (
           <option key={u} value={u}>
@@ -576,11 +572,11 @@ function WarningsButton({ warnings }: { warnings: string[] }) {
   if (!warnings.length) return <span className="inline-block size-9" aria-hidden />;
   return (
     <>
-      <IconButton label={`Avisos: ${warnings.join('. ')}`} onClick={() => setOpen((o) => !o)} className="text-warn hover:text-warn">
-        <span ref={ref} className="inline-flex">
+      <span ref={ref} className="inline-flex">
+        <IconButton label={`Avisos: ${warnings.join('. ')}`} onClick={() => setOpen((o) => !o)} className="text-warn hover:text-warn" aria-expanded={open}>
           <AlertTriangle className="size-4" />
-        </span>
-      </IconButton>
+        </IconButton>
+      </span>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end" minWidth={260} className="p-3">
         <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-warn">Revisa esta línea</div>
         <ul className="space-y-1.5 text-sm text-ink-2">
@@ -607,11 +603,11 @@ function RowMenu(p: RowProps) {
   const link = info.product ? `/ingredientes/${info.product.id}` : info.sub ? `/platos/${info.sub.id}` : undefined;
   return (
     <>
-      <IconButton label="Más opciones de la línea" onClick={() => setOpen((o) => !o)}>
-        <span ref={ref} className="inline-flex">
+      <span ref={ref} className="inline-flex">
+        <IconButton label="Más opciones de la línea" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open}>
           <MoreHorizontal className="size-4" />
-        </span>
-      </IconButton>
+        </IconButton>
+      </span>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end" minWidth={280} role="menu">
         <div className="m-1 mb-1.5 rounded-xl bg-surface-2 p-3">
           <div className="flex items-center gap-1.5 text-xs font-bold text-ink">

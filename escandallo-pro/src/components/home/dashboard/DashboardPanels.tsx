@@ -1,6 +1,18 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { ArrowRight, BellRing, Camera, CheckCircle2, ChefHat, ClipboardCheck, FileText, Flame, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
+import {
+  ArrowRight,
+  BellRing,
+  Camera,
+  CheckCircle2,
+  ChefHat,
+  ClipboardCheck,
+  FileText,
+  Flame,
+  Sparkles,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 import type { PriceAlert } from '../../../core/analytics';
 import type { BusinessSettings } from '../../../types';
 import { fmtEur, fmtPct } from '../../../lib/format';
@@ -31,7 +43,17 @@ const rowCls =
   'flex items-center gap-3 rounded-xl px-2 py-2.5 -mx-2 transition hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-2 focus-visible:outline-brand-500';
 
 /** Subidas (y bajadas) de precio de ingredientes por encima del umbral configurado. */
-export function PriceAlertsPanel({ alerts, business, error, className }: { alerts: PriceAlert[]; business: BusinessSettings; error?: string; className?: string }) {
+export function PriceAlertsPanel({
+  alerts,
+  business,
+  error,
+  className,
+}: {
+  alerts: PriceAlert[];
+  business: BusinessSettings;
+  error?: string;
+  className?: string;
+}) {
   const ups = alerts.filter((a) => a.changePct > 0).length;
   return (
     <Card className={className}>
@@ -39,12 +61,22 @@ export function PriceAlertsPanel({ alerts, business, error, className }: { alert
         icon={<BellRing className="size-5" />}
         title="Alertas de precio"
         subtitle={`Cambios de ±${fmtPct(business.priceAlertPct, 0)} o más respecto a la compra anterior`}
-        action={ups > 0 ? <Badge tone="bad">{ups} subida{ups === 1 ? '' : 's'}</Badge> : undefined}
+        action={
+          ups > 0 ? (
+            <Badge tone="bad">
+              {ups} subida{ups === 1 ? '' : 's'}
+            </Badge>
+          ) : undefined
+        }
       />
       {error ? (
         <p className="rounded-xl bg-bad-soft px-3 py-2 text-sm text-ink-2">No se pudieron calcular las alertas: {error}</p>
       ) : alerts.length === 0 ? (
-        <PanelEmpty icon={<CheckCircle2 className="size-5" />} title="Precios estables" text="Ningún ingrediente ha cambiado de precio por encima de tu umbral de alerta." />
+        <PanelEmpty
+          icon={<CheckCircle2 className="size-5" />}
+          title="Precios estables"
+          text="Ningún ingrediente ha cambiado de precio por encima de tu umbral de alerta."
+        />
       ) : (
         <>
           <ul className="divide-y divide-line">
@@ -54,13 +86,19 @@ export function PriceAlertsPanel({ alerts, business, error, className }: { alert
               return (
                 <li key={a.productId}>
                   <Link to={`/ingredientes/${a.productId}`} className={rowCls}>
-                    <span className={cx('flex size-9 shrink-0 items-center justify-center rounded-xl', up ? 'bg-bad-soft text-bad' : 'bg-ok-soft text-ok')}>
+                    <span
+                      className={cx(
+                        'flex size-9 shrink-0 items-center justify-center rounded-xl',
+                        up ? 'bg-bad-soft text-bad' : 'bg-ok-soft text-ok',
+                      )}
+                    >
                       {up ? <TrendingUp className="size-4" /> : <TrendingDown className="size-4" />}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-ink">{a.productName}</span>
                       <span className="tabular block truncate text-xs text-muted">
-                        {fmtUnitPrice(a.previousPrice)} → <span className="font-semibold text-ink-2">{fmtUnitPrice(a.currentPrice)}</span>/{a.baseUnit}
+                        {fmtUnitPrice(a.previousPrice)} → <span className="font-semibold text-ink-2">{fmtUnitPrice(a.currentPrice)}</span>/
+                        {a.baseUnit}
                         {' · '}
                         {n ? `afecta a ${n} plato${n === 1 ? '' : 's'}` : 'sin platos afectados'}
                       </span>
@@ -76,7 +114,9 @@ export function PriceAlertsPanel({ alerts, business, error, className }: { alert
               );
             })}
           </ul>
-          <PanelFooterLink to="/informes?tab=precios">{alerts.length > 5 ? `Ver las ${alerts.length} alertas` : 'Ver evolución de precios'}</PanelFooterLink>
+          <PanelFooterLink to="/informes?tab=precios">
+            {alerts.length > 5 ? `Ver las ${alerts.length} alertas` : 'Ver evolución de precios'}
+          </PanelFooterLink>
         </>
       )}
     </Card>
@@ -95,7 +135,11 @@ export function AttentionPanel({ rows, className }: { rows: DishFcRow[]; classNa
         action={bad > 0 ? <Badge tone="bad">{bad} en rojo</Badge> : rows.length ? <Badge tone="warn">{rows.length} en ámbar</Badge> : undefined}
       />
       {rows.length === 0 ? (
-        <PanelEmpty icon={<CheckCircle2 className="size-5" />} title="Toda la carta en objetivo" text="Ningún plato supera tu food cost objetivo. Sigue vigilando las alertas de precio." />
+        <PanelEmpty
+          icon={<CheckCircle2 className="size-5" />}
+          title="Toda la carta en objetivo"
+          text="Ningún plato supera tu food cost objetivo. Sigue vigilando las alertas de precio."
+        />
       ) : (
         <>
           <ul className="divide-y divide-line">
@@ -114,14 +158,18 @@ export function AttentionPanel({ rows, className }: { rows: DishFcRow[]; classNa
                     <span className="shrink-0 text-right">
                       <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted">PVP sugerido</span>
                       <span className="tabular block text-sm font-bold text-ink">{fmtEur(r.suggestedPrice)}</span>
-                      {priceGap != null && priceGap > 0.004 && <span className="tabular block text-[10px] font-semibold text-bad">{fmtSignedEur(priceGap)}</span>}
+                      {priceGap != null && priceGap > 0.004 && (
+                        <span className="tabular block text-[10px] font-semibold text-bad">{fmtSignedEur(priceGap)}</span>
+                      )}
                     </span>
                   </Link>
                 </li>
               );
             })}
           </ul>
-          <PanelFooterLink to={bad > 0 ? '/platos?fc=bad' : '/platos?fc=warn'}>{rows.length > 6 ? `Ver los ${rows.length} platos` : 'Revisar escandallos'}</PanelFooterLink>
+          <PanelFooterLink to={bad > 0 ? '/platos?fc=bad' : '/platos?fc=warn'}>
+            {rows.length > 6 ? `Ver los ${rows.length} platos` : 'Revisar escandallos'}
+          </PanelFooterLink>
         </>
       )}
     </Card>
@@ -146,14 +194,20 @@ export function ReviewPanel({ items, className }: { items: ReviewItem[]; classNa
         action={items.length ? <Badge tone="warn">{items.length}</Badge> : undefined}
       />
       {items.length === 0 ? (
-        <PanelEmpty icon={<CheckCircle2 className="size-5" />} title="Todo al día" text="No hay facturas, cartas ni escandallos pendientes de revisar." />
+        <PanelEmpty
+          icon={<CheckCircle2 className="size-5" />}
+          title="Todo al día"
+          text="No hay facturas, cartas ni escandallos pendientes de revisar."
+        />
       ) : (
         <>
           <ul className="divide-y divide-line">
             {items.slice(0, 6).map((it) => (
               <li key={`${it.kind}-${it.id}`}>
                 <Link to={it.to} className={rowCls}>
-                  <span className={cx('flex size-9 shrink-0 items-center justify-center rounded-xl', REVIEW_TONE[it.tone])}>{REVIEW_ICON[it.kind]}</span>
+                  <span className={cx('flex size-9 shrink-0 items-center justify-center rounded-xl', REVIEW_TONE[it.tone])}>
+                    {REVIEW_ICON[it.kind]}
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-ink">{it.title}</span>
                     <span className="block truncate text-xs text-muted">{it.subtitle}</span>

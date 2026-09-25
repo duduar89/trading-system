@@ -22,7 +22,11 @@ export function QueuePanel({ queue, invoices }: { queue: QueueState | null; invo
   const progress = queue?.running ? queue.progress : undefined;
 
   return (
-    <div className="relative mb-6 animate-slide-up overflow-hidden rounded-2xl border border-info/30 bg-surface shadow-card" role="status" aria-live="polite">
+    <div
+      className="relative mb-6 animate-slide-up overflow-hidden rounded-2xl border border-info/30 bg-surface shadow-card"
+      role="status"
+      aria-live="polite"
+    >
       <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-info to-brand-500" />
       <div className="flex flex-col gap-3 p-4 pl-5 sm:flex-row sm:items-center sm:gap-5">
         <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-info-soft text-info">
@@ -31,15 +35,14 @@ export function QueuePanel({ queue, invoices }: { queue: QueueState | null; invo
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-display text-base font-bold text-ink">{runningId ? 'Leyendo facturas…' : 'Facturas en cola'}</span>
-            {queued.length > 0 && (
-              <Badge tone="neutral">
-                {queued.length} en cola
-              </Badge>
-            )}
+            {queued.length > 0 && <Badge tone="neutral">{queued.length} en cola</Badge>}
           </div>
           {runningId && (
             <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-muted">
-              <Link to={`/facturas/${runningId}`} className="max-w-full truncate font-semibold text-ink-2 hover:text-brand-600 dark:hover:text-brand-400">
+              <Link
+                to={`/facturas/${runningId}`}
+                className="max-w-full truncate font-semibold text-ink-2 hover:text-brand-600 dark:hover:text-brand-400"
+              >
                 {invoiceLabel(running)}
               </Link>
               {queue?.stage && <span className="truncate">· {queue.stage}</span>}
@@ -62,11 +65,17 @@ export function InvoiceProcessing({ invoice, queue }: { invoice: Invoice; queue:
   const position = queue ? queue.queued.filter((id) => id !== queue.running).indexOf(invoice.id) : -1;
   const progress = queue?.running === invoice.id ? queue.progress : undefined;
   return (
-    <div className="hero-mesh relative overflow-hidden rounded-3xl border border-line bg-surface p-6 text-center shadow-card sm:p-10" role="status" aria-live="polite">
+    <div
+      className="hero-mesh relative overflow-hidden rounded-3xl border border-line bg-surface p-6 text-center shadow-card sm:p-10"
+      role="status"
+      aria-live="polite"
+    >
       <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-3xl bg-surface text-brand-500 shadow-glow">
         <ScanLine className="size-8 animate-pulse-soft" />
       </div>
-      <h2 className="font-display text-xl font-extrabold text-ink sm:text-2xl">{isRunning ? 'Leyendo tu factura…' : 'En cola para leer'}</h2>
+      <h2 className="font-display text-xl font-extrabold text-ink sm:text-2xl">
+        {isRunning ? 'Leyendo tu factura…' : 'En cola para leer'}
+      </h2>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted">
         {isRunning
           ? (queue?.stage ?? 'Detectando proveedor, líneas, cantidades y precios.')

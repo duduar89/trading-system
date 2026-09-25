@@ -45,7 +45,7 @@ export function PriceTrendChip({ trend, baseUnit, className }: { trend?: PriceTr
   if (!trend || trend.changePct == null || Math.abs(trend.changePct) < 0.1) return null;
   const up = trend.changePct > 0;
   const unit = baseUnit ? ` (${perUnitLabel(baseUnit)})` : '';
-  const title = `${up ? 'Sube' : 'Baja'} ${fmtPct(Math.abs(trend.changePct))} desde la compra del ${fmtDate(trend.previousDate)}: ${fmtEurPrecise(trend.previous)} → ${fmtEurPrecise(trend.current)}${unit}`;
+  const title = `${up ? 'Sube' : 'Baja'} ${fmtPct(Math.abs(trend.changePct))} desde el ${fmtDate(trend.previousDate)}: ${fmtEurPrecise(trend.previous)} → ${fmtEurPrecise(trend.current)}${unit}`;
   return (
     <span
       title={title}
@@ -68,7 +68,13 @@ export function ChangePct({ pct, className }: { pct?: number; className?: string
   if (Math.abs(pct) < 0.1) return <span className={clsx('text-xs font-semibold text-muted', className)}>= sin cambio</span>;
   const up = pct > 0;
   return (
-    <span className={clsx('tabular inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-bold', up ? 'text-bad' : 'text-ok', className)}>
+    <span
+      className={clsx(
+        'tabular inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-bold',
+        up ? 'text-bad' : 'text-ok',
+        className,
+      )}
+    >
       <span aria-hidden>{up ? '▲' : '▼'}</span>
       <span className="sr-only">{up ? 'Sube' : 'Baja'}</span>
       {fmtPct(Math.abs(pct))}
@@ -78,7 +84,8 @@ export function ChangePct({ pct, className }: { pct?: number; className?: string
 
 /** Punto de confianza de lectura (0–1). */
 export function ConfidenceDot({ value, className }: { value?: number; className?: string }) {
-  if (value == null || !Number.isFinite(value)) return <span className={clsx('inline-block size-2.5 shrink-0 rounded-full bg-line-strong', className)} title="Introducida a mano" />;
+  if (value == null || !Number.isFinite(value))
+    return <span className={clsx('inline-block size-2.5 shrink-0 rounded-full bg-line-strong', className)} title="Introducida a mano" />;
   const tone = value >= 0.85 ? 'bg-ok' : value >= 0.6 ? 'bg-warn' : 'bg-bad';
   const label = value >= 0.85 ? 'alta' : value >= 0.6 ? 'media: revísala' : 'baja: compruébala con el documento';
   return (
@@ -92,7 +99,19 @@ export function ConfidenceDot({ value, className }: { value?: number; className?
 }
 
 /** Icono con burbuja explicativa accesible (hover, foco y toque). */
-export function Hint({ children, icon, tone = 'warn', label, className }: { children: ReactNode; icon?: ReactNode; tone?: 'warn' | 'info' | 'bad'; label: string; className?: string }) {
+export function Hint({
+  children,
+  icon,
+  tone = 'warn',
+  label,
+  className,
+}: {
+  children: ReactNode;
+  icon?: ReactNode;
+  tone?: 'warn' | 'info' | 'bad';
+  label: string;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const id = useId();
   const tones = { warn: 'text-warn', info: 'text-info', bad: 'text-bad' };

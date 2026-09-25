@@ -25,7 +25,16 @@ import { EscandalloMock, HeroVisual, InvoiceMock, PhoneMenuMock, WELCOME_MOCK_CS
 import { RestoreBackupButton } from '../components/home/backup';
 import { useDemoLoader } from '../components/home/shared';
 
-const BUSINESS_TYPES = ['Restaurante', 'Bar de tapas', 'Cafetería', 'Gastrobar', 'Catering', 'Hotel', 'Grupo de restauración', 'Cliente de consultoría'];
+const BUSINESS_TYPES = [
+  'Restaurante',
+  'Bar de tapas',
+  'Cafetería',
+  'Gastrobar',
+  'Catering',
+  'Hotel',
+  'Grupo de restauración',
+  'Cliente de consultoría',
+];
 const COLORS = ['#ff5a1f', '#8b5cf6', '#10b981', '#3b82f6', '#f43f5e', '#f59e0b', '#0ea5e9', '#14b8a6'];
 
 const FEATURES: { icon: ReactNode; title: string; text: string; highlight?: boolean }[] = [
@@ -136,7 +145,15 @@ function CreateWorkspaceForm({ onCancel }: { onCancel: () => void }) {
           </span>
         </div>
         <Field label="Nombre del restaurante o cliente" error={touched && !name.trim() ? 'Escribe un nombre para continuar' : undefined}>
-          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej.: Taberna La Lonja" maxLength={80} autoComplete="organization" className="h-12 text-base" />
+          <Input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ej.: Taberna La Lonja"
+            maxLength={80}
+            autoComplete="organization"
+            className="h-12 text-base"
+          />
         </Field>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Tipo de negocio">
@@ -149,7 +166,14 @@ function CreateWorkspaceForm({ onCancel }: { onCancel: () => void }) {
             </Select>
           </Field>
           <Field label="Ciudad (opcional)">
-            <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej.: Valencia" maxLength={60} autoComplete="address-level2" className="h-12 text-base sm:text-sm" />
+            <Input
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Ej.: Valencia"
+              maxLength={60}
+              autoComplete="address-level2"
+              className="h-12 text-base sm:text-sm"
+            />
           </Field>
         </div>
         <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
@@ -177,9 +201,9 @@ export default function Welcome() {
     requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
   };
 
-  const ctaCls = 'h-auto! min-h-14 w-full whitespace-normal! px-5! py-3 text-center leading-tight sm:w-auto sm:px-7!';
+  const ctaCls = 'h-auto! min-h-14 w-full whitespace-normal! px-5! py-3 text-center leading-tight sm:w-auto sm:whitespace-nowrap! sm:px-7!';
   const ctas = (where: 'hero' | 'footer') => (
-    <div className={cx('flex flex-col gap-3 sm:flex-row', where === 'footer' && 'sm:justify-center')}>
+    <div className={cx('flex flex-col gap-3 sm:flex-row sm:flex-wrap', where === 'footer' && 'sm:justify-center')}>
       <Button size="xl" onClick={loadDemo} loading={demoLoading} icon={<PlayCircle className="size-5 shrink-0" />} className={ctaCls}>
         Probar con un restaurante de ejemplo
       </Button>
@@ -211,7 +235,12 @@ export default function Welcome() {
       {/* Hero */}
       <section className={cx('relative overflow-hidden', hasWorkspace ? 'rounded-3xl border border-line bg-surface' : '')}>
         <div className="hero-mesh pointer-events-none absolute inset-0 opacity-90" aria-hidden />
-        <div className={cx('relative mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] items-center gap-10 px-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-8', hasWorkspace ? 'py-10 sm:px-8 lg:py-14' : 'pb-14 pt-6 sm:px-6 lg:pb-20 lg:pt-12')}>
+        <div
+          className={cx(
+            'relative mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] items-center gap-10 px-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-8',
+            hasWorkspace ? 'py-10 sm:px-8 lg:py-14' : 'pb-14 pt-6 sm:px-6 lg:pb-20 lg:pt-12',
+          )}
+        >
           <div className="animate-slide-up">
             <div className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-line bg-surface/80 px-3 py-1.5 text-xs font-semibold text-ink-2 shadow-card backdrop-blur">
               <span className="flex size-4 items-center justify-center rounded-full bg-ok text-white">
@@ -224,8 +253,8 @@ export default function Welcome() {
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-2 sm:text-lg">
               Sube tus facturas, haz una foto a la carta y obtén el <strong className="font-semibold text-ink">escandallo</strong>, el{' '}
-              <strong className="font-semibold text-ink">food cost</strong> y la <strong className="font-semibold text-ink">merma</strong> de cada plato. Sin teclear
-              precios ni pelearte con hojas de cálculo.
+              <strong className="font-semibold text-ink">food cost</strong> y la <strong className="font-semibold text-ink">merma</strong> de cada
+              plato. Sin teclear precios ni pelearte con hojas de cálculo.
             </p>
             <div className="mt-7">{ctas('hero')}</div>
             <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-2">
@@ -266,14 +295,19 @@ export default function Welcome() {
                 </div>
                 <div className="p-5">
                   <div className="flex items-center gap-3">
-                    <span className="flex size-8 items-center justify-center rounded-full bg-brand-500 font-display text-sm font-extrabold text-white shadow-glow">{s.n}</span>
+                    <span className="flex size-8 items-center justify-center rounded-full bg-brand-500 font-display text-sm font-extrabold text-white shadow-glow">
+                      {s.n}
+                    </span>
                     <h3 className="font-display text-lg font-bold text-ink">{s.title}</h3>
                   </div>
                   <p className="mt-2 text-sm leading-relaxed text-muted">{s.text}</p>
                 </div>
               </Card>
               {i < STEPS.length - 1 && (
-                <span className="absolute -right-4 top-[130px] z-10 hidden size-8 items-center justify-center rounded-full border border-line bg-elevated text-brand-500 shadow-card md:flex" aria-hidden>
+                <span
+                  className="absolute -right-4 top-[130px] z-10 hidden size-8 items-center justify-center rounded-full border border-line bg-elevated text-brand-500 shadow-card md:flex"
+                  aria-hidden
+                >
                   <ArrowRight className="size-4" />
                 </span>
               )}
@@ -293,10 +327,20 @@ export default function Welcome() {
         </div>
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map((f) => (
-            <Card key={f.title} className={cx('relative overflow-hidden transition hover:-translate-y-0.5 hover:shadow-pop', f.highlight && 'border-brand-500/40')}>
+            <Card
+              key={f.title}
+              className={cx('relative overflow-hidden transition hover:-translate-y-0.5 hover:shadow-pop', f.highlight && 'border-brand-500/40')}
+            >
               {f.highlight && <div className="hero-mesh pointer-events-none absolute inset-0 opacity-50" aria-hidden />}
               <div className="relative">
-                <div className={cx('flex size-10 items-center justify-center rounded-xl', f.highlight ? 'bg-brand-500 text-white shadow-glow' : 'bg-brand-500/10 text-brand-500')}>{f.icon}</div>
+                <div
+                  className={cx(
+                    'flex size-10 items-center justify-center rounded-xl',
+                    f.highlight ? 'bg-brand-500 text-white shadow-glow' : 'bg-brand-500/10 text-brand-500',
+                  )}
+                >
+                  {f.icon}
+                </div>
                 <h3 className="mt-4 font-display text-base font-bold text-ink">{f.title}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted">{f.text}</p>
               </div>
@@ -312,7 +356,9 @@ export default function Welcome() {
           <div className="relative">
             <FileText className="mx-auto size-8 text-brand-400" aria-hidden />
             <h2 className="mt-3 font-display text-3xl font-extrabold sm:text-4xl">Tu primer escandallo, antes del próximo servicio</h2>
-            <p className="mx-auto mt-3 max-w-xl text-bg/75">Gratis y sin registro. Prueba con el restaurante de ejemplo o empieza directamente con tus facturas.</p>
+            <p className="mx-auto mt-3 max-w-xl text-bg/75">
+              Gratis y sin registro. Prueba con el restaurante de ejemplo o empieza directamente con tus facturas.
+            </p>
             <div className="mt-7">{ctas('footer')}</div>
           </div>
         </div>

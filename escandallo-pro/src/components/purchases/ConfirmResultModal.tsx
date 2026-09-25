@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowRight, CheckCircle2, ChefHat, FileText, Sparkles } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ChefHat, FileText, Sparkles, X } from 'lucide-react';
 import type { Dish, DishCost, ID } from '../../types';
-import { Badge, Button, FoodCostBadge, Modal } from '../ui';
+import { Badge, Button, FoodCostBadge, IconButton, Modal } from '../ui';
 import { foodCostStatus } from '../../core/costing';
 import { useBusiness } from '../../state/hooks';
 import { fmtEur, fmtEurPrecise, fmtNum } from '../../lib/format';
@@ -52,7 +52,9 @@ export function ConfirmResultModal({
   }, [outcome, costsAfter, dishes]);
 
   if (!outcome) return null;
-  const overTarget = impacted.filter((i) => i.dish.kind === 'plato' && foodCostStatus(i.after.foodCostPct, i.after.targetFoodCostPct, business.warningFoodCostPct) === 'bad').length;
+  const overTarget = impacted.filter(
+    (i) => i.dish.kind === 'plato' && foodCostStatus(i.after.foodCostPct, i.after.targetFoodCostPct, business.warningFoodCostPct) === 'bad',
+  ).length;
 
   return (
     <Modal
@@ -64,13 +66,21 @@ export function ConfirmResultModal({
           <Button variant="ghost" icon={<FileText className="size-4" />} onClick={() => navigate('/facturas')}>
             Volver a facturas
           </Button>
-          <Button variant="primary" icon={<ChefHat className="size-4" />} iconRight={<ArrowRight className="size-4" />} onClick={() => navigate('/platos')}>
-            Ver escandallos afectados{impacted.length ? ` (${impacted.length})` : ''}
+          <Button
+            variant="primary"
+            icon={<ChefHat className="size-4" />}
+            iconRight={<ArrowRight className="size-4" />}
+            onClick={() => navigate('/platos')}
+          >
+            {impacted.length ? `Ver escandallos afectados (${impacted.length})` : 'Ver escandallos'}
           </Button>
         </>
       }
     >
-      <div className="hero-mesh -mx-5 -mt-4 mb-5 border-b border-line px-5 pb-6 pt-7 text-center">
+      <div className="hero-mesh relative -mx-5 -mt-4 mb-5 border-b border-line px-5 pb-6 pt-7 text-center">
+        <IconButton label="Cerrar" onClick={onClose} className="absolute right-3 top-3">
+          <X className="size-5" />
+        </IconButton>
         <div className="mx-auto mb-3 flex size-14 animate-slide-up items-center justify-center rounded-2xl bg-ok text-white shadow-[0_12px_30px_-12px_rgb(16_185_129/0.9)]">
           <CheckCircle2 className="size-7" />
         </div>
@@ -78,7 +88,7 @@ export function ConfirmResultModal({
         <p className="mt-1 text-sm text-muted">Tu base de precios y todos los escandallos ya están al día.</p>
         <div className="mx-auto mt-5 grid max-w-md grid-cols-3 gap-2">
           <BigNumber value={outcome.updated} label={outcome.updated === 1 ? 'precio actualizado' : 'precios actualizados'} />
-          <BigNumber value={outcome.created} label={outcome.created === 1 ? 'producto nuevo' : 'productos nuevos'} accent />
+          <BigNumber value={outcome.created} label={outcome.created === 1 ? 'producto nuevo' : 'productos nuevos'} accent={outcome.created > 0} />
           <BigNumber value={impacted.length} label={impacted.length === 1 ? 'escandallo cambia' : 'escandallos cambian'} />
         </div>
       </div>
@@ -109,7 +119,10 @@ export function ConfirmResultModal({
           <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">Ingredientes nuevos en tu base de precios</h3>
           <div className="flex flex-wrap gap-2">
             {created.map((r) => (
-              <span key={r.productId} className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-1.5 text-sm">
+              <span
+                key={r.productId}
+                className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-1.5 text-sm"
+              >
                 <Badge tone="brand">Nuevo</Badge>
                 <span className="font-semibold text-ink">{r.name}</span>
                 <span className="tabular text-xs text-muted">
@@ -127,7 +140,10 @@ export function ConfirmResultModal({
       {unchanged > 0 && (
         <p className="mb-5 text-sm text-muted">
           {fmtNum(unchanged, 0)} {unchanged === 1 ? 'ingrediente mantiene' : 'ingredientes mantienen'} el mismo precio
-          {outcome.skipped > 0 ? ` · ${outcome.skipped} ${outcome.skipped === 1 ? 'línea omitida' : 'líneas omitidas'} (ignoradas o sin precio)` : ''}.
+          {outcome.skipped > 0
+            ? ` · ${outcome.skipped} ${outcome.skipped === 1 ? 'línea omitida' : 'líneas omitidas'} (ignoradas o sin precio)`
+            : ''}
+          .
         </p>
       )}
 
@@ -157,9 +173,15 @@ export function ConfirmResultModal({
                 </div>
                 {dish.kind === 'plato' && after.foodCostPct != null && (
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <FoodCostBadge pct={before.foodCostPct} status={foodCostStatus(before.foodCostPct, before.targetFoodCostPct, business.warningFoodCostPct)} />
+                    <FoodCostBadge
+                      pct={before.foodCostPct}
+                      status={foodCostStatus(before.foodCostPct, before.targetFoodCostPct, business.warningFoodCostPct)}
+                    />
                     <ArrowRight className="size-3.5 text-muted" />
-                    <FoodCostBadge pct={after.foodCostPct} status={foodCostStatus(after.foodCostPct, after.targetFoodCostPct, business.warningFoodCostPct)} />
+                    <FoodCostBadge
+                      pct={after.foodCostPct}
+                      status={foodCostStatus(after.foodCostPct, after.targetFoodCostPct, business.warningFoodCostPct)}
+                    />
                   </div>
                 )}
                 {dish.kind === 'elaboracion' && <Badge>Elaboración</Badge>}
@@ -176,7 +198,11 @@ export function ConfirmResultModal({
 function BigNumber({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
   return (
     <div className="rounded-2xl border border-line bg-surface/80 px-2 py-3 backdrop-blur">
-      <div className={accent ? 'font-display text-3xl font-extrabold text-gradient-brand' : 'font-display text-3xl font-extrabold text-ink'}>{fmtNum(value, 0)}</div>
+      <div
+        className={accent ? 'font-display text-3xl font-extrabold text-gradient-brand' : 'font-display text-3xl font-extrabold text-ink'}
+      >
+        {fmtNum(value, 0)}
+      </div>
       <div className="mt-0.5 text-[11px] font-semibold leading-tight text-muted">{label}</div>
     </div>
   );

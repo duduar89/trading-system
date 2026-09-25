@@ -58,7 +58,6 @@ function sanitizePatch(patch: Partial<YieldTest>): Partial<YieldTest> {
   const out: Partial<YieldTest> = { ...patch };
   delete out.id;
   delete out.createdAt;
-  if ('name' in patch && typeof patch.name === 'string') out.name = patch.name;
   if ('grossWeightKg' in patch) out.grossWeightKg = nonNeg(patch.grossWeightKg);
   if ('purchasePricePerKg' in patch) out.purchasePricePerKg = nonNeg(patch.purchasePricePerKg);
   if ('cookingLossPct' in patch) out.cookingLossPct = pct(patch.cookingLossPct);

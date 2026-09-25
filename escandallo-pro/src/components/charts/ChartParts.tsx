@@ -2,7 +2,15 @@ import type { ReactNode } from 'react';
 import clsx from 'clsx';
 
 /** Contenedor del tooltip de los gráficos: el valor manda, la etiqueta acompaña. */
-export function ChartTooltipBox({ title, rows, footer }: { title?: ReactNode; rows: { key: string; color?: string; label: ReactNode; value: ReactNode; shape?: 'line' | 'dot' }[]; footer?: ReactNode }) {
+export function ChartTooltipBox({
+  title,
+  rows,
+  footer,
+}: {
+  title?: ReactNode;
+  rows: { key: string; color?: string; label: ReactNode; value: ReactNode; shape?: 'line' | 'dot' }[];
+  footer?: ReactNode;
+}) {
   return (
     <div className="pointer-events-none min-w-[160px] max-w-[260px] rounded-xl border border-line bg-elevated px-3 py-2.5 text-xs shadow-pop">
       {title && <div className="mb-1.5 truncate font-semibold text-ink-2">{title}</div>}
@@ -58,9 +66,26 @@ export function ChartLegend({
 }
 
 /** Estado vacío compacto para el hueco de un gráfico. */
-export function ChartEmpty({ icon, title, description, action, className }: { icon?: ReactNode; title: ReactNode; description?: ReactNode; action?: ReactNode; className?: string }) {
+export function ChartEmpty({
+  icon,
+  title,
+  description,
+  action,
+  className,
+}: {
+  icon?: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={clsx('flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-surface-2/60 px-5 py-8 text-center', className)}>
+    <div
+      className={clsx(
+        'flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-surface-2/60 px-5 py-8 text-center',
+        className,
+      )}
+    >
       {icon && <div className="mb-2.5 flex size-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">{icon}</div>}
       <div className="text-sm font-semibold text-ink">{title}</div>
       {description && <p className="mt-1 max-w-sm text-xs text-muted">{description}</p>}

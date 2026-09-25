@@ -51,7 +51,13 @@ export function ExportTab({ data }: { data: ReportsData }) {
       const { exportEscandallosXlsx, exportProductsXlsx, downloadBlob } = await import('../../../lib/export');
       if (kind === 'escandallos') {
         if (!data.workspace) throw new Error('No hay restaurante activo');
-        const blob = await exportEscandallosXlsx({ workspace: data.workspace, dishes: data.dishes, costs: data.costs, ctx: data.ctx, business: data.business });
+        const blob = await exportEscandallosXlsx({
+          workspace: data.workspace,
+          dishes: data.dishes,
+          costs: data.costs,
+          ctx: data.ctx,
+          business: data.business,
+        });
         downloadBlob(blob, backupFileName(wsName, new Date(), 'xlsx').replace('escandallo-pro_', 'escandallos_'));
         toast.success('Excel de escandallos descargado', `${platos} platos y ${elaboraciones} elaboraciones, con una hoja por ficha técnica.`);
       } else {
@@ -76,7 +82,13 @@ export function ExportTab({ data }: { data: ReportsData }) {
           description="Resumen de toda la carta (PVP, coste, food cost, margen, merma y PVP sugerido) y una hoja con la ficha técnica de cada plato."
           meta={`${platos} platos · ${elaboraciones} elaboraciones`}
           action={
-            <Button block loading={busy === 'escandallos'} disabled={!data.dishes.length || busy != null} onClick={() => run('escandallos')} icon={<ChefHat className="size-4" />}>
+            <Button
+              block
+              loading={busy === 'escandallos'}
+              disabled={!data.dishes.length || busy != null}
+              onClick={() => run('escandallos')}
+              icon={<ChefHat className="size-4" />}
+            >
               Descargar Excel
             </Button>
           }
@@ -88,7 +100,14 @@ export function ExportTab({ data }: { data: ReportsData }) {
           description="Tu base de precios: cada ingrediente con su categoría, precio por unidad, proveedor, última compra, mermas y alérgenos."
           meta={`${data.products.length} ingredientes · ${data.suppliers.length} proveedores`}
           action={
-            <Button block variant="outline" loading={busy === 'ingredientes'} disabled={!data.products.length || busy != null} onClick={() => run('ingredientes')} icon={<FileSpreadsheet className="size-4" />}>
+            <Button
+              block
+              variant="outline"
+              loading={busy === 'ingredientes'}
+              disabled={!data.products.length || busy != null}
+              onClick={() => run('ingredientes')}
+              icon={<FileSpreadsheet className="size-4" />}
+            >
               Descargar Excel
             </Button>
           }
@@ -100,7 +119,14 @@ export function ExportTab({ data }: { data: ReportsData }) {
           description="Todo el restaurante en un archivo JSON para guardarlo, pasarlo a otro dispositivo o restaurarlo desde Ajustes."
           meta={`${data.invoices.length} facturas · ${data.yieldTests.length} pruebas de rendimiento`}
           action={
-            <Button block variant="outline" loading={busy === 'backup'} disabled={busy != null} onClick={() => run('backup')} icon={<ShieldCheck className="size-4" />}>
+            <Button
+              block
+              variant="outline"
+              loading={busy === 'backup'}
+              disabled={busy != null}
+              onClick={() => run('backup')}
+              icon={<ShieldCheck className="size-4" />}
+            >
               Descargar copia (JSON)
             </Button>
           }
@@ -113,7 +139,9 @@ export function ExportTab({ data }: { data: ReportsData }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="font-display text-base font-bold text-ink">Fichas técnicas para cocina</div>
-          <p className="text-sm text-muted">Abre cualquier escandallo y pulsa «Imprimir» para obtener su ficha técnica con ingredientes, gramajes, alérgenos y elaboración.</p>
+          <p className="text-sm text-muted">
+            Abre cualquier escandallo y pulsa «Imprimir» para obtener su ficha técnica con ingredientes, gramajes, alérgenos y elaboración.
+          </p>
         </div>
         <Button variant="outline" onClick={() => navigate('/platos')}>
           Ir a escandallos
@@ -121,8 +149,8 @@ export function ExportTab({ data }: { data: ReportsData }) {
       </Card>
 
       <Callout tone="info" icon={<Info className="size-4" />}>
-        Los archivos se generan en tu dispositivo: no se sube nada a ningún servidor. La copia de seguridad no incluye las fotos y PDF originales de facturas y
-        cartas.
+        Los archivos se generan en tu dispositivo: no se sube nada a ningún servidor. La copia de seguridad no incluye las fotos y PDF originales de
+        facturas y cartas.
       </Callout>
     </div>
   );

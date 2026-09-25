@@ -191,9 +191,9 @@ export interface DashboardStats {
   avgWastePct?: number;
 }
 
-/** Etiquetas de los tramos de food cost (límite inferior incluido). */
+/** Tramos de food cost (límite superior incluido: un 30 % exacto cae en "25–30 %", igual que el semáforo). */
 export const FOOD_COST_BUCKETS: { label: string; min: number; max: number }[] = [
-  { label: '< 25 %', min: -Infinity, max: 25 },
+  { label: '≤ 25 %', min: -Infinity, max: 25 },
   { label: '25–30 %', min: 25, max: 30 },
   { label: '30–35 %', min: 30, max: 35 },
   { label: '35–40 %', min: 35, max: 40 },
@@ -272,7 +272,7 @@ export function dashboardStats(args: {
     if (status === 'ok') ok++;
     else if (status === 'warn') warn++;
     else if (status === 'bad') bad++;
-    const bi = FOOD_COST_BUCKETS.findIndex((b) => fc >= b.min && fc < b.max);
+    const bi = FOOD_COST_BUCKETS.findIndex((b) => fc > b.min && fc <= b.max);
     if (bi >= 0) buckets[bi].count++;
   }
   const avgFoodCostPct = fcCount ? fcSum / fcCount : undefined;

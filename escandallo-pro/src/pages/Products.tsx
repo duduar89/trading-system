@@ -16,7 +16,15 @@ import { PriceTrendChip } from '../components/purchases/badges';
 import { NewProductModal } from '../components/purchases/NewProductModal';
 import { MergeProductsModal } from '../components/purchases/MergeProductsModal';
 import { ImportPriceListModal } from '../components/purchases/ImportPriceListModal';
-import { DEFAULT_PRODUCT_FILTERS, filterProducts, priceTrends, productStats, type PriceTrend, type ProductFilters, type ProductSort } from '../components/purchases/logic';
+import {
+  DEFAULT_PRODUCT_FILTERS,
+  filterProducts,
+  priceTrends,
+  productStats,
+  type PriceTrend,
+  type ProductFilters,
+  type ProductSort,
+} from '../components/purchases/logic';
 
 const PAGE = 150;
 
@@ -60,7 +68,10 @@ export default function Products() {
   const trends = useMemo(() => priceTrends(points ?? []), [points]);
   const supplierNames = useMemo(() => new Map((suppliers ?? []).map((s) => [s.id, s.name])), [suppliers]);
   const list = useMemo(() => filterProducts(products ?? [], filters, trends), [products, filters, trends]);
-  const stats = useMemo(() => productStats(products ?? [], trends, business.priceAlertPct, todayIso()), [products, trends, business.priceAlertPct]);
+  const stats = useMemo(
+    () => productStats(products ?? [], trends, business.priceAlertPct, todayIso()),
+    [products, trends, business.priceAlertPct],
+  );
   const categoryCounts = useMemo(() => {
     const m = new Map<string, number>();
     for (const p of products ?? []) m.set(p.category, (m.get(p.category) ?? 0) + 1);
@@ -85,7 +96,7 @@ export default function Products() {
   const selectedProducts = (products ?? []).filter((p) => selected.has(p.id));
 
   const onDeleteSelected = async () => {
-    const ids = [...selected];
+    const ids = selectedProducts.map((p) => p.id);
     let failed = 0;
     for (const id of ids) {
       try {
@@ -123,16 +134,28 @@ export default function Products() {
         title="Ingredientes"
         subtitle="Tu base de precios: lo que pagas de verdad por cada kilo, litro o unidad, sin IVA. Se actualiza sola con cada factura confirmada."
         actions={
-          <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto lg:flex-nowrap">
             {!empty && (
-              <Button variant="ghost" icon={<Download className="size-4" />} onClick={() => void onExport()} loading={exporting} title="Exportar a Excel">
+              <Button
+                variant="ghost"
+                icon={<Download className="size-4" />}
+                onClick={() => void onExport()}
+                loading={exporting}
+                title="Exportar a Excel"
+                className="flex-1 sm:flex-none"
+              >
                 <span className="sm:hidden 2xl:inline">Exportar</span>
               </Button>
             )}
-            <Button variant="outline" icon={<FileSpreadsheet className="size-4" />} onClick={() => setImportOpen(true)}>
+            <Button variant="outline" icon={<FileSpreadsheet className="size-4" />} onClick={() => setImportOpen(true)} className="flex-1 sm:flex-none">
               Importar tarifa
             </Button>
-            <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setNewOpen(true)}>
+            <Button
+              variant="primary"
+              icon={<Plus className="size-4" />}
+              onClick={() => setNewOpen(true)}
+              className="order-first w-full sm:order-none sm:w-auto"
+            >
               Nuevo ingrediente
             </Button>
           </div>
@@ -162,7 +185,13 @@ export default function Products() {
       ) : (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Stat label="Ingredientes" value={loading ? '—' : fmtNum(stats.total, 0)} icon={<Carrot className="size-4" />} tone="brand" hint={`${categoryCounts.size} categorías`} />
+            <Stat
+              label="Ingredientes"
+              value={loading ? '—' : fmtNum(stats.total, 0)}
+              icon={<Carrot className="size-4" />}
+              tone="brand"
+              hint={`${categoryCounts.size} categorías`}
+            />
             <Stat
               label="Con precio"
               value={loading ? '—' : fmtNum(stats.withPrice, 0)}
@@ -188,9 +217,19 @@ export default function Products() {
 
           <div className="mb-4 space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row">
-              <SearchInput value={filters.query} onChange={(v) => setF({ query: v })} placeholder="Buscar por nombre o como aparece en factura…" className="flex-1" />
+              <SearchInput
+                value={filters.query}
+                onChange={(v) => setF({ query: v })}
+                placeholder="Buscar por nombre o como aparece en factura…"
+                className="flex-1"
+              />
               <div className="grid grid-cols-2 gap-2 sm:flex">
-                <Select value={filters.category} onChange={(e) => setF({ category: e.target.value as ProductFilters['category'] })} aria-label="Categoría" className="sm:w-52">
+                <Select
+                  value={filters.category}
+                  onChange={(e) => setF({ category: e.target.value as ProductFilters['category'] })}
+                  aria-label="Categoría"
+                  className="sm:w-52"
+                >
                   <option value="todas">Todas las categorías</option>
                   {CATEGORIES.filter((c) => categoryCounts.has(c)).map((c) => (
                     <option key={c} value={c}>
@@ -198,7 +237,12 @@ export default function Products() {
                     </option>
                   ))}
                 </Select>
-                <Select value={filters.sort} onChange={(e) => setF({ sort: e.target.value as ProductSort })} aria-label="Ordenar por" className="sm:w-52">
+                <Select
+                  value={filters.sort}
+                  onChange={(e) => setF({ sort: e.target.value as ProductSort })}
+                  aria-label="Ordenar por"
+                  className="sm:w-52"
+                >
                   {SORTS.map((s) => (
                     <option key={s.value} value={s.value}>
                       {s.label}
@@ -208,17 +252,36 @@ export default function Products() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <FilterChip active={filters.noPrice} onClick={() => setF({ noPrice: !filters.noPrice })} icon={<PackageSearch className="size-3.5" />} count={stats.withoutPrice}>
+              <FilterChip
+                active={filters.noPrice}
+                onClick={() => setF({ noPrice: !filters.noPrice })}
+                icon={<PackageSearch className="size-3.5" />}
+                count={stats.withoutPrice}
+              >
                 Sin precio
               </FilterChip>
-              <FilterChip active={filters.withYield} onClick={() => setF({ withYield: !filters.withYield })} icon={<Scale className="size-3.5" />} count={yieldCount}>
+              <FilterChip
+                active={filters.withYield}
+                onClick={() => setF({ withYield: !filters.withYield })}
+                icon={<Scale className="size-3.5" />}
+                count={yieldCount}
+              >
                 Con prueba de merma
               </FilterChip>
-              <FilterChip active={filters.rising} onClick={() => setF({ rising: !filters.rising })} icon={<TrendingUp className="size-3.5" />} count={risingCount}>
+              <FilterChip
+                active={filters.rising}
+                onClick={() => setF({ rising: !filters.rising })}
+                icon={<TrendingUp className="size-3.5" />}
+                count={risingCount}
+              >
                 Subidas
               </FilterChip>
               {filtered && (
-                <button type="button" onClick={() => setF(DEFAULT_PRODUCT_FILTERS)} className="min-h-9 px-2 text-xs font-semibold text-muted underline-offset-2 hover:text-ink hover:underline">
+                <button
+                  type="button"
+                  onClick={() => setF(DEFAULT_PRODUCT_FILTERS)}
+                  className="min-h-9 px-2 text-xs font-semibold text-muted underline-offset-2 hover:text-ink hover:underline"
+                >
                   Quitar filtros
                 </button>
               )}
@@ -305,14 +368,28 @@ export default function Products() {
                   </thead>
                   <tbody>
                     {visible.map((p) => (
-                      <ProductRow key={p.id} p={p} trend={trends.get(p.id)} supplier={p.supplierId ? supplierNames.get(p.supplierId) : undefined} selected={selected.has(p.id)} onToggle={toggle} />
+                      <ProductRow
+                        key={p.id}
+                        p={p}
+                        trend={trends.get(p.id)}
+                        supplier={p.supplierId ? supplierNames.get(p.supplierId) : undefined}
+                        selected={selected.has(p.id)}
+                        onToggle={toggle}
+                      />
                     ))}
                   </tbody>
                 </Table>
               </div>
               <div className="space-y-2.5 lg:hidden">
                 {visible.map((p) => (
-                  <ProductCard key={p.id} p={p} trend={trends.get(p.id)} supplier={p.supplierId ? supplierNames.get(p.supplierId) : undefined} selected={selected.has(p.id)} onToggle={toggle} />
+                  <ProductCard
+                    key={p.id}
+                    p={p}
+                    trend={trends.get(p.id)}
+                    supplier={p.supplierId ? supplierNames.get(p.supplierId) : undefined}
+                    selected={selected.has(p.id)}
+                    onToggle={toggle}
+                  />
                 ))}
               </div>
               {list.length > limit && (
@@ -343,7 +420,19 @@ export default function Products() {
   );
 }
 
-function FilterChip({ active, onClick, icon, count, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; count?: number; children: React.ReactNode }) {
+function FilterChip({
+  active,
+  onClick,
+  icon,
+  count,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  count?: number;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -351,12 +440,16 @@ function FilterChip({ active, onClick, icon, count, children }: { active: boolea
       aria-pressed={active}
       className={clsx(
         'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition',
-        active ? 'border-brand-500 bg-brand-500 text-white shadow-glow' : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
+        active
+          ? 'border-brand-500 bg-brand-500 text-white shadow-glow'
+          : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
       )}
     >
       {icon}
       {children}
-      {count != null && <span className={clsx('tabular rounded-full px-1.5 text-[10px]', active ? 'bg-white/25' : 'bg-surface-2 text-muted')}>{count}</span>}
+      {count != null && (
+        <span className={clsx('tabular rounded-full px-1.5 text-[10px]', active ? 'bg-white/25' : 'bg-surface-2 text-muted')}>{count}</span>
+      )}
     </button>
   );
 }
@@ -392,7 +485,19 @@ function PriceCell({ p, trend }: { p: Product; trend?: PriceTrend }) {
   );
 }
 
-function ProductRow({ p, trend, supplier, selected, onToggle }: { p: Product; trend?: PriceTrend; supplier?: string; selected: boolean; onToggle: (id: ID) => void }) {
+function ProductRow({
+  p,
+  trend,
+  supplier,
+  selected,
+  onToggle,
+}: {
+  p: Product;
+  trend?: PriceTrend;
+  supplier?: string;
+  selected: boolean;
+  onToggle: (id: ID) => void;
+}) {
   const navigate = useNavigate();
   return (
     <tr
@@ -403,13 +508,22 @@ function ProductRow({ p, trend, supplier, selected, onToggle }: { p: Product; tr
       }}
     >
       <Td>
-        <input type="checkbox" aria-label={`Seleccionar ${p.name}`} checked={selected} onChange={() => onToggle(p.id)} className="size-4 accent-brand-500" />
+        <input
+          type="checkbox"
+          aria-label={`Seleccionar ${p.name}`}
+          checked={selected}
+          onChange={() => onToggle(p.id)}
+          className="size-4 accent-brand-500"
+        />
       </Td>
       <Td>
         <div className="flex min-w-0 items-center gap-3">
           <CategoryBadge category={p.category} compact />
           <div className="min-w-0">
-            <Link to={`/ingredientes/${p.id}`} className="block max-w-[340px] truncate font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400">
+            <Link
+              to={`/ingredientes/${p.id}`}
+              className="block max-w-[340px] truncate font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400"
+            >
               {p.name}
             </Link>
             <div className="flex items-center gap-1.5 text-xs text-muted">
@@ -417,7 +531,10 @@ function ProductRow({ p, trend, supplier, selected, onToggle }: { p: Product; tr
               {p.aliases.length > 0 && (
                 <>
                   <span aria-hidden>·</span>
-                  <span title={`También aparece como: ${p.aliases.join(' · ')}`} className="cursor-help underline decoration-dotted underline-offset-2">
+                  <span
+                    title={`También aparece como: ${p.aliases.join(' · ')}`}
+                    className="cursor-help underline decoration-dotted underline-offset-2"
+                  >
                     +{p.aliases.length} {p.aliases.length === 1 ? 'nombre' : 'nombres'}
                   </span>
                 </>
@@ -447,12 +564,30 @@ function ProductRow({ p, trend, supplier, selected, onToggle }: { p: Product; tr
   );
 }
 
-function ProductCard({ p, trend, supplier, selected, onToggle }: { p: Product; trend?: PriceTrend; supplier?: string; selected: boolean; onToggle: (id: ID) => void }) {
+function ProductCard({
+  p,
+  trend,
+  supplier,
+  selected,
+  onToggle,
+}: {
+  p: Product;
+  trend?: PriceTrend;
+  supplier?: string;
+  selected: boolean;
+  onToggle: (id: ID) => void;
+}) {
   return (
     <Card padded={false} className={clsx('transition', selected && 'border-brand-500/50 bg-brand-500/5')}>
       <div className="flex items-start gap-3 p-3.5">
         <label className="-m-1.5 flex size-10 shrink-0 cursor-pointer items-center justify-center">
-          <input type="checkbox" aria-label={`Seleccionar ${p.name}`} checked={selected} onChange={() => onToggle(p.id)} className="size-4 accent-brand-500" />
+          <input
+            type="checkbox"
+            aria-label={`Seleccionar ${p.name}`}
+            checked={selected}
+            onChange={() => onToggle(p.id)}
+            className="size-4 accent-brand-500"
+          />
         </label>
         <Link to={`/ingredientes/${p.id}`} className="flex min-w-0 flex-1 items-start gap-3">
           <CategoryBadge category={p.category} compact className="size-10 text-xl" />

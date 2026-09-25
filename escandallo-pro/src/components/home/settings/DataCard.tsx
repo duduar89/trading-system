@@ -54,7 +54,11 @@ export function DataCard({ workspaceId, id }: { workspaceId?: string; id?: strin
 
   return (
     <Card id={id} className="scroll-mt-24">
-      <CardHeader icon={<Database className="size-5" />} title="Datos y copias de seguridad" subtitle="Tus datos viven solo en este dispositivo. Haz copias para no perderlos y para pasarlos a otro." />
+      <CardHeader
+        icon={<Database className="size-5" />}
+        title="Datos y copias de seguridad"
+        subtitle="Tus datos viven solo en este dispositivo. Haz copias para no perderlos y para pasarlos a otro."
+      />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-line p-4">

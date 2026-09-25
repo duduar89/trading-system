@@ -44,7 +44,5 @@ export function searchProducts(query: string, products: Product[], limit = 20): 
       hits.set(p.id, { product: p, score: starts ? 0.75 : 0.55, matchedOn: matchesQuery(q, p.name) ? undefined : alias });
     }
   }
-  return [...hits.values()]
-    .sort((a, b) => b.score - a.score || a.product.name.localeCompare(b.product.name, 'es'))
-    .slice(0, limit);
+  return [...hits.values()].sort((a, b) => b.score - a.score || a.product.name.localeCompare(b.product.name, 'es')).slice(0, limit);
 }

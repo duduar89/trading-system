@@ -21,6 +21,7 @@ import { useAppSettings, useBusiness, useCostingContext, useCurrentWorkspace, us
 import { errorMessage, toast } from '../state/store';
 import { deleteDish, duplicateDish, rematchDish, updateDish } from '../services/dishes';
 import { aiAvailable } from '../extract/index';
+import { db } from '../db';
 import { fmtEur } from '../lib/format';
 import { AllergenChips } from '../components/Allergens';
 import { Badge, Button, Card, CardHeader, ConfirmDialog, EmptyState, Field, IconButton, Input, NumberInput, Segmented, Select, Textarea } from '../components/ui';
@@ -54,21 +55,41 @@ export default function DishEditor() {
     setDraftState(d);
   }, []);
 
+  // Marca de tiempo de nuestro último guardado: su "eco" desde la BD no debe reemplazar el borrador
+  // (el servicio normaliza espacios y eso borraría, p. ej., el espacio que el usuario acaba de teclear).
+  const ownStamp = useRef<string | undefined>(undefined);
   const saver = useAutosave<Dish>(
-    (d) => updateDish(d.id, editablePatch(d)),
+    async (d) => {
+      const patch = editablePatch(d);
+      if (!d.name.trim()) delete patch.name; // nombre a medio escribir: se conserva el guardado
+      await updateDish(d.id, patch);
+      ownStamp.current = (await db().dishes.get(d.id))?.updatedAt;
+    },
     400,
     (e) => toast.error('No se pudieron guardar los cambios', errorMessage(e)),
   );
   const { isPending, schedule, flush } = saver;
 
   // Sincroniza el borrador con la BD (carga inicial, propuestas, cambios desde otra pestaña),
-  // sin pisar lo que el usuario está escribiendo.
+  // sin pisar lo que el usuario está escribiendo ni cambios que aún no se han podido guardar.
   useEffect(() => {
     if (!dbDish) return;
     const cur = draftRef.current;
     if (!cur || cur.id !== dbDish.id) setDraft(dbDish);
-    else if (!isPending() && dbDish.updatedAt !== cur.updatedAt) setDraft(dbDish);
+    else if (!isPending() && dbDish.updatedAt !== ownStamp.current && dbDish.updatedAt !== cur.updatedAt) setDraft(dbDish);
   }, [dbDish, isPending, setDraft]);
+
+  // Ctrl/Cmd + S guarda al momento (por costumbre; el autoguardado ya lo hace solo).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        void flush();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [flush]);
 
   const update = useCallback(
     (patch: Partial<Dish>) => {
@@ -197,7 +218,7 @@ export default function DishEditor() {
               <Link to="/platos" className="inline-flex h-9 items-center gap-1.5 rounded-lg pr-2 text-sm font-semibold text-muted transition hover:text-ink">
                 <ArrowLeft className="size-4" /> Escandallos
               </Link>
-              <SaveIndicator state={saver.state} />
+              <SaveIndicator state={saver.state} onRetry={() => void flush()} />
             </div>
             <NameField value={draft.name} onChange={(name) => update({ name })} />
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -382,10 +403,6 @@ export default function DishEditor() {
         withItems={draft.items.length}
         single
         onClose={() => setProposeOpen(false)}
-        onDone={(res) => {
-          if (res.usedAI) toast.ai('Ingredientes propuestos con IA', 'Revisa las líneas en violeta y acéptalas.');
-          else toast.success('Ingredientes propuestos', 'Base de recetas local, gratis. Revisa las líneas en violeta.');
-        }}
       />
       <ConfirmDialog
         open={confirmDelete}
@@ -438,15 +455,26 @@ function NameField({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
-function SaveIndicator({ state }: { state: SaveState }) {
+function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
   if (state === 'idle') return null;
+  if (state === 'error') {
+    return (
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex items-center gap-1 rounded-full bg-bad-soft px-2 py-0.5 text-[11px] font-semibold text-bad hover:underline"
+        aria-live="polite"
+      >
+        <CloudOff className="size-3" /> Sin guardar · Reintentar
+      </button>
+    );
+  }
   return (
     <span
       className={clsx(
         'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
         state === 'saving' && 'bg-surface-2 text-muted',
         state === 'saved' && 'bg-ok-soft text-ok',
-        state === 'error' && 'bg-bad-soft text-bad',
       )}
       aria-live="polite"
     >
@@ -454,13 +482,9 @@ function SaveIndicator({ state }: { state: SaveState }) {
         <>
           <Loader2 className="size-3 animate-spin" /> Guardando…
         </>
-      ) : state === 'saved' ? (
-        <>
-          <Check className="size-3" /> Guardado
-        </>
       ) : (
         <>
-          <CloudOff className="size-3" /> Sin guardar
+          <Check className="size-3" /> Guardado
         </>
       )}
     </span>

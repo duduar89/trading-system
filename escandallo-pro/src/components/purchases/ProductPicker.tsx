@@ -37,7 +37,19 @@ const PANEL_W = 400;
  * búsqueda instantánea (tolera erratas y abreviaturas), "Crear nuevo" y "Ignorar línea".
  * Escritorio: panel flotante anclado; móvil: hoja inferior.
  */
-export function ProductPicker({ products, seed, selectedId, excludeIds, onSelect, create, onIgnore, label, children, triggerClassName, disabled }: ProductPickerProps) {
+export function ProductPicker({
+  products,
+  seed,
+  selectedId,
+  excludeIds,
+  onSelect,
+  create,
+  onIgnore,
+  label,
+  children,
+  triggerClassName,
+  disabled,
+}: ProductPickerProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const desktop = useMediaQuery('(min-width: 640px)');
@@ -55,7 +67,7 @@ export function ProductPicker({ products, seed, selectedId, excludeIds, onSelect
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={label}
+        title={label}
         onClick={() => setOpen((o) => !o)}
         className={clsx(
           'group inline-flex min-h-10 w-full items-center gap-2 rounded-xl border border-line-strong bg-surface px-2.5 text-left text-sm text-ink transition hover:border-brand-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-60',
@@ -79,7 +91,15 @@ export function ProductPicker({ products, seed, selectedId, excludeIds, onSelect
   );
 }
 
-function FloatingPanel({ anchor, onClose, children }: { anchor: React.RefObject<HTMLButtonElement | null>; onClose: () => void; children: ReactNode }) {
+function FloatingPanel({
+  anchor,
+  onClose,
+  children,
+}: {
+  anchor: React.RefObject<HTMLButtonElement | null>;
+  onClose: () => void;
+  children: ReactNode;
+}) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number; maxHeight: number }>();
 
@@ -130,7 +150,11 @@ function FloatingPanel({ anchor, onClose, children }: { anchor: React.RefObject<
     <div
       ref={panelRef}
       className="fixed z-[60] flex animate-fade-in flex-col overflow-hidden rounded-2xl border border-line bg-elevated shadow-pop"
-      style={pos ? { left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: Math.min(pos.maxHeight, 460) } : { visibility: 'hidden' }}
+      style={
+        pos
+          ? { left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: Math.min(pos.maxHeight, 460) }
+          : { opacity: 0, pointerEvents: 'none', left: 0, top: 0, width: PANEL_W }
+      }
     >
       {children}
     </div>,
@@ -148,7 +172,10 @@ function PickerPanel({
   onSelect,
   onDone,
   sheet,
-}: Pick<ProductPickerProps, 'products' | 'seed' | 'selectedId' | 'excludeIds' | 'create' | 'onIgnore' | 'onSelect'> & { onDone: () => void; sheet?: boolean }) {
+}: Pick<ProductPickerProps, 'products' | 'seed' | 'selectedId' | 'excludeIds' | 'create' | 'onIgnore' | 'onSelect'> & {
+  onDone: () => void;
+  sheet?: boolean;
+}) {
   const [query, setQuery] = useState('');
   const [createName, setCreateName] = useState(create?.name ?? '');
   const [createNameTouched, setCreateNameTouched] = useState(false);
@@ -199,7 +226,8 @@ function PickerPanel({
     if (!sheet) inputRef.current?.focus();
   }, [sheet]);
 
-  const effectiveCreateName = createNameTouched || !query.trim() ? createName : query.trim().charAt(0).toUpperCase() + query.trim().slice(1);
+  const effectiveCreateName =
+    createNameTouched || !query.trim() ? createName : query.trim().charAt(0).toUpperCase() + query.trim().slice(1);
 
   const choose = (o: Option | undefined) => {
     if (!o) return;
@@ -249,7 +277,13 @@ function PickerPanel({
           className="h-10 w-full rounded-xl border border-line-strong bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-muted/70 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
         />
       </div>
-      <div ref={listRef} id={listId} role="listbox" aria-label="Ingredientes" className={clsx('min-h-0 flex-1 overflow-y-auto', sheet ? 'max-h-[60dvh]' : 'p-1.5')}>
+      <div
+        ref={listRef}
+        id={listId}
+        role="listbox"
+        aria-label="Ingredientes"
+        className={clsx('min-h-0 flex-1 overflow-y-auto', sheet ? 'max-h-[60dvh]' : 'p-1.5')}
+      >
         {options.map((o, i) => {
           const isActive = i === active;
           const common = {
@@ -264,7 +298,10 @@ function PickerPanel({
               <div
                 key="create"
                 {...common}
-                className={clsx('mb-1 rounded-xl border p-2.5 transition', isActive ? 'border-brand-400 bg-brand-500/8' : 'border-dashed border-line-strong')}
+                className={clsx(
+                  'mb-1 rounded-xl border p-2.5 transition',
+                  isActive ? 'border-brand-400 bg-brand-500/8' : 'border-dashed border-line-strong',
+                )}
               >
                 <div className="mb-2 flex items-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
                   <Plus className="size-3.5" /> Crear nuevo ingrediente
@@ -278,16 +315,16 @@ function PickerPanel({
                     }}
                     onFocus={() => setActive(i)}
                     aria-label="Nombre del nuevo ingrediente"
-                    className="h-10 min-w-0 flex-1 rounded-xl border border-line-strong bg-surface px-3 text-sm font-semibold text-ink focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
+                    className="h-10 w-full min-w-0 shrink-0 rounded-xl border border-line-strong bg-surface px-3 text-sm font-semibold sm:w-auto sm:flex-1 text-ink focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
                   />
                   <Select
                     value={createCategory}
                     onChange={(e) => setCreateCategory(e.target.value as IngredientCategory | '')}
                     onFocus={() => setActive(i)}
                     aria-label="Categoría del nuevo ingrediente"
-                    className="sm:w-40"
+                    className="sm:w-44"
                   >
-                    <option value="">Categoría automática</option>
+                    <option value="">Automática</option>
                     {CATEGORIES.map((c) => (
                       <option key={c} value={c}>
                         {CATEGORY_LABELS[c].emoji} {CATEGORY_LABELS[c].label}
@@ -313,7 +350,10 @@ function PickerPanel({
                 type="button"
                 {...common}
                 onClick={() => choose(o)}
-                className={clsx('mt-1 flex min-h-11 w-full items-center gap-2.5 rounded-xl border-t border-line px-2.5 text-left text-sm text-muted transition', isActive && 'bg-surface-2 text-ink')}
+                className={clsx(
+                  'mt-1 flex min-h-11 w-full items-center gap-2.5 rounded-xl border-t border-line px-2.5 text-left text-sm text-muted transition',
+                  isActive && 'bg-surface-2 text-ink',
+                )}
               >
                 <Ban className="size-4" /> Ignorar línea <span className="text-xs">(portes, envases, cargos…)</span>
               </button>
@@ -324,14 +364,19 @@ function PickerPanel({
           return (
             <div key={p.id}>
               {i === firstMatch && (
-                <SectionTitle>{query.trim() ? `${hits.length} resultado${hits.length === 1 ? '' : 's'}` : 'Coincidencias probables'}</SectionTitle>
+                <SectionTitle>
+                  {query.trim() ? `${hits.length} resultado${hits.length === 1 ? '' : 's'}` : 'Coincidencias probables'}
+                </SectionTitle>
               )}
               {i === firstAll && <SectionTitle>Todos los ingredientes</SectionTitle>}
               <button
                 type="button"
                 {...common}
                 onClick={() => choose(o)}
-                className={clsx('flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition', isActive ? 'bg-surface-2' : 'hover:bg-surface-2')}
+                className={clsx(
+                  'flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition',
+                  isActive ? 'bg-surface-2' : 'hover:bg-surface-2',
+                )}
               >
                 <CategoryBadge category={p.category} compact />
                 <span className="min-w-0 flex-1">
@@ -358,11 +403,14 @@ function PickerPanel({
             Ningún ingrediente coincide con «{query.trim()}».{create ? ' Puedes crearlo arriba.' : ''}
           </p>
         )}
-        {!query.trim() && !pool.length && <p className="px-3 py-4 text-center text-sm text-muted">Aún no hay ingredientes en tu base de precios.</p>}
+        {!query.trim() && !pool.length && (
+          <p className="px-3 py-4 text-center text-sm text-muted">Aún no hay ingredientes en tu base de precios.</p>
+        )}
       </div>
       {!sheet && (
         <div className="shrink-0 border-t border-line px-3 py-2 text-[11px] text-muted">
-          <kbd className="font-mono">↑↓</kbd> moverse · <kbd className="font-mono">Enter</kbd> elegir · <kbd className="font-mono">Esc</kbd> cerrar
+          <kbd className="font-mono">↑↓</kbd> moverse · <kbd className="font-mono">Enter</kbd> elegir · <kbd className="font-mono">Esc</kbd>{' '}
+          cerrar
         </div>
       )}
     </div>

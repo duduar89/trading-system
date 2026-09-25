@@ -25,7 +25,13 @@ import {
   topWithOther,
 } from './insights';
 
-const business: BusinessSettings = { ...DEFAULT_BUSINESS_SETTINGS, targetFoodCostPct: 30, warningFoodCostPct: 35, defaultSaleVatPct: 10, priceRounding: 0.5 };
+const business: BusinessSettings = {
+  ...DEFAULT_BUSINESS_SETTINGS,
+  targetFoodCostPct: 30,
+  warningFoodCostPct: 35,
+  defaultSaleVatPct: 10,
+  priceRounding: 0.5,
+};
 const T = '2026-09-01T10:00:00.000Z';
 
 function product(p: Partial<Product> & { id: string; name: string }): Product {
@@ -88,7 +94,13 @@ const dishes: Dish[] = [
   // Elaboración: no es plato de carta
   dish({ id: 'd-fondo', name: 'Fondo', kind: 'elaboracion', items: [item('patata', 1)], status: 'borrador' }),
   // Borrador con líneas propuestas
-  dish({ id: 'd-borrador', name: 'Croquetas', menuPrice: 9, status: 'borrador', items: [item('patata', 0.1, { suggested: true }), item('aceite', 0.02, { unit: 'l', suggested: true })] }),
+  dish({
+    id: 'd-borrador',
+    name: 'Croquetas',
+    menuPrice: 9,
+    status: 'borrador',
+    items: [item('patata', 0.1, { suggested: true }), item('aceite', 0.02, { unit: 'l', suggested: true })],
+  }),
 ];
 
 function costs(): Map<string, DishCost> {
@@ -221,11 +233,23 @@ describe('onboardingSteps', () => {
 describe('reviewQueue', () => {
   it('agrupa facturas, cartas y platos pendientes con prioridad', () => {
     const invoices = [
-      { id: 'i1', supplierName: 'Makro', date: '2026-09-20', status: 'revision', lines: [{ id: 'l1', matchStatus: 'nuevo' }, { id: 'l2', matchStatus: 'vinculado' }], createdAt: T },
+      {
+        id: 'i1',
+        supplierName: 'Makro',
+        date: '2026-09-20',
+        status: 'revision',
+        lines: [
+          { id: 'l1', matchStatus: 'nuevo' },
+          { id: 'l2', matchStatus: 'vinculado' },
+        ],
+        createdAt: T,
+      },
       { id: 'i2', supplierName: '', fileName: 'foto.jpg', date: '2026-09-21', status: 'error', error: 'imagen ilegible', lines: [], createdAt: T },
       { id: 'i3', supplierName: 'Otro', date: '2026-09-22', status: 'confirmada', lines: [], createdAt: T },
     ] as unknown as Invoice[];
-    const scans = [{ id: 's1', name: 'Carta verano', images: [], status: 'revision', entries: [{ id: 'e1' }, { id: 'e2' }], createdAt: T }] as unknown as MenuScan[];
+    const scans = [
+      { id: 's1', name: 'Carta verano', images: [], status: 'revision', entries: [{ id: 'e1' }, { id: 'e2' }], createdAt: T },
+    ] as unknown as MenuScan[];
     const q = reviewQueue(invoices, dishes, scans);
     expect(q.map((r) => `${r.kind}:${r.id}`)).toEqual(['factura:i2', 'factura:i1', 'carta:s1', 'plato:d-borrador']);
     expect(q[0]!.subtitle).toContain('imagen ilegible');
@@ -292,7 +316,12 @@ describe('simulador', () => {
     const before = costs();
     const expensive = products.map((p) => (p.id === 'solomillo' ? { ...p, pricePerBase: 24 } : p));
     const after = costAllDishes(buildCostingContext(expensive, dishes, yieldTests, business));
-    const sim = ['d-solomillo', 'd-tapa'].map((id) => ({ dishId: id, name: dishes.find((d) => d.id === id)!.name, before: before.get(id)!, after: after.get(id)! }));
+    const sim = ['d-solomillo', 'd-tapa'].map((id) => ({
+      dishId: id,
+      name: dishes.find((d) => d.id === id)!.name,
+      before: before.get(id)!,
+      after: after.get(id)!,
+    }));
     const rows = simulationRows(sim, dishes, business);
     expect(rows[0]!.dishId).toBe('d-solomillo');
     expect(rows[0]!.deltaCost).toBeCloseTo(-1.5, 5);
@@ -302,6 +331,20 @@ describe('simulador', () => {
     const sum = simulationSummary(rows);
     expect(sum).toMatchObject({ affected: 2, improved: 2, worsened: 0 });
     expect(sum.avgDeltaFc).toBeLessThan(0);
+  });
+  it('pone los platos antes que las elaboraciones y solo cuenta platos en el resumen', () => {
+    const before = costs();
+    const cheaper = products.map((p) => (p.id === 'patata' ? { ...p, pricePerBase: 3 } : p));
+    const after = costAllDishes(buildCostingContext(cheaper, dishes, yieldTests, business));
+    const ids = ['d-fondo', 'd-bravas', 'd-borrador'];
+    const sim = ids.map((id) => ({ dishId: id, name: dishes.find((d) => d.id === id)!.name, before: before.get(id)!, after: after.get(id)! }));
+    const rows = simulationRows(sim, new Map(dishes.map((d) => [d.id, d])), business);
+    // El fondo (elaboración) tiene el mayor impacto por ración pero va al final
+    expect(rows.map((r) => r.dishId)).toEqual(['d-bravas', 'd-borrador', 'd-fondo']);
+    expect(rows[2]!.kind).toBe('elaboracion');
+    const sum = simulationSummary(rows);
+    expect(sum.affected).toBe(2);
+    expect(sum.affectedElaborations).toBe(1);
   });
   it('productsInUse cuenta platos distintos que usan cada producto', () => {
     const used = productsInUse(products, dishes);

@@ -22,7 +22,11 @@ export function AmountInput({ value, onValue, decimals = 2, minDecimals = 0, suf
   const toText = (v: number | undefined | null) =>
     v == null || !Number.isFinite(v)
       ? ''
-      : new Intl.NumberFormat('es-ES', { minimumFractionDigits: Math.min(minDecimals, decimals), maximumFractionDigits: decimals, useGrouping: false }).format(v);
+      : new Intl.NumberFormat('es-ES', {
+          minimumFractionDigits: Math.min(minDecimals, decimals),
+          maximumFractionDigits: decimals,
+          useGrouping: false,
+        }).format(v);
   const [text, setText] = useState(toText(value));
   const focused = useRef(false);
   useEffect(() => {
@@ -55,4 +59,3 @@ export function AmountInput({ value, onValue, decimals = 2, minDecimals = 0, suf
     />
   );
 }
-

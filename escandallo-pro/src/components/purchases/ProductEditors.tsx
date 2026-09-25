@@ -40,7 +40,10 @@ export function AliasEditor({ product }: { product: Product }) {
       {product.aliases.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {product.aliases.map((a) => (
-            <span key={a} className="inline-flex max-w-full items-center gap-1 rounded-full border border-line bg-surface-2 py-0.5 pl-2.5 pr-1 text-xs font-medium text-ink-2">
+            <span
+              key={a}
+              className="inline-flex max-w-full items-center gap-1 rounded-full border border-line bg-surface-2 py-0.5 pl-2.5 pr-1 text-xs font-medium text-ink-2"
+            >
               <span className="truncate">{a}</span>
               <button
                 type="button"
@@ -67,7 +70,13 @@ export function AliasEditor({ product }: { product: Product }) {
           placeholder="Ej.: TOM. PERA CAT I"
           aria-label="Añadir otro nombre"
         />
-        <Button variant="outline" icon={<Plus className="size-4" />} onClick={() => void add()} disabled={!text.trim()} aria-label="Añadir nombre">
+        <Button
+          variant="outline"
+          icon={<Plus className="size-4" />}
+          onClick={() => void add()}
+          disabled={!text.trim()}
+          aria-label="Añadir nombre"
+        >
           <span className="hidden sm:inline">Añadir</span>
         </Button>
       </div>
@@ -124,7 +133,16 @@ export function ChangePriceModal({ product, open, onClose }: { product: Product;
         }}
       >
         <Field label={`Nuevo precio sin IVA (${perUnitLabel(product.baseUnit)})`}>
-          <AmountInput value={price} onValue={setPrice} decimals={4} minDecimals={2} suffix={perUnitLabel(product.baseUnit)} min={0} autoFocus className="text-lg" />
+          <AmountInput
+            value={price}
+            onValue={setPrice}
+            decimals={4}
+            minDecimals={2}
+            suffix={perUnitLabel(product.baseUnit)}
+            min={0}
+            autoFocus
+            className="text-lg"
+          />
         </Field>
         {product.pricePerBase > 0 && price != null && price > 0 && (
           <div className="flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2 text-sm">
@@ -134,7 +152,10 @@ export function ChangePriceModal({ product, open, onClose }: { product: Product;
             <ChangePct pct={change} />
           </div>
         )}
-        <Field label="Fecha del precio" hint={olderThanLast ? 'Es anterior a la última compra: quedará en el histórico sin cambiar el precio vigente.' : undefined}>
+        <Field
+          label="Fecha del precio"
+          hint={olderThanLast ? 'Es anterior a la última compra: quedará en el histórico sin cambiar el precio vigente.' : undefined}
+        >
           <Input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
         </Field>
         <button type="submit" className="hidden" aria-hidden tabIndex={-1} />

@@ -11,7 +11,7 @@ export const KB_LACTEOS: KbIngredient[] = [
     alg: ['lacteos'],
     dens: 1,
   }),
-  ing('Nata para cocinar', 'lacteo', 'l', 0, 0, 2.3, { aka: ['nata cocina', 'crema de leche para cocinar', 'nata 18', 'nata ligera'], alg: ['lacteos'], dens: 1.01 }),
+  ing('Nata para cocinar', 'lacteo', 'l', 0, 0, 2.3, { aka: ['nata cocina', 'crema de leche para cocinar', 'nata ligera', 'nata para cocina'], alg: ['lacteos'], dens: 1.01 }),
   ing('Nata agria', 'lacteo', 'kg', 0, 0, 6, { aka: ['crema agria', 'sour cream', 'creme fraiche', 'crema fresca'], alg: ['lacteos'] }),
   ing('Mantequilla', 'lacteo', 'kg', 0, 0, 9, { aka: ['mantequilla sin sal', 'mantequilla con sal', 'mantequilla en rama', 'butter', 'mantequilla de vaca'], alg: ['lacteos'] }),
   ing('Yogur natural', 'lacteo', 'kg', 0, 0, 2.5, { aka: ['yogur', 'yogures', 'yogurt', 'yogur natural sin azucar'], alg: ['lacteos'], uw: 0.125 }),
@@ -59,8 +59,8 @@ export const KB_LACTEOS: KbIngredient[] = [
 
 /** Cereales, harinas, pastas, arroces, pan y masas. */
 export const KB_CEREALES: KbIngredient[] = [
-  ing('Harina de trigo', 'cereal', 'kg', 0, 0, 0.8, { aka: ['harina', 'harina floja', 'harina de reposteria', 'harina 000', 'harina 0000', 'harina todo uso', 'harina blanca'], alg: ['gluten'] }),
-  ing('Harina de fuerza', 'cereal', 'kg', 0, 0, 1.1, { aka: ['harina panificable', 'harina de trigo de fuerza', 'harina tipo 00', 'harina 00', 'harina para pizza'], alg: ['gluten'] }),
+  ing('Harina de trigo', 'cereal', 'kg', 0, 0, 0.8, { aka: ['harina', 'harina floja', 'harina de reposteria', 'harina todo uso', 'harina blanca'], alg: ['gluten'] }),
+  ing('Harina de fuerza', 'cereal', 'kg', 0, 0, 1.1, { aka: ['harina panificable', 'harina de trigo de fuerza', 'harina de fuerza tipo 00', 'harina para pizza'], alg: ['gluten'] }),
   ing('Harina para freír', 'cereal', 'kg', 0, 0, 1.3, { aka: ['harina de freir', 'harina para rebozar', 'harina de fritura', 'harina especial fritos', 'harina de trigo duro', 'harina para fritos'], alg: ['gluten'] }),
   ing('Harina de garbanzo', 'cereal', 'kg', 0, 0, 3, { aka: ['harina de garbanzos', 'besan'] }),
   ing('Harina de maíz', 'cereal', 'kg', 0, 0, 1.8, { aka: ['harina de maiz amarilla', 'polenta', 'harina pan', 'harina precocida de maiz'] }),
@@ -79,7 +79,7 @@ export const KB_CEREALES: KbIngredient[] = [
   ing('Arroz para sushi', 'cereal', 'kg', 0, 0, 3, { aka: ['arroz japones', 'arroz de sushi'] }),
   ing('Espaguetis', 'cereal', 'kg', 0, 0, 1.4, { aka: ['spaghetti', 'espagueti', 'spaguetti', 'spaghettis', 'linguine', 'espaguetini'], alg: ['gluten'] }),
   ing('Macarrones', 'cereal', 'kg', 0, 0, 1.3, { aka: ['macarron', 'maccheroni'], alg: ['gluten'] }),
-  ing('Pasta seca', 'cereal', 'kg', 0, 0, 1.4, { aka: ['pasta', 'penne', 'plumas', 'fusilli', 'helices', 'rigatoni', 'farfalle', 'lazos', 'pasta corta', 'orecchiette'], alg: ['gluten'] }),
+  ing('Pasta seca', 'cereal', 'kg', 0, 0, 1.4, { aka: ['pasta', 'penne', 'fusilli', 'helices', 'rigatoni', 'farfalle', 'lazos', 'pasta corta', 'orecchiette'], alg: ['gluten'] }),
   ing('Tallarines', 'cereal', 'kg', 0, 0, 1.6, { aka: ['tagliatelle', 'tallarin', 'fettuccine', 'pappardelle'], alg: ['gluten'] }),
   ing('Pasta fresca al huevo', 'cereal', 'kg', 0, 0, 6.5, { aka: ['pasta fresca', 'tagliatelle fresca', 'tallarines frescos', 'pasta al huevo'], alg: ['gluten', 'huevo'] }),
   ing('Fideos', 'cereal', 'kg', 0, 0, 1.4, { aka: ['fideo', 'fideo fino', 'fideo para fideua', 'fideo grueso', 'fideo cabellin', 'fideos de sopa', 'fideo numero 2'], alg: ['gluten'] }),
@@ -290,7 +290,7 @@ export const KB_DULCE: KbIngredient[] = [
   ing('Gelatina en hojas', 'dulce', 'kg', 0, 0, 35, { aka: ['gelatina', 'hojas de gelatina', 'colas de pescado', 'gelatina neutra', 'gelatina en polvo'] }),
   ing('Agar-agar', 'dulce', 'kg', 0, 0, 80, { aka: ['agar', 'agar agar'] }),
   ing('Vaina de vainilla', 'dulce', 'kg', 0, 0, 350, { aka: ['vainilla', 'vainilla en rama', 'vainilla bourbon', 'vainas de vainilla'], uw: 0.004 }),
-  ing('Extracto de vainilla', 'dulce', 'l', 0, 0, 40, { aka: ['esencia de vainilla', 'aroma de vainilla', 'pasta de vainilla'], dens: 1 }),
+  ing('Extracto de vainilla', 'dulce', 'l', 0, 0, 40, { aka: ['esencia de vainilla', 'pasta de vainilla'], dens: 1 }),
   ing('Coco rallado', 'dulce', 'kg', 0, 0, 6, { aka: ['coco deshidratado', 'coco en polvo'] }),
   ing('Mermelada', 'dulce', 'kg', 0, 0, 4, { aka: ['confitura', 'mermelada de fresa', 'mermelada de frutos rojos', 'mermelada de melocoton', 'mermelada de naranja', 'compota', 'mermelada de tomate', 'confitura de tomate'] }),
   ing('Dulce de membrillo', 'dulce', 'kg', 0, 0, 4.5, { aka: ['membrillo', 'carne de membrillo'] }),

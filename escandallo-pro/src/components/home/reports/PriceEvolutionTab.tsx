@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { AlertTriangle, ArrowRight, LineChart, TrendingDown, TrendingUp } from 'lucide-react';
 import { priceAlerts } from '../../../core/analytics';
@@ -36,7 +36,10 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
     return m;
   }, [data.pricePoints]);
 
-  const alerts = useMemo(() => safeCompute(() => priceAlerts(data.products, data.pricePoints, 0, data.dishes)), [data.products, data.pricePoints, data.dishes]);
+  const alerts = useMemo(
+    () => safeCompute(() => priceAlerts(data.products, data.pricePoints, 0, data.dishes).filter((a) => Math.abs(a.changePct) >= 0.05)),
+    [data.products, data.pricePoints, data.dishes],
+  );
   const supplierName = useMemo(() => new Map(data.suppliers.map((s) => [s.id, s.name])), [data.suppliers]);
 
   const list = useMemo(() => {
@@ -47,7 +50,9 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
         return { product: p, series, summary: priceSummary(series) };
       })
       .filter((x) => x.series.length > 0 && (!q || norm(x.product.name).includes(q) || x.product.aliases.some((a) => norm(a).includes(q))))
-      .sort((a, b) => Math.abs(b.summary?.changePct ?? 0) - Math.abs(a.summary?.changePct ?? 0) || a.product.name.localeCompare(b.product.name, 'es'));
+      .sort(
+        (a, b) => Math.abs(b.summary?.changePct ?? 0) - Math.abs(a.summary?.changePct ?? 0) || a.product.name.localeCompare(b.product.name, 'es'),
+      );
   }, [data.products, pointsByProduct, query]);
 
   const requested = params.get('producto');
@@ -60,10 +65,12 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
   const series = useMemo(() => priceSeries(selectedId ? (pointsByProduct.get(selectedId) ?? []) : []), [pointsByProduct, selectedId]);
   const summary = priceSummary(series);
 
-  const select = (id: ID) => {
+  const detailRef = useRef<HTMLDivElement>(null);
+  const select = (id: ID, scroll = false) => {
     const next = new URLSearchParams(params);
     next.set('producto', id);
     setParams(next, { replace: true });
+    if (scroll) detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   if (!data.pricePoints.length) {
@@ -73,7 +80,10 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
         title="Todavía no hay histórico de precios"
         description="Cada factura confirmada guarda el precio de cada ingrediente. Con dos o más compras verás aquí cómo evoluciona."
         action={
-          <Link to="/facturas?nuevo=1" className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-600">
+          <Link
+            to="/facturas?nuevo=1"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-600"
+          >
             Subir facturas <ArrowRight className="size-4" />
           </Link>
         }
@@ -83,7 +93,7 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div ref={detailRef} className="grid scroll-mt-6 grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <Card padded={false} className="flex flex-col overflow-hidden lg:max-h-[640px]">
           <div className="border-b border-line p-3">
             <SearchInput value={query} onChange={setQuery} placeholder="Buscar ingrediente…" />
@@ -133,7 +143,10 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
                 title={selected.name}
                 subtitle={`${CATEGORY_LABELS[selected.category]?.label ?? ''} · precio sin IVA en ${perUnitLabel(selected.baseUnit)}`}
                 action={
-                  <Link to={`/ingredientes/${selected.id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400">
+                  <Link
+                    to={`/ingredientes/${selected.id}`}
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                  >
                     Ficha <ArrowRight className="size-4" />
                   </Link>
                 }
@@ -141,7 +154,11 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
               <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
                   { label: 'Precio actual', value: fmtUnitPrice(summary.last.price), strong: true },
-                  { label: 'Variación', value: series.length > 1 ? fmtSignedPct(summary.changePct) : '—', tone: summary.changePct > 0.05 ? 'text-bad' : summary.changePct < -0.05 ? 'text-ok' : 'text-ink' },
+                  {
+                    label: 'Variación',
+                    value: series.length > 1 ? fmtSignedPct(summary.changePct) : '—',
+                    tone: summary.changePct > 0.05 ? 'text-bad' : summary.changePct < -0.05 ? 'text-ok' : 'text-ink',
+                  },
                   { label: 'Mínimo', value: fmtUnitPrice(summary.min) },
                   { label: 'Máximo', value: fmtUnitPrice(summary.max) },
                 ].map((k) => (
@@ -192,7 +209,9 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
                               <span className={cx('ml-1.5 text-[11px] font-bold', ch > 0 ? 'text-bad' : 'text-ok')}>{fmtSignedPct(ch)}</span>
                             )}
                           </td>
-                          <td className="hidden max-w-[180px] truncate px-3 py-2 text-ink-2 sm:table-cell">{(p.supplierId && supplierName.get(p.supplierId)) || '—'}</td>
+                          <td className="hidden max-w-[180px] truncate px-3 py-2 text-ink-2 sm:table-cell">
+                            {(p.supplierId && supplierName.get(p.supplierId)) || '—'}
+                          </td>
                           <td className="max-w-[220px] truncate px-3 py-2 text-muted" title={p.rawDescription}>
                             {SOURCE_LABEL[p.source]}
                             {p.rawDescription ? ` · ${p.rawDescription}` : ''}
@@ -242,26 +261,32 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
               {alerts.value.slice(0, 20).map((a) => {
                 const up = a.changePct > 0;
                 return (
-                  <tr key={a.productId} className="cursor-pointer transition hover:bg-surface-2" onClick={() => select(a.productId)}>
+                  <tr key={a.productId} className="cursor-pointer transition hover:bg-surface-2" onClick={() => select(a.productId, true)}>
                     <Td className="max-w-[240px]">
                       <span className="flex items-center gap-2 font-semibold text-ink">
-                        {up ? <TrendingUp className="size-4 shrink-0 text-bad" aria-hidden /> : <TrendingDown className="size-4 shrink-0 text-ok" aria-hidden />}
+                        {up ? (
+                          <TrendingUp className="size-4 shrink-0 text-bad" aria-hidden />
+                        ) : (
+                          <TrendingDown className="size-4 shrink-0 text-ok" aria-hidden />
+                        )}
                         <span className="truncate">{a.productName}</span>
                       </span>
                     </Td>
-                    <Td align="right">
+                    <Td align="right" className="whitespace-nowrap">
                       {fmtUnitPrice(a.previousPrice)}/{a.baseUnit}
                     </Td>
-                    <Td align="right" className="font-semibold text-ink">
+                    <Td align="right" className="whitespace-nowrap font-semibold text-ink">
                       {fmtUnitPrice(a.currentPrice)}/{a.baseUnit}
                     </Td>
-                    <Td align="right">
+                    <Td align="right" className="whitespace-nowrap">
                       <Badge tone={up ? 'bad' : 'ok'} className="tabular">
                         {fmtSignedPct(a.changePct)}
                       </Badge>
                     </Td>
                     <Td className="whitespace-nowrap">{fmtDate(a.currentDate)}</Td>
-                    <Td align="right">{a.affectedDishIds.length}</Td>
+                    <Td align="right" className="whitespace-nowrap">
+                      {a.affectedDishIds.length}
+                    </Td>
                   </tr>
                 );
               })}

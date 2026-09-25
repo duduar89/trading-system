@@ -74,7 +74,9 @@ export function DropdownMenu({
     document.addEventListener('mousedown', onDown);
     document.addEventListener('touchstart', onDown);
     document.addEventListener('keydown', onKey);
-    const raf = requestAnimationFrame(() => menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true }));
+    const raf = requestAnimationFrame(() =>
+      menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true }),
+    );
     return () => {
       cancelAnimationFrame(raf);
       document.removeEventListener('mousedown', onDown);
@@ -103,7 +105,13 @@ export function DropdownMenu({
             role="menu"
             aria-label={label}
             onKeyDown={onMenuKey}
-            style={{ left: pos?.left ?? -9999, top: pos?.top, bottom: pos?.bottom, width: Math.min(MENU_W, window.innerWidth - 16), visibility: pos ? 'visible' : 'hidden' }}
+            style={{
+              left: pos?.left ?? -9999,
+              top: pos?.top,
+              bottom: pos?.bottom,
+              width: Math.min(MENU_W, window.innerWidth - 16),
+              visibility: pos ? 'visible' : 'hidden',
+            }}
             className="fixed z-[60] animate-fade-in overflow-hidden rounded-2xl border border-line bg-elevated p-1.5 shadow-pop"
           >
             {items.map((it, i) => (
@@ -121,7 +129,13 @@ export function DropdownMenu({
                   it.tone === 'danger' ? 'text-bad' : 'text-ink',
                 )}
               >
-                {it.icon && <span className={clsx('mt-0.5 shrink-0', it.tone === 'ai' ? 'text-ai' : it.tone === 'danger' ? 'text-bad' : 'text-muted')}>{it.icon}</span>}
+                {it.icon && (
+                  <span
+                    className={clsx('mt-0.5 shrink-0', it.tone === 'ai' ? 'text-ai' : it.tone === 'danger' ? 'text-bad' : 'text-muted')}
+                  >
+                    {it.icon}
+                  </span>
+                )}
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold">{it.label}</span>
                   {it.description && <span className="mt-0.5 block text-xs text-muted">{it.description}</span>}

@@ -10,7 +10,7 @@ import { WorkspaceAvatar, switchWorkspace } from '../../WorkspaceSwitcher';
 import { Button, Card, CardHeader, Field, Input, Modal, cx } from '../../ui';
 import { confirmNameMatches } from '../settingsLogic';
 
-const COLORS = ['#ff5a1f', '#8b5cf6', '#10b981', '#3b82f6', '#f43f5e', '#f59e0b', '#0ea5e9', '#14b8a6', '#0b0f14'];
+const COLORS = ['#ff5a1f', '#8b5cf6', '#10b981', '#3b82f6', '#f43f5e', '#f59e0b', '#0ea5e9', '#14b8a6', '#475569'];
 const COLOR_NAMES: Record<string, string> = {
   '#ff5a1f': 'Tomate',
   '#8b5cf6': 'Violeta',
@@ -20,9 +20,18 @@ const COLOR_NAMES: Record<string, string> = {
   '#f59e0b': 'Ámbar',
   '#0ea5e9': 'Cielo',
   '#14b8a6': 'Turquesa',
-  '#0b0f14': 'Carbón',
+  '#475569': 'Pizarra',
 };
-const BUSINESS_TYPES = ['Restaurante', 'Bar de tapas', 'Cafetería', 'Gastrobar', 'Catering', 'Hotel', 'Grupo de restauración', 'Cliente de consultoría'];
+const BUSINESS_TYPES = [
+  'Restaurante',
+  'Bar de tapas',
+  'Cafetería',
+  'Gastrobar',
+  'Catering',
+  'Hotel',
+  'Grupo de restauración',
+  'Cliente de consultoría',
+];
 
 type Draft = { name: string; businessType: string; city: string; color?: string };
 
@@ -85,12 +94,18 @@ function DeleteWorkspaceDialog({ ws, open, onClose }: { ws: Workspace; open: boo
         <div className="flex gap-3 rounded-xl bg-bad-soft p-3 text-sm text-ink-2">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad" />
           <p>
-            Se borrarán <strong className="text-ink">todas</strong> las facturas, ingredientes, escandallos y pruebas de merma de «{ws.name}» de este dispositivo. No se
-            puede deshacer. Si quieres conservarlos, descarga antes una copia de seguridad.
+            Se borrarán <strong className="text-ink">todas</strong> las facturas, ingredientes, escandallos y pruebas de merma de «{ws.name}» de este
+            dispositivo. No se puede deshacer. Si quieres conservarlos, descarga antes una copia de seguridad.
           </p>
         </div>
         <Field label={<>Escribe «{ws.name}» para confirmar</>}>
-          <Input value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && confirm()} autoComplete="off" placeholder={ws.name} />
+          <Input
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && confirm()}
+            autoComplete="off"
+            placeholder={ws.name}
+          />
         </Field>
       </div>
     </Modal>
@@ -104,7 +119,9 @@ export function WorkspaceCard({ ws, id }: { ws: Workspace; id?: string }) {
   const [deleting, setDeleting] = useState(false);
   const d = draft ?? draftOf(ws);
   const base = draftOf(ws);
-  const dirty = draft != null && (d.name.trim() !== base.name || d.businessType.trim() !== base.businessType || d.city.trim() !== base.city || d.color !== base.color);
+  const dirty =
+    draft != null &&
+    (d.name.trim() !== base.name || d.businessType.trim() !== base.businessType || d.city.trim() !== base.city || d.color !== base.color);
   const nameError = !d.name.trim() ? 'El nombre no puede quedar vacío' : undefined;
   const set = (patch: Partial<Draft>) => setDraft({ ...d, ...patch });
 
@@ -130,7 +147,11 @@ export function WorkspaceCard({ ws, id }: { ws: Workspace; id?: string }) {
 
   return (
     <Card id={id} className="scroll-mt-24">
-      <CardHeader icon={<Store className="size-5" />} title="Restaurante o cliente" subtitle="Cómo se llama y cómo lo distingues de otros espacios." />
+      <CardHeader
+        icon={<Store className="size-5" />}
+        title="Restaurante o cliente"
+        subtitle="Cómo se llama y cómo lo distingues de otros espacios."
+      />
       <div className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3">
         <WorkspaceAvatar name={d.name || '?'} color={d.color} />
         <div className="min-w-0">
@@ -143,7 +164,13 @@ export function WorkspaceCard({ ws, id }: { ws: Workspace; id?: string }) {
           <Input value={d.name} onChange={(e) => set({ name: e.target.value })} maxLength={80} />
         </Field>
         <Field label="Tipo de negocio">
-          <Input value={d.businessType} onChange={(e) => set({ businessType: e.target.value })} list="ep-business-types" placeholder="Restaurante, bar, catering…" maxLength={60} />
+          <Input
+            value={d.businessType}
+            onChange={(e) => set({ businessType: e.target.value })}
+            list="ep-business-types"
+            placeholder="Restaurante, bar, catering…"
+            maxLength={60}
+          />
           <datalist id="ep-business-types">
             {BUSINESS_TYPES.map((t) => (
               <option key={t} value={t} />
@@ -183,7 +210,12 @@ export function WorkspaceCard({ ws, id }: { ws: Workspace; id?: string }) {
         </div>
       </div>
       <div className="mt-5 flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <Button variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 className="size-4" />} onClick={() => setDeleting(true)}>
+        <Button
+          variant="ghost"
+          className="text-bad! hover:bg-bad-soft! hover:text-bad!"
+          icon={<Trash2 className="size-4" />}
+          onClick={() => setDeleting(true)}
+        >
           Eliminar restaurante
         </Button>
         <div className="flex gap-2">

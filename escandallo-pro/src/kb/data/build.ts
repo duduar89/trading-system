@@ -1,6 +1,7 @@
 import type { Allergen, BaseUnit, IngredientCategory, QtyBasis, QtyUnit } from '../../types';
 import type { KbIngredient } from '../ingredients';
 import type { KbRecipe, KbRecipeItem } from '../recipes';
+import { phraseKey } from '../text';
 
 /** Datos opcionales de una ficha de ingrediente (formato compacto para las tablas de datos). */
 export interface IngExtra {
@@ -29,9 +30,17 @@ export function ing(
   price: number,
   extra: IngExtra = {},
 ): KbIngredient {
+  // Alias sin redundancias: se descartan los que normalizan igual que el nombre u otro alias (plurales, tildes).
+  const seen = new Set([phraseKey(name)]);
+  const aliases = (extra.aka ?? []).filter((a) => {
+    const k = phraseKey(a);
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   const item: KbIngredient = {
     name,
-    aliases: extra.aka ?? [],
+    aliases,
     category,
     baseUnit,
     wastePct: waste,

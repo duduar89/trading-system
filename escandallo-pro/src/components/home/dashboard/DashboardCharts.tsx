@@ -60,7 +60,12 @@ export function FoodCostByDishCard({ rows, business, className }: { rows: DishFc
               ]}
             />
             {rows.length > LIMIT && (
-              <Button variant="ghost" size="sm" onClick={() => setExpanded((e) => !e)} iconRight={expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setExpanded((e) => !e)}
+                iconRight={expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+              >
                 {expanded ? 'Ver menos' : `Ver los ${rows.length} platos`}
               </Button>
             )}
@@ -72,7 +77,15 @@ export function FoodCostByDishCard({ rows, business, className }: { rows: DishFc
 }
 
 /** Distribución de platos por tramos de food cost. */
-export function BucketsCard({ buckets, business, className }: { buckets: { label: string; count: number }[]; business: BusinessSettings; className?: string }) {
+export function BucketsCard({
+  buckets,
+  business,
+  className,
+}: {
+  buckets: { label: string; count: number }[];
+  business: BusinessSettings;
+  className?: string;
+}) {
   const t = useChartTheme();
   const total = buckets.reduce((s, b) => s + b.count, 0);
   const data = buckets.map((b) => {
@@ -125,7 +138,12 @@ export function MonthlySpendCard({ monthly, className }: { monthly: { month: str
   const navigate = useNavigate();
   const data = useMemo(() => {
     const filled = fillMonths(monthly).slice(-12);
-    return filled.map((m) => ({ key: m.month, label: monthLabel(m.month, filled.length > 6 ? 'month' : 'short'), value: m.total, tooltipTitle: monthLabel(m.month, 'long') }));
+    return filled.map((m) => ({
+      key: m.month,
+      label: monthLabel(m.month, filled.length > 6 ? 'month' : 'short'),
+      value: m.total,
+      tooltipTitle: monthLabel(m.month, 'long'),
+    }));
   }, [monthly]);
   const last = data[data.length - 1];
   const max = data.reduce((m, d) => Math.max(m, d.value), 0);
@@ -170,13 +188,21 @@ export function MonthlySpendCard({ monthly, className }: { monthly: { month: str
 export function CategorySpendCard({ byCategory, className }: { byCategory: { category: IngredientCategory; total: number }[]; className?: string }) {
   const total = byCategory.reduce((s, c) => s + c.total, 0);
   const items = topWithOther(
-    byCategory.map((c) => ({ key: c.category as string, name: `${CATEGORY_LABELS[c.category]?.emoji ?? '📦'} ${CATEGORY_LABELS[c.category]?.label ?? c.category}`, total: c.total })),
+    byCategory.map((c) => ({
+      key: c.category as string,
+      name: `${CATEGORY_LABELS[c.category]?.emoji ?? '📦'} ${CATEGORY_LABELS[c.category]?.label ?? c.category}`,
+      total: c.total,
+    })),
     7,
     (t, n) => ({ key: '__otros', name: `Otras ${n} categorías`, total: t }),
   );
   return (
     <Card className={className}>
-      <CardHeader icon={<PieChart className="size-5" />} title="Gasto por categoría" subtitle={total ? `${fmtEur(total)} en el periodo analizado` : 'Dónde se va tu dinero'} />
+      <CardHeader
+        icon={<PieChart className="size-5" />}
+        title="Gasto por categoría"
+        subtitle={total ? `${fmtEur(total)} en el periodo analizado` : 'Dónde se va tu dinero'}
+      />
       {items.length === 0 ? (
         <ChartEmpty title="Sin compras que analizar" description="Confirma tus facturas para ver en qué categorías gastas más." />
       ) : (

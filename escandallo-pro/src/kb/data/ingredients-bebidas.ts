@@ -24,8 +24,8 @@ export const KB_BEBIDAS: KbIngredient[] = [
   // ── Cervezas ──
   ing('Cerveza de barril', 'bebida', 'l', 0, 0, 2.2, { aka: ['cerveza', 'cerveza de grifo', 'barril de cerveza', 'cerveza rubia', 'cerveza lager', 'cerveza tirada'], alg: ['gluten'], dens: 1.01 }),
   ing('Cerveza en botella', 'bebida', 'l', 0, 0, 2.6, { aka: ['tercio de cerveza', 'botellin de cerveza', 'cerveza tercio', 'cerveza botellin', 'cerveza lata', 'quinto'], alg: ['gluten'], dens: 1.01 }),
-  ing('Cerveza sin alcohol', 'bebida', 'l', 0, 0, 2.4, { aka: ['cerveza 0 0', 'cerveza sin', 'cerveza tostada sin alcohol'], alg: ['gluten'], dens: 1.01 }),
-  ing('Cerveza artesana', 'bebida', 'l', 0, 0, 6, { aka: ['cerveza artesanal', 'ipa', 'cerveza ipa', 'cerveza craft'], alg: ['gluten'], dens: 1.01 }),
+  ing('Cerveza sin alcohol', 'bebida', 'l', 0, 0, 2.4, { aka: ['cerveza sin', 'cerveza tostada sin alcohol'], alg: ['gluten'], dens: 1.01 }),
+  ing('Cerveza artesanal', 'bebida', 'l', 0, 0, 6, { aka: ['ipa', 'cerveza ipa', 'cerveza craft'], alg: ['gluten'], dens: 1.01 }),
 
   // ── Destilados y licores ──
   ing('Ginebra', 'bebida', 'l', 0, 0, 16, { aka: ['gin', 'ginebra premium', 'london dry gin'], dens: 0.95 }),
@@ -77,6 +77,10 @@ export const KB_BEBIDAS: KbIngredient[] = [
   ing('Menestra de verduras congelada', 'congelado', 'kg', 0, 10, 2.5, { aka: ['verduras congeladas', 'menestra congelada', 'verduras para paella', 'salteado de verduras congelado', 'wok de verduras'] }),
   ing('Lomo de merluza congelado', 'congelado', 'kg', 3, 15, 10, { aka: ['merluza congelada', 'merluza del cabo', 'merluza austral', 'lomo de merluza del cabo', 'merluza de pincho congelada'], alg: ['pescado'] }),
   ing('Gyozas', 'congelado', 'ud', 0, 5, 0.25, { aka: ['gyoza', 'empanadillas japonesas', 'dumplings', 'gyozas de cerdo', 'gyozas de pollo', 'gyozas de verduras', 'dim sum'], alg: ['gluten', 'soja', 'sesamo'], uw: 0.02 }),
+  ing('Hamburguesa vegetal', 'congelado', 'kg', 0, 10, 14, {
+    aka: ['hamburguesa vegana', 'burger vegana', 'burger vegetal', 'medallon vegetal', 'hamburguesa de soja', 'hamburguesa beyond', 'carne vegetal'],
+    alg: ['soja', 'gluten'],
+  }),
   ing('Croqueta congelada', 'congelado', 'kg', 0, 5, 6, { aka: ['croquetas congeladas', 'croqueta industrial', 'croquetas precocinadas'], alg: ['gluten', 'lacteos', 'huevo'] }),
   ing('Masa de croissant congelada', 'congelado', 'ud', 0, 0, 0.3, { aka: ['croissant congelado', 'bolleria congelada', 'napolitana congelada'], alg: ['gluten', 'lacteos', 'huevo'], uw: 0.07 }),
 ];

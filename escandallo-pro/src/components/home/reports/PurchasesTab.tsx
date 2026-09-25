@@ -32,7 +32,9 @@ export function PurchasesTab({ data }: { data: ReportsData }) {
             ? `Tienes ${pending} factura${pending === 1 ? '' : 's'} pendiente${pending === 1 ? '' : 's'} de revisar. Confírmalas para ver aquí tus compras por mes, proveedor y categoría.`
             : 'Sube tus facturas de proveedor: verás cuánto gastas por mes, por proveedor y en qué ingredientes.'
         }
-        action={<Button onClick={() => navigate(pending ? '/facturas' : '/facturas?nuevo=1')}>{pending ? 'Revisar facturas' : 'Subir facturas'}</Button>}
+        action={
+          <Button onClick={() => navigate(pending ? '/facturas' : '/facturas?nuevo=1')}>{pending ? 'Revisar facturas' : 'Subir facturas'}</Button>
+        }
       />
     );
   }
@@ -46,7 +48,11 @@ export function PurchasesTab({ data }: { data: ReportsData }) {
     (t, n) => ({ key: '__otros', name: `Otros ${n} proveedores`, total: t }),
   );
   const categories = topWithOther(
-    stats.spendByCategory.map((c) => ({ key: c.category as string, name: `${CATEGORY_LABELS[c.category]?.emoji ?? '📦'} ${CATEGORY_LABELS[c.category]?.label ?? c.category}`, total: c.total })),
+    stats.spendByCategory.map((c) => ({
+      key: c.category as string,
+      name: `${CATEGORY_LABELS[c.category]?.emoji ?? '📦'} ${CATEGORY_LABELS[c.category]?.label ?? c.category}`,
+      total: c.total,
+    })),
     8,
     (t, n) => ({ key: '__otros', name: `Otras ${n} categorías`, total: t }),
   );
@@ -68,16 +74,37 @@ export function PurchasesTab({ data }: { data: ReportsData }) {
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Stat label="Gasto total" value={fmtEur(total)} icon={<ShoppingCart className="size-4" />} tone="brand" hint={`${monthly.length} mes${monthly.length === 1 ? '' : 'es'}, sin IVA`} />
+        <Stat
+          label="Gasto total"
+          value={fmtEur(total)}
+          icon={<ShoppingCart className="size-4" />}
+          tone="brand"
+          hint={`${monthly.length} mes${monthly.length === 1 ? '' : 'es'}, sin IVA`}
+        />
         <Stat label="Media mensual" value={fmtEur(total / activeMonths)} icon={<Receipt className="size-4" />} hint="meses con compras" />
-        <Stat label="Facturas" value={confirmed.length} icon={<FileText className="size-4" />} hint={`ticket medio ${fmtEur(total / Math.max(1, confirmed.length))}`} />
-        <Stat label="Proveedores" value={stats.spendBySupplier.length} icon={<Truck className="size-4" />} hint={suppliers[0] ? `el principal: ${fmtPct(supTotal ? (suppliers[0].total / supTotal) * 100 : 0, 0)}` : undefined} />
+        <Stat
+          label="Facturas"
+          value={confirmed.length}
+          icon={<FileText className="size-4" />}
+          hint={`ticket medio ${fmtEur(total / Math.max(1, confirmed.length))}`}
+        />
+        <Stat
+          label="Proveedores"
+          value={stats.spendBySupplier.length}
+          icon={<Truck className="size-4" />}
+          hint={suppliers[0] ? `el principal: ${fmtPct(supTotal ? (suppliers[0].total / supTotal) * 100 : 0, 0)}` : undefined}
+        />
       </div>
 
       <Card>
         <CardHeader icon={<Receipt className="size-5" />} title="Gasto por mes" subtitle="Facturas confirmadas, importes sin IVA" />
         <ColumnChart
-          data={monthly.map((m) => ({ key: m.month, label: monthLabel(m.month, monthly.length > 6 ? 'month' : 'short'), value: m.total, tooltipTitle: monthLabel(m.month, 'long') }))}
+          data={monthly.map((m) => ({
+            key: m.month,
+            label: monthLabel(m.month, monthly.length > 6 ? 'month' : 'short'),
+            value: m.total,
+            tooltipTitle: monthLabel(m.month, 'long'),
+          }))}
           height={260}
           formatValue={fmtEur}
           formatAxis={fmtEurAxis}

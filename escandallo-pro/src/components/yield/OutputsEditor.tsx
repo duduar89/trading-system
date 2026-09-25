@@ -174,7 +174,7 @@ export function OutputsEditor({
             key={q.label}
             type="button"
             onClick={() => add({ name: q.name, kind: q.kind, weightKg: 0, valuePerKg: q.valuePerKg })}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-ink-2 transition hover:border-brand-400 hover:text-ink active:scale-95"
+            className="inline-flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-ink-2 transition hover:border-brand-400 hover:text-ink active:scale-95"
           >
             <span className="size-2 rounded-full" style={fillStyle(q.kind)} aria-hidden />+ {q.label}
           </button>
@@ -183,7 +183,7 @@ export function OutputsEditor({
           size="sm"
           variant="ghost"
           icon={<Plus className="size-3.5" />}
-          className="h-9 rounded-full"
+          className="h-10 rounded-full"
           onClick={() => add({ name: '', kind: outputs.some((o) => o.kind === 'principal') ? 'desperdicio' : 'principal', weightKg: 0 }, 'n')}
         >
           Otra salida

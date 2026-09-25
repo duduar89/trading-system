@@ -11,6 +11,8 @@ import {
   GROUP_DEFAULTS,
   GROUP_MEMBERS,
   GROUP_SEVERITY,
+  HERB_FORMS,
+  HERBS_SPICES,
   HYPERNYMS,
   MASCULINE_A_NOUNS,
   NOISE_WORDS,
@@ -89,14 +91,17 @@ const SLASH_SIN: Record<string, string> = { h: 'hueso', p: 'piel', e: 'espinas',
 const SLASH_CON: Record<string, string> = { h: 'hueso', p: 'piel', c: 'cascara' };
 const UNIT_ALT =
   'kgs?|kilos?|kilogramos?|k|grs?|grm|gramos?|g|mg|l|lts?|ltr|litros?|cl|ml|cc|uds?|u|un|unds?|unid(?:ades)?|pzs?|piezas?|dz|docenas?';
-const RE_MULTIPACK = new RegExp(`\\d+(?:[.,]\\d+)?\\s*[x*×]\\s*\\d+(?:[.,]\\d+)?(?:\\s*(?:${UNIT_ALT})(?![a-z]))?`, 'g');
-const RE_QTY_UNIT = new RegExp(`\\d+(?:[.,]\\d+)?\\s*(?:${UNIT_ALT})(?![a-z])`, 'g');
+/** En una sola pasada: porcentajes, grados, multipacks ("6x1l"), cantidad + unidad ("500 gr") y fracciones/calibres ("1/2", "8/10"). */
+const RE_NUMERIC_NOISE = new RegExp(
+  `\\d+(?:[.,]\\d+)?\\s*(?:[%º°ª]|[x*×]\\s*\\d+(?:[.,]\\d+)?(?:\\s*(?:${UNIT_ALT})(?![a-z]))?|(?:${UNIT_ALT})(?![a-z]))|\\d+\\s*[/-]\\s*\\d+`,
+  'g',
+);
 
 function basicNormalize(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
+  const lower = s.toLowerCase();
+  // Vía rápida: el texto de facturas suele ser ASCII puro y no necesita descomposición Unicode
+  if (/^[\x20-\x7e]*$/.test(lower)) return lower;
+  return lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
 /** minúsculas, sin tildes ni signos, espacios colapsados. */
@@ -143,7 +148,7 @@ function correctTypo(t: string): string {
 function preprocess(raw: string): string {
   let s = ` ${basicNormalize(raw)} `;
   const hasDigit = /\d/.test(s);
-  if (hasDigit) s = s.replace(/[a-z0-9]*[015][a-z0-9]*/g, (t) => (/[a-z]/.test(t) ? fixOcrToken(t) : t));
+  if (hasDigit) s = s.replace(/\b[a-z]*[015][a-z]*(?:[015][a-z]*)?\b/g, (t) => (/[a-z]{2}/.test(t) ? fixOcrToken(t) : t));
   if (s.includes('/')) {
     s = s.replace(/\bs\s*\/\s*([hpeglsca])\b/g, (_m, c: string) => ` sin ${SLASH_SIN[c]} `);
     s = s.replace(/\bc\s*\/\s*([hpc])\b/g, (_m, c: string) => ` con ${SLASH_CON[c]} `);
@@ -154,13 +159,7 @@ function preprocess(raw: string): string {
   }
   // Siglas con puntos: "V.E." → "ve", "A.O.V.E." → "aove", "D.O.P." → "dop"
   if (s.includes('.')) s = s.replace(/\b(?:[a-z]\.\s?){2,}(?![a-z])/g, (m) => ` ${m.replace(/[.\s]/g, '')} `);
-  if (hasDigit) {
-    s = s.replace(/\d+(?:[.,]\d+)?\s*[%º°ª]/g, ' ');
-    s = s.replace(/\d+\s*[/-]\s*\d+/g, ' ');
-    s = s.replace(RE_MULTIPACK, ' ');
-    s = s.replace(RE_QTY_UNIT, ' ');
-    s = s.replace(/[a-z]*\d[a-z\d]*/g, ' ');
-  }
+  if (hasDigit) s = s.replace(RE_NUMERIC_NOISE, ' ').replace(/[a-z]*\d[a-z\d]*/g, ' ');
   return s.replace(/[^a-z]+/g, ' ').trim();
 }
 
@@ -175,44 +174,29 @@ function singularize(w: string): string {
 }
 
 /** Expande abreviaturas de proveedor con contexto ("AC. OLIVA", "V.E.", "VIRG. EXT."). */
-function expandAbbreviations(ws: string[]): { words: string[]; expanded: boolean[] } {
+function expandAbbreviations(ws: string[]): string[] {
   const words: string[] = [];
-  const expanded: boolean[] = [];
-  const push = (list: string[], exp: boolean) => {
-    for (const w of list) {
-      words.push(w);
-      expanded.push(exp);
-    }
-  };
   for (let i = 0; i < ws.length; i++) {
     const w = ws[i];
     const next = ws[i + 1];
     const prev = words[words.length - 1];
     if (w === 've' || (w === 'v' && next === 'e')) {
-      push(['virgen', 'extra'], true);
+      words.push('virgen', 'extra');
       if (w === 'v') i++;
-      continue;
+    } else if (w === 'ac' && next && /^(?:oliv|oliva|ol|gir|giras|girasol|orujo)$/.test(next)) {
+      words.push('aceite');
+    } else if (w === 'ol' && prev === 'aceite') {
+      words.push('oliva');
+    } else if ((w === 'ext' || w === 'ex' || w === 'extr') && prev === 'virgen') {
+      words.push('extra');
+    } else {
+      // Una palabra culinaria real nunca se reinterpreta como abreviatura de otra
+      const ab = ABBREVIATIONS[w];
+      if (ab && !(KNOWN.has(w) && ab.length === 1 && ab[0] !== w)) words.push(...ab);
+      else words.push(w);
     }
-    if (w === 'ac' && next && /^(?:oliv|oliva|ol|gir|giras|girasol|orujo)$/.test(next)) {
-      push(['aceite'], true);
-      continue;
-    }
-    if (w === 'ol' && prev === 'aceite') {
-      push(['oliva'], true);
-      continue;
-    }
-    if ((w === 'ext' || w === 'ex' || w === 'extr') && prev === 'virgen') {
-      push(['extra'], true);
-      continue;
-    }
-    const ab = ABBREVIATIONS[w];
-    if (ab && !(KNOWN.has(w) && ab.length === 1 && ab[0] !== w)) {
-      push(ab, ab.length !== 1 || ab[0] !== w);
-      continue;
-    }
-    push([w], false);
   }
-  return { words, expanded };
+  return words;
 }
 
 function isDropped(w: string, prev: string | undefined): boolean {
@@ -245,8 +229,16 @@ interface Analyzed {
   tokenSet: Set<string>;
   /** Todos los tokens son términos conocidos sin sinónimos débiles: sólo pueden coincidir por igualdad exacta. */
   exactOnly: boolean;
+  /** Tokens que dicen "de qué" es el producto (caldo *de pescado*): sustantivos culinarios que no son el principal ni cortes. */
+  specifier: boolean[];
+  hasCut: boolean;
+  headSourceLike: boolean;
+  /** El principal es una hierba o especia (se compran secas/molidas). */
+  herb: boolean;
 }
 
+/** Máximo de tokens significativos por nombre (las descripciones reales tienen menos de 10). */
+const MAX_TOKENS = 24;
 const ANALYSIS_CACHE_MAX = 20000;
 const analysisCache = new Map<string, Analyzed>();
 const SIM_CACHE_MAX = 50000;
@@ -266,16 +258,60 @@ function cacheSet<V>(cache: Map<string, V>, max: number, key: string, value: V):
 
 function tokenKind(t: string, index: number): TokenKind {
   if (index === 0 && (NOUN_WHEN_FIRST.has(t) || FOOD_NOUNS.has(t))) return 'noun';
-  if (WEAK_QUALIFIERS.has(t) || /^sin[a-z]{3,}$/.test(t)) return 'weak';
-  if (TRANSFORMS.has(t)) return 'transform';
+  if (WEAK_QUALIFIERS.has(t)) return 'weak';
+  // Variantes dietéticas ("sin lactosa", "sin gluten", "sin alcohol") cambian el producto como una transformación
+  if (TRANSFORMS.has(t) || /^sin[a-z]{3,}$/.test(t)) return 'transform';
   return 'noun';
+}
+
+type Family = 'carne' | 'ave' | 'pescado' | 'marisco' | 'vegetal';
+
+/** Familia de un sustantivo genérico de clase. */
+const GENERIC_FAMILY: Record<string, Family> = {
+  pescado: 'pescado',
+  marisco: 'marisco',
+  carne: 'carne',
+  embutido: 'carne',
+  charcuteria: 'carne',
+  ave: 'ave',
+  verdura: 'vegetal',
+  hortaliza: 'vegetal',
+  fruta: 'vegetal',
+  fruto: 'vegetal',
+  especia: 'vegetal',
+  hierba: 'vegetal',
+};
+const SHELLFISH = new Set(['pulpo', 'calamar', 'sepia', 'gamba', 'langostino', 'cigala', 'bogavante', 'langosta', 'mejillon', 'almeja', 'vieira']);
+const POULTRY = new Set(['pollo', 'pavo', 'pato', 'codorniz', 'perdiz']);
+const MEAT = new Set(['bovino', 'porcino', 'ovino', 'caprino', 'conejo', 'caza', 'caballo', 'bufalo']);
+
+/** Familia animal de un token concreto (por su especie), o undefined si no es animal. */
+function animalFamily(t: string): Family | undefined {
+  const cls = (GROUP_MEMBERS[t] ?? []).find(([g]) => g === 'especie')?.[1];
+  if (!cls) return undefined;
+  if (MEAT.has(cls)) return 'carne';
+  if (POULTRY.has(cls)) return 'ave';
+  return SHELLFISH.has(cls) ? 'marisco' : 'pescado';
+}
+
+/** ¿Pueden referirse a lo mismo un genérico y un concreto? ("pescado" ~ "merluza", "carne" ~ "pollo", "verdura" ~ "calabaza") */
+function familyCompatible(x: string, y: string): boolean {
+  const check = (generic: string, other: string) => {
+    const f = GENERIC_FAMILY[generic];
+    if (!f) return false;
+    const af = animalFamily(other);
+    if (f === 'vegetal') return !af && !GENERIC_FAMILY[other];
+    return af === f || (f === 'carne' && af === 'ave');
+  };
+  return check(x, y) || check(y, x);
 }
 
 function analyze(name: string): Analyzed {
   const cached = analysisCache.get(name);
   if (cached) return cached;
 
-  const { words } = expandAbbreviations(preprocess(name).split(' ').filter(Boolean));
+  const words = expandAbbreviations(preprocess(name).split(' ').filter(Boolean));
+  words.push(...percentQualifiers(name, words));
   // 1) Palabras vacías, ruido y "sin/con + X"
   const kept: string[] = [];
   for (let i = 0; i < words.length; i++) {
@@ -322,7 +358,7 @@ function analyze(name: string): Analyzed {
   phrased.forEach((t, i) => {
     let v = t;
     if (!(i === 0 && (NOUN_WHEN_FIRST.has(t) || FOOD_NOUNS.has(t)))) v = FEMININE_ADJECTIVES[t] ?? t;
-    if (!tokens.includes(v)) tokens.push(v);
+    if (tokens.length < MAX_TOKENS && !tokens.includes(v)) tokens.push(v);
   });
 
   const kinds = tokens.map((t, i) => tokenKind(t, i));
@@ -332,7 +368,11 @@ function analyze(name: string): Analyzed {
     return !!hypo && tokens.some((u) => u !== t && hypo.has(u));
   });
   // Sustantivo principal: primer término culinario conocido; si no, primera palabra que no sea variedad.
-  let head = tokens.findIndex((t, i) => kinds[i] === 'noun' && !hyperWeak[i] && (FOOD_NOUNS.has(t) || CUTS.has(t) || HYPONYMS.has(t)));
+  // (un tipo concreto —parmesano, piquillo— sólo manda si va primero o acompaña a su genérico: "pisto manchego" ≠ queso)
+  const hypernymPresent = hyperWeak.some(Boolean);
+  const knownNoun = (t: string, i: number) => FOOD_NOUNS.has(t) || CUTS.has(t) || (HYPONYMS.has(t) && (i === 0 || hypernymPresent));
+  let head = tokens.length && NOUN_WHEN_FIRST.has(tokens[0]) ? 0 : -1;
+  if (head < 0) head = tokens.findIndex((t, i) => kinds[i] === 'noun' && !hyperWeak[i] && knownNoun(t, i));
   if (head < 0) head = tokens.findIndex((t, i) => kinds[i] === 'noun' && !hyperWeak[i] && !VARIETIES.has(t));
   if (head < 0) head = tokens.findIndex((_t, i) => kinds[i] === 'noun' && !hyperWeak[i]);
   if (head < 0) head = kinds.findIndex((k) => k === 'transform');
@@ -364,9 +404,30 @@ function analyze(name: string): Analyzed {
     weakExpansion,
     tokenSet: new Set(tokens),
     exactOnly: tokens.every((t) => KNOWN.has(t) && !WEAK_SYN.has(t)),
+    specifier: tokens.map((t, i) => i !== head && strong[i] && FOOD_NOUNS.has(t) && !CUTS.has(t)),
+    hasCut: tokens.some((t) => CUTS.has(t)),
+    headSourceLike: head >= 0 && isSourceLike(tokens[head]),
+    herb: head >= 0 && HERBS_SPICES.has(tokens[head]),
   };
   cacheSet(analysisCache, ANALYSIS_CACHE_MAX, name, result);
   return result;
+}
+
+/**
+ * Porcentajes que definen el producto y que el preprocesado descarta:
+ * "NATA 35%" es nata para montar (≥ 30 % MG) y "NATA 18%" para cocinar; "CHOCOLATE 70%" es chocolate negro.
+ */
+function percentQualifiers(raw: string, words: string[]): string[] {
+  if (!raw.includes('%')) return [];
+  const m = /(\d+(?:[.,]\d+)?)\s*%/.exec(raw);
+  if (!m) return [];
+  const pct = Number(m[1].replace(',', '.'));
+  if (words.includes('nata') && !words.some((w) => w === 'montar' || w === 'cocinar' || w === 'cocina')) {
+    if (pct >= 30) return ['montar'];
+    if (pct <= 22) return ['cocinar'];
+  }
+  if (words.includes('chocolate') && pct >= 50 && !words.some((w) => /^(?:negro|negra|blanco|blanca|leche)$/.test(w))) return ['negro'];
+  return [];
 }
 
 /** Tokens significativos: sin stopwords, formatos, cantidades ni marcas; singularizados y con sinónimos canónicos. */
@@ -456,6 +517,28 @@ function isSourceLike(t: string): boolean {
   return DE_SOURCES.has(t) || (GROUP_MEMBERS[t] ?? []).some(([g]) => g === 'especie');
 }
 
+/** Tope por contradicciones duras (especie, base, color…) entre dos nombres analizados; 1 si no las hay. */
+function conflictCap(A: Analyzed, B: Analyzed): number {
+  let cap = 1;
+  for (const [g, va] of A.groups) {
+    const vb = B.groups.get(g);
+    const sev = GROUP_SEVERITY[g];
+    if (!vb || sev.cap === undefined) continue;
+    let common = false;
+    for (const v of va) if (vb.has(v)) common = true;
+    if (!common) cap = Math.min(cap, sev.cap);
+  }
+  return cap;
+}
+
+// Búferes reutilizables (la función no es reentrante): evitan reservar memoria en cada comparación.
+const PAIR_I = new Int16Array(MAX_TOKENS * MAX_TOKENS);
+const PAIR_J = new Int16Array(MAX_TOKENS * MAX_TOKENS);
+const PAIR_S = new Float64Array(MAX_TOKENS * MAX_TOKENS);
+const MATCH_A = new Int16Array(MAX_TOKENS);
+const MATCH_B = new Int16Array(MAX_TOKENS);
+const SIM_A = new Float64Array(MAX_TOKENS);
+
 function similarityAnalyzed(A: Analyzed, B: Analyzed): number {
   const na = A.tokens.length;
   const nb = B.tokens.length;
@@ -464,39 +547,47 @@ function similarityAnalyzed(A: Analyzed, B: Analyzed): number {
   // Descarte rápido: sin tokens comunes y sin posibilidad de erratas/sinónimos → 0
   if (A.exactOnly && B.exactOnly) {
     let shared = false;
-    const [small, big] = na <= nb ? [A.tokens, B.tokenSet] : [B.tokens, A.tokenSet];
-    for (const t of small) {
-      if (big.has(t)) {
-        shared = true;
-        break;
-      }
-    }
+    const small = na <= nb ? A.tokens : B.tokens;
+    const big = na <= nb ? B.tokenSet : A.tokenSet;
+    for (let k = 0; k < small.length && !shared; k++) shared = big.has(small[k]);
     if (!shared) return 0;
   }
 
-  // Emparejamiento voraz de tokens por similitud descendente
-  const cand: { i: number; j: number; s: number }[] = [];
+  // Emparejamiento voraz de tokens por similitud descendente (a igualdad, primero los sustantivos principales)
+  let np = 0;
   for (let i = 0; i < na; i++) {
     for (let j = 0; j < nb; j++) {
-      const s = tokenSim(A.tokens[i], B.tokens[j]);
-      if (s >= MIN_TOKEN_SIM) cand.push({ i, j, s });
+      const sim = tokenSim(A.tokens[i], B.tokens[j]);
+      if (sim < MIN_TOKEN_SIM) continue;
+      // Inserción ordenada (listas muy cortas)
+      const prio = (i === A.head ? 1 : 0) + (j === B.head ? 1 : 0);
+      let k = np++;
+      while (k > 0) {
+        const ps = PAIR_S[k - 1];
+        const pprio = (PAIR_I[k - 1] === A.head ? 1 : 0) + (PAIR_J[k - 1] === B.head ? 1 : 0);
+        if (ps > sim || (ps === sim && pprio >= prio)) break;
+        PAIR_S[k] = ps;
+        PAIR_I[k] = PAIR_I[k - 1];
+        PAIR_J[k] = PAIR_J[k - 1];
+        k--;
+      }
+      PAIR_S[k] = sim;
+      PAIR_I[k] = i;
+      PAIR_J[k] = j;
     }
   }
-  if (!cand.length) return 0;
-  if (cand.length > 1) {
-    const prio = (c: { i: number; j: number }) => (c.i === A.head ? 1 : 0) + (c.j === B.head ? 1 : 0);
-    cand.sort((x, y) => y.s - x.s || prio(y) - prio(x));
-  }
-  const matchA = new Array<number>(na).fill(-1);
-  const simA = new Array<number>(na).fill(0);
-  const matchB = new Array<number>(nb).fill(-1);
+  if (!np) return 0;
+  MATCH_A.fill(-1, 0, na);
+  MATCH_B.fill(-1, 0, nb);
   let usedWeakSynonym = false;
-  for (const c of cand) {
-    if (matchA[c.i] >= 0 || matchB[c.j] >= 0) continue;
-    matchA[c.i] = c.j;
-    matchB[c.j] = c.i;
-    simA[c.i] = c.s;
-    if (c.s < STRONG_SIM) usedWeakSynonym = true;
+  for (let k = 0; k < np; k++) {
+    const i = PAIR_I[k];
+    const j = PAIR_J[k];
+    if (MATCH_A[i] >= 0 || MATCH_B[j] >= 0) continue;
+    MATCH_A[i] = j;
+    MATCH_B[j] = i;
+    SIM_A[i] = PAIR_S[k];
+    if (PAIR_S[k] < STRONG_SIM) usedWeakSynonym = true;
   }
 
   let matchedA = 0;
@@ -505,20 +596,22 @@ function similarityAnalyzed(A: Analyzed, B: Analyzed): number {
   let strongAllA = true;
   let strongAllB = true;
   for (let i = 0; i < na; i++) {
-    const j = matchA[i];
+    const j = MATCH_A[i];
     const strong = A.strong[i];
     if (j >= 0) {
-      matchedA += A.weights[i] * simA[i];
-      matchedB += B.weights[j] * simA[i];
-      if (strong) minStrongSim = Math.min(minStrongSim, simA[i]);
-      if (strong && simA[i] < STRONG_SIM) strongAllA = false;
+      matchedA += A.weights[i] * SIM_A[i];
+      matchedB += B.weights[j] * SIM_A[i];
+      if (strong) {
+        if (SIM_A[i] < minStrongSim) minStrongSim = SIM_A[i];
+        if (SIM_A[i] < STRONG_SIM) strongAllA = false;
+      }
     } else if (strong) strongAllA = false;
   }
   for (let j = 0; j < nb; j++) {
     if (!B.strong[j]) continue;
-    const i = matchB[j];
-    if (i < 0 || simA[i] < STRONG_SIM) strongAllB = false;
-    else minStrongSim = Math.min(minStrongSim, simA[i]);
+    const i = MATCH_B[j];
+    if (i < 0 || SIM_A[i] < STRONG_SIM) strongAllB = false;
+    else if (SIM_A[i] < minStrongSim) minStrongSim = SIM_A[i];
   }
 
   const covA = matchedA / A.total;
@@ -531,61 +624,87 @@ function similarityAnalyzed(A: Analyzed, B: Analyzed): number {
   }
 
   // Sustantivo principal
-  const headAMatched = A.head >= 0 && matchA[A.head] >= 0;
-  const headBMatched = B.head >= 0 && matchB[B.head] >= 0;
+  const headAMatched = A.head >= 0 && MATCH_A[A.head] >= 0;
+  const headBMatched = B.head >= 0 && MATCH_B[B.head] >= 0;
   if (!headAMatched || !headBMatched) {
     let cap = HEAD_MISMATCH_CAP;
     if (strongAllA !== strongAllB) {
-      const [S, L, sHeadMatched] = strongAllA ? [A, B, headAMatched] : [B, A, headBMatched];
-      if (sHeadMatched && CUTS.has(L.tokens[L.head]) && isSourceLike(S.tokens[S.head])) cap = CUT_OF_SOURCE_CAP;
+      const S = strongAllA ? A : B;
+      const L = strongAllA ? B : A;
+      const sHeadMatched = strongAllA ? headAMatched : headBMatched;
+      if (sHeadMatched && L.head >= 0 && CUTS.has(L.tokens[L.head]) && S.headSourceLike) cap = CUT_OF_SOURCE_CAP;
     }
     score = Math.min(score, cap);
   }
 
+  // Mismo sustantivo principal pero distinto "de qué" ("caldo de pescado" ⇄ "caldo de pollo", "zumo de naranja" ⇄ "zumo de limón")
+  if (headAMatched && headBMatched && score > HEAD_MISMATCH_CAP && specifierConflict(A, MATCH_A, B, MATCH_B)) score = HEAD_MISMATCH_CAP;
+
   // Una pieza/corte del animal frente al animal ("Pollo" ⇄ "POLLO PECHUGA", "Merluza" ⇄ "LOMO MERLUZA"): sugerencia.
-  if (score > CUT_OF_SOURCE_CAP) {
-    const cutOnlyIn = (X: Analyzed, matchX: number[], Y: Analyzed) =>
-      X.tokens.some((t, i) => matchX[i] < 0 && CUTS.has(t)) && !Y.tokens.some((t) => CUTS.has(t)) && Y.head >= 0 && isSourceLike(Y.tokens[Y.head]);
-    if (cutOnlyIn(A, matchA, B) || cutOnlyIn(B, matchB, A)) score = CUT_OF_SOURCE_CAP;
-  }
+  if (score > CUT_OF_SOURCE_CAP && (cutOnlyIn(A, MATCH_A, B) || cutOnlyIn(B, MATCH_B, A))) score = CUT_OF_SOURCE_CAP;
 
   // Contradicciones y valores no habituales
   let penalty = 0;
-  const seen = new Set<ConflictGroup>();
-  const check = (g: ConflictGroup) => {
-    if (seen.has(g)) return;
-    seen.add(g);
-    const va = A.groups.get(g);
+  for (const [g, va] of A.groups) {
     const vb = B.groups.get(g);
-    if (va && vb) {
+    if (vb) {
       let common = false;
       for (const v of va) if (vb.has(v)) common = true;
       if (!common) {
         const sev = GROUP_SEVERITY[g];
-        if (sev.cap !== undefined) score = Math.min(score, sev.cap);
+        if (sev.cap !== undefined && score > sev.cap) score = sev.cap;
         if (sev.penalty) penalty += sev.penalty;
       }
-      return;
-    }
-    const present = va ?? vb;
-    const other = va ? B : A;
-    if (!present || other.head < 0) return;
-    const def = GROUP_DEFAULTS[other.tokens[other.head]]?.[g];
-    if (def && !present.has(def) && (g === 'base' || g === 'grasa' || g === 'color')) penalty += NON_DEFAULT_PENALTY;
-  };
-  for (const g of A.groups.keys()) check(g);
-  for (const g of B.groups.keys()) check(g);
+    } else penalty += nonDefaultPenalty(g, va, B);
+  }
+  for (const [g, vb] of B.groups) if (!A.groups.has(g)) penalty += nonDefaultPenalty(g, vb, A);
 
   // Transformaciones presentes sólo en un lado (tomate ≠ tomate frito)
-  let transforms = 0;
-  for (let i = 0; i < na; i++) if (A.kinds[i] === 'transform' && matchA[i] < 0 && i !== A.head) transforms++;
-  for (let j = 0; j < nb; j++) if (B.kinds[j] === 'transform' && matchB[j] < 0 && j !== B.head) transforms++;
+  const transforms = unmatchedTransforms(A, MATCH_A) + unmatchedTransforms(B, MATCH_B);
   if (transforms) penalty += TRANSFORM_PENALTY + TRANSFORM_PENALTY_EXTRA * (transforms - 1);
 
   score -= penalty;
-  if (usedWeakSynonym) score = Math.min(score, WEAK_SYNONYM_CAP);
-  if (A.weakExpansion !== B.weakExpansion) score = Math.min(score, WEAK_EXPANSION_CAP);
-  return Math.max(0, Math.min(1, score));
+  if (usedWeakSynonym && score > WEAK_SYNONYM_CAP) score = WEAK_SYNONYM_CAP;
+  if (A.weakExpansion !== B.weakExpansion && score > WEAK_EXPANSION_CAP) score = WEAK_EXPANSION_CAP;
+  return score < 0 ? 0 : score > 1 ? 1 : score;
+}
+
+/** Penalización si un lado indica un valor no habitual y el otro es el genérico ("Harina" ⇄ "HARINA MAIZ"). */
+function nonDefaultPenalty(g: ConflictGroup, present: Set<string>, other: Analyzed): number {
+  if (other.head < 0 || (g !== 'base' && g !== 'grasa' && g !== 'color')) return 0;
+  const def = GROUP_DEFAULTS[other.tokens[other.head]]?.[g];
+  return def && !present.has(def) ? NON_DEFAULT_PENALTY : 0;
+}
+
+function specifierConflict(A: Analyzed, matchA: Int16Array, B: Analyzed, matchB: Int16Array): boolean {
+  let anyA = false;
+  let anyB = false;
+  for (let i = 0; i < A.tokens.length; i++) if (A.specifier[i] && matchA[i] < 0) anyA = true;
+  for (let j = 0; j < B.tokens.length; j++) if (B.specifier[j] && matchB[j] < 0) anyB = true;
+  if (!anyA || !anyB) return false;
+  for (let i = 0; i < A.tokens.length; i++) {
+    if (!A.specifier[i] || matchA[i] >= 0) continue;
+    for (let j = 0; j < B.tokens.length; j++) {
+      if (B.specifier[j] && matchB[j] < 0 && familyCompatible(A.tokens[i], B.tokens[j])) return false;
+    }
+  }
+  return true;
+}
+
+function cutOnlyIn(X: Analyzed, matchX: Int16Array, Y: Analyzed): boolean {
+  if (Y.hasCut || !Y.headSourceLike) return false;
+  for (let i = 0; i < X.tokens.length; i++) if (matchX[i] < 0 && CUTS.has(X.tokens[i])) return true;
+  return false;
+}
+
+function unmatchedTransforms(X: Analyzed, matchX: Int16Array): number {
+  let n = 0;
+  for (let i = 0; i < X.tokens.length; i++) {
+    if (X.kinds[i] !== 'transform' || matchX[i] >= 0 || i === X.head) continue;
+    if (X.herb && HERB_FORMS.has(X.tokens[i])) continue;
+    n++;
+  }
+  return n;
 }
 
 /**
@@ -624,7 +743,8 @@ export function rankMatches<T extends { name: string; aliases?: string[] }>(quer
   };
   const out: MatchCandidate<T>[] = [];
   for (const item of items) {
-    let best = scoreOf(item.name);
+    const nameScore = scoreOf(item.name);
+    let best = nameScore;
     let on = item.name;
     if (best < 1 && item.aliases) {
       for (const alias of item.aliases) {
@@ -635,6 +755,8 @@ export function rankMatches<T extends { name: string; aliases?: string[] }>(quer
           if (s >= 1) break;
         }
       }
+      // Un alias genérico ("lomo fino", "vino") no puede saltarse una contradicción del nombre ("Solomillo de ternera" ≠ cerdo)
+      if (on !== item.name && best > nameScore && Q.tokens.length && item.name) best = Math.min(best, conflictCap(Q, analyze(item.name)));
     }
     if (best >= minScore) out.push({ item, score: best, matchedOn: on });
   }
@@ -650,6 +772,13 @@ function isAdjective(w: string): boolean {
   if (FOOD_NOUNS.has(w) && !WEAK_QUALIFIERS.has(w) && !TRANSFORMS.has(w)) return false;
   const m = FEMININE_ADJECTIVES[w] ?? w;
   return ADJECTIVES_MASC.has(m) || WEAK_QUALIFIERS.has(m) || TRANSFORMS.has(m) || /^(?:virgen|extra|dulce|picante|verde|suave|natural|integral)$/.test(w);
+}
+
+/** "cordero" y "lechal", "cerdo" e "ibérico": misma especie (el segundo precisa al primero). */
+function sameSpecies(a: string, b: string): boolean {
+  const sp = (t: string) => (GROUP_MEMBERS[t] ?? []).find(([g]) => g === 'especie')?.[1];
+  const x = sp(a);
+  return !!x && x === sp(b);
 }
 
 function isFeminineNoun(w: string): boolean {
@@ -684,7 +813,7 @@ function display(w: string): string {
  */
 export function cleanProductName(description: string): string {
   if (!description) return '';
-  const { words } = expandAbbreviations(preprocess(String(description)).split(' ').filter(Boolean));
+  const words = expandAbbreviations(preprocess(String(description)).split(' ').filter(Boolean));
 
   // 1) Contenido + palabras vacías (se decide después cuáles conservar)
   type Item = { w: string; stop: boolean };
@@ -719,14 +848,30 @@ export function cleanProductName(description: string): string {
 
   // 2) Adjetivos iniciales al final ("CONG. GAMBA ROJA" → "gamba roja congelada")
   const lead: Item[] = [];
-  while (content.length > 1 && !content[0].stop && isAdjective(content[0].w) && content.some((x) => !x.stop && !isAdjective(x.w))) {
+  // ("dulce de leche", "asado de tira": ahí la primera palabra es el sustantivo)
+  const nounFirst = NOUN_WHEN_FIRST.has(content[0].w) && content.length > 1 && content[1].stop;
+  while (!nounFirst && content.length > 1 && !content[0].stop && isAdjective(content[0].w) && content.some((x) => !x.stop && !isAdjective(x.w))) {
     lead.push(content.shift() as Item);
     while (content.length && content[0].stop) content.shift();
   }
   content.push(...lead);
 
+  // 2b) Orden de proveedor "especie + corte" → "corte de especie" ("MERLUZA FILETE" → "filete de merluza")
+  if (!content[0].stop && DE_SOURCES.has(content[0].w)) {
+    for (let k = 1; k < Math.min(content.length, 4); k++) {
+      const it = content[k];
+      if (it.stop) break;
+      if (CUTS.has(it.w) && DE_HEADS.has(it.w)) {
+        content.splice(k, 1);
+        content.unshift(it);
+        break;
+      }
+      if (!isAdjective(it.w) && !sameSpecies(content[0].w, it.w)) break;
+    }
+  }
+
   // 3) Concordancia con el sustantivo principal
-  const headWord = content.find((x) => !x.stop && !isAdjective(x.w))?.w ?? content[0].w;
+  const headWord = nounFirst ? content[0].w : (content.find((x) => !x.stop && !isAdjective(x.w))?.w ?? content[0].w);
   const feminine = isFeminineNoun(headWord);
   const out: string[] = [];
   let lastNoun: string | undefined;

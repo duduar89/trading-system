@@ -1,6 +1,7 @@
 import type { BaseUnit, InvoiceLine, Product } from '../../types';
 import { normalizeInvoiceLine } from '../../core/pack';
 import { AUTO_LINK_THRESHOLD, SUGGEST_THRESHOLD, cleanProductName, rankMatches } from '../../core/matching';
+import { priceConversionFactor } from '../../services/products';
 import { foldText, type PriceRow } from './logic';
 
 export interface ImportPlanRow {
@@ -72,19 +73,50 @@ export function planPriceImport(rows: PriceRow[], products: Product[], createMis
       best = undefined;
     }
     if (best && best.score >= AUTO_LINK_THRESHOLD) {
-      const sameUnit = best.item.baseUnit === baseUnit;
-      if (sameUnit) {
-        out.push({ row, name, baseUnit, pricePerBase, warnings, action: 'update', product: best.item, score: best.score });
+      const conv = priceConversionFactor(baseUnit, best.item.baseUnit, best.item);
+      if (conv) {
+        const converted = pricePerBase * conv.factor;
+        const note = conv.factor !== 1 ? [`Convertido a €/${best.item.baseUnit}${conv.assumption ? ` (${conv.assumption})` : ''}`] : [];
+        out.push({
+          row,
+          name,
+          baseUnit: best.item.baseUnit,
+          pricePerBase: converted,
+          warnings: [...warnings, ...note],
+          action: 'update',
+          product: best.item,
+          score: best.score,
+        });
         continue;
       }
-      warnings = [...warnings, `«${best.item.name}» tiene el precio en €/${best.item.baseUnit}; esta fila sale en €/${baseUnit}.`];
+      warnings = [...warnings, `«${best.item.name}» tiene el precio en €/${best.item.baseUnit}; esta fila sale en €/${baseUnit} y no se puede convertir.`];
     }
     if (!createMissing) {
-      out.push({ row, name, baseUnit, pricePerBase, warnings, action: 'skip', product: best?.item, score: best?.score, reason: 'No está en tu base de precios' });
+      out.push({
+        row,
+        name,
+        baseUnit,
+        pricePerBase,
+        warnings,
+        action: 'skip',
+        product: best?.item,
+        score: best?.score,
+        reason: 'No está en tu base de precios',
+      });
       continue;
     }
     const key = foldText(name);
-    out.push({ row, name, baseUnit, pricePerBase, warnings, action: 'create', product: best?.item, score: best?.score, reason: plannedNames.has(key) ? 'Repetido en la tarifa' : undefined });
+    out.push({
+      row,
+      name,
+      baseUnit,
+      pricePerBase,
+      warnings,
+      action: 'create',
+      product: best?.item,
+      score: best?.score,
+      reason: plannedNames.has(key) ? 'Repetido en la tarifa' : undefined,
+    });
     plannedNames.add(key);
   }
   return {

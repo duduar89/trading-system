@@ -236,7 +236,7 @@ function normalizeForDates(s: string): string {
   return s
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
+    .replace(/[\u0300-\u036f]/g, '');
 }
 
 function daysInMonth(y: number, m: number): number {
@@ -383,7 +383,7 @@ export function round(v: number, decimals = 2): number {
   return Math.round((v + Number.EPSILON) * f) / f;
 }
 
-/** Igualdad aproximada para validar importes: |a−b| ≤ max(tolAbs, tolRel·max(|a|,|b|)). */
+/** Igualdad aproximada para validar importes: |a−b| ≤ max(tolAbs, tolRel·max(|a|,|b|)) (con margen de coma flotante). */
 export function approxEqual(a: number, b: number, tolAbs = 0.02, tolRel = 0.01): boolean {
-  return Math.abs(a - b) <= Math.max(tolAbs, tolRel * Math.max(Math.abs(a), Math.abs(b)));
+  return Math.abs(a - b) <= Math.max(tolAbs, tolRel * Math.max(Math.abs(a), Math.abs(b))) + 1e-9;
 }

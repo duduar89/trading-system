@@ -54,7 +54,7 @@ export const KB_CARNES: KbIngredient[] = [
   ing('Hueso de tuétano', 'carne', 'kg', 0, 15, 6, { aka: ['tuetano', 'canoa de tuetano', 'hueso de tuetano en canoa'] }),
 
   // ── Cerdo e ibérico ──
-  ing('Lomo de cerdo', 'carne', 'kg', 5, 25, 6.5, { aka: ['cerdo', 'cinta de lomo', 'lomo cinta', 'lomo de cerdo fresco', 'carne de cerdo', 'lomo fresco'] }),
+  ing('Lomo de cerdo', 'carne', 'kg', 5, 25, 6.5, { aka: ['cerdo', 'lomo', 'cinta de lomo', 'lomo cinta', 'lomo de cerdo fresco', 'carne de cerdo', 'lomo fresco', 'lomo adobado', 'cinta de lomo adobada'] }),
   ing('Chuleta de cerdo', 'carne', 'kg', 5, 25, 6, { aka: ['chuletas de cerdo', 'chuleta de aguja', 'chuleta de lomo de cerdo'] }),
   ing('Solomillo de cerdo', 'carne', 'kg', 5, 25, 8.5, { aka: ['solomillo cerdo', 'solomillo de cerdo blanco'] }),
   ing('Solomillo ibérico', 'carne', 'kg', 5, 25, 17, { aka: ['solomillo de cerdo iberico', 'solomillito iberico', 'solomillo de iberico'] }),
@@ -71,7 +71,7 @@ export const KB_CARNES: KbIngredient[] = [
   ing('Oreja de cerdo', 'carne', 'kg', 5, 30, 4.5, { aka: ['oreja', 'oreja cocida', 'oreja de cerdo cocida', 'orejas'] }),
   ing('Manitas de cerdo', 'carne', 'kg', 40, 30, 3.5, { aka: ['manos de cerdo', 'patas de cerdo', 'manitas', 'mano de cerdo'] }),
   ing('Carne picada de cerdo', 'carne', 'kg', 0, 25, 6, { aka: ['picada de cerdo', 'magro picado', 'carne picada cerdo'] }),
-  ing('Magro de cerdo', 'carne', 'kg', 3, 32, 6.8, { aka: ['magro', 'carne de cerdo para guisar', 'cerdo para guisar', 'magro de cerdo troceado', 'pincho moruno'] }),
+  ing('Magro de cerdo', 'carne', 'kg', 3, 32, 6.8, { aka: ['magro', 'carne de cerdo para guisar', 'cerdo para guisar', 'magro de cerdo troceado', 'pincho moruno', 'cochinita', 'cochinita pibil', 'paleta de cerdo', 'aguja de cerdo', 'pulled pork', 'carnitas', 'cerdo desmechado'] }),
   ing('Tocino', 'carne', 'kg', 0, 40, 4, { aka: ['tocino fresco', 'tocino de cerdo', 'tocino blanco', 'tocino iberico'] }),
   ing('Cochinillo', 'carne', 'kg', 5, 35, 14, { aka: ['cochinillo segoviano', 'toston', 'lechon', 'cochinillo entero', 'cuarto de cochinillo'] }),
 
@@ -118,7 +118,7 @@ export const KB_CARNES: KbIngredient[] = [
 
   // ── Curados y cocidos ──
   ing('Jamón ibérico de bellota loncheado', 'charcuteria', 'kg', 0, 0, 110, {
-    aka: ['jamon de bellota', 'jamon iberico de bellota', 'jamon bellota', 'jamon 100 iberico', 'pata negra', 'jamon de bellota loncheado',
+    aka: ['jamon de bellota', 'jamon iberico de bellota', 'jamon bellota', 'pata negra', 'jamon de bellota loncheado',
       'jamon iberico de bellota 100', 'jamon iberico puro de bellota'],
   }),
   ing('Jamón ibérico de bellota pieza', 'charcuteria', 'kg', 48, 0, 55, {
@@ -132,6 +132,9 @@ export const KB_CARNES: KbIngredient[] = [
   }),
   ing('Jamón serrano pieza', 'charcuteria', 'kg', 45, 0, 9, { aka: ['jamon serrano con hueso', 'pata de jamon serrano', 'jamon serrano entero'] }),
   ing('Paleta ibérica de bellota loncheada', 'charcuteria', 'kg', 0, 0, 70, { aka: ['paleta iberica', 'paleta de bellota', 'paleta iberica de bellota'] }),
+  ing('Taquitos de jamón ibérico', 'charcuteria', 'kg', 0, 0, 24, {
+    aka: ['recortes de jamon iberico', 'taquitos de iberico', 'jamon iberico en taquitos', 'virutas de jamon iberico', 'tacos de jamon iberico', 'dados de jamon iberico'],
+  }),
   ing('Taquitos de jamón', 'charcuteria', 'kg', 0, 0, 12, {
     aka: ['tacos de jamon', 'taquitos de jamon serrano', 'recortes de jamon', 'virutas de jamon', 'jamon en taquitos', 'dados de jamon', 'picadillo de jamon'],
   }),

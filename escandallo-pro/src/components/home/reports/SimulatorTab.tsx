@@ -65,7 +65,14 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
           />
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
             <div className="space-y-4">
-              <Field label="Ingrediente" hint={selected ? `Se usa en ${selected.uses} plato${selected.uses === 1 ? '' : 's'} o elaboraci${selected.uses === 1 ? 'ón' : 'ones'}` : undefined}>
+              <Field
+                label="Ingrediente"
+                hint={
+                  selected
+                    ? `Se usa en ${selected.uses} plato${selected.uses === 1 ? '' : 's'} o elaboraci${selected.uses === 1 ? 'ón' : 'ones'}`
+                    : undefined
+                }
+              >
                 <Select value={product?.id ?? ''} onChange={(e) => setProductId(e.target.value)} className="h-12 text-base sm:text-sm">
                   {grouped.map(([cat, list]) => (
                     <optgroup key={cat} label={`${CATEGORY_LABELS[cat]?.emoji ?? ''} ${CATEGORY_LABELS[cat]?.label ?? cat}`}>
@@ -107,7 +114,12 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
                   </div>
                   <div className="tabular text-xs text-muted">ahora {fmtUnitPrice(product?.pricePerBase)}</div>
                 </div>
-                <span className={cx('inline-flex items-center gap-1 rounded-xl px-3 py-1.5 font-display text-xl font-extrabold', up ? 'bg-bad-soft text-bad' : pct < 0 ? 'bg-ok-soft text-ok' : 'bg-surface-2 text-muted')}>
+                <span
+                  className={cx(
+                    'inline-flex items-center gap-1 rounded-xl px-3 py-1.5 font-display text-xl font-extrabold',
+                    up ? 'bg-bad-soft text-bad' : pct < 0 ? 'bg-ok-soft text-ok' : 'bg-surface-2 text-muted',
+                  )}
+                >
                   {up ? <TrendingUp className="size-5" /> : pct < 0 ? <TrendingDown className="size-5" /> : null}
                   {fmtSignedPct(pct, pct % 1 === 0 ? 0 : 1)}
                 </span>
@@ -138,7 +150,9 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
                     onClick={() => setPct(q)}
                     className={cx(
                       'h-9 rounded-full border px-3 text-xs font-bold transition',
-                      Math.abs(pct - q) < 0.01 ? 'border-brand-500 bg-brand-500 text-white' : 'border-line bg-surface-2 text-ink-2 hover:border-line-strong',
+                      Math.abs(pct - q) < 0.01
+                        ? 'border-brand-500 bg-brand-500 text-white'
+                        : 'border-line bg-surface-2 text-ink-2 hover:border-line-strong',
                     )}
                   >
                     {q > 0 ? `+${q}` : q} %
@@ -159,14 +173,26 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
           {summary && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
-                { label: 'Platos afectados', value: String(summary.affected), tone: 'text-ink' },
-                { label: 'Food cost medio', value: fmtPp(summary.avgDeltaFc), tone: (summary.avgDeltaFc ?? 0) > 0.05 ? 'text-bad' : (summary.avgDeltaFc ?? 0) < -0.05 ? 'text-ok' : 'text-ink' },
+                {
+                  label: 'Platos afectados',
+                  value: String(summary.affected),
+                  tone: 'text-ink',
+                  hint: summary.affectedElaborations
+                    ? `y ${summary.affectedElaborations} elaboraci${summary.affectedElaborations === 1 ? 'ón' : 'ones'}`
+                    : undefined,
+                },
+                {
+                  label: 'Food cost medio',
+                  value: fmtPp(summary.avgDeltaFc),
+                  tone: (summary.avgDeltaFc ?? 0) > 0.05 ? 'text-bad' : (summary.avgDeltaFc ?? 0) < -0.05 ? 'text-ok' : 'text-ink',
+                },
                 { label: 'Empeoran de color', value: String(summary.worsened), tone: summary.worsened ? 'text-bad' : 'text-ink' },
                 { label: 'Mejoran de color', value: String(summary.improved), tone: summary.improved ? 'text-ok' : 'text-ink' },
               ].map((k) => (
                 <div key={k.label} className="rounded-2xl border border-line bg-surface p-4 shadow-card">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted">{k.label}</div>
                   <div className={cx('tabular mt-1 font-display text-2xl font-extrabold', k.tone)}>{k.value}</div>
+                  {'hint' in k && k.hint && <div className="text-xs text-muted">{k.hint}</div>}
                 </div>
               ))}
             </div>
@@ -174,58 +200,112 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
 
           <Card padded={false}>
             <div className="p-4 pb-3 sm:p-5 sm:pb-3">
-              <CardHeader icon={<ChefHat className="size-5" />} title="Impacto por plato" subtitle="Ordenado por el cambio de coste por ración." />
+              <CardHeader icon={<ChefHat className="size-5" />} title="Impacto por plato" subtitle="Primero los platos de carta, ordenados por el cambio de coste por ración; después, las elaboraciones." />
             </div>
             {rows.length === 0 ? (
               <p className="px-5 pb-5 text-sm text-muted">Este ingrediente no afecta a ningún plato con coste calculable.</p>
             ) : (
-              <Table className="rounded-none border-x-0 border-b-0">
-                <thead>
-                  <tr>
-                    <Th>Plato</Th>
-                    <Th>Food cost antes → después</Th>
-                    <Th align="right">Δ coste ración</Th>
-                    <Th align="right">PVP carta</Th>
-                    <Th align="right">PVP sugerido</Th>
-                  </tr>
-                </thead>
-                <tbody>
+              <>
+                <ul className="divide-y divide-line border-t border-line sm:hidden">
                   {rows.map((r) => (
-                    <tr key={r.dishId} className="cursor-pointer transition hover:bg-surface-2" onClick={() => navigate(`/platos/${r.dishId}`)}>
-                      <Td className="max-w-[240px]">
-                        <span className="block truncate font-semibold text-ink">{r.name}</span>
-                        <span className="tabular block text-xs text-muted">
-                          {fmtEur(r.costBefore)} → {fmtEur(r.costAfter)}
-                          {r.kind === 'elaboracion' && ' · elaboración'}
-                        </span>
-                      </Td>
-                      <Td>
-                        {r.fcBefore != null ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <FoodCostBadge pct={r.fcBefore} status={r.statusBefore} />
-                            <ArrowRight className="size-3.5 text-muted" aria-label="pasa a" />
-                            <FoodCostBadge pct={r.fcAfter} status={r.statusAfter} />
+                    <li key={r.dishId}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/platos/${r.dishId}`)}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition active:bg-surface-2"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-ink">{r.name}</span>
+                          <span className="tabular block text-xs text-muted">
+                            coste {fmtEur(r.costBefore)} → {fmtEur(r.costAfter)}
+                            {r.kind === 'plato' && r.suggestedAfter != null
+                              ? ` · sugerido ${fmtEur(r.suggestedAfter)}`
+                              : r.kind === 'elaboracion'
+                                ? ' · elaboración'
+                                : ''}
                           </span>
-                        ) : (
-                          <span className="text-xs text-muted">sin PVP</span>
-                        )}
-                      </Td>
-                      <Td align="right" className={cx('font-semibold', r.deltaCost > 0.0005 ? 'text-bad' : r.deltaCost < -0.0005 ? 'text-ok' : 'text-ink')}>
-                        {fmtSignedEur(r.deltaCost)}
-                      </Td>
-                      <Td align="right">{fmtEur(r.menuPrice)}</Td>
-                      <Td align="right">
-                        <span className="font-semibold text-ink">{fmtEur(r.suggestedAfter)}</span>
-                        {r.suggestedBefore != null && r.suggestedAfter != null && Math.abs(r.suggestedAfter - r.suggestedBefore) > 0.004 && (
-                          <Badge tone={r.suggestedAfter > r.suggestedBefore ? 'bad' : 'ok'} className="ml-1.5">
-                            {fmtSignedEur(r.suggestedAfter - r.suggestedBefore)}
-                          </Badge>
-                        )}
-                      </Td>
-                    </tr>
+                          {r.fcBefore != null && (
+                            <span className="mt-1 flex items-center gap-1.5">
+                              <FoodCostBadge pct={r.fcBefore} status={r.statusBefore} />
+                              <ArrowRight className="size-3 text-muted" aria-label="pasa a" />
+                              <FoodCostBadge pct={r.fcAfter} status={r.statusAfter} />
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          className={cx(
+                            'tabular shrink-0 text-sm font-bold',
+                            r.deltaCost > 0.0005 ? 'text-bad' : r.deltaCost < -0.0005 ? 'text-ok' : 'text-ink',
+                          )}
+                        >
+                          {fmtSignedEur(r.deltaCost)}
+                        </span>
+                      </button>
+                    </li>
                   ))}
-                </tbody>
-              </Table>
+                </ul>
+                <Table className="hidden rounded-none border-x-0 border-b-0 sm:block">
+                  <thead>
+                    <tr>
+                      <Th>Plato</Th>
+                      <Th>Food cost antes → después</Th>
+                      <Th align="right">Δ coste ración</Th>
+                      <Th align="right">PVP carta</Th>
+                      <Th align="right">PVP sugerido</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.dishId} className="cursor-pointer transition hover:bg-surface-2" onClick={() => navigate(`/platos/${r.dishId}`)}>
+                        <Td className="max-w-[240px]">
+                          <span className="block truncate font-semibold text-ink">{r.name}</span>
+                          <span className="tabular block text-xs text-muted">
+                            {fmtEur(r.costBefore)} → {fmtEur(r.costAfter)}
+                            {r.kind === 'elaboracion' && ' · elaboración'}
+                          </span>
+                        </Td>
+                        <Td>
+                          {r.fcBefore != null ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <FoodCostBadge pct={r.fcBefore} status={r.statusBefore} />
+                              <ArrowRight className="size-3.5 text-muted" aria-label="pasa a" />
+                              <FoodCostBadge pct={r.fcAfter} status={r.statusAfter} />
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted">{r.kind === 'elaboracion' ? 'elaboración (sin PVP)' : 'sin PVP'}</span>
+                          )}
+                        </Td>
+                        <Td
+                          align="right"
+                          className={cx(
+                            'whitespace-nowrap font-semibold',
+                            r.deltaCost > 0.0005 ? 'text-bad' : r.deltaCost < -0.0005 ? 'text-ok' : 'text-ink',
+                          )}
+                        >
+                          {fmtSignedEur(r.deltaCost)}
+                        </Td>
+                        <Td align="right" className="whitespace-nowrap">
+                          {fmtEur(r.menuPrice)}
+                        </Td>
+                        <Td align="right" className="whitespace-nowrap">
+                          {r.kind === 'plato' ? (
+                            <>
+                              <span className="font-semibold text-ink">{fmtEur(r.suggestedAfter)}</span>
+                              {r.suggestedBefore != null && r.suggestedAfter != null && Math.abs(r.suggestedAfter - r.suggestedBefore) > 0.004 && (
+                                <Badge tone={r.suggestedAfter > r.suggestedBefore ? 'bad' : 'ok'} className="ml-1.5">
+                                  {fmtSignedEur(r.suggestedAfter - r.suggestedBefore)}
+                                </Badge>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </>
             )}
           </Card>
         </>

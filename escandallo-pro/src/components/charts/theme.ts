@@ -38,8 +38,26 @@ export interface ChartTheme {
   neutral: string;
 }
 
-const LIGHT = { ink: '#0b0f14', ink2: '#2a3441', muted: '#677486', line: '#e6e9ee', lineStrong: '#d3d8e0', surface: '#ffffff', surface2: '#f8f9fb', elevated: '#ffffff' };
-const DARK = { ink: '#f3f5f8', ink2: '#c9d1dc', muted: '#8a97a8', line: '#222c39', lineStrong: '#2e3a4a', surface: '#121821', surface2: '#0f141c', elevated: '#19212d' };
+const LIGHT = {
+  ink: '#0b0f14',
+  ink2: '#2a3441',
+  muted: '#677486',
+  line: '#e6e9ee',
+  lineStrong: '#d3d8e0',
+  surface: '#ffffff',
+  surface2: '#f8f9fb',
+  elevated: '#ffffff',
+};
+const DARK = {
+  ink: '#f3f5f8',
+  ink2: '#c9d1dc',
+  muted: '#8a97a8',
+  line: '#222c39',
+  lineStrong: '#2e3a4a',
+  surface: '#121821',
+  surface2: '#0f141c',
+  elevated: '#19212d',
+};
 
 function subscribe(cb: () => void): () => void {
   if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return () => undefined;

@@ -33,8 +33,8 @@ import { ConfirmResultModal, type ConfirmOutcome } from '../components/purchases
 import { InvoiceProcessing } from '../components/purchases/ProcessingQueue';
 import { InvoiceStatusBadge, MethodBadge, SaveIndicator } from '../components/purchases/badges';
 import { DropdownMenu } from '../components/purchases/DropdownMenu';
-import { useDebouncedAction, useInvoiceQueue } from '../components/purchases/hooks';
-import { recomputeLine } from '../components/purchases/lineEdit';
+import { useDebouncedAction, useInvoiceQueue, useMediaQuery } from '../components/purchases/hooks';
+import { lineConversion, recomputeLine } from '../components/purchases/lineEdit';
 import { diffPrices, summarizeLines, totalsCheck, type PriceSnapshot } from '../components/purchases/logic';
 
 type LineFilter = 'todas' | 'decidir' | 'avisos';
@@ -79,6 +79,7 @@ export default function InvoiceReview() {
   const [askMismatch, setAskMismatch] = useState(false);
   const [showDoc, setShowDoc] = useState(true);
   const [mobileDoc, setMobileDoc] = useState(false);
+  const wide = useMediaQuery('(min-width: 1280px)');
 
   // Sincroniza el borrador con la BD mientras no haya cambios locales pendientes.
   useEffect(() => {
@@ -125,12 +126,18 @@ export default function InvoiceReview() {
   const onPatchLine = useCallback(
     (lineId: ID, patch: Partial<InvoiceLine>, meta?: LinePatchMeta) => {
       if (meta?.packManual) packManual.current.add(lineId);
-      updateDraft((d) => ({ ...d, lines: d.lines.map((l) => (l.id === lineId ? recomputeLine(l, patch, packManual.current.has(lineId)) : l)) }));
+      updateDraft((d) => ({
+        ...d,
+        lines: d.lines.map((l) => (l.id === lineId ? recomputeLine(l, patch, packManual.current.has(lineId)) : l)),
+      }));
     },
     [updateDraft],
   );
 
-  const onRemoveLine = useCallback((lineId: ID) => updateDraft((d) => ({ ...d, lines: d.lines.filter((l) => l.id !== lineId) })), [updateDraft]);
+  const onRemoveLine = useCallback(
+    (lineId: ID) => updateDraft((d) => ({ ...d, lines: d.lines.filter((l) => l.id !== lineId) })),
+    [updateDraft],
+  );
 
   const onAddLine = useCallback(() => {
     try {
@@ -168,12 +175,13 @@ export default function InvoiceReview() {
   const productsById = useMemo(() => new Map<ID, Product>((products ?? []).map((p) => [p.id, p])), [products]);
   const check = useMemo(() => (draft ? totalsCheck(draft.lines, draft.subtotal, draft.vatTotal, draft.total) : null), [draft]);
   const summary = useMemo(() => (draft ? summarizeLines(draft.lines) : null), [draft]);
+  // Líneas cuyo precio no se podrá aplicar a su ingrediente (unidad distinta sin peso por unidad / densidad).
   const mismatches = useMemo(
     () =>
       (draft?.lines ?? []).filter((l) => {
         if (l.matchStatus === 'ignorado' || l.matchStatus === 'nuevo' || !l.productId) return false;
         const p = productsById.get(l.productId);
-        return !!(p && l.baseUnit && p.baseUnit !== l.baseUnit);
+        return !!p && lineConversion(l, p).kind === 'incompatible';
       }).length,
     [draft, productsById],
   );
@@ -194,7 +202,9 @@ export default function InvoiceReview() {
     setSaveState('idle');
     try {
       await processInvoice(id, { forceLocal });
-      toast.success('Factura leída de nuevo', 'Revisa las líneas antes de confirmar.');
+      const fresh = await db().invoices.get(id);
+      if (fresh?.status === 'error') toast.error('No se pudo leer la factura', fresh.error);
+      else toast.success('Factura leída de nuevo', 'Revisa las líneas antes de confirmar.');
     } catch (e) {
       toast.error('No se pudo volver a leer la factura', errorMessage(e));
     }
@@ -211,7 +221,10 @@ export default function InvoiceReview() {
   };
 
   const acceptAllSuggestions = () =>
-    updateDraft((d) => ({ ...d, lines: d.lines.map((l) => (l.matchStatus === 'sugerido' && l.productId ? { ...l, matchStatus: 'vinculado' } : l)) }));
+    updateDraft((d) => ({
+      ...d,
+      lines: d.lines.map((l) => (l.matchStatus === 'sugerido' && l.productId ? { ...l, matchStatus: 'vinculado' } : l)),
+    }));
 
   const doConfirm = async () => {
     const d = draftRef.current;
@@ -224,7 +237,9 @@ export default function InvoiceReview() {
       setSaveState('saved');
       const wdb = db();
       const beforeList = await wdb.products.toArray();
-      const snapshot = new Map<ID, PriceSnapshot>(beforeList.map((p) => [p.id, { id: p.id, name: p.name, price: p.pricePerBase, baseUnit: p.baseUnit }]));
+      const snapshot = new Map<ID, PriceSnapshot>(
+        beforeList.map((p) => [p.id, { id: p.id, name: p.name, price: p.pricePerBase, baseUnit: p.baseUnit }]),
+      );
       const costsBefore = dishCosts?.costs;
       const res = await confirmInvoice(id);
       const afterList = await wdb.products.toArray();
@@ -295,7 +310,7 @@ export default function InvoiceReview() {
       description: 'Gratis y en tu dispositivo. Sustituye las líneas actuales.',
       icon: <RefreshCw className="size-4" />,
       onSelect: () => setAskReprocess({ forceLocal: true }),
-      disabled: !invoice.file,
+      disabled: !invoice.file || invoice.method === 'hoja',
     },
     ...(canUseAi
       ? [
@@ -305,7 +320,7 @@ export default function InvoiceReview() {
             icon: <Sparkles className="size-4" />,
             tone: 'ai' as const,
             onSelect: () => setAskReprocess({ forceLocal: false }),
-            disabled: !invoice.file,
+            disabled: !invoice.file || invoice.method === 'hoja',
           },
         ]
       : []),
@@ -315,12 +330,16 @@ export default function InvoiceReview() {
       icon: <Trash2 className="size-4" />,
       tone: 'danger' as const,
       onSelect: () => setAskDelete(true),
+      disabled: invoice.status === 'procesando',
     },
   ];
 
   return (
     <div className="animate-fade-in">
-      <Link to="/facturas" className="mb-3 inline-flex min-h-10 items-center gap-1.5 rounded-lg text-sm font-semibold text-muted transition hover:text-ink">
+      <Link
+        to="/facturas"
+        className="mb-3 inline-flex min-h-10 items-center gap-1.5 rounded-lg text-sm font-semibold text-muted transition hover:text-ink"
+      >
         <ArrowLeft className="size-4" /> Facturas
       </Link>
 
@@ -331,7 +350,7 @@ export default function InvoiceReview() {
             <span className="min-w-0 break-words">{title}</span>
             <span className="flex items-center gap-1.5 align-middle">
               <InvoiceStatusBadge status={invoice.status} />
-              <MethodBadge method={invoice.method} />
+              {invoice.method && <MethodBadge method={invoice.method} />}
             </span>
           </span>
         }
@@ -339,7 +358,9 @@ export default function InvoiceReview() {
           <span className="tabular">
             {fmtDate(draft.date)}
             {draft.number ? ` · Nº ${draft.number}` : ''} · {draft.lines.length} {draft.lines.length === 1 ? 'línea' : 'líneas'}
-            {check && check.linesSum > 0 ? ` · ${fmtEur(draft.subtotal && draft.subtotal > 0 ? draft.subtotal : check.linesSum)} sin IVA` : ''}
+            {check && check.linesSum > 0
+              ? ` · ${fmtEur(draft.subtotal && draft.subtotal > 0 ? draft.subtotal : check.linesSum)} sin IVA`
+              : ''}
           </span>
         }
         actions={
@@ -347,7 +368,12 @@ export default function InvoiceReview() {
             <SaveIndicator state={saveState} />
             <div className="hidden xl:block">
               {hasDoc && (
-                <Button variant="ghost" size="md" icon={showDoc ? <EyeOff className="size-4" /> : <Eye className="size-4" />} onClick={() => setShowDoc((s) => !s)}>
+                <Button
+                  variant="ghost"
+                  size="md"
+                  icon={showDoc ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  onClick={() => setShowDoc((s) => !s)}
+                >
                   {showDoc ? 'Ocultar documento' : 'Ver documento'}
                 </Button>
               )}
@@ -405,8 +431,8 @@ export default function InvoiceReview() {
       )}
 
       {/* Documento en móvil / tableta: plegable */}
-      {hasDoc && (
-        <div className="mb-5 xl:hidden">
+      {hasDoc && !wide && (
+        <div className="mb-5">
           <button
             type="button"
             onClick={() => setMobileDoc((o) => !o)}
@@ -418,15 +444,29 @@ export default function InvoiceReview() {
             </span>
             <ChevronDown className={clsx('size-4 text-muted transition', mobileDoc && 'rotate-180')} />
           </button>
-          {mobileDoc && <FilePreview file={invoice.file} fileName={invoice.fileName} fileType={invoice.fileType} rawText={invoice.rawText} className="mt-2 h-[70dvh]" />}
+          {mobileDoc && (
+            <FilePreview
+              file={invoice.file}
+              fileName={invoice.fileName}
+              fileType={invoice.fileType}
+              rawText={invoice.rawText}
+              className="mt-2 h-[70dvh]"
+            />
+          )}
         </div>
       )}
 
-      <div className={clsx('grid gap-6', hasDoc && showDoc && 'xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]')}>
-        {hasDoc && showDoc && (
-          <div className="hidden xl:block">
+      <div className={clsx('grid gap-6', hasDoc && showDoc && wide && 'grid-cols-[minmax(0,5fr)_minmax(0,7fr)]')}>
+        {hasDoc && showDoc && wide && (
+          <div>
             <div className="sticky top-6">
-              <FilePreview file={invoice.file} fileName={invoice.fileName} fileType={invoice.fileType} rawText={invoice.rawText} className="h-[calc(100dvh-6rem)]" />
+              <FilePreview
+                file={invoice.file}
+                fileName={invoice.fileName}
+                fileType={invoice.fileType}
+                rawText={invoice.rawText}
+                className="h-[calc(100dvh-6rem)]"
+              />
             </div>
           </div>
         )}
@@ -437,7 +477,11 @@ export default function InvoiceReview() {
           ) : (
             <>
               {confirmed && (
-                <Callout tone="ok" icon={<CheckCircle2 className="size-4" />} title={`Confirmada${invoice.confirmedAt ? ` el ${fmtDate(invoice.confirmedAt)}` : ''}`}>
+                <Callout
+                  tone="ok"
+                  icon={<CheckCircle2 className="size-4" />}
+                  title={`Confirmada${invoice.confirmedAt ? ` el ${fmtDate(invoice.confirmedAt)}` : ''}`}
+                >
                   Sus precios ya están en tu base de datos. Si corriges algo, vuelve a aplicar los precios: no se duplican.
                 </Callout>
               )}
@@ -475,7 +519,10 @@ export default function InvoiceReview() {
                       onChange={setLineFilter}
                       options={[
                         { value: 'todas', label: 'Todas' },
-                        { value: 'decidir', label: `Por decidir${summary.suggested + summary.created ? ` (${summary.suggested + summary.created})` : ''}` },
+                        {
+                          value: 'decidir',
+                          label: `Por decidir${summary.suggested + summary.created ? ` (${summary.suggested + summary.created})` : ''}`,
+                        },
                         { value: 'avisos', label: `Avisos${summary.withWarnings ? ` (${summary.withWarnings})` : ''}` },
                       ]}
                     />
@@ -497,7 +544,11 @@ export default function InvoiceReview() {
               ) : visibleLines.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-muted">
                   Nada por aquí: {lineFilter === 'decidir' ? 'todas las líneas están decididas' : 'ninguna línea tiene avisos'}.{' '}
-                  <button type="button" className="font-semibold text-brand-600 underline dark:text-brand-400" onClick={() => setLineFilter('todas')}>
+                  <button
+                    type="button"
+                    className="font-semibold text-brand-600 underline dark:text-brand-400"
+                    onClick={() => setLineFilter('todas')}
+                  >
                     Ver todas
                   </button>
                 </div>
@@ -554,10 +605,9 @@ export default function InvoiceReview() {
       <ConfirmDialog
         open={askMismatch}
         onClose={() => setAskMismatch(false)}
-        title="Hay unidades que no coinciden"
-        message={`${mismatches} ${mismatches === 1 ? 'línea tiene' : 'líneas tienen'} un precio por unidad distinto al de su ingrediente (p. ej. €/ud frente a €/kg). Si confirmas, ese precio puede quedar mal. Te recomendamos revisar el formato o la unidad.`}
+        title="Hay precios que no se podrán aplicar"
+        message={`${mismatches} ${mismatches === 1 ? 'línea está' : 'líneas están'} en una unidad distinta a la de su ingrediente (p. ej. €/ud frente a €/kg) y no hay peso por unidad o densidad para convertirla. Si confirmas, ${mismatches === 1 ? 'esa línea se omitirá' : 'esas líneas se omitirán'} y el resto de precios se actualizarán.`}
         confirmLabel="Confirmar igualmente"
-        danger
         onConfirm={() => void doConfirm()}
       />
       <ConfirmResultModal outcome={outcome} onClose={() => setOutcome(null)} dishes={dishes} costsAfter={dishCosts?.costs} />
@@ -587,14 +637,19 @@ function ConfirmBar({
   const notes: string[] = [];
   if (suggested > 0) notes.push(`${suggested} ${suggested === 1 ? 'sugerencia se aplicará' : 'sugerencias se aplicarán'} tal cual`);
   if (unpriced > 0) notes.push(`${unpriced} sin precio se ${unpriced === 1 ? 'omitirá' : 'omitirán'}`);
-  if (mismatches > 0) notes.push(`${mismatches} con unidad distinta`);
+  if (mismatches > 0) notes.push(`${mismatches} no se ${mismatches === 1 ? 'podrá' : 'podrán'} aplicar (unidad distinta)`);
   return (
     <div className="sticky bottom-[84px] z-20 mt-6 lg:bottom-4 lg:pr-20 2xl:pr-0">
       <div className="flex items-center gap-3 rounded-2xl border border-line bg-elevated/95 p-2.5 shadow-pop backdrop-blur-xl sm:p-3.5">
         <div className="hidden min-w-0 flex-1 px-1 sm:block">
           <div className="truncate text-sm font-semibold text-ink">
-            {priced} {priced === 1 ? 'precio' : 'precios'} para tu base de datos
-            {created > 0 && <span className="text-brand-600 dark:text-brand-400"> · {created} {created === 1 ? 'nuevo' : 'nuevos'}</span>}
+            {priced} {priced === 1 ? 'precio listo' : 'precios listos'}
+            {created > 0 && (
+              <span className="text-brand-600 dark:text-brand-400">
+                {' '}
+                · {created} {created === 1 ? 'ingrediente nuevo' : 'ingredientes nuevos'}
+              </span>
+            )}
           </div>
           <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
             {notes.length ? (
@@ -609,8 +664,17 @@ function ConfirmBar({
             )}
           </div>
         </div>
-        <Button size="lg" variant="primary" loading={confirming} icon={<CheckCircle2 className="size-5" />} onClick={onConfirm} className="w-full shrink-0 sm:w-auto">
-          <span className="sm:hidden">{confirmed ? 'Volver a aplicar precios' : `Confirmar · ${priced} ${priced === 1 ? 'precio' : 'precios'}`}</span>
+        <Button
+          size="lg"
+          variant="primary"
+          loading={confirming}
+          icon={<CheckCircle2 className="size-5" />}
+          onClick={onConfirm}
+          className="w-full shrink-0 sm:w-auto"
+        >
+          <span className="sm:hidden">
+            {confirmed ? 'Volver a aplicar precios' : `Confirmar · ${priced} ${priced === 1 ? 'precio' : 'precios'}`}
+          </span>
           <span className="hidden sm:inline">{confirmed ? 'Volver a aplicar precios' : 'Confirmar y actualizar precios'}</span>
         </Button>
       </div>
