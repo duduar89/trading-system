@@ -187,12 +187,20 @@ export function invoiceStats(invoices: Invoice[], today: string): InvoiceStats {
   const month = today.slice(0, 7);
   const prev = shiftMonth(month, -1);
   const s: InvoiceStats = { monthCount: 0, monthSpend: 0, monthPendingSpend: 0, prevMonthSpend: 0, toReview: 0, inProgress: 0, errors: 0 };
+  // Una copia por revisar de otra factura (el PDF y la foto de la misma) no suma gasto: sería contar dos veces la misma compra.
+  // Se cuenta la confirmada o, si ninguna lo está, la más antigua. Las confirmadas cuentan siempre (quien confirma las dos dice
+  // que son distintas).
+  const pendingCopy = (inv: Invoice) => {
+    if (inv.status !== 'revision') return false;
+    const dup = findDuplicateInvoice(inv, invoices);
+    return !!dup && (dup.status === 'confirmada' || dup.createdAt < inv.createdAt || (dup.createdAt === inv.createdAt && dup.id < inv.id));
+  };
   for (const inv of invoices) {
     if (inv.status === 'revision') s.toReview++;
     else if (inv.status === 'pendiente' || inv.status === 'procesando') s.inProgress++;
     else if (inv.status === 'error') s.errors++;
     const ym = (inv.date ?? '').slice(0, 7);
-    const counts = inv.status === 'confirmada' || inv.status === 'revision';
+    const counts = (inv.status === 'confirmada' || inv.status === 'revision') && (ym === month || ym === prev) && !pendingCopy(inv);
     if (ym === month) {
       s.monthCount++;
       if (counts) {
@@ -297,6 +305,33 @@ export function duplicateInvoiceIds(all: Invoice[]): Set<ID> {
 }
 
 // ───────────────────────────── Precios ─────────────────────────────
+
+/**
+ * Precio vigente que tendrá `keep` tras fusionarle `remove` (services/products.mergeProducts + recomputeCurrentPrice): el
+ * registro más reciente de los dos históricos (por fecha y, a igualdad, por orden de alta), con los precios del duplicado
+ * pasados a la unidad del que se conserva (`factor`). Sin histórico, el precio del que se conserva o, si no tiene, el del otro.
+ */
+export function mergedPricePreview(
+  keep: Product,
+  remove: Product,
+  points: PricePoint[],
+  factor: number,
+): { price: number; date?: string; source?: PricePoint['source']; fromRemoved: boolean } | undefined {
+  let best: PricePoint | undefined;
+  for (const p of points) {
+    if (p.productId !== keep.id && p.productId !== remove.id) continue;
+    if (!(p.pricePerBase > 0) || !Number.isFinite(p.pricePerBase)) continue;
+    if (!best || p.date > best.date || (p.date === best.date && p.id > best.id)) best = p;
+  }
+  const convert = (v: number) => Math.round(v * factor * 1e6) / 1e6;
+  if (best) {
+    const fromRemoved = best.productId === remove.id;
+    return { price: fromRemoved ? convert(best.pricePerBase) : best.pricePerBase, date: best.date, source: best.source, fromRemoved };
+  }
+  if (keep.pricePerBase > 0) return { price: keep.pricePerBase, fromRemoved: false };
+  if (remove.pricePerBase > 0) return { price: convert(remove.pricePerBase), fromRemoved: true };
+  return undefined;
+}
 
 /** Variación porcentual (positivo = subida). undefined si no hay precio de partida. */
 export function pctChange(before: number | undefined, after: number | undefined): number | undefined {

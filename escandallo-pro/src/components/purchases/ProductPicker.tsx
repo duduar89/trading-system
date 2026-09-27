@@ -266,6 +266,127 @@ function PickerPanel({
   const firstAll = options.findIndex((o) => o.kind === 'product' && o.section === 'all');
   const firstMatch = options.findIndex((o) => o.kind === 'product' && o.section === 'match');
 
+  const optionNodes = options.map((o, i) => {
+    const isActive = i === active;
+    const common = {
+      id: `${listId}-${i}`,
+      'data-index': i,
+      role: 'option' as const,
+      'aria-selected': isActive,
+      onMouseEnter: () => setActive(i),
+    };
+    if (o.kind === 'create') {
+      // No es una opción del listbox: contiene controles (nombre, categoría, botón) y va en un grupo propio.
+      return (
+        <div
+          key="create"
+          id={common.id}
+          data-index={i}
+          onMouseEnter={common.onMouseEnter}
+          role="group"
+          aria-label="Crear nuevo ingrediente"
+          className={clsx(
+            'mb-1 rounded-xl border p-2.5 transition',
+            isActive ? 'border-brand-400 bg-brand-500/8' : 'border-dashed border-line-strong',
+          )}
+        >
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
+            <Plus className="size-3.5" /> Crear nuevo ingrediente
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={effectiveCreateName}
+              onChange={(e) => {
+                setCreateNameTouched(true);
+                setCreateName(e.target.value);
+              }}
+              onFocus={() => setActive(i)}
+              aria-label="Nombre del nuevo ingrediente"
+              className="h-10 w-full min-w-0 shrink-0 rounded-xl border border-line-strong bg-surface px-3 text-sm font-semibold sm:w-auto sm:flex-1 text-ink focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
+            />
+            <Select
+              value={createCategory}
+              onChange={(e) => setCreateCategory(e.target.value as IngredientCategory | '')}
+              onFocus={() => setActive(i)}
+              aria-label="Categoría del nuevo ingrediente"
+              className="sm:w-44"
+            >
+              <option value="">Automática</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORY_LABELS[c].emoji} {CATEGORY_LABELS[c].label}
+                </option>
+              ))}
+            </Select>
+            <button
+              type="button"
+              onClick={() => choose(o)}
+              disabled={!effectiveCreateName.trim()}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand-500 px-3.5 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+            >
+              Crear
+            </button>
+          </div>
+        </div>
+      );
+    }
+    if (o.kind === 'ignore') {
+      return (
+        <button
+          key="ignore"
+          type="button"
+          {...common}
+          onClick={() => choose(o)}
+          className={clsx(
+            'mt-1 flex min-h-11 w-full items-center gap-2.5 rounded-xl border-t border-line px-2.5 text-left text-sm text-muted transition',
+            isActive && 'bg-surface-2 text-ink',
+          )}
+        >
+          <Ban className="size-4" /> Ignorar línea <span className="text-xs">(portes, envases, cargos…)</span>
+        </button>
+      );
+    }
+    const p = o.hit.product;
+    const selected = p.id === selectedId;
+    return (
+      <div key={p.id}>
+        {i === firstMatch && (
+          <SectionTitle>
+            {query.trim() ? `${hits.length} resultado${hits.length === 1 ? '' : 's'}` : 'Coincidencias probables'}
+          </SectionTitle>
+        )}
+        {i === firstAll && <SectionTitle>Todos los ingredientes</SectionTitle>}
+        <button
+          type="button"
+          {...common}
+          onClick={() => choose(o)}
+          className={clsx(
+            'flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition',
+            isActive ? 'bg-surface-2' : 'hover:bg-surface-2',
+          )}
+        >
+          <CategoryBadge category={p.category} compact />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5">
+              <span className="truncate text-sm font-semibold text-ink">{p.name}</span>
+              {selected && <Check className="size-4 shrink-0 text-ok" aria-label="Seleccionado" />}
+            </span>
+            {o.hit.matchedOn && <span className="block truncate text-[11px] text-muted">por «{o.hit.matchedOn}»</span>}
+          </span>
+          <span className="shrink-0 text-right">
+            <span className={clsx('tabular block text-xs font-semibold', p.pricePerBase > 0 ? 'text-ink-2' : 'text-muted')}>
+              {p.pricePerBase > 0 ? `${fmtEurPrecise(p.pricePerBase)}/${p.baseUnit}` : `sin precio (${perUnitLabel(p.baseUnit)})`}
+            </span>
+            {isEstimatedPrice(p) && <EstimatedBadge short className="mt-0.5" />}
+            {o.section === 'match' && !query.trim() && o.hit.score > 0 && (
+              <span className="tabular block text-[10px] font-semibold text-muted">coincide {Math.round(o.hit.score * 100)} %</span>
+            )}
+          </span>
+        </button>
+      </div>
+    );
+  });
+
   return (
     <div className={clsx('flex min-h-0 flex-col', sheet && '-mx-1')} onKeyDown={onKey}>
       <div className={clsx('relative shrink-0', sheet ? 'mb-3' : 'border-b border-line p-2')}>
@@ -279,133 +400,16 @@ function PickerPanel({
           role="combobox"
           aria-expanded
           aria-controls={listId}
-          aria-activedescendant={`${listId}-${active}`}
+          aria-activedescendant={options[active] && options[active].kind !== 'create' ? `${listId}-${active}` : undefined}
           aria-autocomplete="list"
           className="h-10 w-full rounded-xl border border-line-strong bg-surface pl-9 pr-3 text-sm text-ink placeholder:text-muted/70 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
         />
       </div>
-      <div
-        ref={listRef}
-        id={listId}
-        role="listbox"
-        aria-label="Ingredientes"
-        className={clsx('min-h-0 flex-1 overflow-y-auto', sheet ? 'max-h-[60dvh]' : 'p-1.5')}
-      >
-        {options.map((o, i) => {
-          const isActive = i === active;
-          const common = {
-            id: `${listId}-${i}`,
-            'data-index': i,
-            role: 'option' as const,
-            'aria-selected': isActive,
-            onMouseEnter: () => setActive(i),
-          };
-          if (o.kind === 'create') {
-            return (
-              <div
-                key="create"
-                {...common}
-                className={clsx(
-                  'mb-1 rounded-xl border p-2.5 transition',
-                  isActive ? 'border-brand-400 bg-brand-500/8' : 'border-dashed border-line-strong',
-                )}
-              >
-                <div className="mb-2 flex items-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
-                  <Plus className="size-3.5" /> Crear nuevo ingrediente
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <input
-                    value={effectiveCreateName}
-                    onChange={(e) => {
-                      setCreateNameTouched(true);
-                      setCreateName(e.target.value);
-                    }}
-                    onFocus={() => setActive(i)}
-                    aria-label="Nombre del nuevo ingrediente"
-                    className="h-10 w-full min-w-0 shrink-0 rounded-xl border border-line-strong bg-surface px-3 text-sm font-semibold sm:w-auto sm:flex-1 text-ink focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15"
-                  />
-                  <Select
-                    value={createCategory}
-                    onChange={(e) => setCreateCategory(e.target.value as IngredientCategory | '')}
-                    onFocus={() => setActive(i)}
-                    aria-label="Categoría del nuevo ingrediente"
-                    className="sm:w-44"
-                  >
-                    <option value="">Automática</option>
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {CATEGORY_LABELS[c].emoji} {CATEGORY_LABELS[c].label}
-                      </option>
-                    ))}
-                  </Select>
-                  <button
-                    type="button"
-                    onClick={() => choose(o)}
-                    disabled={!effectiveCreateName.trim()}
-                    className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand-500 px-3.5 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
-                  >
-                    Crear
-                  </button>
-                </div>
-              </div>
-            );
-          }
-          if (o.kind === 'ignore') {
-            return (
-              <button
-                key="ignore"
-                type="button"
-                {...common}
-                onClick={() => choose(o)}
-                className={clsx(
-                  'mt-1 flex min-h-11 w-full items-center gap-2.5 rounded-xl border-t border-line px-2.5 text-left text-sm text-muted transition',
-                  isActive && 'bg-surface-2 text-ink',
-                )}
-              >
-                <Ban className="size-4" /> Ignorar línea <span className="text-xs">(portes, envases, cargos…)</span>
-              </button>
-            );
-          }
-          const p = o.hit.product;
-          const selected = p.id === selectedId;
-          return (
-            <div key={p.id}>
-              {i === firstMatch && (
-                <SectionTitle>
-                  {query.trim() ? `${hits.length} resultado${hits.length === 1 ? '' : 's'}` : 'Coincidencias probables'}
-                </SectionTitle>
-              )}
-              {i === firstAll && <SectionTitle>Todos los ingredientes</SectionTitle>}
-              <button
-                type="button"
-                {...common}
-                onClick={() => choose(o)}
-                className={clsx(
-                  'flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition',
-                  isActive ? 'bg-surface-2' : 'hover:bg-surface-2',
-                )}
-              >
-                <CategoryBadge category={p.category} compact />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-semibold text-ink">{p.name}</span>
-                    {selected && <Check className="size-4 shrink-0 text-ok" aria-label="Seleccionado" />}
-                  </span>
-                  {o.hit.matchedOn && <span className="block truncate text-[11px] text-muted">por «{o.hit.matchedOn}»</span>}
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className={clsx('tabular block text-xs font-semibold', p.pricePerBase > 0 ? 'text-ink-2' : 'text-muted')}>
-                    {p.pricePerBase > 0 ? `${fmtEurPrecise(p.pricePerBase)}/${p.baseUnit}` : `sin precio (${perUnitLabel(p.baseUnit)})`}
-                  </span>
-                  {isEstimatedPrice(p) && <EstimatedBadge short className="mt-0.5" />}
-                  {o.section === 'match' && !query.trim() && o.hit.score > 0 && (
-                    <span className="tabular block text-[10px] font-semibold text-muted">coincide {Math.round(o.hit.score * 100)} %</span>
-                  )}
-                </span>
-              </button>
-            </div>
-          );
-        })}
+      <div ref={listRef} className={clsx('min-h-0 flex-1 overflow-y-auto', sheet ? 'max-h-[60dvh]' : 'p-1.5')}>
+        {options[0]?.kind === 'create' && optionNodes[0]}
+        <div id={listId} role="listbox" aria-label="Ingredientes">
+          {options[0]?.kind === 'create' ? optionNodes.slice(1) : optionNodes}
+        </div>
         {query.trim() && !hits.length && (
           <p className="px-3 py-4 text-center text-sm text-muted">
             Ningún ingrediente coincide con «{query.trim()}».{create ? ' Puedes crearlo arriba.' : ''}

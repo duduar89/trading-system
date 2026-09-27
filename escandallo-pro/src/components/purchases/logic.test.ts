@@ -14,6 +14,7 @@ import {
   invoiceNetAmount,
   invoiceStats,
   isMeaningfulChange,
+  mergedPricePreview,
   lineAmount,
   matchesQuery,
   parsePriceRows,
@@ -203,6 +204,22 @@ describe('lista de facturas', () => {
     expect(s.toReview).toBe(1);
     expect(s.errors).toBe(1);
     expect(s.inProgress).toBe(1);
+  });
+  it('invoiceStats: la copia por revisar de otra factura (PDF y foto) no suma gasto dos veces', () => {
+    const pdf = invoice({ id: 'pdf', number: 'CSG-26-004187', date: '2026-09-19', subtotal: 596.58, status: 'revision', createdAt: '2026-09-25T09:00:00Z' });
+    const photo = invoice({ ...pdf, id: 'foto', createdAt: '2026-09-25T09:00:05Z' });
+    const other = invoice({ id: 'otra', number: 'FV-1', date: '2026-09-18', subtotal: 96.48, status: 'revision' });
+    let s = invoiceStats([photo, pdf, other], '2026-09-27');
+    expect(s.monthSpend).toBe(693.06);
+    expect(s.monthPendingSpend).toBe(693.06);
+    expect(s.toReview).toBe(3);
+    // Confirmada la foto, la que queda por revisar es la copia
+    s = invoiceStats([{ ...photo, status: 'confirmada' }, pdf, other], '2026-09-27');
+    expect(s.monthSpend).toBe(693.06);
+    expect(s.monthPendingSpend).toBe(96.48);
+    // Confirmadas las dos (el usuario dice que son distintas): cuentan las dos
+    s = invoiceStats([{ ...photo, status: 'confirmada' }, { ...pdf, status: 'confirmada' }, other], '2026-09-27');
+    expect(s.monthSpend).toBe(1289.64);
   });
   it('invoiceStats: el mes anterior de enero es diciembre del año previo', () => {
     const s = invoiceStats([invoice({ date: '2025-12-20', subtotal: 12 })], '2026-01-05');
@@ -528,5 +545,28 @@ describe('facturas repetidas (PDF y foto de la misma factura)', () => {
     expect(findDuplicateInvoice(photo, [{ ...pdf, status: 'error' }, photo])).toBeUndefined();
     expect(findDuplicateInvoice({ ...photo, status: 'procesando' }, [pdf])).toBeUndefined();
     expect(findDuplicateInvoice(invoice({ id: 'vacia', supplierName: '', number: 'X1', status: 'revision' }), [invoice({ id: 'v2', supplierName: '', number: 'X1', status: 'revision' })])).toBeUndefined();
+  });
+});
+
+describe('mergedPricePreview (precio tras fusionar duplicados)', () => {
+  const tomato = product({ id: 't', name: 'Tomate pera', pricePerBase: 1.85, lastPurchaseDate: '2026-09-18' });
+  const dup = product({ id: 'd', name: 'Tomates pera maduros', pricePerBase: 1.9, priceSource: 'manual', lastPurchaseDate: '2026-09-27' });
+
+  it('el registro más reciente de los dos históricos, como recomputeCurrentPrice (también si es a mano)', () => {
+    const points = [pp('p1', 't', '2026-09-18', 1.85), { ...pp('p2', 'd', '2026-09-27', 1.9), source: 'manual' as const }, pp('x', 'otro', '2026-09-30', 9)];
+    expect(mergedPricePreview(tomato, dup, points, 1)).toEqual({ price: 1.9, date: '2026-09-27', source: 'manual', fromRemoved: true });
+    expect(mergedPricePreview(dup, tomato, points, 1)?.fromRemoved).toBe(false);
+  });
+
+  it('a igual fecha gana el alta más reciente; convierte el precio del duplicado a la unidad del que se conserva', () => {
+    const points = [pp('p1', 't', '2026-09-18', 1.85), pp('p2', 'd', '2026-09-18', 0.95)];
+    expect(mergedPricePreview(tomato, dup, points, 2)).toMatchObject({ price: 1.9, fromRemoved: true });
+    expect(mergedPricePreview(tomato, dup, [pp('p9', 't', '2026-09-18', 1.85), pp('p2', 'd', '2026-09-18', 0.95)], 2)).toMatchObject({ price: 1.85, fromRemoved: false });
+  });
+
+  it('sin histórico: el precio del que se conserva o, si no tiene, el del otro', () => {
+    expect(mergedPricePreview(tomato, dup, [], 1)).toEqual({ price: 1.85, fromRemoved: false });
+    expect(mergedPricePreview({ ...tomato, pricePerBase: 0 }, dup, [], 1)).toEqual({ price: 1.9, fromRemoved: true });
+    expect(mergedPricePreview({ ...tomato, pricePerBase: 0 }, { ...dup, pricePerBase: 0 }, [], 1)).toBeUndefined();
   });
 });

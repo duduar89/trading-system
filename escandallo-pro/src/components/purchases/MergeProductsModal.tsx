@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { Merge } from 'lucide-react';
-import type { ID, Product } from '../../types';
+import { useLiveQuery } from 'dexie-react-hooks';
+import type { ID, PricePoint, Product } from '../../types';
 import { Button, Modal } from '../ui';
+import { db } from '../../db';
 import { fmtDate, fmtEurPrecise } from '../../lib/format';
-import { mergeProducts } from '../../services/products';
+import { mergeProducts, priceConversionFactor } from '../../services/products';
 import { errorMessage, toast } from '../../state/store';
 import { CategoryBadge } from './CategoryBadge';
+import { mergedPricePreview } from './logic';
+
+const SOURCE_TEXT: Record<PricePoint['source'], string> = {
+  factura: 'de una factura',
+  hoja: 'de una tarifa',
+  manual: 'introducido a mano',
+  demo: 'de ejemplo',
+};
 
 /** Fusionar dos ingredientes duplicados eligiendo cuál se conserva. */
 export function MergeProductsModal({
@@ -22,6 +32,10 @@ export function MergeProductsModal({
 }) {
   const [keepId, setKeepId] = useState<ID | undefined>(defaultKeepId);
   const [saving, setSaving] = useState(false);
+  const idA = pair?.[0].id;
+  const idB = pair?.[1].id;
+  // Históricos de los dos: el precio vigente tras fusionar es el registro más reciente de ambos (se muestra antes de fusionar).
+  const points = useLiveQuery(async () => (idA && idB ? db().pricePoints.where('productId').anyOf([idA, idB]).toArray() : []), [idA, idB]);
 
   useEffect(() => {
     if (!pair) return;
@@ -34,6 +48,12 @@ export function MergeProductsModal({
   if (!pair) return null;
   const keep = pair.find((p) => p.id === keepId) ?? pair[0];
   const remove = pair.find((p) => p.id !== keep.id) ?? pair[1];
+  const conv = priceConversionFactor(remove.baseUnit, keep.baseUnit, {
+    unitWeightKg: keep.unitWeightKg ?? remove.unitWeightKg,
+    densityKgPerL: keep.densityKgPerL ?? remove.densityKgPerL,
+  });
+  const after = points && conv ? mergedPricePreview(keep, remove, points, conv.factor) : undefined;
+  const priceChanges = !!after && Math.abs(after.price - keep.pricePerBase) > 1e-9;
 
   const submit = async () => {
     setSaving(true);
@@ -113,6 +133,19 @@ export function MergeProductsModal({
           );
         })}
       </div>
+      {after && (
+        <p className={clsx('mt-3 rounded-xl px-3 py-2 text-sm text-ink-2', priceChanges ? 'bg-warn-soft' : 'bg-surface-2')}>
+          Precio tras fusionar:{' '}
+          <b className="tabular text-ink">
+            {fmtEurPrecise(after.price)}/{keep.baseUnit}
+          </b>
+          {priceChanges ? (keep.pricePerBase > 0 ? ` (ahora ${fmtEurPrecise(keep.pricePerBase)}/${keep.baseUnit})` : '') : ' (sin cambios)'}
+          {after.date && after.source
+            ? `: es el precio más reciente de los dos históricos, ${SOURCE_TEXT[after.source]} el ${fmtDate(after.date)}${after.fromRemoved ? ` en «${remove.name}»` : ''}.`
+            : '.'}
+          {priceChanges && ' Si no es el bueno, cámbialo después desde la ficha del ingrediente.'}
+        </p>
+      )}
       {keep.baseUnit !== remove.baseUnit && (
         <p className="mt-3 rounded-xl bg-warn-soft px-3 py-2 text-sm text-ink-2">
           Ojo: «{keep.name}» se compra por {keep.baseUnit} y «{remove.name}» por {remove.baseUnit}. Revisa las recetas afectadas después de

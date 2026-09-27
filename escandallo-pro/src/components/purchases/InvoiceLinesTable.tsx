@@ -486,22 +486,26 @@ function MatchCell({
     </ProductPicker>
   );
 
+  // Las tres variantes (nuevo, sugerido, vinculado) colocan el selector en la misma posición del árbol (div > div > selector):
+  // así, al elegir un ingrediente, React conserva el botón y el foco vuelve a él (si no, se perdería al cambiar de variante).
   if (line.matchStatus === 'nuevo' || !product) {
     const cat = line.suggestedCategory ? CATEGORY_LABELS[line.suggestedCategory] : undefined;
     return (
       <div className="space-y-1.5">
-        {picker(
-          <>
-            <Badge tone="brand" icon={<Plus className="size-3" />}>
-              Nuevo producto
-            </Badge>
-            <span className="min-w-0 flex-1 truncate font-semibold">
-              {cat && <span aria-hidden>{cat.emoji} </span>}
-              {createName || 'Sin nombre'}
-            </span>
-            <ChevronDown className="size-4 shrink-0 text-muted" />
-          </>,
-        )}
+        <div>
+          {picker(
+            <>
+              <Badge tone="brand" icon={<Plus className="size-3" />}>
+                Nuevo producto
+              </Badge>
+              <span className="min-w-0 flex-1 truncate font-semibold">
+                {cat && <span aria-hidden>{cat.emoji} </span>}
+                {createName || 'Sin nombre'}
+              </span>
+              <ChevronDown className="size-4 shrink-0 text-muted" />
+            </>,
+          )}
+        </div>
         {lookalike && !disabled && (
           <div className="flex items-center gap-2 rounded-xl bg-warn-soft px-3 py-1.5 text-xs text-ink-2">
             <span className="min-w-0 flex-1 truncate">
@@ -559,14 +563,20 @@ function MatchCell({
     );
   }
 
-  return picker(
-    <>
-      <Badge tone="ok" icon={<Check className="size-3" />}>
-        Vinculado
-      </Badge>
-      <span className="min-w-0 flex-1 truncate font-semibold">{product.name}</span>
-      <RotateCcw className="size-3.5 shrink-0 text-muted opacity-0 transition group-hover:opacity-100" aria-hidden />
-      <ChevronDown className="size-4 shrink-0 text-muted" />
-    </>,
+  return (
+    <div>
+      <div>
+        {picker(
+          <>
+            <Badge tone="ok" icon={<Check className="size-3" />}>
+              Vinculado
+            </Badge>
+            <span className="min-w-0 flex-1 truncate font-semibold">{product.name}</span>
+            <RotateCcw className="size-3.5 shrink-0 text-muted opacity-0 transition group-hover:opacity-100" aria-hidden />
+            <ChevronDown className="size-4 shrink-0 text-muted" />
+          </>,
+        )}
+      </div>
+    </div>
   );
 }

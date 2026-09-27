@@ -635,16 +635,20 @@ try {
     await shot('cola-de-lectura', { fullPage: false });
     const t0 = Date.now();
     let sawProcessing = false;
+    let sawDupToast = false;
     const invoices = await waitFor(
       async () => {
         const list = await dbAll('invoices');
         if (list.some((i) => i.status === 'procesando')) sawProcessing = true;
+        // Al terminar de leer la foto se avisa de que repite la factura de carnes (el aviso dura unos segundos).
+        if (!sawDupToast) sawDupToast = (await page.getByRole('status').filter({ hasText: 'Parece una factura repetida' }).count()) > 0;
         return list.length >= 5 && list.every((i) => i.status !== 'pendiente' && i.status !== 'procesando') ? list : null;
       },
       { timeout: OCR_TIMEOUT, interval: 1000, what: 'a que terminen las lecturas' },
     );
     note(`lectura de 5 archivos: ${((Date.now() - t0) / 1000).toFixed(0)} s`);
     check(sawProcessing, 'no se vio ninguna factura en estado «procesando»');
+    check(sawDupToast, 'al terminar de leer la foto no se avisó de que parece una factura repetida');
     check(invoices.length === 5, `se esperaban 5 facturas y hay ${invoices.length}`);
     for (const inv of invoices) note(`${inv.fileName}: ${inv.status} · ${inv.method} · ${inv.lines.length} líneas${inv.error ? ` · ${inv.error}` : ''}`);
     const byFile = (f) => invoices.find((i) => i.fileName === f);
@@ -980,6 +984,14 @@ try {
     await page.getByRole('button', { name: 'Fusionar', exact: true }).click();
     const mdlg = page.getByRole('dialog').filter({ hasText: 'Fusionar ingredientes duplicados' });
     await mdlg.getByRole('radio', { name: new RegExp(`^.*${tomato?.name}`) }).first().click();
+    // El precio vigente tras fusionar es el registro más reciente de los dos históricos (como al borrar o confirmar facturas):
+    // aquí el 1,90 € introducido hoy a mano al crear el duplicado. El diálogo lo anuncia antes de fusionar.
+    const dupPoint = (await dbAll('pricePoints')).find((p) => p.productId === dup?.id);
+    const expectedAfter = dupPoint && dupPoint.date >= '2026-09-18' ? 1.9 : 1.85;
+    await mdlg.getByText('Precio tras fusionar').waitFor({ timeout: 5000 });
+    const preview = norm(await mdlg.getByText('Precio tras fusionar').innerText());
+    check(preview.includes(`${fmtEurPrecise(expectedAfter)}/kg`), `el diálogo debería anunciar el precio tras fusionar (${fmtEurPrecise(expectedAfter)}/kg): ${preview}`);
+    if (expectedAfter !== 1.85) check(preview.includes(`ahora ${fmtEurPrecise(1.85)}/kg`) && /Tomates pera maduros/.test(preview), `el diálogo debería explicar el cambio de precio: ${preview}`);
     await shot('fusionar', { fullPage: false });
     await mdlg.getByRole('button', { name: /^Fusionar en/ }).click();
     await mdlg.waitFor({ state: 'detached' });
@@ -987,8 +999,9 @@ try {
     const kept = products.find((p) => p.id === tomato?.id);
     check(!products.some((p) => p.id === dup?.id), 'el duplicado sigue existiendo');
     check(kept?.aliases.some((a) => fold(a) === fold('Tomates pera maduros')), `el nombre del duplicado debería pasar a alias (${kept?.aliases.join(' | ')})`);
-    check(near(kept?.pricePerBase, 1.85, 1e-6), `el precio vigente del tomate debería seguir en 1,85 (compra más reciente) y es ${kept?.pricePerBase}`);
+    check(near(kept?.pricePerBase, expectedAfter, 1e-6), `el precio vigente del tomate debería ser ${expectedAfter} (el anunciado) y es ${kept?.pricePerBase}`);
     const pts = (await dbAll('pricePoints')).filter((p) => p.productId === tomato?.id);
+    check(pts.length === 2 && pts.some((p) => p.invoiceId === ids.fruta && near(p.pricePerBase, 1.85, 1e-6)), 'el histórico del tomate debería conservar el punto de la factura y sumar el del duplicado');
     note(`puntos del tomate tras fusionar: ${pts.map((p) => `${p.date} ${p.pricePerBase} ${p.source}`).join(' · ')}`);
     check(products.length === 27, `tras fusionar deberían quedar 27 ingredientes (${products.length})`);
   });
