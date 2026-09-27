@@ -19,17 +19,24 @@ import type { OcrResult } from './ocr';
 
 export type Psm = '3' | '4' | '6' | '11';
 
+/** Motor de una pasada: Tesseract (por defecto) o el lector PaddleOCR (redes neuronales, ver paddleOcr.ts). */
+export type OcrEngine = 'tesseract' | 'paddle';
+
 export interface OcrPass {
   id: string;
   psm: Psm;
   binarize: boolean;
   /** Reescalado relativo de la imagen preparada (el modelo LSTM es sensible al tamaño: variar la escala da lecturas distintas). */
   scale?: number;
+  /** Motor que lee esta pasada (por defecto Tesseract; en las de Paddle `psm` no se usa). */
+  engine?: OcrEngine;
 }
 
 /** Motor de OCR: reconoce una imagen en escala de grises con el modo de segmentación indicado. */
 export interface OcrBackend {
   recognize(image: GrayImage, psm: Psm, onProgress?: (fraction: number) => void): Promise<TessPage>;
+  /** Lector PaddleOCR, si está disponible (si falla, las pasadas de Paddle se saltan y siguen las de Tesseract). */
+  recognizePaddle?(image: GrayImage, onProgress?: (fraction: number) => void): Promise<TessPage>;
 }
 
 export const INVOICE_PASSES: readonly OcrPass[] = [
@@ -44,6 +51,15 @@ export const MENU_PASSES: readonly OcrPass[] = [
   { id: 'columna-binarizada', psm: '4', binarize: true },
   { id: 'dispersa', psm: '11', binarize: false },
 ];
+
+/** Pasada del lector PaddleOCR (la primera en las cartas cuando el navegador puede usarlo). */
+export const PADDLE_PASS: OcrPass = { id: 'paddle', psm: '3', binarize: false, engine: 'paddle' };
+
+/** Cartas con el lector PaddleOCR: primero Paddle; Tesseract, como segunda opinión y de reserva. */
+export const MENU_PASSES_PADDLE: readonly OcrPass[] = [PADDLE_PASS, ...MENU_PASSES];
+
+/** Pasadas mínimas con Paddle: 1 = Tesseract sólo si la lectura de Paddle se queda corta. */
+export const MENU_MIN_PASSES_PADDLE = 1;
 
 export interface PreparedPage {
   image: GrayImage;
@@ -86,6 +102,9 @@ export interface PassReport {
   validated: number;
   quality: number;
   ms: number;
+  engine?: OcrEngine;
+  /** La pasada no se ha podido hacer (p. ej. el lector PaddleOCR no ha cargado): motivo. */
+  failed?: string;
 }
 
 /** Reconoce todas las páginas con una pasada y reconstruye las filas. */
@@ -98,9 +117,18 @@ export async function recognizePages(
 ): Promise<OcrResult> {
   const results: { page: TessPage; pageNo: number }[] = [];
   for (let i = 0; i < pages.length; i++) {
-    const read = await backend.recognize(imageFor(pages[i], pass), pass.psm, (f) => onFraction?.((i + Math.min(1, Math.max(0, f))) / pages.length));
-    const scale = pass.scale && Math.abs(pass.scale - 1) > 0.01 ? pass.scale : 1;
-    const page = await withDarkRegions(read, pages[i], backend, scale);
+    const onPage = (f: number) => onFraction?.((i + Math.min(1, Math.max(0, f))) / pages.length);
+    const image = imageFor(pages[i], pass);
+    let page: TessPage;
+    if (pass.engine === 'paddle') {
+      if (!backend.recognizePaddle) throw new Error('Lector PaddleOCR no disponible');
+      // Paddle lee también el texto claro sobre fondo oscuro: no hacen falta las zonas invertidas aparte
+      page = await backend.recognizePaddle(image, onPage);
+    } else {
+      const read = await backend.recognize(image, pass.psm, onPage);
+      const scale = pass.scale && Math.abs(pass.scale - 1) > 0.01 ? pass.scale : 1;
+      page = await withDarkRegions(read, pages[i], backend, scale);
+    }
     results.push({ page, pageNo: i + 1 });
     onFraction?.((i + 1) / pages.length);
   }
@@ -246,46 +274,65 @@ export function menuQuality(menu: ExtractedMenu): number {
   return s;
 }
 
-/** OCR de una carta: se repite con otra segmentación si se han leído pocos platos. */
+/**
+ * OCR de una carta: se repite con otra segmentación (u otro motor) si se han leído pocos platos. Las pasadas de
+ * PaddleOCR se saltan si el motor no está disponible o falla al cargar: la carta se lee igual con Tesseract.
+ */
 export async function ocrMenu(
   pages: PreparedPage[],
   backend: OcrBackend,
   parse: (text: string, ocr: OcrResult) => ExtractedMenu,
   opts: PipelineOptions & {
     minEntries?: number;
+    /** Pasadas que se hacen siempre, aunque la primera ya parezca completa (segunda opinión). Por defecto 1. */
+    minPasses?: number;
     /** Combina las lecturas de varias pasadas (p. ej. `mergeMenuPasses` del parser de cartas). */
     merge?: (menus: ExtractedMenu[]) => ExtractedMenu;
     /** Calidad de una lectura (por defecto `menuQuality` de este módulo). */
     quality?: (menu: ExtractedMenu) => number;
   } = {},
 ): Promise<MenuOcrOutcome> {
-  const passes = (opts.passes ?? MENU_PASSES).slice(0, Math.max(1, opts.maxPasses ?? Infinity));
+  const requested = (opts.passes ?? MENU_PASSES).filter((p) => p.engine !== 'paddle' || !!backend.recognizePaddle);
+  const passes = requested.slice(0, Math.max(1, opts.maxPasses ?? Infinity));
   const now = opts.now ?? (() => Date.now());
   const base = opts.stage ?? 'Leyendo texto (OCR)…';
   const minEntries = opts.minEntries ?? 4;
+  const minPasses = opts.minPasses ?? 1;
   const quality = opts.quality ?? menuQuality;
   const reports: PassReport[] = [];
   const menus: ExtractedMenu[] = [];
   let best: { menu: ExtractedMenu; ocr: OcrResult; q: number } | undefined;
   let result: ExtractedMenu | undefined;
+  let lastError: unknown;
   for (let k = 0; k < passes.length; k++) {
     const pass = passes[k];
     const t0 = now();
-    const stage = k === 0 ? base : 'Segunda lectura de la carta…';
-    const from = k === 0 ? 0 : 0.8 + (0.2 * (k - 1)) / Math.max(1, passes.length - 1);
-    const to = k === 0 ? 0.8 : 0.8 + (0.2 * k) / Math.max(1, passes.length - 1);
-    const ocr = await recognizePages(pages, backend, pass, 'columns', (f) => opts.onProgress?.({ stage, progress: from + (to - from) * f }));
+    // Tramos de la barra por pasada HECHA (si falla la carga de Paddle, la de Tesseract ocupa el tramo principal)
+    const n = menus.length;
+    const stage = n === 0 ? base : 'Segunda lectura de la carta…';
+    const from = n === 0 ? 0 : 0.8 + (0.2 * (n - 1)) / Math.max(1, passes.length - 1);
+    const to = n === 0 ? 0.8 : 0.8 + (0.2 * n) / Math.max(1, passes.length - 1);
+    let ocr: OcrResult;
+    try {
+      ocr = await recognizePages(pages, backend, pass, 'columns', (f) => opts.onProgress?.({ stage, progress: from + (to - from) * f }));
+    } catch (err) {
+      // Sólo el lector PaddleOCR es prescindible: un fallo de Tesseract se propaga como siempre
+      if (pass.engine !== 'paddle') throw err;
+      lastError = err;
+      reports.push({ id: pass.id, psm: pass.psm, binarize: pass.binarize, lines: 0, validated: 0, quality: 0, ms: now() - t0, engine: 'paddle', failed: err instanceof Error ? err.message : String(err) });
+      continue;
+    }
     const menu = parse(ocr.text, ocr);
     menus.push(menu);
     const q = quality(menu);
     const priced = menu.entries.filter((e) => e.price !== undefined && e.price > 0);
-    reports.push({ id: pass.id, psm: pass.psm, binarize: pass.binarize, lines: menu.entries.length, validated: priced.length, quality: q, ms: now() - t0 });
+    reports.push({ id: pass.id, psm: pass.psm, binarize: pass.binarize, lines: menu.entries.length, validated: priced.length, quality: q, ms: now() - t0, engine: pass.engine ?? 'tesseract' });
     if (!best || q > best.q) best = { menu, ocr, q };
     result = opts.merge && menus.length > 1 ? opts.merge(menus) : best.menu;
     const pricedAll = result.entries.filter((e) => e.price !== undefined && e.price > 0);
     const avgConf = pricedAll.length ? pricedAll.reduce((s, e) => s + (e.confidence ?? 0.7), 0) / pricedAll.length : 0;
-    if (pricedAll.length >= minEntries && avgConf >= 0.6) break;
+    if (menus.length >= minPasses && pricedAll.length >= minEntries && avgConf >= 0.6) break;
   }
-  if (!best || !result) throw new Error('No se ha podido leer la carta');
+  if (!best || !result) throw lastError instanceof Error ? lastError : new Error('No se ha podido leer la carta');
   return { menu: { ...result, method: 'ocr', rawText: best.ocr.text }, ocr: best.ocr, passes: reports };
 }

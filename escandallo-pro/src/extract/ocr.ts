@@ -3,6 +3,9 @@ import type { PdfTextLine } from './pdf';
 import { encodePgm, grayToRgba, rgbaToGray, stretchContrast, type GrayImage, type OcrPrepOptions } from './imageOps';
 import { ocrPagesToResult, type LayoutMode, type TessPage } from './ocrLayout';
 import {
+  MENU_MIN_PASSES_PADDLE,
+  MENU_PASSES,
+  MENU_PASSES_PADDLE,
   ocrInvoice,
   ocrMenu,
   preparePages,
@@ -14,12 +17,16 @@ import {
   type PreparedPage,
   type Psm,
 } from './ocrPipeline';
+import { getPaddleEngine, paddleSupported, terminatePaddle } from './paddleEngine';
 import type { PrepRequest, PrepResponse } from './prep.worker';
 
 /**
- * OCR local con tesseract.js (idioma 'spa', modelos LSTM "best_int": los más precisos que admite tesseract.js).
+ * OCR local con tesseract.js (idioma 'spa', modelos LSTM "best_int": los más precisos que admite tesseract.js) y, para
+ * las cartas, el lector PaddleOCR (PP-OCRv5 latino sobre ONNX Runtime Web, ver paddleEngine.ts), que lee mucho mejor
+ * las fotos reales (letra decorativa, pizarras, fotos torcidas o borrosas); Tesseract queda de segunda opinión y de
+ * reserva si el navegador no puede con Paddle.
  * Gratis y en el dispositivo: la imagen nunca sale del navegador. Se carga bajo demanda (import dinámico) porque pesa;
- * el modelo de idioma se descarga la primera vez y el service worker lo deja en caché para trabajar sin conexión.
+ * los modelos se descargan la primera vez y quedan en caché para trabajar sin conexión.
  *
  * Este módulo es el adaptador del navegador (canvas + worker de Tesseract). La lógica de verdad es pura y está en
  * `imageOps.ts` (preparación de la imagen), `ocrLayout.ts` (filas a partir de las palabras) y `ocrPipeline.ts`
@@ -117,8 +124,9 @@ function scheduleIdle(): void {
   idleTimer = setTimeout(() => void terminateOcr(), IDLE_MS);
 }
 
-/** Libera el worker de Tesseract (memoria). Se vuelve a crear solo cuando haga falta. */
+/** Libera los lectores (Tesseract y PaddleOCR) y su memoria. Se vuelven a crear solos cuando haga falta. */
 export async function terminateOcr(): Promise<void> {
+  terminatePaddle();
   if (idleTimer) clearTimeout(idleTimer);
   idleTimer = undefined;
   const p = workerPromise;
@@ -147,9 +155,12 @@ const LOAD_STAGES: Record<string, string> = {
   'initializing api': 'Preparando el lector de texto…',
 };
 
-/** Motor del navegador: imagen en escala de grises → PGM → Tesseract (salida por bloques con cajas). */
-function browserBackend(onLoad?: ProgressFn): OcrBackend {
-  return {
+/**
+ * Motor del navegador: imagen en escala de grises → PGM → Tesseract (salida por bloques con cajas) y, si se pide y el
+ * navegador puede, el lector PaddleOCR en su worker.
+ */
+function browserBackend(onLoad?: ProgressFn, opts: { paddle?: boolean } = {}): OcrBackend {
+  const backend: OcrBackend = {
     async recognize(image: GrayImage, psm: Psm, onProgress?: (fraction: number) => void): Promise<TessPage> {
       progressSink = (m) => {
         if (m.status === 'recognizing text') onProgress?.(m.progress);
@@ -170,6 +181,10 @@ function browserBackend(onLoad?: ProgressFn): OcrBackend {
       }
     },
   };
+  if (opts.paddle && paddleSupported()) {
+    backend.recognizePaddle = async (image, onProgress) => (await getPaddleEngine(onLoad)).recognize(image, onProgress);
+  }
+  return backend;
 }
 
 // ───────────────────────────── Decodificación de imágenes ─────────────────────────────
@@ -365,18 +380,32 @@ export async function ocrInvoiceImages(images: Blob[], onProgress?: ProgressFn, 
   return enqueue(() => ocrInvoice(pages, browserBackend(p), { onProgress: p, maxPasses: opts.maxPasses }));
 }
 
-/** OCR de una carta con detección de columnas; `parse` interpreta el texto y las cajas (parser de cartas). */
+/**
+ * OCR de una carta con detección de columnas; `parse` interpreta el texto y las cajas (parser de cartas).
+ * Motor: PaddleOCR primero (si el navegador puede) y Tesseract como segunda opinión y de reserva; `engine: 'tesseract'`
+ * lee sólo con Tesseract.
+ */
 export async function ocrMenuImages(
   images: Blob[],
   parse: (text: string, ocr: OcrResult) => ExtractedMenu,
   onProgress?: ProgressFn,
-  opts: { maxPasses?: number; prep?: OcrPrepOptions; merge?: (menus: ExtractedMenu[]) => ExtractedMenu; quality?: (menu: ExtractedMenu) => number } = {},
+  opts: {
+    maxPasses?: number;
+    prep?: OcrPrepOptions;
+    merge?: (menus: ExtractedMenu[]) => ExtractedMenu;
+    quality?: (menu: ExtractedMenu) => number;
+    engine?: 'auto' | 'tesseract';
+  } = {},
 ): Promise<MenuOcrOutcome> {
   if (!images.length) throw new Error('No hay imágenes que leer');
   // Cartas: pizarras y cartas oscuras se invierten antes de leer (texto oscuro sobre fondo claro).
   const pages = await preparedFrom(images, slice(onProgress, 0, 0.1), { normalizePolarity: true, ...opts.prep });
   const p = slice(onProgress, 0.1, 1);
-  return enqueue(() => ocrMenu(pages, browserBackend(p), parse, { onProgress: p, maxPasses: opts.maxPasses, merge: opts.merge, quality: opts.quality }));
+  const paddle = opts.engine !== 'tesseract' && paddleSupported();
+  const passes = paddle ? MENU_PASSES_PADDLE : MENU_PASSES;
+  return enqueue(() =>
+    ocrMenu(pages, browserBackend(p, { paddle }), parse, { onProgress: p, passes, minPasses: paddle ? MENU_MIN_PASSES_PADDLE : 1, maxPasses: opts.maxPasses, merge: opts.merge, quality: opts.quality }),
+  );
 }
 
 /** Convierte una salida de Tesseract ya obtenida en OcrResult (útil para reprocesar sin volver a reconocer). */

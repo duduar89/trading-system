@@ -103,7 +103,7 @@ async function encodeJpeg(bitmap: ImageBitmap, width: number, height: number, qu
   ctx.fillRect(0, 0, width, height);
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(bitmap, 0, 0, width, height);
-  return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('No se pudo codificar la imagen'))), 'image/jpeg', quality));
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('No se ha podido codificar la imagen'))), 'image/jpeg', quality));
 }
 
 /**
