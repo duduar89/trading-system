@@ -171,7 +171,8 @@ export function costItem(item: RecipeItem, ctx: CostingContext, stack: Set<ID> =
     let baseUnit: BaseUnit;
     let pricePerBase: number;
     let yieldQty = sub.yieldQty && sub.yieldQty > 0 ? sub.yieldQty : undefined;
-    let yieldUnit: BaseUnit | undefined = sub.yieldUnit;
+    // Rendimiento sin unidad: kg, lo mismo que muestra su ficha ("€ por kg producido").
+    let yieldUnit: BaseUnit | undefined = sub.yieldUnit ?? (yieldQty ? 'kg' : undefined);
     if (!yieldQty) {
       // Sin rendimiento declarado: si piden en peso/volumen, estimamos por la suma de lo servido.
       if (dimensionOf(item.unit) !== 'count') {
@@ -242,6 +243,9 @@ export function costItem(item: RecipeItem, ctx: CostingContext, stack: Set<ID> =
   if (waste.source === 'prueba' && waste.yieldResult && product.baseUnit === 'kg') {
     // Coste real por kg aprovechable (descuenta subproductos) aplicado al peso neto.
     cost = q.net * waste.yieldResult.costPerUsableKg;
+    if (price > 0 && waste.yieldResult.byproductValue >= waste.yieldResult.grossCost) {
+      warnings.push('La prueba de rendimiento valora los subproductos por encima del coste de la pieza: revísala');
+    }
   } else {
     cost = q.gross * price;
   }
@@ -375,11 +379,24 @@ export function costAllDishes(ctx: CostingContext): Map<ID, DishCost> {
 
 export type FoodCostStatus = 'ok' | 'warn' | 'bad' | 'none';
 
-/** Semáforo de food cost: verde ≤ objetivo, ámbar ≤ umbral de atención, rojo por encima. */
+/**
+ * Porcentaje redondeado a la décima exactamente como se muestra en la app y en el Excel ("30,0 %").
+ * Absorbe el ruido de coma flotante (4,50 € sobre 16,50 € con 10 % de IVA da 30,000000000000004 %).
+ */
+export function roundPct(pct: number): number {
+  return Number.isFinite(pct) ? Number(pct.toFixed(1)) : pct;
+}
+
+/**
+ * Semáforo de food cost: verde ≤ objetivo, ámbar ≤ umbral de atención, rojo por encima.
+ * Clasifica la cifra que ve el usuario (redondeada a la décima): un plato al PVP sugerido, o que muestra "30,0 %"
+ * con un objetivo del 30 %, nunca sale en ámbar.
+ */
 export function foodCostStatus(pct: number | undefined, target: number, warning: number): FoodCostStatus {
   if (pct == null || !Number.isFinite(pct)) return 'none';
-  if (pct <= target) return 'ok';
-  if (pct <= warning) return 'warn';
+  const shown = roundPct(pct);
+  if (shown <= target) return 'ok';
+  if (shown <= warning) return 'warn';
   return 'bad';
 }
 

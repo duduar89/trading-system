@@ -1,0 +1,67 @@
+{
+  "id": "m06",
+  "kind": "menu",
+  "features": [
+    "carta de vinos",
+    "columnas Copa | Botella (copa vacía en muchos vinos)",
+    "añadas (2017…2024) en el nombre",
+    "subsecciones D.O."
+  ],
+  "entries": [
+    {
+      "section": "Tintos · D.O.Ca. Rioja",
+      "name": "Viña Ardanza Reserva 2017",
+      "price": 38
+    },
+    {
+      "section": "Tintos · D.O.Ca. Rioja",
+      "name": "Marqués de Riscal Reserva 2019",
+      "price": 29.5
+    },
+    {
+      "section": "Tintos · D.O.Ca. Rioja",
+      "name": "Luis Cañas Crianza 2021",
+      "price": 22
+    },
+    {
+      "section": "Tintos · D.O. Ribera del Duero",
+      "name": "Protos Roble 2022",
+      "price": 19.5
+    },
+    {
+      "section": "Tintos · D.O. Ribera del Duero",
+      "name": "Pago de Carraovejas 2021",
+      "price": 58
+    },
+    {
+      "section": "Tintos · D.O. Ribera del Duero",
+      "name": "Emilio Moro 2021",
+      "price": 32
+    },
+    {
+      "section": "Blancos · D.O. Rías Baixas",
+      "name": "Pazo de Señoráns 2023",
+      "price": 27
+    },
+    {
+      "section": "Blancos · D.O. Rías Baixas",
+      "name": "Martín Códax 2024",
+      "price": 18.5
+    },
+    {
+      "section": "Blancos · D.O. Rueda",
+      "name": "José Pariente Verdejo 2024",
+      "price": 17
+    },
+    {
+      "section": "Espumosos · D.O. Cava",
+      "name": "Juvé & Camps Reserva de la Familia",
+      "price": 26
+    },
+    {
+      "section": "Espumosos · D.O. Cava",
+      "name": "Gramona Imperial Gran Reserva",
+      "price": 34
+    }
+  ]
+}

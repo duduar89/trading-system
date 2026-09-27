@@ -165,8 +165,12 @@ export function ImportPriceListModal({
     }
     setResult(res);
     setStep('done');
-    if (res.failed) toast.error(`${res.failed} filas no se pudieron importar`);
-    else toast.success('Tarifa importada', `${res.updated} precios actualizados · ${res.created} ingredientes nuevos`);
+    if (res.failed) toast.error(res.failed === 1 ? '1 fila no se pudo importar' : `${res.failed} filas no se pudieron importar`);
+    else
+      toast.success(
+        'Tarifa importada',
+        `${res.updated} ${res.updated === 1 ? 'precio actualizado' : 'precios actualizados'} · ${res.created} ${res.created === 1 ? 'ingrediente nuevo' : 'ingredientes nuevos'}`,
+      );
   };
 
   return (
@@ -297,9 +301,17 @@ export function ImportPriceListModal({
 
           <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-2 p-3.5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap gap-1.5">
-              <Badge tone="ok">{fmtNum(plan.updates, 0)} actualizan precio</Badge>
-              <Badge tone="brand">{fmtNum(plan.creates, 0)} ingredientes nuevos</Badge>
-              {plan.skips > 0 && <Badge>{fmtNum(plan.skips, 0)} omitidas</Badge>}
+              <Badge tone="ok">
+                {fmtNum(plan.updates, 0)} {plan.updates === 1 ? 'actualiza precio' : 'actualizan precio'}
+              </Badge>
+              <Badge tone="brand">
+                {fmtNum(plan.creates, 0)} {plan.creates === 1 ? 'ingrediente nuevo' : 'ingredientes nuevos'}
+              </Badge>
+              {plan.skips > 0 && (
+                <Badge>
+                  {fmtNum(plan.skips, 0)} {plan.skips === 1 ? 'omitida' : 'omitidas'}
+                </Badge>
+              )}
             </div>
             <div className="sm:max-w-xs">
               <Switch
@@ -398,15 +410,15 @@ export function ImportPriceListModal({
           <div className="mx-auto mt-5 grid max-w-sm grid-cols-2 gap-2">
             <div className="rounded-2xl border border-line bg-surface p-3">
               <div className="font-display text-3xl font-extrabold text-ink">{fmtNum(result.updated, 0)}</div>
-              <div className="text-xs font-semibold text-muted">precios actualizados</div>
+              <div className="text-xs font-semibold text-muted">{result.updated === 1 ? 'precio actualizado' : 'precios actualizados'}</div>
             </div>
             <div className="rounded-2xl border border-line bg-surface p-3">
               <div className="font-display text-3xl font-extrabold text-gradient-brand">{fmtNum(result.created, 0)}</div>
-              <div className="text-xs font-semibold text-muted">ingredientes nuevos</div>
+              <div className="text-xs font-semibold text-muted">{result.created === 1 ? 'ingrediente nuevo' : 'ingredientes nuevos'}</div>
             </div>
           </div>
           {result.failed > 0 && (
-            <p className={clsx('mt-4 text-sm font-semibold text-bad')}>{result.failed} filas no se pudieron importar.</p>
+            <p className={clsx('mt-4 text-sm font-semibold text-bad')}>{result.failed === 1 ? '1 fila no se pudo importar.' : `${result.failed} filas no se pudieron importar.`}</p>
           )}
           <p className="mx-auto mt-4 max-w-sm text-sm text-muted">
             Hemos rellenado mermas y alérgenos típicos de los ingredientes nuevos. Tus escandallos ya usan los precios nuevos.

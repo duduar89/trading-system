@@ -1,0 +1,106 @@
+{
+  "id": "inv02-carniceria-uds-kilos-lotes",
+  "kind": "invoice",
+  "features": [
+    "Código | Descripción | Uds | Kilos | Precio | Dto | Importe | IVA",
+    "sublíneas de lote y caducidad",
+    "CIF del cliente antes que el del proveedor",
+    "CIF del proveedor sólo en el pie",
+    "pesos con 3 decimales"
+  ],
+  "header": {
+    "supplierName": "Cárnicas Hermanos Ortega S.A.",
+    "supplierTaxId": "A45182276",
+    "number": "CHO/26/11873",
+    "date": "2026-09-19",
+    "subtotal": 635.19,
+    "vatTotal": 63.52,
+    "total": 698.71
+  },
+  "lines": [
+    {
+      "description": "SOLOMILLO DE TERNERA",
+      "code": "3001",
+      "quantity": 4.38,
+      "unit": "kg",
+      "unitPrice": 32.5,
+      "total": 142.35,
+      "vatPct": 10
+    },
+    {
+      "description": "ENTRECOT DE VACA MADURADA",
+      "code": "3005",
+      "quantity": 6.215,
+      "unit": "kg",
+      "unitPrice": 27.9,
+      "discountPct": 5,
+      "total": 164.73,
+      "vatPct": 10
+    },
+    {
+      "description": "CARRILLERA DE CERDO IBÉRICO",
+      "code": "3012",
+      "quantity": 3.96,
+      "unit": "kg",
+      "unitPrice": 10.4,
+      "total": 41.18,
+      "vatPct": 10
+    },
+    {
+      "description": "SECRETO IBÉRICO",
+      "code": "3020",
+      "quantity": 2.845,
+      "unit": "kg",
+      "unitPrice": 17.25,
+      "total": 49.08,
+      "vatPct": 10
+    },
+    {
+      "description": "PECHUGA DE POLLO FILETEADA",
+      "code": "3031",
+      "quantity": 5,
+      "unit": "kg",
+      "unitPrice": 7.15,
+      "total": 35.75,
+      "vatPct": 10
+    },
+    {
+      "description": "PIERNA DE CORDERO LECHAL",
+      "code": "3040",
+      "quantity": 5.47,
+      "unit": "kg",
+      "unitPrice": 21.8,
+      "total": 119.25,
+      "vatPct": 10
+    },
+    {
+      "description": "CHORIZO FRESCO PARRILLA",
+      "code": "3052",
+      "quantity": 2.3,
+      "unit": "kg",
+      "unitPrice": 8.95,
+      "total": 20.59,
+      "vatPct": 10
+    },
+    {
+      "description": "HAMBURGUESA VACUNO 180G",
+      "code": "3060",
+      "quantity": 4.32,
+      "unit": "kg",
+      "unitPrice": 11.6,
+      "discountPct": 3,
+      "total": 48.61,
+      "vatPct": 10
+    },
+    {
+      "description": "MORCILLA DE BURGOS",
+      "code": "3071",
+      "quantity": 1.75,
+      "unit": "kg",
+      "unitPrice": 7.8,
+      "total": 13.65,
+      "vatPct": 10
+    }
+  ],
+  "extras": []
+}

@@ -1,0 +1,378 @@
+{
+  "id": "inv01-ultramarinos-2-paginas",
+  "kind": "invoice",
+  "features": [
+    "39 líneas en 2 páginas",
+    "Suma y sigue / Suma anterior",
+    "IVA por línea (%)",
+    "desglose 4/10/21",
+    "cabecera repetida en la página 2"
+  ],
+  "header": {
+    "supplierName": "Ultramarinos y Distribuciones Levante S.L.",
+    "supplierTaxId": "B96287412",
+    "number": "FL-2026/004871",
+    "date": "2026-09-17",
+    "subtotal": 1102.78,
+    "vatTotal": 101.58,
+    "total": 1204.36
+  },
+  "lines": [
+    {
+      "description": "ACEITE OLIVA VIRGEN EXTRA GARRAFA 5L",
+      "code": "100231",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 38.9,
+      "discountPct": 3,
+      "total": 226.4,
+      "vatPct": 4
+    },
+    {
+      "description": "ACEITE GIRASOL ALTO OLEICO 10L",
+      "code": "100245",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 24.75,
+      "total": 49.5,
+      "vatPct": 4
+    },
+    {
+      "description": "ARROZ BOMBA D.O. VALENCIA 1KG",
+      "code": "110012",
+      "quantity": 10,
+      "unit": "ud",
+      "unitPrice": 4.15,
+      "total": 41.5,
+      "vatPct": 4
+    },
+    {
+      "description": "ARROZ REDONDO SACO 5KG",
+      "code": "110020",
+      "quantity": 4,
+      "unit": "ud",
+      "unitPrice": 7.2,
+      "total": 28.8,
+      "vatPct": 4
+    },
+    {
+      "description": "HARINA DE TRIGO T-45 SACO 25KG",
+      "code": "120003",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 17.8,
+      "total": 17.8,
+      "vatPct": 4
+    },
+    {
+      "description": "PAN RALLADO 1KG",
+      "code": "120010",
+      "quantity": 3,
+      "unit": "ud",
+      "unitPrice": 1.95,
+      "total": 5.85,
+      "vatPct": 4
+    },
+    {
+      "description": "AZÚCAR BLANCO 1KG",
+      "code": "130101",
+      "quantity": 10,
+      "unit": "ud",
+      "unitPrice": 1.19,
+      "total": 11.9,
+      "vatPct": 10
+    },
+    {
+      "description": "SAL MARINA GRUESA 1KG",
+      "code": "130115",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 0.58,
+      "total": 3.48,
+      "vatPct": 10
+    },
+    {
+      "description": "GARBANZO PEDROSILLANO 1KG",
+      "code": "140220",
+      "quantity": 5,
+      "unit": "ud",
+      "unitPrice": 3.4,
+      "total": 17,
+      "vatPct": 4
+    },
+    {
+      "description": "LENTEJA PARDINA 1KG",
+      "code": "140225",
+      "quantity": 5,
+      "unit": "ud",
+      "unitPrice": 2.85,
+      "total": 14.25,
+      "vatPct": 4
+    },
+    {
+      "description": "ALUBIA BLANCA 1KG",
+      "code": "140230",
+      "quantity": 3,
+      "unit": "ud",
+      "unitPrice": 3.1,
+      "total": 9.3,
+      "vatPct": 4
+    },
+    {
+      "description": "TOMATE TRITURADO LATA 5KG",
+      "code": "150301",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 6.35,
+      "discountPct": 5,
+      "total": 36.2,
+      "vatPct": 10
+    },
+    {
+      "description": "TOMATE FRITO BRIK 2KG",
+      "code": "150310",
+      "quantity": 4,
+      "unit": "ud",
+      "unitPrice": 4.9,
+      "total": 19.6,
+      "vatPct": 10
+    },
+    {
+      "description": "PIMIENTO DEL PIQUILLO LATA 3KG",
+      "code": "150402",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 16.4,
+      "total": 32.8,
+      "vatPct": 10
+    },
+    {
+      "description": "ATÚN CLARO EN ACEITE LATA 1KG",
+      "code": "160110",
+      "quantity": 4,
+      "unit": "ud",
+      "unitPrice": 12.95,
+      "total": 51.8,
+      "vatPct": 10
+    },
+    {
+      "description": "ANCHOA CANTÁBRICO 00 LATA 500G",
+      "code": "160125",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 29.5,
+      "total": 59,
+      "vatPct": 10
+    },
+    {
+      "description": "VINAGRE DE JEREZ 1L",
+      "code": "170001",
+      "quantity": 3,
+      "unit": "ud",
+      "unitPrice": 4.25,
+      "total": 12.75,
+      "vatPct": 10
+    },
+    {
+      "description": "VINAGRE BALSÁMICO MÓDENA 500ML",
+      "code": "170010",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 3.6,
+      "total": 7.2,
+      "vatPct": 10
+    },
+    {
+      "description": "PIMENTÓN DE LA VERA DULCE 750G",
+      "code": "180020",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 11.2,
+      "total": 11.2,
+      "vatPct": 10
+    },
+    {
+      "description": "COMINO MOLIDO 500G",
+      "code": "180025",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 6.8,
+      "total": 6.8,
+      "vatPct": 10
+    },
+    {
+      "description": "PIMIENTA NEGRA GRANO 1KG",
+      "code": "180031",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 18.9,
+      "total": 18.9,
+      "vatPct": 10
+    },
+    {
+      "description": "AZAFRÁN EN HEBRA 5G",
+      "code": "180040",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 14.5,
+      "total": 29,
+      "vatPct": 10
+    },
+    {
+      "description": "LAUREL HOJA 100G",
+      "code": "180052",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 2.1,
+      "total": 4.2,
+      "vatPct": 10
+    },
+    {
+      "description": "CALDO DE PESCADO BRIK 1L",
+      "code": "190101",
+      "quantity": 12,
+      "unit": "ud",
+      "unitPrice": 1.65,
+      "total": 19.8,
+      "vatPct": 10
+    },
+    {
+      "description": "CALDO DE POLLO BRIK 1L",
+      "code": "190110",
+      "quantity": 12,
+      "unit": "ud",
+      "unitPrice": 1.45,
+      "total": 17.4,
+      "vatPct": 10
+    },
+    {
+      "description": "MAYONESA CUBO 3,6KG",
+      "code": "200015",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 9.8,
+      "total": 19.6,
+      "vatPct": 10
+    },
+    {
+      "description": "KETCHUP DOSIFICADOR 1,8KG",
+      "code": "200020",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 6.15,
+      "total": 12.3,
+      "vatPct": 10
+    },
+    {
+      "description": "MOSTAZA DIJON 1KG",
+      "code": "200030",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 5.9,
+      "total": 5.9,
+      "vatPct": 10
+    },
+    {
+      "description": "CHOCOLATE COBERTURA 70% 1KG",
+      "code": "210001",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 12.4,
+      "total": 24.8,
+      "vatPct": 10
+    },
+    {
+      "description": "LEVADURA FRESCA 500G",
+      "code": "210012",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 2.35,
+      "total": 4.7,
+      "vatPct": 4
+    },
+    {
+      "description": "NUECES PELADAS 1KG",
+      "code": "220105",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 13.6,
+      "total": 13.6,
+      "vatPct": 10
+    },
+    {
+      "description": "ALMENDRA MARCONA CRUDA 1KG",
+      "code": "220110",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 16.9,
+      "total": 16.9,
+      "vatPct": 10
+    },
+    {
+      "description": "CAFÉ GRANO NATURAL 1KG",
+      "code": "230002",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 15.8,
+      "discountPct": 10,
+      "total": 85.32,
+      "vatPct": 10
+    },
+    {
+      "description": "AZÚCAR SOBRES 1000 UDS",
+      "code": "230010",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 9.95,
+      "total": 19.9,
+      "vatPct": 10
+    },
+    {
+      "description": "SERVILLETA PAPEL 40X40 2C 1200 UDS",
+      "code": "240001",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 21.3,
+      "total": 42.6,
+      "vatPct": 21
+    },
+    {
+      "description": "FILM TRANSPARENTE 300M",
+      "code": "240010",
+      "quantity": 3,
+      "unit": "ud",
+      "unitPrice": 8.45,
+      "total": 25.35,
+      "vatPct": 21
+    },
+    {
+      "description": "PAPEL ALUMINIO 200M",
+      "code": "240020",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 11.9,
+      "total": 23.8,
+      "vatPct": 21
+    },
+    {
+      "description": "LAVAVAJILLAS MÁQUINA 20L",
+      "code": "250001",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 34.5,
+      "discountPct": 5,
+      "total": 32.78,
+      "vatPct": 21
+    },
+    {
+      "description": "ABRILLANTADOR MÁQUINA 10L",
+      "code": "250010",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 22.8,
+      "total": 22.8,
+      "vatPct": 21
+    }
+  ],
+  "extras": []
+}

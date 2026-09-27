@@ -167,6 +167,8 @@ function foodCostRules(ws: Worksheet, ref: string, firstCell: string, target: nu
   const t = typeof target === 'number' ? String(Math.round(target * 1e6) / 1e6) : target;
   const w = String(Math.round((warningPct / 100) * 1e6) / 1e6);
   const upper = `MAX(${t},${w})`;
+  // Se compara la cifra mostrada (formato 0,0 % = 3 decimales en tanto por uno), igual que core/costing.foodCostStatus.
+  const shown = `ROUND(${firstCell},3)`;
   const style = (s: Exclude<FoodCostStatus, 'none'>) => ({
     fill: { type: 'pattern' as const, pattern: 'solid' as const, bgColor: { argb: STATUS_COLORS[s].fill } },
     font: { bold: true, color: { argb: STATUS_COLORS[s].font } },
@@ -174,9 +176,9 @@ function foodCostRules(ws: Worksheet, ref: string, firstCell: string, target: nu
   ws.addConditionalFormatting({
     ref,
     rules: [
-      { type: 'expression', priority: 1, formulae: [`AND(ISNUMBER(${firstCell}),${firstCell}<=${t})`], style: style('ok') },
-      { type: 'expression', priority: 2, formulae: [`AND(ISNUMBER(${firstCell}),${firstCell}>${t},${firstCell}<=${upper})`], style: style('warn') },
-      { type: 'expression', priority: 3, formulae: [`AND(ISNUMBER(${firstCell}),${firstCell}>${upper})`], style: style('bad') },
+      { type: 'expression', priority: 1, formulae: [`AND(ISNUMBER(${firstCell}),${shown}<=${t})`], style: style('ok') },
+      { type: 'expression', priority: 2, formulae: [`AND(ISNUMBER(${firstCell}),${shown}>${t},${shown}<=${upper})`], style: style('warn') },
+      { type: 'expression', priority: 3, formulae: [`AND(ISNUMBER(${firstCell}),${shown}>${upper})`], style: style('bad') },
     ],
   });
 }
@@ -315,15 +317,21 @@ function addDishSheet(
     value(ws.getCell(4 + i, 2), v, fmt, bold);
     if (i === 0) ws.getCell(4, 2).alignment = { vertical: 'middle', horizontal: 'left' };
   });
+  // Sin coste (receta vacía o sin precios) el food cost sería 0 % y el margen todo el PVP: se deja en blanco, como en la app.
+  const hasCost = cost.costPerPortion > 0;
   const rounding = business.priceRounding > 0 ? business.priceRounding : 0;
   const suggestedFormula = rounding
     ? `IF(AND(B9>0,H5>0),CEILING(ROUND(B9/H5*(1+B7),6),${rounding}),"")`
     : 'IF(AND(B9>0,H5>0),ROUND(B9/H5*(1+B7),2),"")';
   const right: [string, Cell['value'], string?, boolean?][] = [
-    ['Food cost', formula('IF(AND(ISNUMBER(B8),B8>0),B9/B8,"")', cost.foodCostPct != null ? cost.foodCostPct / 100 : undefined), FMT_PCT, true],
+    ['Food cost', formula('IF(AND(ISNUMBER(B8),B8>0,B9>0),B9/B8,"")', hasCost && cost.foodCostPct != null ? cost.foodCostPct / 100 : undefined), FMT_PCT, true],
     ['Food cost objetivo', target, FMT_PCT],
-    ['Margen bruto por ración', formula('IF(ISNUMBER(B8),B8-B9,"")', num(cost.grossMargin)), FMT_EUR, true],
-    ['Margen bruto (%)', formula('IF(AND(ISNUMBER(B8),B8>0),(B8-B9)/B8,"")', cost.grossMarginPct != null ? cost.grossMarginPct / 100 : undefined), FMT_PCT],
+    ['Margen bruto por ración', formula('IF(AND(ISNUMBER(B8),B9>0),B8-B9,"")', hasCost ? num(cost.grossMargin) : undefined), FMT_EUR, true],
+    [
+      'Margen bruto (%)',
+      formula('IF(AND(ISNUMBER(B8),B8>0,B9>0),(B8-B9)/B8,"")', hasCost && cost.grossMarginPct != null ? cost.grossMarginPct / 100 : undefined),
+      FMT_PCT,
+    ],
     ['PVP sugerido (IVA incl.)', formula(suggestedFormula, num(cost.suggestedPrice)), FMT_EUR],
     ['Merma por ración (kg)', cost.wasteKgPerPortion, FMT_QTY],
     ['Coste de la merma por ración', formula(`IF(B5>0,SUM(P${firstLine}:P${lastLine})/B5,0)`, cost.wasteCostPerPortion), FMT_EUR],
@@ -349,8 +357,11 @@ function addDishSheet(
   if (dish.kind === 'elaboracion') {
     const perUnit = num(cost.pricePerYieldUnit);
     info2.value =
-      dish.yieldQty && dish.yieldUnit
-        ? `${String(dish.yieldQty).replace('.', ',')} ${dish.yieldUnit}${perUnit != null ? ` · ${perUnit.toFixed(2).replace('.', ',')} €/${dish.yieldUnit}` : ''}`
+      // Sin unidad, el rendimiento se entiende en kg (igual que en la app); por debajo de 1 € con 4 decimales, como la app.
+      dish.yieldQty && dish.yieldQty > 0
+        ? `${String(dish.yieldQty).replace('.', ',')} ${dish.yieldUnit ?? 'kg'}${
+            perUnit != null ? ` · ${perUnit.toFixed(Math.abs(perUnit) >= 1 ? 2 : 4).replace('.', ',')} €/${dish.yieldUnit ?? 'kg'}` : ''
+          }`
         : 'Sin rendimiento indicado (se usa por raciones)';
   } else {
     const pct = Math.round(cost.completeness * 100);
@@ -504,7 +515,7 @@ export async function exportEscandallosXlsx(args: {
   pageFooter(summary, `Escandallos · ${workspace.name} · Escandallo Pro`);
   const platos = infos.filter((i) => i.dish.kind === 'plato');
   // Misma población que la fórmula AVERAGE de la fila de medias (las filas sin PVP no cuentan).
-  const withPrice = infos.filter((i) => i.cost.foodCostPct != null);
+  const withPrice = infos.filter((i) => i.cost.foodCostPct != null && i.cost.costPerPortion > 0);
   const avgFc = withPrice.length ? withPrice.reduce((s, i) => s + (i.cost.foodCostPct ?? 0), 0) / withPrice.length : undefined;
   titleBlock(
     summary,
@@ -521,6 +532,7 @@ export async function exportEscandallosXlsx(args: {
     const { dish, cost } = info;
     const ref = sheetRef(info.sheet);
     const vat = (dish.saleVatPct ?? business.defaultSaleVatPct) / 100;
+    const hasCost = cost.costPerPortion > 0;
     const values: [Cell['value'], string?][] = [
       [sheetLink(info.sheet, dish.name, dish.kind === 'plato' ? 'Abrir la ficha del plato' : 'Abrir la ficha de la elaboración')],
       [dish.kind === 'plato' ? 'Plato' : 'Elaboración'],
@@ -530,10 +542,13 @@ export async function exportEscandallosXlsx(args: {
       [vat, '0%'],
       [formula(`IF(AND(ISNUMBER(E${r}),E${r}>0),E${r}/(1+F${r}),"")`, num(cost.netPrice)), FMT_EUR],
       [formula(`${ref}!${info.costCell}`, cost.costPerPortion), FMT_EUR],
-      [formula(`IF(AND(ISNUMBER(G${r}),G${r}>0),H${r}/G${r},"")`, cost.foodCostPct != null ? cost.foodCostPct / 100 : undefined), FMT_PCT],
+      [formula(`IF(AND(ISNUMBER(G${r}),G${r}>0,H${r}>0),H${r}/G${r},"")`, hasCost && cost.foodCostPct != null ? cost.foodCostPct / 100 : undefined), FMT_PCT],
       [cost.targetFoodCostPct / 100, FMT_PCT],
-      [formula(`IF(ISNUMBER(G${r}),G${r}-H${r},"")`, num(cost.grossMargin)), FMT_EUR],
-      [formula(`IF(AND(ISNUMBER(G${r}),G${r}>0),(G${r}-H${r})/G${r},"")`, cost.grossMarginPct != null ? cost.grossMarginPct / 100 : undefined), FMT_PCT],
+      [formula(`IF(AND(ISNUMBER(G${r}),H${r}>0),G${r}-H${r},"")`, hasCost ? num(cost.grossMargin) : undefined), FMT_EUR],
+      [
+        formula(`IF(AND(ISNUMBER(G${r}),G${r}>0,H${r}>0),(G${r}-H${r})/G${r},"")`, hasCost && cost.grossMarginPct != null ? cost.grossMarginPct / 100 : undefined),
+        FMT_PCT,
+      ],
       [formula(`${ref}!${info.suggestedCell}`, num(cost.suggestedPrice)), FMT_EUR],
       [cost.wasteKgPerPortion, FMT_QTY],
       [cost.wastePct / 100, FMT_PCT],
@@ -565,7 +580,7 @@ export async function exportEscandallosXlsx(args: {
     avgRow.getCell(9).numFmt = FMT_PCT;
     avgRow.getCell(10).value = business.targetFoodCostPct / 100;
     avgRow.getCell(10).numFmt = FMT_PCT;
-    const margins = infos.map((p) => p.cost.grossMargin).filter((m): m is number => m != null);
+    const margins = infos.map((p) => (p.cost.costPerPortion > 0 ? p.cost.grossMargin : undefined)).filter((m): m is number => m != null);
     avgRow.getCell(11).value = formula(`IFERROR(AVERAGE(K${headerRow + 1}:K${lastRow}),"")`, margins.length ? margins.reduce((a, b) => a + b, 0) / margins.length : undefined);
     avgRow.getCell(11).numFmt = FMT_EUR;
     for (let c = 1; c <= headers.length; c++) {

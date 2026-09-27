@@ -1,0 +1,72 @@
+{
+  "id": "inv11-software-precio-antes-unidades",
+  "kind": "invoice",
+  "features": [
+    "Concepto | Precio | Unidades | Subtotal | IVA | Total (con IVA)",
+    "precio antes que la cantidad",
+    "importe con IVA por línea al final",
+    "descripciones en minúsculas con números (80/20, 1.000 uds)",
+    "fecha larga «21 de septiembre de 2026» y fecha de vencimiento",
+    "importes con €"
+  ],
+  "header": {
+    "supplierName": "Café Tostadero Aurora S.L.",
+    "supplierTaxId": "B65922049",
+    "number": "F2026-0317",
+    "date": "2026-09-21",
+    "subtotal": 321.2,
+    "vatTotal": 39.05,
+    "total": 360.25
+  },
+  "lines": [
+    {
+      "description": "Café en grano mezcla 80/20 1 kg",
+      "quantity": 10,
+      "unit": "ud",
+      "unitPrice": 16.5,
+      "total": 165,
+      "vatPct": 10
+    },
+    {
+      "description": "Café descafeinado molido 500 g",
+      "quantity": 4,
+      "unit": "ud",
+      "unitPrice": 9.8,
+      "total": 39.2,
+      "vatPct": 10
+    },
+    {
+      "description": "Azucarillos 8 g (caja 1.000 uds)",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 12.9,
+      "total": 25.8,
+      "vatPct": 10
+    },
+    {
+      "description": "Leche de avena barista 1 L",
+      "quantity": 12,
+      "unit": "ud",
+      "unitPrice": 2.35,
+      "total": 28.2,
+      "vatPct": 10
+    },
+    {
+      "description": "Revisión y limpieza de máquina espresso",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 45,
+      "total": 45,
+      "vatPct": 21
+    },
+    {
+      "description": "Vasos de cartón 8 oz (pack 50)",
+      "quantity": 5,
+      "unit": "ud",
+      "unitPrice": 3.6,
+      "total": 18,
+      "vatPct": 21
+    }
+  ],
+  "extras": []
+}

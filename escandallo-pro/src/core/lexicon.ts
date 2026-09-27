@@ -401,7 +401,7 @@ export const WEAK_EXPANSIONS: Record<string, string[]> = {
 
 // ───────────────────────────── Grupos contradictorios ─────────────────────────────
 
-export type ConflictGroup = 'especie' | 'base' | 'color' | 'grasa' | 'curacion' | 'raza' | 'alimentacion' | 'estado' | 'sabor';
+export type ConflictGroup = 'especie' | 'base' | 'color' | 'grasa' | 'curacion' | 'raza' | 'alimentacion' | 'estado' | 'sabor' | 'uso';
 
 /** Palabra → [grupo, clase]. Dos nombres con clases distintas del mismo grupo (y ninguna común) se contradicen. */
 export const GROUP_MEMBERS: Record<string, [ConflictGroup, string][]> = (() => {
@@ -485,6 +485,9 @@ export const GROUP_MEMBERS: Record<string, [ConflictGroup, string][]> = (() => {
   add('estado', 'congelado', 'congelado');
   add('sabor', 'dulce', 'dulce');
   add('sabor', 'picante', 'picante');
+  // Nata: para montar (≥ 30 % MG) y para cocinar son productos distintos (precio y uso): nunca se sustituyen solas
+  add('uso', 'montar', 'montar');
+  add('uso', 'cocinar', 'cocinar cocina');
   return map;
 })();
 
@@ -499,6 +502,7 @@ export const GROUP_SEVERITY: Record<ConflictGroup, { cap?: number; penalty?: num
   alimentacion: { cap: 0.72 },
   estado: { penalty: 0.05 },
   sabor: { cap: 0.78 },
+  uso: { cap: 0.5 },
 };
 
 /** Valor por defecto de un grupo según el sustantivo principal ("Harina" = harina de trigo; "Aceite" = de oliva). */
@@ -513,6 +517,8 @@ export const GROUP_DEFAULTS: Record<string, Partial<Record<ConflictGroup, string
   azucar: { color: 'blanco' },
   vinagre: { base: 'vino' },
   arroz: { color: 'blanco' },
+  // "Jamón" a secas es jamón serrano: el ibérico cuesta de tres a diez veces más
+  jamon: { raza: 'serrano' },
 };
 
 // ───────────────────────────── Singular y género ─────────────────────────────
@@ -642,6 +648,7 @@ export const DISPLAY_PREFIX: Record<string, string> = {
   casar: 'del',
   temporada: 'de',
   corral: 'de',
+  fuerza: 'de',
 };
 
 /** Sustantivos que llevan "de" + origen: "Solomillo de ternera", "Aceite de oliva", "Harina de trigo". */

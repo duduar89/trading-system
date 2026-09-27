@@ -474,7 +474,8 @@ function MatchCell({
           onPatch({
             matchStatus: 'nuevo',
             productId: undefined,
-            matchScore: undefined,
+            // 0 = «nuevo» elegido a mano: no se vuelve a emparejar solo (ver refreshInvoiceMatches)
+            matchScore: 0,
             suggestedName: name,
             suggestedCategory: category ?? line.suggestedCategory,
           }),

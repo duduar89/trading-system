@@ -5,6 +5,7 @@ import {
   Camera,
   CircleAlert,
   ClipboardList,
+  Copy,
   Eye,
   FileSpreadsheet,
   FileText,
@@ -20,8 +21,8 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
-import type { Invoice } from '../types';
-import { Button, Callout, Card, ConfirmDialog, FileDrop, PageHeader, SearchInput, Segmented, Stat, Table, Td, Th } from '../components/ui';
+import type { ID, Invoice } from '../types';
+import { Badge, Button, Callout, Card, ConfirmDialog, FileDrop, PageHeader, SearchInput, Segmented, Stat, Table, Td, Th } from '../components/ui';
 import { db } from '../db';
 import { useAppSettings, useInvoices } from '../state/hooks';
 import { errorMessage, toast } from '../state/store';
@@ -34,7 +35,14 @@ import { InvoiceStatusBadge, MethodBadge } from '../components/purchases/badges'
 import { QueuePanel } from '../components/purchases/ProcessingQueue';
 import { DropdownMenu } from '../components/purchases/DropdownMenu';
 import { useInvoiceQueue } from '../components/purchases/hooks';
-import { filterInvoices, invoiceNetAmount, invoiceStats, pctChange, type InvoiceFilter } from '../components/purchases/logic';
+import {
+  duplicateInvoiceIds,
+  filterInvoices,
+  invoiceNetAmount,
+  invoiceStats,
+  pctChange,
+  type InvoiceFilter,
+} from '../components/purchases/logic';
 
 const ACCEPT = '.pdf,application/pdf,image/*,.heic,.heif,.xlsx,.xlsm,.csv,.tsv';
 const CALLOUT_KEY = 'ep-invoices-local-callout';
@@ -106,6 +114,7 @@ export default function Invoices() {
   const today = todayIso();
   const stats = useMemo(() => invoiceStats(invoices ?? [], today), [invoices, today]);
   const list = useMemo(() => filterInvoices(invoices ?? [], filter, query), [invoices, filter, query]);
+  const duplicates = useMemo(() => duplicateInvoiceIds(invoices ?? []), [invoices]);
   const aiOn = aiAvailable(settings);
   const spendTrend = pctChange(stats.prevMonthSpend, stats.monthSpend);
 
@@ -362,11 +371,17 @@ export default function Invoices() {
           ) : (
             <>
               <div className="hidden lg:block">
-                <InvoiceTable invoices={list} onReprocess={onReprocess} onDelete={setToDelete} />
+                <InvoiceTable invoices={list} duplicates={duplicates} onReprocess={onReprocess} onDelete={setToDelete} />
               </div>
               <div className="space-y-3 lg:hidden">
                 {list.map((inv) => (
-                  <InvoiceCard key={inv.id} invoice={inv} onReprocess={onReprocess} onDelete={setToDelete} />
+                  <InvoiceCard
+                    key={inv.id}
+                    invoice={inv}
+                    duplicate={duplicates.has(inv.id)}
+                    onReprocess={onReprocess}
+                    onDelete={setToDelete}
+                  />
                 ))}
               </div>
             </>
@@ -449,12 +464,25 @@ function RowActions({
   );
 }
 
+/** Aviso de factura repetida (el PDF y una foto de la misma factura, por ejemplo). */
+function DuplicateBadge() {
+  return (
+    <span title="Hay otra factura con el mismo proveedor y número: si es la misma, elimina una para no contar el gasto dos veces">
+      <Badge tone="warn" icon={<Copy className="size-3" />}>
+        Repetida
+      </Badge>
+    </span>
+  );
+}
+
 function InvoiceTable({
   invoices,
+  duplicates,
   onReprocess,
   onDelete,
 }: {
   invoices: Invoice[];
+  duplicates: Set<ID>;
   onReprocess: (i: Invoice) => void;
   onDelete: (i: Invoice) => void;
 }) {
@@ -501,7 +529,10 @@ function InvoiceTable({
               {inv.lines.length || inv.subtotal ? fmtEur(invoiceNetAmount(inv)) : <span className="font-normal text-muted">—</span>}
             </Td>
             <Td>
-              <InvoiceStatusBadge status={inv.status} />
+              <div className="flex flex-wrap items-center gap-1.5">
+                <InvoiceStatusBadge status={inv.status} />
+                {duplicates.has(inv.id) && <DuplicateBadge />}
+              </div>
               {inv.status === 'error' && inv.error && (
                 <div className="mt-1 max-w-[220px] truncate text-xs text-bad" title={inv.error}>
                   {inv.error}
@@ -530,10 +561,12 @@ function InvoiceTable({
 
 function InvoiceCard({
   invoice: inv,
+  duplicate,
   onReprocess,
   onDelete,
 }: {
   invoice: Invoice;
+  duplicate?: boolean;
   onReprocess: (i: Invoice) => void;
   onDelete: (i: Invoice) => void;
 }) {
@@ -545,6 +578,7 @@ function InvoiceCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <InvoiceStatusBadge status={inv.status} />
             <MethodBadge method={inv.method} />
+            {duplicate && <DuplicateBadge />}
           </div>
           <div className="mt-2 truncate font-display text-base font-bold text-ink">{invoiceTitle(inv)}</div>
           <div className="tabular mt-0.5 text-xs text-muted">

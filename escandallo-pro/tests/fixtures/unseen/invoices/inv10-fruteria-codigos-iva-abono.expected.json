@@ -1,0 +1,111 @@
+{
+  "id": "inv10-fruteria-codigos-iva-abono",
+  "kind": "invoice",
+  "features": [
+    "Cant. | Ud. | Descripción | Precio | C.IVA | Importe (cantidad primero)",
+    "código de IVA entre precio e importe",
+    "línea de abono con cantidad negativa",
+    "precios de 3 decimales",
+    "S. Coop. con CIF F"
+  ],
+  "header": {
+    "supplierName": "Hortofrutícola Vega del Tajo S. Coop.",
+    "supplierTaxId": "F45022134",
+    "number": "VT-004512",
+    "date": "2026-09-20",
+    "subtotal": 139.34,
+    "vatTotal": 7.47,
+    "total": 146.81
+  },
+  "lines": [
+    {
+      "description": "TOMATE PERA",
+      "quantity": 12.5,
+      "unit": "kg",
+      "unitPrice": 1.85,
+      "total": 23.13,
+      "vatPct": 4
+    },
+    {
+      "description": "PIMIENTO ROJO CALIFORNIA",
+      "quantity": 8,
+      "unit": "kg",
+      "unitPrice": 2.45,
+      "total": 19.6,
+      "vatPct": 4
+    },
+    {
+      "description": "PATATA NUEVA",
+      "quantity": 25,
+      "unit": "kg",
+      "unitPrice": 0.895,
+      "total": 22.38,
+      "vatPct": 4
+    },
+    {
+      "description": "LECHUGA ROMANA",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 0.78,
+      "total": 4.68,
+      "vatPct": 4
+    },
+    {
+      "description": "CILANTRO MANOJO",
+      "quantity": 10,
+      "unit": "manojo",
+      "unitPrice": 0.65,
+      "total": 6.5,
+      "vatPct": 4
+    },
+    {
+      "description": "AGUACATE HASS",
+      "quantity": 4.25,
+      "unit": "kg",
+      "unitPrice": 4.9,
+      "total": 20.83,
+      "vatPct": 4
+    },
+    {
+      "description": "FRESA CAJA 2KG",
+      "quantity": 3,
+      "unit": "caja",
+      "unitPrice": 7.5,
+      "total": 22.5,
+      "vatPct": 4
+    },
+    {
+      "description": "SETAS SHIITAKE BANDEJA 250G",
+      "quantity": 2,
+      "unit": "bandeja",
+      "unitPrice": 2.95,
+      "total": 5.9,
+      "vatPct": 4
+    },
+    {
+      "description": "ZUMO DE NARANJA NATURAL 1L",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 2.35,
+      "total": 14.1,
+      "vatPct": 10
+    },
+    {
+      "description": "BOLSA PAPEL KRAFT 100 UDS",
+      "quantity": 1,
+      "unit": "paquete",
+      "unitPrice": 6.2,
+      "total": 6.2,
+      "vatPct": 21
+    },
+    {
+      "description": "ABONO TOMATE PERA DEFECTUOSO",
+      "quantity": -3.5,
+      "unit": "kg",
+      "unitPrice": 1.85,
+      "total": -6.48,
+      "vatPct": 4
+    }
+  ],
+  "extras": []
+}

@@ -1,0 +1,68 @@
+{
+  "id": "m03",
+  "kind": "menu",
+  "features": [
+    "precios sin €",
+    "precios enteros",
+    "punto decimal (8.50)",
+    "«Desde 1987» y teléfono en el pie",
+    "horario"
+  ],
+  "entries": [
+    {
+      "section": "De la huerta",
+      "name": "Ensalada de tomate de la huerta",
+      "price": 9.5
+    },
+    {
+      "section": "De la huerta",
+      "name": "Pimientos de Padrón",
+      "price": 7
+    },
+    {
+      "section": "De la huerta",
+      "name": "Alcachofas a la plancha",
+      "price": 11.5
+    },
+    {
+      "section": "De la huerta",
+      "name": "Pisto con huevo",
+      "price": 8.5
+    },
+    {
+      "section": "Del mar",
+      "name": "Pulpo a la brasa",
+      "price": 19
+    },
+    {
+      "section": "Del mar",
+      "name": "Chipirones encebollados",
+      "price": 14.5
+    },
+    {
+      "section": "Del mar",
+      "name": "Bacalao al pil pil",
+      "price": 18.5
+    },
+    {
+      "section": "De la tierra",
+      "name": "Chuletón de buey (1 kg)",
+      "price": 58
+    },
+    {
+      "section": "De la tierra",
+      "name": "Rabo de toro estofado",
+      "price": 16
+    },
+    {
+      "section": "De la tierra",
+      "name": "Presa ibérica",
+      "price": 17.5
+    },
+    {
+      "section": "De la tierra",
+      "name": "Callos a la madrileña",
+      "price": 12
+    }
+  ]
+}

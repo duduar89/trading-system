@@ -1,0 +1,46 @@
+{
+  "id": "m04",
+  "kind": "menu",
+  "features": [
+    "pizarra: fondo oscuro",
+    "letra manuscrita (Caveat)",
+    "precios enteros con €"
+  ],
+  "entries": [
+    {
+      "section": "Para empezar",
+      "name": "Alcachofas confitadas con jamón",
+      "price": 12
+    },
+    {
+      "section": "Para empezar",
+      "name": "Tataki de atún rojo",
+      "price": 19
+    },
+    {
+      "section": "Principales",
+      "name": "Rabo de toro al vino tinto",
+      "price": 18.5
+    },
+    {
+      "section": "Principales",
+      "name": "Arroz meloso de bogavante",
+      "price": 24
+    },
+    {
+      "section": "Principales",
+      "name": "Cogote de merluza a la brasa",
+      "price": 22
+    },
+    {
+      "section": "Dulces",
+      "name": "Torrija caramelizada",
+      "price": 6.5
+    },
+    {
+      "section": "Dulces",
+      "name": "Milhojas de crema",
+      "price": 5.9
+    }
+  ]
+}

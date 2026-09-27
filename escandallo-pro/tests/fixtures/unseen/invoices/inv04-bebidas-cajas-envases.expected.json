@@ -1,0 +1,125 @@
+{
+  "id": "inv04-bebidas-cajas-envases",
+  "kind": "invoice",
+  "features": [
+    "Cajas | Botellas | Precio (3 decimales) | Importe",
+    "envases retornables, devolución (negativa) y fianza",
+    "IVA 10/21 por línea",
+    "cliente con NIF de persona física"
+  ],
+  "header": {
+    "supplierName": "Bebidas y Distribuciones Montes S.L.",
+    "supplierTaxId": "B24890311",
+    "number": "BD-2609-00318",
+    "date": "2026-09-16",
+    "subtotal": 537.23,
+    "vatTotal": 110.34,
+    "total": 647.57
+  },
+  "lines": [
+    {
+      "description": "CERVEZA ESTRELLA 1/3 RET. C/24",
+      "code": "40110",
+      "quantity": 120,
+      "unit": "bot",
+      "unitPrice": 0.66,
+      "total": 79.2,
+      "vatPct": 21
+    },
+    {
+      "description": "CERVEZA SIN ALCOHOL 1/3 C/24",
+      "code": "40115",
+      "quantity": 48,
+      "unit": "bot",
+      "unitPrice": 0.59,
+      "total": 28.32,
+      "vatPct": 21
+    },
+    {
+      "description": "BARRIL CERVEZA 30L",
+      "code": "40201",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 72.5,
+      "total": 145,
+      "vatPct": 21
+    },
+    {
+      "description": "AGUA MINERAL 50CL C/35",
+      "code": "41010",
+      "quantity": 105,
+      "unit": "bot",
+      "unitPrice": 0.215,
+      "total": 22.58,
+      "vatPct": 10
+    },
+    {
+      "description": "REFRESCO COLA 35CL C/24",
+      "code": "41020",
+      "quantity": 48,
+      "unit": "bot",
+      "unitPrice": 0.52,
+      "total": 24.96,
+      "vatPct": 21
+    },
+    {
+      "description": "TÓNICA PREMIUM 20CL C/24",
+      "code": "41030",
+      "quantity": 24,
+      "unit": "bot",
+      "unitPrice": 0.61,
+      "total": 14.64,
+      "vatPct": 21
+    },
+    {
+      "description": "VINO TINTO RIOJA CRIANZA 75CL",
+      "code": "42001",
+      "quantity": 12,
+      "unit": "bot",
+      "unitPrice": 5.45,
+      "total": 65.4,
+      "vatPct": 21
+    },
+    {
+      "description": "VINO BLANCO RUEDA VERDEJO 75CL",
+      "code": "42010",
+      "quantity": 6,
+      "unit": "bot",
+      "unitPrice": 4.38,
+      "total": 26.28,
+      "vatPct": 21
+    },
+    {
+      "description": "CAVA BRUT NATURE 75CL",
+      "code": "42050",
+      "quantity": 6,
+      "unit": "bot",
+      "unitPrice": 6.9,
+      "total": 41.4,
+      "vatPct": 21
+    },
+    {
+      "description": "GINEBRA LONDON DRY 70CL",
+      "code": "43001",
+      "quantity": 3,
+      "unit": "bot",
+      "unitPrice": 11.95,
+      "total": 35.85,
+      "vatPct": 21
+    }
+  ],
+  "extras": [
+    {
+      "description": "ENVASE RETORNABLE CAJA 1/3",
+      "amount": 18
+    },
+    {
+      "description": "DEVOLUCIÓN ENVASE CAJA 1/3",
+      "amount": -14.4
+    },
+    {
+      "description": "FIANZA BARRIL 30L",
+      "amount": 50
+    }
+  ]
+}

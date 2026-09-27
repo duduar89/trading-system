@@ -669,9 +669,9 @@ function similarityAnalyzed(A: Analyzed, B: Analyzed): number {
   return score < 0 ? 0 : score > 1 ? 1 : score;
 }
 
-/** Penalización si un lado indica un valor no habitual y el otro es el genérico ("Harina" ⇄ "HARINA MAIZ"). */
+/** Penalización si un lado indica un valor no habitual y el otro es el genérico ("Harina" ⇄ "HARINA MAIZ", "Jamón" ⇄ "JAMON IBERICO"). */
 function nonDefaultPenalty(g: ConflictGroup, present: Set<string>, other: Analyzed): number {
-  if (other.head < 0 || (g !== 'base' && g !== 'grasa' && g !== 'color')) return 0;
+  if (other.head < 0 || (g !== 'base' && g !== 'grasa' && g !== 'color' && g !== 'raza')) return 0;
   const def = GROUP_DEFAULTS[other.tokens[other.head]]?.[g];
   return def && !present.has(def) ? NON_DEFAULT_PENALTY : 0;
 }
@@ -830,6 +830,17 @@ export function cleanProductName(description: string): string {
     if (prev === w) continue;
     seq.push({ w, stop: false });
   }
+  // Origen con artículo al final ("AJO MORADO LAS PEDROÑERAS", "ACEITE LA ESPAÑOLA"): un topónimo o marca desconocidos no
+  // forman parte del nombre genérico (los conocidos se conservan: "de la Vera").
+  const origin = seq.findIndex(
+    (it, i) =>
+      it.stop &&
+      ORIGIN_ARTICLES.has(it.w) &&
+      i < seq.length - 1 &&
+      seq.slice(0, i).some((x) => !x.stop) &&
+      seq.slice(i + 1).every((x) => !x.stop && !KNOWN.has(x.w) && !PROPER_NOUNS[x.w]),
+  );
+  if (origin > 0) seq.splice(seq[origin - 1].stop && seq[origin - 1].w === 'de' ? origin - 1 : origin);
   // Palabras vacías sólo entre dos palabras de contenido
   const content: Item[] = [];
   for (let i = 0; i < seq.length; i++) {
@@ -886,7 +897,10 @@ export function cleanProductName(description: string): string {
     let w = it.w;
     const adjective = idx > 0 && isAdjective(w) && w !== headWord;
     if (adjective) {
-      w = agree(w, feminine);
+      // Los calificativos del animal concuerdan con él y no con el corte: "Pechuga de pollo campero"
+      const ofAnimal =
+        adjSinceNoun === 0 && !!lastNoun && lastNoun !== headWord && DE_SOURCES.has(lastNoun) && ANIMAL_QUALIFIERS.has(FEMININE_ADJECTIVES[w] ?? w);
+      w = agree(w, ofAnimal ? isFeminineNoun(lastNoun as string) : feminine);
       adjSinceNoun++;
     }
     if (!adjective && idx > 0 && !prevIsStop) {
@@ -895,12 +909,32 @@ export function cleanProductName(description: string): string {
       else if (DE_SOURCES.has(w) && lastNoun && DE_HEADS.has(lastNoun) && adjSinceNoun <= 2) out.push('de');
     }
     if (!adjective) {
-      lastNoun = w;
-      adjSinceNoun = 0;
+      // Una variedad tras el sustantivo no le quita el "de": "Lomo alto de vaca"
+      if (VARIETIES.has(w) && lastNoun && !DE_SOURCES.has(w)) adjSinceNoun++;
+      else {
+        lastNoun = w;
+        adjSinceNoun = 0;
+      }
     }
     out.push(w);
   });
 
-  const text = out.map(display).join(' ').replace(/\s+/g, ' ').trim();
+  // Tildes y eñes de las palabras que no están en el diccionario, tal y como venían escritas ("CECINA DE LEÓN")
+  const originals = String(description).toLowerCase().normalize('NFC').split(/[^\p{L}]+/u).filter(Boolean);
+  const restore = (w: string): string => {
+    const shown = display(w);
+    if (shown !== w) return shown;
+    for (const o of originals) {
+      if (o.length < w.length || o.length - w.length > 2 || o === w) continue;
+      if (o.normalize('NFD').replace(/[̀-ͯ]/g, '').startsWith(w)) return o.slice(0, w.length);
+    }
+    return w;
+  };
+  const text = out.map(restore).join(' ').replace(/\s+/g, ' ').trim();
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
+
+/** Artículos que introducen un origen o marca al final de la descripción ("LAS PEDROÑERAS"). */
+const ORIGIN_ARTICLES = new Set(['la', 'las', 'el', 'los']);
+/** Calificativos que describen al animal (raza, crianza, origen) y concuerdan con él: "pollo campero", "cerdo ibérico". */
+const ANIMAL_QUALIFIERS = new Set(['campero', 'iberico', 'gallego', 'asturiano', 'vasco', 'lechal']);

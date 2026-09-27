@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import clsx from 'clsx';
-import { Check, FlaskConical, Sparkles, AlertTriangle } from 'lucide-react';
+import { Check, CircleDashed, FlaskConical, Sparkles, AlertTriangle } from 'lucide-react';
 import type { BusinessSettings, Dish, DishCost } from '../../types';
 import { fmtEur } from '../../lib/format';
 import { AllergenChips } from '../Allergens';
@@ -44,6 +44,7 @@ export function DishCard({
   selected,
   selecting,
   onToggle,
+  estimated = 0,
 }: {
   dish: Dish;
   cost?: DishCost;
@@ -51,6 +52,8 @@ export function DishCard({
   selected: boolean;
   selecting: boolean;
   onToggle: () => void;
+  /** Líneas cuyo ingrediente tiene todavía el precio orientativo (sin factura): el coste es una estimación. */
+  estimated?: number;
 }) {
   const fc = shownFoodCost(cost);
   const margin = shownMargin(cost);
@@ -135,6 +138,14 @@ export function DishCard({
                   </span>
                 ) : (
                   `${dish.items.length} ingredientes con precio`
+                )}
+                {estimated > 0 && (
+                  <span
+                    className="ml-1.5 inline-flex items-center gap-0.5 font-semibold text-info"
+                    title="Precio de referencia orientativo: sube tus facturas y el coste pasará a ser el real."
+                  >
+                    <CircleDashed className="size-3" aria-hidden /> {estimated} {estimated === 1 ? 'estimado' : 'estimados'}
+                  </span>
                 )}
               </span>
               {hasWaste && <span className="text-muted">Merma {fmtPctNb(cost.wastePct, 0)}</span>}

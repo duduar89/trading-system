@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import { AlertTriangle, ArrowRight, CheckCircle2, Target, XCircle } from 'lucide-react';
 import type { BusinessSettings } from '../../../types';
-import type { FoodCostStatus } from '../../../core/costing';
+import { roundPct, type FoodCostStatus } from '../../../core/costing';
 import { fmtNum, fmtPct } from '../../../lib/format';
 import { Card, cx } from '../../ui';
 import { businessStatus, foodCostScale, type StatusCounts } from '../insights';
@@ -36,15 +36,18 @@ export function FoodCostHero({
   const status = businessStatus(pct, business);
   const s = STATUS_TEXT[status];
   const scale = foodCostScale(pct, business);
-  const diff = pct != null ? pct - business.targetFoodCostPct : undefined;
+  // Diferencia sobre la cifra mostrada (una décima), igual que el semáforo: con "30,0 %" estás justo en el objetivo.
+  const diff = pct != null ? roundPct(roundPct(pct) - business.targetFoodCostPct) : undefined;
   const Icon = s.icon;
 
   const sentence =
     diff == null
       ? 'Añade el PVP y los ingredientes de tus platos para ver tu food cost.'
-      : diff <= 0
-        ? `${fmtNum(Math.abs(diff), 1)} puntos por debajo de tu objetivo del ${fmtPct(business.targetFoodCostPct, 0)}. ¡Buen trabajo!`
-        : `${fmtNum(diff, 1)} puntos por encima de tu objetivo del ${fmtPct(business.targetFoodCostPct, 0)}. Revisa los platos en rojo.`;
+      : diff === 0
+        ? `Justo en tu objetivo del ${fmtPct(business.targetFoodCostPct, 0)}. ¡Buen trabajo!`
+        : diff < 0
+          ? `${fmtNum(Math.abs(diff), 1)} puntos por debajo de tu objetivo del ${fmtPct(business.targetFoodCostPct, 0)}. ¡Buen trabajo!`
+          : `${fmtNum(diff, 1)} puntos por encima de tu objetivo del ${fmtPct(business.targetFoodCostPct, 0)}. Revisa los platos en rojo.`;
 
   return (
     <Card className={cx('relative flex flex-col overflow-hidden', className)}>

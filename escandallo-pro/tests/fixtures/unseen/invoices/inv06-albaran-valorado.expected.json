@@ -1,0 +1,87 @@
+{
+  "id": "inv06-albaran-valorado",
+  "kind": "invoice",
+  "features": [
+    "albarán valorado (sin «factura»)",
+    "Cantidad | Descripción | Precio | Importe",
+    "fecha con puntos",
+    "IVA «s/ base» por tipo",
+    "número en caja «ALBARÁN VALORADO Nº»"
+  ],
+  "header": {
+    "supplierName": "Obrador Panadería Santa Clara S.L.",
+    "supplierTaxId": "B14355275",
+    "number": "AV-26-03412",
+    "date": "2026-09-24",
+    "subtotal": 153.15,
+    "vatTotal": 10.19,
+    "total": 163.34
+  },
+  "lines": [
+    {
+      "description": "BARRA DE PAN RÚSTICA 250G",
+      "quantity": 40,
+      "unit": "ud",
+      "unitPrice": 0.42,
+      "total": 16.8,
+      "vatPct": 4
+    },
+    {
+      "description": "PAN DE HAMBURGUESA BRIOCHE",
+      "quantity": 25,
+      "unit": "ud",
+      "unitPrice": 0.55,
+      "total": 13.75,
+      "vatPct": 4
+    },
+    {
+      "description": "HOGAZA DE CENTENO 1KG",
+      "quantity": 3,
+      "unit": "ud",
+      "unitPrice": 3.2,
+      "total": 9.6,
+      "vatPct": 4
+    },
+    {
+      "description": "PANECILLO INDIVIDUAL 40G",
+      "quantity": 60,
+      "unit": "ud",
+      "unitPrice": 0.18,
+      "total": 10.8,
+      "vatPct": 4
+    },
+    {
+      "description": "CROISSANT DE MANTEQUILLA",
+      "quantity": 12,
+      "unit": "ud",
+      "unitPrice": 0.85,
+      "total": 10.2,
+      "vatPct": 10
+    },
+    {
+      "description": "TARTA DE QUESO 12 RACIONES",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 24,
+      "total": 48,
+      "vatPct": 10
+    },
+    {
+      "description": "BIZCOCHO DE LIMÓN 1KG",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 9.5,
+      "total": 9.5,
+      "vatPct": 10
+    },
+    {
+      "description": "PICOS DE PAN 250G",
+      "quantity": 30,
+      "unit": "ud",
+      "unitPrice": 1.15,
+      "total": 34.5,
+      "vatPct": 4
+    }
+  ],
+  "extras": []
+}

@@ -1,0 +1,66 @@
+{
+  "id": "m05",
+  "kind": "menu",
+  "features": [
+    "tabla con columnas ½ Ración | Ración",
+    "platos sólo con ración (—)",
+    "precio sin €"
+  ],
+  "entries": [
+    {
+      "section": "Raciones",
+      "name": "Calamares a la andaluza",
+      "price": 14
+    },
+    {
+      "section": "Raciones",
+      "name": "Pulpo a la gallega",
+      "price": 19.5
+    },
+    {
+      "section": "Raciones",
+      "name": "Croquetas caseras",
+      "price": 10.5
+    },
+    {
+      "section": "Raciones",
+      "name": "Patatas bravas",
+      "price": 6.5
+    },
+    {
+      "section": "Raciones",
+      "name": "Jamón ibérico de bellota",
+      "price": 22
+    },
+    {
+      "section": "Raciones",
+      "name": "Queso manchego curado",
+      "price": 12
+    },
+    {
+      "section": "Raciones",
+      "name": "Chopitos fritos",
+      "price": 13
+    },
+    {
+      "section": "Raciones",
+      "name": "Gambas al ajillo",
+      "price": 14.5
+    },
+    {
+      "section": "Del carbón",
+      "name": "Pimientos del piquillo rellenos",
+      "price": 11
+    },
+    {
+      "section": "Del carbón",
+      "name": "Secreto ibérico",
+      "price": 16
+    },
+    {
+      "section": "Del carbón",
+      "name": "Chorizo criollo",
+      "price": 8.5
+    }
+  ]
+}

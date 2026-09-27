@@ -86,7 +86,8 @@ export function PurchasesTab({ data }: { data: ReportsData }) {
           label="Facturas"
           value={confirmed.length}
           icon={<FileText className="size-4" />}
-          hint={`ticket medio ${fmtEur(total / Math.max(1, confirmed.length))}`}
+          // Mismo conjunto en numerador y denominador: todas las facturas confirmadas (el gasto total sólo cubre 12 meses).
+          hint={`ticket medio ${fmtEur(supTotal / Math.max(1, confirmed.length))}`}
         />
         <Stat
           label="Proveedores"

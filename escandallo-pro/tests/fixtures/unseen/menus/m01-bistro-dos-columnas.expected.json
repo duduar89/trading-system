@@ -1,0 +1,80 @@
+{
+  "id": "m01",
+  "kind": "menu",
+  "features": [
+    "dos columnas",
+    "puntos de relleno",
+    "descripciones en cursiva",
+    "cargo de pan en el pie"
+  ],
+  "entries": [
+    {
+      "section": "Entrantes",
+      "name": "Crema de calabaza asada",
+      "price": 7.5
+    },
+    {
+      "section": "Entrantes",
+      "name": "Burrata con tomate de temporada",
+      "price": 12.9,
+      "description": "Albahaca fresca y aceite de oliva virgen extra"
+    },
+    {
+      "section": "Entrantes",
+      "name": "Tartar de salmón",
+      "price": 14.5
+    },
+    {
+      "section": "Entrantes",
+      "name": "Croquetas de boletus (6 uds)",
+      "price": 9
+    },
+    {
+      "section": "Principales",
+      "name": "Risotto de setas y trufa",
+      "price": 16.8
+    },
+    {
+      "section": "Principales",
+      "name": "Lubina a la bilbaína",
+      "price": 21.5,
+      "description": "Con patatas confitadas"
+    },
+    {
+      "section": "Principales",
+      "name": "Magret de pato con frutos rojos",
+      "price": 19.9
+    },
+    {
+      "section": "Carnes",
+      "name": "Entrecot de vaca madurada (300 g)",
+      "price": 24.5
+    },
+    {
+      "section": "Carnes",
+      "name": "Carrilleras al Pedro Ximénez",
+      "price": 17.9
+    },
+    {
+      "section": "Carnes",
+      "name": "Hamburguesa Black Angus",
+      "price": 15.5,
+      "description": "Queso cheddar, cebolla caramelizada y patatas"
+    },
+    {
+      "section": "Postres",
+      "name": "Tarta de queso cremosa",
+      "price": 6.5
+    },
+    {
+      "section": "Postres",
+      "name": "Coulant de chocolate",
+      "price": 7
+    },
+    {
+      "section": "Postres",
+      "name": "Sorbete de limón al cava",
+      "price": 5.5
+    }
+  ]
+}

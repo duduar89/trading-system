@@ -8,6 +8,7 @@ import {
   CheckCheck,
   CheckCircle2,
   ChevronDown,
+  Copy,
   Eye,
   FileSearch,
   PencilLine,
@@ -20,9 +21,9 @@ import {
 import type { ID, Invoice, InvoiceLine, Product } from '../types';
 import { db } from '../db';
 import { Badge, Button, Callout, ConfirmDialog, EmptyState, PageHeader, Segmented, Spinner } from '../components/ui';
-import { useAppSettings, useDishCosts, useDishes, useProducts, useSuppliers } from '../state/hooks';
+import { useAppSettings, useDishCosts, useDishes, useInvoices, useProducts, useSuppliers } from '../state/hooks';
 import { errorMessage, toast } from '../state/store';
-import { confirmInvoice, deleteInvoice, newInvoiceLine, processInvoice, updateInvoice } from '../services/invoices';
+import { confirmInvoice, deleteInvoice, newInvoiceLine, processInvoice, refreshInvoiceMatches, updateInvoice } from '../services/invoices';
 import { aiAvailable } from '../extract/index';
 import { fmtDate, fmtEur } from '../lib/format';
 import { FilePreview } from '../components/purchases/FilePreview';
@@ -34,7 +35,7 @@ import { InvoiceStatusBadge, MethodBadge, SaveIndicator } from '../components/pu
 import { DropdownMenu } from '../components/purchases/DropdownMenu';
 import { useDebouncedAction, useInvoiceQueue, useMediaQuery } from '../components/purchases/hooks';
 import { lineConversion, recomputeLine } from '../components/purchases/lineEdit';
-import { diffPrices, summarizeLines, totalsCheck, type PriceSnapshot } from '../components/purchases/logic';
+import { diffPrices, findDuplicateInvoice, invoiceNetAmount, summarizeLines, totalsCheck, type PriceSnapshot } from '../components/purchases/logic';
 
 type LineFilter = 'todas' | 'decidir' | 'avisos';
 type SaveState = 'idle' | 'saving' | 'saved' | 'dirty' | 'error';
@@ -54,6 +55,13 @@ function toDraft(inv: Invoice): InvoiceDraft {
 
 export default function InvoiceReview() {
   const { id } = useParams();
+  // Un estado por factura: al pasar de una a otra sin salir de la pantalla (historial, enlace directo o navegación rápida)
+  // no se arrastran el borrador, sus guardados pendientes ni los diálogos abiertos de la anterior.
+  return <InvoiceReviewScreen key={id} />;
+}
+
+function InvoiceReviewScreen() {
+  const { id } = useParams();
   const navigate = useNavigate();
   // undefined = cargando · null = no existe
   const invoice = useLiveQuery(async () => (id ? ((await db().invoices.get(id)) ?? null) : null), [id]);
@@ -62,6 +70,7 @@ export default function InvoiceReview() {
   const settings = useAppSettings();
   const dishes = useDishes();
   const dishCosts = useDishCosts();
+  const invoices = useInvoices();
   const queue = useInvoiceQueue();
 
   const [draft, setDraft] = useState<InvoiceDraft | null>(null);
@@ -79,6 +88,15 @@ export default function InvoiceReview() {
   const [showDoc, setShowDoc] = useState(true);
   const [mobileDoc, setMobileDoc] = useState(false);
   const wide = useMediaQuery('(min-width: 1280px)');
+
+  // Líneas «nuevo» leídas antes de que existieran sus productos (p. ej. varias facturas subidas a la vez y confirmada ya la
+  // primera): al abrir la revisión se vuelven a emparejar con la base de precios actual.
+  const refreshedFor = useRef<ID | null>(null);
+  useEffect(() => {
+    if (!invoice || invoice.status !== 'revision' || refreshedFor.current === invoice.id) return;
+    refreshedFor.current = invoice.id;
+    refreshInvoiceMatches(invoice.id).catch(() => undefined);
+  }, [invoice]);
 
   // Sincroniza el borrador con la BD mientras no haya cambios locales pendientes.
   useEffect(() => {
@@ -192,6 +210,8 @@ export default function InvoiceReview() {
   }, [draft, lineFilter]);
 
   const canUseAi = aiAvailable(settings);
+  // La misma factura subida dos veces (el PDF y una foto): confirmar las dos contaría el gasto dos veces.
+  const duplicate = useMemo(() => (invoice && invoices ? findDuplicateInvoice(invoice, invoices) : undefined), [invoice, invoices]);
 
   const reprocess = async (forceLocal: boolean) => {
     if (!id) return;
@@ -422,6 +442,32 @@ export default function InvoiceReview() {
         </Callout>
       )}
 
+      {duplicate && !processing && (
+        <Callout
+          tone="warn"
+          icon={<Copy className="size-4" />}
+          title={duplicate.status === 'confirmada' ? 'Parece repetida: ya confirmaste esta factura' : 'Parece repetida: tienes otra igual por revisar'}
+          className="mb-5"
+        >
+          <p>
+            {duplicate.number ? `La factura nº ${duplicate.number}` : `Una factura del ${fmtDate(duplicate.date)} por ${fmtEur(invoiceNetAmount(duplicate))}`} de{' '}
+            {duplicate.supplierName || 'este proveedor'} ya está en tus facturas
+            {duplicate.fileName ? ` («${duplicate.fileName}»)` : ''}.{' '}
+            {duplicate.status === 'confirmada'
+              ? 'Si es la misma, elimina esta copia: si la confirmas también, su gasto contará dos veces.'
+              : 'Si es la misma, revisa solo una y elimina la otra para no contar el gasto dos veces.'}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" icon={<Eye className="size-3.5" />} onClick={() => navigate(`/facturas/${duplicate.id}`)}>
+              Ver la otra
+            </Button>
+            <Button size="sm" variant="danger" icon={<Trash2 className="size-3.5" />} onClick={() => setAskDelete(true)}>
+              Eliminar esta copia
+            </Button>
+          </div>
+        </Callout>
+      )}
+
       {/* Documento en móvil / tableta: plegable */}
       {hasDoc && !wide && (
         <div className="mb-5">
@@ -566,6 +612,7 @@ export default function InvoiceReview() {
                   suggested={summary.suggested}
                   unpriced={summary.total - summary.ignored - summary.priced}
                   mismatches={mismatches}
+                  duplicate={!!duplicate}
                   onConfirm={onConfirmClick}
                 />
               )}
@@ -616,6 +663,7 @@ function ConfirmBar({
   suggested,
   unpriced,
   mismatches,
+  duplicate,
   onConfirm,
 }: {
   confirmed: boolean;
@@ -625,9 +673,11 @@ function ConfirmBar({
   suggested: number;
   unpriced: number;
   mismatches: number;
+  duplicate?: boolean;
   onConfirm: () => void;
 }) {
   const notes: string[] = [];
+  if (duplicate) notes.push('parece una factura repetida');
   if (suggested > 0) notes.push(`${suggested} ${suggested === 1 ? 'sugerencia se aplicará' : 'sugerencias se aplicarán'} tal cual`);
   if (unpriced > 0) notes.push(`${unpriced} sin precio se ${unpriced === 1 ? 'omitirá' : 'omitirán'}`);
   if (mismatches > 0) notes.push(`${mismatches} no se ${mismatches === 1 ? 'podrá' : 'podrán'} aplicar (unidad distinta)`);
@@ -647,7 +697,7 @@ function ConfirmBar({
           <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
             {notes.length ? (
               <>
-                <AlertTriangle className={clsx('size-3.5 shrink-0', mismatches ? 'text-bad' : 'text-warn')} />
+                <AlertTriangle className={clsx('size-3.5 shrink-0', mismatches || duplicate ? 'text-bad' : 'text-warn')} />
                 <span className="truncate">{notes.join(' · ')}</span>
               </>
             ) : (

@@ -46,6 +46,7 @@ import {
   matchInvoiceLines,
   newInvoiceLine,
   processInvoice,
+  refreshInvoiceMatches,
   resumePendingInvoices,
   subscribeInvoiceQueue,
   updateInvoice,
@@ -1186,19 +1187,20 @@ describe('confirmInvoice: casos límite', () => {
     const alcaparras = products.find((p) => p.name === 'Alcaparras');
     expect(alcaparras).toMatchObject({ baseUnit: 'kg', pricePerBase: 12 });
     expect(saved.lines[2]).toMatchObject({ productId: alcaparras?.id, matchStatus: 'vinculado' });
-    // Mismo producto en dos líneas: un solo producto, dos precios; manda la última línea
+    // Mismo producto en dos líneas: un solo producto y un solo precio, la media ponderada por cantidad
+    // (5 kg a 2,40 + 5 kg a 2,20 = 23 € / 10 kg), no la última línea impresa.
     const arroz = products.find((p) => p.name === 'Arroz bomba') as Product;
-    expect(arroz.pricePerBase).toBeCloseTo(2.2, 6);
+    expect(arroz.pricePerBase).toBeCloseTo(2.3, 6);
     expect(arroz.aliases).toEqual(expect.arrayContaining(['ARROZ BOMBA 1KG', 'ARROZ BOMBA SACO 5KG']));
-    expect(await db().pricePoints.where('productId').equals(arroz.id).count()).toBe(2);
+    expect(await db().pricePoints.where('productId').equals(arroz.id).count()).toBe(1);
     expect(await db().suppliers.toArray()).toMatchObject([{ name: 'Ultramarinos Pepe', taxId: 'B11111111' }]);
 
     // Re-confirmar: mismo resultado, sin avisos repetidos
     await confirmInvoice(inv.id);
     const again = (await db().invoices.get(inv.id)) as Invoice;
     expect(again.lines[0].warnings?.filter((w) => w.startsWith('Precio convertido'))).toHaveLength(1);
-    expect((await db().products.get(arroz.id))?.pricePerBase).toBeCloseTo(2.2, 6);
-    expect(await db().pricePoints.count()).toBe(4);
+    expect((await db().products.get(arroz.id))?.pricePerBase).toBeCloseTo(2.3, 6);
+    expect(await db().pricePoints.count()).toBe(3);
   });
 
   it('una factura antigua no cambia el precio vigente pero sí queda en el histórico', async () => {
@@ -1611,7 +1613,8 @@ describe('exportación: semáforo, enlaces y casos límite', () => {
     expect(ajilloRow.getCell(10).value).toBeCloseTo(0.38, 6);
     expect(ajilloRow.getCell(10).numFmt).toBe('0.0%');
     const margin = ajilloRow.getCell(11).value as { formula: string; result: number };
-    expect(margin.formula).toBe(`IF(ISNUMBER(G${ajilloRow.number}),G${ajilloRow.number}-H${ajilloRow.number},"")`);
+    // Sin coste por ración no hay margen (como en la app): la fórmula exige coste > 0
+    expect(margin.formula).toBe(`IF(AND(ISNUMBER(G${ajilloRow.number}),H${ajilloRow.number}>0),G${ajilloRow.number}-H${ajilloRow.number},"")`);
     expect(margin.result).toBeCloseTo(costs.get(ajillo.id)!.grossMargin!, 6);
     expect((ajilloRow.getCell(1).value as { hyperlink: string }).hyperlink).toMatch(/^#'Gambas al ajillo( \(2\))?'!A1$/);
     const racionRow = rows.find((r) => r.getCell(5).value === 26)!;
@@ -1619,13 +1622,18 @@ describe('exportación: semáforo, enlaces y casos límite', () => {
 
     const cfs = (summary as unknown as { conditionalFormattings: CF[] }).conditionalFormattings;
     const main = cfs.find((c) => c.ref === 'I5:I7')!;
-    expect(main.rules.map((r) => r.formulae[0])).toEqual(['AND(ISNUMBER(I5),I5<=J5)', 'AND(ISNUMBER(I5),I5>J5,I5<=MAX(J5,0.35))', 'AND(ISNUMBER(I5),I5>MAX(J5,0.35))']);
+    // El semáforo compara la cifra mostrada (0,0 %), igual que la app
+    expect(main.rules.map((r) => r.formulae[0])).toEqual([
+      'AND(ISNUMBER(I5),ROUND(I5,3)<=J5)',
+      'AND(ISNUMBER(I5),ROUND(I5,3)>J5,ROUND(I5,3)<=MAX(J5,0.35))',
+      'AND(ISNUMBER(I5),ROUND(I5,3)>MAX(J5,0.35))',
+    ]);
     expect(main.rules.map((r) => r.style.fill?.bgColor?.argb)).toEqual(['FFDCFCE7', 'FFFEF3C7', 'FFFEE2E2']);
 
     const ajilloSheet = wb.getWorksheet((ajilloRow.getCell(1).value as { hyperlink: string }).hyperlink.match(/'(.+)'/)![1])!;
     expect(ajilloSheet.getCell('H5').value).toBeCloseTo(0.38, 6);
     const dishCfs = (ajilloSheet as unknown as { conditionalFormattings: CF[] }).conditionalFormattings;
-    expect(dishCfs.find((c) => c.ref === 'H4')?.rules[0].formulae[0]).toBe('AND(ISNUMBER(H4),H4<=H5)');
+    expect(dishCfs.find((c) => c.ref === 'H4')?.rules[0].formulae[0]).toBe('AND(ISNUMBER(H4),ROUND(H4,3)<=H5)');
     const link = ajilloSheet.getRow(17).getCell(2).value as { text: string; hyperlink: string };
     expect(link).toMatchObject({ text: 'Alioli (elaboración)', hyperlink: "#'Alioli'!A1" });
     expect(ajilloSheet.views[0]).toMatchObject({ state: 'frozen', ySplit: 15 });
@@ -1656,5 +1664,42 @@ describe('exportación: semáforo, enlaces y casos límite', () => {
 describe('espacio de trabajo', () => {
   it('los servicios usan el espacio activo', () => {
     expect(getCurrentWorkspaceId()).toBe(wsId);
+  });
+});
+
+describe('refreshInvoiceMatches (varias facturas subidas a la vez)', () => {
+  it('vincula las líneas «nuevo» leídas antes de que existieran sus productos, sin tocar las decididas a mano', async () => {
+    // Dos lecturas de la misma factura de carnes (PDF y foto), ambas antes de tener productos: todo «nuevo».
+    const pdf = rawInvoice({
+      supplierName: 'Carnes Selectas Guadarrama S.L.',
+      number: 'CSG-1',
+      lines: [line('SOLOMILLO TERNERA NAC. ENTERO', 4.62, 'kg', 33.5, 154.77), line('SECRETO IBERICO CEBO', 3.4, 'kg', 16.8, 57.12)],
+    });
+    const photo = rawInvoice({
+      supplierName: 'Carnes Selectas Guadarrama S.L.',
+      number: 'CSG-1',
+      lines: [
+        line('SOLOMILLO TERNERA NAC. ENTERO', 4.62, 'kg', 33.5, 154.77),
+        // El usuario eligió «Crear nuevo ingrediente» en el selector: se respeta
+        line('SECRETO IBERICO CEBO', 3.4, 'kg', 16.8, 57.12, { matchScore: 0, suggestedName: 'Secreto de bellota' }),
+        line('BOLSAS BASURA', 1, 'ud', 3, 3, { matchStatus: 'ignorado' }),
+      ],
+    });
+    await db().invoices.bulkAdd([pdf, photo]);
+    expect(await refreshInvoiceMatches(photo.id)).toBe(0); // aún no hay productos
+    const res = await confirmInvoice(pdf.id);
+    expect(res.created).toBe(2);
+    const products = await db().products.toArray();
+    const solomillo = products.find((p) => p.name.startsWith('Solomillo')) as Product;
+
+    expect(await refreshInvoiceMatches(photo.id)).toBe(1);
+    const saved = (await db().invoices.get(photo.id)) as Invoice;
+    expect(saved.lines[0]).toMatchObject({ matchStatus: 'vinculado', productId: solomillo.id });
+    expect(saved.lines[1]).toMatchObject({ matchStatus: 'nuevo', matchScore: 0 });
+    expect(saved.lines[1].productId).toBeUndefined();
+    expect(saved.lines[2].matchStatus).toBe('ignorado');
+    // Idempotente y sólo para facturas por revisar
+    expect(await refreshInvoiceMatches(photo.id)).toBe(0);
+    expect(await refreshInvoiceMatches(pdf.id)).toBe(0);
   });
 });

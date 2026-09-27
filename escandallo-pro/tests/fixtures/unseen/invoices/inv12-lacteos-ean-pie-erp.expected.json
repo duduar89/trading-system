@@ -1,0 +1,115 @@
+{
+  "id": "inv12-lacteos-ean-pie-erp",
+  "kind": "invoice",
+  "features": [
+    "códigos EAN-13",
+    "fuente monoespaciada en mayúsculas",
+    "pie horizontal de ERP: bruto | dto. p.p. | base | %IVA | cuota | %R.E. | cuota R.E. | total",
+    "dos tipos de IVA en filas del pie",
+    "descuentos por línea"
+  ],
+  "header": {
+    "supplierName": "Lácteos y Huevos Sierra Norte S.L.",
+    "supplierTaxId": "B87615027",
+    "number": "A-2026-07734",
+    "date": "2026-09-22",
+    "subtotal": 297.72,
+    "vatTotal": 18.22,
+    "total": 315.94
+  },
+  "lines": [
+    {
+      "description": "LECHE ENTERA UHT 1L",
+      "code": "8437004512018",
+      "quantity": 24,
+      "unit": "ud",
+      "unitPrice": 0.78,
+      "total": 18.72,
+      "vatPct": 4
+    },
+    {
+      "description": "NATA PARA MONTAR 35% 1L",
+      "code": "8437004512117",
+      "quantity": 12,
+      "unit": "ud",
+      "unitPrice": 3.15,
+      "total": 37.8,
+      "vatPct": 10
+    },
+    {
+      "description": "HUEVOS FRESCOS L ESTUCHE 30",
+      "code": "8437004513015",
+      "quantity": 5,
+      "unit": "ud",
+      "unitPrice": 6.4,
+      "total": 32,
+      "vatPct": 4
+    },
+    {
+      "description": "QUESO DE BURGOS NATURAL 1KG",
+      "code": "8437004514012",
+      "quantity": 4,
+      "unit": "ud",
+      "unitPrice": 5.85,
+      "total": 23.4,
+      "vatPct": 4
+    },
+    {
+      "description": "YOGUR GRIEGO NATURAL 1KG",
+      "code": "8437004515019",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 3.9,
+      "discountPct": 10,
+      "total": 21.06,
+      "vatPct": 10
+    },
+    {
+      "description": "MANTEQUILLA CON SAL 500G",
+      "code": "8437004516016",
+      "quantity": 8,
+      "unit": "ud",
+      "unitPrice": 4.1,
+      "total": 32.8,
+      "vatPct": 10
+    },
+    {
+      "description": "QUESO CURADO DE OVEJA 3KG",
+      "code": "8437004517013",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 42.6,
+      "discountPct": 5,
+      "total": 80.94,
+      "vatPct": 4
+    },
+    {
+      "description": "REQUESÓN FRESCO 500G",
+      "code": "8437004518010",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 2.75,
+      "total": 16.5,
+      "vatPct": 4
+    },
+    {
+      "description": "MOZZARELLA FIOR DI LATTE 125G",
+      "code": "8437004519017",
+      "quantity": 20,
+      "unit": "ud",
+      "unitPrice": 1.05,
+      "total": 21,
+      "vatPct": 4
+    },
+    {
+      "description": "BATIDO DE CACAO 200ML PACK 3",
+      "code": "8437004520013",
+      "quantity": 10,
+      "unit": "ud",
+      "unitPrice": 1.35,
+      "total": 13.5,
+      "vatPct": 10
+    }
+  ],
+  "extras": []
+}

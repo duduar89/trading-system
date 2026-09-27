@@ -196,6 +196,21 @@ describe('priceAlerts', () => {
     expect(r[2].affectedDishIds).toEqual(['gazpacho']);
   });
 
+  it('"afecta a N platos" cuenta sólo platos de carta, también los que lo llevan a través de elaboraciones', () => {
+    const carta = [
+      dish({ id: 'ensalada', items: [item({ id: 'i', ref: { type: 'product', id: 'tomate' } })] }),
+      dish({ id: 'sofrito', kind: 'elaboracion', items: [item({ id: 's', ref: { type: 'product', id: 'tomate' } })] }),
+      dish({ id: 'salsa', kind: 'elaboracion', items: [item({ id: 't', ref: { type: 'dish', id: 'sofrito' } })] }),
+      dish({ id: 'albondigas', items: [item({ id: 'a', ref: { type: 'dish', id: 'salsa' } })] }),
+      dish({ id: 'flan', items: [item({ id: 'f', ref: { type: 'product', id: 'nata' } })] }),
+    ];
+    const t = priceAlerts(products, points, 5, carta).find((a) => a.productId === 'tomate')!;
+    // Uso directo (contrato previo): ensalada y la elaboración sofrito
+    expect(t.affectedDishIds).toEqual(['ensalada', 'sofrito']);
+    // Platos de carta afectados: ensalada (directo) y albóndigas (sofrito → salsa → albóndigas); nunca elaboraciones
+    expect([...t.affectedPlatoIds].sort()).toEqual(['albondigas', 'ensalada']);
+  });
+
   it('el umbral es inclusivo y se aplica en valor absoluto', () => {
     expect(priceAlerts(products, points, 10).map((a) => a.productId)).toEqual(['tomate', 'lomo', 'aceite']);
     expect(priceAlerts(products, points, 10.01).map((a) => a.productId)).toEqual(['tomate']);
@@ -333,6 +348,28 @@ describe('dashboardStats', () => {
     expect(r.monthlySpend[0]).toEqual({ month: '2024-03', total: 3 });
     expect(r.monthlySpend[11]).toEqual({ month: '2025-02', total: 14 });
     expect(r.weightedFoodCostPct).toBeCloseTo(r.avgFoodCostPct ?? NaN, 10);
+  });
+
+  it('un plato justo en el objetivo (con ruido de coma flotante) cuenta en verde y en el tramo 25–30 %', () => {
+    // 4,50 € sobre 16,50 € con 10 % de IVA = 30,000000000000004 %
+    const d = [dish({ id: 'J', menuPrice: 16.5 }), dish({ id: 'K', menuPrice: 11 })];
+    const c = new Map<string, DishCost>([
+      ['J', cost('J', { costPerPortion: 4.5, netPrice: 16.5 / 1.1 })],
+      ['K', cost('K', { costPerPortion: 3.506, netPrice: 10 })], // 35,06 % → rojo y tramo 35–40 %
+    ]);
+    expect(c.get('J')!.foodCostPct).toBeGreaterThan(30);
+    const r = dashboardStats({ dishes: d, costs: c, products: [], invoices: [], business });
+    expect([r.dishesOk, r.dishesWarn, r.dishesBad]).toEqual([1, 0, 1]);
+    expect(r.foodCostBuckets.map((b) => b.count)).toEqual([0, 1, 0, 1, 0]);
+  });
+
+  it('con objetivo propio del plato usa la misma franja ámbar desplazada que su ficha', () => {
+    const d = [dish({ id: 'T', menuPrice: 11, targetFoodCostPct: 25 })];
+    // 28 %: por encima de su objetivo (25) pero dentro de su franja (25 + 5) → ámbar; 31 % → rojo (no ámbar hasta 35)
+    const at = (pct: number) =>
+      dashboardStats({ dishes: d, costs: new Map([['T', cost('T', { costPerPortion: pct / 10, netPrice: 10, targetFoodCostPct: 25 })]]), products: [], invoices: [], business });
+    expect([at(28).dishesWarn, at(28).dishesBad]).toEqual([1, 0]);
+    expect([at(31).dishesWarn, at(31).dishesBad]).toEqual([0, 1]);
   });
 
   it('sin datos', () => {

@@ -1,0 +1,60 @@
+{
+  "id": "m07",
+  "kind": "menu",
+  "features": [
+    "iconos de alérgenos (emoji) tras el nombre",
+    "descripciones largas en dos filas",
+    "leyenda de alérgenos en el pie",
+    "«70 %» dentro de una descripción"
+  ],
+  "entries": [
+    {
+      "section": "Para comenzar",
+      "name": "Ceviche de corvina",
+      "price": 14.5,
+      "description": "Leche de tigre de ají amarillo, boniato glaseado, maíz cancha y cilantro fresco"
+    },
+    {
+      "section": "Para comenzar",
+      "name": "Ensalada de burrata y tomates heirloom",
+      "price": 13,
+      "description": "Tomates de temporada, pesto de albahaca, piñones tostados y aceite de oliva arbequina"
+    },
+    {
+      "section": "Para comenzar",
+      "name": "Croquetas melosas de cocido",
+      "price": 9.5,
+      "description": "Receta de la abuela con rebozado crujiente de panko. Seis unidades"
+    },
+    {
+      "section": "Principales",
+      "name": "Arroz meloso de carabinero",
+      "price": 23.5,
+      "description": "Fumet tostado de cabezas, alioli suave de azafrán y lima"
+    },
+    {
+      "section": "Principales",
+      "name": "Lomo de bacalao confitado",
+      "price": 21,
+      "description": "Pil pil de sus pieles, pimientos asados al carbón y patata ratte"
+    },
+    {
+      "section": "Principales",
+      "name": "Presa ibérica a la brasa",
+      "price": 22.5,
+      "description": "Parmentier de patata ahumada, chimichurri de hierbas y sal en escamas"
+    },
+    {
+      "section": "Postres",
+      "name": "Torrija de brioche",
+      "price": 7.5,
+      "description": "Caramelizada al momento con helado de leche merengada y canela"
+    },
+    {
+      "section": "Postres",
+      "name": "Chocolate en texturas",
+      "price": 8,
+      "description": "Cremoso al 70 %, bizcocho aireado, tierra de cacao y sorbete de frambuesa"
+    }
+  ]
+}

@@ -20,6 +20,13 @@ import { SCAN_STATUS, saveMenuScanPatch, scanWarnings } from '../components/dish
 
 export default function MenuReview() {
   const { id } = useParams();
+  // Un estado por carta: al pasar de una a otra sin salir de la pantalla (historial, enlace directo o navegación rápida)
+  // no se arrastran el borrador, sus guardados pendientes ni los diálogos abiertos de la anterior.
+  return <MenuReviewScreen key={id} />;
+}
+
+function MenuReviewScreen() {
+  const { id } = useParams();
   const navigate = useNavigate();
   const scans = useMenuScans();
   const dishes = useDishes();

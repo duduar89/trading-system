@@ -98,11 +98,11 @@ export function EscandalloTable({ dish, cost, ctx, products, business, onItemsCh
   const dishPriceLabel = useCallback(
     (d: Dish): ReactNode => {
       const c = costDish(d, ctx);
-      if (d.yieldQty && d.yieldQty > 0 && d.yieldUnit) {
+      if (d.yieldQty && d.yieldQty > 0) {
         return (
           <>
             <span className="font-semibold">{fmtPrice(c.totalCost / d.yieldQty)}</span>
-            <span className="text-muted"> /{d.yieldUnit}</span>
+            <span className="text-muted"> /{d.yieldUnit ?? 'kg'}</span>
           </>
         );
       }
@@ -146,7 +146,7 @@ export function EscandalloTable({ dish, cost, ctx, products, business, onItemsCh
       }
     } else if (opt.kind === 'dish' && opt.dish) {
       const d = opt.dish;
-      const yu = d.yieldQty && d.yieldQty > 0 ? d.yieldUnit : undefined;
+      const yu = d.yieldQty && d.yieldQty > 0 ? (d.yieldUnit ?? 'kg') : undefined;
       if (yu && !convertToBase(1, item.unit, yu, {}).ok) patch.unit = defaultRecipeUnit(yu);
       // En elaboraciones la merma ya va dentro de su escandallo.
       patch.wastePct = undefined;

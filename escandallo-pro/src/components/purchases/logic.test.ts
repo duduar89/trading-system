@@ -5,6 +5,8 @@ import {
   columnLetter,
   diffPrices,
   DEFAULT_PRODUCT_FILTERS,
+  duplicateInvoiceIds,
+  findDuplicateInvoice,
   filterInvoices,
   filterProducts,
   foldText,
@@ -460,5 +462,55 @@ describe('niceTicks y parseAmount', () => {
     expect(parseAmount('1.5')).toBe(1.5);
     expect(parseAmount(' ')).toBeUndefined();
     expect(parseAmount('abc')).toBeNaN();
+  });
+});
+
+describe('facturas repetidas (PDF y foto de la misma factura)', () => {
+  const pdf = invoice({
+    id: 'pdf',
+    supplierName: 'Carnes Selectas Guadarrama S.L.',
+    supplierTaxId: 'B78456123',
+    number: 'CSG-26-004187',
+    date: '2026-09-19',
+    subtotal: 596.58,
+    status: 'confirmada',
+    createdAt: '2026-09-25T09:00:00.000Z',
+  });
+  const photo = invoice({
+    id: 'foto',
+    supplierName: 'CARNES SELECTAS GUADARRAMA, SL',
+    number: 'CSG 26 004187',
+    date: '2026-09-19',
+    subtotal: 596.58,
+    status: 'revision',
+    createdAt: '2026-09-25T09:00:01.000Z',
+  });
+
+  it('detecta la misma factura por proveedor y número aunque cambien mayúsculas, signos y forma jurídica', () => {
+    expect(findDuplicateInvoice(photo, [pdf, photo])?.id).toBe('pdf');
+    expect(findDuplicateInvoice(pdf, [pdf, photo])?.id).toBe('foto');
+    expect([...duplicateInvoiceIds([pdf, photo])].sort()).toEqual(['foto', 'pdf']);
+  });
+
+  it('prefiere la confirmada', () => {
+    const third = invoice({ ...photo, id: 'otra', status: 'revision', createdAt: '2026-09-24T00:00:00.000Z' });
+    expect(findDuplicateInvoice(photo, [third, pdf, photo])?.id).toBe('pdf');
+  });
+
+  it('no confunde facturas distintas del mismo proveedor ni el mismo número de otro proveedor', () => {
+    const next = invoice({ ...pdf, id: 'siguiente', number: 'CSG-26-004188', status: 'revision' });
+    const other = invoice({ ...pdf, id: 'otro', supplierName: 'Frutas García', supplierTaxId: 'B28123456', status: 'revision' });
+    expect(findDuplicateInvoice(next, [pdf, next, other])).toBeUndefined();
+    expect(findDuplicateInvoice(other, [pdf, next, other])).toBeUndefined();
+    expect(duplicateInvoiceIds([pdf, next, other]).size).toBe(0);
+  });
+
+  it('sin número: misma fecha e importe; las que tienen error o se están leyendo no cuentan', () => {
+    const noNumber = invoice({ ...photo, id: 'sin-num', number: undefined });
+    expect(findDuplicateInvoice(noNumber, [pdf, noNumber])?.id).toBe('pdf');
+    expect(findDuplicateInvoice(invoice({ ...noNumber, subtotal: 600 }), [pdf])).toBeUndefined();
+    expect(findDuplicateInvoice(photo, [{ ...pdf, status: 'error' }, photo])).toBeUndefined();
+    expect(findDuplicateInvoice({ ...photo, status: 'procesando' }, [pdf])).toBeUndefined();
+    expect(findDuplicateInvoice(invoice({ id: 'vacia', supplierName: '', number: 'X1', status: 'revision' }), [invoice({ id: 'v2', supplierName: '', number: 'X1', status: 'revision' })])).toBeUndefined();
   });
 });

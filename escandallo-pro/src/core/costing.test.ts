@@ -9,6 +9,7 @@ import {
   effectiveWaste,
   foodCostStatus,
   maxAffordablePrice,
+  roundPct,
   roundUpTo,
   suggestedMenuPrice,
 } from './costing';
@@ -511,11 +512,40 @@ describe('foodCostStatus', () => {
     [Number.NaN, 'none'],
     [22, 'ok'],
     [30, 'ok'],
-    [30.01, 'warn'],
+    // Se clasifica la cifra que se muestra (una décima): 30,01 % se ve "30,0 %" y no puede salir en ámbar.
+    [30.000000000000004, 'ok'],
+    [30.01, 'ok'],
+    [30.0001, 'ok'],
+    [30.06, 'warn'],
     [35, 'warn'],
+    [35.04, 'warn'],
+    [35.06, 'bad'],
     [35.5, 'bad'],
   ])('%s → %s', (pct, expected) => {
     expect(foodCostStatus(pct, 30, 35)).toBe(expected);
+  });
+
+  it('un plato al PVP sugerido nunca sale en ámbar (ruido de coma flotante)', () => {
+    // 4,50 € / (16,50 € / 1,10) = 30,000000000000004 %
+    const fc = (4.5 / (16.5 / 1.1)) * 100;
+    expect(fc).toBeGreaterThan(30);
+    expect(foodCostStatus(fc, 30, 35)).toBe('ok');
+    for (const cost of [1.23, 3.3, 4.5, 6.6, 9.9, 12.34]) {
+      for (const rounding of [0.5, 0.1, 0.05]) {
+        for (const vat of [0, 4, 10, 21]) {
+          const price = suggestedMenuPrice(cost, 30, vat, rounding)!;
+          const pct = (cost / (price / (1 + vat / 100))) * 100;
+          expect(foodCostStatus(pct, 30, 35), `${cost} € · ${rounding} · IVA ${vat} %`).toBe('ok');
+        }
+      }
+    }
+  });
+
+  it('roundPct redondea como la interfaz', () => {
+    expect(roundPct(30.000000000000004)).toBe(30);
+    expect(roundPct(30.05)).toBe(30.1);
+    expect(roundPct(28.44)).toBe(28.4);
+    expect(roundPct(Number.POSITIVE_INFINITY)).toBe(Number.POSITIVE_INFINITY);
   });
 });
 

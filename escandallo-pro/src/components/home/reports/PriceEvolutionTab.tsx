@@ -285,7 +285,7 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
                     </Td>
                     <Td className="whitespace-nowrap">{fmtDate(a.currentDate)}</Td>
                     <Td align="right" className="whitespace-nowrap">
-                      {a.affectedDishIds.length}
+                      {a.affectedPlatoIds.length}
                     </Td>
                   </tr>
                 );

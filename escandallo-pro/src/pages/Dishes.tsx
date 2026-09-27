@@ -27,6 +27,7 @@ import { errorMessage, toast } from '../state/store';
 import { deleteDish, updateDish } from '../services/dishes';
 
 import { foodCostStatus } from '../core/costing';
+import { isEstimatedPrice } from '../components/purchases/estimated';
 import { Button, Callout, ConfirmDialog, EmptyState, IconButton, PageHeader, SearchInput, Segmented, Select, Stat } from '../components/ui';
 import { DishCard, DishCardSkeleton } from '../components/dishes/DishCard';
 import { DishListTable } from '../components/dishes/DishListTable';
@@ -128,6 +129,17 @@ export default function Dishes() {
   const hasNoSection = useMemo(() => all.some((d) => (kind === 'todos' || d.kind === kind) && !d.section?.trim()), [all, kind]);
   const stats = useMemo(() => (costs ? dishListStats(all, costs, business) : undefined), [all, costs, business]);
   const fcCounts = useMemo(() => (costs ? foodCostCounts(all, costs, business) : undefined), [all, costs, business]);
+  // Líneas con precio orientativo (ingrediente creado con precio estimado y aún sin factura), por plato.
+  const estimatedByDish = useMemo(() => {
+    const out = new Map<ID, number>();
+    const products = dc?.ctx.products;
+    if (!products) return out;
+    for (const d of all) {
+      const n = d.items.filter((it) => it.ref?.type === 'product' && isEstimatedPrice(products.get(it.ref.id))).length;
+      if (n) out.set(d.id, n);
+    }
+    return out;
+  }, [all, dc]);
   const visible = useMemo(() => {
     if (!costs) return [];
     const filtered = filterByFoodCost(filterDishes(all, { query, kind: fc ? 'plato' : kind, status, section }), costs, business, fc);
@@ -414,7 +426,16 @@ export default function Dishes() {
           ) : view === 'cards' || !wide ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {visible.map((d) => (
-                <DishCard key={d.id} dish={d} cost={costs.get(d.id)} business={business} selected={selected.has(d.id)} selecting={selected.size > 0} onToggle={() => toggle(d.id)} />
+                <DishCard
+                  key={d.id}
+                  dish={d}
+                  cost={costs.get(d.id)}
+                  business={business}
+                  selected={selected.has(d.id)}
+                  selecting={selected.size > 0}
+                  onToggle={() => toggle(d.id)}
+                  estimated={estimatedByDish.get(d.id)}
+                />
               ))}
             </div>
           ) : (

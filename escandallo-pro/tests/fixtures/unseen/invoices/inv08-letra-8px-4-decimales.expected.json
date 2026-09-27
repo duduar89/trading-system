@@ -1,0 +1,231 @@
+{
+  "id": "inv08-letra-8px-4-decimales",
+  "kind": "invoice",
+  "features": [
+    "letra de 8 px",
+    "Descripción | Cantidad | Precio | Importe (cantidad tras la descripción, sin unidad)",
+    "precios de 4 decimales (0,8950)",
+    "miles en cantidades (1.200) e importes (1.234,56)",
+    "cliente con CIF de letra G"
+  ],
+  "header": {
+    "supplierName": "Comercial Gastronómica del Norte S.A.",
+    "supplierTaxId": "A48033161",
+    "number": "26/F/002231",
+    "date": "2026-09-21",
+    "subtotal": 2057.62,
+    "vatTotal": 102.07,
+    "total": 2159.69
+  },
+  "lines": [
+    {
+      "description": "PATATA AGRIA LAVADA",
+      "quantity": 150,
+      "unit": "kg",
+      "unitPrice": 0.895,
+      "total": 134.25,
+      "vatPct": 4
+    },
+    {
+      "description": "CEBOLLA AMARILLA",
+      "quantity": 60,
+      "unit": "kg",
+      "unitPrice": 0.74,
+      "total": 44.4,
+      "vatPct": 4
+    },
+    {
+      "description": "ZANAHORIA",
+      "quantity": 25,
+      "unit": "kg",
+      "unitPrice": 0.92,
+      "total": 23,
+      "vatPct": 4
+    },
+    {
+      "description": "PIMIENTO VERDE ITALIANO",
+      "quantity": 12.5,
+      "unit": "kg",
+      "unitPrice": 2.15,
+      "total": 26.88,
+      "vatPct": 4
+    },
+    {
+      "description": "TOMATE RAMA",
+      "quantity": 18.4,
+      "unit": "kg",
+      "unitPrice": 1.99,
+      "total": 36.62,
+      "vatPct": 4
+    },
+    {
+      "description": "LECHUGA ICEBERG",
+      "quantity": 24,
+      "unit": "ud",
+      "unitPrice": 0.68,
+      "total": 16.32,
+      "vatPct": 4
+    },
+    {
+      "description": "AJO SECO MALLA 1KG",
+      "quantity": 5,
+      "unit": "ud",
+      "unitPrice": 4.75,
+      "total": 23.75,
+      "vatPct": 4
+    },
+    {
+      "description": "LIMÓN VERNA",
+      "quantity": 10,
+      "unit": "kg",
+      "unitPrice": 1.35,
+      "total": 13.5,
+      "vatPct": 4
+    },
+    {
+      "description": "NARANJA DE ZUMO",
+      "quantity": 40,
+      "unit": "kg",
+      "unitPrice": 0.82,
+      "total": 32.8,
+      "vatPct": 4
+    },
+    {
+      "description": "MANZANA GOLDEN",
+      "quantity": 15,
+      "unit": "kg",
+      "unitPrice": 1.65,
+      "total": 24.75,
+      "vatPct": 4
+    },
+    {
+      "description": "PLÁTANO DE CANARIAS",
+      "quantity": 12,
+      "unit": "kg",
+      "unitPrice": 1.98,
+      "total": 23.76,
+      "vatPct": 4
+    },
+    {
+      "description": "FRESÓN DE HUELVA",
+      "quantity": 6,
+      "unit": "kg",
+      "unitPrice": 3.4,
+      "total": 20.4,
+      "vatPct": 4
+    },
+    {
+      "description": "CHAMPIÑÓN LAMINADO 1KG",
+      "quantity": 8,
+      "unit": "ud",
+      "unitPrice": 3.15,
+      "total": 25.2,
+      "vatPct": 4
+    },
+    {
+      "description": "CALABACÍN",
+      "quantity": 9.6,
+      "unit": "kg",
+      "unitPrice": 1.45,
+      "total": 13.92,
+      "vatPct": 4
+    },
+    {
+      "description": "BERENJENA",
+      "quantity": 7.2,
+      "unit": "kg",
+      "unitPrice": 1.6,
+      "total": 11.52,
+      "vatPct": 4
+    },
+    {
+      "description": "PUERRO",
+      "quantity": 6,
+      "unit": "kg",
+      "unitPrice": 1.75,
+      "total": 10.5,
+      "vatPct": 4
+    },
+    {
+      "description": "PEREJIL MANOJO",
+      "quantity": 20,
+      "unit": "ud",
+      "unitPrice": 0.45,
+      "total": 9,
+      "vatPct": 4
+    },
+    {
+      "description": "ACEITE OLIVA VIRGEN EXTRA GARRAFA 5L",
+      "quantity": 32,
+      "unit": "ud",
+      "unitPrice": 38.58,
+      "total": 1234.56,
+      "vatPct": 4
+    },
+    {
+      "description": "VINAGRE DE VINO BLANCO 5L",
+      "quantity": 4,
+      "unit": "ud",
+      "unitPrice": 3.9,
+      "total": 15.6,
+      "vatPct": 10
+    },
+    {
+      "description": "SAL FINA 1KG",
+      "quantity": 12,
+      "unit": "ud",
+      "unitPrice": 0.49,
+      "total": 5.88,
+      "vatPct": 10
+    },
+    {
+      "description": "SERVILLETA CÓCTEL 20X20",
+      "quantity": 1200,
+      "unit": "ud",
+      "unitPrice": 0.0215,
+      "total": 25.8,
+      "vatPct": 21
+    },
+    {
+      "description": "GUANTES NITRILO T/M CAJA 100",
+      "quantity": 10,
+      "unit": "ud",
+      "unitPrice": 5.45,
+      "total": 54.5,
+      "vatPct": 21
+    },
+    {
+      "description": "BOLSA BASURA 85X105 ROLLO 10",
+      "quantity": 15,
+      "unit": "ud",
+      "unitPrice": 1.89,
+      "total": 28.35,
+      "vatPct": 21
+    },
+    {
+      "description": "HUEVOS CAMPEROS L DOCENA",
+      "quantity": 30,
+      "unit": "ud",
+      "unitPrice": 2.65,
+      "total": 79.5,
+      "vatPct": 4
+    },
+    {
+      "description": "LECHE SEMIDESNATADA 1L",
+      "quantity": 48,
+      "unit": "ud",
+      "unitPrice": 0.79,
+      "total": 37.92,
+      "vatPct": 4
+    },
+    {
+      "description": "QUESO MANCHEGO SEMICURADO",
+      "quantity": 6.85,
+      "unit": "kg",
+      "unitPrice": 12.4,
+      "total": 84.94,
+      "vatPct": 4
+    }
+  ],
+  "extras": []
+}

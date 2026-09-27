@@ -1,0 +1,66 @@
+{
+  "id": "m02",
+  "kind": "menu",
+  "features": [
+    "precio delante del nombre",
+    "secciones en bandas de color",
+    "tipografía condensada"
+  ],
+  "entries": [
+    {
+      "section": "Tapas frías",
+      "name": "Gilda de anchoa y guindilla",
+      "price": 3.5
+    },
+    {
+      "section": "Tapas frías",
+      "name": "Boquerones en vinagre",
+      "price": 4.2
+    },
+    {
+      "section": "Tapas frías",
+      "name": "Ensaladilla rusa",
+      "price": 5.8
+    },
+    {
+      "section": "Tapas frías",
+      "name": "Salpicón de marisco",
+      "price": 6.5
+    },
+    {
+      "section": "Tapas calientes",
+      "name": "Tortilla de patatas",
+      "price": 4
+    },
+    {
+      "section": "Tapas calientes",
+      "name": "Oreja a la plancha",
+      "price": 7.5
+    },
+    {
+      "section": "Tapas calientes",
+      "name": "Calamares a la romana",
+      "price": 8.9
+    },
+    {
+      "section": "Tapas calientes",
+      "name": "Patatas bravas",
+      "price": 6.2
+    },
+    {
+      "section": "Bocadillos",
+      "name": "Bocadillo de calamares",
+      "price": 5.5
+    },
+    {
+      "section": "Bocadillos",
+      "name": "Serranito de lomo",
+      "price": 6.8
+    },
+    {
+      "section": "Bocadillos",
+      "name": "Pepito de ternera",
+      "price": 4.9
+    }
+  ]
+}

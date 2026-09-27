@@ -69,7 +69,8 @@ export function MenuEngineeringTab({ data }: { data: ReportsData }) {
   }));
   const totalUnits = rows.reduce((s, r) => s + r.unitsSold, 0);
   const totalMargin = rows.reduce((s, r) => s + r.totalMargin, 0);
-  const highMargin = rows.filter((r) => r.contributionMargin >= me.avgMargin).length;
+  // Mismo criterio (con tolerancia de coma flotante) que la clasificación de la matriz.
+  const highMargin = rows.filter((r) => r.profitability === 'alta').length;
 
   return (
     <div className="space-y-4 sm:space-y-5">

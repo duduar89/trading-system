@@ -1,0 +1,132 @@
+{
+  "id": "inv05-ticket-cash-carry",
+  "kind": "invoice",
+  "features": [
+    "ticket térmico 80 mm monoespaciado",
+    "descripción y números en filas distintas (x6 0,82 4,92)",
+    "artículos a peso (kg × EUR/kg)",
+    "códigos de IVA A/B/C",
+    "totales al pie",
+    "CIF con guion"
+  ],
+  "header": {
+    "supplierName": "CASH & CARRY GASTRO SUR S.A.",
+    "supplierTaxId": "A41234568",
+    "number": "T012-2026-058831",
+    "date": "2026-09-23",
+    "subtotal": 113.31,
+    "vatTotal": 9.85,
+    "total": 123.16
+  },
+  "lines": [
+    {
+      "description": "LECHE ENTERA BRIK 1L",
+      "code": "2104578",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 0.82,
+      "total": 4.92,
+      "vatPct": 4
+    },
+    {
+      "description": "HUEVOS CAMPEROS M 30U",
+      "code": "3301456",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 7.45,
+      "total": 7.45,
+      "vatPct": 4
+    },
+    {
+      "description": "CEBOLLA MALLA 5KG",
+      "code": "5500123",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 3.95,
+      "total": 3.95,
+      "vatPct": 4
+    },
+    {
+      "description": "QUESO CURADO CUÑA",
+      "code": "2201887",
+      "quantity": 0.845,
+      "unit": "kg",
+      "unitPrice": 14.9,
+      "total": 12.59,
+      "vatPct": 4
+    },
+    {
+      "description": "ACEITE GIRASOL 5L",
+      "code": "6610022",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 9.65,
+      "total": 19.3,
+      "vatPct": 4
+    },
+    {
+      "description": "TOMATE TRITURADO 3KG",
+      "code": "7012345",
+      "quantity": 3,
+      "unit": "ud",
+      "unitPrice": 3.1,
+      "total": 9.3,
+      "vatPct": 10
+    },
+    {
+      "description": "ATUN CLARO RO-900",
+      "code": "7015501",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 8.75,
+      "total": 8.75,
+      "vatPct": 10
+    },
+    {
+      "description": "PAPEL COCINA 2 ROLLOS",
+      "code": "8800120",
+      "quantity": 4,
+      "unit": "ud",
+      "unitPrice": 2.95,
+      "total": 11.8,
+      "vatPct": 21
+    },
+    {
+      "description": "BOLSA BASURA 85X105",
+      "code": "8811403",
+      "quantity": 1,
+      "unit": "ud",
+      "unitPrice": 4.2,
+      "total": 4.2,
+      "vatPct": 21
+    },
+    {
+      "description": "JAMON COCIDO EXTRA",
+      "code": "2200045",
+      "quantity": 1.26,
+      "unit": "kg",
+      "unitPrice": 9.8,
+      "total": 12.35,
+      "vatPct": 10
+    },
+    {
+      "description": "NATA COCINA 1L",
+      "code": "4401987",
+      "quantity": 6,
+      "unit": "ud",
+      "unitPrice": 2.15,
+      "total": 12.9,
+      "vatPct": 10
+    },
+    {
+      "description": "PAN BARRA PRECOCIDA",
+      "code": "1109876",
+      "quantity": 20,
+      "unit": "ud",
+      "unitPrice": 0.29,
+      "total": 5.8,
+      "vatPct": 4
+    }
+  ],
+  "extras": []
+}

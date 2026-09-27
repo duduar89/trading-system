@@ -311,6 +311,26 @@ describe('similarity: reglas de dominio', () => {
     expect(similarity('Chocolate negro', 'CHOCOLATE 70% 1KG')).toBe(1);
   });
 
+  it('nata para montar y nata para cocinar nunca se emparejan (el precio de una no vale para la otra)', () => {
+    // Regresión E2E: «NATA 35% MG 1L» actualizaba el precio de la «Nata para cocinar» de los escandallos (+62 %)
+    // y «Nata para montar 35 %» de la tarta de queso se vinculaba sola a la de cocinar.
+    expect(similarity('NATA 35% MG 1L', 'Nata para cocinar')).toBeLessThan(SUGGEST_THRESHOLD);
+    expect(similarity('Nata para montar 35 %', 'Nata para cocinar')).toBeLessThan(SUGGEST_THRESHOLD);
+    expect(similarity('NATA 18% 1L', 'Nata para montar')).toBeLessThan(SUGGEST_THRESHOLD);
+    expect(similarity('Nata', 'NATA 35% MG 1L')).toBeGreaterThanOrEqual(AUTO_LINK_THRESHOLD);
+    expect(similarity('Nata para cocinar', 'NATA COCINA 1L')).toBeGreaterThanOrEqual(AUTO_LINK_THRESHOLD);
+  });
+
+  it('jamón a secas es serrano: el ibérico de bellota no pasa por unos taquitos de jamón', () => {
+    // Regresión E2E: «JAMON IBERICO BELLOTA LONCHEADO 100G» (114 €/kg) se aplicaba a «Taquitos de jamón» (12 €/kg).
+    expect(similarity('JAMON IBERICO BELLOTA LONCHEADO 100G', 'Taquitos de jamón')).toBeLessThan(SUGGEST_THRESHOLD);
+    expect(similarity('JAMON IBERICO BELLOTA LONCHEADO 100G', 'Jamón ibérico de bellota')).toBeGreaterThanOrEqual(AUTO_LINK_THRESHOLD);
+    expect(similarity('Jamón', 'JAMON SERRANO')).toBeGreaterThanOrEqual(AUTO_LINK_THRESHOLD);
+    const generic = similarity('Jamón', 'JAMON IBERICO BELLOTA LONCHAS');
+    expect(generic).toBeGreaterThanOrEqual(SUGGEST_THRESHOLD);
+    expect(generic).toBeLessThan(AUTO_LINK_THRESHOLD);
+  });
+
   it('hierbas y especias secas o molidas no son "otro producto"', () => {
     expect(similarity('Tomillo', 'TOMILLO SECO')).toBeGreaterThanOrEqual(AUTO_LINK_THRESHOLD);
     expect(similarity('Comino', 'COMINO MOLIDO')).toBeGreaterThanOrEqual(AUTO_LINK_THRESHOLD);
@@ -492,5 +512,28 @@ describe('cleanProductName', () => {
     for (const d of ['TOMATE PERA CAT.I CAJA 6KG', 'ACEITE OLIVA V.E. GARRAFA 5L', 'SOLOMILLO TERNERA NAC. KG', 'MANT. SIN SAL 250G']) {
       expect(similarity(cleanProductName(d), d)).toBe(1);
     }
+  });
+});
+
+describe('cleanProductName: facturas reales de un restaurante nuevo (QA compras)', () => {
+  it.each([
+    // Topónimo desconocido con artículo al final: fuera (antes «Ajo morado las pedronera», con la eñe y la ese perdidas)
+    ['AJO MORADO LAS PEDROÑERAS', 'Ajo morado'],
+    ['ACEITE LA ESPAÑOLA 1L', 'Aceite'],
+    // Los conocidos se conservan
+    ['PIMENTON DULCE DE LA VERA 75G', 'Pimentón dulce de la Vera'],
+    // El calificativo del animal concuerda con el animal, no con el corte (antes «Pechuga de pollo campera»)
+    ['PECHUGA POLLO CAMPERO', 'Pechuga de pollo campero'],
+    ['CARRILLERA CERDO IBERICO', 'Carrillera de cerdo ibérico'],
+    ['CHULETA TERNERA GALLEGA', 'Chuleta de ternera gallega'],
+    ['CARRILLERA IBERICA', 'Carrillera ibérica'],
+    // Una variedad tras el sustantivo no le quita el «de» (antes «Lomo alto vaca madurada», «Harina de trigo fuerza»)
+    ['LOMO ALTO VACA MADURADA 30D', 'Lomo alto de vaca madurada'],
+    ['HARINA TRIGO FUERZA SACO 10KG', 'Harina de trigo de fuerza'],
+    ['HARINA FUERZA 1KG', 'Harina de fuerza'],
+    // Tildes y eñes de palabras fuera del diccionario, como venían escritas
+    ['CECINA DE LEÓN', 'Cecina de león'],
+  ])('%s → %s', (input, expected) => {
+    expect(cleanProductName(input)).toBe(expected);
   });
 });

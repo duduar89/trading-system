@@ -210,6 +210,81 @@ export function invoiceStats(invoices: Invoice[], today: string): InvoiceStats {
   return s;
 }
 
+// ───────────────────────────── Facturas repetidas ─────────────────────────────
+
+const LEGAL_FORMS = /\b(?:s l u|s l l|s l|s a|s c p|s c|c b|s coop|sccl|slu|sll|sl|sa|scp|cb|sociedad limitada|sociedad anonima)\b/g;
+
+interface InvoiceIdentity {
+  suppliers: string[];
+  number: string;
+  date: string;
+  cents: number;
+}
+
+function invoiceIdentity(inv: Invoice): InvoiceIdentity {
+  const tax = (inv.supplierTaxId ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const name = foldText(inv.supplierName).replace(LEGAL_FORMS, ' ').replace(/\s+/g, ' ').trim();
+  const suppliers = [tax.length >= 8 ? `cif:${tax}` : '', name ? `nombre:${name}` : '', inv.supplierId ? `id:${inv.supplierId}` : ''].filter(Boolean);
+  const number = (inv.number ?? '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .replace(/^0+(?=\d)/, '');
+  return { suppliers, number, date: inv.date ?? '', cents: Math.round(invoiceNetAmount(inv) * 100) };
+}
+
+function sameInvoice(a: InvoiceIdentity, b: InvoiceIdentity): boolean {
+  if (!a.suppliers.some((s) => b.suppliers.includes(s))) return false;
+  // En España el número de factura es único por proveedor; si falta en alguna, misma fecha y mismo importe.
+  if (a.number && b.number) return a.number === b.number;
+  return !!a.date && a.date === b.date && a.cents > 0 && a.cents === b.cents;
+}
+
+/** Sólo cuentan las facturas ya leídas: por revisar o confirmadas. */
+const readInvoice = (inv: Invoice) => inv.status === 'revision' || inv.status === 'confirmada';
+
+/**
+ * Otra factura que parece la misma que `inv`: mismo proveedor (CIF, nombre sin forma jurídica o ficha) y mismo número o, si
+ * a alguna le falta el número, misma fecha e importe. Pasa al subir el PDF y una foto de la misma factura, y confirmar las
+ * dos contaría el gasto dos veces. Prefiere la confirmada y, si no, la más antigua.
+ */
+export function findDuplicateInvoice(inv: Invoice, all: Invoice[]): Invoice | undefined {
+  if (!readInvoice(inv)) return undefined;
+  const me = invoiceIdentity(inv);
+  if (!me.suppliers.length) return undefined;
+  const hits = all.filter((o) => o.id !== inv.id && readInvoice(o) && sameInvoice(me, invoiceIdentity(o)));
+  hits.sort(
+    (a, b) =>
+      Number(b.status === 'confirmada') - Number(a.status === 'confirmada') || (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0),
+  );
+  return hits[0];
+}
+
+/** Ids de las facturas que tienen otra igual (ver findDuplicateInvoice), para marcarlas en la lista. */
+export function duplicateInvoiceIds(all: Invoice[]): Set<ID> {
+  const out = new Set<ID>();
+  const bySupplier = new Map<string, { inv: Invoice; key: InvoiceIdentity }[]>();
+  for (const inv of all) {
+    if (!readInvoice(inv)) continue;
+    const key = invoiceIdentity(inv);
+    for (const s of key.suppliers) {
+      let group = bySupplier.get(s);
+      if (!group) bySupplier.set(s, (group = []));
+      group.push({ inv, key });
+    }
+  }
+  for (const group of bySupplier.values())
+    for (let i = 0; i < group.length; i++)
+      for (let j = i + 1; j < group.length; j++) {
+        const a = group[i];
+        const b = group[j];
+        if (a.inv.id !== b.inv.id && sameInvoice(a.key, b.key)) {
+          out.add(a.inv.id);
+          out.add(b.inv.id);
+        }
+      }
+  return out;
+}
+
 // ───────────────────────────── Precios ─────────────────────────────
 
 /** Variación porcentual (positivo = subida). undefined si no hay precio de partida. */

@@ -1,0 +1,93 @@
+{
+  "id": "inv09-descripciones-dos-filas",
+  "kind": "invoice",
+  "features": [
+    "descripciones partidas en 2–3 filas",
+    "números centrados verticalmente entre las filas de la descripción",
+    "C.I.F. con puntos"
+  ],
+  "header": {
+    "supplierName": "Ibéricos y Embutidos de Guijuelo S.L.",
+    "supplierTaxId": "B37144284",
+    "number": "IEG-2026-1409",
+    "date": "2026-09-15",
+    "subtotal": 427.19,
+    "vatTotal": 42.72,
+    "total": 469.91
+  },
+  "lines": [
+    {
+      "description": "JAMÓN IBÉRICO DE BELLOTA 100% RAZA IBÉRICA LONCHEADO A CUCHILLO 100 G",
+      "code": "J100",
+      "quantity": 10,
+      "unit": "ud",
+      "unitPrice": 12.8,
+      "total": 128,
+      "vatPct": 10
+    },
+    {
+      "description": "PALETA IBÉRICA DE CEBO DE CAMPO DESHUESADA PIEZA 2,5 KG APROX.",
+      "code": "P210",
+      "quantity": 2.64,
+      "unit": "kg",
+      "unitPrice": 29.5,
+      "total": 77.88,
+      "vatPct": 10
+    },
+    {
+      "description": "LOMO EMBUCHADO IBÉRICO DE BELLOTA MEDIA PIEZA ENVASADO AL VACÍO",
+      "code": "L305",
+      "quantity": 1.21,
+      "unit": "kg",
+      "unitPrice": 38.9,
+      "total": 47.07,
+      "vatPct": 10
+    },
+    {
+      "description": "CHORIZO IBÉRICO CULAR EXTRA CURACIÓN NATURAL",
+      "code": "C410",
+      "quantity": 2.48,
+      "unit": "kg",
+      "unitPrice": 16.4,
+      "total": 40.67,
+      "vatPct": 10
+    },
+    {
+      "description": "SALCHICHÓN IBÉRICO DE BELLOTA VELA",
+      "code": "S420",
+      "quantity": 1.95,
+      "unit": "kg",
+      "unitPrice": 18.2,
+      "total": 35.49,
+      "vatPct": 10
+    },
+    {
+      "description": "QUESO DE OVEJA CURADO EN ACEITE DE OLIVA D.O.P. MANCHEGO",
+      "code": "Q501",
+      "quantity": 3.1,
+      "unit": "kg",
+      "unitPrice": 17.8,
+      "total": 55.18,
+      "vatPct": 10
+    },
+    {
+      "description": "MORCÓN IBÉRICO",
+      "code": "M430",
+      "quantity": 1.5,
+      "unit": "kg",
+      "unitPrice": 15.6,
+      "total": 23.4,
+      "vatPct": 10
+    },
+    {
+      "description": "SOBRASADA DE MALLORCA I.G.P. CULANA TRADICIONAL",
+      "code": "S440",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 9.75,
+      "total": 19.5,
+      "vatPct": 10
+    }
+  ],
+  "extras": []
+}

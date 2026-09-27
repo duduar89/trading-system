@@ -1,0 +1,118 @@
+{
+  "id": "inv07-apaisada-lotes-dto-doble",
+  "kind": "invoice",
+  "features": [
+    "página apaisada",
+    "12 columnas: Ref | Descripción | Lote | Cad. | Bultos | Cantidad | Ud. | Precio | Dto.1 | Dto.2 | Importe | IVA",
+    "lotes numéricos",
+    "dos descuentos en cascada",
+    "descuento por pronto pago",
+    "cabecera en rejilla (etiqueta arriba, valor debajo) con fecha de vencimiento"
+  ],
+  "header": {
+    "supplierName": "Distribuciones Horeca Meseta S.L.",
+    "supplierTaxId": "B45077898",
+    "number": "DHM26-00917",
+    "date": "2026-09-18",
+    "subtotal": 437.35,
+    "vatTotal": 39.79,
+    "total": 477.14
+  },
+  "lines": [
+    {
+      "description": "PATATA PREFRITA 9MM CONGELADA",
+      "code": "CG1020",
+      "quantity": 40,
+      "unit": "kg",
+      "unitPrice": 1.38,
+      "total": 55.2,
+      "vatPct": 10
+    },
+    {
+      "description": "CROQUETA JAMÓN IBÉRICO 1KG",
+      "code": "CG1105",
+      "quantity": 12,
+      "unit": "ud",
+      "unitPrice": 6.75,
+      "discountPct": 5,
+      "total": 76.95,
+      "vatPct": 10
+    },
+    {
+      "description": "GUISANTE FINO CONGELADO 2,5KG",
+      "code": "CG2010",
+      "quantity": 4,
+      "unit": "ud",
+      "unitPrice": 5.9,
+      "total": 23.6,
+      "vatPct": 4
+    },
+    {
+      "description": "NATA PARA COCINAR 35% 1L",
+      "code": "RF3001",
+      "quantity": 12,
+      "unit": "ud",
+      "unitPrice": 3.45,
+      "discountPct": 6.9,
+      "total": 38.54,
+      "vatPct": 10
+    },
+    {
+      "description": "MANTEQUILLA SIN SAL 1KG",
+      "code": "RF3010",
+      "quantity": 5,
+      "unit": "ud",
+      "unitPrice": 8.9,
+      "total": 44.5,
+      "vatPct": 10
+    },
+    {
+      "description": "QUESO MOZZARELLA RALLADO 2KG",
+      "code": "RF3022",
+      "quantity": 4,
+      "unit": "ud",
+      "unitPrice": 11.2,
+      "discountPct": 3,
+      "total": 43.46,
+      "vatPct": 4
+    },
+    {
+      "description": "YOGUR NATURAL 125G PACK 24",
+      "code": "RF3030",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 7.8,
+      "total": 15.6,
+      "vatPct": 10
+    },
+    {
+      "description": "GAMBA PELADA CRUDA 1KG",
+      "code": "CG4001",
+      "quantity": 6,
+      "unit": "kg",
+      "unitPrice": 13.95,
+      "total": 83.7,
+      "vatPct": 10
+    },
+    {
+      "description": "CALAMAR ANILLAS A LA ROMANA 1KG",
+      "code": "CG4015",
+      "quantity": 5,
+      "unit": "kg",
+      "unitPrice": 7.4,
+      "discountPct": 4,
+      "total": 35.52,
+      "vatPct": 10
+    },
+    {
+      "description": "HELADO DE VAINILLA CUBETA 5L",
+      "code": "CG5001",
+      "quantity": 2,
+      "unit": "ud",
+      "unitPrice": 14.6,
+      "total": 29.2,
+      "vatPct": 10
+    }
+  ],
+  "extras": []
+}

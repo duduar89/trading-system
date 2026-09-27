@@ -1,5 +1,5 @@
 import type { BusinessSettings, Dish, DishCost, ID, Invoice, InvoiceLine, MenuEngineeringClass, PricePoint, Product, IngredientCategory, BaseUnit } from '../types';
-import { costDish, foodCostStatus, type CostingContext } from './costing';
+import { costDish, foodCostStatus, roundPct, type CostingContext } from './costing';
 
 /**
  * Analítica de negocio: ingeniería de menú, alertas de precio y KPIs del panel.
@@ -101,6 +101,8 @@ export interface PriceAlert {
   currentDate: string;
   /** Platos/elaboraciones que usan el producto (directamente). */
   affectedDishIds: ID[];
+  /** Platos de carta (kind 'plato') afectados, directamente o a través de elaboraciones: el "afecta a N platos". */
+  affectedPlatoIds: ID[];
 }
 
 /** Dos precios se consideran iguales si difieren menos de 0,01 céntimos. */
@@ -128,6 +130,7 @@ export function priceAlerts(products: Product[], pricePoints: PricePoint[], thre
       usage.set(it.ref.id, list);
     }
   }
+  const kindById = new Map(dishes.map((d) => [d.id, d.kind]));
   const threshold = Math.abs(thresholdPct);
   const alerts: PriceAlert[] = [];
   for (const product of products) {
@@ -145,6 +148,7 @@ export function priceAlerts(products: Product[], pricePoints: PricePoint[], thre
     if (!previous) continue;
     const changePct = ((current.pricePerBase - previous.pricePerBase) / previous.pricePerBase) * 100;
     if (Math.abs(changePct) + 1e-9 < threshold) continue;
+    const affectedPlatoIds = [...dishesUsingProduct(dishes, product.id)].filter((id) => kindById.get(id) === 'plato');
     alerts.push({
       productId: product.id,
       productName: product.name,
@@ -155,6 +159,7 @@ export function priceAlerts(products: Product[], pricePoints: PricePoint[], thre
       previousDate: previous.date,
       currentDate: current.date,
       affectedDishIds: usage.get(product.id) ?? [],
+      affectedPlatoIds,
     });
   }
   alerts.sort((a, b) => b.changePct - a.changePct);
@@ -267,12 +272,16 @@ export function dashboardStats(args: {
       wCost += c.costPerPortion * u;
       wRevenue += net * u;
     }
+    // Mismo semáforo que la ficha del plato: con objetivo propio, la franja ámbar del negocio se desplaza con él.
     const target = d.targetFoodCostPct ?? business.targetFoodCostPct;
-    const status = foodCostStatus(fc, target, Math.max(target, business.warningFoodCostPct));
+    const band = Math.max(0, business.warningFoodCostPct - business.targetFoodCostPct);
+    const status = foodCostStatus(fc, target, target + band);
     if (status === 'ok') ok++;
     else if (status === 'warn') warn++;
     else if (status === 'bad') bad++;
-    const bi = FOOD_COST_BUCKETS.findIndex((b) => fc > b.min && fc <= b.max);
+    // Tramo de la cifra mostrada (una décima), igual que el semáforo: "30,0 %" cae en 25–30 %.
+    const shown = roundPct(fc);
+    const bi = FOOD_COST_BUCKETS.findIndex((b) => shown > b.min && shown <= b.max);
     if (bi >= 0) buckets[bi].count++;
   }
   const avgFoodCostPct = fcCount ? fcSum / fcCount : undefined;

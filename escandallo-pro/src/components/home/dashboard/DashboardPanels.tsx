@@ -82,7 +82,7 @@ export function PriceAlertsPanel({
           <ul className="divide-y divide-line">
             {alerts.slice(0, 5).map((a) => {
               const up = a.changePct > 0;
-              const n = a.affectedDishIds.length;
+              const n = a.affectedPlatoIds.length;
               return (
                 <li key={a.productId}>
                   <Link to={`/ingredientes/${a.productId}`} className={rowCls}>

@@ -8,7 +8,6 @@ import {
   addProductAliasIn,
   buildProduct,
   findOrCreateSupplierIn,
-  insertProductIn,
   loadKbFinder,
   matchSupplier,
   priceConversionFactor,
@@ -152,6 +151,34 @@ export function matchInvoiceLines(lines: InvoiceLine[], products: Product[], opt
       matchScore: Math.round(best.score * 1000) / 1000,
       matchStatus: best.score >= AUTO_LINK_THRESHOLD ? 'vinculado' : 'sugerido',
     };
+  });
+}
+
+/**
+ * Vuelve a emparejar con los productos actuales las líneas «nuevo» que el usuario no ha decidido (sin `matchScore`).
+ * Caso típico: se suben varias facturas a la vez y, al confirmar la primera, se crean productos que las demás (leídas antes)
+ * ya pueden vincular; si no, se verían como «Nuevo producto». Las líneas que el usuario ha marcado como nuevas desde el
+ * selector (`matchScore: 0`) no se tocan. Sólo facturas por revisar. Devuelve cuántas líneas cambian.
+ */
+export async function refreshInvoiceMatches(id: ID): Promise<number> {
+  const wdb = db();
+  return wdb.transaction('rw', [wdb.invoices, wdb.products], async () => {
+    const inv = await wdb.invoices.get(id);
+    if (!inv || inv.status !== 'revision') return 0;
+    const stale = (l: InvoiceLine) => l.matchStatus === 'nuevo' && !l.productId && l.matchScore === undefined;
+    if (!inv.lines.some(stale)) return 0;
+    const products = await wdb.products.toArray();
+    if (!products.length) return 0;
+    let changed = 0;
+    const lines = inv.lines.map((l) => {
+      if (!stale(l)) return l;
+      const [next] = matchInvoiceLines([l], products, { supplierId: inv.supplierId });
+      if (next.matchStatus === 'nuevo') return l;
+      changed++;
+      return next;
+    });
+    if (changed) await wdb.invoices.update(id, { lines });
+    return changed;
   });
 }
 
@@ -594,7 +621,8 @@ export async function updateInvoice(id: ID, patch: Partial<Invoice>): Promise<vo
 /**
  * Confirma la factura: proveedor (findOrCreateSupplier); por cada línea no ignorada con pricePerBase > 0:
  * 'nuevo' → crea producto (nombre = suggestedName, categoría sugerida) ; 'sugerido'/'vinculado' → usa productId.
- * Registra precio (setProductPrice con fecha de factura) y aprende alias (descripción original).
+ * Registra precio (setProductPrice con fecha de factura) y aprende alias (descripción original). Si un producto aparece en
+ * varias líneas (formatos, ofertas…), registra un único precio: la media ponderada por cantidad en su unidad base.
  * Marca status 'confirmada'. Idempotente: re-confirmar no duplica PricePoints de la misma factura.
  * Si la unidad de la línea no coincide con la del producto se convierte (densidad, peso por unidad); si no se puede,
  * la línea se omite con un aviso. `skipped` cuenta las líneas ignoradas, sin precio o con unidad incompatible.
@@ -627,6 +655,20 @@ export async function confirmInvoice(id: ID): Promise<{ created: number; updated
     let updated = 0;
     let skipped = 0;
     const lines: InvoiceLine[] = [];
+    // Compras de cada producto en esta factura (en su unidad base): un solo precio por producto y factura, la media ponderada.
+    // Con la última línea el precio dependería del orden de impresión y dos líneas generarían una alerta falsa entre ellas.
+    const purchases = new Map<ID, { amount: number; qty: number; weighted: number; prices: number[]; descriptions: string[] }>();
+    const addPurchase = (productId: ID, unitPrice: number, qty: number | undefined, description: string) => {
+      let acc = purchases.get(productId);
+      if (!acc) purchases.set(productId, (acc = { amount: 0, qty: 0, weighted: 0, prices: [], descriptions: [] }));
+      acc.prices.push(unitPrice);
+      if (qty != null && Number.isFinite(qty) && qty > 0) {
+        acc.amount += unitPrice * qty;
+        acc.qty += qty;
+        acc.weighted++;
+      }
+      if (description && !acc.descriptions.includes(description)) acc.descriptions.push(description);
+    };
 
     for (const raw of inv.lines) {
       const line = ensureNormalized(raw);
@@ -667,7 +709,9 @@ export async function confirmInvoice(id: ID): Promise<{ created: number; updated
             kbFind,
             { date, invoiceId: id, rawDescription: description },
           );
-          await insertProductIn(wdb, p, { date, invoiceId: id, rawDescription: description });
+          // Sin PricePoint aquí: se registra al final con la media ponderada de todas sus líneas.
+          await wdb.products.add(p);
+          addPurchase(p.id, price, line.baseQuantity, description);
           byId.set(p.id, p);
           if (p.searchKey) byKey.set(p.searchKey, p);
           touched.add(p.id);
@@ -688,7 +732,7 @@ export async function confirmInvoice(id: ID): Promise<{ created: number; updated
         continue;
       }
       if (conv.assumption) warnings.push(`Precio convertido de €/${lineUnit} a €/${product.baseUnit}: ${conv.assumption.charAt(0).toLowerCase()}${conv.assumption.slice(1)}`);
-      await setProductPriceIn(wdb, product.id, round6(price * conv.factor), 'factura', { date, supplierId, invoiceId: id, rawDescription: description });
+      addPurchase(product.id, price * conv.factor, line.baseQuantity != null ? line.baseQuantity / conv.factor : undefined, description);
       await addProductAliasIn(wdb, product.id, description);
       if (line.suggestedName) await addProductAliasIn(wdb, product.id, line.suggestedName);
       touched.add(product.id);
@@ -696,6 +740,10 @@ export async function confirmInvoice(id: ID): Promise<{ created: number; updated
       lines.push({ ...line, warnings, productId: product.id, matchStatus: 'vinculado' });
     }
 
+    for (const [pid, acc] of purchases) {
+      const price = acc.weighted === acc.prices.length && acc.qty > 0 ? acc.amount / acc.qty : acc.prices.reduce((s, v) => s + v, 0) / acc.prices.length;
+      await setProductPriceIn(wdb, pid, round6(price), 'factura', { date, supplierId, invoiceId: id, rawDescription: acc.descriptions.join(' + ') });
+    }
     for (const pid of touched) await recomputeCurrentPrice(pid, wdb);
 
     const patch: Partial<Invoice> = { status: 'confirmada', confirmedAt: nowIso(), date, lines, error: undefined };
