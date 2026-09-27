@@ -116,7 +116,7 @@ export function fixDigitsInWord(token: string): string | undefined {
 }
 
 function fixWord(token: string): string[] {
-  const inWord = fixDigitsInWord(token);
+  const inWord = fixDigitsInWord(token) ?? fixShapeConfusions(token);
   if (inWord) return [inWord];
   const glued = GLUED_PACK.exec(token);
   if (glued) return [...fixWord(glued[1]), glued[2]];
@@ -149,10 +149,120 @@ export function fixTrailingUnitSix(tokens: string[]): string[] {
   return tokens;
 }
 
+/** Productos líquidos y envases de líquidos: su formato va en litros ("1l" que el OCR lee "11"). */
+const LIQUIDS = new Set(
+  (
+    'aceite leche agua vino cerveza nata zumo refresco vinagre caldo fumet licor bebida horchata batido sidra cava mosto ' +
+    'vermut ginebra whisky ron tonica gaseosa soja lejia detergente fregasuelos limpiador lavavajillas abrillantador ' +
+    'garrafa botella bidon brik brick tetrabrik barril'
+  ).split(' '),
+);
+/** Volúmenes habituales en litros. */
+const COMMON_LITERS = new Set([0.2, 0.25, 0.33, 0.5, 0.7, 0.75, 1, 1.5, 2, 2.5, 3, 5, 10, 20, 25, 30, 50]);
+
+/** ¿La descripción usa minúsculas? Entonces las unidades pegadas a la cifra también suelen ir en minúscula ("250g", "1l"). */
+function mixedCase(tokens: string[]): boolean {
+  return tokens.some((t) => /\p{Ll}{2,}/u.test(t) && !/\d/.test(t));
+}
+
+function hasWordIn(tokens: string[], set: Set<string>): boolean {
+  return tokens.some((t) => {
+    const f = fold(t).replace(/[^a-z]/g, '');
+    return set.has(f) || (f.endsWith('s') && set.has(f.slice(0, -1))) || (f.endsWith('es') && set.has(f.slice(0, -2)));
+  });
+}
+
+const numValue = (s: string) => Number(s.replace(',', '.'));
+
+/**
+ * Unidades en minúscula leídas como cifras: la «l» como «1» ("11" → "1l", "101" → "10l", "6x11" → "6x1l") y la «g»
+ * como «9» ("2509" → "250g"), además de "70c1" → "70cl", "1k9" → "1kg" y "lkg" → "1kg". Las de «l» y «g» sólo con
+ * contexto: descripción en minúsculas y un volumen o gramaje habitual (y, para litros, un producto líquido).
+ */
+export function fixLowercaseUnits(tokens: string[]): string[] {
+  const lower = mixedCase(tokens);
+  const liquid = hasWordIn(tokens, LIQUIDS);
+  const spice = hasWordIn(tokens, HERBS_SPICES);
+  return tokens.map((t, i) => {
+    const prev = fold(tokens[i - 1] ?? '').replace(/[.:º°#]/g, '');
+    if (/^(ref|cod|codigo|art|lote|n|no)$/.test(prev)) return t;
+    const cl = /^(\d+(?:[.,]\d+)?)([cm])1$/i.exec(t);
+    if (cl) return `${cl[1]}${cl[2]}${cl[2] === cl[2].toUpperCase() ? 'L' : 'l'}`;
+    const k9 = /^(\d+(?:[.,]\d+)?)([kK])9$/.exec(t);
+    if (k9) return `${k9[1]}${k9[2]}g`;
+    const lkg = /^[lIi](kgs?|KGS?|Kg)$/.exec(t);
+    if (lkg) return `1${lkg[1]}`;
+    if (!lower) return t;
+    const m = /^(\d+x)?(\d+(?:[.,]\d{1,2})?)([19])$/i.exec(t);
+    if (!m) return t;
+    const v = numValue(m[2]);
+    if (m[3] === '1' && liquid && COMMON_LITERS.has(v)) return `${m[1] ?? ''}${m[2]}l`;
+    if (m[3] === '9' && !m[1] && Number.isInteger(v) && (COMMON_GRAMS.has(v) || (spice && v >= 1 && v <= 5))) return `${m[2]}g`;
+    return t;
+  });
+}
+
+/** Confusiones de formas del OCR dentro de palabras: "rn" ↔ "m", "m" ↔ "n" ("Carme" → "Carne"), sólo hacia una palabra conocida. */
+export function fixShapeConfusions(token: string): string | undefined {
+  if (!/^\p{L}{3,}$/u.test(token) || knownWord(token)) return undefined;
+  const swaps: [RegExp, string][] = [
+    [/m/g, 'rn'],
+    [/rn/g, 'm'],
+    [/M/g, 'RN'],
+    [/RN/g, 'M'],
+    [/m/g, 'n'],
+    [/n/g, 'm'],
+    [/M/g, 'N'],
+    [/N/g, 'M'],
+  ];
+  for (const [re, rep] of swaps) {
+    for (const m of token.matchAll(re)) {
+      const at = m.index ?? 0;
+      const cand = token.slice(0, at) + rep + token.slice(at + m[0].length);
+      if (knownWord(cand)) return cand;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Basura pegada al principio de la descripción (restos de una raya de la tabla o de una viñeta): "tGARBANZO" →
+ * "GARBANZO", "¡Nata" → "Nata", "|Tomate" → "Tomate". Una minúscula suelta sólo se quita delante de una mayúscula
+ * cuando el resto es una palabra conocida o va entero en mayúsculas.
+ */
+export function stripLeadingJunk(token: string): string {
+  const punct = /^[¡!|_~'"`´^*•·.,:;¦]+(?=\p{L})/u.exec(token);
+  if (punct) return token.slice(punct[0].length);
+  const m = /^\p{Ll}(\p{Lu}\p{L}{2,})$/u.exec(token);
+  if (m && (knownWord(m[1]) || m[1] === m[1].toUpperCase())) return m[1];
+  return token;
+}
+
+/** "FRESOÓN" → "FRESÓN": la misma vocal leída dos veces, con y sin tilde. */
+export function dedupeAccentedVowel(token: string): string {
+  return token.replace(/([aeiou])([áéíóú])|([áéíóú])([aeiou])/gi, (m: string, a?: string, b?: string, c?: string, d?: string) => {
+    const plain = a ?? d ?? '';
+    const accented = b ?? c ?? '';
+    return fold(accented) === plain.toLowerCase() ? accented : m;
+  });
+}
+
+/** Categorías comerciales de frutas y hortalizas en números romanos ("CATEGORÍA I", "Cat. II") leídos como cifras o «l». */
+function fixRomanCategory(tokens: string[]): string[] {
+  return tokens.map((t, i) => {
+    if (i === 0 || !/^(?:categoria|cat|clase)$/.test(fold(tokens[i - 1]).replace(/[.:]/g, ''))) return t;
+    if (/^[1lI|]$/.test(t)) return 'I';
+    if (/^[1lI|]{2}$/.test(t)) return 'II';
+    return t;
+  });
+}
+
 /** Limpia errores típicos del OCR en una descripción de producto (ver cabecera del módulo). */
 export function fixOcrDescription(desc: string): string {
-  const tokens = desc.split(/\s+/).filter(Boolean).flatMap(fixWord);
-  return fixTrailingUnitSix(tokens).join(' ');
+  const raw = desc.split(/\s+/).filter(Boolean).map(dedupeAccentedVowel);
+  if (raw.length) raw[0] = stripLeadingJunk(raw[0]);
+  const tokens = raw.flatMap(fixWord).map((t) => (/^\d+(?:[.,]\d+)?nm$/i.test(t) ? t.replace(/n(m)$/i, (_, x: string) => `${x}${x}`) : t));
+  return fixRomanCategory(fixTrailingUnitSix(fixLowercaseUnits(tokens))).join(' ');
 }
 
 const GLUE_TAIL = ['a', 'al', 'de', 'del', 'con', 'y', 'en'];

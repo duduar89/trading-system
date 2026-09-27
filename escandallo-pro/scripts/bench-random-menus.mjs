@@ -65,6 +65,7 @@ const ocrLayout = await load('/src/extract/ocrLayout.ts');
 const extractIndex = await load('/src/extract/index.ts');
 const menuParser = await load('/src/extract/menuParser.ts');
 const menuImage = await load('/src/extract/menuImage.ts');
+const menuUtils = await load('/src/extract/menuUtils.ts');
 /** --polarity: pizarras y cartas de fondo oscuro invertidas antes del preprocesado (cambio de contrato solicitado). */
 const POLARITY = !!args.polarity;
 const pdfjs = await import(join(ROOT, 'node_modules/pdfjs-dist/legacy/build/pdf.mjs'));
@@ -199,7 +200,13 @@ async function menuFromImages(images) {
   for (const img of images) src.update(img);
   if (POLARITY) src.update('polaridad');
   const srcKey = src.digest('hex');
-  const opts = { merge: menuParser.mergeMenuPasses, quality: menuParser.menuQuality };
+  const passIds = typeof args['pass-ids'] === 'string' ? args['pass-ids'].split(',') : undefined;
+  const opts = {
+    merge: menuParser.mergeMenuPasses,
+    quality: menuParser.menuQuality,
+    ...(args.passes ? { maxPasses: Number(args.passes) } : {}),
+    ...(passIds ? { passes: passIds.map((id) => pipeline.MENU_PASSES.find((p) => p.id === id)).filter(Boolean) } : {}),
+  };
   if (args.fast) {
     const calls = new Map();
     let miss = false;
@@ -249,7 +256,9 @@ async function menuFromTextPdf(bytes) {
   const { lines, hasText } = await pdfTextLines(bytes);
   if (!hasText) return menuFromImages(await pdfToImages(bytes));
   const text = layout.linesToText(ocrLayout.columnsReadingOrder(lines));
-  return { menu: menuParser.parseMenuText(text, 'pdf-texto'), passes: ['pdf-texto'], rawText: text };
+  // --pdf-boxes: la capa de texto con sus posiciones (menuUtils.pdfLinesToMenuBoxes, integración solicitada en index.ts)
+  const boxes = args['pdf-boxes'] ? menuUtils.pdfLinesToMenuBoxes(lines) : undefined;
+  return { menu: menuParser.parseMenuText(text, 'pdf-texto', boxes), passes: ['pdf-texto'], rawText: text };
 }
 
 // ───────────────────────────── Puntuación ─────────────────────────────

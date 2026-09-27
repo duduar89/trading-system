@@ -168,6 +168,11 @@ describe('findDate', () => {
     expect(findDate('lote 99/99/2025 entrega 10/03/2025')).toBe('2025-03-10');
   });
 
+  it('en un albarán, la fecha de entrega gana al vencimiento', () => {
+    expect(findDate('Fecha vencimiento  02/09/2025\nAlbarán  608028\nFecha entrega  04/07/2025')).toBe('2025-07-04');
+    expect(findDate('Vto. 30/08/2025   F. entrega 30/07/2025')).toBe('2025-07-30');
+  });
+
   it('penaliza años fuera de rango y fechas de caducidad', () => {
     expect(findDate('Consumo preferente 10/10/2026\nFecha 01/03/2025')).toBe('2025-03-01');
     expect(findDate('Cliente desde 01/01/1998 Fecha 02/02/2025')).toBe('2025-02-02');

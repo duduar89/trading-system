@@ -313,15 +313,17 @@ const LABEL_RE = new RegExp(
   [
     // Fecha de la factura (máxima prioridad)
     '(?<strong>fecha\\s*(?:de\\s*)?(?:la\\s*)?(?:factura|fra\\b|emision|expedicion|documento|doc\\b)|f\\.?\\s*(?:factura|fra\\b|emision|expedicion)|invoice\\s*date|fecha\\s*fact\\b)',
-    // Otras fechas que NO son la de la factura
-    '(?<neg>(?:fecha\\s*(?:de\\s*(?:la\\s*|del\\s*)?)?)?(?:vencimiento|venc\\b|vto\\b|vence|entrega|pedido|albaran|caducidad|consumo|pago|cobro|valid[oa]|validez|hasta|desde|periodo|nacimiento|alta\\b|servicio|operacion|contable|cargo|impresion|due\\s*date))',
+    // Vencimientos y pagos: nunca son la fecha del documento (ni siquiera la de un albarán)
+    '(?<due>(?:fecha\\s*(?:de\\s*(?:la\\s*|del\\s*)?)?)?(?:vencimiento|venc\\b|vto\\b|vence|pago|cobro|limite|due\\s*date))',
+    // Otras fechas que NO son la de la factura (la de entrega o la del albarán sí lo son de un albarán sin otra fecha)
+    '(?<neg>(?:fecha\\s*(?:de\\s*(?:la\\s*|del\\s*)?)?)?(?:entrega|pedido|albaran|caducidad|consumo|valid[oa]|validez|hasta|desde|periodo|nacimiento|alta\\b|servicio|operacion|contable|cargo|impresion))',
     '(?<pos>fecha|fec\\b|fch\\b|date\\b)',
   ].join('|'),
   'g',
 );
 
 interface Label {
-  kind: 'strong' | 'neg' | 'pos';
+  kind: 'strong' | 'neg' | 'due' | 'pos';
   start: number;
   end: number;
 }
@@ -332,13 +334,13 @@ function findLabels(line: string): Label[] {
   let m: RegExpExecArray | null;
   while ((m = LABEL_RE.exec(line))) {
     const g = m.groups ?? {};
-    const kind: Label['kind'] = g.strong ? 'strong' : g.neg ? 'neg' : 'pos';
+    const kind: Label['kind'] = g.strong ? 'strong' : g.due ? 'due' : g.neg ? 'neg' : 'pos';
     out.push({ kind, start: m.index, end: m.index + m[0].length });
   }
   return out;
 }
 
-const LABEL_SCORE: Record<Label['kind'], number> = { strong: 9, pos: 5, neg: -7 };
+const LABEL_SCORE: Record<Label['kind'], number> = { strong: 9, pos: 5, neg: -7, due: -9 };
 
 /**
  * Busca la fecha de la factura dentro de un texto largo. Prefiere las fechas cercanas a etiquetas como

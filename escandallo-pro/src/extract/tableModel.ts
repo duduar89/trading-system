@@ -52,6 +52,8 @@ export interface LabelInfo {
   unit?: string;
   /** Unidad a la que se refiere el precio ("€/kg" → kg). */
   perUnit?: string;
+  /** Descuento expresado en euros ("Dto. €", "Imp. dto.") en lugar de porcentaje. */
+  amount?: boolean;
 }
 
 export interface Box {
@@ -63,6 +65,8 @@ export interface TWord extends Box {
   text: string;
   /** Es un número (cantidad, precio, importe…), no texto. */
   num?: boolean;
+  /** Decimales escritos del número (0 en "12", 3 en "4,235"). */
+  dec?: number;
   /** Índice de celda dentro de la fila: palabras con el mismo índice están en la misma celda. */
   seg: number;
 }
@@ -86,6 +90,8 @@ export interface TableColumn extends Box {
   label?: string;
   unit?: string;
   perUnit?: string;
+  /** Descuento en euros (ver LabelInfo). */
+  amount?: boolean;
   /** Filas con contenido en la columna, cuántas con números y cuántas con texto. */
   rows: number;
   numeric: number;
@@ -126,7 +132,9 @@ export function classifyLabel(text: string): LabelInfo {
   if (/ cad | caducidad| caduc| cons pref| consumo pref| consumir /.test(t)) return { kind: 'cad' };
   if (/ origen | pais | proc | procedencia /.test(t)) return { kind: 'origin' };
   if (/ i ?v ?a | iva| tiva |^ tipo $| impuesto| vat /.test(t)) return { kind: 'vat' };
-  if (/ d(?:c)?tos? ?\d? | dto\d | dcto | desc \d? ?$|^ desc | % desc| descuento| bonif| rappel/.test(t) && !/ descrip/.test(t)) return { kind: 'disc' };
+  if (/ d(?:c)?tos? ?\d? | dto\d | dcto | desc \d? ?$|^ desc | % desc| descuento| bonif| rappel/.test(t) && !/ descrip/.test(t)) {
+    return /€|eur| imp | importe/.test(t) && !/%/.test(t) ? { kind: 'disc', amount: true } : { kind: 'disc' };
+  }
   const priceWord = RE_PRICE_WORD.test(t) || (/€/.test(t) && /\//.test(t));
   const totalWord = RE_TOTAL_WORD.test(t);
   const perUnit = /(?:\/ ?| por | )(?:kg|kilo|kgs)\b/.test(t) ? 'kg' : /\/ ?(?:ud|u|und|unid)\b/.test(t) ? 'ud' : /\/ ?(?:l|lt|litro)\b/.test(t) ? 'l' : undefined;
@@ -439,6 +447,7 @@ export function buildTableModel(phrases: readonly HeaderPhrase[] | undefined, ro
       c.kind = p.info.kind;
       c.unit = p.info.unit;
       c.perUnit = p.info.perUnit;
+      c.amount = p.info.amount;
     });
   }
   typeByData(columns, unitRows);
@@ -547,6 +556,37 @@ export function buildVotedModel(rows: readonly TRow[], votes: readonly RoleVote[
     if (c.kind) continue;
     if (unitRows[j] >= Math.max(1, c.rows * 0.6) && c.numeric <= c.rows * 0.2) c.kind = 'unit';
     else if (c.texty > 0 && c.numeric <= c.rows * 0.5) c.kind = 'other';
+  }
+  // Cantidad ↔ precio: q × p = importe es simétrico y las filas votan con el orden habitual (cantidad antes que
+  // precio). Los decimales lo desempatan: los precios se escriben con decimales fijos y nunca enteros sueltos; las
+  // cantidades mezclan enteros (unidades) con pesos (3 decimales). Se cuentan proporciones, no casos sueltos: un
+  // decimal perdido por el OCR ("2,74" leído "274") no debe dar la vuelta a toda la tabla
+  const qc = columns.find((c) => c.kind === 'qty');
+  const pc = columns.find((c) => c.kind === 'price');
+  if (qc && pc) {
+    const decs = (col: TableColumn) => {
+      const count = new Map<number, number>();
+      let n = 0;
+      for (const r of rows) {
+        for (const w of r.words) {
+          if (!w.num || w.dec === undefined || columns[columnIndex(columns, w)] !== col) continue;
+          count.set(w.dec, (count.get(w.dec) ?? 0) + 1);
+          n++;
+        }
+      }
+      const ints = (count.get(0) ?? 0) / Math.max(1, n);
+      const mode = Math.max(0, ...count.values()) / Math.max(1, n);
+      return { ints, mode, kinds: count.size };
+    };
+    const dq = decs(qc);
+    const dp = decs(pc);
+    // Enteros en la columna del precio y ninguno en la de la cantidad: basta con unos pocos si la de la cantidad tiene
+    // decimales fijos (como un precio); si los mezcla (como una cantidad), hacen falta muchos
+    const swap = (dp.ints > 0 && dq.ints === 0 && dq.kinds > 0 && (dp.ints >= 0.3 || dq.kinds === 1)) || (dp.kinds > 1 && dp.mode < 0.7 && dq.kinds === 1 && dq.ints === 0);
+    if (swap) {
+      qc.kind = 'price';
+      pc.kind = 'qty';
+    }
   }
   if (!columns.some((c) => c.kind === 'desc') || !columns.some((c) => c.kind === 'total') || !columns.some((c) => c.kind === 'price')) return undefined;
   return { columns, cw, labeled: false };

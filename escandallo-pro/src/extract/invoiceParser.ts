@@ -124,6 +124,8 @@ interface Solution {
   p: NumTok;
   t: NumTok;
   d: NumTok[];
+  /** Descuento en euros (columna "Dto. €"): importe = cantidad × precio − descuento. */
+  dAmount?: NumTok;
   f?: NumTok;
   err: number;
   validated: boolean;
@@ -150,6 +152,15 @@ interface ParsedLine {
   descX?: number;
   /** Palabras que ha usado la aritmética (para deducir las columnas de una tabla sin cabecera). */
   roles?: RoleVote[];
+  /** OCR: cuadra sólo gracias a la tolerancia de redondeo (no al céntimo). */
+  inexact?: boolean;
+  /** OCR: lectura alternativa exacta al céntimo con una cifra corregida (ver `exactRefine`). */
+  exactAlt?: { quantity: number; unitPrice: number };
+}
+
+/** Porcentaje a 2 decimales, mitad hacia arriba sin el error de coma flotante (12,125 → 12,13, no 12,12). */
+function pctRound(v: number): number {
+  return (Math.sign(v) * Math.round(Math.abs(v) * 100 + 1e-7)) / 100;
 }
 
 function box(w: Word): { x0: number; x1: number } {
@@ -285,6 +296,8 @@ function decimalsOf(s: string, value: number): number {
 
 function parseWordNumber(raw: string, allowOcr: boolean): NumInfo | undefined {
   let s = raw.replace(/^[([{"'“«]+/, '').replace(/[)\]}"'”»:;]+$/, '');
+  // OCR: restos de un filete vertical pegados a la cifra ("|24,64", "4,85/", "298!")
+  if (allowOcr) s = s.replace(/^[|!¦]+(?=\d)/, '').replace(/(\d)[|!¦/]+$/, '$1');
   if (!s || !/\d/.test(s) && !allowOcr) return undefined;
   let cur = false;
   let pct = false;
@@ -534,7 +547,7 @@ function isHeaderishRow(row: Row, main: Row): boolean {
 }
 
 function toTRow(row: Row): TRow {
-  return { cw: row.cw, words: row.words.map<TWord>((w) => ({ text: w.raw, x0: w.x0, x1: w.x1, seg: w.seg, num: !!w.num })) };
+  return { cw: row.cw, words: row.words.map<TWord>((w) => ({ text: w.raw, x0: w.x0, x1: w.x1, seg: w.seg, num: !!w.num, dec: w.num?.dec })) };
 }
 
 /** Cabeceras de tabla con sus filas vecinas de etiquetas (partidas en dos filas o agrupadas). */
@@ -645,6 +658,12 @@ function modelSolve(toks: NumTok[], header: TableHeader): Solution | undefined {
     if (discs.length === 2) discSets.push([discs[0]], [discs[1]]);
   }
   const mults = of('mult').filter((f) => f.value > 1);
+  // Descuentos en euros: por la etiqueta de su columna o, si el porcentaje no cuadra, probando el importe
+  const amountCol = (d: NumTok) => {
+    const j = columnIndex(model.columns, d.w);
+    return j >= 0 && !!model.columns[j].amount;
+  };
+  const amountDiscs = of('disc').filter((d) => d.value > 0 && (amountCol(d) || d.n.dec === 2));
   let best: Solution | undefined;
   for (const t of tCands) {
     if (t.n.pct) continue;
@@ -656,12 +675,20 @@ function modelSolve(toks: NumTok[], header: TableHeader): Solution | undefined {
         for (const f of [undefined, ...mults]) {
           if (f === q || f === p) continue;
           for (const [di, d] of discSets.entries()) {
+            if (d.some(amountCol)) continue;
             let calc = q.value * p.value * (f ? f.value : 1);
             for (const dd of d) calc *= 1 - dd.value / 100;
             const err = Math.abs(calc - t.value);
             if (err > tolerance(q.value * (f ? f.value : 1), p.value)) continue;
             const score = 30 - (qRank.get(q) ?? 3) * 2 - di * 3 - (f ? 4 : 0) - (err > 0.0051 ? 1 : 0) - (q.n.fixed || p.n.fixed || t.n.fixed ? 2 : 0);
             if (!best || score > best.score) best = { q, p, t, d, f, err, validated: true, loose: false, score };
+          }
+          for (const da of amountDiscs) {
+            const calc = round(q.value * p.value * (f ? f.value : 1), 2) - da.value * Math.sign(t.value);
+            const err = Math.abs(calc - t.value);
+            if (err > 0.0101) continue;
+            const score = 28 - (qRank.get(q) ?? 3) * 2 - (amountCol(da) ? 0 : 3) - (f ? 4 : 0);
+            if (!best || score > best.score) best = { q, p, t, d: [], dAmount: da, f, err, validated: true, loose: false, score };
           }
         }
       }
@@ -871,8 +898,9 @@ function repairVariants(toks: NumTok[], row: Row): NumTok[][] {
     if (t.inDesc || t.n.pct) return;
     const raw = t.w.raw.replace(/[^\d.,-]/g, '');
     const digits = raw.replace(/[^\d]/g, '');
-    if (t.n.dec === 0 && /^\d{3,6}$/.test(digits) && Number.isInteger(t.value)) {
-      for (const div of [100, 1000, 10]) {
+    if (t.n.dec === 0 && (row.ocr ? /^\d{2,6}$/ : /^\d{3,6}$/).test(digits) && Number.isInteger(t.value)) {
+      // "446" → 4,46 / 0,446 / 44,6; en OCR también "37" → 3,7
+      for (const div of digits.length === 2 ? [10] : [100, 1000, 10]) {
         const v = round(t.value / div, 4);
         const dec = div === 100 ? 2 : div === 1000 ? 3 : 1;
         const fixed = `${Math.trunc(v)},${String(Math.round((v % 1) * div)).padStart(dec, '0')}`;
@@ -1047,6 +1075,69 @@ function digitRepairAll(toks: NumTok[], opts: RepairOpts): { sol: Solution; dist
   return [...found.values()].sort((a, b) => a.dist - b.dist);
 }
 
+/**
+ * OCR: una fila que cuadra sólo gracias a la tolerancia de redondeo, con una cantidad o un precio a UNA cifra de dar
+ * el importe exacto, suele ser una cifra mal leída ("6,290" leído "6,299") o una cifra de más al final ("3,22 €" leído
+ * "3,222"). Se corrige si la alternativa exacta es única. El importe nunca se toca aquí (es lo que suma la base).
+ */
+function exactRefine(sol: Solution): Solution {
+  if (sol.err <= 0.0051 || sol.f || sol.dAmount) return sol;
+  const factor = sol.d.reduce((a, d) => a * (1 - d.value / 100), 1);
+  const t = sol.t.value;
+  const exact = (q: number, p: number) => Math.abs(round(q * p * factor, 2) - t) <= 0.001;
+  const found: Solution[] = [];
+  for (const which of ['q', 'p'] as const) {
+    const tok = sol[which];
+    const other = which === 'q' ? sol.p.value : sol.q.value;
+    const dec = tok.n.dec;
+    if (dec === 0 || tok.value <= 0 || other === 0) continue;
+    const options: { value: number; dec: number }[] = [];
+    // Una cifra cambiada (mismos decimales)
+    const sub = round(t / (other * factor), dec);
+    if (sub > 0 && digitDistance(digitsOf(tok.value, dec), digitsOf(sub, dec)) === 1) options.push({ value: sub, dec });
+    // Una cifra de más al final
+    const cut = Math.trunc(Math.abs(tok.value) * 10 ** (dec - 1) + 1e-9) / 10 ** (dec - 1);
+    if (cut > 0) options.push({ value: cut, dec: dec - 1 });
+    for (const o of options) {
+      if (!exact(which === 'q' ? o.value : other, which === 'p' ? o.value : other)) continue;
+      const fixed = o.value.toFixed(o.dec).replace('.', ',');
+      const repl: NumTok = { ...tok, value: o.value, n: { ...tok.n, value: o.value, dec: o.dec, fixed, repaired: true } };
+      found.push({ ...sol, [which]: repl, err: 0 });
+      break;
+    }
+  }
+  return found.length === 1 ? found[0] : sol;
+}
+
+/** Anota en una línea de OCR si cuadra al céntimo y, si no, su alternativa exacta (se decide con todo el documento). */
+function markExactness(line: ParsedLine, sol: Solution, row: Row): ParsedLine {
+  if (!row.ocr || !sol.validated || sol.err <= 0.0051) return line;
+  line.inexact = true;
+  const alt = exactRefine(sol);
+  if (alt !== sol) line.exactAlt = { quantity: round(alt.q.value, 4), unitPrice: round(alt.p.value, 4) };
+  return line;
+}
+
+/**
+ * OCR: si el documento calcula sus importes al céntimo (casi todas sus líneas cuadran exactas), las que sólo cuadran
+ * por redondeo y tienen una alternativa exacta a una cifra de distancia se corrigen: es una cifra mal leída, no un
+ * precio con más decimales de los impresos.
+ */
+function applyExactConvention(parsed: ParsedLine[]): void {
+  const validated = parsed.filter((l) => l.validated);
+  if (validated.length < 4) return;
+  const exactShare = validated.filter((l) => !l.inexact).length / validated.length;
+  if (exactShare < 0.75) return;
+  for (const l of parsed) {
+    if (!l.exactAlt) continue;
+    l.quantity = l.exactAlt.quantity;
+    l.unitPrice = l.exactAlt.unitPrice;
+    l.inexact = false;
+    l.exactAlt = undefined;
+    l.confidence = Math.min(l.confidence, 0.85);
+  }
+}
+
 // ───────────────────────────── Construcción de la línea ─────────────────────────────
 
 function normUnit(u: string): string {
@@ -1078,6 +1169,7 @@ function headerUnit(header: TableHeader | undefined, sol: Solution): string | un
 function buildLineModel(row: Row, sol: Solution, toks: NumTok[], confidence: number, warnings: string[], model: TableModel): ParsedLine {
   const words = row.words;
   const used = new Set<number>([sol.q.wi, sol.p.wi, sol.t.wi, ...sol.d.map((d) => d.wi)]);
+  if (sol.dAmount) used.add(sol.dAmount.wi);
   if (sol.f) used.add(sol.f.wi);
   for (const t of [sol.q, sol.p, sol.t]) if (t.n.fixed && /^\d{1,4},\d{2,3}$/.test(t.n.fixed) && !/[.,]/.test(t.w.raw)) used.add(t.wi + 1);
   const colAt = (w: Word) => {
@@ -1133,7 +1225,9 @@ function buildLineModel(row: Row, sol: Solution, toks: NumTok[], confidence: num
     if (!/\d+\s*[x*]\s*\d/i.test(description2)) description2 = `${description2} ${sol.f.value} UD`.trim();
   }
   let discountPct: number | undefined;
-  if (sol.d.length) discountPct = round((1 - sol.d.reduce((acc, d) => acc * (1 - d.value / 100), 1)) * 100, 2);
+  if (sol.d.length) discountPct = pctRound((1 - sol.d.reduce((acc, d) => acc * (1 - d.value / 100), 1)) * 100);
+  // Descuento en euros: el porcentaje equivalente sale del importe
+  if (sol.dAmount) discountPct = round((1 - sol.t.value / (sol.q.value * unitPrice)) * 100, 2);
   const fixes = [sol.q, sol.p, sol.t, ...sol.d].filter((t) => t.n.repaired && t.wi < words.length).map((t) => `"${t.w.raw}" → ${t.n.fixed}`);
   if (fixes.length) warnings.push(`Lectura corregida por la validación aritmética: ${fixes.join(', ')}`);
   if (sol.t.wi >= words.length) warnings.push('Importe ilegible: calculado a partir de la base imponible');
@@ -1252,7 +1346,7 @@ function buildLine(row: Row, codeEnd: number, code: string | undefined, sol: Sol
     if (!/\d+\s*[x*]\s*\d/i.test(description)) description = `${description} ${sol.f.value} UD`.trim();
   }
   let discountPct: number | undefined;
-  if (sol.d.length) discountPct = round((1 - sol.d.reduce((acc, d) => acc * (1 - d.value / 100), 1)) * 100, 2);
+  if (sol.d.length) discountPct = pctRound((1 - sol.d.reduce((acc, d) => acc * (1 - d.value / 100), 1)) * 100);
   const fixes = [sol.q, sol.p, sol.t, ...sol.d].filter((t) => t.n.repaired && t.wi < words.length).map((t) => `"${t.w.raw}" → ${t.n.fixed}`);
   if (fixes.length) warnings.push(`Lectura corregida por la validación aritmética: ${fixes.join(', ')}`);
   if (sol.t.wi >= words.length) warnings.push('Importe ilegible: calculado a partir de la base imponible');
@@ -1296,18 +1390,26 @@ function descColumnText(row: Row, model: TableModel): string {
   );
 }
 
+/**
+ * OCR: mota o resto de otra fila leído como una palabra corta fuera de la descripción ("o", "de", "é", un "5" suelto
+ * sin decimales). No basta para que una fila de texto deje de ser la continuación de una descripción.
+ */
+function isOcrJunk(w: Word, row: Row): boolean {
+  return !!row.ocr && w.raw.replace(/[^\p{L}\d]/gu, '').length <= 2 && !(w.num && w.num.dec > 0) && !w.num?.cur;
+}
+
 /** Fila con el modelo de tabla. undefined = la aritmética no cuadra con las columnas (se prueba sin modelo). */
 function parseRowWithModel(row: Row, header: TableHeader): RowParse | undefined {
   const toks = numTokens(row, 0, header);
   const inNumericCols = toks.filter((t) => (t.col === undefined ? !t.inDesc : NUMERIC_KINDS.has(t.col)));
-  // Continuación posible: algo con letras en la columna de descripción (también "1L", "500G")
-  const hasLetters = row.words.some((w) => /\p{L}/u.test(w.raw) && columnOf(w, header, row.cw) === 'desc');
-  if (!inNumericCols.some((t) => t.col !== 'vat' && t.col !== 'disc')) return { textOnly: hasLetters };
+  // Continuación posible: algo en la columna de descripción (también "1L", "500G", "40/60")
+  const hasLetters = row.words.some((w) => /[\p{L}\d]/u.test(w.raw) && columnOf(w, header, row.cw) === 'desc');
+  if (!inNumericCols.some((t) => t.col !== 'vat' && t.col !== 'disc' && !isOcrJunk(t.w, row))) return { textOnly: hasLetters };
   const strict = toks.filter((t) => t.col === undefined || NUMERIC_KINDS.has(t.col));
   const sol = modelSolve(strict, header);
   if (!sol) return undefined;
   const conf = [sol.q, sol.p, sol.t].some((t) => t.n.fixed) ? 0.85 : 1;
-  return { line: buildLine(row, 0, undefined, sol, strict, conf, [], header) };
+  return { line: markExactness(buildLine(row, 0, undefined, sol, strict, conf, [], header), sol, row) };
 }
 
 function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): RowParse {
@@ -1363,7 +1465,7 @@ function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): 
   }
   if (sol) {
     if ([sol.q, sol.p, sol.t, ...sol.d].some((t) => t.n.fixed)) conf = Math.min(conf, 0.85);
-    const line = buildLine(row, codeEnd, code, sol, toks, conf, warnings, header);
+    const line = markExactness(buildLine(row, codeEnd, code, sol, toks, conf, warnings, header), sol, row);
     // Sin validar del todo: puede corregirse después con la base imponible o con otra lectura
     if (ocrLoose) line.validated = false;
     return { line };
@@ -1382,9 +1484,11 @@ function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): 
   let t: NumTok | undefined;
   let d: NumTok | undefined;
   if (header?.positional) {
-    q = tail.find((x) => x.col === 'qty') ?? tail.find((x) => x.col === 'bultos');
+    q = tail.find((x) => x.col === 'qty') ?? tail.find((x) => x.col === 'uds') ?? tail.find((x) => x.col === 'bultos');
     p = tail.find((x) => x.col === 'price');
-    t = [...tail].reverse().find((x) => x.col === 'total');
+    // Con dos columnas de importe ("Subtotal | IVA | Total"), la base es la de la izquierda
+    const totalCols = header.model ? header.model.columns.filter((c) => c.kind === 'total').length : 1;
+    t = totalCols > 1 ? tail.find((x) => x.col === 'total') : [...tail].reverse().find((x) => x.col === 'total');
     d = toks.find((x) => x.col === 'disc');
   }
   let rest = tail.filter((x) => x !== q && x !== p && x !== t);
@@ -1605,6 +1709,8 @@ function supplierNameScore(seg: Segment, idx: number, supplierIdRow: number | un
 function cleanName(s: string): string {
   return collapseSpaces(
     s
+      // OCR: la «S» de la forma social leída como «$» ("Obrador Campos $.L.")
+      .replace(/(^|\s)\$\.?\s?(L|A|COOP)\b/gi, '$1S.$2')
       .replace(/\b(?:C\.?I\.?F|N\.?I\.?F|DNI|NIF\/CIF|CIF\/NIF)\.?\s*[:.]?\s*(?:ES)?[A-Z0-9-]{8,11}\b.*$/i, '')
       .replace(SUPPLIER_LABEL_RE, '')
       .replace(/^[\s·•|:,.-]+|[\s·•|:,-]+$/g, ''),
@@ -1612,7 +1718,8 @@ function cleanName(s: string): string {
 }
 
 // "Nº" también cuando el OCR lee el ordinal como comillas, asterisco o acento
-const NS = '(?:n\\.?\\s?[ºo°"\'*´`]|num(?:ero)?|nro|n)\\.?';
+// (y como "?", "%" o "2": "FACTURA N?: 046165", "N*%: 2026/4161", "N2  FV-38419")
+const NS = '(?:n\\.?\\s?(?:[ºo°"\'*´`?%]{1,2}|2(?=\\s+\\S*\\d))|num(?:ero)?|nro|n)\\.?';
 const INVOICE_NUMBER_LABEL = new RegExp(
   '(?:' +
   [
@@ -1620,7 +1727,7 @@ const INVOICE_NUMBER_LABEL = new RegExp(
     `\\b(?:factura|fra\\.?)\\s*(?:simplificada\\s*|rectificativa\\s*)?(?:${NS})?(?=[\\s:#.]|$)`,
     `\\b(?:documento|doc\\.|ticket|invoice)\\s*(?:${NS}|no\\.?|number|#)?`,
     `\\bnumero\\b`,
-    `\\bn\\.?\\s?[ºo°"'*´\`]\\.?(?=\\s*[:.]?\\s*[a-z]{0,4}[-/]?\\d)`,
+    `\\bn\\.?\\s?[ºo°"'*´\`?%]{1,2}\\.?(?=\\s*[:.]?\\s*[a-z]{0,4}[-/]?\\d)`,
   ]
     .map((p) => `(?:${p})`)
     .join('|') +
@@ -1629,8 +1736,36 @@ const INVOICE_NUMBER_LABEL = new RegExp(
 );
 const NUMBER_NEG = /(?:cliente|pedido|albaran|cuenta|proveedor|lote|telefono|registro|pagina|hoja|agente|ruta|vendedor|caja|terminal|operacion|tarjeta|autorizacion|s\/ref|serie)\W*$/;
 
+/** Valor de una rejilla en la fila siguiente, bajo la etiqueta (sin fechas, horas, códigos postales ni años sueltos). */
+function valueBelow(rows: Row[], ri: number, labelX: number): string | undefined {
+  const row = rows[ri];
+  const next = rows[ri + 1];
+  if (!next) return undefined;
+  const cand = next.words
+    .filter((w, k) => {
+      if (!/\d/.test(w.raw) || parseDateEs(w.raw) || /^\d{1,2}:\d{2}/.test(w.raw) || w.raw.replace(/[^\dA-Za-z]/g, '').length < 3) return false;
+      // Ni códigos postales ("46811 Valencia") ni años de una fecha en letra ("9 de junio de 2025")
+      if (/^\d{5}$/.test(w.raw) && /^\p{L}{3,}/u.test(next.words[k + 1]?.raw ?? '')) return false;
+      if (/^(?:19|20)\d{2}$/.test(w.raw) && next.words[k - 1]?.f === 'de') return false;
+      return true;
+    })
+    .map((w) => ({ w, d: Math.abs(w.x0 - labelX) }))
+    .sort((a, b) => a.d - b.d)[0];
+  if (!cand || cand.d > (row.positional ? 60 : 12)) return undefined;
+  return cand.w.raw;
+}
+
 function extractInvoiceNumber(rows: Row[]): string | undefined {
   let best: { value: string; score: number; row: Row } | undefined;
+  const consider = (raw: string, score: number, ri: number) => {
+    // OCR: las letras de un número de factura van en mayúsculas ("Fv-38419" es "FV-38419")
+    const value = rows[ri].ocr ? raw.replace(/[.,:;]+$/, '').toUpperCase() : raw.replace(/[.,:;]+$/, '');
+    if (parseDateEs(value) || /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(value) || /^\d{1,2}:\d{2}/.test(value)) return;
+    if (/^(?:ES)?[A-Z]\d{7}[0-9A-J]$/i.test(value) || /^\d{8}[A-Z]$/i.test(value)) return;
+    if (value.replace(/[^\d]/g, '').length < 1 || value.length > 30) return;
+    const s = score + (ri < 15 ? 1 : 0);
+    if (!best || s > best.score) best = { value, score: s, row: rows[ri] };
+  };
   rows.forEach((row, ri) => {
     const text = row.text;
     const f = foldKeepLength(text);
@@ -1658,30 +1793,20 @@ function extractInvoiceNumber(rows: Row[]): string | undefined {
       if (!value || !/\d/.test(value)) {
         // El título suelto ("FACTURA") no es una etiqueta de número fiable para el valor de debajo
         if (/factura|fra/.test(label) && !withNo) score = 3;
-        // Valor en la fila siguiente, bajo la etiqueta
-        const next = rows[ri + 1];
-        if (!next) continue;
-        const labelX = row.positional ? xAtChar(row, m.index) : m.index;
-        const cand = next.words
-          .filter((w, k) => {
-            if (!/\d/.test(w.raw) || parseDateEs(w.raw) || /^\d{1,2}:\d{2}/.test(w.raw) || w.raw.replace(/[^\dA-Za-z]/g, '').length < 3) return false;
-            // Ni códigos postales ("46811 Valencia") ni años de una fecha en letra ("9 de junio de 2025")
-            if (/^\d{5}$/.test(w.raw) && /^\p{L}{3,}/u.test(next.words[k + 1]?.raw ?? '')) return false;
-            if (/^(?:19|20)\d{2}$/.test(w.raw) && next.words[k - 1]?.f === 'de') return false;
-            return true;
-          })
-          .map((w) => ({ w, d: Math.abs(w.x0 - labelX) }))
-          .sort((a, b) => a.d - b.d)[0];
-        if (!cand || cand.d > (row.positional ? 60 : 12)) continue;
-        value = cand.w.raw;
+        value = valueBelow(rows, ri, row.positional ? xAtChar(row, m.index) : m.index);
+        if (!value) continue;
         score -= 3;
       }
-      value = value.replace(/[.,:;]+$/, '');
-      if (parseDateEs(value) || /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(value) || /^\d{1,2}:\d{2}/.test(value)) continue;
-      if (/^(?:ES)?[A-Z]\d{7}[0-9A-J]$/i.test(value) || /^\d{8}[A-Z]$/i.test(value)) continue;
-      if (value.replace(/[^\d]/g, '').length < 1 || value.length > 30) continue;
-      if (ri < 15) score += 1;
-      if (!best || score > best.score) best = { value, score, row };
+      consider(value, score, ri);
+    }
+    // Rejilla de datos con la celda «Nº» / «Número» sola ("Nº | Fecha | Cliente") y el valor debajo
+    const segs = segmentsOf(row);
+    if (segs.length >= 2 && segs.every((s) => !/\d/.test(s.text))) {
+      for (const seg of segs) {
+        if (!/^(?:n\.?\s?[ºo°]\.?|num(?:ero)?\.?|nro\.?)$/.test(fold(seg.text))) continue;
+        const value = valueBelow(rows, ri, seg.x0);
+        if (value) consider(value, 2, ri);
+      }
     }
   });
   if (!best) return albaranNumber(rows);
@@ -1956,11 +2081,17 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
     }
     if (supplierName) break;
   }
+  // Razón social partida en dos filas que corta en una palabra de enlace: "Frutas y Verduras del" / "Cantábrico C.B."
+  const CONNECTOR_END = /(?:^|\s)(?:de|del|la|las|los|el|y|e|&|-)$/i;
   const withSuffix = (sg: Segment, b: Block): string => {
-    // Razón social partida en dos filas: "… Levante" / "S.A."
-    const text = cleanName(sg.text);
+    let text = cleanName(sg.text);
+    const at = b.segs.indexOf(sg);
+    const prev = b.segs[at - 1];
+    if (prev && prev.row < sg.row && CONNECTOR_END.test(collapseSpaces(prev.text)) && nameCandidate(cleanName(prev.text))) text = `${cleanName(prev.text)} ${text}`;
     if (COMPANY_SUFFIX_RE.test(fold(text))) return text;
-    const next = b.segs[b.segs.indexOf(sg) + 1];
+    const next = b.segs[at + 1];
+    if (next && next.row > sg.row && CONNECTOR_END.test(text) && !/\d/.test(next.text)) return `${text} ${cleanName(next.text)}`;
+    // Razón social partida en dos filas: "… Levante" / "S.A."
     if (next && next.row > sg.row && /^(?:s\.?\s?l\.?\s?u?\.?|s\.?\s?a\.?\s?u?\.?|s\.?\s?coop\.?|c\.?\s?b\.?|slu|sau)$/i.test(collapseSpaces(next.text))) return `${text} ${collapseSpaces(next.text)}`;
     return text;
   };
@@ -2339,8 +2470,9 @@ function continuationText(t: TextRow): { text: string; code?: string } | undefin
     for (const w of words) {
       const j = columnIndex(model.columns, w);
       if (j >= 0 && model.columns[j].kind === 'desc') desc.push(w);
-      else return undefined;
+      else if (!isOcrJunk(w, t.row)) return undefined;
     }
+    if (!desc.length) return undefined;
     return { text: collapseSpaces(desc.map((w) => w.raw).join(' ')) };
   }
   const lc = leadingCode(words);
@@ -2412,7 +2544,7 @@ function attachContinuations(parsed: ParsedLine[], texts: TextRow[], rows: Row[]
     else if (next && middle && dNext <= limit && dNext < dPrev * 0.87) target = 'pre';
     // Mucho más cerca de la línea siguiente que de la anterior: la otra mitad de su descripción va en la fila de los
     // números (celdas centradas en vertical cuya segunda fila de texto cae a la altura de los importes)
-    else if (next && dNext <= limit && dNext < dPrev * 0.6 && (pitch === undefined ? Number.isFinite(dPrev) : dNext < pitch * 0.75)) target = 'pre';
+    else if (next && dNext <= limit && dNext < dPrev * 0.45 && (pitch === undefined ? Number.isFinite(dPrev) : dNext < pitch * 0.75)) target = 'pre';
     else if (prev && dPrev <= limit) target = 'post';
     if (target === 'pre' && next) {
       const list = pre.get(next) ?? [];
@@ -2576,9 +2708,10 @@ function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: Table
     const codeless = leadingCode(row.words).end ? fold(row.words.slice(leadingCode(row.words).end).map((w) => w.raw).join(' ')) : fold(row.text.trim());
     const descCol = header?.model ? fold(descColumnText(row, header.model)) : '';
     if (EXTRA_RE.test(codeless) || EXTRA_RE.test(descPart) || (descCol && EXTRA_RE.test(descCol))) {
-      const nums = numbersIn(row).filter((t) => !t.n.pct);
+      // Importe: el último número con céntimos (nunca un formato "75cl" ni un entero suelto)
+      const nums = numbersIn(row).filter((t) => !t.n.pct && !t.n.unit && !t.n.perUnit);
       const money = nums.filter((t) => t.n.dec === 2 || t.n.cur);
-      const amount = money.length ? money[money.length - 1].value : nums.length ? nums[nums.length - 1].value : 0;
+      const amount = money.length ? money[money.length - 1].value : 0;
       // Sin importe no es un cargo: puede ser la continuación de una descripción ("… ENVASE RETORNABLE")
       if (amount) {
         extras.push({ description: collapseSpaces(row.text), amount });
@@ -2613,6 +2746,15 @@ function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: Table
     else if (!res.line && firstHeader < 0 && isAmountOnlyRow(row)) amountOnly.push(row);
   }
   attachContinuations(parsed, textRows, rows, zoneOf);
+  // Portes, envases y fianzas con la descripción partida en dos filas ("ENVASE RETORNABLE" / "CAJA 1/3  8  4,20"): se
+  // reconocen con la descripción completa
+  for (let k = parsed.length - 1; k >= 0; k--) {
+    const l = parsed[k];
+    if (l.validated && EXTRA_RE.test(fold(l.description))) {
+      extras.push({ description: l.description, amount: l.total });
+      parsed.splice(k, 1);
+    }
+  }
   // Sin cabecera de tabla, sólo filas validadas y con descripción
   if (firstHeader < 0) {
     for (let k = parsed.length - 1; k >= 0; k--) {
@@ -2936,6 +3078,7 @@ export function parseInvoiceReading(input: { text: string; lines?: string[] }, m
     }
   }
   const { parsed, extras, tableEnd, header, amountOnly } = walk;
+  if (method === 'ocr') applyExactConvention(parsed);
 
   // 3) Cabecera del documento y totales
   const firstLineRow = parsed.length ? Math.min(...parsed.flatMap((l) => l.rows)) : rows.length;

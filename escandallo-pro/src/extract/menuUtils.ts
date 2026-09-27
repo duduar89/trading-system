@@ -906,6 +906,9 @@ function fillerText(s: string): boolean {
  */
 function prefilter(items: Item[]): Item[] {
   const H = typicalHeight(items);
+  // Ancho típico por carácter respecto a la altura (para detectar cajas que el OCR estiró sobre un icono vecino)
+  const ratios = items.filter((i) => letterCountOf(i.text) >= 4 && (i.conf ?? 100) >= 80).map((i) => (i.x1 - i.x0) / i.text.length / i.h);
+  const charRatio = ratios.length >= 10 ? median(ratios) : 0;
   const out: Item[] = [];
   for (const it of items) {
     let { text, x0, x1 } = it;
@@ -923,11 +926,13 @@ function prefilter(items: Item[]): Item[] {
     }
     // Sin letras ni cifras (salvo el símbolo del euro): filetes, viñetas, adornos. Un guion corto y fino se conserva:
     // separa el nombre de su descripción en la misma línea ("Pulpo – con cachelos")
-    const dash = /^[-–—]{1,2}$/.test(text) && x1 - x0 <= 1.6 * H && it.h <= 0.45 * H;
+    const dash = /^[-–—]{1,2}$/.test(text) && x1 - x0 <= 1.6 * H && it.h <= 1.2 * H;
     if (!/[\p{L}\p{N}€½]/u.test(text) && !dash) continue;
     // Rayas y puntos finos (bordes punteados leídos como texto, también como tiras de letras)
     if (it.h < 0.4 * H && x1 - x0 > 2.5 * H && letterCountOf(text) < 2) continue;
     if (fillerText(text) && (it.h < 0.6 * H || letterCountOf(text) >= 12)) continue;
+    // Palabra con una caja mucho más ancha que su texto (el OCR la unió con un icono o un adorno): se ajusta al texto
+    if (charRatio > 0 && letterCountOf(text) >= 3 && (x1 - x0) / text.length > 2.2 * charRatio * it.h) x1 = x0 + 1.15 * charRatio * it.h * text.length;
     out.push({ ...it, text: dash ? '–' : text, x0, x1, cx: (x0 + x1) / 2, price: PRICE_BOX.test(text) });
   }
   return out;
@@ -1020,7 +1025,8 @@ function skewOf(items: Item[]): number {
 /** ¿Caja con aspecto de precio de la carta (no un número volado de alérgenos)? */
 function isPriceItem(it: Item, H: number): boolean {
   if (!(it.price || NUMERIC_BOX.test(it.text)) || it.h < 0.7 * H) return false;
-  // Una añada ("2019") o un número de cuatro cifras sin decimales ni moneda no es un precio de carta
+  // Una añada ("2019"), un número de cuatro cifras sin decimales ni moneda o una numeración ("7.", "3)") no son precios
+  if (/^\d{1,2}[.)]$/.test(it.text)) return false;
   return !/^(?:19|20)\d{2}$|^\d{4}$/.test(it.text.replace(/[.,]$/, ''));
 }
 
@@ -1165,7 +1171,7 @@ function findGutter(items: Item[], H: number): Gutter | undefined {
     const R = regionStats(right, H);
     if (DBG) console.log('gutter', Math.round(gs), Math.round(ge), 'span', spanning.size, JSON.stringify(L), JSON.stringify(R), 'H', H.toFixed(1), 'tau', tau);
     if (L.letterRows < 3 || R.letterRows < 3 || L.letterRows < 0.4 * L.rows || R.letterRows < 0.4 * R.rows) continue;
-    if (pagePrices >= 6 && (L.priceRows < 2 || R.priceRows < 2)) continue;
+    if (pagePrices >= 6 && (L.priceRows < Math.max(2, 0.2 * L.letterRows) || R.priceRows < Math.max(2, 0.2 * R.letterRows))) continue;
     const score = (ge - gs) * Math.sqrt(Math.min(L.letterRows, R.letterRows));
     if (!best || score > best.score) best = { gs, ge, left, right, spanning: [...spanning], score };
   }
@@ -1333,10 +1339,11 @@ function cleanRowItems(members: Item[]): Item[] {
   const words = sorted.filter((m) => letterCountOf(m.text) >= 2 && (m.conf ?? 100) >= 40);
   const ref = words.length ? words : sorted;
   const hr = median(ref.map((m) => m.h));
-  const base = median(ref.map((m) => m.y1));
-  // Números volados (alérgenos "¹ ³ ⁷", "1,3,7" en pequeño)
+  // Centro vertical de las palabras de la fila (los trazos bajos de "gallega" no mueven el centro tanto como la base)
+  const midY = median(ref.map((m) => m.cy));
+  // Números volados (alérgenos "¹ ³ ⁷", "1,3,7" en pequeño): más bajos que el texto y enteros por encima de su centro
   const kept = sorted
-    .filter((m) => !(m.h < 0.8 * hr && m.y1 < base - 0.18 * hr && !/\p{L}/u.test(m.text) && /\d/.test(m.text)))
+    .filter((m) => !(m.h < 0.72 * hr && m.y1 < midY && !/\p{L}/u.test(m.text) && /\d/.test(m.text)))
     .map((m) => {
       // Icono pegado al final de una palabra ("romescoO", "brasa®"): se quita si lo que queda es una palabra real
       const glued = /^(\p{Ll}{3,})[OQG0@©®]$/u.exec(m.text);
@@ -1346,7 +1353,10 @@ function cleanRowItems(members: Item[]): Item[] {
   // ¿El nombre va en mayúsculas? (entonces una sigla en mayúsculas no delata nada)
   const nameWords = kept.filter((m) => letterCountOf(m.text) >= 4 && !fillerText(m.text) && (m.conf ?? 100) >= 70);
   const namesUpper = nameWords.length > 0 && nameWords.filter((m) => isShouting(m.text)).length >= nameWords.length / 2;
-  const junk = (m: Item, trailingPrice: boolean): boolean => {
+  // ¿Nombre Con Cada Palabra En Mayúscula? (entonces "De", "La", "A" pueden ser del nombre)
+  const lowerWords = kept.filter((m) => /^\p{Ll}/u.test(m.text) && letterCountOf(m.text) >= 1).length;
+  const namesTitle = !namesUpper && nameWords.length >= 2 && lowerWords === 0;
+  const junk = (m: Item, trailingPrice: boolean, trailing = true): boolean => {
     const t = m.text;
     const letters = letterCountOf(t);
     const alnum = t.replace(/[^\p{L}\p{N}]/gu, '').length;
@@ -1361,6 +1371,9 @@ function cleanRowItems(members: Item[]): Item[] {
     if (letters <= 3 && !isRealWord(t) && (m.conf ?? 100) < 75) return true;
     // Sigla corta en mayúsculas que no existe, detrás de un nombre que no va en mayúsculas ("… al carbón OJO")
     if (letters <= 3 && letters === alnum && core === core.toUpperCase() && !isRealWord(core) && !namesUpper) return true;
+    // Letra o par de letras con mayúscula inicial al final de un nombre ("… al pil pil Su", "Mo", "G"): códigos de
+    // alérgenos (iconos con letra, muy habituales como texto en los PDF de carta), no palabras del nombre
+    if (trailing && /^\p{Lu}\p{Ll}?$/u.test(core) && !KEEP_UPPER.has(core.toUpperCase()) && !namesTitle) return true;
     // Relleno ("LALA", "AAA") o palabra en mayúsculas colgando de un nombre en minúsculas (salvo siglas: DO, BBQ, XL…)
     if (fillerText(t)) return true;
     if (!namesUpper && letters >= 2 && letters === alnum && core === core.toUpperCase() && !KEEP_UPPER.has(core)) return true;
@@ -1377,8 +1390,13 @@ function cleanRowItems(members: Item[]): Item[] {
   };
   const isCur = (m: Item) => /^(?:€|eur)$/i.test(m.text);
   const hasDec = (m: Item) => /\d[.,'’€]\d/.test(m.text) || /€|eur/i.test(m.text);
-  // Una sola cifra en una caja cuadrada: un icono (una cifra de verdad es mucho más estrecha que alta)
-  const iconShape = (m: Item) => m.text.replace(/[^\p{L}\p{N}]/gu, '').length === 1 && (m.x1 - m.x0) / m.h >= 0.85;
+  // Cifras que son iconos: una sola cifra en una caja cuadrada, o una tira de glifos redondos ("00", "0000", "080") tan
+  // anchos como altos (una cifra de verdad es mucho más estrecha que alta)
+  const iconShape = (m: Item) => {
+    const core = m.text.replace(/[^\p{L}\p{N}]/gu, '');
+    if (core.length === 1) return m.text.trim().length === 1 && (m.x1 - m.x0) / m.h >= 0.85;
+    return /^[0O8Q9D6]{2,6}$/.test(core) && !/[.,'’€]/.test(m.text) && (m.x1 - m.x0) / core.length >= 0.8 * m.h;
+  };
   // Grupo de precios del final: el último precio y, delante, los del mismo formato y tamaño (media / ración, copa / botella)
   let end = kept.length;
   while (end > 0 && isCur(kept[end - 1])) end--;
@@ -1406,7 +1424,7 @@ function cleanRowItems(members: Item[]): Item[] {
   const isJunkAt = (t: Item, k: number): boolean => {
     // Medidas del nombre ("300 g", "(6 uds)") se conservan
     if (UNIT_WORD.test(t.text) && k >= 2 && /^\(?\d+(?:[.,]\d+)?$/.test(kept[k - 2].text)) return false;
-    const bareNumber = /^\d{1,2}[.,]?$/.test(t.text);
+    const bareNumber = /^\d{1,3}[.,]?$/.test(t.text);
     return junk(t, trailingPrice) || (bareNumber && (trailingPrice || leadingPrice || iconShape(t)));
   };
   let k = priceStart;
@@ -1429,8 +1447,8 @@ function cleanRowItems(members: Item[]): Item[] {
   const cleaned = [...kept.slice(0, k), ...kept.slice(end2)];
   // Restos por la izquierda (viñetas, iconos delante del nombre), sin tocar un precio delantero
   let s = 0;
-  while (s < cleaned.length - 1 && !isNum(cleaned[s]) && junk(cleaned[s], false)) s++;
-  const out = cleaned.slice(s);
+  while (s < cleaned.length - 1 && !isNum(cleaned[s]) && junk(cleaned[s], false, false)) s++;
+  const out = cleaned.slice(s).filter((m) => !(isNum(m) && m.text.replace(/\D/g, '').length >= 2 && iconShape(m) && !cleaned.some((o) => o !== m && letterCountOf(o.text) >= 3)));
   if (!out.some((m) => letterCountOf(m.text) >= 2 || isNum(m))) return [];
   return out;
 }
@@ -1500,6 +1518,7 @@ function groupRows(items: Item[]): MenuRow[] {
   const built = rows
     .map((row) => {
       const keep = new Set(cleanRowItems(row.segs.flatMap((sg) => sg.items)));
+      if ((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.MENU_DEBUG_ROWS) console.log('fila', row.segs.flatMap((sg) => sg.items).map((i) => i.text).join(' | '), '→', [...keep].map((i) => i.text).join(' '));
       const members = [...keep].sort((a, b) => a.x0 - b.x0);
       if (!members.length) return undefined;
       const descAt = descriptionSplit(members);
@@ -1561,6 +1580,13 @@ function groupRows(items: Item[]): MenuRow[] {
     })
     .filter((b): b is NonNullable<typeof b> => !!b)
     .sort((a, b) => a.y - b.y);
+  // Borde derecho útil de la columna: percentil alto de los finales de fila (el título o una línea suelta más ancha no
+  // cuentan), para saber si un nombre largo tuvo que partirse
+  const ends = built.map((b) => b.row.x1 ?? 0).filter((x) => x > 0).sort((p, q) => p - q);
+  if (ends.length >= 4) {
+    const edge = ends[Math.floor(0.85 * (ends.length - 1))];
+    for (const b of built) b.row.colX1 = edge;
+  }
   for (let i = 1; i < built.length; i++) {
     const a = built[i - 1];
     const b = built[i];
@@ -1569,6 +1595,54 @@ function groupRows(items: Item[]): MenuRow[] {
     b.row.gap = Math.max(0, gap) / Math.max(1, b.h);
   }
   return built.map((b) => b.row);
+}
+
+/** Línea de la capa de texto de un PDF con sus fragmentos posicionados (forma de `PdfTextLine` de pdf.ts). */
+export interface PositionedLine {
+  page: number;
+  /** Línea base (de arriba a abajo). */
+  y: number;
+  items: readonly { x: number; width: number; str: string }[];
+}
+
+/** Ancho aproximado de un carácter en «em» (tipografía proporcional media), para repartir el ancho de un fragmento. */
+function charEm(c: string): number {
+  if (/[.,:;'!|·´`]/.test(c)) return 0.28;
+  if (c === ' ') return 0.28;
+  if (/[iljtfrIíï1]/.test(c)) return 0.32;
+  if (/[mwMWæœ]/.test(c)) return 0.85;
+  if (/\d/.test(c)) return 0.55;
+  if (/\p{Lu}/u.test(c)) return 0.66;
+  if (/[_—–-]/.test(c)) return 0.5;
+  return 0.52;
+}
+
+/**
+ * Cajas de palabra a partir de la capa de texto de un PDF de carta (para reconstruir columnas, filas y tamaños de letra
+ * con el mismo motor que las fotos). El ancho de cada fragmento se reparte entre sus caracteres según su anchura típica
+ * (un relleno de puntos ocupa poco por carácter, una «m» mucho), y la altura de la caja es el cuerpo de letra estimado,
+ * así una descripción en letra más pequeña sigue siéndolo.
+ */
+export function pdfLinesToMenuBoxes(lines: readonly PositionedLine[]): MenuBox[] {
+  const out: MenuBox[] = [];
+  for (const l of lines) {
+    for (const it of l.items) {
+      const str = it.str.replace(/\s+/g, ' ').trim();
+      if (!str || !(it.width > 0)) continue;
+      const ems = [...str].map(charEm);
+      const em = it.width / Math.max(0.5, ems.reduce((a, b) => a + b, 0));
+      const h = Math.max(1, em);
+      let x = it.x;
+      let k = 0;
+      for (const word of str.split(' ')) {
+        const w = [...word].reduce((acc, _c, n) => acc + ems[k + n], 0) * em;
+        out.push({ text: word, bbox: { x0: x, y0: l.y - 0.78 * h, x1: x + w, y1: l.y + 0.22 * h }, page: l.page });
+        k += [...word].length + 1;
+        x += w + 0.28 * em;
+      }
+    }
+  }
+  return out;
 }
 
 /**

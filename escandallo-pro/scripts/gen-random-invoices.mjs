@@ -678,11 +678,29 @@ function makeLines(R, products, opts, style) {
     if (l.cases) l.cases = -Math.max(1, Math.ceil(Math.abs(l.qty) / (l.prod.caseOf || 1)));
     if (l.pieces) l.pieces = -Math.max(1, Math.min(Math.abs(l.pieces), 2));
   }
-  for (const l of lines) l.total = rnd(l.qty * l.price * (1 - (l.dto ?? 0) / 100) * (1 - (l.dto2 ?? 0) / 100), 2);
+  if (opts.uc) {
+    for (const l of lines) {
+      if (l.unit === 'kg') continue;
+      l.uc = l.prod.caseOf ?? R.pick([6, 10, 12, 24]);
+      l.cases = Math.max(1, Math.round(Math.abs(l.qty) / l.uc)) * Math.sign(l.qty || 1);
+      l.qty = l.cases * l.uc;
+    }
+  }
+  for (const l of lines) {
+    if (opts.discStyle === 'eur') {
+      // Descuento en euros: importe = bruto − descuento; el % resultante se deduce del importe
+      const gross = rnd(l.qty * l.price, 2);
+      l.dtoEur = l.dto ? rnd((gross * l.dto) / 100, 2) : 0;
+      l.total = rnd(gross - l.dtoEur, 2);
+      l.dtoPctFromTotal = l.dtoEur ? rnd((1 - l.total / (l.qty * l.price)) * 100, 2) : undefined;
+      l.dto = undefined;
+    } else l.total = rnd(l.qty * l.price * (1 - (l.dto ?? 0) / 100) * (1 - (l.dto2 ?? 0) / 100), 2);
+  }
   return lines;
 }
 
 function combinedDiscount(l) {
+  if (l.dtoPctFromTotal !== undefined) return l.dtoPctFromTotal;
   if (!l.dto && !l.dto2) return undefined;
   return rnd((1 - (1 - (l.dto ?? 0) / 100) * (1 - (l.dto2 ?? 0) / 100)) * 100, 2);
 }
@@ -768,9 +786,13 @@ const COL_LABELS = {
   dto2: ['Dto.2', 'Dto 2', 'Dto2', 'Desc. 2', '% Dto.2'],
   total: ['Importe', 'Total', 'Neto', 'Importe neto', 'Total línea', 'Importe €', 'Base', 'Subtotal', 'Valor', 'Total €'],
   vat: ['IVA', '% IVA', 'IVA %', 'T. IVA', 'Tipo', '%IVA', 'I.V.A.'],
+  dtoEur: ['Dto. €', 'Imp. dto.', 'Descuento €', 'Dto. (€)'],
+  totalBase: ['Subtotal', 'Base', 'Importe neto', 'Neto', 'Base imp.'],
+  totalVat: ['Total', 'Total €', 'Importe total', 'Total c/IVA'],
+  uc: ['U/C', 'Uds/caja', 'UxC', 'Ud./caja'],
 };
 
-const ALIGN = { line: 'c', code: '', ean: '', desc: '', lot: '', cad: '', origin: '', bultos: 'r', uds: 'r', qty: 'r', unit: 'c', price: 'r', dto1: 'r', dto2: 'r', total: 'r', vat: 'c' };
+const ALIGN = { line: 'c', code: '', ean: '', desc: '', lot: '', cad: '', origin: '', bultos: 'r', uds: 'r', uc: 'r', qty: 'r', unit: 'c', price: 'r', dto1: 'r', dto2: 'r', total: 'r', vat: 'c', totalVat: 'r' };
 
 function chooseColumns(R, kind, products, template) {
   const hasKg = products.some((p) => p.unit === 'kg');
@@ -808,7 +830,14 @@ function chooseColumns(R, kind, products, template) {
   if (allKg && qtyLabelKind === 'qty' && R.chance(0.3)) qtyLabelKind = 'qtyKg';
   const unitCol = R.chance(0.42) ? (R.chance(0.85) ? 'after' : 'before') : null;
   const discounts = R.chance(0.3) ? (R.chance(0.28) ? 2 : 1) : 0;
+  // Descuento en euros en lugar de porcentaje (algunos ERP)
+  const discStyle = discounts === 1 && R.chance(0.25) ? 'eur' : 'pct';
   const vatCol = R.chance(0.5) ? (R.chance(0.8) ? 'after' : 'before') : null;
+  // Importe con IVA por línea además de la base
+  const totalVat = vatCol === 'after' && R.chance(0.15);
+  // Unidades por caja entre los bultos y la cantidad
+  const uc = qtyBlock[0] === 'bultos' && qtyBlock.length === 2 && qtyLabelKind === 'qty' && R.chance(0.3);
+  if (uc) qtyBlock.splice(1, 0, 'uc');
   const priceFirst = template !== 'albaran' && R.chance(0.08);
   const qtyFirst = template === 'albaran' ? R.chance(0.75) : R.chance(0.03);
 
@@ -823,6 +852,7 @@ function chooseColumns(R, kind, products, template) {
   if (vatCol === 'before') money.push('vat');
   money.push('total');
   if (vatCol === 'after') money.push('vat');
+  if (totalVat) money.push('totalVat');
 
   if (qtyFirst) cols.push(...lead.filter((c) => c === 'line'), ...qtyPart, ...lead.filter((c) => c !== 'line'), 'desc');
   else cols.push(...lead, 'desc');
@@ -839,13 +869,15 @@ function chooseColumns(R, kind, products, template) {
     if (c === 'qty') list = COL_LABELS[qtyLabelKind];
     if (c === 'price' && (qtyLabelKind === 'qtyKg' && allKg ? R.chance(0.5) : allKg && R.chance(0.2))) list = COL_LABELS.priceKg;
     if (c === 'dto1' && discounts === 2) list = COL_LABELS.dto1b;
+    if (c === 'dto1' && discStyle === 'eur') list = COL_LABELS.dtoEur;
+    if (c === 'total' && totalVat) list = COL_LABELS.totalBase;
     let label = R.pick(list.filter((l) => !used.has(l.toLowerCase())));
     if (!label) label = list[0];
     used.add(label.toLowerCase());
     labels[c] = label;
   }
   if (labels.desc === 'Artículo' && labels.code === 'Art.') labels.code = 'Código';
-  return { cols, labels, discounts, bottles, qtyLabelKind };
+  return { cols, labels, discounts, discStyle, bottles, qtyLabelKind };
 }
 
 function fmtQty(l, nf) {
@@ -886,8 +918,13 @@ function cellText(col, l, ctx) {
       const s = fmtNum(l.price, l.priceDec, { thousands: nf.thousands });
       return nf.priceCur ? `${s} €` : s;
     }
+    case 'uc':
+      return l.uc ? String(l.uc) : '';
+    case 'totalVat':
+      return l.extra && !l.vat ? '' : `${fmtNum(rnd(l.total * (1 + l.vat / 100), 2), 2, { thousands: nf.thousands, trailingMinus: nf.trailingMinus })}${nf.totalCur}`;
     case 'dto1':
     case 'dto2': {
+      if (col === 'dto1' && l.dtoEur !== undefined) return l.dtoEur ? fmtNum(l.dtoEur, 2) : fmtOpt.zeroDisc && !l.extra ? fmtNum(0, 2) : '';
       const v = col === 'dto1' ? l.dto : l.dto2;
       if (!v) return fmtOpt.zeroDisc && !l.extra ? fmtNum(0, fmtOpt.discDec) : '';
       return `${fmtNum(v, Number.isInteger(v) ? fmtOpt.discDec : Math.max(1, fmtOpt.discDec))}${fmtOpt.discPct ? '%' : ''}`;
@@ -1042,7 +1079,7 @@ function tableTemplate(R, ctx) {
   const descIdx = cols.indexOf('desc');
   const wrapHeader = R.chance(0.2);
   const widths = {
-    line: 26, code: R.int(44, 70), ean: 92, lot: 58, cad: 58, origin: 50, bultos: 44, uds: 40, qty: R.int(46, 64), unit: 36, price: R.int(52, 72), dto1: 40, dto2: 40, total: R.int(62, 84), vat: 36,
+    line: 26, code: R.int(44, 70), ean: 92, lot: 58, cad: 58, origin: 50, bultos: 44, uds: 40, uc: 36, qty: R.int(46, 64), unit: 36, price: R.int(52, 72), dto1: 40, dto2: 40, total: R.int(62, 84), vat: 36, totalVat: R.int(62, 84),
   };
   const colgroup = `<colgroup>${cols
     .map((c) => (c === 'desc' ? '<col>' : `<col style="width:${Math.round(widths[c] * (fs / 10))}px">`))
@@ -1448,6 +1485,8 @@ export function generateInvoice(seed, opts = {}) {
       qtyDecKg: template === 'ticket' ? 3 : nf.qtyDecKg,
       qtyDecUd: template === 'ticket' ? 0 : nf.qtyDecUd,
       discounts: cfg.discounts,
+      discStyle: cfg.discStyle,
+      uc: cfg.cols.includes('uc'),
       discountRate: R.float(0.15, 0.6),
       bottles: cfg.bottles,
       negativeAll: rectificativa,

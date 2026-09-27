@@ -69,3 +69,55 @@ describe('fixTrailingUnitSix: «G» final leída como «6»', () => {
     expect(fixOcrDescription('LATA 756 TOMATE')).toBe('LATA 756 TOMATE');
   });
 });
+
+describe('unidades en minúscula leídas como cifras', () => {
+  it('la «l» de litros leída como «1» en productos líquidos', () => {
+    expect(fixOcrDescription('Aceite de girasol garrafa 11')).toBe('Aceite de girasol garrafa 1l');
+    expect(fixOcrDescription('Aceite oliva virgen extra 51')).toBe('Aceite oliva virgen extra 5l');
+    expect(fixOcrDescription('Leche entera brik 6x11')).toBe('Leche entera brik 6x1l');
+    expect(fixOcrDescription('Agua mineral 1,51')).toBe('Agua mineral 1,5l');
+    expect(fixOcrDescription('Barril cerveza 301')).toBe('Barril cerveza 30l');
+  });
+  it('no toca cifras sin contexto de líquido o en mayúsculas', () => {
+    expect(fixOcrDescription('Tomate calibre 11')).toBe('Tomate calibre 11');
+    expect(fixOcrDescription('ACEITE GIRASOL 11')).toBe('ACEITE GIRASOL 11');
+    expect(fixOcrDescription('Vino tinto crianza 2011')).toBe('Vino tinto crianza 2011');
+  });
+  it('la «g» de gramos leída como «9»', () => {
+    expect(fixOcrDescription('Tomate cherry bandeja 2509')).toBe('Tomate cherry bandeja 250g');
+    expect(fixOcrDescription('Azafrán en hebra 19')).toBe('Azafrán en hebra 1g');
+    expect(fixOcrDescription('Harina de trigo 1k9')).toBe('Harina de trigo 1kg');
+    expect(fixOcrDescription('Huevos camperos 19')).toBe('Huevos camperos 19');
+  });
+  it('centilitros, kilos y milímetros mal leídos', () => {
+    expect(fixOcrDescription('Vino blanco verdejo 75c1')).toBe('Vino blanco verdejo 75cl');
+    expect(fixOcrDescription('Arroz redondo lkg')).toBe('Arroz redondo 1kg');
+    expect(fixOcrDescription('Film transparente 9nm')).toBe('Film transparente 9mm');
+  });
+});
+
+describe('otras confusiones del OCR en descripciones', () => {
+  it('"rn" y "m" sólo hacia palabras conocidas', () => {
+    expect(fixOcrDescription('Carme picada de vacuno')).toBe('Carne picada de vacuno');
+    expect(fixOcrDescription('Carmen del Mar')).toBe('Carmen del Mar');
+  });
+  it('quita basura pegada al principio', () => {
+    expect(fixOcrDescription('tGARBANZO COCIDO 400G')).toBe('GARBANZO COCIDO 400G');
+    expect(fixOcrDescription('tCroqueta de jamón')).toBe('Croqueta de jamón');
+    expect(fixOcrDescription('¡Nata para montar')).toBe('Nata para montar');
+    expect(fixOcrDescription('eXtra')).toBe('eXtra');
+  });
+});
+
+describe('vocales duplicadas y categorías en romanos', () => {
+  it('quita la vocal leída dos veces con y sin tilde', () => {
+    expect(fixOcrDescription('FRESOÓN')).toBe('FRESÓN');
+    expect(fixOcrDescription('Melón piel de sapo')).toBe('Melón piel de sapo');
+    expect(fixOcrDescription('JAMOÓN IBÉRICO')).toBe('JAMÓN IBÉRICO');
+  });
+  it('categoría comercial I / II leída como cifra', () => {
+    expect(fixOcrDescription('PLÁTANO DE CANARIAS CATEGORÍA 1')).toBe('PLÁTANO DE CANARIAS CATEGORÍA I');
+    expect(fixOcrDescription('Manzana golden cat. 11')).toBe('Manzana golden cat. II');
+    expect(fixOcrDescription('Huevos camperos 1 docena')).toBe('Huevos camperos 1 docena');
+  });
+});

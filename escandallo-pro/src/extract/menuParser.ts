@@ -197,9 +197,9 @@ function analyze(row: MenuRow, ctx: { leading: boolean } = { leading: false }): 
     return { ...base, name: cleanName(text.slice(0, market.index).replace(/[\s(–-]+$/, '')), market: true };
   }
 
-  // Cabecera de columnas de precio ("MEDIA   RACIÓN", "Copa   Botella")
-  const header = priceHeader(text);
-  if (header.labels >= 2 && !/\d/.test(text)) {
+  // Cabecera de columnas de precio ("MEDIA   RACIÓN", "Copa   Botella"; las etiquetas suelen ir en letra más pequeña)
+  const header = priceHeader(text.split(DESC_MARK).join(' '));
+  if (header.labels >= 2 && !/\d/.test(text.replace(/\b1\/2\b/g, ''))) {
     return { ...base, kind: 'colheader', name: header.rest, ...(header.rest ? { headerSection: header.rest } : {}) };
   }
 
@@ -451,7 +451,9 @@ function parseStream(rows: MenuRow[], state: ParseState, stats: StreamStats): vo
     const cur = l.row;
     if (prev?.nameX1 !== undefined && cur?.firstWordW !== undefined && prev.colX1 !== undefined) {
       const h = prev.textH ?? cur.textH ?? 0;
-      const room = (prev.priceX0 ?? prev.colX1) - prev.nameX1;
+      // Precio pegado al nombre (carta sin columna de precios): lo que queda libre es lo que hay tras el precio
+      const inlinePrice = prev.priceX0 !== undefined && prev.priceX0 - prev.nameX1 < 1.8 * h;
+      const room = inlinePrice ? prev.colX1 - (prev.x1 ?? prev.nameX1) : (prev.priceX0 ?? prev.colX1) - prev.nameX1;
       if (h > 0 && cur.firstWordW + 0.4 * h < room - 2.2 * h) return false;
     }
     const lastWord = fold(last.name.split(/\s+/).pop() ?? '');
@@ -493,8 +495,9 @@ function parseStream(rows: MenuRow[], state: ParseState, stats: StreamStats): vo
     }
 
     if (L.kind === 'price') {
-      // Una cifra suelta sin decimales ni € ("1", "3") suele ser ruido del OCR, salvo en cartas con precios enteros
-      if (L.weakPrice && !stats.integerStyle) continue;
+      // Una cifra suelta sin decimales ni € ("1", "3") suele ser ruido del OCR, salvo en cartas con precios enteros; y
+      // leída con muy poca confianza, ruido siempre (iconos, trazos)
+      if (L.weakPrice && (!stats.integerStyle || (L.confidence ?? 100) < 60)) continue;
       const run: Line[] = [L];
       let j = i + 1;
       while (j < lines.length && (lines[j].kind === 'price' || lines[j].kind === 'noise')) {
@@ -611,8 +614,10 @@ function parseStream(rows: MenuRow[], state: ParseState, stats: StreamStats): vo
         if (!seenContent) {
           // Primera cabecera de la columna: sección si le sigue un plato (con precio en su línea o en la siguiente)
           const after = next ? lines[lines.indexOf(next) + 1] : undefined;
-          const big = stats.dishSize > 0 && L.size >= 1.1 * stats.dishSize;
-          if (next?.kind === 'priced' || (big && next?.kind === 'plain' && (after?.kind === 'priced' || after?.kind === 'price'))) setSection(sec);
+          // (el título de la carta es mucho mayor que las secciones, y el lema que le sigue, más pequeño que los platos)
+          const big = stats.dishSize > 0 && L.size >= 1.1 * stats.dishSize && L.size < 2.2 * stats.dishSize;
+          const dishLike = !!next && stats.dishSize > 0 && next.size >= 0.9 * stats.dishSize;
+          if (next?.kind === 'priced' || (big && dishLike && next?.kind === 'plain' && (after?.kind === 'priced' || after?.kind === 'price'))) setSection(sec);
           continue;
         }
         if (!stats.capsDominant || (words <= 4 && nextLooksDish) || (words <= 4 && lastKind !== 'dish' && lastKind !== 'desc')) {
@@ -677,8 +682,25 @@ function formatDescription(s: string | undefined, ocr: boolean): string | undefi
   if (!t || letterCount(t) < 4) return undefined;
   // Restos ilegibles del OCR ("N cart", "T \" Xmayos"): mejor sin descripción que con basura
   if (ocr && wordQuality(t) < 0.75) return undefined;
+  if (ocr && implausibleShortText(t)) return undefined;
   if (isShouting(t)) t = toSentenceCase(t);
   return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/** Grupos de consonantes con que puede empezar una palabra (español y préstamos habituales en cartas). */
+const ONSETS = new Set(['bl', 'br', 'cl', 'cr', 'dr', 'fl', 'fr', 'gl', 'gr', 'pl', 'pr', 'tr', 'ch', 'll', 'rr', 'sh', 'tx', 'ts', 'ps', 'sr', 'sch', 'th', 'wh', 'kr', 'kl', 'ph', 'sp', 'st', 'sc', 'sk', 'sm', 'sn', 'sl', 'sw']);
+
+/**
+ * Texto corto (1–2 palabras) sin ninguna palabra conocida y con un arranque imposible en español ("Xmayos", "Tbc"):
+ * restos del OCR, no una descripción.
+ */
+function implausibleShortText(t: string): boolean {
+  const ws = t.split(/\s+/).map((w) => fold(w).replace(/[^a-zñ]/g, '')).filter((w) => w.length >= 2);
+  if (!ws.length || ws.length > 2 || ws.some((w) => isKnownFoodWord(w) || PARTICLES.has(w))) return false;
+  return ws.some((w) => {
+    const m = /^[^aeiouy]+/.exec(w)?.[0] ?? '';
+    return m.length >= 2 && !ONSETS.has(m) && !ONSETS.has(m.slice(0, 2));
+  });
 }
 
 function fmtPrice(v: number): string {
@@ -745,7 +767,7 @@ function restoreLostDecimals(drafts: Draft[], nameOf: (d: Draft) => string, warn
     if (!outlier) continue;
     if (fixed >= lo * 0.5 && fixed <= hi * 1.6 && !SHARED_DISH.test(d.name) && !d.perUnit) {
       d.price = fixed;
-      d.priceConf = Math.min(d.priceConf, 0.7);
+      d.priceConf = Math.min(d.priceConf, 0.6);
       d.corrected = true;
       d.decimals = divisor === 100 ? 2 : 1;
       fixes++;
@@ -800,7 +822,10 @@ export function parseMenuText(text: string, method: 'ocr' | 'pdf-texto', boxes?:
   const analyzed = streams.flat().map((r) => analyze(r, { leading })).filter((l): l is Line => !!l);
   const priced = analyzed.filter((l) => l.kind === 'priced');
   const capsDominant = priced.length > 0 && priced.filter((l) => isShouting(l.name)).length / priced.length >= 0.6;
-  const integerStyle = priced.length > 0 && priced.filter((l) => l.weakPrice).length / priced.length >= 0.3;
+  // Carta de precios enteros ("Pulpo 18"): sólo cuentan los enteros de 1–2 cifras (un "1450" es una coma perdida)
+  // Precios de un decimal ("12,5") → los redondos se imprimen sin decimales ("13"): también son enteros legítimos
+  const oneDecimal = analyzed.filter((l) => (l.kind === 'priced' || l.kind === 'price') && l.decimals === 1).length;
+  const integerStyle = (priced.length > 0 && priced.filter((l) => l.weakPrice && (l.price ?? 0) < 100).length / priced.length >= 0.3) || oneDecimal >= 2;
   const sizes = priced.map((l) => l.size).filter((h) => h > 0);
   const dishGap = median(priced.map((l) => l.gap).filter((g): g is number => g !== undefined && g > 0.3));
   const dishSize = sizes.length >= 2 ? median(sizes) : 0;
@@ -934,6 +959,7 @@ export function mergeMenuPasses(passes: readonly ExtractedMenu[]): ExtractedMenu
   const valid = passes.filter((p) => p && p.entries);
   if (!valid.length) return { entries: [], method: 'ocr', warnings: ['No se han encontrado platos en el texto'] };
   const ranked = [...valid].sort((a, b) => menuQuality(b) - menuQuality(a));
+
   const base = ranked[0];
   const entries: Entry[] = base.entries.map((e) => ({ ...e }));
   for (const other of ranked.slice(1)) {

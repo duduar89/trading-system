@@ -17,9 +17,10 @@
  *                                    [--verbose] [--only=<plantilla|rasgo>] [--json=<archivo>] [--regen]
  *   --verbose   detalle de los fallos (sólo semillas de ajuste)
  *   --ocr       mide también la ruta OCR con las primeras --ocr-count semillas del conjunto (foto o PDF escaneado)
+ *   --dump=<dir> guarda el texto leído por el OCR de cada documento (sólo semillas de ajuste)
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -49,7 +50,11 @@ const PDF_CACHE = join(ROOT, `node_modules/.cache/escandallo-random/${genHash}`)
 const OCR_CACHE = join(ROOT, 'node_modules/.cache/escandallo-random-ocr');
 mkdirSync(PDF_CACHE, { recursive: true });
 // Las cachés de versiones anteriores del generador ya no sirven
-for (const d of readdirSync(dirname(PDF_CACHE))) if (d !== genHash) rmSync(join(dirname(PDF_CACHE), d), { recursive: true, force: true });
+// (salvo si otra ejecución las está usando: modificadas hace menos de 30 minutos)
+for (const d of readdirSync(dirname(PDF_CACHE))) {
+  const full = join(dirname(PDF_CACHE), d);
+  if (d !== genHash && Date.now() - statSync(full).mtimeMs > 30 * 60 * 1000) rmSync(full, { recursive: true, force: true });
+}
 mkdirSync(OCR_CACHE, { recursive: true });
 
 // ───────────────────────────── Módulos de la app ─────────────────────────────
@@ -340,7 +345,7 @@ async function ocrInvoiceFromPdf(bytes) {
   for (const png of pngs) grays.push(await loadGray(png));
   const outcome = await pipeline.ocrInvoice(pipeline.preparePages(grays), backend);
   const inv = pngs.length > 1 && outcome.ocr.rows?.length ? extractIndex.parseInvoicePages(outcome.ocr.rows, 'ocr') : [outcome.invoice];
-  return { inv: inv.length > 1 ? outcome.invoice : inv[0], passes: outcome.passes };
+  return { inv: inv.length > 1 ? outcome.invoice : inv[0], passes: outcome.passes, rows: outcome.ocr.rows };
 }
 
 try {
@@ -367,9 +372,16 @@ try {
       if (v.pdf) r = await ocrInvoiceFromPdf(await scannedPdf(shots));
       else {
         const outcome = await pipeline.ocrInvoice(pipeline.preparePages([await loadGray(shots[0].jpeg)]), backend);
-        r = { inv: outcome.invoice, passes: outcome.passes };
+        r = { inv: outcome.invoice, passes: outcome.passes, rows: outcome.ocr.rows };
       }
       results.push({ group: v.pdf ? 'escaneo' : 'foto', seed, expected, ms: Date.now() - ts, inv: r.inv, score: scoreInvoice(r.inv, expected), rawText: r.inv?.rawText });
+      // Texto leído por el OCR para depurar (nunca de las semillas reservadas)
+      if (typeof args.dump === 'string' && !isHeldout(seed)) {
+        mkdirSync(resolve(args.dump), { recursive: true });
+        writeFileSync(join(resolve(args.dump), `${seed}-${v.pdf ? 'escaneo' : 'foto'}.txt`), r.inv?.rawText ?? '');
+        shots.forEach((shot, k) => writeFileSync(join(resolve(args.dump), `${seed}-${v.pdf ? 'escaneo' : 'foto'}-p${k + 1}.jpg`), shot.jpeg));
+        if (r.rows) writeFileSync(join(resolve(args.dump), `${seed}-${v.pdf ? 'escaneo' : 'foto'}.rows.json`), JSON.stringify(r.rows));
+      }
     }
   }
 } finally {

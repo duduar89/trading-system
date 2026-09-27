@@ -136,15 +136,24 @@ describe('descripciones en varias filas', () => {
     const inv = parse(
       pdfRows([
         ...HEAD,
+        // Paso entre líneas 16 pt (texto de 12 pt + relleno); el título de sección lleva 6 pt más de aire encima
         { text: 'Código  Descripción              Cant.   Precio   Importe', y: 60 },
         { text: 'J100    JAMÓN IBÉRICO DE BELLOTA    10    12,80    128,00', y: 76 },
-        { text: '        LONCHEADO A CUCHILLO', y: 86 },
-        { text: 'L305    LOMO EMBUCHADO IBÉRICO       1    38,90     38,90', y: 100 },
-        { text: '        CHARCUTERÍA', y: 118 },
-        { text: 'C410    CHORIZO IBÉRICO CULAR        2    16,40     32,80', y: 128 },
+        { text: '        LONCHEADO A CUCHILLO', y: 88 },
+        { text: 'L305    LOMO EMBUCHADO IBÉRICO       1    38,90     38,90', y: 104 },
+        { text: 'S420    SALCHICHÓN IBÉRICO           1    18,20     18,20', y: 120 },
+        { text: 'Q501    QUESO DE OVEJA CURADO        1    17,80     17,80', y: 136 },
+        { text: '        CHARCUTERÍA', y: 158 },
+        { text: 'C410    CHORIZO IBÉRICO CULAR        2    16,40     32,80', y: 174 },
       ]),
     );
-    expect(inv.lines.map((l) => l.description)).toEqual(['JAMÓN IBÉRICO DE BELLOTA LONCHEADO A CUCHILLO', 'LOMO EMBUCHADO IBÉRICO', 'CHORIZO IBÉRICO CULAR']);
+    expect(inv.lines.map((l) => l.description)).toEqual([
+      'JAMÓN IBÉRICO DE BELLOTA LONCHEADO A CUCHILLO',
+      'LOMO EMBUCHADO IBÉRICO',
+      'SALCHICHÓN IBÉRICO',
+      'QUESO DE OVEJA CURADO',
+      'CHORIZO IBÉRICO CULAR',
+    ]);
   });
 
   it('celdas centradas en vertical: los números quedan entre las dos filas de la descripción', () => {
@@ -294,6 +303,47 @@ describe('cabecera del documento por bloques', () => {
     expect(inv.date).toBe('2026-01-26');
     // Rectificativa: los totales conservan el signo
     expect([inv.subtotal, inv.vatTotal, inv.total]).toEqual([-7.7, -0.31, -8.01]);
+  });
+
+  it('razón social partida en dos filas por una palabra de enlace ("… Verduras del" / "Cantábrico C.B.")', () => {
+    const inv = parse(
+      pdfRows([
+        'Importaciones Frutas y Verduras del        Albarán de entrega',
+        'Cantábrico C.B.',
+        'Albarán nº  AV-26-15522',
+        'Pol. Ind. San Juan, 127                              Fecha     14/06/2026',
+        'CIF: E-96740386',
+        '',
+        'Cliente:',
+        'Casa de Comidas El Cenador S.A.',
+        'N.I.F.: B97129498',
+        '',
+        'Producto                        Unidades    Precio/ud    Importe',
+        'PIMIENTO VERDE ITALIANO            6,253         1,89      11,82',
+        'Base imponible  11,82',
+      ]),
+    );
+    expect(inv.supplierName).toBe('Importaciones Frutas y Verduras del Cantábrico C.B.');
+    expect(inv.number).toBe('AV-26-15522');
+  });
+
+  it('rejilla de datos con la celda «Nº» sola y el valor debajo', () => {
+    const inv = parse(
+      pdfRows([
+        'Hermanos Hernández S.L.                 Datos del cliente',
+        '                                        Arrocería El Faro S.L.',
+        'NIF/CIF: B99200164                      CIF: B-90072075',
+        'NOTA DE ENTREGA VALORADA',
+        'Nº                   Fecha                    Cliente',
+        '627827               02/08/2026               33644',
+        'Cant  Ref.      Artículo                  Precio €     Valor',
+        '15,241  CA7520  TOMATE PERA                  1,763     26,87',
+        '4  A982         AJO SECO MALLA 1KG           5,725     22,90',
+        'Total base imponible   49,77',
+      ]),
+    );
+    expect(inv.number).toBe('627827');
+    expect(inv.date).toBe('2026-08-02');
   });
 });
 

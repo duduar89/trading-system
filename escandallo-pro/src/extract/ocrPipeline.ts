@@ -1,5 +1,5 @@
 import type { ExtractedInvoice, ExtractedMenu, ProgressFn } from '../types';
-import { prepareForOcr, resample, sauvola, type GrayImage, type OcrPrepInfo, type OcrPrepOptions } from './imageOps';
+import { prepareForOcr, removeRules, resample, sauvola, type GrayImage, type OcrPrepInfo, type OcrPrepOptions } from './imageOps';
 import { ocrPagesToResult, type LayoutMode, type TessPage } from './ocrLayout';
 import { invoiceQuality, mergeInvoiceReadings, parseInvoiceReading, sumMatches, type InvoiceReading } from './invoiceParser';
 import type { OcrResult } from './ocr';
@@ -140,8 +140,19 @@ function stageFor(base: string, passIndex: number): string {
   return passIndex === 1 ? 'Segunda lectura para cuadrar importes…' : 'Última lectura de comprobación…';
 }
 
+/**
+ * Página sin los filetes de la tabla: Tesseract lee los bordes verticales pegados a las cifras como "|", "!", "/" o
+ * "1" ("4,25|" → 4,251) y los horizontales tapan decimales. Se borran sobre una copia (la original no se toca).
+ */
+export function withoutRules(page: PreparedPage): PreparedPage {
+  const image: GrayImage = { width: page.image.width, height: page.image.height, data: page.image.data.slice() };
+  const removed = removeRules(image, (page.info.lineHeight ?? 36) * page.info.scale);
+  return removed ? { image, info: page.info } : page;
+}
+
 /** OCR de una factura con reintentos guiados por la validación aritmética. */
-export async function ocrInvoice(pages: PreparedPage[], backend: OcrBackend, opts: PipelineOptions = {}): Promise<InvoiceOcrOutcome> {
+export async function ocrInvoice(pagesIn: PreparedPage[], backend: OcrBackend, opts: PipelineOptions = {}): Promise<InvoiceOcrOutcome> {
+  const pages = pagesIn.map(withoutRules);
   const passes = (opts.passes ?? INVOICE_PASSES).slice(0, Math.max(1, opts.maxPasses ?? Infinity));
   const now = opts.now ?? (() => Date.now());
   const base = opts.stage ?? 'Leyendo texto (OCR)…';
