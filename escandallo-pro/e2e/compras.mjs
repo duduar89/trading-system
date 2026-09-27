@@ -490,7 +490,7 @@ async function readLineCards() {
     cards.map((c) => {
       const v = (f) => c.querySelector(`[data-field="${f}"]`)?.value ?? '';
       const text = (c.innerText || '').replace(/\s+/g, ' ');
-      const real = /Precio real\s*([\d.,]+\s*€)\s*\/\s*(kg|l|ud)/.exec(text);
+      const real = /Precio real\s*([\d.,]+\s*€)\s*\/\s*(kg|l|ud)/i.exec(text); // la etiqueta va en mayúsculas por CSS
       let status = 'desconocido';
       if (/Línea ignorada/.test(text)) status = 'ignorado';
       else if (/Nuevo producto/.test(text)) status = 'nuevo';
