@@ -18,6 +18,7 @@
  *   --verbose   detalle de los fallos (sólo semillas de ajuste)
  *   --ocr       mide también la ruta OCR con las primeras --ocr-count semillas del conjunto (foto o PDF escaneado)
  *   --dump=<dir> guarda el texto leído por el OCR de cada documento (sólo semillas de ajuste)
+ *   --font-scale=<k> variante de maquetación de las semillas de ajuste (letra ×k: otras roturas de línea y de página)
  */
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -78,11 +79,19 @@ async function getBrowser() {
   return browser;
 }
 
+// Variante de maquetación de las mismas semillas (sólo ajuste): otra escala de letra reparte distinto las filas
+const fontScale = args['font-scale'] ? Number(args['font-scale']) : undefined;
+if (fontScale && anyHeldout) {
+  log('Las variantes de maquetación (--font-scale) sólo se permiten con semillas de ajuste.');
+  process.exit(1);
+}
+
 async function docFor(seed) {
-  const pdfFile = join(PDF_CACHE, `${seed}.pdf`);
-  const jsonFile = join(PDF_CACHE, `${seed}.json`);
+  const tag = fontScale ? `-f${fontScale}` : '';
+  const pdfFile = join(PDF_CACHE, `${seed}${tag}.pdf`);
+  const jsonFile = join(PDF_CACHE, `${seed}${tag}.json`);
   if (!args.regen && existsSync(pdfFile) && existsSync(jsonFile)) return { pdf: readFileSync(pdfFile), expected: JSON.parse(readFileSync(jsonFile, 'utf8')) };
-  const { doc, pdf } = await renderInvoicePdf(await getBrowser(), seed);
+  const { doc, pdf } = await renderInvoicePdf(await getBrowser(), seed, fontScale ? { fontScale } : {});
   writeFileSync(pdfFile, pdf);
   writeFileSync(jsonFile, JSON.stringify(doc.expected));
   return { pdf: Buffer.from(pdf), expected: doc.expected };
@@ -216,7 +225,10 @@ function variantFor(seed, pages, template) {
 async function degradeImage(imageBytes, v, size) {
   const b = await getBrowser();
   const aspect = size.height / size.width;
-  const pageW = Math.round(Math.min(v.pageWidth, (v.pageWidth * 1.414) / Math.max(1, aspect)));
+  // Escáner: resolución fija sobre un cristal A4 (un ticket largo queda a ~200 ppp). Foto: el lado largo del papel,
+  // como mucho el de una foto de móvil encuadrada (~3000 px); con el límite del A4 un ticket largo quedaba a ~320 px
+  // de ancho, ilegible para cualquier OCR y muy por debajo de una foto real
+  const pageW = Math.round(Math.min(v.pageWidth, v.pdf ? (v.pageWidth * 1.414) / Math.max(1, aspect) : 3000 / Math.max(1, aspect)));
   const pageH = Math.round(pageW * aspect);
   const W = Math.round(pageW * (1 + 2 * v.margin));
   const H = Math.round(pageH + pageW * 2 * v.margin);

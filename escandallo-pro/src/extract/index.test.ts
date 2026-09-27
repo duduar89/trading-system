@@ -241,7 +241,7 @@ describe('extractMenuFromFiles', () => {
     m.extractPdfText.mockResolvedValue(textPdf('ENTRANTES\nCroquetas   9,50'));
     m.parseMenuText.mockReturnValue(menu(['Croquetas'], 'pdf-texto'));
     const res = await extractMenuFromFiles([pdfFile()], { settings: settings() });
-    expect(m.parseMenuText).toHaveBeenCalledWith(expect.stringContaining('Croquetas'), 'pdf-texto');
+    expect(m.parseMenuText).toHaveBeenCalledWith(expect.stringContaining('Croquetas'), 'pdf-texto', expect.any(Array)); // + cajas de texto del PDF
     expect(m.ocrMenuImages).not.toHaveBeenCalled();
     expect(res.method).toBe('pdf-texto');
   });

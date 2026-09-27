@@ -174,6 +174,28 @@ describe('descripciones en varias filas', () => {
     expect(inv.lines.map((l) => l.code)).toEqual(['25-7892', '68-9294', '33-3892']);
   });
 
+  it('celdas de tres filas centradas: fila de texto encima y debajo de la línea con descripción propia', () => {
+    const rows = [
+      { text: 'Código     Descripción                    Cantidad     Precio     Importe', y: 100 },
+      { text: '           QUESO MANCHEGO CURADO', y: 114 },
+      { text: 'Q100       DE OVEJA GRAN RESERVA               2,500      18,40       46,00', y: 122 },
+      { text: '           PIEZA 3 KG APROX.', y: 130 },
+      { text: '           ACEITE DE OLIVA VIRGEN', y: 145 },
+      { text: 'A200       EXTRA COSECHA TEMPRANA                  6       9,50       57,00', y: 153 },
+      { text: '           GARRAFA 5 L', y: 161 },
+      { text: '           CECINA DE LEÓN IGP', y: 176 },
+      { text: 'C300       LONCHEADA A CUCHILLO                    4       7,25       29,00', y: 184 },
+      { text: '           SOBRE 100 G', y: 192 },
+      { text: 'Base imponible   132,00', y: 215 },
+    ];
+    const inv = parse(pdfRows([...HEAD.map((t, i) => ({ text: t, y: i * 8 })), ...rows]));
+    expect(inv.lines.map((l) => l.description)).toEqual([
+      'QUESO MANCHEGO CURADO DE OVEJA GRAN RESERVA PIEZA 3 KG APROX.',
+      'ACEITE DE OLIVA VIRGEN EXTRA COSECHA TEMPRANA GARRAFA 5 L',
+      'CECINA DE LEÓN IGP LONCHEADA A CUCHILLO SOBRE 100 G',
+    ]);
+  });
+
   it('una fila de continuación sin letras ("40/60") también se une', () => {
     const inv = parse(
       pdfRows([
@@ -226,6 +248,23 @@ describe('tickets de cash & carry', () => {
     expect(inv.lines[2].unit).toBe('kg');
     expect(inv.supplierTaxId).toBe('A41234560');
     expect(inv.supplierName).toBe('CASH MAYORISTA DEL SUR S.A.');
+  });
+
+  it('la descripción va con la fila de números siguiente aunque la altura de las filas baile (OCR)', () => {
+    // Paso normal de 28 pt; la última descripción queda a 26 pt de la fila anterior y a 31 de la suya
+    const rows = [
+      { text: 'ART.    DESCRIPCION                IMPORTE', y: 112 },
+      { text: '5934    QUESO CURADO DE OVEJA', y: 140 },
+      { text: '   4,258 kg x 20,29 /kg          86,39 A', y: 168 },
+      { text: '1509    LECHE SEMIDESNATADA 1L', y: 194 },
+      { text: '        x26   0,85               22,10 A', y: 225 },
+      { text: 'BASE IMPONIBLE                  108,49', y: 262 },
+    ];
+    const inv = parse(pdfRows([...HEAD.map((t, i) => ({ text: t, y: i * 28 })), ...rows], 6));
+    expect(inv.lines.map((l) => [l.description, l.quantity, l.total])).toEqual([
+      ['QUESO CURADO DE OVEJA', 4.258, 86.39],
+      ['LECHE SEMIDESNATADA 1L', 26, 22.1],
+    ]);
   });
 });
 
@@ -327,6 +366,24 @@ describe('cabecera del documento por bloques', () => {
     expect(inv.number).toBe('AV-26-15522');
   });
 
+  it('el NIF que va bajo la etiqueta «Cliente» de la caja de datos nunca es el del proveedor', () => {
+    const inv = parse(
+      pdfRows([
+        'Hortofrutícola Herrero S.L.                                FACTURA',
+        'Pol. Ind. Colón, 107 · 24219 León              F. pago         Pagaré 60 días',
+        'Tel. 981 954 887                               Número          B-2026/409515',
+        '                                               Cliente         12170 · Restaurante La Tahona',
+        '                                               NIF             65740931-P',
+        '                                               Fecha emisión   24.02.2026',
+        'Descripción                      Cant.     Precio    Importe',
+        'TOMATE PERA                        12      1,25      15,00',
+        'Base imponible   15,00',
+      ]),
+    );
+    expect(inv.supplierName).toBe('Hortofrutícola Herrero S.L.');
+    expect(inv.supplierTaxId).toBeUndefined();
+  });
+
   it('rejilla de datos con la celda «Nº» sola y el valor debajo', () => {
     const inv = parse(
       pdfRows([
@@ -344,6 +401,188 @@ describe('cabecera del documento por bloques', () => {
     );
     expect(inv.number).toBe('627827');
     expect(inv.date).toBe('2026-08-02');
+  });
+});
+
+describe('robustez ante otras maquetaciones (letra más grande, tablas partidas)', () => {
+  it('razón social en dos filas con la misma letra, alineada a la derecha; las siglas del logotipo no cuentan', () => {
+    const rows = [
+      { text: 'Facturar a                          IBS', y: 40 },
+      { text: '                                    Importaciones Bodegas Sierra', y: 53 },
+      { text: 'Grupo El Faro S.L.                          Norte S.L.U.', y: 71 },
+      { text: 'CIF: B-12489167                        CIF/NIF: B26219220', y: 104 },
+      { text: 'Factura nº F-2026/0001   Fecha: 03/09/2026', y: 120 },
+      { text: 'Descripción                      Cant.     Precio    Importe', y: 140 },
+      { text: 'VINO TINTO CRIANZA                  6      4,50      27,00', y: 152 },
+      { text: 'Base imponible   27,00', y: 170 },
+    ];
+    // Letra del nombre más grande (8 pt por carácter) que la del resto (5 pt)
+    const lines = pdfRows(rows).map((l) => {
+      if (l.y !== 53 && l.y !== 71) return l;
+      const items = l.items.map((it) => (/Importaciones|Norte/.test(it.str) ? { ...it, width: it.str.length * 8, x: it.str.startsWith('Norte') ? 180 + 16 * 8 : 180 } : it));
+      return { ...l, items };
+    });
+    const inv = parse(lines);
+    expect(inv.supplierName).toBe('Importaciones Bodegas Sierra Norte S.L.U.');
+  });
+
+  it('«Continúa en la página siguiente» sin «suma anterior»: la tabla sigue en la otra página', () => {
+    const lines = pdfRows([
+      ...HEAD,
+      'Unidades  Descripción              Precio    Importe',
+      '12        TOMATE PERA                1,25      15,00',
+      'Continúa en la página siguiente',
+      'Página 1 de 2',
+    ]).concat(
+      pdfRows(['FRUTAS DEL VALLE S.L.            FACTURA F-2026/0001', 'Unidades  Descripción              Precio    Importe', '4         AJO MORADO                 2,50      10,00', 'Base imponible   25,00  Total factura   26,00']).map((l) => ({ ...l, page: 2 })),
+    );
+    const inv = parse(lines);
+    expect(inv.lines.map((l) => l.description)).toEqual(['TOMATE PERA', 'AJO MORADO']);
+    expect(inv.subtotal).toBe(25);
+  });
+
+  it('"Total factura 397,43" no es el número de factura; un EAN-13 no es descripción', () => {
+    const inv = parse(
+      pdfRows([
+        'FRUTAS DEL VALLE S.L.        CIF: B12345674',
+        'ALBARÁN ALB-042802 · 21/04/2025',
+        'Descripción                                 Cant.     Precio    Importe',
+        'RAPE NEGRO COLA 8476869720984                3,73    24,2233      90,35',
+        'Base imponible   90,35     Total factura   99,39',
+      ]),
+    );
+    expect(inv.number).toBe('ALB-042802');
+    expect(inv.lines[0].description).toBe('RAPE NEGRO COLA');
+  });
+
+  it('una línea que cuadra y cuya descripción sigue en «ENVASE RETORNABLE» es un producto, no un cargo', () => {
+    const inv = parse(
+      pdfRows([
+        ...HEAD,
+        'Código    Descripción                     Cantidad    Precio    Importe',
+        { text: '          TÓNICA PREMIUM 20CL', y: 100 },
+        { text: '7407      ENVASE RETORNABLE                 14,000     0,543       7,60', y: 106 },
+        { text: '1191      PORTES                             1,000    12,00       12,00', y: 124 },
+        { text: 'Base imponible   19,60', y: 140 },
+      ]),
+    );
+    expect(inv.lines.map((l) => l.description)).toEqual(['TÓNICA PREMIUM 20CL ENVASE RETORNABLE']);
+  });
+
+  it('descripción en cuatro filas con los números centrados: se unen todas las de encima', () => {
+    const rows = [
+      { text: 'Mercancía      Art.        Cantidad   Pr. Unit.   Importe', y: 100 },
+      { text: 'Nata para', y: 114 },
+      { text: 'Cocinar 1l', y: 126 },
+      { text: '               3767939         6       2,898      17,39', y: 132 },
+      { text: 'Caja 6', y: 138 },
+      { text: 'Unidades', y: 150 },
+      { text: 'Queso de', y: 166 },
+      { text: 'Burgos 1kg', y: 178 },
+      { text: '               7772948        10       5,478      54,78', y: 184 },
+      { text: 'Producto', y: 190 },
+      { text: 'Refrigerado', y: 202 },
+      { text: 'Base imponible   72,17', y: 225 },
+    ];
+    const inv = parse(pdfRows([...HEAD.map((t, i) => ({ text: t, y: i * 12 })), ...rows]));
+    expect(inv.lines.map((l) => l.description)).toEqual(['Nata para Cocinar 1l Caja 6 Unidades', 'Queso de Burgos 1kg Producto Refrigerado']);
+  });
+});
+
+describe('OCR: cifras mal leídas que la aritmética del documento corrige', () => {
+  const parseOcr = (lines: PdfTextLine[]) => parseInvoiceText({ text: lines.map((l) => l.text).join('\n') }, 'ocr', lines);
+  const doc = (rows: string[], base: string) =>
+    pdfRows([...HEAD, 'Descripción                      Cant.     Precio    Importe', ...rows, `Base imponible   ${base}`]);
+
+  it('si las demás líneas cuadran al céntimo, una cifra de más o cambiada en la cantidad se corrige', () => {
+    const inv = parseOcr(
+      doc(
+        [
+          'TOMATE PERA                     12,500      1,20      15,00',
+          'CEBOLLA AMARILLA                 8,000      0,95       7,60',
+          'PLATANO DE CANARIAS              6,299      1,69      10,63',
+          'LIMON                            4,000      1,50       6,00',
+          'SOLOMILLO DE TERNERA             3,171     32,87     104,20',
+          'ZANAHORIA                        5,000      0,80       4,00',
+        ],
+        '147,43',
+      ),
+    );
+    expect(inv.lines.map((l) => l.quantity)).toEqual([12.5, 8, 6.29, 4, 3.17, 5]);
+    expect(inv.lines.map((l) => l.unitPrice)).toEqual([1.2, 0.95, 1.69, 1.5, 32.87, 0.8]);
+  });
+
+  it('un importe con una cifra mal leída se corrige si así cuadra la base imponible', () => {
+    const inv = parseOcr(
+      doc(
+        [
+          'TOMATE PERA                        12      1,25      15,00',
+          'CEBOLLA AMARILLA                    8      0,95       7,60',
+          'QUESO CURADO                        2     16,83      33,67',
+          'LIMON                               4      1,50       6,00',
+          'ZANAHORIA                           5      0,80       4,00',
+        ],
+        '66,26',
+      ),
+    );
+    expect(inv.lines.map((l) => l.total)).toEqual([15, 7.6, 33.66, 6, 4]);
+  });
+
+  it('un «1» de más delante del importe ("124,64" por 24,64) se quita si así cuadra la fila', () => {
+    const inv = parseOcr(doc(['CHAMPIÑON LAMINADO 1KG               7      3,52     124,64', 'TOMATE PERA                        12      1,25      15,00'], '39,64'));
+    expect(inv.lines.map((l) => [l.quantity, l.unitPrice, l.total])).toEqual([
+      [7, 3.52, 24.64],
+      [12, 1.25, 15],
+    ]);
+  });
+
+  it('tipo de IVA con una cifra mal leída en el desglose ("24" por 21): lo decide la aritmética', () => {
+    const inv = parseOcr(
+      pdfRows([
+        ...HEAD,
+        'Descripción                      Cant.     Precio    Importe',
+        'TOMATE PERA                        12      1,25      15,00',
+        'GASTOS DE TRANSPORTE                1     14,13      14,13',
+        'BASE IMPONIBLE   % IVA   CUOTA',
+        '15,00     4,00     0,60',
+        '14,13    24,00     2,97',
+        'TOTAL A PAGAR    32,70',
+      ]),
+    );
+    expect([inv.subtotal, inv.vatTotal, inv.total]).toEqual([29.13, 3.57, 32.7]);
+  });
+
+  it('base = bruto − pronto pago cuando el desglose de IVA no se lee entero', () => {
+    const inv = parseOcr(
+      pdfRows([
+        ...HEAD,
+        'Descripción                      Cant.     Precio    Importe',
+        'TOMATE PERA                        12      1,25      15,00',
+        'AGUA MINERAL 1,5L                  10      0,50       5,00',
+        'Total bruto      20,00',
+        'Dto. P.P. 2%     -0,40',
+        'Importe IVA       1,51',
+        '21%      4,90      1,03',
+        'Total a pagar    21,11',
+      ]),
+    );
+    expect([inv.subtotal, inv.total]).toEqual([19.6, 21.11]);
+  });
+
+  it('precio con cifras de más ("33,50" leído "733,550") entre cantidad e importe bien leídos', () => {
+    const inv = parseOcr(doc(['SOLOMILLO TERNERA NAC. ENTERO        4,620    733,550     154,77', 'TOMATE PERA                        12      1,25      15,00'], '169,77'));
+    expect(inv.lines.map((l) => [l.quantity, l.unitPrice, l.total])).toEqual([
+      [4.62, 33.5, 154.77],
+      [12, 1.25, 15],
+    ]);
+  });
+
+  it('restos de un filete vertical pegados a las cifras ("4,25|", "|15,00")', () => {
+    const inv = parseOcr(doc(['ENTRECOT DE VACA                  4,25|    30,24     128,52', 'TOMATE PERA                        12      1,25     |15,00'], '143,52'));
+    expect(inv.lines.map((l) => [l.quantity, l.unitPrice, l.total])).toEqual([
+      [4.25, 30.24, 128.52],
+      [12, 1.25, 15],
+    ]);
   });
 });
 

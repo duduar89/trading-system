@@ -4,6 +4,7 @@ import { extractPdfText, pdfToImages, type PdfTextLine } from './pdf';
 import { ocrInvoiceImages, ocrMenuImages, preprocessImage, type OcrResult } from './ocr';
 import { invoiceQuality, parseInvoiceText } from './invoiceParser';
 import { menuQuality, mergeMenuPasses, parseMenuText } from './menuParser';
+import { pdfLinesToMenuBoxes, type PositionedLine } from './menuUtils';
 import { guessColumnMapping, readSpreadsheet, sheetToInvoices } from './spreadsheet';
 import { columnsReadingOrder, menuBoxesFromOcr } from './ocrLayout';
 import { linesToText } from './layout';
@@ -293,6 +294,8 @@ export async function extractMenuFromFiles(
   const images: Blob[] = [];
   let usedOcr = false;
   // PDF con texto (carta digital): se lee directamente y en orden de columnas; si es escaneado, se renderiza para OCR
+  const pdfLines: PositionedLine[] = [];
+  let pdfPageOffset = 0;
   for (let i = 0; i < valid.length; i++) {
     const f = valid[i];
     if (kinds[i] !== 'pdf') {
@@ -302,6 +305,10 @@ export async function extractMenuFromFiles(
     const pdfText = await extractPdfText(f, scoped(onProgress, base, base + span * 0.1));
     if (pdfText.hasText) {
       texts.push(linesToText(columnsReadingOrder(pdfText.lines)));
+      // Posiciones de cada fragmento (páginas numeradas de forma continua entre PDF) para emparejar precio y plato por fila
+      const offset = pdfPageOffset;
+      pdfLines.push(...pdfText.lines.map((l) => ({ ...l, page: l.page + offset })));
+      pdfPageOffset += pdfText.pageCount;
     } else {
       onProgress?.({ stage: 'Reconociendo texto…', progress: base + span * 0.1 });
       images.push(...(await pdfToImages(f, { scale: 300 / 72, maxSide: 3300, maxPages: 12 }, scoped(onProgress, base + span * 0.1, base + span * 0.2))));
@@ -312,7 +319,7 @@ export async function extractMenuFromFiles(
   const rawTexts: string[] = [];
   if (texts.length) {
     onProgress?.({ stage: 'Interpretando la carta…', progress: base + span * 0.2 });
-    const menu = parseMenuText(texts.join('\n\n'), 'pdf-texto');
+    const menu = parseMenuText(texts.join('\n\n'), 'pdf-texto', pdfLinesToMenuBoxes(pdfLines));
     entries.push(...menu.entries);
     warnings.push(...menu.warnings);
     rawTexts.push(menu.rawText ?? texts.join('\n\n'));

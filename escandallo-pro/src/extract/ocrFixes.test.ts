@@ -100,6 +100,7 @@ describe('otras confusiones del OCR en descripciones', () => {
   it('"rn" y "m" sólo hacia palabras conocidas', () => {
     expect(fixOcrDescription('Carme picada de vacuno')).toBe('Carne picada de vacuno');
     expect(fixOcrDescription('Carmen del Mar')).toBe('Carmen del Mar');
+    expect(fixOcrDescription('Musio de pollo deshuesado')).toBe('Muslo de pollo deshuesado');
   });
   it('quita basura pegada al principio', () => {
     expect(fixOcrDescription('tGARBANZO COCIDO 400G')).toBe('GARBANZO COCIDO 400G');
@@ -119,5 +120,35 @@ describe('vocales duplicadas y categorías en romanos', () => {
     expect(fixOcrDescription('PLÁTANO DE CANARIAS CATEGORÍA 1')).toBe('PLÁTANO DE CANARIAS CATEGORÍA I');
     expect(fixOcrDescription('Manzana golden cat. 11')).toBe('Manzana golden cat. II');
     expect(fixOcrDescription('Huevos camperos 1 docena')).toBe('Huevos camperos 1 docena');
+  });
+});
+
+describe('restos del OCR al principio y al final', () => {
+  it('mayúscula de más pegada a una palabra conocida', () => {
+    expect(fixOcrDescription('NMORTADELA')).toBe('MORTADELA');
+    expect(fixOcrDescription('RMANTEQUILLA SIN SAL 1KG')).toBe('MANTEQUILLA SIN SAL 1KG');
+    expect(fixOcrDescription('ACEITE')).toBe('ACEITE');
+  });
+  it('palabras cortas en minúsculas o ristras de signos al final de una descripción en mayúsculas', () => {
+    expect(fixOcrDescription('LOMO BAJO DE VACA Te Tes')).toBe('LOMO BAJO DE VACA');
+    expect(fixOcrDescription('ZUMO DE NARANJA 1L mes')).toBe('ZUMO DE NARANJA 1L');
+    expect(fixOcrDescription('GAMBA ROJA CAL. 2 ..-.enceunEe')).toBe('GAMBA ROJA CAL. 2');
+    expect(fixOcrDescription('Queso de cabra rulo')).toBe('Queso de cabra rulo');
+    expect(fixOcrDescription('ATÚN CLARO EN ACEITE 3 kg')).toBe('ATÚN CLARO EN ACEITE 3 kg');
+  });
+  it('centilitros con la «l» leída como «I»', () => {
+    expect(fixOcrDescription('Licor de Hierbas 70cI')).toBe('Licor de Hierbas 70cl');
+  });
+});
+
+describe('más confusiones de unidades y palabras pegadas', () => {
+  it('«l» de litros leída como «I» tras la cifra', () => {
+    expect(fixOcrDescription('Aceite oliva virgen extra garrafa 5I')).toBe('Aceite oliva virgen extra garrafa 5l');
+    expect(fixOcrDescription('ACEITE GIRASOL GARRAFA 5I')).toBe('ACEITE GIRASOL GARRAFA 5L');
+  });
+  it('preposición pegada al final de una palabra conocida', () => {
+    expect(fixOcrDescription('PECHUGADE POLLO FILETEADA')).toBe('PECHUGA DE POLLO FILETEADA');
+    expect(fixOcrDescription('BARRADE PAN 250G')).toBe('BARRA DE PAN 250G');
+    expect(fixOcrDescription('MERMELADA DE FRESA')).toBe('MERMELADA DE FRESA');
   });
 });

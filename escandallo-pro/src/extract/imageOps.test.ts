@@ -9,6 +9,7 @@ import {
   estimateSkew,
   grayToRgba,
   histogram,
+  invertDarkRegions,
   median3,
   otsuThreshold,
   prepareForOcr,
@@ -183,6 +184,27 @@ describe('limpieza', () => {
     expect(removed).toBeGreaterThan(1000);
     expect(meanIn(img, 100, 70, 400, 2)).toBeGreaterThan(200);
     expect(meanIn(img, 60, 48, 20, 10)).toBeLessThan(60);
+  });
+
+  it('invierte las bandas de fondo oscuro con texto claro y no los trazos de un rótulo en negrita', () => {
+    const img = createGray(600, 300, 255);
+    // Banda oscura con "letras" claras
+    fillRect(img, 20, 20, 500, 40, 50);
+    for (let x = 40; x < 480; x += 24) fillRect(img, x, 30, 10, 20, 250);
+    // Trazo grueso de un rótulo en negrita (corto)
+    fillRect(img, 100, 150, 30, 30, 0);
+    // Rótulo grande en negrita (el doble de alto que el texto): trazos de 5 px con una barra, sobre papel blanco
+    for (let x = 200; x < 440; x += 14) fillRect(img, x, 200, 5, 30, 0);
+    fillRect(img, 200, 200, 240, 4, 0);
+    const n = invertDarkRegions(img, 16);
+    expect(n).toBeGreaterThan(10000);
+    // Fondo de la banda ahora claro y las letras oscuras
+    expect(meanIn(img, 25, 22, 10, 6)).toBeGreaterThan(200);
+    expect(meanIn(img, 42, 32, 6, 16)).toBeLessThan(10);
+    // Los trazos de los rótulos siguen siendo negros y el papel entre ellos, blanco
+    expect(meanIn(img, 105, 155, 20, 20)).toBe(0);
+    expect(meanIn(img, 200, 210, 5, 20)).toBe(0);
+    expect(meanIn(img, 206, 210, 7, 20)).toBe(255);
   });
 });
 

@@ -101,6 +101,8 @@ function priceHeader(text: string): { labels: number; rest: string } {
 function cleanName(s: string): string {
   let t = s
     .replace(/^\s*(?:[-–•·*>»|!¡\][_~=]+\s*|\d{1,2}\s*[.)]\s+(?=\p{L}))/u, '')
+    // Numeración con el punto leído como coma ("4, Tequeños") y moneda suelta del precio de al lado ("EUR Rape…")
+    .replace(/^\s*(?:\d{1,2},\s+(?=\p{Lu})|(?:€|eur(?:os)?)\s+(?=\p{L}))/iu, '')
     .replace(/^[li]\s+(?=\p{Lu})/u, '')
     .replace(/[\s.·•…_\-–:|,;/€]+$/, '')
     .replace(/\s{2,}/g, ' ')
@@ -144,7 +146,9 @@ function splitNameColumns(raw: string): { name: string; desc?: string } {
 /** Texto a la izquierda de los `used` últimos precios (sin sus etiquetas si hay varios precios). */
 function nameBeforePrices(text: string, tail: TailPrices, used: number): { name: string; desc?: string } {
   const first = tail.tokens[tail.tokens.length - used];
-  return splitNameColumns(text.slice(0, used >= 2 ? first.labelStart : first.start));
+  // Otro precio con decimales o moneda delante del elegido (copa / botella sin cabecera de columnas): no es del nombre
+  const head = text.slice(0, used >= 2 ? first.labelStart : first.start).replace(/(?:\s+(?:€\s?)?\d{1,3}[.,]\d{2}\s?(?:€|eur\b)?)+\s*$/i, '');
+  return splitNameColumns(head);
 }
 
 /** Precio delante del nombre ("12,50   Croquetas", "€9 Bravas", "14 Pulpo"): grupo 1 = precio, resto = nombre. */
@@ -172,6 +176,9 @@ function leadingPrice(text: string): LeadingPrice | undefined {
   if (!(price >= 0.5 && price <= 999)) return undefined;
   return { price, strong, rest, decimals: cents?.length ?? 0 };
 }
+
+/** Añada de un vino escrita sola. */
+const VINTAGE = /^(?:19[5-9]\d|20[0-3]\d)$/;
 
 function analyze(row: MenuRow, ctx: { leading: boolean } = { leading: false }): Line | undefined {
   const text = normalizeMenuLine(row.text);
@@ -232,7 +239,8 @@ function analyze(row: MenuRow, ctx: { leading: boolean } = { leading: false }): 
   if (isNoiseLine(text) || isNoiseLine(row.text)) return { ...base, kind: 'noise' };
   const { name, desc } = text.includes(DESC_MARK) ? splitNameColumns(text) : { name: cleanName(text), desc: undefined };
   if (RE_CHARGE.test(name)) return { ...base, kind: 'noise' };
-  if (letterCount(name) < 2) return { ...base, kind: 'noise' };
+  // Una añada suelta ("2019") puede ser el final del nombre de un vino partido en dos renglones; otra cifra sola, ruido
+  if (letterCount(name) < 2 && !VINTAGE.test(name)) return { ...base, kind: 'noise' };
   return { ...base, name, ...(desc ? { desc } : {}) };
 }
 
@@ -315,6 +323,8 @@ interface ParseState {
   corrections: number;
   /** Sección con la que acabó el flujo anterior (la columna derecha o la página siguiente pueden continuarla). */
   carry?: { section?: string; mainSection?: string; wine: boolean; multi: boolean };
+  /** Cabeceras de sección leídas hasta ahora: cuántas en mayúsculas y cuántas no (estilo de las secciones de la carta). */
+  sectionCase?: { upper: number; other: number };
 }
 
 function formatSection(sec: SectionInfo): string {
@@ -330,6 +340,8 @@ interface StreamStats {
   leading: boolean;
   /** Separación vertical típica entre platos (en alturas de texto; 0 = desconocida). */
   dishGap: number;
+  /** Separación típica entre el precio en su propio renglón y el nombre del plato siguiente (0 = no es ese estilo). */
+  belowGap: number;
 }
 
 /** ¿Estilo «Cada Palabra En Mayúscula» (incluidas las partículas: "Pulpo A La Gallega")? */
@@ -369,6 +381,10 @@ function parseStream(rows: MenuRow[], state: ParseState, stats: StreamStats): vo
   const setSection = (sec: SectionInfo, withMulti = false) => {
     const label = formatSection(sec);
     const isDo = /^(?:d\.?\s?o|igp|v\.?t|vino de la tierra)/i.test(sec.label);
+    // Estilo de las cabeceras (las denominaciones de origen, subsecciones de los vinos, no cuentan)
+    const cases = (state.sectionCase ??= { upper: 0, other: 0 });
+    if (!isDo && isShouting(lineText)) cases.upper++;
+    else if (!isDo) cases.other++;
     if (isDo && mainSection && wine) section = `${mainSection} · ${label}`;
     else {
       section = label;
@@ -417,15 +433,23 @@ function parseStream(rows: MenuRow[], state: ParseState, stats: StreamStats): vo
   const isDesc = (l: Line): boolean => {
     // "Con…", "Acompañado de…", minúscula inicial: descripción salvo que esté muy lejos del plato
     if (isDescriptionLike(l.name)) return !(l.gap !== undefined && l.gap > 3);
+    // Carta con el precio debajo de cada plato: tras un precio empieza otro plato (el anterior ya se cerró)
+    if (stats.belowGap > 0 && prevWasPrice) return false;
+    // Letra más pequeña que la de los platos y no muy lejos (entre medias puede haber quedado una fila de iconos)
+    if (smaller(l) && !(l.gap !== undefined && l.gap > 3)) return true;
     // Muy separada del plato (pie de la carta, aviso): no es su descripción
     if (farBelow(l)) return false;
-    if (smaller(l)) return true;
     // Enumeraciones ("Primero, segundo, postre, pan y bebida"): descripción
     const words = l.name.split(/\s+/).length;
     const commas = (l.name.match(/,/g) ?? []).length;
     if (commas >= 2 || (commas >= 1 && words >= 5)) return true;
     // Continuación de una descripción partida en dos líneas
     if (lastKind === 'desc' && last?.description && !/[.!?]$/.test(last.description) && /^\p{Ll}/u.test(l.name)) return true;
+    // Carta con el precio en su propio renglón debajo del plato: el renglón pegado al nombre recién empezado (más que
+    // la separación entre un precio y el plato siguiente) es su descripción, aunque la letra no sea más pequeña
+    if (stats.belowGap > 0 && lastKind === 'dish' && last && last.price === undefined && !last.description && !prevWasPrice) {
+      if (l.gap !== undefined && l.gap < 0.8 * stats.belowGap && !(stats.dishSize > 0 && l.size > 1.3 * stats.dishSize)) return true;
+    }
     return false;
   };
   /** Separada de la fila anterior por más de una línea en blanco (sólo si se conoce la geometría). */
@@ -440,12 +464,23 @@ function parseStream(rows: MenuRow[], state: ParseState, stats: StreamStats): vo
    */
   const continuesName = (l: Line): boolean => {
     if (!last || lastKind !== 'dish' || prevWasPrice || last.description || l.market) return false;
-    if (l.gap === undefined || !(stats.dishSize > 0 && l.size >= 0.88 * stats.dishSize && l.size <= 1.3 * stats.dishSize)) return false;
+    if (l.gap === undefined) return false;
     // Más pegada que la separación habitual entre platos
     const limit = stats.dishGap > 0 ? Math.min(1.4, Math.max(0.55, 0.85 * stats.dishGap)) : 0.9;
     if (l.gap > limit) return false;
+    // Añada suelta en el renglón siguiente ("… Fermentado en barrica" / "2015"), con la altura de letra del nombre (sin
+    // letras no hay tamaño de palabra que medir)
+    if (VINTAGE.test(l.name.trim())) {
+      const hPrev = lastNameLine?.row?.textH;
+      const hCur = l.row?.textH;
+      return last.wine && (!hPrev || !hCur || (hCur >= 0.75 * hPrev && hCur <= 1.3 * hPrev));
+    }
+    if (!(stats.dishSize > 0 && l.size >= 0.88 * stats.dishSize && l.size <= 1.3 * stats.dishSize)) return false;
     const words = l.name.split(/\s+/);
     if (words.length > 6 || letterCount(l.name) < 2) return false;
+    const endWord = fold(last.name.split(/\s+/).pop() ?? '');
+    // El nombre quedó colgando ("… a la", "… con salsa de") o con un paréntesis abierto: sigue seguro
+    if (DANGLING.has(endWord) || (last.name.match(/\(/g) ?? []).length > (last.name.match(/\)/g) ?? []).length) return true;
     // Si la primera palabra cabía de sobra en el renglón anterior, el nombre no se partió ahí (es otra cosa)
     const prev = lastNameLine?.row;
     const cur = l.row;
@@ -481,9 +516,12 @@ function parseStream(rows: MenuRow[], state: ParseState, stats: StreamStats): vo
     lastKind = 'desc';
   };
 
+  /** Texto de la línea en curso (para el estilo de las cabeceras de sección). */
+  let lineText = '';
   for (let i = 0; i < lines.length; i++) {
     const L = lines[i];
     if (L.kind === 'noise') continue;
+    lineText = L.text;
     prevWasPrice = afterPriceLine;
     afterPriceLine = L.kind === 'price';
 
@@ -590,17 +628,34 @@ function parseStream(rows: MenuRow[], state: ParseState, stats: StreamStats): vo
       lastNameLine = L;
       continue;
     }
+    // La añada suelta que no sigue a un vino no es nada más
+    if (VINTAGE.test(L.name)) continue;
     const sec = sectionInfo(L.name);
+    // Denominación de origen ("D.O. Rueda"): subsección de los vinos o, en letra pequeña bajo un vino, su descripción
+    const origin = !!sec && /^(?:d\.?\s?o|igp|v\.?t|vino de la tierra)/i.test(sec.label);
     // Letra claramente más pequeña que la de los platos justo debajo de un plato: descripción (también en mayúsculas),
     // no una cabecera de sección
-    if (recent() && last && smaller(L) && !farBelow(L) && !(sec && /vocab|spaced|deco/.test(sec.strength))) {
+    const closed = stats.belowGap > 0 && prevWasPrice && !isDescriptionLike(L.name);
+    if (recent() && last && smaller(L) && !farBelow(L) && !closed && !(sec && /vocab|spaced|deco/.test(sec.strength) && !origin)) {
       addDescription(last, L.name);
       continue;
     }
+    // Subtítulo de la sección en letra pequeña justo debajo de su cabecera ("TINTOS" / "Crianza en barrica")
+    if (lastKind === 'section' && smaller(L) && !farBelow(L) && !(sec && /vocab|spaced|deco/.test(sec.strength))) continue;
     if (sec) {
       const nextIsPrice = next?.kind === 'price';
+      // Con el precio en su propio renglón, entre el nombre del plato y su precio puede ir la descripción
+      const nextAt = next ? lines.indexOf(next) : -1;
+      const priceAfterDesc =
+        stats.belowGap > 0 && !!next && next.kind === 'plain' && (smaller(next) || isDescriptionLike(next.name)) && nextContent(nextAt)?.kind === 'price';
       const folded = fold(sec.label);
-      if (sec.strength === 'vocab' && !(nextIsPrice && (DUAL_SECTION.has(folded) || !isShouting(sec.label)))) {
+      // Las secciones de la carta van todas en mayúsculas y esta no, con la letra de los platos: es un plato que empieza
+      // como una sección ("Huevos a la flamenca" bajo "HUEVOS"). Las denominaciones de origen ("D.O. Rueda") son
+      // subsecciones de los vinos y suelen ir con otra letra.
+      const cases = state.sectionCase ?? { upper: 0, other: 0 };
+      const offStyle =
+        !origin && cases.upper >= 1 && cases.other === 0 && !isShouting(L.name) && stats.dishSize > 0 && L.size > 0 && L.size < 1.12 * stats.dishSize;
+      if (sec.strength === 'vocab' && !offStyle && !((nextIsPrice || priceAfterDesc) && (DUAL_SECTION.has(folded) || !isShouting(sec.label)))) {
         setSection(sec);
         continue;
       }
@@ -617,7 +672,8 @@ function parseStream(rows: MenuRow[], state: ParseState, stats: StreamStats): vo
           // (el título de la carta es mucho mayor que las secciones, y el lema que le sigue, más pequeño que los platos)
           const big = stats.dishSize > 0 && L.size >= 1.1 * stats.dishSize && L.size < 2.2 * stats.dishSize;
           const dishLike = !!next && stats.dishSize > 0 && next.size >= 0.9 * stats.dishSize;
-          if (next?.kind === 'priced' || (big && dishLike && next?.kind === 'plain' && (after?.kind === 'priced' || after?.kind === 'price'))) setSection(sec);
+          const dishFollows = after?.kind === 'priced' || after?.kind === 'price' || (!!after && stats.belowGap > 0 && after.kind === 'plain' && nextContent(lines.indexOf(after))?.kind === 'price');
+          if (next?.kind === 'priced' || (big && dishLike && next?.kind === 'plain' && dishFollows)) setSection(sec);
           continue;
         }
         if (!stats.capsDominant || (words <= 4 && nextLooksDish) || (words <= 4 && lastKind !== 'dish' && lastKind !== 'desc')) {
@@ -625,7 +681,7 @@ function parseStream(rows: MenuRow[], state: ParseState, stats: StreamStats): vo
           continue;
         }
       }
-      if (sec.strength === 'weak' && stats.dishSize > 0 && L.size >= 1.2 * stats.dishSize && !nextIsPrice) {
+      if (sec.strength === 'weak' && stats.dishSize > 0 && L.size >= 1.2 * stats.dishSize && (seenContent || L.size < 2.2 * stats.dishSize) && !nextIsPrice) {
         setSection(sec);
         continue;
       }
@@ -819,7 +875,8 @@ export function parseMenuText(text: string, method: 'ocr' | 'pdf-texto', boxes?:
     }
   }
   const leading = (leadStrong >= 3 && leadStrong >= tailStrong) || (leadAny >= 4 && leadAny >= 2 * tailAny);
-  const analyzed = streams.flat().map((r) => analyze(r, { leading })).filter((l): l is Line => !!l);
+  const perStream = streams.map((rows) => rows.map((r) => analyze(r, { leading })).filter((l): l is Line => !!l));
+  const analyzed = perStream.flat();
   const priced = analyzed.filter((l) => l.kind === 'priced');
   const capsDominant = priced.length > 0 && priced.filter((l) => isShouting(l.name)).length / priced.length >= 0.6;
   // Carta de precios enteros ("Pulpo 18"): sólo cuentan los enteros de 1–2 cifras (un "1450" es una coma perdida)
@@ -828,13 +885,29 @@ export function parseMenuText(text: string, method: 'ocr' | 'pdf-texto', boxes?:
   const integerStyle = (priced.length > 0 && priced.filter((l) => l.weakPrice && (l.price ?? 0) < 100).length / priced.length >= 0.3) || oneDecimal >= 2;
   const sizes = priced.map((l) => l.size).filter((h) => h > 0);
   const dishGap = median(priced.map((l) => l.gap).filter((g): g is number => g !== undefined && g > 0.3));
-  const dishSize = sizes.length >= 2 ? median(sizes) : 0;
+  // Precio en su propio renglón debajo de cada plato: el renglón que sigue a cada precio empieza el plato siguiente
+  // (de ahí el tamaño de letra de los nombres, si casi ninguna fila lleva el precio dentro, y la separación entre platos)
+  const afterPrice: Line[] = [];
+  let priceOnly = 0;
+  for (const list of perStream) {
+    const ls = list.filter((l) => l.kind !== 'noise');
+    ls.forEach((l, k) => {
+      if (l.kind !== 'price' || (l.weakPrice && !integerStyle)) return;
+      priceOnly++;
+      const nx = ls[k + 1];
+      if (nx && nx.kind === 'plain' && nx.gap !== undefined && !nx.market) afterPrice.push(nx);
+    });
+  }
+  const priceBelow = priceOnly >= 3 && priceOnly >= 1.5 * priced.length && afterPrice.length >= 3;
+  const belowSizes = afterPrice.map((l) => l.size).filter((h) => h > 0);
+  const dishSize = sizes.length >= 2 ? median(sizes) : priceBelow && belowSizes.length >= 3 ? median(belowSizes) : 0;
+  const belowGap = priceBelow ? median(afterPrice.map((l) => l.gap as number)) : 0;
 
   const state: ParseState = { drafts: [], serial: 0, order: 0, corrections: 0 };
   const streamOf: number[] = [];
   streams.forEach((rows, si) => {
     const before = state.drafts.length;
-    parseStream(rows, state, { capsDominant, dishSize, integerStyle, leading, dishGap });
+    parseStream(rows, state, { capsDominant, dishSize, integerStyle, leading, dishGap, belowGap });
     for (let k = before; k < state.drafts.length; k++) streamOf[k] = si;
   });
 
@@ -962,12 +1035,15 @@ export function mergeMenuPasses(passes: readonly ExtractedMenu[]): ExtractedMenu
 
   const base = ranked[0];
   const entries: Entry[] = base.entries.map((e) => ({ ...e }));
+  /** Precios leídos para cada plato en todas las pasadas (para votar si no coinciden). */
+  const seen = new Map<Entry, number[]>(entries.map((e) => [e, e.price !== undefined ? [e.price] : []]));
   for (const other of ranked.slice(1)) {
     let anchor = -1;
     for (const e of other.entries) {
       const at = entries.findIndex((x) => sameDish(x, e));
       if (at >= 0) {
         const cur = entries[at];
+        if (e.price !== undefined) seen.get(cur)?.push(e.price);
         if (cur.price === undefined && e.price !== undefined) {
           cur.price = e.price;
           cur.confidence = Math.min(e.confidence ?? 0.7, 0.85);
@@ -986,9 +1062,23 @@ export function mergeMenuPasses(passes: readonly ExtractedMenu[]): ExtractedMenu
       // Plato que sólo aparece en esta pasada: con precio, confianza alta y un precio que no esté ya en su sección
       const priceTaken = entries.some((x) => x.section === e.section && x.price !== undefined && e.price !== undefined && Math.abs(x.price - e.price) < 0.001);
       if (e.price !== undefined && !priceTaken && (e.confidence ?? 0) >= 0.9 && wordQuality(e.name) >= 0.9 && (!e.section || entries.some((x) => x.section === e.section))) {
-        entries.splice(anchor + 1, 0, { ...e, confidence: Math.min(e.confidence ?? 0.9, 0.85) });
+        const added = { ...e, confidence: Math.min(e.confidence ?? 0.9, 0.85) };
+        entries.splice(anchor + 1, 0, added);
+        seen.set(added, [e.price]);
         anchor++;
       }
+    }
+  }
+  // Precio en disputa: si las otras pasadas coinciden en otro precio (al menos dos lecturas iguales y más que las del
+  // precio elegido), se toma ese. Una pasada puede leer mal una cifra o emparejar el precio de la fila de al lado.
+  for (const [cur, prices] of seen) {
+    if (cur.price === undefined || prices.length < 3) continue;
+    const tally = new Map<number, number>();
+    for (const p of prices) tally.set(round(p, 2), (tally.get(round(p, 2)) ?? 0) + 1);
+    const [top, votes] = [...tally.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (votes >= 2 && votes > (tally.get(round(cur.price, 2)) ?? 0)) {
+      cur.price = top;
+      cur.confidence = Math.min(cur.confidence ?? 0.8, 0.8);
     }
   }
   const warnings = base.warnings.filter((w) => !/no tiene(n)? precio legible/.test(w));

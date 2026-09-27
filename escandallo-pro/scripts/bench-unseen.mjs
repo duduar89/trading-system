@@ -15,7 +15,8 @@
  * poder medir cambios del parser sin repetir el OCR; --no-cache la desactiva.
  *
  * Uso: node scripts/bench-unseen.mjs [--only=<texto>] [--no-ocr] [--no-menus] [--no-invoices] [--no-cache]
- *                                    [--keep=<dir>] [--json=<archivo>] [--verbose] [--assert]
+ *                                    [--keep=<dir>] [--json=<archivo>] [--verbose] [--assert] [--polarity]
+ *   --polarity  cartas: invierte las de fondo oscuro antes del preprocesado (menuImage.normalizeMenuPolarity)
  *   --assert  termina con código 1 si no se alcanzan los objetivos (PDF texto ≥ 97 % líneas y ≥ 95 % cabecera,
  *             degradadas ≥ 93 %, cartas ≥ 95 %).
  */
@@ -331,9 +332,15 @@ async function invoiceFromImage(jpeg) {
   return { inv: outcome.invoice, method: 'ocr foto', passes: outcome.passes };
 }
 
+/** --polarity: pizarras y cartas de fondo oscuro invertidas antes del preprocesado (menuImage.ts; integración solicitada). */
+const menuImage = args.polarity ? await load('/src/extract/menuImage.ts') : undefined;
+
 async function menuFromImages(images) {
   const grays = [];
-  for (const img of images) grays.push(await loadGray(img));
+  for (const img of images) {
+    const g = await loadGray(img);
+    grays.push(menuImage ? menuImage.normalizeMenuPolarity(g).image : g);
+  }
   const outcome = await pipeline.ocrMenu(pipeline.preparePages(grays), backend, extractIndex.parseMenuOcr, { merge: menuParser.mergeMenuPasses, quality: menuParser.menuQuality });
   return { menu: outcome.menu, passes: outcome.passes, rawText: outcome.ocr.text };
 }

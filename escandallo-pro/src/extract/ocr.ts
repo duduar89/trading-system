@@ -373,7 +373,8 @@ export async function ocrMenuImages(
   opts: { maxPasses?: number; prep?: OcrPrepOptions; merge?: (menus: ExtractedMenu[]) => ExtractedMenu; quality?: (menu: ExtractedMenu) => number } = {},
 ): Promise<MenuOcrOutcome> {
   if (!images.length) throw new Error('No hay imágenes que leer');
-  const pages = await preparedFrom(images, slice(onProgress, 0, 0.1), opts.prep);
+  // Cartas: pizarras y cartas oscuras se invierten antes de leer (texto oscuro sobre fondo claro).
+  const pages = await preparedFrom(images, slice(onProgress, 0, 0.1), { normalizePolarity: true, ...opts.prep });
   const p = slice(onProgress, 0.1, 1);
   return enqueue(() => ocrMenu(pages, browserBackend(p), parse, { onProgress: p, maxPasses: opts.maxPasses, merge: opts.merge, quality: opts.quality }));
 }

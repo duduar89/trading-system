@@ -79,6 +79,25 @@ describe('ocrInvoice', () => {
     expect(events.some((e) => e.stage.startsWith('Segunda lectura'))).toBe(true);
   });
 
+  it('lee aparte, invertida, la banda de fondo oscuro y sustituye lo leído en ella', async () => {
+    const image = createGray(1200, 900, 250);
+    for (let y = 30; y < 70; y++) for (let x = 40; x < 1160; x++) image.data[y * 1200 + x] = 40;
+    const sizes: number[] = [];
+    const backend: OcrBackend = {
+      async recognize(img) {
+        sizes.push(img.width);
+        // La página entera lee basura en la banda; el recorte invertido, la razón social
+        if (img.width < 1200) return pageFromText('Frutas García S.L.            CIF: B28123456');
+        return pageFromText(['▒▒ EEE ▒▒▒', ...good.split('\n').slice(1)].join('\n'));
+      },
+    };
+    const out = await ocrInvoice([{ image, info: { ...INFO, width: 1200, height: 900 } }], backend);
+    expect(sizes.filter((w) => w < 1200)).toHaveLength(1);
+    expect(out.invoice.supplierName).toBe('Frutas García S.L.');
+    expect(out.invoice.rawText).not.toContain('EEE');
+    expect(out.invoice.lines).toHaveLength(4);
+  });
+
   it('preparePages prepara cada imagen', () => {
     const [p] = preparePages([createGray(300, 200, 250)]);
     expect(p.image.width).toBeGreaterThan(0);

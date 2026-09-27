@@ -470,6 +470,12 @@ export function isDescriptionLike(s: string): boolean {
 // ───────────────────────────── Mayúsculas ─────────────────────────────
 
 const KEEP_UPPER = new Set(['DO', 'D.O.', 'DOP', 'DOCA', 'D.O.CA.', 'IGP', 'I.G.P.', 'BBQ', 'XL', 'XXL', 'IPA', 'AOVE', 'KM0', 'VIP', 'PX', 'II', 'III', 'IV', 'VI', 'VII', 'VIII', 'IX', 'XO', 'VSOP', 'S/M', 'V.T.', 'VT', 'DJ']);
+
+/** ¿Sigla de carta que se escribe en mayúsculas? Con o sin los puntos ("D.O", "D.O.", "DO"). */
+function isKeptUpper(word: string): boolean {
+  const w = word.replace(/[^\p{L}\p{N}./]/gu, '').toUpperCase();
+  return KEEP_UPPER.has(w) || KEEP_UPPER.has(`${w}.`) || KEEP_UPPER.has(w.replace(/\./g, ''));
+}
 /** Nombres propios habituales en cartas (clave plegada → forma correcta). */
 const PROPER: Record<string, string> = {
   padron: 'Padrón', guijuelo: 'Guijuelo', jabugo: 'Jabugo', joselito: 'Joselito', idiazabal: 'Idiazábal', cabrales: 'Cabrales',
@@ -522,7 +528,7 @@ export function toSentenceCase(s: string): string {
       continue;
     }
     const bare = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}.]+$/gu, '').toUpperCase();
-    if (KEEP_UPPER.has(bare)) {
+    if (isKeptUpper(bare)) {
       out += w;
       continue;
     }
@@ -541,7 +547,7 @@ export function toTitleCase(s: string): string {
       continue;
     }
     const bare = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}.]+$/gu, '').toUpperCase();
-    if (KEEP_UPPER.has(bare)) out += w;
+    if (isKeptUpper(bare)) out += w;
     else {
       const lower = w.toLowerCase();
       out += !first && LOWER_PARTICLES.has(lower) ? lower : capFirst(lower);
@@ -859,7 +865,7 @@ function isRealWord(w: string): boolean {
   const k = fold(w).replace(/[^a-z0-9ñ]/g, '');
   if (!k) return false;
   if (SHORT_WORDS.has(k) || FUNCTION_WORDS.has(k)) return true;
-  if (KEEP_UPPER.has(w.replace(/[^\p{L}\p{N}./]/gu, '').toUpperCase())) return true;
+  if (isKeptUpper(w)) return true;
   return isKnownFoodWord(w);
 }
 
@@ -1095,17 +1101,13 @@ function findGutter(items: Item[], H: number): Gutter | undefined {
     const sorted = [...row].sort((a, b) => a.x0 - b.x0);
     sorted.forEach((p, k) => {
       if (!isPriceItem(p, H)) return;
-      const next = sorted[k + 1];
+      // El símbolo del euro en su propia caja ("22 €") no separa el precio de su nombre
+      const next = sorted.slice(k + 1).find((i) => !/^(?:€|eur)$/i.test(i.text));
       const prev = sorted[k - 1];
       if (next && isLetterWord(next) && next.x0 - p.x1 < 6 * H && !(prev && isLetterWord(prev) && p.x0 - prev.x1 < 1.5 * H)) leadingPrices++;
     });
   }
   const leadingLayout = pagePrices >= 4 && leadingPrices >= 0.6 * pagePrices;
-  if ((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.MENU_DEBUG) {
-    const prof: string[] = [];
-    for (let k = 0; k < nb; k += 4) prof.push(String(Math.round(cov[k])));
-    console.log('cov', Math.round(minX), Math.round(maxX), 'bin', bin.toFixed(1), 'p90', p90, 'tau', tau, prof.join(' '));
-  }
   let best: Gutter | undefined;
   let start = -1;
   for (let k = 0; k <= nb; k++) {
@@ -1117,7 +1119,6 @@ function findGutter(items: Item[], H: number): Gutter | undefined {
     const inner = start > 0 && k < nb;
     start = -1;
     if (!inner || ge - gs < minW) continue;
-    const DBG = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.MENU_DEBUG;
     // Eje de la calle: centro del tramo más largo de cobertura mínima (el borde irregular de los nombres largos no cuenta)
     let minCov = Infinity;
     for (let q = Math.round((gs - minX) / bin); q < Math.round((ge - minX) / bin); q++) minCov = Math.min(minCov, cov[q]);
@@ -1157,19 +1158,27 @@ function findGutter(items: Item[], H: number): Gutter | undefined {
     // derecha empieza un precio con el que termina el plato (nada pegado detrás; con el precio delante vendría su nombre)
     let both = 0;
     let pairing = 0;
-    for (const row of roughRows(items.filter((i) => !spanning.has(i)), H)) {
+    const rows = roughRows(items.filter((i) => !spanning.has(i)), H);
+    // Inicio de la columna de la derecha: donde empiezan sus renglones con letras. Un precio que empieza ahí (precio en
+    // su propio renglón bajo el nombre, alineado con él) abre un renglón de esa columna, no cierra el de la izquierda
+    const starts = rows
+      .map((row) => row.filter((i) => i.x0 >= axis && isLetterWord(i)).sort((a, b) => a.x0 - b.x0)[0]?.x0)
+      .filter((x): x is number => x !== undefined)
+      .sort((a, b) => a - b);
+    const colStart = starts.length >= 3 ? starts[Math.floor(starts.length / 2)] : undefined;
+    for (const row of rows) {
       const l = row.filter((i) => i.x1 <= axis).sort((a, b) => b.x1 - a.x1)[0];
       const rs = row.filter((i) => i.x0 >= axis).sort((a, b) => a.x0 - b.x0);
       if (!l || !rs.length) continue;
       both++;
       const r = rs[0];
       const after = rs.find((i) => i !== r && !/^(?:€|eur)$/i.test(i.text));
-      if (!isPriceItem(l, H) && isPriceItem(r, H) && (!after || after.x0 - r.x1 > 2.5 * H)) pairing++;
+      const opensColumn = colStart !== undefined && Math.abs(r.x0 - colStart) < 0.8 * H;
+      if (!isPriceItem(l, H) && isPriceItem(r, H) && (!after || after.x0 - r.x1 > 2.5 * H) && !opensColumn) pairing++;
     }
     if (!leadingLayout && both >= 3 && pairing >= 0.5 * both) continue;
     const L = regionStats(left, H);
     const R = regionStats(right, H);
-    if (DBG) console.log('gutter', Math.round(gs), Math.round(ge), 'span', spanning.size, JSON.stringify(L), JSON.stringify(R), 'H', H.toFixed(1), 'tau', tau);
     if (L.letterRows < 3 || R.letterRows < 3 || L.letterRows < 0.4 * L.rows || R.letterRows < 0.4 * R.rows) continue;
     if (pagePrices >= 6 && (L.priceRows < Math.max(2, 0.2 * L.letterRows) || R.priceRows < Math.max(2, 0.2 * R.letterRows))) continue;
     const score = (ge - gs) * Math.sqrt(Math.min(L.letterRows, R.letterRows));
@@ -1367,16 +1376,18 @@ function cleanRowItems(members: Item[]): Item[] {
     // Icono redondo: cada glifo tan ancho como alto (una cifra o una letra son más estrechas); entre paréntesis, "(G)"
     const real = core.length >= 2 && core !== core.toUpperCase() ? isRealWord(core) : core.length >= 2 && isRealWord(core) && !ROUND_GLYPHS.test(core);
     if (ROUND_GLYPHS.test(core) && !real && (perChar >= (trailingPrice ? 0.75 : 0.9) * m.h || /^[([].*[)\]]$/.test(t))) return true;
+    // Glifos redondos leídos casi a ciegas ("0OOOG", "ODOG" con confianza muy baja): icono aunque no sea tan ancho
+    if (ROUND_GLYPHS.test(core) && !real && (m.conf ?? 100) < 50) return true;
     if (isNum(m)) return false;
     if (letters <= 3 && !isRealWord(t) && (m.conf ?? 100) < 75) return true;
     // Sigla corta en mayúsculas que no existe, detrás de un nombre que no va en mayúsculas ("… al carbón OJO")
     if (letters <= 3 && letters === alnum && core === core.toUpperCase() && !isRealWord(core) && !namesUpper) return true;
     // Letra o par de letras con mayúscula inicial al final de un nombre ("… al pil pil Su", "Mo", "G"): códigos de
     // alérgenos (iconos con letra, muy habituales como texto en los PDF de carta), no palabras del nombre
-    if (trailing && /^\p{Lu}\p{Ll}?$/u.test(core) && !KEEP_UPPER.has(core.toUpperCase()) && !namesTitle) return true;
+    if (trailing && /^\p{Lu}\p{Ll}?$/u.test(core) && !isKeptUpper(core) && !namesTitle) return true;
     // Relleno ("LALA", "AAA") o palabra en mayúsculas colgando de un nombre en minúsculas (salvo siglas: DO, BBQ, XL…)
     if (fillerText(t)) return true;
-    if (!namesUpper && letters >= 2 && letters === alnum && core === core.toUpperCase() && !KEEP_UPPER.has(core)) return true;
+    if (!namesUpper && letters >= 2 && letters === alnum && core === core.toUpperCase() && !isKeptUpper(core)) return true;
     // Palabra desconocida mucho más baja que el texto de la fila: restos de un borde punteado bajo el nombre
     if (m.h < 0.6 * hr && letters >= 2 && !isRealWord(t)) return true;
     // Sólo letras sin trazos altos ni bajos ("nece", "acer", "reee"), más bajas que el texto y que no existen: así
@@ -1421,11 +1432,15 @@ function cleanRowItems(members: Item[]): Item[] {
   // Restos por la derecha del nombre (antes del precio): iconos, adornos y números sueltos de alérgenos. Las palabras
   // gramaticales cortas intercaladas ("… 2 Y acer") no detienen la limpieza, pero sólo se quitan si hay basura a su
   // izquierda (un nombre partido en dos renglones puede acabar en "… en su")
-  const isJunkAt = (t: Item, k: number): boolean => {
+  const isJunkAt = (t: Item, idx: number): boolean => {
     // Medidas del nombre ("300 g", "(6 uds)") se conservan
-    if (UNIT_WORD.test(t.text) && k >= 2 && /^\(?\d+(?:[.,]\d+)?$/.test(kept[k - 2].text)) return false;
+    if (UNIT_WORD.test(t.text) && idx >= 1 && /^\(?\d+(?:[.,]\d+)?$/.test(kept[idx - 1].text)) return false;
     const bareNumber = /^\d{1,3}[.,]?$/.test(t.text);
-    return junk(t, trailingPrice) || (bareNumber && (trailingPrice || leadingPrice || iconShape(t)));
+    // Cifra con paréntesis de cierre sin su apertura en la fila ("Torrezno 6)"): resto de un icono
+    const orphanParen = /^[\d.,]{1,4}\)$/.test(t.text) && !kept.slice(0, idx).some((o) => o.text.includes('('));
+    // Cifra suelta leída casi a ciegas detrás del nombre: resto de un icono (un precio se lee con más confianza)
+    const blindNumber = bareNumber && (t.conf ?? 100) < 45;
+    return junk(t, trailingPrice) || orphanParen || blindNumber || (bareNumber && (trailingPrice || leadingPrice || iconShape(t)));
   };
   let k = priceStart;
   let scan = priceStart;
@@ -1518,7 +1533,6 @@ function groupRows(items: Item[]): MenuRow[] {
   const built = rows
     .map((row) => {
       const keep = new Set(cleanRowItems(row.segs.flatMap((sg) => sg.items)));
-      if ((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.MENU_DEBUG_ROWS) console.log('fila', row.segs.flatMap((sg) => sg.items).map((i) => i.text).join(' | '), '→', [...keep].map((i) => i.text).join(' '));
       const members = [...keep].sort((a, b) => a.x0 - b.x0);
       if (!members.length) return undefined;
       const descAt = descriptionSplit(members);
@@ -1537,8 +1551,12 @@ function groupRows(items: Item[]): MenuRow[] {
         prevH = sg.h;
       }
       // Tamaño de letra: sólo con cajas de texto «simples» (una línea OCR con huecos de columna dentro, p. ej.
-      // "Bravas      6,50 €", no permite medir el ancho por carácter).
-      const ref = members.filter((m) => !m.price && !NUMERIC_BOX.test(m.text) && /\p{L}/u.test(m.text) && !/\s{3,}/.test(m.text));
+      // "Bravas      6,50 €", no permite medir el ancho por carácter). Con descripción en la misma fila, el del nombre
+      // (una descripción larga en letra pequeña no convierte la fila del plato en una fila de descripción)
+      const descIdx = descAt ? members.indexOf(descAt) : -1;
+      const ref = (descIdx > 0 ? members.slice(0, descIdx) : members).filter(
+        (m) => !m.price && !NUMERIC_BOX.test(m.text) && /\p{L}/u.test(m.text) && !/\s{3,}/.test(m.text),
+      );
       let size = 0;
       if (ref.length) {
         const h = median(ref.map((m) => m.h));

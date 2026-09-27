@@ -1,6 +1,6 @@
 import type { ExtractedInvoice, ExtractedMenu, ProgressFn } from '../types';
-import { prepareForOcr, removeRules, resample, sauvola, type GrayImage, type OcrPrepInfo, type OcrPrepOptions } from './imageOps';
-import { ocrPagesToResult, type LayoutMode, type TessPage } from './ocrLayout';
+import { crop, invertDarkRegions, prepareForOcr, removeRules, resample, sauvola, type GrayImage, type OcrPrepInfo, type OcrPrepOptions, type Rect } from './imageOps';
+import { ocrPagesToResult, type LayoutMode, type OcrBox, type TessLine, type TessPage } from './ocrLayout';
 import { invoiceQuality, mergeInvoiceReadings, parseInvoiceReading, sumMatches, type InvoiceReading } from './invoiceParser';
 import type { OcrResult } from './ocr';
 
@@ -50,6 +50,8 @@ export interface PreparedPage {
   info: OcrPrepInfo;
   /** Variantes (binarizada, reescalada) calculadas bajo demanda para las lecturas de rescate. */
   variants?: Map<string, GrayImage>;
+  /** Zonas de fondo oscuro (texto claro): se leen aparte, invertidas (ver `prepareInvoicePage`). */
+  dark?: { rect: Rect; image: GrayImage; lines?: TessLine[] }[];
 }
 
 /** Prepara las páginas para OCR (recorte, ruido, fondo, contraste, enderezado y escala). */
@@ -96,7 +98,9 @@ export async function recognizePages(
 ): Promise<OcrResult> {
   const results: { page: TessPage; pageNo: number }[] = [];
   for (let i = 0; i < pages.length; i++) {
-    const page = await backend.recognize(imageFor(pages[i], pass), pass.psm, (f) => onFraction?.((i + Math.min(1, Math.max(0, f))) / pages.length));
+    const read = await backend.recognize(imageFor(pages[i], pass), pass.psm, (f) => onFraction?.((i + Math.min(1, Math.max(0, f))) / pages.length));
+    const scale = pass.scale && Math.abs(pass.scale - 1) > 0.01 ? pass.scale : 1;
+    const page = await withDarkRegions(read, pages[i], backend, scale);
     results.push({ page, pageNo: i + 1 });
     onFraction?.((i + 1) / pages.length);
   }
@@ -141,18 +145,62 @@ function stageFor(base: string, passIndex: number): string {
 }
 
 /**
- * Página sin los filetes de la tabla: Tesseract lee los bordes verticales pegados a las cifras como "|", "!", "/" o
- * "1" ("4,25|" → 4,251) y los horizontales tapan decimales. Se borran sobre una copia (la original no se toca).
+ * Página de factura lista para las tablas, sobre una copia (la original no se toca):
+ *  - se borran los filetes de la tabla: Tesseract lee los bordes verticales pegados a las cifras como "|", "!", "/" o
+ *    "1" ("4,25|" → 4,251) y los horizontales tapan decimales;
+ *  - las zonas de fondo oscuro (banda con la razón social, cabecera de la tabla en negativo) se recortan invertidas
+ *    para leerlas aparte: Tesseract no lee texto claro sobre oscuro, y si se invierten en la propia página cambia
+ *    cómo segmenta las filas de la tabla de debajo (celdas de dos filas).
  */
-export function withoutRules(page: PreparedPage): PreparedPage {
+export function prepareInvoicePage(page: PreparedPage): PreparedPage {
   const image: GrayImage = { width: page.image.width, height: page.image.height, data: page.image.data.slice() };
-  const removed = removeRules(image, (page.info.lineHeight ?? 36) * page.info.scale);
-  return removed ? { image, info: page.info } : page;
+  const lineHeight = (page.info.lineHeight ?? 36) * page.info.scale;
+  removeRules(image, lineHeight);
+  const inverted: GrayImage = { width: image.width, height: image.height, data: image.data.slice() };
+  const rects: Rect[] = [];
+  invertDarkRegions(inverted, lineHeight, rects);
+  const pad = Math.round(lineHeight * 0.3);
+  const dark = rects.map((r) => {
+    const rect = { x0: Math.max(0, r.x0 - pad), y0: Math.max(0, r.y0 - pad), x1: Math.min(image.width, r.x1 + pad), y1: Math.min(image.height, r.y1 + pad) };
+    return { rect, image: crop(inverted, rect) };
+  });
+  return { image, info: page.info, dark: dark.length ? dark : undefined };
+}
+
+const shift = (b: OcrBox, dx: number, dy: number, k: number): OcrBox => ({ x0: (b.x0 + dx) * k, y0: (b.y0 + dy) * k, x1: (b.x1 + dx) * k, y1: (b.y1 + dy) * k });
+
+/**
+ * Sustituye en una lectura lo leído dentro de las zonas oscuras (restos sin sentido) por la lectura aparte de cada
+ * zona invertida, en las coordenadas de la página (con la escala de la pasada).
+ */
+async function withDarkRegions(read: TessPage, page: PreparedPage, backend: OcrBackend, scale: number): Promise<TessPage> {
+  if (!page.dark?.length) return read;
+  for (const d of page.dark) d.lines ??= ((await backend.recognize(d.image, '6')).blocks ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines));
+  const inside = (b: OcrBox) => {
+    const cx = (b.x0 + b.x1) / 2 / scale;
+    const cy = (b.y0 + b.y1) / 2 / scale;
+    return page.dark?.some((d) => cx >= d.rect.x0 && cx <= d.rect.x1 && cy >= d.rect.y0 && cy <= d.rect.y1) ?? false;
+  };
+  const blocks = (read.blocks ?? []).map((b) => ({
+    ...b,
+    paragraphs: b.paragraphs.map((p) => ({ lines: p.lines.map((l) => ({ ...l, words: l.words.filter((w) => !inside(w.bbox)) })).filter((l) => l.words.length) })),
+  }));
+  for (const d of page.dark) {
+    const lines: TessLine[] = (d.lines ?? []).map((l) => ({
+      ...l,
+      bbox: shift(l.bbox, d.rect.x0, d.rect.y0, scale),
+      baseline: l.baseline ? shift(l.baseline, d.rect.x0, d.rect.y0, scale) : undefined,
+      rowAttributes: l.rowAttributes?.rowHeight ? { rowHeight: l.rowAttributes.rowHeight * scale } : undefined,
+      words: l.words.map((w) => ({ ...w, bbox: shift(w.bbox, d.rect.x0, d.rect.y0, scale) })),
+    }));
+    if (lines.length) blocks.push({ bbox: shift(d.rect, 0, 0, scale), paragraphs: [{ lines }] });
+  }
+  return { ...read, blocks };
 }
 
 /** OCR de una factura con reintentos guiados por la validación aritmética. */
 export async function ocrInvoice(pagesIn: PreparedPage[], backend: OcrBackend, opts: PipelineOptions = {}): Promise<InvoiceOcrOutcome> {
-  const pages = pagesIn.map(withoutRules);
+  const pages = pagesIn.map(prepareInvoicePage);
   const passes = (opts.passes ?? INVOICE_PASSES).slice(0, Math.max(1, opts.maxPasses ?? Infinity));
   const now = opts.now ?? (() => Date.now());
   const base = opts.stage ?? 'Leyendo texto (OCR)…';

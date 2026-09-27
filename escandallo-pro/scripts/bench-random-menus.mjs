@@ -9,17 +9,21 @@
  *  - PDF con texto: pdf.js (legacy) → filas (layout.ts) → orden por columnas (ocrLayout.columnsReadingOrder) →
  *    parseMenuText(…, 'pdf-texto').
  *
- * Protocolo contra el sobreajuste: afinar SÓLO con --set=tune (semillas 1–60); --set=holdout (1001–1040) imprime sólo el
- * agregado, sin detalle por carta (--reveal lo muestra, para el análisis final de fallos).
+ * Protocolo contra el sobreajuste: afinar SÓLO con --set=tune (semillas 1–60, lo que se usa por defecto); --set=holdout
+ * (1001–1040) o --set=all imprimen sólo el agregado, sin detalle por carta (--reveal lo muestra, para el análisis final de
+ * fallos).
  *
  * Las lecturas de tesseract se guardan en caché (node_modules/.cache/escandallo-random-ocr, clave = imagen + modo).
  *
  * Uso: node scripts/bench-random-menus.mjs [--set=tune|holdout|all] [--seeds=1-10] [--kinds=clean,degraded,pdf]
  *                                         [--jobs=2] [--features] [--verbose] [--reveal] [--json=<archivo>] [--no-cache]
- *                                         [--fast] [--polarity] [--assert]
+ *                                         [--fast] [--polarity] [--pdf-boxes] [--extract-dir=<ruta>] [--assert]
  *   --fast      reutiliza las lecturas de tesseract ya hechas sin repetir la preparación de imagen (para afinar el parser)
  *   --polarity  invierte antes del preprocesado las cartas de fondo oscuro (menuImage.normalizeMenuPolarity, pendiente
  *               de integrar en el canal de la app)
+ *   --pdf-boxes PDF con texto: también las posiciones de la capa de texto (menuUtils.pdfLinesToMenuBoxes, integración
+ *               solicitada en index.ts)
+ *   --extract-dir  otra copia de src/extract (ruta desde la raíz del proyecto) para comparar con la versión anterior
  *   --assert    código 1 si no se alcanzan: limpia ≥ 95 %, degradada ≥ 90 %
  */
 import { createHash } from 'node:crypto';
@@ -41,8 +45,10 @@ const log = (...a) => console.log(...a);
 const OUT = args.dir ? resolve(String(args.dir)) : DEFAULT_OUT;
 const CACHE = join(ROOT, 'node_modules/.cache/escandallo-random-ocr');
 mkdirSync(CACHE, { recursive: true });
-const seeds = seedsFor(args);
-const HOLDOUT = args.set === 'holdout' || seeds.every((s) => s > 1000);
+// Por defecto, sólo las semillas de ajuste: las reservadas se piden expresamente (--set=holdout|all)
+const seeds = seedsFor(args.set || typeof args.seeds === 'string' ? args : { ...args, set: 'tune' });
+// Con alguna semilla reservada, sólo el agregado (sin detalle por carta)
+const HOLDOUT = seeds.some((s) => s > 1000);
 const REVEAL = !HOLDOUT || !!args.reveal;
 const KINDS = new Set(String(args.kinds ?? 'clean,degraded,pdf').split(','));
 const JOBS = Math.max(1, Math.min(4, Number(args.jobs ?? 2)));
@@ -57,15 +63,18 @@ const exps = await ensureGenerated(seeds, OUT, { log: (m) => log(m) });
 const { createServer } = await import('vite');
 const server = await createServer({ root: ROOT, configFile: false, logLevel: 'error', appType: 'custom', server: { middlewareMode: true, hmr: false, ws: false }, optimizeDeps: { noDiscovery: true, include: [] } });
 const load = (p) => server.ssrLoadModule(p);
-const layout = await load('/src/extract/layout.ts');
-const pdfMod = await load('/src/extract/pdf.ts');
-const imageOps = await load('/src/extract/imageOps.ts');
-const pipeline = await load('/src/extract/ocrPipeline.ts');
-const ocrLayout = await load('/src/extract/ocrLayout.ts');
-const extractIndex = await load('/src/extract/index.ts');
-const menuParser = await load('/src/extract/menuParser.ts');
-const menuImage = await load('/src/extract/menuImage.ts');
-const menuUtils = await load('/src/extract/menuUtils.ts');
+// --extract-dir: otra copia de src/extract (ruta desde la raíz del proyecto), p. ej. la versión anterior del parser
+// para medir el antes y el después con las mismas lecturas de tesseract
+const EX = typeof args['extract-dir'] === 'string' ? `/${String(args['extract-dir']).replace(/^\/+|\/+$/g, '')}` : '/src/extract';
+const layout = await load(`${EX}/layout.ts`);
+const pdfMod = await load(`${EX}/pdf.ts`);
+const imageOps = await load(`${EX}/imageOps.ts`);
+const pipeline = await load(`${EX}/ocrPipeline.ts`);
+const ocrLayout = await load(`${EX}/ocrLayout.ts`);
+const extractIndex = await load(`${EX}/index.ts`);
+const menuParser = await load(`${EX}/menuParser.ts`);
+const menuImage = await load(`${EX}/menuImage.ts`);
+const menuUtils = await load(`${EX}/menuUtils.ts`);
 /** --polarity: pizarras y cartas de fondo oscuro invertidas antes del preprocesado (cambio de contrato solicitado). */
 const POLARITY = !!args.polarity;
 const pdfjs = await import(join(ROOT, 'node_modules/pdfjs-dist/legacy/build/pdf.mjs'));
@@ -377,7 +386,7 @@ function agg(list) {
 
 const targets = { limpia: 0.95, degradada: 0.9, 'pdf-texto': 0.97 };
 log('─'.repeat(130));
-log(`Cartas procedurales · semillas ${HOLDOUT ? 'RESERVADAS' : args.set === 'tune' ? 'de ajuste' : ''} (${exps.length} cartas, ${exps.reduce((n, e) => n + e.entries.length, 0)} platos) · plato exacto = nombre + precio`);
+log(`Cartas procedurales · semillas ${seeds.every((x) => x > 1000) ? 'RESERVADAS' : HOLDOUT ? 'de ajuste + RESERVADAS' : 'de ajuste'} (${exps.length} cartas, ${exps.reduce((n, e) => n + e.entries.length, 0)} platos) · plato exacto = nombre + precio`);
 let pass = true;
 for (const g of ['limpia', 'degradada', 'pdf-texto']) {
   const list = results.filter((r) => r.group === g);

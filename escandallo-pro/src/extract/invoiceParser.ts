@@ -4,7 +4,7 @@ import { normalizeInvoiceLine } from '../core/pack';
 import { cleanProductName } from '../core/matching';
 import type { PdfTextLine } from './pdf';
 import { collapseSpaces, despaceLetters, fixOcrNumber, fold, foldKeepLength, fuzzyIn, median } from './textUtils';
-import { fixOcrDescription } from './ocrFixes';
+import { fixOcrDescription, knownWord } from './ocrFixes';
 import {
   buildTableModel,
   buildVotedModel,
@@ -156,6 +156,8 @@ interface ParsedLine {
   inexact?: boolean;
   /** OCR: lectura alternativa exacta al céntimo con una cifra corregida (ver `exactRefine`). */
   exactAlt?: { quantity: number; unitPrice: number };
+  /** OCR: importe exacto (cantidad × precio) a una cifra de distancia del leído. */
+  totalAlt?: number;
 }
 
 /** Porcentaje a 2 decimales, mitad hacia arriba sin el error de coma flotante (12,125 → 12,13, no 12,12). */
@@ -533,6 +535,8 @@ function isUnitText(s: string): boolean {
  */
 function isHeaderishRow(row: Row, main: Row): boolean {
   if (!row.words.length || row.words.length > 16) return false;
+  // Notas sobre los precios ("PRECIOS SIN IVA", "IVA incluido") no son etiquetas de columna
+  if (/precios?\s*(?:sin|con)\s*i\.?v\.?a|i\.?v\.?a\.?\s*(?:incluido|no\s*incluido)|impuestos\s*incluidos/.test(row.f)) return false;
   if (row.words.some((w) => w.num && !w.num.pct && !/^[123]$/.test(w.raw))) return false;
   const perSeg = new Map<number, Word[]>();
   for (const w of row.words) perSeg.set(w.seg, [...(perSeg.get(w.seg) ?? []), w]);
@@ -547,7 +551,7 @@ function isHeaderishRow(row: Row, main: Row): boolean {
 }
 
 function toTRow(row: Row): TRow {
-  return { cw: row.cw, words: row.words.map<TWord>((w) => ({ text: w.raw, x0: w.x0, x1: w.x1, seg: w.seg, num: !!w.num, dec: w.num?.dec })) };
+  return { cw: row.cw, words: row.words.map<TWord>((w) => ({ text: w.raw, x0: w.x0, x1: w.x1, seg: w.seg, num: !!w.num, dec: w.num?.dec, value: w.num?.value })) };
 }
 
 /** Cabeceras de tabla con sus filas vecinas de etiquetas (partidas en dos filas o agrupadas). */
@@ -907,6 +911,12 @@ function repairVariants(toks: NumTok[], row: Row): NumTok[][] {
         variants.push(toks.map((x, i) => (i === k ? { ...x, value: v, n: { ...x.n, value: v, dec, fixed, repaired: true } } : x)));
       }
     }
+    // OCR: un «1» de más delante (resto de un filete o de la raya del «€»): "124,64" por 24,64
+    if (row.ocr && /^1\d+[.,]?\d*$/.test(raw) && digits.length >= 3 && !t.n.fixed) {
+      const s = raw.slice(1);
+      const v = parseNumberEs(s);
+      if (v !== undefined && v > 0) variants.push(toks.map((x, i) => (i === k ? { ...x, value: v, n: { ...x.n, value: v, fixed: s, repaired: true } } : x)));
+    }
     // "1.250" leído como miles cuando era 1,250 kg
     if (t.n.dec === 0 && /^\d{1,3}[.]\d{3}$/.test(raw)) {
       const v = t.value / 1000;
@@ -925,6 +935,47 @@ function repairVariants(toks: NumTok[], row: Row): NumTok[][] {
     }
   });
   return variants;
+}
+
+/** Distancia de edición entre dos cadenas de cifras (inserciones, borrados y cambios). */
+function editDist(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/**
+ * OCR: precio con cifras de más o de menos ("33,50" leído "733,550") entre una cantidad y un importe bien leídos. El
+ * precio que da el importe exacto (al céntimo) se acepta si está a dos ediciones como mucho de lo leído y es único.
+ */
+function priceByEdit(toks: NumTok[]): Solution | undefined {
+  const cands = toks.filter((t) => !t.inDesc && !t.n.pct && !t.n.perUnit && t.value > 0);
+  const t = [...cands].reverse().find((x) => x.n.dec === 2 || x.n.cur);
+  if (!t) return undefined;
+  const found: Solution[] = [];
+  for (const p of cands) {
+    if (p.wi >= t.wi) continue;
+    for (const q of cands) {
+      if (q.wi >= p.wi || q.value >= 10000) continue;
+      for (const dec of [2, 3, 4]) {
+        const cand = round(t.value / q.value, dec);
+        if (!(cand > 0) || Math.abs(round(q.value * cand, 2) - t.value) > 0.001 || cand === p.value) continue;
+        const read = rawDigits(p);
+        const want = digitsOf(cand, dec).replace(/^0+(?=\d)/, '');
+        const dist = editDist(read.replace(/^0+(?=\d)/, ''), want);
+        if (dist < 1 || dist > 2 || Math.abs(read.length - want.length) > 2) continue;
+        const fixed = cand.toFixed(dec).replace('.', ',');
+        const repl: NumTok = { ...p, value: cand, n: { ...p.n, value: cand, dec, fixed, repaired: true } };
+        if (!found.some((f) => f.p.value === cand && f.q === q)) found.push({ q, p: repl, t, d: [], err: 0, validated: true, loose: false, score: 0 });
+        break;
+      }
+    }
+  }
+  return found.length === 1 ? found[0] : undefined;
 }
 
 /** Cifras de un valor escrito con `dec` decimales (1.15, 2 → "115"). */
@@ -1018,9 +1069,12 @@ function digitRepairAll(toks: NumTok[], opts: RepairOpts): { sol: Solution; dist
   };
   for (const t of totals) {
     const tv = target ?? t.value;
+    // Importe ilegible sustituido por el deducido de la base: la cantidad y el precio leídos pueden estar bien tal cual
+    const minDist = t.w.seg === -1 ? 0 : 1;
     for (const p of cands) {
       if (p === t || p.wi >= t.wi || !colOk(p, 'price', positional)) continue;
-      for (const q of cands) {
+      // La cantidad más próxima al precio primero (no un formato "25KG" de la descripción con el mismo valor)
+      for (const q of [...cands].reverse()) {
         if (q === t || q === p || q.wi >= p.wi || !colOk(q, 'qty', positional) || q.value >= 10000) continue;
         const discOpts: NumTok[][] = [[]];
         for (const d of pcts) if (d.wi > p.wi && d.wi < t.wi) discOpts.push([d]);
@@ -1032,7 +1086,7 @@ function digitRepairAll(toks: NumTok[], opts: RepairOpts): { sol: Solution; dist
             const cand = round(tv / (q.value * f), dec);
             if (cand > 0 && Math.abs(q.value * cand * f - tv) <= tolerance(q.value, cand)) {
               const dist = digitDistance(rawDigits(p), digitsOf(cand, p.n.dec || 2));
-              if (dist >= 1 && dist <= opts.maxDist) push(q, p, t, d, p, cand, dist);
+              if (dist >= minDist && dist <= opts.maxDist) push(q, p, t, d, p, cand, dist);
             }
           }
           // Importe (sólo si se ha leído de verdad)
@@ -1085,56 +1139,92 @@ function exactRefine(sol: Solution): Solution {
   const factor = sol.d.reduce((a, d) => a * (1 - d.value / 100), 1);
   const t = sol.t.value;
   const exact = (q: number, p: number) => Math.abs(round(q * p * factor, 2) - t) <= 0.001;
-  const found: Solution[] = [];
+  const found = new Map<string, { sol: Solution; cut: boolean }>();
   for (const which of ['q', 'p'] as const) {
     const tok = sol[which];
     const other = which === 'q' ? sol.p.value : sol.q.value;
     const dec = tok.n.dec;
     if (dec === 0 || tok.value <= 0 || other === 0) continue;
-    const options: { value: number; dec: number }[] = [];
+    const options: { value: number; dec: number; cut: boolean }[] = [];
     // Una cifra cambiada (mismos decimales)
     const sub = round(t / (other * factor), dec);
-    if (sub > 0 && digitDistance(digitsOf(tok.value, dec), digitsOf(sub, dec)) === 1) options.push({ value: sub, dec });
+    if (sub > 0 && digitDistance(digitsOf(tok.value, dec), digitsOf(sub, dec)) === 1) options.push({ value: sub, dec, cut: false });
     // Una cifra de más al final
     const cut = Math.trunc(Math.abs(tok.value) * 10 ** (dec - 1) + 1e-9) / 10 ** (dec - 1);
-    if (cut > 0) options.push({ value: cut, dec: dec - 1 });
+    if (cut > 0) options.push({ value: cut, dec: dec - 1, cut: true });
     for (const o of options) {
       if (!exact(which === 'q' ? o.value : other, which === 'p' ? o.value : other)) continue;
+      const key = `${which}|${o.value}`;
+      const prev = found.get(key);
+      if (prev) {
+        prev.cut ||= o.cut;
+        continue;
+      }
       const fixed = o.value.toFixed(o.dec).replace('.', ',');
       const repl: NumTok = { ...tok, value: o.value, n: { ...tok.n, value: o.value, dec: o.dec, fixed, repaired: true } };
-      found.push({ ...sol, [which]: repl, err: 0 });
-      break;
+      found.set(key, { sol: { ...sol, [which]: repl, err: 0 }, cut: o.cut });
     }
   }
-  return found.length === 1 ? found[0] : sol;
+  const list = [...found.values()];
+  if (list.length === 1) return list[0].sol;
+  // Varias alternativas: una cifra de más al final (el OCR añade un «1» o repite una cifra) es lo más probable
+  const cuts = list.filter((x) => x.cut);
+  return cuts.length === 1 ? cuts[0].sol : sol;
 }
 
-/** Anota en una línea de OCR si cuadra al céntimo y, si no, su alternativa exacta (se decide con todo el documento). */
+/** Anota en una línea de OCR si cuadra al céntimo y, si no, sus alternativas exactas (se decide con todo el documento). */
 function markExactness(line: ParsedLine, sol: Solution, row: Row): ParsedLine {
-  if (!row.ocr || !sol.validated || sol.err <= 0.0051) return line;
+  if (!row.ocr || !sol.validated) return line;
+  // Un importe con tres decimales ("45,066") lleva una cifra de más al final (resto de un filete o del «€»): se quita si
+  // así cuadra al céntimo con cantidad × precio
+  if (sol.t.n.dec === 3 && !sol.f && !sol.dAmount) {
+    const cut = (Math.sign(sol.t.value) * Math.trunc(Math.abs(sol.t.value) * 100 + 1e-7)) / 100;
+    const calc = round(sol.q.value * sol.p.value * sol.d.reduce((a, d) => a * (1 - d.value / 100), 1), 2);
+    if (Math.abs(calc - cut) <= 0.001) {
+      line.total = cut;
+      return line;
+    }
+  }
+  if (sol.err <= 0.0051) return line;
   line.inexact = true;
   const alt = exactRefine(sol);
   if (alt !== sol) line.exactAlt = { quantity: round(alt.q.value, 4), unitPrice: round(alt.p.value, 4) };
+  if (!sol.f && !sol.dAmount) {
+    // O bien el importe tiene una cifra mal leída ("33,67" por 33,66)
+    const calc = round(sol.q.value * sol.p.value * sol.d.reduce((a, d) => a * (1 - d.value / 100), 1), 2);
+    if (calc !== 0 && Math.sign(calc) === Math.sign(sol.t.value) && digitDistance(digitsOf(sol.t.value, 2), digitsOf(calc, 2)) === 1) line.totalAlt = calc;
+  }
   return line;
 }
 
 /**
  * OCR: si el documento calcula sus importes al céntimo (casi todas sus líneas cuadran exactas), las que sólo cuadran
- * por redondeo y tienen una alternativa exacta a una cifra de distancia se corrigen: es una cifra mal leída, no un
- * precio con más decimales de los impresos.
+ * por redondeo tienen una cifra mal leída, no un precio con más decimales de los impresos. Si corregir sus importes
+ * hace cuadrar la suma con la base imponible se corrigen los importes; si no, la cantidad o el precio (el importe es
+ * lo que suma la base).
  */
-function applyExactConvention(parsed: ParsedLine[]): void {
+function applyExactConvention(parsed: ParsedLine[], target: number | undefined): void {
   const validated = parsed.filter((l) => l.validated);
   if (validated.length < 4) return;
   const exactShare = validated.filter((l) => !l.inexact).length / validated.length;
-  if (exactShare < 0.75) return;
+  if (exactShare < 0.6) return;
+  const sum = (withTotals: boolean) => round(parsed.reduce((s, l) => s + (withTotals && l.totalAlt !== undefined ? l.totalAlt : l.total), 0), 2);
+  // Al céntimo: la tolerancia de redondeo de la suma dejaría pasar justo la cifra mal leída
+  const fixTotals = target !== undefined && parsed.some((l) => l.totalAlt !== undefined) && Math.abs(sum(false) - target) > 0.001 && Math.abs(sum(true) - target) <= 0.001;
   for (const l of parsed) {
-    if (!l.exactAlt) continue;
-    l.quantity = l.exactAlt.quantity;
-    l.unitPrice = l.exactAlt.unitPrice;
+    if (fixTotals && l.totalAlt !== undefined) {
+      l.total = l.totalAlt;
+      l.confidence = Math.min(l.confidence, 0.85);
+    } else if (l.exactAlt) {
+      l.quantity = l.exactAlt.quantity;
+      l.unitPrice = l.exactAlt.unitPrice;
+      l.confidence = Math.min(l.confidence, 0.85);
+    } else continue;
     l.inexact = false;
+  }
+  for (const l of parsed) {
     l.exactAlt = undefined;
-    l.confidence = Math.min(l.confidence, 0.85);
+    l.totalAlt = undefined;
   }
 }
 
@@ -1457,7 +1547,7 @@ function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): 
   }
   if (!sol && row.ocr) {
     // Una cifra mal leída (1↔4, 3↔8…) que la aritmética determina sin ambigüedad
-    const dr = digitRepair(toks, { header, maxDist: 1, row });
+    const dr = digitRepair(toks, { header, maxDist: 1, row }) ?? priceByEdit(toks);
     if (dr) {
       sol = dr;
       conf = 0.8;
@@ -1654,8 +1744,12 @@ function segmentsOf(row: Row): Segment[] {
   if (row.positional) {
     // Agrupar palabras separadas por huecos de columna
     let cur: Segment | undefined;
+    let prevCw = row.cw;
     for (const w of row.words) {
-      if (cur && w.x0 - cur.x1 <= row.cw * 1.6) {
+      // El hueco se mide con la letra de las propias palabras (un rótulo grande tiene espacios más anchos)
+      const cw = Math.max(row.cw, Math.min(prevCw, (w.x1 - w.x0) / Math.max(1, w.raw.length)));
+      prevCw = (w.x1 - w.x0) / Math.max(1, w.raw.length);
+      if (cur && w.x0 - cur.x1 <= cw * 1.6) {
         cur.text += ` ${w.raw}`;
         cur.x1 = w.x1;
       } else {
@@ -1676,7 +1770,7 @@ const COMPANY_SUFFIX_RE = /(?:^|[\s,.])(?:s\.?\s?l\.?\s?u?\.?|s\.?\s?a\.?\s?u?\.
 const BUSINESS_RE =
   /\b(?:distribuciones|distribucion|distribuidora|comercial|mayorista|mayoristas|frutas|verduras|hortalizas|carnes|carniceria|pescados|mariscos|bebidas|hermanos|hnos|hijos|grupo|alimentacion|alimentos|alimentaria|suministros|cash|carry|lacteos|panaderia|obrador|bodegas?|vinos|congelados|hosteleria|horeca|cooperativa|makro|mercadona|conservas|embutidos|charcuteria|quesos|aceites|almazara|cafes|importaciones|exclusivas|productos)\b/;
 const NOT_NAME_RE =
-  /^(?:factura|fra\b|albaran|ticket|original|copia|duplicado|pagina|pag\b|hoja|fecha|n[ºo°]|numero|num\b|cliente|datos|pedido|forma\s*de\s*pago|vencimiento|c\.?i\.?f|n\.?i\.?f|dni|tel|tlf|telf|telefono|movil|fax|email|e-mail|correo|web|www|http|iban|swift|bic|cuenta|entidad|domicilio|direccion|codigo|cod\b|serie|documento|simplificada|rectificativa|proforma|presupuesto|agente|ruta|vendedor|repartidor|hora|caja\b|terminal|operador|atendido|descripcion|concepto|cantidad|precio|importe|total|base|iva|inscrita|registro|r\.?m\.?|tomo|folio|seccion)\b/;
+  /^(?:factura|fra\b|albaran|ticket|original|copia|duplicado|pagina|pag\b|hoja|fecha|n[ºo°]|numero|num\b|cliente|datos|pedido|forma\s*de\s*pago|vencimiento|c\.?i\.?f|n\.?i\.?f|dni|tel|tlf|telf|telefono|movil|fax|email|e-mail|correo|web|www|http|iban|swift|bic|cuenta|entidad|domicilio|direccion|codigo|cod\b|serie|documento|simplificada|rectificativa|proforma|presupuesto|agente|ruta|vendedor|repartidor|hora|caja\b|terminal|operador|atendido|descripcion|concepto|cantidad|precio|importe|total|base|iva|inscrita|registro|r\.?m\.?|tomo|folio|seccion|pagare|transferencia|recibo|contado|giro|confirming|efectivo|tarjeta)\b/;
 const ADDRESS_RE =
   /^(?:c\/|c\.\s|calle|avda|avenida|av\.|pza|plaza|paseo|ps\.|pso|ctra|carretera|pol\.|poligono|pg\.|p\.i\.|nave|camino|cmno|ronda|urb\.|urbanizacion|apartado|apdo|cp\b|c\.p\.|travesia|trav\.|glorieta|parque|mercado|mercamadrid|mercabarna|merca\w+|parcela|parc\.|local|edificio|edif\.|km\b|bloque|portal|piso)\b/;
 
@@ -1779,8 +1873,8 @@ function extractInvoiceNumber(rows: Row[]): string | undefined {
       const label = m[0];
       const strong = /factura|fra|invoice|ticket|documento|doc/.test(label);
       const before = f.slice(Math.max(0, m.index - 12), m.index);
-      // "Fecha factura", "F. factura", "Vto. factura": etiquetas de fecha, no de número
-      if (/(?:fecha|f\.|fec\.?|vto\.?|vencimiento)\s*(?:de\s*)?(?:la\s*)?$/.test(before)) continue;
+      // "Fecha factura", "F. factura", "Vto. factura": etiquetas de fecha, no de número; "Total factura": un importe
+      if (/(?:fecha|f\.|fec\.?|vto\.?|vencimiento|total|importe|base|suma|neto)\s*(?:de\s*)?(?:la\s*)?$/.test(before)) continue;
       if (!strong && NUMBER_NEG.test(before)) continue;
       if (/(?:cliente|pedido|albaran|proveedor)\s*$/.test(before) && !/factura/.test(label)) continue;
       const withNo = new RegExp(NS).test(label.replace(/factura|fra/, ''));
@@ -1788,8 +1882,9 @@ function extractInvoiceNumber(rows: Row[]): string | undefined {
       const rest = text.slice(m.index + label.length);
       const tok = /^([A-Za-z]{0,6}[-/.]?\d[A-Za-z0-9\-/._]*|\d[A-Za-z0-9\-/._]*)/.exec(rest);
       let value = tok?.[1];
-      // Un día seguido del mes ("26 de enero") es una fecha
+      // Un día seguido del mes ("26 de enero") es una fecha; "397,43" es un importe
       if (value && /^\d{1,2}$/.test(value) && /^\d{1,2}\s+de\s+[a-z]/i.test(fold(rest))) continue;
+      if (value && /^\d+$/.test(value) && new RegExp(`^${value}[.,]\\d{2}(?!\\d)`).test(rest)) continue;
       if (!value || !/\d/.test(value)) {
         // El título suelto ("FACTURA") no es una etiqueta de número fiable para el valor de debajo
         if (/factura|fra/.test(label) && !withNo) score = 3;
@@ -1820,31 +1915,38 @@ const ALBARAN_LABEL = new RegExp(`(?:\\b(?:albaran|nota\\s*de\\s*entrega|alb\\.)
 
 /** Número de un albarán valorado (sólo si el documento no trae número de factura). */
 function albaranNumber(rows: Row[]): string | undefined {
-  for (let ri = 0; ri < rows.length; ri++) {
-    const row = rows[ri];
-    const f = foldKeepLength(row.text);
-    ALBARAN_LABEL.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = ALBARAN_LABEL.exec(f))) {
-      if (!m[0].length) {
-        ALBARAN_LABEL.lastIndex++;
-        continue;
+  const valid = (v: string | undefined) => {
+    if (!v) return undefined;
+    const value = v.replace(/[.,:;]+$/, '');
+    if (parseDateEs(value) || /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(value) || value.replace(/[^\d]/g, '').length < 2) return undefined;
+    return value;
+  };
+  // Primero el valor en la misma celda que la etiqueta ("Albarán nº 332683"); sólo si no hay ninguno, debajo de ella
+  for (const below of [false, true]) {
+    for (let ri = 0; ri < rows.length; ri++) {
+      const row = rows[ri];
+      const f = foldKeepLength(row.text);
+      ALBARAN_LABEL.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = ALBARAN_LABEL.exec(f))) {
+        if (!m[0].length) {
+          ALBARAN_LABEL.lastIndex++;
+          continue;
+        }
+        let value: string | undefined;
+        if (!below) value = valid(/^([A-Za-z]{0,6}[-/.]?\d[A-Za-z0-9\-/._]*)/.exec(row.text.slice(m.index + m[0].length))?.[1]);
+        else if (rows[ri + 1]) {
+          // Valor debajo de la etiqueta (rejilla), que no sea el de otra etiqueta de su fila ("Cód. cliente 05994")
+          const next = rows[ri + 1];
+          const labelX = row.positional ? xAtChar(row, m.index) : m.index;
+          const cand = next.words
+            .filter((w, k) => /\d/.test(w.raw) && !parseDateEs(w.raw) && w.raw.replace(/[^\dA-Za-z]/g, '').length >= 3 && !NUMBER_NEG.test(next.words.slice(Math.max(0, k - 3), k).map((x) => x.f).join(' ')))
+            .map((w) => ({ w, d: Math.abs(w.x0 - labelX) }))
+            .sort((a, b) => a.d - b.d)[0];
+          if (cand && cand.d <= (row.positional ? 60 : 12)) value = valid(cand.w.raw);
+        }
+        if (value) return value;
       }
-      const rest = row.text.slice(m.index + m[0].length);
-      let value = /^([A-Za-z]{0,6}[-/.]?\d[A-Za-z0-9\-/._]*)/.exec(rest)?.[1];
-      if (!value && rows[ri + 1]) {
-        // Valor debajo de la etiqueta (rejilla)
-        const labelX = row.positional ? xAtChar(row, m.index) : m.index;
-        const cand = rows[ri + 1].words
-          .filter((w) => /\d/.test(w.raw) && !parseDateEs(w.raw) && w.raw.replace(/[^\dA-Za-z]/g, '').length >= 3)
-          .map((w) => ({ w, d: Math.abs(w.x0 - labelX) }))
-          .sort((a, b) => a.d - b.d)[0];
-        if (cand && cand.d <= (row.positional ? 60 : 12)) value = cand.w.raw;
-      }
-      if (!value) continue;
-      value = value.replace(/[.,:;]+$/, '');
-      if (parseDateEs(value) || /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(value) || value.replace(/[^\d]/g, '').length < 2) continue;
-      return value;
     }
   }
   return undefined;
@@ -1861,7 +1963,7 @@ interface HeaderInfo {
 
 /** Etiqueta que abre el bloque del cliente ("Cliente", "Facturar a", "Datos del cliente", "Sr./Sres.", "Destinatario"). */
 const CUSTOMER_LABEL_RE =
-  /^(?:clientes?|datos\s*(?:fiscales\s*)?(?:del\s*)?cliente|facturar\s*a|facturado\s*a|destinatario|enviar\s*a|entregar\s*a|direccion\s*(?:de\s*)?(?:entrega|envio)|lugar\s*de\s*entrega|comprador|receptor|sr\.?\s*\/?\s*sres\.?|sres\.?|senor(?:es)?|a\/a|attn)\s*[:.]?(?:\s|$)/;
+  /^(?:clientes?|datos\s*(?:fiscales\s*)?(?:del\s*)?cliente|facturar\s*a|facturado\s*a|destinatario|enviar\s*a|entregar\s*a|direccion\s*(?:de\s*)?(?:entrega|envio)|lugar\s*de\s*entrega|comprador|receptor|sr\.?\s*[/il|1]?\s*sres\.?|sres\.?|senor(?:es)?|a\/a|attn)\s*[:.]?(?:\s|$)/;
 /** Celda con el código y el nombre del cliente dentro de la caja de datos ("Cód. cliente 0094 · Bar X S.L."). */
 const CUSTOMER_CODE_SEG_RE = /^(?:cod\.?\s*(?:de\s*)?cliente|n[ºo°]\.?\s*(?:de\s*)?cliente|cliente\s*n[ºo°]\.?|num\.?\s*cliente|clientes?)\s*[:.]?\s*\S/;
 /** Fila con el identificador fiscal del cliente ("NIF cliente", "CIF del cliente"). */
@@ -1995,6 +2097,28 @@ function headerBlocks(zone: Row[]): Block[] {
   return blocks;
 }
 
+/** ¿Es un EAN-13 válido (13 cifras con su dígito de control)? */
+export function isEan13(token: string): boolean {
+  if (!/^\d{13}$/.test(token)) return false;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += Number(token[i]) * (i % 2 ? 3 : 1);
+  return (10 - (sum % 10)) % 10 === Number(token[12]);
+}
+
+/** ¿La etiqueta del CIF/NIF de esta fila está justo debajo de una etiqueta de cliente (misma X) de la fila anterior? */
+function idUnderCustomerLabel(prev: Row, row: Row, idX: number): boolean {
+  const label = segmentsOf(row)
+    .filter((sg) => sg.x1 <= idX + row.cw && /^(?:n\.?\s?i\.?\s?f|c\.?\s?i\.?\s?f|dni|nif\/cif|cif\/nif)\b/.test(fold(sg.text)))
+    .pop();
+  if (!label) return false;
+  const tol = Math.max(row.cw, prev.cw) * 2;
+  return segmentsOf(prev).some((sg) => Math.abs(sg.x0 - label.x0) <= tol && /^(?:cliente|cod\.?\s*cliente|destinatario|comprador)\b/.test(fold(sg.text)));
+}
+
+/** Etiquetas de una caja de datos del documento (a la izquierda de su valor). */
+const META_LABEL_SEG_RE =
+  /^(?:factura|fra\b|n[ºo°*?"]|numero|num\b|fecha|f\.|fec\b|cliente|cod\b|cod\.|codigo|n\.?\s?i\.?\s?f|c\.?\s?i\.?\s?f|dni|nif|cif|f\.?\s*pago|forma\s*de\s*pago|pago|vencimiento|vto|pedido|albaran|pagina|hoja|serie|ruta|agente|comercial|su\s*ref|s\/ref)\b.{0,20}$/;
+
 const LOGO_RE = /^[A-ZÑÁÉÍÓÚ&.]{1,5}$/;
 
 /** ¿Parece una razón social o nombre comercial (no una dirección, un teléfono, una etiqueta…)? */
@@ -2002,6 +2126,8 @@ function nameCandidate(text: string): boolean {
   const t = collapseSpaces(text);
   const f = fold(t);
   if (f.replace(/[^a-z]/g, '').length < 3) return false;
+  // Más cifras que letras: un código o un NIF mal leído ("EE240031-P"), no un nombre
+  if (f.replace(/[^0-9]/g, '').length > f.replace(/[^a-z]/g, '').length) return false;
   // Sólo la forma jurídica ("S.L.U." de una razón social partida en dos filas)
   if (f.replace(COMPANY_SUFFIX_RE, '').replace(/[^a-z]/g, '').length < 3) return false;
   if (NOT_NAME_RE.test(f) || ADDRESS_RE.test(f) || CUSTOMER_LABEL_RE.test(f)) return false;
@@ -2058,6 +2184,13 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
       if (texts.some((t) => /\b(?:factura|fecha|albaran|ticket)\b/.test(t))) score -= 3;
       if (b.firstRow === top) score += 1;
       if (b.segs.length >= 2) score += 1;
+      // Columna de valores de una caja de datos ("Nº factura | 2026/0720", "Cliente | Mesón X S.L.", "N.I.F. | B…"):
+      // cada valor tiene su etiqueta a la izquierda; no es el bloque del proveedor
+      const values = b.segs.filter((sg) => {
+        const row = allRows[sg.row];
+        return !!row && segmentsOf(row).some((o) => o.x1 <= sg.x0 && sg.x0 - o.x1 <= row.cw * 14 && META_LABEL_SEG_RE.test(fold(collapseSpaces(o.text))));
+      }).length;
+      if (values >= Math.max(2, b.segs.length * 0.5)) score -= 12;
       if (score > bestScore) {
         bestScore = score;
         supplierBlock = b;
@@ -2083,16 +2216,74 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
   }
   // Razón social partida en dos filas que corta en una palabra de enlace: "Frutas y Verduras del" / "Cantábrico C.B."
   const CONNECTOR_END = /(?:^|\s)(?:de|del|la|las|los|el|y|e|&|-)$/i;
-  const withSuffix = (sg: Segment, b: Block): string => {
+  // Dos filas seguidas del mismo rótulo: alineadas a la izquierda y con la misma letra
+  const segCw = (x: Segment) => (x.x1 - x.x0) / Math.max(1, collapseSpaces(x.text).length);
+  const sameName = (a: Segment, c: Segment): boolean => {
+    const ra = allRows[a.row];
+    const rc = allRows[c.row];
+    if (!ra || !rc || ra.page !== rc.page || c.row <= a.row || !ra.positional) return false;
+    const cwa = segCw(a);
+    const cwc = segCw(c);
+    const cw = Math.max(cwa, cwc);
+    // Siguiente línea del mismo rótulo: justo debajo (una línea de su letra), alineada (izquierda, derecha o centro) y
+    // con la misma letra
+    const aligned = Math.min(Math.abs(a.x0 - c.x0), Math.abs(a.x1 - c.x1), Math.abs(a.x0 + a.x1 - c.x0 - c.x1) / 2) <= cw * 2;
+    return rc.y - ra.y <= cw * 3.4 && aligned && Math.abs(cwa - cwc) <= cw * 0.15;
+  };
+  const plainName = (x: Segment) => {
+    const t = cleanName(x.text);
+    // Un nombre de verdad (no las siglas del logotipo, "U D L", ni un rótulo espaciado, "P R OVEE D O R")
+    if (!/\p{L}{3,}/u.test(t) || LOGO_RE.test(t.replace(/\s+/g, ''))) return false;
+    if (/^(?:datos(?:del)?)?(?:proveedor|emisor|vendedor|expedidor|cliente|destinatario|facturara)/.test(fold(t).replace(/[^a-z]/g, ''))) return false;
+    return nameCandidate(t) && !/\d/.test(t) && !COMPANY_SUFFIX_RE.test(fold(t)) && !SUPPLIER_LABEL_RE.test(fold(t)) && !CUSTOMER_LABEL_RE.test(fold(t));
+  };
+  const withSuffix = (sg: Segment, b: Block): string => extendName(sg, b.segs);
+  // Tramo de una fila a partir de un segmento: los segmentos siguientes muy próximos ("Aragón" + "S.L.")
+  const runFrom = (o: Segment, segs: Segment[]): Segment => {
+    const same = segs.filter((x) => x.row === o.row && x.x0 >= o.x0).sort((a, c) => a.x0 - c.x0);
+    const out = { ...o };
+    for (const x of same.slice(1)) {
+      if (x.x0 - out.x1 > segCw(o) * 3) break;
+      out.text = `${out.text} ${x.text}`;
+      out.x1 = x.x1;
+    }
+    return out;
+  };
+  const extendName = (sgIn: Segment, segsIn: Segment[]): string => {
+    const segs = segsIn.map((o) => runFrom(o, segsIn)).filter((o, _k, all) => !all.some((p) => p !== o && p.row === o.row && p.x0 < o.x0 && p.x1 >= o.x1));
+    const sg = segs.find((o) => o.row === sgIn.row && o.x0 === sgIn.x0) ?? sgIn;
     let text = cleanName(sg.text);
-    const at = b.segs.indexOf(sg);
-    const prev = b.segs[at - 1];
-    if (prev && prev.row < sg.row && CONNECTOR_END.test(collapseSpaces(prev.text)) && nameCandidate(cleanName(prev.text))) text = `${cleanName(prev.text)} ${text}`;
-    if (COMPANY_SUFFIX_RE.test(fold(text))) return text;
-    const next = b.segs[at + 1];
-    if (next && next.row > sg.row && CONNECTOR_END.test(text) && !/\d/.test(next.text)) return `${text} ${cleanName(next.text)}`;
-    // Razón social partida en dos filas: "… Levante" / "S.A."
-    if (next && next.row > sg.row && /^(?:s\.?\s?l\.?\s?u?\.?|s\.?\s?a\.?\s?u?\.?|s\.?\s?coop\.?|c\.?\s?b\.?|slu|sau)$/i.test(collapseSpaces(next.text))) return `${text} ${collapseSpaces(next.text)}`;
+    const at = segs.indexOf(sg);
+    const prev = segs[at - 1];
+    const hasSuffix = COMPANY_SUFFIX_RE.test(fold(text));
+    // "Importaciones Bodegas Sierra" / "Norte S.L.U.": la fila de encima, con la misma letra, es el principio del nombre
+    const prevSeg = hasSuffix ? segs.filter((o) => o !== sg && o.row < sg.row && plainName(o) && sameName(o, sg)).pop() : undefined;
+    if (prevSeg) text = `${cleanName(prevSeg.text)} ${text}`;
+    else if (prev && prev.row < sg.row && nameCandidate(cleanName(prev.text)) && CONNECTOR_END.test(collapseSpaces(prev.text))) {
+      text = `${cleanName(prev.text)} ${text}`;
+    }
+    // Filas siguientes del rótulo (hasta dos): el primer segmento de debajo que se solapa en X (no el de otra columna)
+    let cur = sg;
+    for (let step = 0; step < 2 && !COMPANY_SUFFIX_RE.test(fold(text)); step++) {
+      const c = cur;
+      const next = segs.filter((o) => o.row > c.row && o.x0 < c.x1 && o.x1 > c.x0).sort((a, d) => a.row - d.row)[0];
+      if (!next) break;
+      const nt = collapseSpaces(next.text);
+      // "Frutas y Verduras del" / "Cantábrico …": corta en una palabra de enlace
+      if (CONNECTOR_END.test(text) && !/\d/.test(nt)) {
+        text = `${text} ${cleanName(nt)}`;
+        cur = next;
+        continue;
+      }
+      // "… Levante" / "S.A.", "… Meseta S." / "Coop."
+      if (/^(?:s\.?\s?l\.?\s?u?\.?|s\.?\s?a\.?\s?u?\.?|s\.?\s?coop\.?|c\.?\s?b\.?|slu|sau)$/i.test(nt) || (/\bs\.$/i.test(text) && /^coop\.?(?:\s*and\.?)?$/i.test(nt))) {
+        text = `${text} ${nt}`;
+        break;
+      }
+      // "Comercial" / "Hostelera Carmona S.L.U.": la fila de debajo, con la misma letra, acaba en la forma jurídica
+      if (sameName(c, next) && !/\d/.test(nt) && COMPANY_SUFFIX_RE.test(fold(cleanName(nt))) && nameCandidate(cleanName(nt))) text = `${text} ${cleanName(nt)}`;
+      break;
+    }
     return text;
   };
   if (!supplierName && supplierBlock) {
@@ -2111,8 +2302,10 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
     const pick = withCompany ?? cands[0];
     if (pick) supplierName = withSuffix(pick, b);
   }
-  // CIF / NIF del proveedor
-  const allIds = zoneIds.length ? zoneIds : findTaxIds(allRows.filter((r) => !excludeRows.has(r.i)));
+  const number = extractInvoiceNumber(zone.length > 2 ? zone : allRows.slice(0, 20));
+  // CIF / NIF del proveedor (nunca el propio número de factura, que a veces tiene la forma de un CIF: "B-20267505")
+  const numberKey = number?.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  const allIds = (zoneIds.length ? zoneIds : findTaxIds(allRows.filter((r) => !excludeRows.has(r.i)))).filter((h) => h.id !== numberKey);
   let supplierTaxId: string | undefined;
   let supplierIdRow: number | undefined;
   {
@@ -2125,6 +2318,8 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
       const row = allRows[hit.row];
       const inZone = hit.row < headerEnd;
       if (inZone && customerSeg(hit.row, hit.x)) score -= 10;
+      // Caja de datos "Cliente | Bar X" / "NIF | B…": el NIF que va justo debajo de la etiqueta del cliente es suyo
+      if (inZone && row && hit.row > 0 && idUnderCustomerLabel(allRows[hit.row - 1], row, hit.x)) score -= 12;
       if (inZone && supplierBlock && blockOfSeg(hit.row, hit.x) === supplierBlock) score += 6;
       if (footer.some((f) => f.id === hit.id)) score += 4;
       // En el pie, junto al nombre del proveedor ("José Pérez Gil · NIF 12345678Z")
@@ -2154,13 +2349,16 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
         const cleaned: Segment = { ...seg, text: cleanName(seg.text) };
         if (!cleaned.text || customerSeg(seg.row, seg.x0)) continue;
         const sc = supplierNameScore(cleaned, idx, supplierIdRow, new Set<number>());
-        if (sc > (best?.score ?? 1)) best = { seg: cleaned, score: sc };
+        if (sc > (best?.score ?? 1)) best = { seg, score: sc };
       }
     });
-    supplierName = best?.seg.text;
+    if (best) {
+      const pool = zone.slice(0, 16).flatMap((r) => segmentsOf(r)).filter((sg) => !customerSeg(sg.row, sg.x0));
+      const pick = pool.find((sg) => sg.row === best?.seg.row && sg.x0 === best.seg.x0) ?? best.seg;
+      supplierName = extendName(pick, pool);
+    }
   }
 
-  const number = extractInvoiceNumber(zone.length > 2 ? zone : allRows.slice(0, 20));
   const headerText = zone.filter((r) => !META_ANY_RE.test(r.f)).map((r) => r.text).join('\n');
   const date = findDate(headerText) ?? findDate(allRows.filter((r) => !excludeRows.has(r.i) && !META_ANY_RE.test(r.f)).map((r) => r.text).join('\n'));
   return { supplierName: supplierName || undefined, supplierTaxId, number, date };
@@ -2210,7 +2408,20 @@ function parseTotals(rowsIn: Row[]): Totals {
     for (const r of nums) {
       const isRate = VAT_RATES.includes(r.value) && r.value > 0 && r.n.dec <= 2;
       const isRe = RE_RATES.includes(r.value) && r.n.dec <= 2;
-      if (!isRate && !isRe) continue;
+      if (!isRate && !isRe) {
+        // OCR: tipo con una cifra mal leída ("24" por 21): lo decide la aritmética de la base y la cuota que lo siguen
+        if (!row.ocr || !Number.isInteger(r.value) || r.value <= 0 || r.value >= 100) continue;
+        for (const b of nums) {
+          if (b.wi >= r.wi || b.n.pct || !b.value) continue;
+          for (const c of nums) {
+            if (c.wi <= r.wi || c.n.pct || !c.value || Math.abs(c.value) >= Math.abs(b.value)) continue;
+            const implied = VAT_RATES.find((v) => v > 0 && Math.abs((b.value * v) / 100 - c.value) <= 0.0151);
+            if (implied === undefined || digitDistance(String(r.value), String(implied)) !== 1) continue;
+            if (!triples.some((x) => x.rate === implied && approxEqual(x.base, b.value, 0.001, 0))) triples.push({ base: b.value, rate: implied, vat: c.value });
+          }
+        }
+        continue;
+      }
       for (const b of nums) {
         if (b === r || b.value === 0 || b.n.pct) continue;
         for (const c of nums) {
@@ -2283,7 +2494,9 @@ function parseTotals(rowsIn: Row[]): Totals {
   const triVat = triples.length ? sum(triples.map((t) => t.vat)) : undefined;
   const triRe = reTriples.length ? sum(reTriples.map((t) => t.vat)) : undefined;
 
-  const baseCands = [...new Set([...(triBase !== undefined ? [triBase] : []), ...labeled.base, ...(labeled.base.length > 1 ? [sum(labeled.base)] : []), ...labeled.sub])];
+  // (y el bruto menos el pronto pago: la base cuando el desglose de IVA no se ha podido leer entero)
+  const netOfDisc = [...labeled.sub, ...labeled.base].flatMap((s) => labeled.disc.map((d) => round(s - d, 2)));
+  const baseCands = [...new Set([...(triBase !== undefined ? [triBase] : []), ...labeled.base, ...(labeled.base.length > 1 ? [sum(labeled.base)] : []), ...labeled.sub, ...netOfDisc])];
   const vatCands = [...new Set([...(triVat !== undefined ? [triVat] : []), ...(labeled.vat.length > 1 ? [sum(labeled.vat)] : []), ...labeled.vat, 0])];
   const reCands = [...new Set([...(triRe !== undefined ? [triRe] : []), ...labeled.re, 0])];
   const totalCands = [...new Set(labeled.total)].sort((a, b) => Math.abs(b) - Math.abs(a));
@@ -2467,9 +2680,14 @@ function continuationText(t: TextRow): { text: string; code?: string } | undefin
   if (!words.length) return undefined;
   if (model) {
     const desc: Word[] = [];
-    for (const w of words) {
+    const inDesc = (w: Word) => {
       const j = columnIndex(model.columns, w);
-      if (j >= 0 && model.columns[j].kind === 'desc') desc.push(w);
+      return j >= 0 && model.columns[j].kind === 'desc';
+    };
+    // Una palabra de la misma celda que la descripción que asoma a la columna de al lado ("…Cantábrico 00") es suya
+    const descSegs = new Set(words.filter(inDesc).map((w) => w.seg));
+    for (const w of words) {
+      if (inDesc(w) || descSegs.has(w.seg)) desc.push(w);
       else if (!isOcrJunk(w, t.row)) return undefined;
     }
     if (!desc.length) return undefined;
@@ -2517,13 +2735,34 @@ function attachContinuations(parsed: ParsedLine[], texts: TextRow[], rows: Row[]
   const ownDesc = new Map(lines.map((l) => [l, l.description.replace(/[^\p{L}]/gu, '').length >= 2]));
   const lastY = new Map(lines.map((l) => [l, yOf(l.row)]));
   const sameZone = (l: ParsedLine, t: Row) => rows[l.row].page === t.page && zoneOf.get(l.row) === zoneOf.get(t.i);
-  const middle = lines.some((l) => {
+  const middleNoDesc = lines.some((l) => {
     if (ownDesc.get(l)) return false;
     const y = yOf(l.row);
     const above = texts.some((t) => sameZone(l, t.row) && t.row.y < y && y - t.row.y < limit);
     const below = texts.some((t) => sameZone(l, t.row) && t.row.y > y && t.row.y - y < limit);
     return above && below;
   });
+  // Celdas de tres filas centradas en vertical ("JAMÓN IBÉRICO DE" / "J100 100% RAZA IBÉRICA  10  12,80" /
+  // "LONCHEADO…"): la línea tiene descripción propia y una fila de texto justo encima y otra justo debajo, a la misma
+  // distancia, y la de encima está más cerca de ella que de la línea anterior
+  const sandwichedLines = lines.filter((l, k) => {
+    const y = yOf(l.row);
+    const prevY = k > 0 && sameZone(lines[k - 1], rows[l.row]) ? yOf(lines[k - 1].row) : -Infinity;
+    const above = texts.filter((t) => sameZone(l, t.row) && t.row.y < y && y - t.row.y < limit && t.row.y > prevY).map((t) => y - t.row.y);
+    const below = texts.filter((t) => sameZone(l, t.row) && t.row.y > y && t.row.y - y < limit).map((t) => t.row.y - y);
+    if (!above.length || !below.length) return false;
+    const a = Math.min(...above);
+    const b = Math.min(...below);
+    return Math.abs(a - b) <= 0.3 * Math.max(a, b) && a < y - a - prevY;
+  });
+  const sandwiched = new Set(sandwichedLines);
+  const middle = middleNoDesc || (sandwiched.size >= 2 && sandwiched.size >= lines.length * 0.4);
+  /** Distancia de una línea a la siguiente del mismo tramo (Infinity si es la última). */
+  const nextGap = (l: ParsedLine): number => {
+    const k = lines.indexOf(l);
+    const n = lines[k + 1];
+    return n && sameZone(n, rows[l.row]) ? yOf(n.row) - yOf(l.row) : Infinity;
+  };
   const pre = new Map<ParsedLine, TextRow[]>();
   const post = new Map<ParsedLine, TextRow[]>();
   const texts2 = new Map<TextRow, string>();
@@ -2540,8 +2779,18 @@ function attachContinuations(parsed: ParsedLine[], texts: TextRow[], rows: Row[]
     const dPrev = prev ? t.row.y - (lastY.get(prev) ?? 0) : Infinity;
     const dNext = next ? yOf(next.row) - t.row.y : Infinity;
     let target: 'pre' | 'post' | undefined;
-    if (next && !ownDesc.get(next) && dNext <= limit && dNext <= dPrev * 1.1) target = 'pre';
+    // La línea siguiente no tiene descripción propia y la anterior ya tiene la suya: la fila es de la siguiente aunque
+    // quede algo más lejos (en el OCR la altura de las filas baila unos píxeles)
+    // (y es la única fila de texto entre las dos: con celdas centradas en vertical habría dos, la mitad de cada una)
+    const prevHasDesc = !!prev && (ownDesc.get(prev) || !!pre.get(prev)?.length);
+    const alone = !!prev && !!next && texts.filter((o) => o.row.i > prev.row && o.row.i < next.row).length === 1;
+    if (next && !ownDesc.get(next) && dNext <= limit && (dNext <= dPrev * 1.1 || (alone && prevHasDesc && dNext <= dPrev * 1.6))) target = 'pre';
     else if (next && middle && dNext <= limit && dNext < dPrev * 0.87) target = 'pre';
+    // La línea siguiente tiene texto justo encima y justo debajo a la misma distancia (celda de tres filas centrada)
+    else if (next && sandwiched.has(next) && dNext <= limit && dNext < dPrev * 0.87) target = 'pre';
+    // Primera línea de la tabla con texto pegado encima (a menos de la mitad del paso hasta la línea siguiente): es el
+    // principio de su descripción, no un título de sección (que va separado como una línea más)
+    else if (next && !prev && dNext <= limit && dNext <= nextGap(next) * 0.6) target = 'pre';
     // Mucho más cerca de la línea siguiente que de la anterior: la otra mitad de su descripción va en la fila de los
     // números (celdas centradas en vertical cuya segunda fila de texto cae a la altura de los importes)
     else if (next && dNext <= limit && dNext < dPrev * 0.45 && (pitch === undefined ? Number.isFinite(dPrev) : dNext < pitch * 0.75)) target = 'pre';
@@ -2559,11 +2808,39 @@ function attachContinuations(parsed: ParsedLine[], texts: TextRow[], rows: Row[]
     } else continue;
     texts2.set(t, ct.text);
   }
+  // Descripciones de más de dos filas por encima de la línea ("Nata para" / "Cocinar 1l" / números): la fila de texto
+  // pegada encima de la primera fila ya unida, a distancia de interlineado y sin otra línea en medio, es de la misma celda
+  // Interlineado dentro de una celda: distancia entre filas de texto seguidas de una misma línea
+  const intra: number[] = [];
   for (const l of lines) {
-    const a = pre.get(l) ?? [];
+    for (const list of [pre.get(l) ?? [], post.get(l) ?? []]) {
+      const ys = list.map((t) => t.row.y).sort((a, b) => a - b);
+      for (let k = 1; k < ys.length; k++) intra.push(ys[k] - ys[k - 1]);
+    }
+  }
+  const lineGap = intra.length ? median(intra) * 1.2 : 0;
+  if (lineGap > 0) lines.forEach((l, k) => {
+    const list = pre.get(l);
+    if (!list?.length) return;
+    const floor = k > 0 && sameZone(lines[k - 1], rows[l.row]) ? (lastY.get(lines[k - 1]) ?? -Infinity) : -Infinity;
+    for (;;) {
+      const top = Math.min(...list.map((t) => t.row.y));
+      const cand = texts
+        .filter((t) => !texts2.has(t) && sameZone(l, t.row) && t.row.y < top && top - t.row.y <= lineGap && t.row.y > floor)
+        .sort((a, b) => b.row.y - a.row.y)[0];
+      const ct = cand && continuationText(cand);
+      if (!cand || !ct || !ct.text.replace(/[^\p{L}\d]/gu, '')) break;
+      list.unshift(cand);
+      texts2.set(cand, ct.text);
+    }
+  });
+  for (const l of lines) {
+    const a = [...(pre.get(l) ?? [])].sort((x, y) => x.row.y - y.row.y);
     const b = post.get(l) ?? [];
     if (!a.length && !b.length) continue;
-    l.description = collapseSpaces([...a.map((t) => texts2.get(t) ?? ''), l.description, ...b.map((t) => texts2.get(t) ?? '')].join(' '));
+    // Sin letras propias ("2" sobrante de una columna de piezas) la fila de números no aporta descripción
+    const own = /\p{L}/u.test(l.description) ? l.description : '';
+    l.description = collapseSpaces([...a.map((t) => texts2.get(t) ?? ''), own, ...b.map((t) => texts2.get(t) ?? '')].join(' '));
     l.rows.push(...a.map((t) => t.row.i), ...b.map((t) => t.row.i));
   }
 }
@@ -2658,6 +2935,7 @@ function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: Table
   let zone = 0;
   let header: TableHeader | undefined = forced;
   let state: 'pre' | 'table' | 'post' | 'paused' = firstHeader >= 0 ? 'pre' : 'table';
+  let pausedPage = 0;
   let lastLineRow = -1;
   let tableEnd = -1;
 
@@ -2677,9 +2955,15 @@ function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: Table
     if (state === 'pre') continue;
     if (PAUSE_RE.test(f)) {
       state = 'paused';
+      pausedPage = row.page;
       excluded.add(row.i);
       zone++;
       continue;
+    }
+    // "Continúa en la página siguiente" sin «suma anterior» en la otra: la tabla sigue en la página siguiente
+    if (state === 'paused' && row.page !== pausedPage && !RESUME_RE.test(f)) {
+      state = 'table';
+      zone++;
     }
     if (state === 'paused') {
       if (RESUME_RE.test(f)) state = 'table';
@@ -2707,7 +2991,10 @@ function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: Table
     // Portes, envases, fianzas: fuera de las líneas pero cuentan en el cuadre
     const codeless = leadingCode(row.words).end ? fold(row.words.slice(leadingCode(row.words).end).map((w) => w.raw).join(' ')) : fold(row.text.trim());
     const descCol = header?.model ? fold(descColumnText(row, header.model)) : '';
-    if (EXTRA_RE.test(codeless) || EXTRA_RE.test(descPart) || (descCol && EXTRA_RE.test(descCol))) {
+    // (una fila que cuadra como línea se decide después con la descripción completa: "TÓNICA PREMIUM 20CL" /
+    // "7407  ENVASE RETORNABLE  14  0,543  7,60" es un producto, no un cargo por envases)
+    const extraLike = EXTRA_RE.test(codeless) || EXTRA_RE.test(descPart) || (descCol && EXTRA_RE.test(descCol));
+    if (extraLike && !parseRow(row, header, inTable).line?.validated) {
       // Importe: el último número con céntimos (nunca un formato "75cl" ni un entero suelto)
       const nums = numbersIn(row).filter((t) => !t.n.pct && !t.n.unit && !t.n.perUnit);
       const money = nums.filter((t) => t.n.dec === 2 || t.n.cur);
@@ -2773,9 +3060,12 @@ function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: Table
 function votedHeader(parsed: ParsedLine[], rows: Row[]): TableHeader | undefined {
   const good = parsed.filter((l) => l.validated && l.confidence >= 0.8 && l.roles?.length && rows[l.row].positional);
   if (good.length < 3) return undefined;
+  // Las filas de continuación (descripciones partidas) también votan: sus palabras son de la columna de descripción
+  const extra = good.flatMap((l) => l.rows.filter((ri) => ri !== l.row).map((ri) => rows[ri]));
+  const extraVotes: RoleVote[] = extra.flatMap((r) => r.words.filter((w) => !w.num && /\p{L}{2,}/u.test(w.raw)).map((w) => ({ x0: w.x0, x1: w.x1, kind: 'desc' as const })));
   const model = buildVotedModel(
-    good.map((l) => toTRow(rows[l.row])),
-    good.flatMap((l) => l.roles ?? []),
+    [...good.map((l) => toTRow(rows[l.row])), ...extra.map(toTRow)],
+    [...good.flatMap((l) => l.roles ?? []), ...extraVotes],
     { isUnitWord: isUnitText },
   );
   if (!model) return undefined;
@@ -2889,6 +3179,17 @@ function summaryWarnings(inv: ExtractedInvoice, r: Pick<InvoiceReading, 'extrasS
 }
 
 /** Similitud de descripciones (Dice de bigramas sobre el texto plegado), 0–1. */
+/** Calidad de una descripción leída por OCR: palabras conocidas del léxico menos restos (palabras raras cortas, signos sueltos). */
+function descQuality(desc: string): number {
+  let score = 0;
+  for (const t of desc.split(/\s+/).filter(Boolean)) {
+    const letters = t.replace(/[^\p{L}]/gu, '');
+    if (letters.length >= 3 && knownWord(letters)) score += 1;
+    else if (/^[^\p{L}\d]+$/u.test(t) || (letters.length > 0 && letters.length <= 2 && !/\d/.test(t) && letters !== letters.toUpperCase())) score -= 1;
+  }
+  return score;
+}
+
 function descSimilarity(a: string, b: string): number {
   const na = fold(a).replace(/[^a-z0-9]+/g, ' ').trim();
   const nb = fold(b).replace(/[^a-z0-9]+/g, ' ').trim();
@@ -2993,6 +3294,22 @@ export function mergeInvoiceReadings(readings: InvoiceReading[]): InvoiceReading
     }
   });
 
+  // 1b) Descripción: entre las lecturas de la misma línea (mismas cifras) gana la que tiene más palabras conocidas y
+  //     menos restos del OCR (las pasadas fallan en letras distintas)
+  lines.forEach((l, idx) => {
+    if (!isValidatedLine(l)) return;
+    let best = { text: l.description, score: descQuality(l.description) };
+    for (const r of others) {
+      for (const c of r.invoice.lines) {
+        if (!isValidatedLine(c) || c.total !== l.total || c.quantity !== l.quantity || c.unitPrice !== l.unitPrice) continue;
+        if (descSimilarity(l.description, c.description) < 0.6) continue;
+        const score = descQuality(c.description);
+        if (score > best.score) best = { text: c.description, score };
+      }
+    }
+    if (best.text !== l.description) lines[idx] = { ...l, description: best.text, suggestedName: cleanProductName(best.text) || undefined };
+  });
+
   // 2) Líneas validadas que faltan en la base
   const subtotal = base.subtotal ?? others.map((r) => r.invoice.subtotal).find((v) => v !== undefined);
   if (subtotal !== undefined) {
@@ -3074,11 +3391,13 @@ export function parseInvoiceReading(input: { text: string; lines?: string[] }, m
     const forced = votedHeader(walk.parsed, rows);
     if (forced) {
       const alt = walkRows(rows, headers, forced);
-      if (alt.parsed.length >= walk.parsed.length) walk = alt;
+      // Con las columnas votadas las descripciones salen limpias (sin lotes ni fechas de caducidad): vale la pena
+      // aunque se pierda alguna fila dudosa (un cargo que pasa a portes, una fila partida)
+      const dirty = (w: WalkResult) => w.parsed.filter((l) => /(?:^|\s)(?:\d{1,2}[/.-]\d{2,4}|\d{5,}-\d{1,3}|[A-Z]{1,2}\d{3,}[A-Z]?)(?=\s|$)/.test(l.description)).length;
+      if (alt.parsed.length >= walk.parsed.length || (alt.parsed.length >= walk.parsed.length - 1 && dirty(alt) + 2 <= dirty(walk))) walk = alt;
     }
   }
   const { parsed, extras, tableEnd, header, amountOnly } = walk;
-  if (method === 'ocr') applyExactConvention(parsed);
 
   // 3) Cabecera del documento y totales
   const firstLineRow = parsed.length ? Math.min(...parsed.flatMap((l) => l.rows)) : rows.length;
@@ -3100,6 +3419,7 @@ export function parseInvoiceReading(input: { text: string; lines?: string[] }, m
   const extrasSum = round(extras.reduce((s, e) => s + e.amount, 0), 2);
   const lineSum = () => round(parsed.reduce((s, l) => s + l.total, 0), 2);
   const target = totals.subtotal !== undefined ? round(totals.subtotal - extrasSum + (totals.globalDiscount ?? 0), 2) : undefined;
+  if (method === 'ocr') applyExactConvention(parsed, target);
   if (target !== undefined && parsed.some((l) => !l.validated)) repairWithSubtotal(parsed, rows, header, target);
   // Tickets: artículos sueltos ("QUESO CREMA 2KG   8,78 A") que sólo se pueden validar con la base imponible o el total
   if (amountOnly.length && !sumMatches(lineSum(), target ?? NaN)) {
@@ -3126,6 +3446,8 @@ export function parseInvoiceReading(input: { text: string; lines?: string[] }, m
 
   // 7) Salida
   const lines: Line[] = parsed.map((l) => {
+    // Un EAN-13 (código de barras con su dígito de control) nunca forma parte de la descripción
+    l.description = collapseSpaces(l.description.split(' ').filter((t) => !isEan13(t)).join(' '));
     if (method === 'ocr') l.description = fixOcrDescription(l.description);
     const base = {
       description: l.description || 'Producto sin descripción',

@@ -13,7 +13,10 @@
  *  4. Estimación de la inclinación por varianza del perfil de proyección en ±8° y enderezado.
  *  5. Escalado para que las líneas de texto midan ~40 px (a Tesseract le cuesta el texto pequeño).
  *  6. Opcional: binarización adaptativa de Sauvola (para una segunda lectura cuando la primera no cuadra).
+ * Para facturas (ocrPipeline.prepareInvoicePage) además: borrado de los filetes de las tablas (`removeRules`) y
+ * localización de las zonas de texto claro sobre fondo oscuro (`invertDarkRegions`), que se leen aparte invertidas.
  */
+import { normalizeMenuPolarity } from './menuImage';
 
 export interface GrayImage {
   width: number;
@@ -837,8 +840,15 @@ export function estimateLineHeight(img: GrayImage): number | undefined {
  */
 export function removeRules(img: GrayImage, lineHeight: number): number {
   const { width: w, height: h, data: d } = img;
-  const t = otsuThreshold(histogram(img, d.length > 4e6 ? 3 : 1));
-  const maxThick = Math.max(2, Math.round(lineHeight * 0.18));
+  // Umbral a medio camino entre el de Otsu y el papel: los filetes finos salen grises (antialias, desenfoque, filetes
+  // de color) y con el de Otsu se escapan; el texto no forma tramos tan largos aunque cuente como oscuro
+  const t = Math.min(215, Math.round((otsuThreshold(histogram(img, d.length > 4e6 ? 3 : 1)) + 255) / 2));
+  const maxThick = Math.max(3, Math.round(lineHeight * 0.25));
+  // Nada de tinta a los lados del tramo (a su propio grosor): en un texto muy desenfocado las letras se tocan y forman
+  // tramos largos, pero encima y debajo (o a izquierda y derecha) siguen los trazos de las letras; junto a un filete
+  // sólo hay papel o el halo gris del desenfoque
+  const off = Math.max(3, Math.round(maxThick * 0.75));
+  const light = (x: number, y: number) => x < 0 || y < 0 || x >= w || y >= h || d[y * w + x] > t;
   const mask = new Uint8Array(w * h);
   let removed = 0;
   // Horizontales
@@ -861,7 +871,7 @@ export function removeRules(img: GrayImage, lineHeight: number): number {
       const on = y < h && mask[y * w + x] === 1;
       if (on && start < 0) start = y;
       if (!on && start >= 0) {
-        if (y - start <= maxThick) {
+        if (y - start <= maxThick && light(x, start - off) && light(x, y - 1 + off)) {
           for (let k = start; k < y; k++) {
             d[k * w + x] = 255;
             removed++;
@@ -892,7 +902,7 @@ export function removeRules(img: GrayImage, lineHeight: number): number {
       const on = x < w && mask[row + x] === 1;
       if (on && start < 0) start = x;
       if (!on && start >= 0) {
-        if (x - start <= maxThick) {
+        if (x - start <= maxThick && light(start - off, y) && light(x - 1 + off, y)) {
           for (let k = start; k < x; k++) {
             d[row + k] = 255;
             removed++;
@@ -903,6 +913,145 @@ export function removeRules(img: GrayImage, lineHeight: number): number {
     }
   }
   return removed;
+}
+
+// ───────────────────────────── Texto claro sobre fondo oscuro ─────────────────────────────
+
+/**
+ * Invierte las zonas de fondo oscuro (bandas con la razón social, cabeceras de tabla en negativo): Tesseract no lee
+ * texto claro sobre fondo oscuro. Se trabaja por bloques de ¼ de línea con la proporción de píxeles oscuros de cada
+ * uno: las zonas crecen desde bloques macizos (fondo) a través de bloques mayoritariamente oscuros (fondo con letras
+ * claras). Sólo se invierten zonas de al menos 8 líneas de ancho y ¾ de línea de alto con mucho fondo macizo y con
+ * margen liso encima y debajo del texto: el texto en negrita (o muy desenfocado) sobre papel blanco no lo tiene. Modifica la imagen en su sitio. Devuelve el
+ * número de píxeles invertidos y, en `rectsOut`, el rectángulo de cada zona invertida.
+ */
+export function invertDarkRegions(img: GrayImage, lineHeight: number, rectsOut?: Rect[]): number {
+  const { width: w, height: h, data: d } = img;
+  const t = otsuThreshold(histogram(img, d.length > 4e6 ? 3 : 1));
+  const bs = Math.max(4, Math.round(lineHeight / 4));
+  const bw = Math.ceil(w / bs);
+  const bh = Math.ceil(h / bs);
+  const frac = new Float32Array(bw * bh);
+  for (let by = 0; by < bh; by++) {
+    const y0 = by * bs;
+    const y1 = Math.min(h, y0 + bs);
+    for (let bx = 0; bx < bw; bx++) {
+      const x0 = bx * bs;
+      const x1 = Math.min(w, x0 + bs);
+      let dark = 0;
+      for (let y = y0; y < y1; y++) {
+        const row = y * w;
+        for (let x = x0; x < x1; x++) if (d[row + x] <= t) dark++;
+      }
+      frac[by * bw + bx] = dark / ((y1 - y0) * (x1 - x0));
+    }
+  }
+  const SOLID = 0.92;
+  const GROW = 0.55;
+  const seen = new Uint8Array(bw * bh);
+  // Una banda ocupa el ancho de una tabla o de un bloque de texto (no el de una palabra en negrita desenfocada)
+  const minW = Math.ceil((lineHeight * 8) / bs);
+  const minH = Math.ceil((lineHeight * 0.75) / bs);
+  const regions: number[][] = [];
+  const stack: number[] = [];
+  for (let start = 0; start < bw * bh; start++) {
+    if (frac[start] < SOLID || seen[start]) continue;
+    const cells: number[] = [];
+    let solid = 0;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    stack.push(start);
+    seen[start] = 1;
+    while (stack.length) {
+      const c = stack.pop() as number;
+      cells.push(c);
+      if (frac[c] >= SOLID) solid++;
+      const cx = c % bw;
+      const cy = (c - cx) / bw;
+      minX = Math.min(minX, cx);
+      maxX = Math.max(maxX, cx);
+      minY = Math.min(minY, cy);
+      maxY = Math.max(maxY, cy);
+      const nb = [cx > 0 ? c - 1 : -1, cx < bw - 1 ? c + 1 : -1, cy > 0 ? c - bw : -1, cy < bh - 1 ? c + bw : -1];
+      for (const n of nb) {
+        if (n >= 0 && !seen[n] && frac[n] >= GROW) {
+          seen[n] = 1;
+          stack.push(n);
+        }
+      }
+    }
+    const bwBox = maxX - minX + 1;
+    const bhBox = maxY - minY + 1;
+    if (bwBox < minW || bhBox < minH) continue;
+    // Cada fila de bloques, de su primer a su último bloque de la zona: así entran las letras claras (huecos)
+    const lo = new Array<number>(bhBox).fill(Infinity);
+    const hi = new Array<number>(bhBox).fill(-Infinity);
+    for (const c of cells) {
+      const cx = c % bw;
+      const r = (c - cx) / bw - minY;
+      lo[r] = Math.min(lo[r], cx);
+      hi[r] = Math.max(hi[r], cx);
+    }
+    const filled: number[] = [];
+    for (let r = 0; r < bhBox; r++) for (let x = lo[r]; x <= hi[r]; x++) filled.push((minY + r) * bw + x);
+    // Banda: casi rellena y con mucho fondo macizo (no el contorno de un rótulo en negrita ni una mancha alargada)
+    if (filled.length < bwBox * bhBox * 0.6 || solid < filled.length * 0.4) continue;
+    // …y con margen de fondo liso encima y debajo del texto: su primera y su última fila de bloques son casi macizas
+    const solidShare = (r: number) => {
+      let n = 0;
+      for (let x = lo[r]; x <= hi[r]; x++) if (frac[(minY + r) * bw + x] >= SOLID) n++;
+      return n / Math.max(1, hi[r] - lo[r] + 1);
+    };
+    // (la fila del borde puede quedar a medias con la rejilla de bloques: vale también la siguiente hacia dentro)
+    const top = Math.max(solidShare(0), bhBox > 2 ? solidShare(1) : 0);
+    const bottom = Math.max(solidShare(bhBox - 1), bhBox > 2 ? solidShare(bhBox - 2) : 0);
+    if (top < 0.7 || bottom < 0.7) continue;
+    regions.push(filled);
+  }
+  const total = regions.reduce((a, r) => a + r.length, 0);
+  // Más de un tercio de la página "oscura": no es una banda, es una foto mal recortada o un fondo sin aplanar
+  if (!total || total > bw * bh * 0.33) return 0;
+  const inRegion = new Uint8Array(bw * bh);
+  for (const cells of regions) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const c of cells) {
+      inRegion[c] = 1;
+      const cx = c % bw;
+      const cy = (c - cx) / bw;
+      minX = Math.min(minX, cx);
+      maxX = Math.max(maxX, cx);
+      minY = Math.min(minY, cy);
+      maxY = Math.max(maxY, cy);
+    }
+    rectsOut?.push({ x0: minX * bs, y0: minY * bs, x1: Math.min(w, (maxX + 1) * bs), y1: Math.min(h, (maxY + 1) * bs) });
+  }
+  let inverted = 0;
+  for (const cells of regions) {
+    for (const c of cells) {
+      const cx = c % bw;
+      const cy = (c - cx) / bw;
+      // Bloques del borde: sólo se aclara el fondo oscuro; el papel que asoma se queda blanco (si no, quedaría un
+      // marco negro alrededor de la banda que Tesseract confunde con texto)
+      const edge = cx === 0 || cy === 0 || cx === bw - 1 || cy === bh - 1 || !inRegion[c - 1] || !inRegion[c + 1] || !inRegion[c - bw] || !inRegion[c + bw];
+      const y1 = Math.min(h, (cy + 1) * bs);
+      const x1 = Math.min(w, (cx + 1) * bs);
+      for (let y = cy * bs; y < y1; y++) {
+        const row = y * w;
+        for (let x = cx * bs; x < x1; x++) {
+          const v = d[row + x];
+          if (edge && v > t) continue;
+          d[row + x] = 255 - v;
+          inverted++;
+        }
+      }
+    }
+  }
+  return inverted;
 }
 
 // ───────────────────────────── Binarización adaptativa ─────────────────────────────
@@ -992,6 +1141,8 @@ export interface OcrPrepOptions {
   denoise?: 'auto' | boolean;
   /** Binarizar con Sauvola (por defecto no: Tesseract umbraliza bien una imagen ya normalizada). */
   binarize?: boolean;
+  /** Cartas: dejar texto oscuro sobre fondo claro (pizarras, cartas negras, recuadros oscuros) antes de preparar. */
+  normalizePolarity?: boolean;
 }
 
 export interface OcrPrepInfo {
@@ -1011,7 +1162,7 @@ export interface OcrPrepInfo {
 
 /** Prepara una imagen en escala de grises para OCR (ver el canal completo en la cabecera del módulo). */
 export function prepareForOcr(input: GrayImage, opts: OcrPrepOptions = {}): { image: GrayImage; info: OcrPrepInfo } {
-  let img = input;
+  let img = opts.normalizePolarity ? normalizeMenuPolarity(input).image : input;
   const target = opts.targetLineHeight ?? 36;
   const maxUp = opts.maxUpscale ?? 2.5;
   const maxPixels = opts.maxPixels ?? 24e6;
@@ -1020,7 +1171,9 @@ export function prepareForOcr(input: GrayImage, opts: OcrPrepOptions = {}): { im
     let scale = 1;
     if (lineHeight !== undefined) {
       if (lineHeight < target * 0.8) scale = Math.min(maxUp, target / lineHeight);
-      else if (lineHeight > target * 2.5) scale = (target * 1.5) / lineHeight;
+      // Reducir, como mucho a la mitad: una estimación de interlineado errónea (fondos con textura, iconos
+      // grandes) no puede dejar la foto ilegible (se llegó a ver ×0,25).
+      else if (lineHeight > target * 2.5) scale = Math.max(0.5, (target * 1.5) / lineHeight);
     }
     scale = Math.min(scale, Math.sqrt(maxPixels / (w * h)), maxSide / Math.max(w, h));
     return Math.abs(scale - 1) < 0.08 ? 1 : scale;

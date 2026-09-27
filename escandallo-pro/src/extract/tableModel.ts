@@ -67,6 +67,8 @@ export interface TWord extends Box {
   num?: boolean;
   /** Decimales escritos del número (0 en "12", 3 en "4,235"). */
   dec?: number;
+  /** Valor del número. */
+  value?: number;
   /** Índice de celda dentro de la fila: palabras con el mismo índice están en la misma celda. */
   seg: number;
 }
@@ -96,6 +98,8 @@ export interface TableColumn extends Box {
   rows: number;
   numeric: number;
   texty: number;
+  /** Filas con un número no entero (con parte decimal distinta de cero) en la columna. */
+  fractional?: number;
 }
 
 export interface TableModel {
@@ -121,8 +125,44 @@ function labelKey(text: string): string {
 const RE_PRICE_WORD = / precio| prec | pr unit| p unit| p u | pu | unitario| unit | tarifa| pvp | p v p |€\s?\/|eur ?\/|\/ ?(?:ud|kg|u) /;
 const RE_TOTAL_WORD = / importe| total| neto | base | subtotal| valor | imp | amount/;
 
+/** Palabras de etiqueta que el OCR suele leer con una letra cambiada, de más o de menos ("oncepto", "Subtetal"). */
+const LABEL_WORDS = [
+  'descripcion', 'articulo', 'concepto', 'producto', 'denominacion', 'detalle', 'designacion', 'mercancia', 'cantidad', 'unidades',
+  'bultos', 'precio', 'unitario', 'importe', 'subtotal', 'total', 'codigo', 'referencia', 'kilos', 'tarifa', 'descuento',
+];
+
+function editDistance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
 /** Tipo de columna de una etiqueta de cabecera ("P. Unit." → precio, "Neto kg" → cantidad en kg…). */
 export function classifyLabel(text: string): LabelInfo {
+  const exact = classifyExact(text);
+  if (exact.kind) return exact;
+  // Etiqueta mal leída por el OCR: se corrige la palabra más parecida del vocabulario (una letra; dos si es larga)
+  let changed = false;
+  const fixed = labelKey(text)
+    .trim()
+    .split(' ')
+    .map((w) => {
+      if (w.length < 5) return w;
+      const hit = LABEL_WORDS.find((v) => v !== w && editDistance(w, v, v.length >= 8 ? 2 : 1) <= (v.length >= 8 ? 2 : 1));
+      if (!hit) return w;
+      changed = true;
+      return hit;
+    })
+    .join(' ');
+  return changed ? classifyExact(fixed) : exact;
+}
+
+function classifyExact(text: string): LabelInfo {
   const t = labelKey(text);
   if (t.trim() === '') return {};
   if (/^ (?:lin|linea|l|pos|no|n|#|item|orden) $/.test(t)) return { kind: 'line' };
@@ -182,7 +222,18 @@ function wordKey(text: string): string {
  * una misma celda (cabeceras monoespaciadas con un solo espacio entre columnas) decide el vocabulario.
  */
 export function headerPhrases(words: readonly TWord[]): HeaderPhrase[] {
-  const sorted = [...words].sort((a, b) => a.x0 - b.x0);
+  // OCR: dos etiquetas unidas por una raya en una sola palabra ("Cant——Precio"): se separan repartiendo la X
+  const split = words.flatMap((w) => {
+    const m = /^(\p{L}+\.?)[-—–_]{2,}(\p{L}+\.?)$/u.exec(w.text);
+    if (!m) return [w];
+    const cw = (w.x1 - w.x0) / w.text.length;
+    const second = w.x1 - m[2].length * cw;
+    return [
+      { ...w, text: m[1], x1: w.x0 + m[1].length * cw, seg: w.seg - 0.5 },
+      { ...w, text: m[2], x0: second },
+    ];
+  });
+  const sorted = [...split].sort((a, b) => a.x0 - b.x0);
   const out: (HeaderPhrase & { keys: string[]; seg: number })[] = [];
   for (const w of sorted) {
     const k = wordKey(w.text);
@@ -449,6 +500,24 @@ export function buildTableModel(phrases: readonly HeaderPhrase[] | undefined, ro
       c.perUnit = p.info.perUnit;
       c.amount = p.info.amount;
     });
+    // Etiqueta de piezas ("Unidades", "Bultos") sobre una columna de cantidades fraccionarias cuando la propia etiqueta
+    // también cubre la columna de su izquierda, sin etiqueta y de enteros (etiquetas pegadas o mal leídas por el OCR,
+    // "Unidades ATA."): la etiqueta es de esa columna
+    assign.forEach((pi, j) => {
+      const c = columns[j];
+      const left = columns[j - 1];
+      if (pi < 0 || !left || left.kind || (c.kind !== 'uds' && c.kind !== 'bultos')) return;
+      const p = phrases[pi];
+      const fractionalCol = (c.fractional ?? 0) >= Math.max(2, c.numeric * 0.6);
+      const intLeft = left.numeric >= Math.max(2, c.numeric * 0.6) && !left.fractional && left.texty <= left.rows * 0.2;
+      if (!fractionalCol || !intLeft || overlap(p, left) <= 0) return;
+      left.kind = c.kind;
+      left.label = c.label;
+      left.unit = c.unit;
+      c.kind = undefined;
+      c.label = undefined;
+      c.unit = undefined;
+    });
   }
   typeByData(columns, unitRows);
   return { columns, cw, labeled };
@@ -468,6 +537,7 @@ function fillStats(columns: TableColumn[], rows: readonly TRow[], opts: BuildMod
   for (const r of rows) {
     const seen = new Set<number>();
     const num = new Set<number>();
+    const frac = new Set<number>();
     const txt = new Set<number>();
     const unitW = new Set<number>();
     for (const w of r.words) {
@@ -475,12 +545,14 @@ function fillStats(columns: TableColumn[], rows: readonly TRow[], opts: BuildMod
       const j = columnIndex(columns, w);
       if (j < 0) continue;
       seen.add(j);
+      if (w.num && w.value !== undefined && !Number.isInteger(w.value)) frac.add(j);
       if (w.num) num.add(j);
       else if (opts.isUnitWord(w.text)) unitW.add(j);
       else if (/\p{L}{2,}/u.test(w.text)) txt.add(j);
     }
     for (const j of seen) columns[j].rows++;
     for (const j of num) columns[j].numeric++;
+    for (const j of frac) columns[j].fractional = (columns[j].fractional ?? 0) + 1;
     for (const j of txt) columns[j].texty++;
     for (const j of unitW) unitRows[j]++;
   }

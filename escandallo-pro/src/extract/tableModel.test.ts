@@ -74,6 +74,18 @@ describe('classifyLabel: sinónimos de las cabeceras', () => {
     expect(info.kind).toBe(kind);
     if (unit) expect(info.unit ?? info.perUnit).toBe(unit);
   });
+  it.each([
+    ['oncepto', 'desc'],
+    ['Subtetal', 'total'],
+    ['Cantidaa', 'qty'],
+    ['Descripcíón del artícuIo', 'desc'],
+  ])('etiqueta mal leída por el OCR: %s → %s', (label, kind) => {
+    expect(classifyLabel(label).kind).toBe(kind);
+  });
+  it('palabras cortas o lejanas no se corrigen', () => {
+    expect(classifyLabel('Notas').kind).toBeUndefined();
+    expect(classifyLabel('Observaciones').kind).toBeUndefined();
+  });
   it('precio por kilo', () => {
     expect(classifyLabel('Precio/kg')).toEqual({ kind: 'price', perUnit: 'kg' });
   });
@@ -94,6 +106,14 @@ describe('headerPhrases: etiquetas de varias palabras', () => {
   it('dos descuentos seguidos no se unen', () => {
     const phrases = headerPhrases(textRow('DTO 1 DTO 2 IMPORTE').words);
     expect(phrases.map((p) => p.text)).toEqual(['DTO 1', 'DTO 2', 'IMPORTE']);
+  });
+  it('OCR: dos etiquetas unidas por una raya se separan ("Cant——Precio neto")', () => {
+    const phrases = headerPhrases(textRow('Cant——Precio neto    Importe').words);
+    expect(phrases.map((p) => [p.text, p.info.kind])).toEqual([
+      ['Cant', 'qty'],
+      ['Precio neto', 'price'],
+      ['Importe', 'total'],
+    ]);
   });
   it('etiquetas en celdas distintas nunca se unen', () => {
     const phrases = headerPhrases(textRow('Precio    unitario').words);

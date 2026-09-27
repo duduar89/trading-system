@@ -115,9 +115,19 @@ export function fixDigitsInWord(token: string): string | undefined {
   return undefined;
 }
 
+/** "BARRADE" → "BARRA DE": preposición pegada al final de una palabra conocida (en mayúsculas o minúsculas). */
+function splitGluedPreposition(token: string): string[] | undefined {
+  if (!/^\p{L}{6,}$/u.test(token) || knownWord(token)) return undefined;
+  const m = /^(\p{L}{4,}?)(del|de|con|en)$/iu.exec(token);
+  if (!m || !knownWord(m[1])) return undefined;
+  return [m[1], m[2]];
+}
+
 function fixWord(token: string): string[] {
   const inWord = fixDigitsInWord(token) ?? fixShapeConfusions(token);
   if (inWord) return [inWord];
+  const prep = splitGluedPreposition(token);
+  if (prep) return prep;
   const glued = GLUED_PACK.exec(token);
   if (glued) return [...fixWord(glued[1]), glued[2]];
   const sl = GLUED_SL.exec(token);
@@ -186,7 +196,10 @@ export function fixLowercaseUnits(tokens: string[]): string[] {
   return tokens.map((t, i) => {
     const prev = fold(tokens[i - 1] ?? '').replace(/[.:º°#]/g, '');
     if (/^(ref|cod|codigo|art|lote|n|no)$/.test(prev)) return t;
-    const cl = /^(\d+(?:[.,]\d+)?)([cm])1$/i.exec(t);
+    // "5I" / "5|": la «l» de litros leída como «I» o «|» (nunca es otra cosa pegada a una cifra)
+    const bigI = /^(\d+(?:[.,]\d+)?)[I|]$/.exec(t);
+    if (bigI && COMMON_LITERS.has(numValue(bigI[1]))) return `${bigI[1]}${lower ? 'l' : 'L'}`;
+    const cl = /^(\d+(?:[.,]\d+)?)([cm])[1I|]$/i.exec(t);
     if (cl) return `${cl[1]}${cl[2]}${cl[2] === cl[2].toUpperCase() ? 'L' : 'l'}`;
     const k9 = /^(\d+(?:[.,]\d+)?)([kK])9$/.exec(t);
     if (k9) return `${k9[1]}${k9[2]}g`;
@@ -202,7 +215,7 @@ export function fixLowercaseUnits(tokens: string[]): string[] {
   });
 }
 
-/** Confusiones de formas del OCR dentro de palabras: "rn" ↔ "m", "m" ↔ "n" ("Carme" → "Carne"), sólo hacia una palabra conocida. */
+/** Confusiones de formas del OCR dentro de palabras: "rn" ↔ "m", "m" ↔ "n", "i" ↔ "l" ("Carme" → "Carne", "Musio" → "Muslo"), sólo hacia una palabra conocida. */
 export function fixShapeConfusions(token: string): string | undefined {
   if (!/^\p{L}{3,}$/u.test(token) || knownWord(token)) return undefined;
   const swaps: [RegExp, string][] = [
@@ -214,6 +227,10 @@ export function fixShapeConfusions(token: string): string | undefined {
     [/n/g, 'm'],
     [/M/g, 'N'],
     [/N/g, 'M'],
+    [/i/g, 'l'],
+    [/l/g, 'i'],
+    [/I/g, 'L'],
+    [/L/g, 'I'],
   ];
   for (const [re, rep] of swaps) {
     for (const m of token.matchAll(re)) {
@@ -231,11 +248,32 @@ export function fixShapeConfusions(token: string): string | undefined {
  * cuando el resto es una palabra conocida o va entero en mayúsculas.
  */
 export function stripLeadingJunk(token: string): string {
-  const punct = /^[¡!|_~'"`´^*•·.,:;¦]+(?=\p{L})/u.exec(token);
+  const punct = /^[¡!|_~'"`´^*•·.,:;¦\[\]]+(?=\p{L})/u.exec(token);
   if (punct) return token.slice(punct[0].length);
   const m = /^\p{Ll}(\p{Lu}\p{L}{2,})$/u.exec(token);
   if (m && (knownWord(m[1]) || m[1] === m[1].toUpperCase())) return m[1];
+  // Mayúscula de más pegada a una palabra conocida ("NMORTADELA", "RMANTEQUILLA")
+  if (/^\p{Lu}{5,}$/u.test(token) && !knownWord(token) && knownWord(token.slice(1))) return token.slice(1);
   return token;
+}
+
+/**
+ * Restos del OCR al final de una descripción en mayúsculas: palabras cortas en minúsculas o mezcladas ("Te Tes",
+ * "mes") y ristras de signos y letras ("..-.enceunEe"). Sólo se quitan del final y nunca la primera palabra.
+ */
+export function stripTrailingJunk(tokens: string[]): string[] {
+  const junk = (t: string) => {
+    const l = t.replace(/[^\p{L}]/gu, '');
+    if (/[.\-_~]{2,}/.test(t) && /\p{Ll}/u.test(t)) return true;
+    return l.length > 0 && l.length <= 4 && l !== l.toUpperCase() && !/\d/.test(t) && !knownWord(l) && !PACK_WORDS.has(fold(l));
+  };
+  let end = tokens.length;
+  while (end > 1 && junk(tokens[end - 1])) end--;
+  if (end === tokens.length) return tokens;
+  const letters = tokens.slice(0, end).join('').replace(/[^\p{L}]/gu, '');
+  const upper = letters.replace(/[^\p{Lu}]/gu, '').length;
+  if (letters.length < 6 || upper < letters.length * 0.8) return tokens;
+  return tokens.slice(0, end);
 }
 
 /** "FRESOÓN" → "FRESÓN": la misma vocal leída dos veces, con y sin tilde. */
@@ -262,7 +300,7 @@ export function fixOcrDescription(desc: string): string {
   const raw = desc.split(/\s+/).filter(Boolean).map(dedupeAccentedVowel);
   if (raw.length) raw[0] = stripLeadingJunk(raw[0]);
   const tokens = raw.flatMap(fixWord).map((t) => (/^\d+(?:[.,]\d+)?nm$/i.test(t) ? t.replace(/n(m)$/i, (_, x: string) => `${x}${x}`) : t));
-  return fixRomanCategory(fixTrailingUnitSix(fixLowercaseUnits(tokens))).join(' ');
+  return fixRomanCategory(fixTrailingUnitSix(fixLowercaseUnits(stripTrailingJunk(tokens)))).join(' ');
 }
 
 const GLUE_TAIL = ['a', 'al', 'de', 'del', 'con', 'y', 'en'];

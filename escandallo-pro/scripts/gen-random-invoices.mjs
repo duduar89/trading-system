@@ -1594,9 +1594,9 @@ export function generateInvoice(seed, opts = {}) {
 // ───────────────────────────── Renderizado a PDF ─────────────────────────────
 
 /** Renderiza la factura a PDF con Chromium (page.pdf). Si una página fija se desborda, regenera con menos filas. */
-export async function renderInvoicePdf(browser, seed) {
-  let scale = 1;
-  let fontScale = 1;
+export async function renderInvoicePdf(browser, seed, variant = {}) {
+  let scale = variant.capacityScale ?? 1;
+  let fontScale = variant.fontScale ?? 1;
   for (let attempt = 0; attempt < 10; attempt++) {
     const doc = generateInvoice(seed, { capacityScale: scale, fontScale });
     // Se mide con el ancho imprimible real (el alto de las páginas fijas depende de cómo se partan las filas)

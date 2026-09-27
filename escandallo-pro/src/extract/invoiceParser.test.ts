@@ -288,4 +288,12 @@ describe('combinación de lecturas (varias pasadas de OCR)', () => {
     const merged = mergeInvoiceReadings([readA, readB]).invoice;
     expect(invoiceQuality(merged)).toBeGreaterThan(invoiceQuality(readA.invoice));
   });
+
+  it('entre lecturas de la misma línea gana la descripción con más palabras conocidas', () => {
+    const lines = (desc: string) => [...base, `${desc}   4,602   KG   33,50   154,17`, 'SECRETO IBERICO CEBO     3,400   KG   16,80    57,12', 'Base imponible   211,29'].join('\n');
+    const bad = parseInvoiceReading({ text: lines('SOLOMILLO TERNFRA NAC.') }, 'ocr');
+    const good = parseInvoiceReading({ text: lines('SOLOMILLO TERNERA NAC.') }, 'ocr');
+    const merged = mergeInvoiceReadings([bad, good]).invoice;
+    expect(merged.lines[0].description).toBe('SOLOMILLO TERNERA NAC');
+  });
 });
