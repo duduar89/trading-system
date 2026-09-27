@@ -559,9 +559,21 @@ async function closeModal() {
   await dlg.waitFor({ state: 'detached', timeout: 5000 }).catch(() => undefined);
 }
 
-async function confirmCurrentInvoice() {
-  const btn = page.getByRole('button', { name: /Confirmar y actualizar precios|Volver a aplicar precios/ });
+/**
+ * Pulsa «Confirmar». `duplicate`: se espera (y se acepta) la confirmación expresa de una factura repetida; si aparece
+ * sin esperarla, o no aparece cuando debe, se anota el fallo.
+ */
+async function confirmCurrentInvoice({ duplicate = false } = {}) {
+  // En móvil el botón se llama «Confirmar · N precios» (el texto largo está oculto).
+  const btn = page.getByRole('button', { name: /Confirmar y actualizar precios|Volver a aplicar precios|Confirmar · \d+ precios?/ });
   await btn.click();
+  await page.getByRole('dialog').first().waitFor({ timeout: 20_000 });
+  const dup = page.getByRole('dialog').filter({ hasText: '¿Confirmar una factura repetida?' });
+  if (await dup.isVisible().catch(() => false)) {
+    check(duplicate, `pide confirmar una factura repetida sin serlo: ${norm(await dup.innerText()).slice(0, 200)}`);
+    if (duplicate) await shot('confirmar-repetida', { fullPage: false });
+    await dup.getByRole('button', { name: 'Confirmar igualmente' }).click();
+  } else check(!duplicate, 'no pide confirmación expresa antes de confirmar una factura repetida');
   // Si hay líneas con unidad incompatible aparece un aviso previo: se confirma igualmente (se anota).
   const mismatch = page.getByRole('dialog').filter({ hasText: 'Hay precios que no se podrán aplicar' });
   if (await mismatch.isVisible().catch(() => false)) {
@@ -659,6 +671,11 @@ try {
       check(row.includes(fmtEur(amount)), `fila ${e.number}: no muestra el total ${fmtEur(amount)} («${row}»)`);
     }
     check(texts.filter((t) => t.includes(EXPECTED.carnes.number)).length === 2, 'la foto de la factura de carnes debería aparecer como segunda factura CSG-26-004187');
+    check(
+      texts.filter((t) => t.includes(EXPECTED.carnes.number) && /repetida/i.test(t)).length === 2,
+      'la lista debería marcar como «Repetida» el PDF y la foto de la factura de carnes',
+    );
+    check(texts.filter((t) => /repetida/i.test(t)).length === 2, 'sólo las dos facturas de carnes deberían marcarse como repetidas');
     check((await page.getByRole('status').filter({ hasText: 'Leyendo facturas' }).count()) === 0, 'el panel de la cola sigue visible al terminar');
     await shot('facturas-por-revisar');
   }, { critical: true });
@@ -727,15 +744,24 @@ try {
     checkLineCards('foto', cards, EXPECTED.foto);
     check(cards.every((c) => c.status === 'vinculado'), `todas deberían venir vinculadas a los productos de la factura PDF: ${cards.map((c) => `${c.description}=${c.status}`).join(', ')}`);
     check(cards.every((c) => /sin cambio/.test(c.text)), 'cada línea debería indicar «= sin cambio» respecto al precio vigente');
-    const pageText = norm(await page.locator('main').innerText());
-    check(/duplicad|ya (está|has) (confirmad|subid)|misma factura/i.test(pageText), 'no avisa de que es la misma factura (proveedor y nº) que otra ya confirmada');
+    // Aviso claro de factura repetida (mismo proveedor y nº que la del PDF, ya confirmada) con la opción de eliminar la copia
+    // o de verla; confirmar pide una confirmación expresa (paso siguiente).
+    const dupTitle = page.locator('main').getByText('Parece repetida: ya confirmaste esta factura');
+    const dupShown = await dupTitle.isVisible().catch(() => false);
+    check(dupShown, 'no avisa de que es la misma factura (proveedor y nº) que otra ya confirmada');
+    if (dupShown) {
+      const callout = norm(await page.locator('main').innerText());
+      check(callout.includes(`La factura nº ${EXPECTED.carnes.number} de ${EXPECTED.carnes.supplierName}`), 'el aviso no identifica la factura original (nº y proveedor)');
+      check(await page.getByRole('button', { name: 'Eliminar esta copia' }).isVisible(), 'el aviso no ofrece «Eliminar esta copia»');
+      check(await page.getByRole('button', { name: 'Ver la otra' }).isVisible(), 'el aviso no ofrece «Ver la otra»');
+    }
     await shot('revision-foto-duplicada');
     const before = await dbAll('pricePoints');
-    const res = await confirmCurrentInvoice();
+    const res = await confirmCurrentInvoice({ duplicate: true });
     check(res.created === 0, `la foto no debe crear productos (creó ${res.created})`);
     check(res.updated === 6, `precios aplicados: ${res.updated} (6)`);
     check(/6 ingredientes mantienen el mismo precio/.test(res.text), `el resumen debería decir que 6 mantienen el precio: ${res.text.slice(0, 300)}`);
-    check(!/Cambios de precio/.test(res.text), 'no debería listar cambios de precio');
+    check(!/Cambios de precio/i.test(res.text), 'no debería listar cambios de precio'); // el rótulo va en mayúsculas por CSS
     await shot('confirmada-foto', { fullPage: false });
     await closeModal();
     products = await dbAll('products');
@@ -761,9 +787,11 @@ try {
     // Vincular «PATATA NUEVA SACO 10KG» con la patata que ya existe, desde el selector.
     const line = page.locator('[data-line-id]').filter({ has: page.locator('[data-field="description"][value="PATATA NUEVA SACO 10KG"]') });
     await line.getByTitle('Elegir ingrediente para esta línea').click();
-    const search = page.getByRole('combobox');
-    await search.fill('patata agria');
-    await page.getByRole('option', { name: new RegExp(potato?.name ?? 'Patata', 'i') }).first().click();
+    // Las unidades de cada línea también son «combobox» (select): se busca dentro del panel del selector.
+    const picker = page.getByRole('dialog', { name: 'Elegir ingrediente para esta línea' });
+    await picker.getByRole('combobox', { name: 'Buscar ingrediente' }).fill('patata agria');
+    await picker.getByRole('option', { name: new RegExp(potato?.name ?? 'Patata', 'i') }).first().click();
+    await picker.waitFor({ state: 'detached' });
     await page.waitForTimeout(200);
     cards = await readLineCards();
     const linked = cards.find((c) => c.description === 'PATATA NUEVA SACO 10KG');
@@ -773,7 +801,8 @@ try {
     // Ignorar las bolsas de basura (no es comida).
     const bags = page.locator('[data-line-id]').filter({ has: page.locator('[data-field="description"][value="BOLSAS BASURA 85X105 20U"]') });
     await bags.getByTitle('Elegir ingrediente para esta línea').click();
-    await page.getByRole('option', { name: /Ignorar línea/ }).click();
+    await picker.getByRole('option', { name: /Ignorar línea/ }).click();
+    await picker.waitFor({ state: 'detached' });
     await page.waitForTimeout(200);
     check(/Línea ignorada/.test(norm(await bags.innerText())), 'las bolsas no aparecen como ignoradas');
     await shot('revision-csv');
@@ -886,7 +915,7 @@ try {
     check(/▲\s*Sube\s*27/.test(tomatoCard?.text ?? '') || /27[,.]\d\s*%/.test(tomatoCard?.text ?? ''), 'la línea del tomate debería mostrar la subida del 27 %');
     await shot('revision-fruteria-2');
     const res = await confirmCurrentInvoice();
-    check(/Cambios de precio/.test(res.text) && /Tomate pera/i.test(res.text), 'el resumen debería listar el cambio de precio del tomate');
+    check(/Cambios de precio/i.test(res.text) && /Tomate pera/i.test(res.text), 'el resumen debería listar el cambio de precio del tomate'); // rótulo en mayúsculas por CSS
     check(res.updated === 8 && res.created === 0, `resumen: ${res.updated} actualizados, ${res.created} nuevos (8 y 0)`);
     check(/7 ingredientes mantienen el mismo precio/.test(res.text), 'el resumen debería decir que 7 mantienen el precio');
     await shot('confirmada-fruteria-2', { fullPage: false });
@@ -945,8 +974,9 @@ try {
     const tomato = findProduct(/^tomate pera$/);
     check(dup && near(dup.pricePerBase, 1.9), 'no se creó el duplicado con precio 1,90');
     check(dup?.category === 'verdura' && dup?.baseUnit === 'kg', `el duplicado debería autocompletarse como verdura/kg (${dup?.category}/${dup?.baseUnit})`);
-    await page.getByLabel(`Seleccionar ${dup?.name}`).check();
-    await page.getByLabel(`Seleccionar ${tomato?.name}`).check();
+    // getByRole ignora las tarjetas de móvil ocultas (getByLabel encontraría las dos casillas de cada ingrediente).
+    await page.getByRole('checkbox', { name: `Seleccionar ${dup?.name}`, exact: true }).check();
+    await page.getByRole('checkbox', { name: `Seleccionar ${tomato?.name}`, exact: true }).check();
     await page.getByRole('button', { name: 'Fusionar', exact: true }).click();
     const mdlg = page.getByRole('dialog').filter({ hasText: 'Fusionar ingredientes duplicados' });
     await mdlg.getByRole('radio', { name: new RegExp(`^.*${tomato?.name}`) }).first().click();

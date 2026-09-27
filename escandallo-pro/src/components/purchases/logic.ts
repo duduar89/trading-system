@@ -232,11 +232,22 @@ function invoiceIdentity(inv: Invoice): InvoiceIdentity {
   return { suppliers, number, date: inv.date ?? '', cents: Math.round(invoiceNetAmount(inv) * 100) };
 }
 
+/** Número de factura con las confusiones típicas del OCR unificadas (O↔0, I/L↔1, S↔5, B↔8, Z↔2, G↔6). */
+function ocrNumberKey(n: string): string {
+  return n.replace(/[OQD]/g, '0').replace(/[IL]/g, '1').replace(/S/g, '5').replace(/B/g, '8').replace(/Z/g, '2').replace(/G/g, '6');
+}
+
 function sameInvoice(a: InvoiceIdentity, b: InvoiceIdentity): boolean {
   if (!a.suppliers.some((s) => b.suppliers.includes(s))) return false;
+  const sameDateAndAmount = !!a.date && a.date === b.date && a.cents > 0 && a.cents === b.cents;
   // En España el número de factura es único por proveedor; si falta en alguna, misma fecha y mismo importe.
-  if (a.number && b.number) return a.number === b.number;
-  return !!a.date && a.date === b.date && a.cents > 0 && a.cents === b.cents;
+  if (a.number && b.number) {
+    // Mismo número de otro año y por otro importe: proveedor que reinicia la numeración cada año, no es la misma.
+    if (a.number === b.number) return !a.date || !b.date || a.date.slice(0, 4) === b.date.slice(0, 4) || a.cents === b.cents;
+    // Número leído distinto sólo por una confusión del OCR (la foto de una factura ya subida), con la misma fecha e importe.
+    return sameDateAndAmount && ocrNumberKey(a.number) === ocrNumberKey(b.number);
+  }
+  return sameDateAndAmount;
 }
 
 /** Sólo cuentan las facturas ya leídas: por revisar o confirmadas. */

@@ -38,6 +38,7 @@ import { useInvoiceQueue } from '../components/purchases/hooks';
 import {
   duplicateInvoiceIds,
   filterInvoices,
+  findDuplicateInvoice,
   invoiceNetAmount,
   invoiceStats,
   pctChange,
@@ -82,12 +83,18 @@ export default function Invoices() {
     const finished = prevRunning.current;
     prevRunning.current = queue?.running ?? null;
     if (!finished || finished === queue?.running) return;
-    void db()
-      .invoices.get(finished)
-      .then((inv) => {
+    void Promise.all([db().invoices.get(finished), db().invoices.toArray()])
+      .then(([inv, all]) => {
         if (!inv) return;
         const name = inv.supplierName || inv.fileName || undefined;
-        if (inv.status === 'revision') toast.success('Factura lista para revisar', name);
+        // La misma factura subida otra vez (el PDF y una foto, por ejemplo): se avisa antes de que alguien la confirme.
+        const dup = inv.status === 'revision' ? findDuplicateInvoice(inv, all) : undefined;
+        if (dup)
+          toast.info(
+            'Parece una factura repetida',
+            `${dup.number ? `La nº ${dup.number}` : 'Una igual'} de ${dup.supplierName || name || 'este proveedor'} ya está en tus facturas${dup.status === 'confirmada' ? ' y confirmada' : ''}. Revísala antes de confirmar.`,
+          );
+        else if (inv.status === 'revision') toast.success('Factura lista para revisar', name);
         else if (inv.status === 'error') toast.error('No se pudo leer una factura', inv.error ?? name);
       })
       .catch(() => undefined);
@@ -467,7 +474,7 @@ function RowActions({
 /** Aviso de factura repetida (el PDF y una foto de la misma factura, por ejemplo). */
 function DuplicateBadge() {
   return (
-    <span title="Hay otra factura con el mismo proveedor y número: si es la misma, elimina una para no contar el gasto dos veces">
+    <span title="Hay otra factura del mismo proveedor con el mismo número (o, sin número, la misma fecha e importe): si es la misma, elimina una para no contar el gasto dos veces">
       <Badge tone="warn" icon={<Copy className="size-3" />}>
         Repetida
       </Badge>

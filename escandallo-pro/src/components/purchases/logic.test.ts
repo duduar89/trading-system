@@ -505,6 +505,22 @@ describe('facturas repetidas (PDF y foto de la misma factura)', () => {
     expect(duplicateInvoiceIds([pdf, next, other]).size).toBe(0);
   });
 
+  it('número mal leído por el OCR (O↔0, B↔8…) con la misma fecha e importe: repetida; con otro importe, no', () => {
+    const misread = invoice({ ...photo, id: 'foto-ocr', number: 'CSG-26-OO41B7' });
+    expect(findDuplicateInvoice(misread, [pdf, misread])?.id).toBe('pdf');
+    expect(findDuplicateInvoice(invoice({ ...misread, subtotal: 590 }), [pdf])).toBeUndefined();
+    expect(findDuplicateInvoice(invoice({ ...misread, date: '2026-09-20' }), [pdf])).toBeUndefined();
+  });
+
+  it('mismo número de otro año y por otro importe (numeración anual): no es la misma', () => {
+    const small = invoice({ ...pdf, id: 'a2025', number: '123', date: '2025-03-02', subtotal: 88.1, status: 'confirmada' });
+    const next = invoice({ ...pdf, id: 'a2026', number: '123', date: '2026-03-05', subtotal: 140.35, status: 'revision' });
+    expect(findDuplicateInvoice(next, [small, next])).toBeUndefined();
+    // Mismo año, o mismo importe aunque la fecha se haya leído mal: sí
+    expect(findDuplicateInvoice(invoice({ ...next, date: '2025-11-30' }), [small])?.id).toBe('a2025');
+    expect(findDuplicateInvoice(invoice({ ...next, subtotal: 88.1 }), [small])?.id).toBe('a2025');
+  });
+
   it('sin número: misma fecha e importe; las que tienen error o se están leyendo no cuentan', () => {
     const noNumber = invoice({ ...photo, id: 'sin-num', number: undefined });
     expect(findDuplicateInvoice(noNumber, [pdf, noNumber])?.id).toBe('pdf');

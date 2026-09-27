@@ -67,7 +67,7 @@ export function ProductPicker({
         ref={triggerRef}
         type="button"
         disabled={disabled}
-        aria-haspopup="listbox"
+        aria-haspopup="dialog"
         aria-expanded={open}
         title={label}
         onClick={() => setOpen((o) => !o)}
@@ -81,7 +81,7 @@ export function ProductPicker({
       </button>
       {open &&
         (desktop ? (
-          <FloatingPanel anchor={triggerRef} onClose={close}>
+          <FloatingPanel anchor={triggerRef} onClose={close} label={label}>
             <PickerPanel {...{ products, seed, selectedId, excludeIds, create, onIgnore }} onSelect={onSelect} onDone={close} />
           </FloatingPanel>
         ) : (
@@ -96,10 +96,12 @@ export function ProductPicker({
 function FloatingPanel({
   anchor,
   onClose,
+  label,
   children,
 }: {
   anchor: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
+  label?: string;
   children: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -151,6 +153,8 @@ function FloatingPanel({
   return createPortal(
     <div
       ref={panelRef}
+      role="dialog"
+      aria-label={label}
       className="fixed z-[60] flex animate-fade-in flex-col overflow-hidden rounded-2xl border border-line bg-elevated shadow-pop"
       style={
         pos
@@ -271,6 +275,7 @@ function PickerPanel({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar ingrediente…"
+          aria-label="Buscar ingrediente"
           role="combobox"
           aria-expanded
           aria-controls={listId}

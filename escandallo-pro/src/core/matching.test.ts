@@ -533,6 +533,13 @@ describe('cleanProductName: facturas reales de un restaurante nuevo (QA compras)
     ['HARINA FUERZA 1KG', 'Harina de fuerza'],
     // Tildes y eñes de palabras fuera del diccionario, como venían escritas
     ['CECINA DE LEÓN', 'Cecina de león'],
+    // «Entero» en un corte sólo indica la pieza sin porcionar (antes «Solomillo de ternera entero»); fuera de un corte distingue
+    ['SOLOMILLO TERNERA NAC. ENTERO', 'Solomillo de ternera'],
+    ['LOMO ENTERO CERDO', 'Lomo de cerdo'],
+    ['PECHUGA POLLO ENTERA', 'Pechuga de pollo'],
+    ['POLLO ENTERO', 'Pollo entero'],
+    ['PIMIENTA NEGRA ENTERA 1KG', 'Pimienta negra entera'],
+    ['LECHE ENTERA 6X1L', 'Leche entera'],
   ])('%s → %s', (input, expected) => {
     expect(cleanProductName(input)).toBe(expected);
   });

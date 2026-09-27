@@ -883,6 +883,13 @@ export function cleanProductName(description: string): string {
 
   // 3) Concordancia con el sustantivo principal
   const headWord = nounFirst ? content[0].w : (content.find((x) => !x.stop && !isAdjective(x.w))?.w ?? content[0].w);
+  // «Entero» en un corte («SOLOMILLO TERNERA ENTERO», «LOMO ENTERO») sólo dice que viene en pieza sin porcionar: el
+  // ingrediente es el corte y la limpieza de la pieza va en su prueba de rendimiento. Donde distingue un producto de sus
+  // partes o de otra variedad se conserva: «Pollo entero», «Leche entera», «Pimienta negra entera», «Salmón fresco entero».
+  if (CUTS.has(headWord)) {
+    for (let i = content.length - 1; i > 0; i--) if (!content[i].stop && (FEMININE_ADJECTIVES[content[i].w] ?? content[i].w) === 'entero') content.splice(i, 1);
+    while (content.length > 1 && content[content.length - 1].stop) content.pop();
+  }
   const feminine = isFeminineNoun(headWord);
   const out: string[] = [];
   let lastNoun: string | undefined;

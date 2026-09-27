@@ -5,8 +5,9 @@ import { useUI } from '../state/store';
 export function Toaster() {
   const toasts = useUI((s) => s.toasts);
   const dismiss = useUI((s) => s.dismissToast);
+  // En móvil, arriba: abajo taparían la navegación y las barras de acción fijas (confirmar factura, carta, selección).
   return (
-    <div className="no-print pointer-events-none fixed inset-x-0 bottom-24 z-[60] flex flex-col items-center gap-2 px-4 lg:bottom-auto lg:left-auto lg:right-6 lg:top-6 lg:items-end">
+    <div className="no-print pointer-events-none fixed inset-x-0 top-[calc(0.75rem+env(safe-area-inset-top))] z-[60] flex flex-col items-center gap-2 px-4 lg:left-auto lg:right-6 lg:top-6 lg:items-end">
       {toasts.map((t) => {
         const Icon = t.tone === 'success' ? CheckCircle2 : t.tone === 'error' ? AlertTriangle : t.tone === 'ai' ? Sparkles : Info;
         return (

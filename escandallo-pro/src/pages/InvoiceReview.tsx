@@ -85,6 +85,7 @@ function InvoiceReviewScreen() {
   const [askReprocess, setAskReprocess] = useState<null | { forceLocal: boolean }>(null);
   const [askDelete, setAskDelete] = useState(false);
   const [askMismatch, setAskMismatch] = useState(false);
+  const [askDuplicate, setAskDuplicate] = useState(false);
   const [showDoc, setShowDoc] = useState(true);
   const [mobileDoc, setMobileDoc] = useState(false);
   const wide = useMediaQuery('(min-width: 1280px)');
@@ -277,9 +278,15 @@ function InvoiceReviewScreen() {
     }
   };
 
-  const onConfirmClick = () => {
+  const confirmOrAskMismatch = () => {
     if (mismatches > 0) setAskMismatch(true);
     else void doConfirm();
+  };
+
+  // Confirmar la copia de una factura ya confirmada contaría su gasto dos veces: se pide confirmación expresa.
+  const onConfirmClick = () => {
+    if (!confirmed && duplicate?.status === 'confirmada') setAskDuplicate(true);
+    else confirmOrAskMismatch();
   };
 
   const onDelete = async () => {
@@ -643,6 +650,18 @@ function InvoiceReviewScreen() {
         onConfirm={() => void onDelete()}
       />
       <ConfirmDialog
+        open={askDuplicate}
+        onClose={() => setAskDuplicate(false)}
+        title="¿Confirmar una factura repetida?"
+        message={
+          duplicate
+            ? `${duplicate.number ? `La factura nº ${duplicate.number}` : `Una factura del ${fmtDate(duplicate.date)} por ${fmtEur(invoiceNetAmount(duplicate))}`} de ${duplicate.supplierName || 'este proveedor'} ya está confirmada. Si es la misma, elimina esta copia: confirmarla contaría su gasto dos veces. Confírmala solo si es otra factura distinta.`
+            : undefined
+        }
+        confirmLabel="Confirmar igualmente"
+        onConfirm={confirmOrAskMismatch}
+      />
+      <ConfirmDialog
         open={askMismatch}
         onClose={() => setAskMismatch(false)}
         title="Hay precios que no se podrán aplicar"
@@ -682,7 +701,7 @@ function ConfirmBar({
   if (unpriced > 0) notes.push(`${unpriced} sin precio se ${unpriced === 1 ? 'omitirá' : 'omitirán'}`);
   if (mismatches > 0) notes.push(`${mismatches} no se ${mismatches === 1 ? 'podrá' : 'podrán'} aplicar (unidad distinta)`);
   return (
-    <div className="sticky bottom-[84px] z-20 mt-6 lg:bottom-4 lg:pr-20 2xl:pr-0">
+    <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 lg:bottom-4 lg:pr-20 2xl:pr-0">
       <div className="flex items-center gap-3 rounded-2xl border border-line bg-elevated/95 p-2.5 shadow-pop backdrop-blur-xl sm:p-3.5">
         <div className="hidden min-w-0 flex-1 px-1 sm:block">
           <div className="truncate text-sm font-semibold text-ink">
