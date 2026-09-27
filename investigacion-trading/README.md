@@ -161,6 +161,7 @@ Detalle en el [doc 07](07-fiscalidad-y-legal.md).
 | [06 · Mercados de predicción y VPN](06-mercados-prediccion-y-vpn.md) | Polymarket, Kalshi, la ley española, alternativas legales |
 | [07 · Fiscalidad y legal](07-fiscalidad-y-legal.md) | IRPF, MiCA, DAC8, 720/721, CNMV, prop firms |
 | [08 · Repos, herramientas y comunidades](08-repos-y-comunidades.md) | Qué stack usar, qué repos son humo, foros y libros |
+| [09 · Otros nichos](09-nichos-adicionales.md) | Bonos por nómina, evaluar código para IA (Outlier, Mercor), inversión de nicho, reventa: qué vale y qué no |
 | [Herramientas](herramientas/README.md) | `cuotas.py`, `funding.py`, `robustez.py`: código probado y sin dependencias |
 
 ---
