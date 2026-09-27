@@ -1095,6 +1095,36 @@ function tableTemplate(R, ctx) {
     head = `<div class="top">${customerBlockHtml(R, ctx)}${supplierBlockHtml(R, ctx, 'right')}</div><div class="metarow">${title}${metaHtml(R, ctx, meta, metaMode)}</div>`;
   } else if (headerMode === 'centered') {
     head = `<div class="center">${supplierBlockHtml(R, ctx, 'center')}</div><div class="top"><div class="box">${title}${metaHtml(R, ctx, meta, metaMode)}</div>${customerBlockHtml(R, ctx)}</div>`;
+  } else if (headerMode === 'band') {
+    // Banda de color con la razón social y el título; debajo, señas del proveedor y una caja de datos que incluye
+    // al cliente (código, nombre y NIF) en lugar de un bloque propio
+    const c = ctx.customer;
+    const custFields = [
+      [R.pick(['Cliente', 'Cliente:', 'Cód. cliente']), R.chance(0.6) ? `${c.code} · ${c.name}` : c.name],
+      [R.pick(['NIF', 'CIF', 'NIF cliente', 'N.I.F.']), printTaxId(R, c.taxId)],
+    ];
+    const box = [...meta.slice(0, 2), ...custFields, ...meta.slice(2)];
+    const s = ctx.supplier;
+    const tagline = R.pick(['Distribución para hostelería', 'Productos frescos de calidad', 'Mayorista de alimentación', 'Servicio a domicilio para restauración', '']);
+    const addr = `<div>${esc(s.addr.street)} · ${esc(s.addr.line2)}</div><div>${esc(taxLine(R, s.taxId, s.person))} · Tel. ${s.phone}</div>${R.chance(0.5) ? `<div class="muted">${esc(s.email)}</div>` : ''}`;
+    head = `<div class="band"><div><div class="bname">${esc(s.name)}</div>${tagline ? `<div>${esc(tagline)}</div>` : ''}</div><div class="btitle">${esc(docTitle)}</div></div>
+      <div class="top"><div class="supplier">${addr}</div><div>${metaHtml(R, ctx, box, R.pick(['lines', 'kv']))}</div></div>`;
+  } else if (headerMode === 'labeled') {
+    // Título y datos del documento arriba; debajo dos cajas rotuladas: emisor (proveedor) y cliente
+    const s = ctx.supplier;
+    const lbl = R.pick(['Emisor', 'EMISOR', 'Proveedor', 'Datos del emisor', 'PROVEEDOR']);
+    const spaced = R.chance(0.4) ? `letter-spacing:${R.int(2, 4)}px;text-transform:uppercase;` : '';
+    const sup = `<div class="customer"><div class="clbl" style="${spaced}">${esc(lbl)}</div><div class="b">${esc(s.name)}</div><div>${esc(s.addr.street)} · ${esc(s.addr.line2)}</div><div>${esc(taxLine(R, s.taxId, s.person))}</div>${R.chance(0.5) ? `<div>${esc(s.email)}</div>` : ''}</div>`;
+    const cust = customerBlockHtml(R, ctx);
+    head = `<div class="top"><div>${title}${metaHtml(R, ctx, meta, 'lines')}</div></div><div class="top" style="margin-top:12px">${R.chance(0.8) ? sup + cust : cust + sup}</div>`;
+  } else if (headerMode === 'inline') {
+    // Cliente en un párrafo con la etiqueta en línea ("Cliente: Nombre · NIF X") y la dirección debajo
+    const c = ctx.customer;
+    const cl = `<p class="inl"><b>${esc(R.pick(['Cliente:', 'Cliente', 'Facturar a:', 'Destinatario:']))}</b> ${esc(c.name)} · ${esc(R.pick(['NIF', 'CIF', 'N.I.F.']))} ${esc(printTaxId(R, c.taxId))}<br>${esc(c.addr.street)} · ${esc(c.addr.line2)}</p>`;
+    const sup = supplierBlockHtml(R, ctx);
+    head = R.chance(0.5)
+      ? `<div class="top">${sup}<div class="box">${title}${metaHtml(R, ctx, meta, metaMode)}</div></div>${cl}`
+      : `<div class="top">${sup}<div>${title}${metaHtml(R, ctx, meta, 'lines')}</div></div>${cl}`;
   } else {
     // grid: proveedor y cliente arriba; datos del documento en rejilla (etiqueta arriba, valor debajo)
     head = `<div class="top">${supplierBlockHtml(R, ctx)}${customerBlockHtml(R, ctx)}</div>${title}${metaHtml(R, ctx, meta, 'grid')}`;
@@ -1133,14 +1163,18 @@ function tableTemplate(R, ctx) {
     .page.fixed:last-child { break-after: auto; }
     .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
     .center { text-align: center; margin-bottom: 8px; }
+    .band { display: flex; justify-content: space-between; align-items: center; background: ${accent}; color: #fff; padding: 8px 12px; margin-bottom: 8px; }
+    .bname { font-size: ${Math.round(fs * R.float(1.4, 1.8))}px; font-weight: 700; }
+    .btitle { font-size: ${Math.round(fs * 2)}px; letter-spacing: 2px; }
+    .inl { margin: 10px 0; }
     .sname { font-size: ${Math.round(fs * R.float(1.4, 1.9))}px; font-weight: 700; color: ${accent}; margin-bottom: 2px; }
     .logo { display: inline-block; background: ${accent}; color: #fff; font-weight: 700; padding: 3px 8px; margin-bottom: 4px; }
     .box { border: 1px solid ${accent}; padding: 6px 10px; min-width: 38%; }
-    .dtitle { font-size: ${Math.round(fs * 1.6)}px; font-weight: 700; color: ${accent}; margin: 4px 0; }
+    .dtitle { font-size: ${Math.round(fs * 1.6)}px; font-weight: 700; color: ${accent}; margin: 4px 0; ${R.chance(0.3) ? `letter-spacing: ${R.int(2, 5)}px;` : ''} }
     .kv td { padding: 1px 10px 1px 0; }
     .custrow { display: flex; justify-content: ${R.pick(['flex-end', 'flex-start'])}; margin: 10px 0; }
     .customer { border: 1px solid #999; padding: 6px 10px; min-width: 40%; }
-    .clbl { font-size: ${Math.max(7, fs - 1.5)}px; color: ${accent}; font-weight: 700; }
+    .clbl { font-size: ${Math.max(7, fs - 1.5)}px; color: ${accent}; font-weight: 700; ${R.chance(0.3) ? `text-transform: uppercase; letter-spacing: ${R.float(1, 2.5).toFixed(1)}px;` : ''} }
     .metarow { margin: 10px 0; }
     table.grid { width: 100%; margin: 8px 0; border: 1px solid ${accent}; }
     table.grid th { background: ${accent}; color: #fff; padding: 2px 6px; text-align: left; font-size: ${Math.max(7, fs - 1)}px; }
@@ -1375,6 +1409,9 @@ export function generateInvoice(seed, opts = {}) {
       [1.5, 'customerLeft'],
       [1.2, 'centered'],
       [1.3, 'grid'],
+      [1.2, 'band'],
+      [1, 'inline'],
+      [0.9, 'labeled'],
     ]),
     vAlign: R.chance(0.6) ? 'top' : 'middle',
     wrapDesc: R.chance(0.18),

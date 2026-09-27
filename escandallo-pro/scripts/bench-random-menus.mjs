@@ -16,7 +16,11 @@
  *
  * Uso: node scripts/bench-random-menus.mjs [--set=tune|holdout|all] [--seeds=1-10] [--kinds=clean,degraded,pdf]
  *                                         [--jobs=2] [--features] [--verbose] [--reveal] [--json=<archivo>] [--no-cache]
- *                                         [--assert]   (código 1 si no se alcanzan: limpia ≥ 95 %, degradada ≥ 90 %)
+ *                                         [--fast] [--polarity] [--assert]
+ *   --fast      reutiliza las lecturas de tesseract ya hechas sin repetir la preparación de imagen (para afinar el parser)
+ *   --polarity  invierte antes del preprocesado las cartas de fondo oscuro (menuImage.normalizeMenuPolarity, pendiente
+ *               de integrar en el canal de la app)
+ *   --assert    código 1 si no se alcanzan: limpia ≥ 95 %, degradada ≥ 90 %
  */
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -60,6 +64,9 @@ const pipeline = await load('/src/extract/ocrPipeline.ts');
 const ocrLayout = await load('/src/extract/ocrLayout.ts');
 const extractIndex = await load('/src/extract/index.ts');
 const menuParser = await load('/src/extract/menuParser.ts');
+const menuImage = await load('/src/extract/menuImage.ts');
+/** --polarity: pizarras y cartas de fondo oscuro invertidas antes del preprocesado (cambio de contrato solicitado). */
+const POLARITY = !!args.polarity;
 const pdfjs = await import(join(ROOT, 'node_modules/pdfjs-dist/legacy/build/pdf.mjs'));
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
@@ -190,6 +197,7 @@ mkdirSync(INDEX, { recursive: true });
 async function menuFromImages(images) {
   const src = createHash('sha1');
   for (const img of images) src.update(img);
+  if (POLARITY) src.update('polaridad');
   const srcKey = src.digest('hex');
   const opts = { merge: menuParser.mergeMenuPasses, quality: menuParser.menuQuality };
   if (args.fast) {
@@ -218,7 +226,10 @@ async function menuFromImages(images) {
     }
   }
   const grays = [];
-  for (const img of images) grays.push(await loadGray(img));
+  for (const img of images) {
+    const g = await loadGray(img);
+    grays.push(POLARITY ? menuImage.normalizeMenuPolarity(g).image : g);
+  }
   const calls = new Map();
   const indexing = {
     async recognize(image, psm) {

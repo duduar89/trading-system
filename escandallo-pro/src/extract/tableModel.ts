@@ -149,7 +149,11 @@ const PREFIX = new Set(['n', 'no', 'num', '%', 'p', 'pr', 'prec', 't', 'f', 'fec
 
 /** ¿La palabra completa la etiqueta anterior en lugar de empezar otra? */
 function isModifier(k: string, prev: string): boolean {
-  if (/^(?:unit|unitario|unitaria|servida|servido|bruto|imponible|%|€|eur|euros|1|2|3|caduc|pref|del|de|la|el|los)$/.test(k)) return true;
+  if (/^(?:unit|unitario|unitaria|servida|servido|bruto|imponible|€|eur|euros|1|2|3|caduc|pref|del|de|la|el|los)$/.test(k)) return true;
+  // "Dto. %", "IVA %"; pero "Importe % IVA" son dos columnas
+  if (k === '%') return /^(?:dto|dtos|dcto|desc|descuento|iva|bonif|tipo)$/.test(prev);
+  // "Precio €/kg", "Precio /ud"
+  if (/^(?:€|eur)?\/(?:kg|kgs|ud|u|und|l|lt)$/.test(k)) return /^(?:precio|p|pr|prec|importe|tarifa|pvp)$/.test(prev);
   if (/^(?:ud|u|kg|kgs|kilo|l|lt)$/.test(k) && /^(?:precio|p|pr|prec|neto|peso|€|eur|cantidad|cant|importe)$/.test(prev)) return true;
   if (k === 'neto' && /^(?:importe|precio|peso|total|p|imp|valor)$/.test(prev)) return true;
   if (/^(?:linea|lin)$/.test(k) && /^(?:total|importe)$/.test(prev)) return true;
@@ -422,12 +426,35 @@ export function buildTableModel(phrases: readonly HeaderPhrase[] | undefined, ro
     }
     cols = next;
   }
-  const columns: TableColumn[] = cols.map((c, j) => {
+  const columns = makeColumns(cols);
+  const unitRows = fillStats(columns, rows, opts);
+  // Etiquetas
+  if (phrases && phrases.length) {
+    const assign = alignPhrases(phrases, columns, cw);
+    assign.forEach((pi, j) => {
+      if (pi < 0) return;
+      const p = phrases[pi];
+      const c = columns[j];
+      c.label = p.text;
+      c.kind = p.info.kind;
+      c.unit = p.info.unit;
+      c.perUnit = p.info.perUnit;
+    });
+  }
+  typeByData(columns, unitRows);
+  return { columns, cw, labeled };
+}
+
+function makeColumns(cols: readonly Box[]): TableColumn[] {
+  return cols.map((c, j) => {
     const prev = cols[j - 1];
     const nxt = cols[j + 1];
     return { x0: c.x0, x1: c.x1, left: prev ? (prev.x1 + c.x0) / 2 : -Infinity, right: nxt ? (c.x1 + nxt.x0) / 2 : Infinity, rows: 0, numeric: 0, texty: 0 };
   });
-  // Estadísticas de contenido
+}
+
+/** Filas con contenido, con números y con texto de cada columna; devuelve las filas con palabras de unidad. */
+function fillStats(columns: TableColumn[], rows: readonly TRow[], opts: BuildModelOptions): number[] {
   const unitRows = new Array<number>(columns.length).fill(0);
   for (const r of rows) {
     const seen = new Set<number>();
@@ -448,20 +475,11 @@ export function buildTableModel(phrases: readonly HeaderPhrase[] | undefined, ro
     for (const j of txt) columns[j].texty++;
     for (const j of unitW) unitRows[j]++;
   }
-  // Etiquetas
-  if (phrases && phrases.length) {
-    const assign = alignPhrases(phrases, columns, cw);
-    assign.forEach((pi, j) => {
-      if (pi < 0) return;
-      const p = phrases[pi];
-      const c = columns[j];
-      c.label = p.text;
-      c.kind = p.info.kind;
-      c.unit = p.info.unit;
-      c.perUnit = p.info.perUnit;
-    });
-  }
-  // Comprobación con los datos y tipado de las columnas sin etiqueta
+  return unitRows;
+}
+
+/** Comprobación de las etiquetas con los datos y tipado de las columnas sin etiqueta. */
+function typeByData(columns: TableColumn[], unitRows: number[]): void {
   const hasDesc = () => columns.some((c) => c.kind === 'desc');
   for (const c of columns) {
     const j = columns.indexOf(c);
@@ -486,7 +504,52 @@ export function buildTableModel(phrases: readonly HeaderPhrase[] | undefined, ro
     const best = [...columns].sort((a, b) => b.texty - a.texty)[0];
     if (best && best.texty > 0 && (!best.kind || !NUMERIC_KINDS.has(best.kind))) best.kind = 'desc';
   }
-  return { columns, cw, labeled };
+}
+
+/** Voto de un dato a una columna: la aritmética ha usado esa palabra como cantidad, precio, importe… */
+export interface RoleVote extends Box {
+  kind: ColumnKind;
+}
+
+/**
+ * Modelo de una tabla SIN cabecera: las columnas salen de las calles de los datos y su tipo de los votos de las filas
+ * que la aritmética ha validado (cada número usado como cantidad, precio, descuento o importe vota por su columna; las
+ * palabras de la descripción, por la de descripción). Gana el tipo con mayoría clara; así la orientación cantidad ↔
+ * precio de toda la columna la deciden las filas sin ambigüedad (enteros, 3 decimales de peso…) y se aplica a las
+ * dudosas.
+ */
+export function buildVotedModel(rows: readonly TRow[], votes: readonly RoleVote[], opts: BuildModelOptions): TableModel | undefined {
+  if (rows.length < 3) return undefined;
+  const cw = median(rows.map((r) => r.cw).filter((x) => x > 0)) || 1;
+  const cols = findDataColumns(rows);
+  if (cols.length < 3) return undefined;
+  const columns = makeColumns(cols);
+  const unitRows = fillStats(columns, rows, opts);
+  const tally = columns.map(() => new Map<ColumnKind, number>());
+  for (const v of votes) {
+    const j = columnIndex(columns, v);
+    if (j >= 0) tally[j].set(v.kind, (tally[j].get(v.kind) ?? 0) + 1);
+  }
+  tally.forEach((t, j) => {
+    const total = [...t.values()].reduce((a, b) => a + b, 0);
+    const best = [...t.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (best && best[1] >= 2 && best[1] >= total * 0.6) columns[j].kind = best[0];
+  });
+  // Dos columnas con el mismo tipo numérico: se queda la de más votos
+  for (const kind of ['qty', 'price', 'total'] as ColumnKind[]) {
+    const same = columns.map((c, j) => ({ c, j })).filter((x) => x.c.kind === kind);
+    if (same.length < 2) continue;
+    same.sort((a, b) => (tally[b.j].get(kind) ?? 0) - (tally[a.j].get(kind) ?? 0));
+    for (const x of same.slice(1)) x.c.kind = undefined;
+  }
+  for (let j = 0; j < columns.length; j++) {
+    const c = columns[j];
+    if (c.kind) continue;
+    if (unitRows[j] >= Math.max(1, c.rows * 0.6) && c.numeric <= c.rows * 0.2) c.kind = 'unit';
+    else if (c.texty > 0 && c.numeric <= c.rows * 0.5) c.kind = 'other';
+  }
+  if (!columns.some((c) => c.kind === 'desc') || !columns.some((c) => c.kind === 'total') || !columns.some((c) => c.kind === 'price')) return undefined;
+  return { columns, cw, labeled: false };
 }
 
 /** Índice de la columna que contiene el centro de la caja (−1 si ninguna). */

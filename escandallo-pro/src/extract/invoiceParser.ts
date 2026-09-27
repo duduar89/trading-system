@@ -3,8 +3,24 @@ import { approxEqual, findDate, parseDateEs, parseNumberEs, round } from '../cor
 import { normalizeInvoiceLine } from '../core/pack';
 import { cleanProductName } from '../core/matching';
 import type { PdfTextLine } from './pdf';
-import { collapseSpaces, fixOcrNumber, fold, foldKeepLength, fuzzyIn, isAllCaps, median } from './textUtils';
+import { collapseSpaces, despaceLetters, fixOcrNumber, fold, foldKeepLength, fuzzyIn, median } from './textUtils';
 import { fixOcrDescription } from './ocrFixes';
+import {
+  buildTableModel,
+  buildVotedModel,
+  classifyLabel,
+  columnIndex,
+  headerPhrases,
+  NUMERIC_KINDS,
+  QTY_KINDS,
+  stackHeaderRows,
+  type ColumnKind,
+  type HeaderPhrase,
+  type RoleVote,
+  type TableModel,
+  type TRow,
+  type TWord,
+} from './tableModel';
 
 /**
  * Parser heurístico de facturas de proveedor (texto de PDF o de OCR) — funciona sin IA.
@@ -38,6 +54,8 @@ interface NumInfo {
   fixed?: string;
   /** Corrección que cambia el valor (decimales perdidos, cifra mal leída): se avisa al usuario. Las letras por cifras ("1O,5O") no. */
   repaired?: boolean;
+  /** Escrito como multiplicador ("x6"): es una cantidad. */
+  mult?: boolean;
 }
 
 interface Word {
@@ -47,6 +65,8 @@ interface Word {
   /** Plegado sin signos de borde. */
   f: string;
   num?: NumInfo;
+  /** Celda de la fila (ítem de pdf.js, celda del OCR o bloque separado por 2+ espacios): misma celda ⇒ mismo índice. */
+  seg: number;
 }
 
 interface Row {
@@ -55,6 +75,8 @@ interface Row {
   f: string;
   words: Word[];
   page: number;
+  /** Posición vertical (de arriba a abajo; en texto plano, el número de fila). */
+  y: number;
   /** true si las X son posiciones reales (pdf.js / OCR); false si son desplazamientos de carácter. */
   positional: boolean;
   /** Ancho medio de carácter en unidades de X. */
@@ -63,7 +85,7 @@ interface Row {
   ocr?: boolean;
 }
 
-type ColKind = 'code' | 'desc' | 'qty' | 'bultos' | 'unit' | 'price' | 'disc' | 'total' | 'vat' | 'lot';
+type ColKind = ColumnKind;
 
 interface HeaderCol {
   kind: ColKind;
@@ -75,6 +97,10 @@ interface HeaderCol {
 
 interface TableHeader {
   row: number;
+  /** Filas que forman la cabecera (etiquetas partidas en dos filas, cabeceras agrupadas). */
+  rows: number[];
+  /** Modelo de columnas deducido de los datos de su tabla (ver tableModel.ts). */
+  model?: TableModel;
   cols: HeaderCol[];
   /** Orden de las columnas numéricas (de izquierda a derecha). */
   numericOrder: ColKind[];
@@ -122,6 +148,28 @@ interface ParsedLine {
   validated: boolean;
   /** Posición X del inicio de la descripción (para las continuaciones). */
   descX?: number;
+  /** Palabras que ha usado la aritmética (para deducir las columnas de una tabla sin cabecera). */
+  roles?: RoleVote[];
+}
+
+function box(w: Word): { x0: number; x1: number } {
+  return { x0: w.x0, x1: w.x1 };
+}
+
+/** Votos de columna de una solución: cantidad, precio, importe, descuentos, IVA y descripción. */
+function solutionRoles(sol: Solution, words: Word[], descWords: Word[], vat?: Word): RoleVote[] {
+  const out: RoleVote[] = [];
+  const add = (t: NumTok, kind: ColumnKind) => {
+    if (t.wi < words.length && words[t.wi] === t.w) out.push({ ...box(t.w), kind });
+  };
+  add(sol.q, 'qty');
+  add(sol.p, 'price');
+  add(sol.t, 'total');
+  for (const d of sol.d) add(d, 'disc');
+  if (vat) out.push({ ...box(vat), kind: 'vat' });
+  // Sólo las palabras de verdad votan por la descripción (no lotes "L2506D", fechas ni códigos pegados a ella)
+  for (const w of descWords) if (/\p{L}{2,}/u.test(w.raw) && !w.num) out.push({ ...box(w), kind: 'desc' });
+  return out;
 }
 
 // ───────────────────────────── Vocabulario ─────────────────────────────
@@ -208,16 +256,17 @@ function headerKind(key: string, hasDesc: boolean): ColKind | undefined {
 
 // Filas que cierran la tabla de líneas (totales, pie)
 const STOP_RE =
-  /(?:^|\s)(?:base\s*imp(?:onible)?|b\.\s*imponible|total\s*base|bases?\s*imponibles?|subtotal|sub-total|suma\s*y\s*sigue|total\s*(?:factura|fra|a\s*pagar|documento|general|eur(?:os)?|neto|bruto|importe|albaran|lineas|productos)|importe\s*total|suma\s*(?:de\s*)?importes?|total\s*bases?|forma\s*de\s*pago|formas\s*de\s*pago|vencimientos?|observaciones|desglose\s*(?:de\s*)?(?:l?\s*)?iva|cuadro\s*(?:de\s*)?iva|resumen\s*(?:de\s*)?iva|recargo\s*(?:de\s*)?equivalencia|cuota\s*i\.?v\.?a|total\s*i\.?v\.?a|i\.?v\.?a\.?\s*\d{1,2}(?:[.,]\d{1,2})?\s*%\s*(?:s\/|sobre)|dto\.?\s*pronto\s*pago|total\s*$|^total\b)/;
+  /(?:^|\s)(?:base\s*imp(?:onible)?|b\.\s*imponible|total\s*base|bases?\s*imponibles?|subtotal|sub-total|suma\s*y\s*sigue|total\s*(?:factura|fra|a\s*pagar|documento|general|eur(?:os)?|neto|bruto|importe|albaran|lineas|productos|articulos|mercancia)|importe\s*total|importe\s*bruto|suma\s*(?:de\s*)?(?:productos|articulos|neto|lineas)|neto\s*mercancia|suma\s*(?:de\s*)?importes?|total\s*bases?|forma\s*de\s*pago|formas\s*de\s*pago|vencimientos?|observaciones|desglose\s*(?:de\s*)?(?:l?\s*)?iva|cuadro\s*(?:de\s*)?iva|resumen\s*(?:de\s*)?iva|recargo\s*(?:de\s*)?equivalencia|cuota\s*i\.?v\.?a|total\s*i\.?v\.?a|i\.?v\.?a\.?\s*\d{1,2}(?:[.,]\d{1,2})?\s*%\s*(?:s\/|sobre)|dto\.?\s*pronto\s*pago|total\s*$|^total\b)/;
 const PAUSE_RE = /suma\s*y\s*sigue|sigue\s*en\s*(?:la\s*)?(?:pagina|hoja)|continua\s*en/;
 const RESUME_RE = /suma\s*anterior|viene\s*de\s*(?:la\s*)?(?:pagina|hoja)|anterior\s*:/;
 /** Metadatos de trazabilidad (lote, caducidad, zona FAO, especie…) que no son líneas. */
 const META_RE =
-  /^(?:\(?\s*)?(?:lote|lot|l\.?\s*:|n[ºo°]?\s*lote|cad\b|cad\.|caducidad|fecha\s*(?:de\s*)?cad|f\.?\s*cad|consumir|consumo\s*pref|origen|pais|fao|zona\s*(?:de\s*)?captura|zona\s*fao|arte\s*(?:de\s*)?pesca|metodo\s*(?:de\s*)?produccion|capturado|criado|especie|nombre\s*cient|n\.?\s*cient|denominacion\s*comercial|presentacion|peso\s*neto|temperatura|conservar|registro\s*sanitario|rgseaa|albaran|alb\.|pedido|s\/ref|su\s*ref|nuestra\s*ref|n\/ref|entrega|matadero|sala\s*de\s*despiece|nacido|sacrificado|despiece|n[ºo°]\s*(?:de\s*)?referencia|codigo\s*de\s*barras|ean\b)/;
+  /^(?:\(?\s*)?(?:lote|lot|l\.?\s*:|n[ºo°]?\s*lote|cad\b|cad\.|caducidad|fecha\s*(?:de\s*)?cad|f\.?\s*cad|consumir|consumo\s*pref|origen\s*[:.]|pais\s*(?:de\s*origen)?\s*[:.]|fao|zona\s*(?:de\s*)?captura|zona\s*fao|arte\s*(?:de\s*)?pesca|metodo\s*(?:de\s*)?produccion|capturado|criado|especie|nombre\s*cient|n\.?\s*cient|denominacion\s*comercial|presentacion|peso\s*neto|temperatura|conservar|registro\s*sanitario|rgseaa|albaran|alb\.|pedido|s\/ref|su\s*ref|nuestra\s*ref|n\/ref|entrega|matadero|sala\s*de\s*despiece|nacido|sacrificado|despiece|n[ºo°]\s*(?:de\s*)?referencia|codigo\s*de\s*barras|ean\b|cat\.\s*(?:extra|i{1,3}|primera|segunda|[12])\b|categoria\s*:|calibre\s*:)/;
 const META_ANY_RE = /\b(?:lote|cad(?:ucidad)?|fao\s*\d{1,2}|f\.\s*cad|consumir\s*pref)\s*[:.]?\s*[a-z0-9]/;
-const SCIENTIFIC_RE = /^\(?[A-Z][a-z]+ [a-z]{3,}\)?(?:\s|$)/;
+/** Nombre científico de la especie en una sublínea de trazabilidad ("Merluccius merluccius · Zona FAO 27 · Arrastre"). */
+const SCIENTIFIC_RE = /^(?:\([A-Z][a-z]+ [a-z]{3,}(?: [a-z]{3,})?\)|[A-Z][a-z]+ [a-z]{3,}(?: [a-z]{3,})?\s*[·•,;|–]\s*\S)/;
 const EXTRA_RE =
-  /^(?:portes?|transporte|gastos\s*(?:de\s*)?(?:envio|transporte)|envio|envases?(?:\s*retornables?)?|retornables?|fianza|deposito|cascos?|palets?|ecotasa|punto\s*verde|recargo\s*(?:de\s*)?combustible|gastos?\s*financieros?|tasa\s*(?:de\s*)?residuos|sirga)\b/;
+  /^(?:portes?|transporte|gastos\s*(?:de\s*)?(?:envio|transporte)|envio|envases?(?:\s*retornables?)?|retornables?|fianza|(?:devolucion|abono|retorno)\s*(?:de\s*)?(?:envases?|cascos?|palets?|fianzas?|barril(?:es)?)|deposito|cascos?|palets?|ecotasa|punto\s*verde|recargo\s*(?:de\s*)?combustible|gastos?\s*financieros?|tasa\s*(?:de\s*)?residuos|sirga)\b/;
 const DISCOUNT_ROW_RE = /^(?:dto|dcto|descuento|desc\.|promo(?:cion)?|oferta|bonif(?:icacion)?|rappel|abono|rebaja|ahorro)\b/;
 
 // ───────────────────────────── Tokenización ─────────────────────────────
@@ -280,28 +329,37 @@ function parseWordNumber(raw: string, allowOcr: boolean): NumInfo | undefined {
   return { value, dec: decimalsOf(s.replace(/-$/, ''), value), pct, cur, unit, perUnit, fixed };
 }
 
-function makeWord(raw: string, x0: number, x1: number, allowOcr: boolean): Word {
+function makeWord(raw: string, x0: number, x1: number, allowOcr: boolean, seg: number): Word {
   const f = fold(raw).replace(/^[^a-z0-9%€]+|[^a-z0-9%€]+$/g, '');
-  const word: Word = { raw, x0, x1, f };
+  const word: Word = { raw, x0, x1, f, seg };
   // Fechas, horas, códigos con "/" o "x" no son números
   if (!/^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(raw) && !/^\d{1,2}:\d{2}/.test(raw)) {
-    const n = parseWordNumber(raw, allowOcr);
-    if (n) word.num = n;
+    const mult = /^[x×*](\d{1,4}(?:[.,]\d{1,3})?)$/i.exec(raw);
+    // "x6" de los tickets: multiplicador de unidades (cantidad)
+    const n = mult ? parseWordNumber(mult[1], false) : parseWordNumber(raw, allowOcr);
+    if (n) word.num = mult ? { ...n, mult: true } : n;
   }
   return word;
 }
 
-/** Une "12,50" + "€" y separa "€12,50"; marca el símbolo de moneda en el número. */
+const RE_PER_UNIT_WORD = /^(?:€|eur|euros)?\s?\/\s?(kg|kgs|kilo|l|lt|litro|ud|uds|u|und|unid|unidad)\.?$/i;
+
+/** Une "12,50" + "€" (o "€/kg", "/kg": precio por unidad) al número anterior; marca la moneda y la unidad. */
 function attachCurrency(words: Word[]): Word[] {
   const out: Word[] = [];
   for (const w of words) {
-    if (/^(?:€|eur|euros)$/i.test(w.raw)) {
-      const prev = out[out.length - 1];
-      if (prev?.num) {
-        prev.num.cur = true;
-        prev.x1 = w.x1;
-        continue;
-      }
+    const prev = out[out.length - 1];
+    if (prev?.num && /^(?:€|eur|euros)$/i.test(w.raw)) {
+      prev.num.cur = true;
+      prev.x1 = w.x1;
+      continue;
+    }
+    const per = RE_PER_UNIT_WORD.exec(w.raw);
+    if (prev?.num && per && !prev.num.unit) {
+      prev.num.perUnit = UNIT_WORDS[per[1].toLowerCase()] ?? per[1].toLowerCase();
+      prev.num.cur ||= /€|eur/i.test(w.raw);
+      prev.x1 = w.x1;
+      continue;
     }
     out.push(w);
   }
@@ -312,13 +370,21 @@ function rowFromText(text: string, i: number, allowOcr: boolean): Row {
   const words: Word[] = [];
   const re = /\S+/g;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) words.push(makeWord(m[0], m.index, m.index + m[0].length, allowOcr));
-  return { i, text, f: fold(text), words: attachCurrency(words), page: 1, positional: false, cw: 1, ocr: allowOcr };
+  let seg = 0;
+  let lastEnd = -10;
+  while ((m = re.exec(text))) {
+    // Dos o más espacios separan celdas (texto alineado por columnas)
+    if (m.index - lastEnd >= 2) seg++;
+    words.push(makeWord(m[0], m.index, m.index + m[0].length, allowOcr, seg));
+    lastEnd = m.index + m[0].length;
+  }
+  return { i, text, f: fold(text), words: attachCurrency(words), page: 1, y: i, positional: false, cw: 1, ocr: allowOcr };
 }
 
 function rowFromPdf(line: PdfTextLine, i: number, allowOcr: boolean): Row {
   const words: Word[] = [];
   const cws: number[] = [];
+  let seg = 0;
   for (const item of line.items) {
     const str = item.str;
     if (!str.trim()) continue;
@@ -326,9 +392,16 @@ function rowFromPdf(line: PdfTextLine, i: number, allowOcr: boolean): Row {
     cws.push(cw);
     const re = /\S+/g;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(str))) words.push(makeWord(m[0], item.x + m.index * cw, item.x + (m.index + m[0].length) * cw, allowOcr));
+    let lastEnd = -10;
+    seg++;
+    while ((m = re.exec(str))) {
+      // Dentro de un mismo ítem (texto monoespaciado), dos o más espacios también separan celdas
+      if (lastEnd >= 0 && m.index - lastEnd >= 2) seg++;
+      words.push(makeWord(m[0], item.x + m.index * cw, item.x + (m.index + m[0].length) * cw, allowOcr, seg));
+      lastEnd = m.index + m[0].length;
+    }
   }
-  return { i, text: line.text, f: fold(line.text), words: attachCurrency(words), page: line.page, positional: true, cw: median(cws) || 1, ocr: allowOcr };
+  return { i, text: line.text, f: fold(line.text), words: attachCurrency(words), page: line.page, y: line.y, positional: true, cw: median(cws) || 1, ocr: allowOcr };
 }
 
 /** Normaliza texto de OCR: "12, 50" → "12,50"; "12 ,50" → "12,50"; comillas y rayas raras. */
@@ -375,63 +448,35 @@ function leadingCode(words: Word[]): { end: number; code?: string } {
 // ───────────────────────────── Cabecera de tabla ─────────────────────────────
 
 function detectTableHeader(row: Row): TableHeader | undefined {
-  const nums = row.words.filter((w) => w.num && !w.num.pct).length;
+  const nums = row.words.filter((w, k) => w.num && !w.num.pct && !(/^[123]$/.test(w.raw) && k > 0 && !row.words[k - 1].num && row.words[k - 1].seg === w.seg)).length;
   if (nums > 1 || row.words.length < 2 || row.words.length > 24) return undefined;
-  const keys = row.words.map((w) => w.f.replace(/[^a-z0-9]/g, ''));
-  const hasDesc = keys.some((k) => headerKind(k, false) === 'desc');
+  // Frases de etiqueta ("P. Unit.", "Nº bultos", "Cantidad servida", "IVA %"), también en cabeceras monoespaciadas
+  // con un solo espacio entre columnas; las erratas del OCR se reconocen con el vocabulario difuso
+  const phrases = headerPhrases(toTRow(row).words);
+  const hasDesc = phrases.some((p) => p.info.kind === 'desc');
   const cols: HeaderCol[] = [];
-  for (let idx = 0; idx < keys.length; idx++) {
-    const w = row.words[idx];
-    const k = keys[idx];
-    const nextKey = keys[idx + 1] ?? '';
-    let kind: ColKind | undefined;
-    let x1 = w.x1;
-    // "P. Unit.", "Pr. unit", "Precio ud.", "Precio / kg", "€/kg": precio
-    if (/^(?:p|pr|prec|precio)$/.test(k) && /^(?:unit|unitario|ud|u|uni|neto|kg|und|unid)$/.test(nextKey)) {
-      kind = 'price';
-      x1 = row.words[idx + 1].x1;
-      idx++;
-    } else if (/€|eur\s*\//i.test(w.raw) && /\/|€/.test(w.raw) && !/^%/.test(w.raw)) {
-      kind = 'price';
-    } else if (/^(?:n|no|num)$/.test(k) && /^(?:uds|unidades|bultos|cajas|piezas)$/.test(nextKey)) {
-      kind = headerKind(nextKey, hasDesc);
-      x1 = row.words[idx + 1].x1;
-      idx++;
-    } else {
-      kind = headerKind(k, hasDesc);
-    }
+  for (const p of phrases) {
+    const label = fold(p.text).replace(/[^a-z0-9]/g, '');
+    const kind = p.info.kind ?? headerKind(label, hasDesc);
     if (!kind) continue;
-    const prev = cols[cols.length - 1];
-    // Etiquetas de varias palabras: "Precio unitario", "Cuota IVA", "Precio neto", "Importe neto"
-    if (prev && w.x0 - prev.x1 < row.cw * 2.5 && cols.length && keys[idx - 1] !== undefined) {
-      if (prev.kind === 'price' && (kind === 'total' || kind === 'unit' || kind === 'qty' || kind === 'price')) {
-        prev.x1 = x1;
-        continue;
-      }
-      if (prev.kind === kind) {
-        prev.x1 = x1;
-        continue;
-      }
-      if (prev.kind === 'total' && kind === 'vat') {
-        prev.kind = 'vat';
-        prev.x1 = x1;
-        continue;
-      }
-    }
-    cols.push({ kind, x0: w.x0, x1, label: k });
+    cols.push({ kind, x0: p.x0, x1: p.x1, label });
   }
   const kinds = new Set(cols.map((c) => c.kind));
-  const main = ['desc', 'qty', 'price', 'total'].filter((k) => kinds.has(k as ColKind)).length;
-  const ok = main >= 3 || (kinds.has('desc') && kinds.has('total') && (kinds.has('qty') || kinds.has('price') || kinds.has('disc') || kinds.has('bultos')));
+  const qtyLike = kinds.has('qty') || kinds.has('uds');
+  const main = [kinds.has('desc'), qtyLike, kinds.has('price'), kinds.has('total')].filter(Boolean).length;
+  const ok = main >= 3 || (kinds.has('desc') && kinds.has('total') && (qtyLike || kinds.has('price') || kinds.has('disc') || kinds.has('bultos')));
   if (!ok) return undefined;
   // Evitar confundir una fila de totales ("Base imponible  IVA  Total") con la cabecera
-  if (!kinds.has('desc') && !kinds.has('qty')) return undefined;
-  const numericKinds: ColKind[] = ['qty', 'bultos', 'price', 'disc', 'total', 'vat'];
-  const numericOrder = cols.filter((c) => numericKinds.includes(c.kind)).map((c) => c.kind);
-  return { row: row.i, cols, numericOrder, positional: row.positional };
+  if (!kinds.has('desc') && !qtyLike) return undefined;
+  const numericOrder = cols.filter((c) => NUMERIC_KINDS.has(c.kind)).map((c) => c.kind);
+  return { row: row.i, rows: [row.i], cols, numericOrder, positional: row.positional };
 }
 
 function columnOf(w: Word, header: TableHeader, cw: number): ColKind | undefined {
+  if (header.model) {
+    const j = columnIndex(header.model.columns, w);
+    return j >= 0 ? header.model.columns[j].kind : undefined;
+  }
   const cols = header.cols;
   const pad = cw * 0.6;
   let best: HeaderCol | undefined;
@@ -457,6 +502,172 @@ function columnOf(w: Word, header: TableHeader, cw: number): ColKind | undefined
     }
   }
   return undefined;
+}
+
+// ───────────────────────────── Modelo de tabla (columnas por los datos + etiquetas) ─────────────────────────────
+
+/** Palabras que acompañan a las etiquetas en cabeceras de varias filas ("Precio" / "unitario", "Dto." / "1"). */
+const HEADER_AUX = new Set(['unit', 'unitario', 'unitaria', 'neto', 'bruto', 'servida', 'servido', 'kg', 'kgs', 'eur', 'euros', '€', '%', 'ud', 'linea', 'art', 'barras', 'pref', 'del', 'de', 'n', 'no', 'nº', 'p', 'pr', 't', 'f', 'imponible', 'articulo', 'kilos', 'uds']);
+
+function isUnitText(s: string): boolean {
+  const k = fold(s).replace(/[^a-z0-9]/g, '');
+  return !!k && !/^\d/.test(k) && UNIT_WORDS[k] !== undefined;
+}
+
+/**
+ * ¿Fila vecina que completa la cabecera (etiquetas partidas en dos filas o agrupadas)? Sin números, casi todo
+ * etiquetas, cada celda de una o dos palabras (una nota como "PRECIOS SIN IVA" no) y alineada con la cabecera.
+ */
+function isHeaderishRow(row: Row, main: Row): boolean {
+  if (!row.words.length || row.words.length > 16) return false;
+  if (row.words.some((w) => w.num && !w.num.pct && !/^[123]$/.test(w.raw))) return false;
+  const perSeg = new Map<number, Word[]>();
+  for (const w of row.words) perSeg.set(w.seg, [...(perSeg.get(w.seg) ?? []), w]);
+  for (const ws of perSeg.values()) if (ws.filter((w) => !/^(?:de|del|la|el)$/.test(w.f)).length > 2) return false;
+  if (!row.words.some((w) => main.words.some((m) => Math.min(w.x1, m.x1) - Math.max(w.x0, m.x0) > 0))) return false;
+  let hits = 0;
+  for (const w of row.words) {
+    const k = w.f.replace(/[^a-z0-9%€º]/g, '');
+    if (HEADER_WORDS.includes(k) || HEADER_AUX.has(k) || classifyLabel(w.raw).kind) hits++;
+  }
+  return hits >= Math.max(1, row.words.length * 0.6);
+}
+
+function toTRow(row: Row): TRow {
+  return { cw: row.cw, words: row.words.map<TWord>((w) => ({ text: w.raw, x0: w.x0, x1: w.x1, seg: w.seg, num: !!w.num })) };
+}
+
+/** Cabeceras de tabla con sus filas vecinas de etiquetas (partidas en dos filas o agrupadas). */
+function detectHeaders(rows: Row[]): Map<number, TableHeader> {
+  const headers = new Map<number, TableHeader>();
+  for (const row of rows) {
+    const h = detectTableHeader(row);
+    if (!h) continue;
+    const near = (a: Row, b: Row) => a.page === b.page && Math.abs(a.y - b.y) <= (a.positional ? Math.max(a.cw, b.cw) * 3.4 : 2.01);
+    const band = [row.i];
+    for (let k = row.i - 1; k >= Math.max(0, row.i - 2); k--) {
+      const r = rows[k];
+      if (!r.f.trim() || headers.has(k) || !near(r, rows[band[0]]) || !isHeaderishRow(r, row)) break;
+      band.unshift(k);
+    }
+    for (let k = row.i + 1; k <= Math.min(rows.length - 1, row.i + 2); k++) {
+      const r = rows[k];
+      if (!r.f.trim() || !near(r, rows[band[band.length - 1]]) || !isHeaderishRow(r, row) || detectTableHeader(r)) break;
+      band.push(k);
+    }
+    h.rows = band;
+    h.row = band[0];
+    headers.set(band[0], h);
+  }
+  return headers;
+}
+
+function sameGeometry(a: TableHeader, b: TableHeader, rows: Row[]): boolean {
+  if (a.cols.length !== b.cols.length) return false;
+  const cw = Math.max(rows[a.row].cw, rows[b.row].cw);
+  return a.cols.every((c, k) => c.kind === b.cols[k].kind && Math.abs(c.x0 - b.cols[k].x0) <= cw * 3);
+}
+
+/** Construye el modelo de columnas de cada tabla (las cabeceras repetidas en varias páginas comparten modelo). */
+function buildModels(rows: Row[], headers: Map<number, TableHeader>): void {
+  const list = [...headers.values()].sort((a, b) => a.row - b.row);
+  const bandRows = new Set(list.flatMap((h) => h.rows));
+  const bodies = new Map<TableHeader, Row[]>();
+  for (const h of list) {
+    const body: Row[] = [];
+    let paused = false;
+    for (let i = Math.max(...h.rows) + 1; i < rows.length; i++) {
+      const row = rows[i];
+      const f = row.f.trim();
+      if (!f) continue;
+      if (bandRows.has(i)) break;
+      if (PAUSE_RE.test(f)) {
+        paused = true;
+        continue;
+      }
+      if (paused) {
+        if (RESUME_RE.test(f)) paused = false;
+        continue;
+      }
+      if (RESUME_RE.test(f)) continue;
+      if (isStopRow(row)) break;
+      if (isMetaRow(row)) continue;
+      const nums = row.words.filter((w) => w.num && !w.num.pct).length;
+      if (nums >= 2 && row.words.some((w) => isTexty(w))) body.push(row);
+    }
+    bodies.set(h, body);
+  }
+  const groups: TableHeader[][] = [];
+  for (const h of list) {
+    const g = groups.find((x) => x[0].positional === h.positional && sameGeometry(x[0], h, rows));
+    if (g) g.push(h);
+    else groups.push([h]);
+  }
+  for (const g of groups) {
+    const body = g.flatMap((h) => bodies.get(h) ?? []);
+    if (!body.length) continue;
+    const key = g[0];
+    const phrases: HeaderPhrase[] = stackHeaderRows(key.rows.map((ri) => headerPhrases(toTRow(rows[ri]).words)));
+    const model = buildTableModel(phrases, body.map(toTRow), { isUnitWord: isUnitText });
+    const lastNumeric = [...(model?.columns ?? [])].reverse().find((c) => c.numeric > 0);
+    const hasTotal = !!model && (model.columns.some((c) => c.kind === 'total') || (!!lastNumeric && lastNumeric.kind === undefined));
+    if (!model || !hasTotal || !model.columns.some((c) => c.kind === 'desc')) continue;
+    for (const h of g) {
+      h.model = model;
+      h.cols = model.columns.filter((c) => c.kind).map((c) => ({ kind: c.kind as ColKind, x0: c.x0, x1: c.x1, label: fold(c.label ?? '').replace(/[^a-z0-9]/g, '') }));
+      h.numericOrder = h.cols.filter((c) => NUMERIC_KINDS.has(c.kind)).map((c) => c.kind);
+    }
+  }
+}
+
+/**
+ * Solución guiada por el modelo de tabla: cantidad, precio, descuentos e importe salen de SUS columnas y se validan
+ * con la aritmética (cantidad × precio × (1 − d1) × (1 − d2) = importe). Con varias columnas de cantidad (uds y kilos,
+ * cajas y botellas) gana la que cuadra, por orden de preferencia. Devuelve undefined si nada cuadra.
+ */
+function modelSolve(toks: NumTok[], header: TableHeader): Solution | undefined {
+  const model = header.model;
+  if (!model) return undefined;
+  const has = (k: ColKind) => model.columns.some((c) => c.kind === k);
+  const of = (k: ColKind) => toks.filter((t) => t.col === k && !t.n.perUnit);
+  const unknown = toks.filter((t) => t.col === undefined && !t.n.pct);
+  const tCands = has('total') ? of('total') : unknown.slice(-1);
+  const pCands = has('price') ? toks.filter((t) => t.col === 'price') : unknown;
+  const qRank = new Map<NumTok, number>();
+  QTY_KINDS.forEach((k, r) => of(k).forEach((t) => qRank.set(t, r)));
+  if (!QTY_KINDS.some((k) => has(k))) unknown.forEach((t) => qRank.set(t, 3));
+  for (const t of toks) if (t.n.mult && !qRank.has(t)) qRank.set(t, 0);
+  const qCands = [...qRank.keys()];
+  const discs = of('disc').filter((d) => d.value > 0 && d.value < 100);
+  const discSets: NumTok[][] = [discs];
+  if (discs.length) {
+    discSets.push([]);
+    if (discs.length === 2) discSets.push([discs[0]], [discs[1]]);
+  }
+  const mults = of('mult').filter((f) => f.value > 1);
+  let best: Solution | undefined;
+  for (const t of tCands) {
+    if (t.n.pct) continue;
+    for (const p of pCands) {
+      if (p === t || p.n.pct || p.value <= 0) continue;
+      for (const q of qCands) {
+        if (q === t || q === p || q.n.pct || q.value === 0) continue;
+        if (Math.sign(q.value * p.value) !== Math.sign(t.value)) continue;
+        for (const f of [undefined, ...mults]) {
+          if (f === q || f === p) continue;
+          for (const [di, d] of discSets.entries()) {
+            let calc = q.value * p.value * (f ? f.value : 1);
+            for (const dd of d) calc *= 1 - dd.value / 100;
+            const err = Math.abs(calc - t.value);
+            if (err > tolerance(q.value * (f ? f.value : 1), p.value)) continue;
+            const score = 30 - (qRank.get(q) ?? 3) * 2 - di * 3 - (f ? 4 : 0) - (err > 0.0051 ? 1 : 0) - (q.n.fixed || p.n.fixed || t.n.fixed ? 2 : 0);
+            if (!best || score > best.score) best = { q, p, t, d, f, err, validated: true, loose: false, score };
+          }
+        }
+      }
+    }
+  }
+  return best;
 }
 
 // ───────────────────────────── Resolución aritmética de una fila ─────────────────────────────
@@ -502,11 +713,16 @@ function numTokens(row: Row, startWord: number, header?: TableHeader): NumTok[] 
     }
     if (!w.num) continue;
     const prev = words[wi - 1];
-    if (prev && !prev.num && NOISE_PREFIX.has(prev.f.replace(/[^a-z]/g, ''))) continue;
-    // "6 X 1L", "24 x 33cl": parte de un formato
+    if (prev && !prev.num && prev.seg === w.seg && NOISE_PREFIX.has(prev.f.replace(/[^a-z]/g, ''))) continue;
+    // "6 X 1L", "24 x 33cl": parte de un formato (pero "6 x 0,82" de un ticket es cantidad × precio)
     const next = words[wi + 1];
-    if (next && /^[x*×]$/i.test(next.raw) && words[wi + 2] && /\d/.test(words[wi + 2].raw)) continue;
-    if (prev && /^[x*×]$/i.test(prev.raw) && words[wi - 2]?.num) continue;
+    const packAfter = (k: number) => {
+      const a = words[k];
+      if (!a || a.seg !== w.seg) return false;
+      return (!!a.num?.unit && a.num.unit !== 'kg') || (!!a.num && unitOf(words[k + 1]) !== undefined && unitOf(words[k + 1]) !== 'kg') || (!a.num && /^\d+(?:[.,]\d+)?(?:cl|ml|l|g|gr|kg)$/i.test(a.raw));
+    };
+    if (next && next.seg === w.seg && /^[x*×]$/i.test(next.raw) && packAfter(wi + 2)) continue;
+    if (prev && prev.seg === w.seg && /^[x*×]$/i.test(prev.raw) && words[wi - 2]?.num && (!!w.num.unit || unitOf(words[wi + 1]) !== undefined) && w.num.unit !== 'kg') continue;
     const inDesc = lastText > wi;
     const lead = firstText === -1 || wi < firstText;
     const col = header ? columnOf(w, header, row.cw) : undefined;
@@ -744,7 +960,7 @@ function digitRepairAll(toks: NumTok[], opts: RepairOpts): { sol: Solution; dist
       const words = opts.row?.words ?? [];
       const last = words[words.length - 1];
       const raw = target.toFixed(2).replace('.', ',');
-      const w: Word = { raw, x0: last ? last.x1 : 0, x1: last ? last.x1 : 0, f: raw, num: { value: target, dec: 2, pct: false, cur: false, fixed: raw } };
+      const w: Word = { raw, x0: last ? last.x1 : 0, x1: last ? last.x1 : 0, f: raw, seg: -1, num: { value: target, dec: 2, pct: false, cur: false, fixed: raw } };
       totals = [{ wi: words.length, w, n: w.num as NumInfo, value: target, inDesc: false, lead: false, col: 'total' }];
     }
   } else {
@@ -820,7 +1036,7 @@ function digitRepairAll(toks: NumTok[], opts: RepairOpts): { sol: Solution; dist
         const value = round(q.value * p.value, 2);
         if (!(value > 0)) continue;
         const raw = value.toFixed(2).replace('.', ',');
-        const w: Word = { raw, x0: lastWord ? lastWord.x1 : 0, x1: lastWord ? lastWord.x1 : 0, f: raw, num: { value, dec: 2, pct: false, cur: false, fixed: raw } };
+        const w: Word = { raw, x0: lastWord ? lastWord.x1 : 0, x1: lastWord ? lastWord.x1 : 0, f: raw, seg: -1, num: { value, dec: 2, pct: false, cur: false, fixed: raw } };
         const t: NumTok = { wi: words.length, w, n: w.num as NumInfo, value, inDesc: false, lead: false, col: 'total' };
         const sol: Solution = { q, p, t, d: [], err: 0, validated: true, loose: false, score: 0 };
         const key = `${q.value}|${p.value}|${value}|`;
@@ -854,7 +1070,95 @@ function headerUnit(header: TableHeader | undefined, sol: Solution): string | un
   return undefined;
 }
 
+/**
+ * Línea con el modelo de tabla: la descripción sale SÓLO de la columna de descripción (nunca de lotes, caducidades,
+ * EAN, códigos ni bultos), el código de su columna, la unidad de la columna de unidad (o pegada a la cantidad, o de la
+ * etiqueta de la columna: "Kilos" → kg) y el IVA de su columna, esté antes o después del importe.
+ */
+function buildLineModel(row: Row, sol: Solution, toks: NumTok[], confidence: number, warnings: string[], model: TableModel): ParsedLine {
+  const words = row.words;
+  const used = new Set<number>([sol.q.wi, sol.p.wi, sol.t.wi, ...sol.d.map((d) => d.wi)]);
+  if (sol.f) used.add(sol.f.wi);
+  for (const t of [sol.q, sol.p, sol.t]) if (t.n.fixed && /^\d{1,4},\d{2,3}$/.test(t.n.fixed) && !/[.,]/.test(t.w.raw)) used.add(t.wi + 1);
+  const colAt = (w: Word) => {
+    const j = columnIndex(model.columns, w);
+    return j >= 0 ? model.columns[j] : undefined;
+  };
+  let vatPct: number | undefined;
+  let vatCode: string | undefined;
+  // IVA de su columna (antes o después del importe) o, sin columna rotulada, el tipo que sigue al importe
+  const vatTok =
+    toks.find((t) => t.col === 'vat' && !used.has(t.wi) && (isVatRateValue(t.n) || t.n.value === 0)) ??
+    toks.find((t) => t.wi > sol.t.wi && t.col === undefined && !used.has(t.wi) && isVatRateValue(t.n));
+  if (vatTok) {
+    vatPct = vatTok.value;
+    used.add(vatTok.wi);
+  }
+  const descWords: Word[] = [];
+  let code: string | undefined;
+  let unitCell: string | undefined;
+  words.forEach((w, k) => {
+    if (used.has(k)) return;
+    const c = colAt(w);
+    const kind = c?.kind;
+    if (kind === 'desc') descWords.push(w);
+    else if (kind === 'code' && !code && /\d/.test(w.raw)) code = w.raw.replace(/[.:"'”’`]+$/, '');
+    else if (kind === 'unit' && !unitCell && /\p{L}/u.test(w.raw)) unitCell = unitOf(w) || fold(w.raw).replace(/[^a-z0-9]/g, '');
+    else if (kind === 'vat' && vatPct === undefined && !vatCode && /^[A-E]$/.test(w.raw.replace(/[()]/g, ''))) vatCode = w.raw.replace(/[()]/g, '');
+  });
+  if (!code && !model.columns.some((c) => c.kind === 'code')) {
+    const lc = leadingCode(descWords);
+    if (lc.end && descWords.length > lc.end) {
+      code = lc.code;
+      descWords.splice(0, lc.end);
+    }
+  }
+  // Unidad: pegada a la cantidad o en su celda, columna de unidad, etiqueta de la columna, precio por unidad
+  const qCol = colAt(sol.q.w);
+  const pCol = colAt(sol.p.w);
+  const nextW = words[sol.q.wi + 1];
+  const inQtyCell = nextW && nextW.seg === sol.q.w.seg && !nextW.num && unitOf(nextW) !== undefined ? unitOf(nextW) || fold(nextW.raw) : undefined;
+  let unit: string | undefined = sol.q.n.unit ?? inQtyCell ?? unitCell ?? qCol?.unit ?? sol.p.n.perUnit ?? pCol?.perUnit;
+  if (!unit && descWords.length > 1) {
+    const u = unitOf(descWords[descWords.length - 1]);
+    if (u) unit = u;
+  }
+  if (!unit) unit = sol.q.n.dec === 3 && !Number.isInteger(sol.q.value) ? 'kg' : 'ud';
+  const description = collapseSpaces(descWords.map((w) => w.raw).join(' ')).replace(/[\s.·:|_-]+$/, '').replace(/^[\s.·:|_-]+/, '');
+  let unitPrice = sol.p.value;
+  let description2 = description;
+  if (sol.f) {
+    unitPrice = round(sol.p.value * sol.f.value, 4);
+    if (unit === 'ud') unit = 'caja';
+    if (!/\d+\s*[x*]\s*\d/i.test(description2)) description2 = `${description2} ${sol.f.value} UD`.trim();
+  }
+  let discountPct: number | undefined;
+  if (sol.d.length) discountPct = round((1 - sol.d.reduce((acc, d) => acc * (1 - d.value / 100), 1)) * 100, 2);
+  const fixes = [sol.q, sol.p, sol.t, ...sol.d].filter((t) => t.n.repaired && t.wi < words.length).map((t) => `"${t.w.raw}" → ${t.n.fixed}`);
+  if (fixes.length) warnings.push(`Lectura corregida por la validación aritmética: ${fixes.join(', ')}`);
+  if (sol.t.wi >= words.length) warnings.push('Importe ilegible: calculado a partir de la base imponible');
+  return {
+    row: row.i,
+    rows: [row.i],
+    code,
+    description: description2,
+    quantity: round(sol.q.value, 4),
+    unit: normUnit(unit),
+    unitPrice: round(unitPrice, 4),
+    discountPct,
+    total: round(sol.t.value, 2),
+    vatPct,
+    vatCode,
+    confidence,
+    warnings,
+    validated: sol.validated || sol.loose,
+    descX: descWords[0]?.x0,
+    roles: solutionRoles(sol, words, descWords, vatTok?.w),
+  };
+}
+
 function buildLine(row: Row, codeEnd: number, code: string | undefined, sol: Solution, toks: NumTok[], confidence: number, warnings: string[], header?: TableHeader): ParsedLine {
+  if (header?.model && [sol.q, sol.p, sol.t].every((t) => t.col === undefined || NUMERIC_KINDS.has(t.col))) return buildLineModel(row, sol, toks, confidence, warnings, header.model);
   const words = row.words;
   const used = new Set<number>([sol.q.wi, sol.p.wi, sol.t.wi, ...sol.d.map((d) => d.wi)]);
   if (sol.f) used.add(sol.f.wi);
@@ -969,6 +1273,7 @@ function buildLine(row: Row, codeEnd: number, code: string | undefined, sol: Sol
     warnings,
     validated: sol.validated || sol.loose,
     descX: descWords[0]?.x0,
+    roles: solutionRoles(sol, words, descWords, vatTok?.w),
   };
 }
 
@@ -978,9 +1283,40 @@ interface RowParse {
   textOnly?: boolean;
 }
 
+/** Texto de la columna de descripción de una fila (con modelo de tabla). */
+function descColumnText(row: Row, model: TableModel): string {
+  return collapseSpaces(
+    row.words
+      .filter((w) => {
+        const j = columnIndex(model.columns, w);
+        return j >= 0 && model.columns[j].kind === 'desc';
+      })
+      .map((w) => w.raw)
+      .join(' '),
+  );
+}
+
+/** Fila con el modelo de tabla. undefined = la aritmética no cuadra con las columnas (se prueba sin modelo). */
+function parseRowWithModel(row: Row, header: TableHeader): RowParse | undefined {
+  const toks = numTokens(row, 0, header);
+  const inNumericCols = toks.filter((t) => (t.col === undefined ? !t.inDesc : NUMERIC_KINDS.has(t.col)));
+  // Continuación posible: algo con letras en la columna de descripción (también "1L", "500G")
+  const hasLetters = row.words.some((w) => /\p{L}/u.test(w.raw) && columnOf(w, header, row.cw) === 'desc');
+  if (!inNumericCols.some((t) => t.col !== 'vat' && t.col !== 'disc')) return { textOnly: hasLetters };
+  const strict = toks.filter((t) => t.col === undefined || NUMERIC_KINDS.has(t.col));
+  const sol = modelSolve(strict, header);
+  if (!sol) return undefined;
+  const conf = [sol.q, sol.p, sol.t].some((t) => t.n.fixed) ? 0.85 : 1;
+  return { line: buildLine(row, 0, undefined, sol, strict, conf, [], header) };
+}
+
 function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): RowParse {
   const words = row.words;
   if (!words.length) return {};
+  if (header?.model) {
+    const res = parseRowWithModel(row, header);
+    if (res) return res;
+  }
   const { end: codeEnd, code } = leadingCode(words);
   const toks = numTokens(row, codeEnd, header);
   const hasText = words.some((w, k) => k >= codeEnd && isTexty(w));
@@ -1034,7 +1370,8 @@ function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): 
   }
   if (!inTable || !hasText) {
     const loneInt = toks.length === 1 && toks[0].n.dec === 0 && !toks[0].n.cur && Math.abs(toks[0].value) < 1000;
-    return { textOnly: hasLetters && (toks.every((t) => t.inDesc) || loneInt) };
+    // Un formato pegado al final del texto ("KETCHUP 1,8KG", "AGUA 50CL") es parte de la descripción
+    return { textOnly: hasLetters && (toks.every((t) => t.inDesc || (!!t.n.unit && !!t.afterText && !t.n.cur)) || loneInt) };
   }
 
   // Sin validación: asignación plausible por columnas o por orden
@@ -1057,6 +1394,8 @@ function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): 
   if (!q) q = rest.filter((x) => x !== p && (!p || x.wi < p.wi)).pop();
   if (!d) d = pctToks.find((x) => (!p || x.wi > p.wi) && (!t || x.wi < t.wi));
   if (!t) return { textOnly: true };
+  // Con modelo de tabla, una fila sin nada en la columna de descripción y que no cuadra no es una línea (pies, totales)
+  if (header?.model && !descColumnText(row, header.model).replace(/[^\p{L}]/gu, '')) return {};
   const fake = (value: number, like: NumTok): NumTok => ({ ...like, value, n: { ...like.n, value, dec: 2, fixed: undefined } });
   let confidence = 0.6;
   if (!p && !q) {
@@ -1086,6 +1425,12 @@ function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): 
 const CIF_RE = /\b(?:ES[\s-]?)?([ABCDEFGHJKLMNPQRSUVW])[\s-]?(\d{7})[\s-]?([0-9A-J])\b/g;
 const NIF_RE = /\b(?:ES[\s-]?)?(\d{8})[\s-]?([A-Z])\b/g;
 const NIE_RE = /\b([XYZ])[\s-]?(\d{7})[\s-]?([A-Z])\b/g;
+
+/** ¿Contiene un CIF, NIF o NIE? */
+function hasTaxId(text: string): boolean {
+  const t = text.toUpperCase();
+  return [CIF_RE, NIF_RE, NIE_RE].some((re) => new RegExp(re.source).test(t));
+}
 
 export function validCif(cif: string): boolean {
   const m = /^([ABCDEFGHJKLMNPQRSUVW])(\d{7})([0-9A-J])$/.exec(cif);
@@ -1189,9 +1534,9 @@ function xAtChar(row: Row, charIndex: number): number {
   return acc;
 }
 
-const CUSTOMER_RE =
-  /\b(?:cliente|destinatario|facturar\s*a|facturado\s*a|datos\s*(?:del\s*)?cliente|enviar\s*a|entregar\s*a|direccion\s*(?:de\s*)?(?:entrega|envio)|lugar\s*de\s*entrega|comprador|receptor|sr\.|sres\.|senor(?:es)?|attn|a\/a)\b/;
 const SUPPLIER_LABEL_RE = /\b(?:proveedor|emisor|vendedor|razon\s*social|expedidor)\b\s*[:.]?/;
+/** Etiqueta que abre el bloque del proveedor ("Emisor", "Proveedor:", "Datos del emisor"). */
+const SUPPLIER_LABEL_START_RE = /^(?:datos\s*(?:del\s*)?)?(?:proveedor|emisor|vendedor|expedidor)\s*[:.]?(?:\s|$)/;
 
 interface Segment {
   text: string;
@@ -1279,7 +1624,7 @@ const INVOICE_NUMBER_LABEL = new RegExp(
   ]
     .map((p) => `(?:${p})`)
     .join('|') +
-    ')\\s*[:#.]?\\s*',
+    ')\\s*[:#.]*\\s*',
   'g',
 );
 const NUMBER_NEG = /(?:cliente|pedido|albaran|cuenta|proveedor|lote|telefono|registro|pagina|hoja|agente|ruta|vendedor|caja|terminal|operacion|tarjeta|autorizacion|s\/ref|serie)\W*$/;
@@ -1299,19 +1644,32 @@ function extractInvoiceNumber(rows: Row[]): string | undefined {
       const label = m[0];
       const strong = /factura|fra|invoice|ticket|documento|doc/.test(label);
       const before = f.slice(Math.max(0, m.index - 12), m.index);
+      // "Fecha factura", "F. factura", "Vto. factura": etiquetas de fecha, no de número
+      if (/(?:fecha|f\.|fec\.?|vto\.?|vencimiento)\s*(?:de\s*)?(?:la\s*)?$/.test(before)) continue;
       if (!strong && NUMBER_NEG.test(before)) continue;
       if (/(?:cliente|pedido|albaran|proveedor)\s*$/.test(before) && !/factura/.test(label)) continue;
-      let score = /factura|fra/.test(label) ? (new RegExp(NS).test(label.replace(/factura|fra/, '')) ? 10 : 7) : /documento|doc|invoice|ticket/.test(label) ? 6 : 4;
+      const withNo = new RegExp(NS).test(label.replace(/factura|fra/, ''));
+      let score = /factura|fra/.test(label) ? (withNo ? 10 : 7) : /documento|doc|invoice|ticket/.test(label) ? 6 : 4;
       const rest = text.slice(m.index + label.length);
       const tok = /^([A-Za-z]{0,6}[-/.]?\d[A-Za-z0-9\-/._]*|\d[A-Za-z0-9\-/._]*)/.exec(rest);
       let value = tok?.[1];
+      // Un día seguido del mes ("26 de enero") es una fecha
+      if (value && /^\d{1,2}$/.test(value) && /^\d{1,2}\s+de\s+[a-z]/i.test(fold(rest))) continue;
       if (!value || !/\d/.test(value)) {
+        // El título suelto ("FACTURA") no es una etiqueta de número fiable para el valor de debajo
+        if (/factura|fra/.test(label) && !withNo) score = 3;
         // Valor en la fila siguiente, bajo la etiqueta
         const next = rows[ri + 1];
         if (!next) continue;
         const labelX = row.positional ? xAtChar(row, m.index) : m.index;
         const cand = next.words
-          .filter((w) => /\d/.test(w.raw) && !parseDateEs(w.raw) && !/^\d{1,2}:\d{2}/.test(w.raw) && w.raw.replace(/[^\dA-Za-z]/g, '').length >= 3)
+          .filter((w, k) => {
+            if (!/\d/.test(w.raw) || parseDateEs(w.raw) || /^\d{1,2}:\d{2}/.test(w.raw) || w.raw.replace(/[^\dA-Za-z]/g, '').length < 3) return false;
+            // Ni códigos postales ("46811 Valencia") ni años de una fecha en letra ("9 de junio de 2025")
+            if (/^\d{5}$/.test(w.raw) && /^\p{L}{3,}/u.test(next.words[k + 1]?.raw ?? '')) return false;
+            if (/^(?:19|20)\d{2}$/.test(w.raw) && next.words[k - 1]?.f === 'de') return false;
+            return true;
+          })
           .map((w) => ({ w, d: Math.abs(w.x0 - labelX) }))
           .sort((a, b) => a.d - b.d)[0];
         if (!cand || cand.d > (row.positional ? 60 : 12)) continue;
@@ -1326,11 +1684,45 @@ function extractInvoiceNumber(rows: Row[]): string | undefined {
       if (!best || score > best.score) best = { value, score, row };
     }
   });
-  if (!best) return undefined;
+  if (!best) return albaranNumber(rows);
   // Serie aparte: "Serie F  Número 2026/1452" → "F-2026/1452"
   const serie = /\bserie\s*[:.]?\s*([A-Z0-9]{1,4})\b/i.exec(best.row.text);
   if (serie && !best.value.toUpperCase().startsWith(serie[1].toUpperCase()) && serie[1] !== best.value) return `${serie[1]}-${best.value}`;
   return best.value;
+}
+
+const ALBARAN_LABEL = new RegExp(`(?:\\b(?:albaran|nota\\s*de\\s*entrega|alb\\.)\\s*(?:valorado\\s*)?(?:${NS})?|\\b${NS}\\s*(?:de\\s*)?(?:albaran|alb\\b\\.?))\\s*[:#.]?\\s*`, 'g');
+
+/** Número de un albarán valorado (sólo si el documento no trae número de factura). */
+function albaranNumber(rows: Row[]): string | undefined {
+  for (let ri = 0; ri < rows.length; ri++) {
+    const row = rows[ri];
+    const f = foldKeepLength(row.text);
+    ALBARAN_LABEL.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = ALBARAN_LABEL.exec(f))) {
+      if (!m[0].length) {
+        ALBARAN_LABEL.lastIndex++;
+        continue;
+      }
+      const rest = row.text.slice(m.index + m[0].length);
+      let value = /^([A-Za-z]{0,6}[-/.]?\d[A-Za-z0-9\-/._]*)/.exec(rest)?.[1];
+      if (!value && rows[ri + 1]) {
+        // Valor debajo de la etiqueta (rejilla)
+        const labelX = row.positional ? xAtChar(row, m.index) : m.index;
+        const cand = rows[ri + 1].words
+          .filter((w) => /\d/.test(w.raw) && !parseDateEs(w.raw) && w.raw.replace(/[^\dA-Za-z]/g, '').length >= 3)
+          .map((w) => ({ w, d: Math.abs(w.x0 - labelX) }))
+          .sort((a, b) => a.d - b.d)[0];
+        if (cand && cand.d <= (row.positional ? 60 : 12)) value = cand.w.raw;
+      }
+      if (!value) continue;
+      value = value.replace(/[.,:;]+$/, '');
+      if (parseDateEs(value) || /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(value) || value.replace(/[^\d]/g, '').length < 2) continue;
+      return value;
+    }
+  }
+  return undefined;
 }
 
 interface HeaderInfo {
@@ -1340,52 +1732,277 @@ interface HeaderInfo {
   date?: string;
 }
 
+// ───────────────────────────── Bloques de la cabecera del documento ─────────────────────────────
+
+/** Etiqueta que abre el bloque del cliente ("Cliente", "Facturar a", "Datos del cliente", "Sr./Sres.", "Destinatario"). */
+const CUSTOMER_LABEL_RE =
+  /^(?:clientes?|datos\s*(?:fiscales\s*)?(?:del\s*)?cliente|facturar\s*a|facturado\s*a|destinatario|enviar\s*a|entregar\s*a|direccion\s*(?:de\s*)?(?:entrega|envio)|lugar\s*de\s*entrega|comprador|receptor|sr\.?\s*\/?\s*sres\.?|sres\.?|senor(?:es)?|a\/a|attn)\s*[:.]?(?:\s|$)/;
+/** Celda con el código y el nombre del cliente dentro de la caja de datos ("Cód. cliente 0094 · Bar X S.L."). */
+const CUSTOMER_CODE_SEG_RE = /^(?:cod\.?\s*(?:de\s*)?cliente|n[ºo°]\.?\s*(?:de\s*)?cliente|cliente\s*n[ºo°]\.?|num\.?\s*cliente|clientes?)\s*[:.]?\s*\S/;
+/** Fila con el identificador fiscal del cliente ("NIF cliente", "CIF del cliente"). */
+const CUSTOMER_ID_RE = /\b(?:n\.?\s?i\.?\s?f|c\.?\s?i\.?\s?f|dni)\.?\s*(?:del\s*)?cliente\b|\bcliente\s*(?:n\.?i\.?f|c\.?i\.?f)\b/;
+
+interface Block {
+  segs: Segment[];
+  x0: number;
+  x1: number;
+  page: number;
+  firstRow: number;
+  lastY: number;
+  closed: boolean;
+  customer: boolean;
+  /** Celdas del cliente dentro de un bloque que no es suyo (caja de datos con "Cliente: 0094 · Bar X", "NIF: …"). */
+  customerSegs: Set<Segment>;
+  /** Abierto por una etiqueta del proveedor ("Emisor", "Proveedor", "Datos del emisor"). */
+  supplierLabel?: boolean;
+}
+
+/**
+ * Bloques de texto de la cabecera (proveedor, cliente, datos del documento…): cada celda de cada fila se une al bloque
+ * de encima con el que se solapa o se alinea (izquierda o derecha) si está cerca en vertical. Así se separan el
+ * proveedor y el cliente aunque compartan filas (uno a cada lado), y el bloque del cliente queda entero bajo su etiqueta.
+ */
+function headerBlocks(zone: Row[]): Block[] {
+  const blocks: Block[] = [];
+  const ys: number[] = [];
+  for (let k = 1; k < zone.length; k++) if (zone[k].page === zone[k - 1].page && zone[k].y > zone[k - 1].y) ys.push(zone[k].y - zone[k - 1].y);
+  const pitch = ys.length ? median(ys) : 1;
+  for (const row of zone) {
+    if (!row.f.trim()) continue;
+    const segs = segmentsOf(row).filter((sg) => /[\p{L}\d]/u.test(sg.text));
+    if (!segs.length) {
+      // Separador ("-----"): cierra los bloques abiertos
+      for (const b of blocks) b.closed = true;
+      continue;
+    }
+    const cw = row.positional ? row.cw : 1;
+    let labelBlock: Block | undefined;
+    let prevSeg: Segment | undefined;
+    for (const sg of segs) {
+      const ft = fold(collapseSpaces(sg.text));
+      const company = COMPANY_SUFFIX_RE.test(ft);
+      // La etiqueta del cliente (o del proveedor) abre siempre un bloque nuevo y se lleva lo que la sigue en su fila
+      const supplierLabel = SUPPLIER_LABEL_START_RE.test(ft);
+      if (CUSTOMER_LABEL_RE.test(ft) || supplierLabel) {
+        labelBlock = { segs: [sg], x0: sg.x0, x1: sg.x1, page: row.page, firstRow: row.i, lastY: row.y, closed: false, customer: !supplierLabel, supplierLabel, customerSegs: new Set() };
+        blocks.push(labelBlock);
+        prevSeg = sg;
+        continue;
+      }
+      if (labelBlock && prevSeg && sg.x0 - prevSeg.x1 <= cw * 8) {
+        labelBlock.segs.push(sg);
+        labelBlock.x1 = Math.max(labelBlock.x1, sg.x1);
+        prevSeg = sg;
+        continue;
+      }
+      labelBlock = undefined;
+      prevSeg = sg;
+      let best: Block | undefined;
+      let bestScore = 0;
+      for (const b of blocks) {
+        if (b.closed || b.page !== row.page || row.y - b.lastY > Math.max(pitch * 2.3, row.positional ? cw * 5 : 2.01)) continue;
+        // Una segunda razón social empieza otro bloque (el proveedor debajo del cliente o al revés)
+        if (company && b.segs.some((o) => o.row !== sg.row && COMPANY_SUFFIX_RE.test(fold(collapseSpaces(o.text))))) continue;
+        const ov = Math.min(sg.x1, b.x1) - Math.max(sg.x0, b.x0);
+        const aligned = Math.abs(sg.x0 - b.x0) <= cw * 3 || Math.abs(sg.x1 - b.x1) <= cw * 3;
+        if (ov <= 0 && !aligned) continue;
+        const score = Math.max(0, ov) + (aligned ? cw * 20 : 0) - (row.y - b.lastY);
+        if (!best || score > bestScore) {
+          best = b;
+          bestScore = score;
+        }
+      }
+      if (best) {
+        best.segs.push(sg);
+        best.x0 = Math.min(best.x0, sg.x0);
+        best.x1 = Math.max(best.x1, sg.x1);
+        best.lastY = row.y;
+      } else blocks.push({ segs: [sg], x0: sg.x0, x1: sg.x1, page: row.page, firstRow: row.i, lastY: row.y, closed: false, customer: false, customerSegs: new Set() });
+    }
+  }
+  for (const b of blocks) {
+    const texts = b.segs.map((sg) => fold(collapseSpaces(sg.text)));
+    b.customer ||= texts.slice(0, 3).some((t) => CUSTOMER_LABEL_RE.test(t)) || texts.some((t) => CUSTOMER_ID_RE.test(t));
+    if (b.customer) continue;
+    // Caja de datos con el cliente dentro: su celda y la del identificador fiscal que la sigue son del cliente
+    const isTaxLabel = (sg: Segment | undefined) => !!sg && /^(?:n\.?\s?i\.?\s?f|c\.?\s?i\.?\s?f|dni|nif\/cif|cif\/nif)\b/.test(fold(collapseSpaces(sg.text)));
+    // Celda a la derecha en la misma fila (en una caja etiqueta | valor, el valor puede caer en otro bloque)
+    const rightOf = (sg: Segment): { seg: Segment; block: Block } | undefined => {
+      let best: { seg: Segment; block: Block } | undefined;
+      for (const o of blocks) for (const x of o.segs) if (x.row === sg.row && x.x0 > sg.x1 && (!best || x.x0 < best.seg.x0)) best = { seg: x, block: o };
+      return best;
+    };
+    texts.forEach((t, k) => {
+      const sg = b.segs[k];
+      let value: { seg: Segment; block: Block } | undefined;
+      if (CUSTOMER_CODE_SEG_RE.test(t) && /\p{L}{3}/u.test(t.replace(CUSTOMER_CODE_SEG_RE, ''))) value = { seg: sg, block: b };
+      else if (/^(?:cod\.?\s*(?:de\s*)?cliente|n[ºo°]\.?\s*(?:de\s*)?cliente|cliente\s*n[ºo°]\.?|clientes?)\s*[:.]?$/.test(t)) {
+        // Etiqueta sola en su celda ("Cód. cliente" | "0094 · Bar X S.L.")
+        const r = rightOf(sg);
+        if (r && /\p{L}{3}/u.test(r.seg.text)) {
+          b.customerSegs.add(sg);
+          value = r;
+        }
+      }
+      if (!value) return;
+      value.block.customerSegs.add(value.seg);
+      // El NIF que sigue (celda siguiente del bloque de la etiqueta, con su valor a la derecha) también es del cliente
+      for (const o of b.segs.slice(k + 1, k + 3)) {
+        if (o === value.seg) continue;
+        if (hasTaxId(o.text)) {
+          b.customerSegs.add(o);
+          break;
+        }
+        if (isTaxLabel(o)) {
+          b.customerSegs.add(o);
+          const r = rightOf(o);
+          if (r && hasTaxId(r.seg.text)) r.block.customerSegs.add(r.seg);
+          break;
+        }
+      }
+      if (value.block !== b) {
+        const vi = value.block.segs.indexOf(value.seg);
+        const nv = value.block.segs[vi + 1];
+        if (nv && hasTaxId(nv.text) && isTaxLabel(b.segs.find((x) => x.row === nv.row))) value.block.customerSegs.add(nv);
+      }
+    });
+  }
+  return blocks;
+}
+
+const LOGO_RE = /^[A-ZÑÁÉÍÓÚ&.]{1,5}$/;
+
+/** ¿Parece una razón social o nombre comercial (no una dirección, un teléfono, una etiqueta…)? */
+function nameCandidate(text: string): boolean {
+  const t = collapseSpaces(text);
+  const f = fold(t);
+  if (f.replace(/[^a-z]/g, '').length < 3) return false;
+  // Sólo la forma jurídica ("S.L.U." de una razón social partida en dos filas)
+  if (f.replace(COMPANY_SUFFIX_RE, '').replace(/[^a-z]/g, '').length < 3) return false;
+  if (NOT_NAME_RE.test(f) || ADDRESS_RE.test(f) || CUSTOMER_LABEL_RE.test(f)) return false;
+  if (/@|www\.|https?:|\.com\b|\.es\b/.test(f)) return false;
+  if (/\b\d{5}\b/.test(f) && !COMPANY_SUFFIX_RE.test(f)) return false;
+  if (/\b[69]\d{2}[\s.]?\d{2,3}[\s.]?\d{2,3}[\s.]?\d{0,3}\b/.test(f)) return false;
+  if (/:$/.test(t)) return false;
+  return true;
+}
+
 function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeRows: Set<number>): HeaderInfo {
   const zone = rows.slice(0, Math.max(1, headerEnd));
-  // Bloque del cliente
-  const customerRows = new Set<number>();
-  let customerX: number | undefined;
-  zone.forEach((row) => {
-    const m = CUSTOMER_RE.exec(row.f);
-    if (!m) return;
-    const x = row.positional ? xAtChar(row, m.index) : m.index;
-    customerX = customerX === undefined ? x : Math.min(customerX, x);
-    customerRows.add(row.i);
-    // El bloque del cliente sigue en las filas de debajo (dirección, CIF) hasta una línea en blanco o la razón social
-    // de otra empresa (el proveedor)
-    for (let k = row.i + 1; k <= row.i + 4 && k < allRows.length; k++) {
-      const next = allRows[k];
-      if (!next.f.trim() || (COMPANY_SUFFIX_RE.test(fold(collapseSpaces(next.text))) && !CUSTOMER_RE.test(next.f))) break;
-      customerRows.add(k);
-    }
-  });
-  const isCustomerPos = (rowIdx: number, x: number) => {
-    if (!customerRows.has(rowIdx)) return false;
-    const row = allRows[rowIdx];
-    const m = CUSTOMER_RE.exec(row.f);
-    if (m) {
-      const lx = row.positional ? xAtChar(row, m.index) : m.index;
-      return x >= lx - 2;
-    }
-    return customerX === undefined || x >= customerX - (allRows[rowIdx].positional ? 40 : 6);
+  const blocks = headerBlocks(zone);
+  const blockOfSeg = (rowIdx: number, x: number) => blocks.find((b) => b.segs.some((sg) => sg.row === rowIdx && x >= sg.x0 - 1 && x <= sg.x1 + 1));
+  const customerSeg = (rowIdx: number, x: number) => {
+    const b = blockOfSeg(rowIdx, x);
+    if (b?.customer || CUSTOMER_ID_RE.test(allRows[rowIdx]?.f ?? '')) return true;
+    return !!b && [...b.customerSegs].some((sg) => sg.row === rowIdx && x >= sg.x0 - 1 && x <= sg.x1 + 1);
   };
 
-  // CIF / NIF del proveedor
+  // Pie legal ("Distribuciones X S.L. · CIF B12345678 · Inscrita en el Registro Mercantil…"): razón social y CIF juntos
+  const footer: { name: string; id: string }[] = [];
+  const footerIds: { id: string; row: Row; valid: boolean }[] = [];
+  for (const row of allRows) {
+    if (row.i < headerEnd || excludeRows.has(row.i) || CUSTOMER_ID_RE.test(row.f)) continue;
+    const ids = findTaxIds([row]);
+    if (!ids.length) continue;
+    for (const h of ids) footerIds.push({ id: h.id, row, valid: h.valid });
+    for (const sg of segmentsOf(row)) {
+      const parts = sg.text.split(/\s[·•|]\s|\s-\s/);
+      for (let k = 0; k < parts.length; k++) {
+        const name = cleanName(parts[k]);
+        if (!COMPANY_SUFFIX_RE.test(fold(name)) || !nameCandidate(name)) continue;
+        footer.push({ name, id: ids[0].id });
+      }
+    }
+  }
+
+  // Bloque del proveedor: el que no es del cliente y tiene razón social, CIF, dirección o teléfono
   const zoneIds = findTaxIds(zone);
+  let supplierBlock: Block | undefined;
+  {
+    let bestScore = 0;
+    const top = Math.min(...blocks.map((b) => b.firstRow));
+    for (const b of blocks) {
+      if (b.customer) continue;
+      const texts = b.segs.filter((sg) => !b.customerSegs.has(sg)).map((sg) => fold(collapseSpaces(sg.text)));
+      let score = b.supplierLabel ? 8 : 0;
+      if (zoneIds.some((h) => blockOfSeg(h.row, h.x) === b && !customerSeg(h.row, h.x))) score += 5;
+      if (texts.some((t) => COMPANY_SUFFIX_RE.test(t))) score += 4;
+      if (texts.some((t) => BUSINESS_RE.test(t))) score += 1;
+      if (texts.some((t) => ADDRESS_RE.test(t) || /\b\d{5}\b/.test(t))) score += 2;
+      if (texts.some((t) => /\btel|telf|telefono|@|www\./.test(t))) score += 1;
+      if (texts.some((t) => /\b(?:factura|fecha|albaran|ticket)\b/.test(t))) score -= 3;
+      if (b.firstRow === top) score += 1;
+      if (b.segs.length >= 2) score += 1;
+      if (score > bestScore) {
+        bestScore = score;
+        supplierBlock = b;
+      }
+    }
+    if (bestScore < 4) supplierBlock = undefined;
+  }
+
+  // Razón social: tras una etiqueta de proveedor en la misma celda ("Proveedor: X S.L.")
+  let supplierName: string | undefined;
+  for (const row of zone) {
+    for (const sg of segmentsOf(row)) {
+      const f = foldKeepLength(sg.text);
+      const m = SUPPLIER_LABEL_RE.exec(f);
+      if (!m) continue;
+      const after = cleanName(sg.text.slice(m.index + m[0].length));
+      if (after && nameCandidate(after)) {
+        supplierName = after;
+        break;
+      }
+    }
+    if (supplierName) break;
+  }
+  const withSuffix = (sg: Segment, b: Block): string => {
+    // Razón social partida en dos filas: "… Levante" / "S.A."
+    const text = cleanName(sg.text);
+    if (COMPANY_SUFFIX_RE.test(fold(text))) return text;
+    const next = b.segs[b.segs.indexOf(sg) + 1];
+    if (next && next.row > sg.row && /^(?:s\.?\s?l\.?\s?u?\.?|s\.?\s?a\.?\s?u?\.?|s\.?\s?coop\.?|c\.?\s?b\.?|slu|sau)$/i.test(collapseSpaces(next.text))) return `${text} ${collapseSpaces(next.text)}`;
+    return text;
+  };
+  if (!supplierName && supplierBlock) {
+    const nameSegs = (b: Block) => b.segs.filter((sg) => !b.customerSegs.has(sg) && nameCandidate(cleanName(sg.text)) && !LOGO_RE.test(collapseSpaces(sg.text)));
+    let b = supplierBlock;
+    if (!nameSegs(b).length) {
+      // Señas sin razón social: el nombre está en el bloque de encima (banda o rótulo con la razón social)
+      const sb = supplierBlock;
+      const above = blocks
+        .filter((o) => o !== sb && !o.customer && o.firstRow < sb.firstRow && Math.min(o.x1, sb.x1) - Math.max(o.x0, sb.x0) > 0 && nameSegs(o).length)
+        .sort((p, q) => q.firstRow - p.firstRow)[0];
+      if (above) b = above;
+    }
+    const cands = nameSegs(b);
+    const withCompany = cands.find((sg) => COMPANY_SUFFIX_RE.test(fold(cleanName(sg.text))));
+    const pick = withCompany ?? cands[0];
+    if (pick) supplierName = withSuffix(pick, b);
+  }
+  // CIF / NIF del proveedor
   const allIds = zoneIds.length ? zoneIds : findTaxIds(allRows.filter((r) => !excludeRows.has(r.i)));
   let supplierTaxId: string | undefined;
   let supplierIdRow: number | undefined;
   {
     let best: { hit: TaxIdHit; score: number } | undefined;
-    for (const hit of allIds) {
+    const cands = [...allIds];
+    for (const f of footerIds) if (!cands.some((h) => h.id === f.id)) cands.push({ id: f.id, row: f.row.i, x: 0, valid: f.valid });
+    const nameKey = supplierName ? fold(supplierName).replace(/[^a-z0-9]+/g, ' ').trim() : '';
+    for (const hit of cands) {
       let score = 0;
       const row = allRows[hit.row];
-      if (isCustomerPos(hit.row, hit.x)) score -= 10;
-      if (/\b(?:c\.?i\.?f|n\.?i\.?f|nif\/cif|vat)\b/.test(row.f)) score += 2;
-      if (SUPPLIER_LABEL_RE.test(row.f)) score += 4;
-      if (hit.row < 8) score += 2;
+      const inZone = hit.row < headerEnd;
+      if (inZone && customerSeg(hit.row, hit.x)) score -= 10;
+      if (inZone && supplierBlock && blockOfSeg(hit.row, hit.x) === supplierBlock) score += 6;
+      if (footer.some((f) => f.id === hit.id)) score += 4;
+      // En el pie, junto al nombre del proveedor ("José Pérez Gil · NIF 12345678Z")
+      if (!inZone && nameKey && row && fold(row.text).replace(/[^a-z0-9]+/g, ' ').includes(nameKey)) score += 5;
+      if (row && /\b(?:c\.?i\.?f|n\.?i\.?f|nif\/cif|vat)\b/.test(row.f)) score += 1;
+      if (row && SUPPLIER_LABEL_RE.test(row.f)) score += 4;
+      if (hit.row < 8) score += 1;
       if (hit.valid) score += 2;
-      score -= hit.row * 0.05;
+      score -= hit.row * 0.02;
       if (!best || score > best.score) best = { hit, score };
     }
     if (best && best.score > -5) {
@@ -1394,26 +2011,19 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
     }
   }
 
-  // Razón social
-  let supplierName: string | undefined;
-  for (const row of zone) {
-    const m = SUPPLIER_LABEL_RE.exec(row.f);
-    if (m) {
-      const after = cleanName(row.text.slice(m.index + m[0].length));
-      if (after && /\p{L}{3}/u.test(after)) {
-        supplierName = after;
-        break;
-      }
-    }
+  if (!supplierName && footer.length) {
+    const f = footer.find((x) => x.id === supplierTaxId) ?? footer[0];
+    supplierName = f.name;
   }
   if (!supplierName) {
+    // Sin bloque claro: la mejor razón social fuera de los bloques del cliente
     let best: { seg: Segment; score: number } | undefined;
     zone.slice(0, 16).forEach((row, idx) => {
       for (const seg of segmentsOf(row)) {
         const cleaned: Segment = { ...seg, text: cleanName(seg.text) };
-        if (!cleaned.text) continue;
-        const s = supplierNameScore(cleaned, idx, supplierIdRow, customerRows, customerX);
-        if (s > (best?.score ?? 1)) best = { seg: cleaned, score: s };
+        if (!cleaned.text || customerSeg(seg.row, seg.x0)) continue;
+        const sc = supplierNameScore(cleaned, idx, supplierIdRow, new Set<number>());
+        if (sc > (best?.score ?? 1)) best = { seg: cleaned, score: sc };
       }
     });
     supplierName = best?.seg.text;
@@ -1446,7 +2056,9 @@ function numbersIn(row: Row): NumTok[] {
     .filter((t): t is NumTok => !!t);
 }
 
-function parseTotals(rows: Row[]): Totals {
+function parseTotals(rowsIn: Row[]): Totals {
+  // Los números con unidad ("500G", "2,5KG") son formatos de envase, nunca importes
+  const rows = rowsIn.map((r) => ({ ...r, words: r.words.map((w) => (w.num && (w.num.unit || w.num.perUnit) ? { ...w, num: undefined } : w)) }));
   const rates: number[] = [];
   const vatCodes: Record<string, number> = {};
   const triples: { base: number; rate: number; vat: number }[] = [];
@@ -1469,10 +2081,11 @@ function parseTotals(rows: Row[]): Totals {
       const isRe = RE_RATES.includes(r.value) && r.n.dec <= 2;
       if (!isRate && !isRe) continue;
       for (const b of nums) {
-        if (b === r || b.value <= 0 || b.n.pct) continue;
+        if (b === r || b.value === 0 || b.n.pct) continue;
         for (const c of nums) {
           if (c === r || c === b || c.n.pct) continue;
-          if (c.value <= 0 || c.value >= b.value) continue;
+          // Facturas rectificativas: base y cuota negativas
+          if (c.value === 0 || Math.sign(c.value) !== Math.sign(b.value) || Math.abs(c.value) >= Math.abs(b.value)) continue;
           if (Math.abs((b.value * r.value) / 100 - c.value) <= 0.0151 && b.wi < c.wi) {
             const list = isRate && !(isRe && !r.n.pct && row.f.includes('r.e')) ? triples : reTriples;
             if (!list.some((x) => x.rate === r.value && approxEqual(x.base, b.value, 0.001, 0))) list.push({ base: b.value, rate: r.value, vat: c.value });
@@ -1527,7 +2140,8 @@ function parseTotals(rows: Row[]): Totals {
         if (cand && cand.d <= (row.positional ? row.cw * 6 : 6)) value = cand.t.value;
       }
       if (value === undefined) return;
-      labeled[lab.kind].push(Math.abs(value));
+      // El signo se conserva (rectificativas en negativo) salvo en los descuentos, que siempre restan
+      labeled[lab.kind].push(lab.kind === 'disc' ? Math.abs(value) : value);
       if (lab.kind === 'vat' && lab.rate !== undefined && VAT_RATES.includes(lab.rate) && !rates.includes(lab.rate)) rates.push(lab.rate);
     });
   }
@@ -1541,7 +2155,7 @@ function parseTotals(rows: Row[]): Totals {
   const baseCands = [...new Set([...(triBase !== undefined ? [triBase] : []), ...labeled.base, ...(labeled.base.length > 1 ? [sum(labeled.base)] : []), ...labeled.sub])];
   const vatCands = [...new Set([...(triVat !== undefined ? [triVat] : []), ...(labeled.vat.length > 1 ? [sum(labeled.vat)] : []), ...labeled.vat, 0])];
   const reCands = [...new Set([...(triRe !== undefined ? [triRe] : []), ...labeled.re, 0])];
-  const totalCands = [...new Set(labeled.total)].sort((a, b) => b - a);
+  const totalCands = [...new Set(labeled.total)].sort((a, b) => Math.abs(b) - Math.abs(a));
 
   let subtotal: number | undefined;
   let vatTotal: number | undefined;
@@ -1582,7 +2196,7 @@ function parseTotals(rows: Row[]): Totals {
     } else if (totalCands.length) {
       total = totalCands[0];
       if (subtotal === undefined && vatTotal !== undefined) subtotal = round(total - vatTotal - (reTotal ?? 0), 2);
-      if (vatTotal === undefined && subtotal !== undefined && subtotal <= total) vatTotal = round(total - subtotal - (reTotal ?? 0), 2);
+      if (vatTotal === undefined && subtotal !== undefined && Math.abs(subtotal) <= Math.abs(total)) vatTotal = round(total - subtotal - (reTotal ?? 0), 2);
     }
   }
   return { subtotal, vatTotal, reTotal, total, globalDiscount: labeled.disc[0], rates, vatCodes };
@@ -1708,18 +2322,336 @@ function combineRepairs(parsed: ParsedLine[], rows: Row[], header: TableHeader |
   });
 }
 
+// ───────────────────────────── Descripciones en varias filas ─────────────────────────────
+
+interface TextRow {
+  row: Row;
+  header?: TableHeader;
+}
+
+/** Texto de descripción de una fila sin importes; undefined si no es una continuación (sublínea, título, pie). */
+function continuationText(t: TextRow): { text: string; code?: string } | undefined {
+  const model = t.header?.model;
+  const words = t.row.words.filter((w) => !/^[.\-_·:|=*]+$/.test(w.raw));
+  if (!words.length) return undefined;
+  if (model) {
+    const desc: Word[] = [];
+    for (const w of words) {
+      const j = columnIndex(model.columns, w);
+      if (j >= 0 && model.columns[j].kind === 'desc') desc.push(w);
+      else return undefined;
+    }
+    return { text: collapseSpaces(desc.map((w) => w.raw).join(' ')) };
+  }
+  const lc = leadingCode(words);
+  return { text: collapseSpaces(words.slice(lc.end).map((w) => w.raw).join(' ')), code: lc.code };
+}
+
+function quantile(values: number[], q: number): number {
+  const s = [...values].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.max(0, Math.floor(q * (s.length - 1))))];
+}
+
+/**
+ * Une las filas de sólo texto a la línea a la que pertenecen, por geometría:
+ *  - alineación arriba (lo habitual en ERP): la fila de debajo continúa la descripción de la línea anterior;
+ *  - alineación centrada (tablas HTML): los números quedan entre dos filas de texto y la línea no tiene descripción
+ *    propia, así que se lleva la fila de arriba y la de abajo;
+ *  - tickets: la descripción va en la fila anterior a «x6  0,82  4,92».
+ * Una fila de texto más separada que el paso normal entre líneas (título de sección, pie) no se une a nada.
+ */
+function attachContinuations(parsed: ParsedLine[], texts: TextRow[], rows: Row[], zoneOf: Map<number, number>): void {
+  if (!texts.length || !parsed.length) return;
+  const lines = [...parsed].sort((a, b) => a.row - b.row);
+  const yOf = (i: number) => rows[i].y;
+  const pitches: number[] = [];
+  for (let k = 1; k < lines.length; k++) {
+    const a = lines[k - 1];
+    const b = lines[k];
+    if (b.row === a.row + 1 && rows[a.row].page === rows[b.row].page) pitches.push(yOf(b.row) - yOf(a.row));
+  }
+  const tableRows = [...zoneOf.keys()].sort((a, b) => a - b);
+  const gaps: number[] = [];
+  for (let k = 1; k < tableRows.length; k++) {
+    const a = rows[tableRows[k - 1]];
+    const b = rows[tableRows[k]];
+    if (a.page === b.page && b.i === a.i + 1 && b.y > a.y) gaps.push(b.y - a.y);
+  }
+  const minGap = gaps.length ? quantile(gaps, 0.1) : 1;
+  const pitch = pitches.length >= 2 ? median(pitches) : undefined;
+  // Sin líneas consecutivas de una fila para medir el paso: altura de una línea de texto (~2,6 anchos de carácter)
+  const cw = median(tableRows.map((i) => rows[i].cw)) || 1;
+  const limit = pitch !== undefined ? Math.max(pitch * 1.08, minGap * 1.05) : Math.max(minGap * 1.6, rows[tableRows[0] ?? 0]?.positional ? cw * 2.6 : 0);
+  const ownDesc = new Map(lines.map((l) => [l, l.description.replace(/[^\p{L}]/gu, '').length >= 2]));
+  const lastY = new Map(lines.map((l) => [l, yOf(l.row)]));
+  const sameZone = (l: ParsedLine, t: Row) => rows[l.row].page === t.page && zoneOf.get(l.row) === zoneOf.get(t.i);
+  const middle = lines.some((l) => {
+    if (ownDesc.get(l)) return false;
+    const y = yOf(l.row);
+    const above = texts.some((t) => sameZone(l, t.row) && t.row.y < y && y - t.row.y < limit);
+    const below = texts.some((t) => sameZone(l, t.row) && t.row.y > y && t.row.y - y < limit);
+    return above && below;
+  });
+  const pre = new Map<ParsedLine, TextRow[]>();
+  const post = new Map<ParsedLine, TextRow[]>();
+  const texts2 = new Map<TextRow, string>();
+  for (const t of [...texts].sort((a, b) => a.row.i - b.row.i)) {
+    const ct = continuationText(t);
+    if (!ct || (t.header?.model ? !ct.text.replace(/[\s.·:|_-]/g, '') : ct.text.replace(/[^\p{L}]/gu, '').length < 2)) continue;
+    let prev: ParsedLine | undefined;
+    let next: ParsedLine | undefined;
+    for (const l of lines) {
+      if (!sameZone(l, t.row)) continue;
+      if (l.row < t.row.i) prev = l;
+      else if (l.row > t.row.i && !next) next = l;
+    }
+    const dPrev = prev ? t.row.y - (lastY.get(prev) ?? 0) : Infinity;
+    const dNext = next ? yOf(next.row) - t.row.y : Infinity;
+    let target: 'pre' | 'post' | undefined;
+    if (next && !ownDesc.get(next) && dNext <= limit && dNext <= dPrev * 1.1) target = 'pre';
+    else if (next && middle && dNext <= limit && dNext < dPrev * 0.87) target = 'pre';
+    // Mucho más cerca de la línea siguiente que de la anterior: la otra mitad de su descripción va en la fila de los
+    // números (celdas centradas en vertical cuya segunda fila de texto cae a la altura de los importes)
+    else if (next && dNext <= limit && dNext < dPrev * 0.6 && (pitch === undefined ? Number.isFinite(dPrev) : dNext < pitch * 0.75)) target = 'pre';
+    else if (prev && dPrev <= limit) target = 'post';
+    if (target === 'pre' && next) {
+      const list = pre.get(next) ?? [];
+      list.push(t);
+      pre.set(next, list);
+      if (ct.code && !next.code) next.code = ct.code;
+    } else if (target === 'post' && prev) {
+      const list = post.get(prev) ?? [];
+      list.push(t);
+      post.set(prev, list);
+      lastY.set(prev, t.row.y);
+    } else continue;
+    texts2.set(t, ct.text);
+  }
+  for (const l of lines) {
+    const a = pre.get(l) ?? [];
+    const b = post.get(l) ?? [];
+    if (!a.length && !b.length) continue;
+    l.description = collapseSpaces([...a.map((t) => texts2.get(t) ?? ''), l.description, ...b.map((t) => texts2.get(t) ?? '')].join(' '));
+    l.rows.push(...a.map((t) => t.row.i), ...b.map((t) => t.row.i));
+  }
+}
+
+/** ¿Fila con descripción y un único importe al final (más, quizá, un código de IVA)? */
+function isAmountOnlyRow(row: Row): boolean {
+  const nums = row.words.filter((w) => w.num && !w.num.pct && !w.num.unit);
+  const money = nums.filter((w) => w.num && (w.num.dec === 2 || w.num.cur));
+  if (money.length !== 1 || nums.length > 2) return false;
+  const last = row.words.findIndex((w) => w === money[0]);
+  const tail = row.words.slice(last + 1);
+  if (tail.length > 1 || (tail.length === 1 && !/^(?:[A-E]|\d{1,2}(?:[.,]\d{1,2})?\s?%)$/.test(tail[0].raw))) return false;
+  const letters = row.words.slice(0, last).filter((w) => !w.num && /\p{L}{3,}/u.test(w.raw));
+  return letters.length >= 1 && !META_ANY_RE.test(row.f) && !STOP_RE.test(row.f.trim());
+}
+
+/**
+ * Añade como líneas (cantidad 1) las filas de importe suelto cuyo importe hace cuadrar la suma de líneas con la base
+ * imponible (o con el total, si los precios incluyen IVA). Prueba todos los subconjuntos (hasta 16 filas) y sólo aplica
+ * uno si es el único que cuadra. Devuelve cuántas se han añadido.
+ */
+function addAmountOnlyLines(parsed: ParsedLine[], rows: Row[], goals: number[], vatCodes: Record<string, number>): number {
+  const cands = rows.slice(0, 16).map((row) => {
+    const money = row.words.filter((w) => w.num && !w.num.pct && !w.num.unit && (w.num.dec === 2 || w.num.cur));
+    return { row, amount: money[0]?.num?.value ?? 0, wi: row.words.indexOf(money[0]) };
+  });
+  const base = round(parsed.reduce((s, l) => s + l.total, 0), 2);
+  for (const goal of goals) {
+    const need = round(goal - base, 2);
+    if (Math.abs(need) < 0.005) return 0;
+    const hits: number[] = [];
+    const n = cands.length;
+    for (let mask = 1; mask < 1 << n && hits.length < 2; mask++) {
+      let sum = 0;
+      for (let k = 0; k < n; k++) if (mask & (1 << k)) sum += cands[k].amount;
+      if (Math.abs(sum - need) <= 0.011) hits.push(mask);
+    }
+    if (hits.length !== 1) continue;
+    let added = 0;
+    cands.forEach((c, k) => {
+      if (!(hits[0] & (1 << k))) return;
+      const words = c.row.words;
+      const lc = leadingCode(words);
+      const desc = collapseSpaces(words.slice(lc.end, c.wi).map((w) => w.raw).join(' '));
+      const vatWord = words[c.wi + 1]?.raw;
+      const vatPct = vatWord && /%$/.test(vatWord) ? parseNumberEs(vatWord) : vatWord && vatCodes[vatWord] !== undefined ? vatCodes[vatWord] : undefined;
+      parsed.push({
+        row: c.row.i,
+        rows: [c.row.i],
+        code: lc.code,
+        description: desc,
+        quantity: 1,
+        unit: 'ud',
+        unitPrice: c.amount,
+        total: c.amount,
+        vatPct,
+        vatCode: vatWord && /^[A-E]$/.test(vatWord) ? vatWord : undefined,
+        confidence: 0.9,
+        warnings: ['Artículo suelto: cantidad 1 validada con la base imponible'],
+        validated: true,
+      });
+      added++;
+    });
+    parsed.sort((a, b) => a.row - b.row);
+    return added;
+  }
+  return 0;
+}
+
+interface WalkResult {
+  parsed: ParsedLine[];
+  extras: { description: string; amount: number }[];
+  excluded: Set<number>;
+  tableEnd: number;
+  /** Última cabecera de tabla activa (para las reparaciones con la base imponible). */
+  header?: TableHeader;
+  /** Filas con descripción y un único importe (artículos sueltos de un ticket), por si completan la base imponible. */
+  amountOnly: Row[];
+}
+
+/** Recorre las filas: líneas, portes y envases, descuentos en fila aparte y continuaciones de descripción. */
+function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: TableHeader): WalkResult {
+  const headerRows = new Set([...headers.values()].flatMap((h) => h.rows));
+  const firstHeader = headers.size ? Math.min(...headers.keys()) : -1;
+  const parsed: ParsedLine[] = [];
+  const extras: { description: string; amount: number }[] = [];
+  const excluded = new Set<number>();
+  const textRows: TextRow[] = [];
+  const amountOnly: Row[] = [];
+  /** Tramo de tabla de cada fila: las continuaciones no cruzan cabeceras, cierres ni «suma y sigue». */
+  const zoneOf = new Map<number, number>();
+  let zone = 0;
+  let header: TableHeader | undefined = forced;
+  let state: 'pre' | 'table' | 'post' | 'paused' = firstHeader >= 0 ? 'pre' : 'table';
+  let lastLineRow = -1;
+  let tableEnd = -1;
+
+  for (const row of rows) {
+    const f = row.f.trim();
+    if (!f) continue;
+    if (headerRows.has(row.i)) {
+      const h = headers.get(row.i);
+      if (h) {
+        header = h;
+        state = 'table';
+        zone++;
+      }
+      excluded.add(row.i);
+      continue;
+    }
+    if (state === 'pre') continue;
+    if (PAUSE_RE.test(f)) {
+      state = 'paused';
+      excluded.add(row.i);
+      zone++;
+      continue;
+    }
+    if (state === 'paused') {
+      if (RESUME_RE.test(f)) state = 'table';
+      excluded.add(row.i);
+      continue;
+    }
+    if (RESUME_RE.test(f)) {
+      excluded.add(row.i);
+      zone++;
+      continue;
+    }
+    if (isStopRow(row)) {
+      if (state === 'table') tableEnd = row.i;
+      state = 'post';
+      zone++;
+      continue;
+    }
+    if (state === 'post' && firstHeader >= 0) continue;
+    if (isMetaRow(row)) {
+      excluded.add(row.i);
+      continue;
+    }
+    const inTable = firstHeader >= 0;
+    const descPart = fold(row.text.replace(/^\s*\S*\d\S*\s+/, '')).trim();
+    // Portes, envases, fianzas: fuera de las líneas pero cuentan en el cuadre
+    const codeless = leadingCode(row.words).end ? fold(row.words.slice(leadingCode(row.words).end).map((w) => w.raw).join(' ')) : fold(row.text.trim());
+    const descCol = header?.model ? fold(descColumnText(row, header.model)) : '';
+    if (EXTRA_RE.test(codeless) || EXTRA_RE.test(descPart) || (descCol && EXTRA_RE.test(descCol))) {
+      const nums = numbersIn(row).filter((t) => !t.n.pct);
+      const money = nums.filter((t) => t.n.dec === 2 || t.n.cur);
+      const amount = money.length ? money[money.length - 1].value : nums.length ? nums[nums.length - 1].value : 0;
+      // Sin importe no es un cargo: puede ser la continuación de una descripción ("… ENVASE RETORNABLE")
+      if (amount) {
+        extras.push({ description: collapseSpaces(row.text), amount });
+        excluded.add(row.i);
+        continue;
+      }
+    }
+    // Descuento en línea aparte ("DTO PROMO  -1,19")
+    if (DISCOUNT_ROW_RE.test(codeless) && parsed.length && lastLineRow >= 0) {
+      const nums = numbersIn(row).filter((t) => !t.n.pct);
+      const pctTok = numbersIn(row).find((t) => t.n.pct);
+      const amountTok = nums[nums.length - 1];
+      const prev = parsed[parsed.length - 1];
+      if (amountTok && Math.abs(amountTok.value) < Math.abs(prev.total)) {
+        const gross = prev.total;
+        prev.total = round(gross - Math.abs(amountTok.value), 2);
+        const base = prev.quantity * prev.unitPrice;
+        prev.discountPct = base > 0 ? round((1 - prev.total / base) * 100, 2) : pctTok?.value;
+        prev.rows.push(row.i);
+        excluded.add(row.i);
+        continue;
+      }
+    }
+    const res = parseRow(row, header, inTable);
+    zoneOf.set(row.i, zone);
+    if (res.line) {
+      parsed.push(res.line);
+      lastLineRow = row.i;
+      continue;
+    }
+    if (res.textOnly && (state === 'table' || firstHeader < 0)) textRows.push({ row, header });
+    else if (!res.line && firstHeader < 0 && isAmountOnlyRow(row)) amountOnly.push(row);
+  }
+  attachContinuations(parsed, textRows, rows, zoneOf);
+  // Sin cabecera de tabla, sólo filas validadas y con descripción
+  if (firstHeader < 0) {
+    for (let k = parsed.length - 1; k >= 0; k--) {
+      const l = parsed[k];
+      if (!l.validated || l.description.replace(/[^\p{L}]/gu, '').length < 3) parsed.splice(k, 1);
+    }
+  }
+
+  return { parsed, extras, excluded, tableEnd, header, amountOnly: amountOnly.filter((r) => !parsed.some((l) => l.rows.includes(r.i))) };
+}
+
+/**
+ * Tabla sin cabecera: modelo de columnas votado por las filas que cuadran (ver buildVotedModel). Devuelve una
+ * cabecera sintética con ese modelo, o undefined si no hay filas suficientes o columnas claras.
+ */
+function votedHeader(parsed: ParsedLine[], rows: Row[]): TableHeader | undefined {
+  const good = parsed.filter((l) => l.validated && l.confidence >= 0.8 && l.roles?.length && rows[l.row].positional);
+  if (good.length < 3) return undefined;
+  const model = buildVotedModel(
+    good.map((l) => toTRow(rows[l.row])),
+    good.flatMap((l) => l.roles ?? []),
+    { isUnitWord: isUnitText },
+  );
+  if (!model) return undefined;
+  const cols = model.columns.filter((c) => c.kind).map((c) => ({ kind: c.kind as ColKind, x0: c.x0, x1: c.x1, label: '' }));
+  return { row: -1, rows: [], model, cols, numericOrder: cols.filter((c) => NUMERIC_KINDS.has(c.kind)).map((c) => c.kind), positional: true };
+}
+
 // ───────────────────────────── Parser principal ─────────────────────────────
 
 function buildRows(input: { text: string; lines?: string[] }, method: 'pdf-texto' | 'ocr', pdfLines?: PdfTextLine[]): Row[] {
   const allowOcr = method === 'ocr';
+  // Texto espaciado letra a letra ("F A C T U R A") recompuesto en palabras
+  const clean = (t: string) => despaceLetters(allowOcr ? cleanOcrText(t) : t);
   if (pdfLines && pdfLines.length) {
-    return pdfLines.map((l, i) => {
-      const line = allowOcr ? { ...l, text: cleanOcrText(l.text), items: l.items.map((it) => ({ ...it, str: cleanOcrText(it.str) })) } : l;
-      return rowFromPdf(line, i, allowOcr);
-    });
+    return pdfLines.map((l, i) => rowFromPdf({ ...l, text: clean(l.text), items: l.items.map((it) => ({ ...it, str: clean(it.str) })) }, i, allowOcr));
   }
   const lines = input.lines ?? input.text.split(/\r?\n/);
-  return lines.map((l, i) => rowFromText(allowOcr ? cleanOcrText(l.replace(/\t/g, '    ')) : l.replace(/\t/g, '    '), i, allowOcr));
+  return lines.map((l, i) => rowFromText(clean(l.replace(/\t/g, '    ')), i, allowOcr));
 }
 
 /** Fila de desglose de IVA: base × tipo / 100 ≈ cuota, o leyenda "A = IVA 21 %". */
@@ -1728,7 +2660,8 @@ function isVatSummaryRow(row: Row): boolean {
   const nums = numbersIn(row);
   if (nums.length < 3 || nums.length > 6) return false;
   const texty = row.words.filter((w) => isTexty(w));
-  if (texty.some((w) => !/^(?:iva|tipo|base|cuota|total|bases|re|r\.e\.)$/.test(w.f)) && texty.length > 1) return false;
+  // Una palabra que no es del cuadro de IVA ("REQUESON 500G 2,26 2,00 …") delata una línea de producto
+  if (texty.some((w) => !/^(?:iva|tipo|base|cuota|total|bases|re|r\.e\.|imponible|importe|b|i)$/.test(w.f) && w.f.length >= 3)) return false;
   for (const r of nums) {
     if (!(VAT_RATES.includes(r.value) && r.value > 0 && r.n.dec <= 2)) continue;
     for (const b of nums) {
@@ -1967,6 +2900,17 @@ export function mergeInvoiceReadings(readings: InvoiceReading[]): InvoiceReading
   return { ...first, invoice, documentWarnings: docWarnings };
 }
 
+/** Tablas detectadas (filas de cabecera y columnas con su tipo), para diagnóstico y pruebas. */
+export function describeInvoiceTables(input: { text: string; lines?: string[] }, method: 'pdf-texto' | 'ocr', pdfLines?: PdfTextLine[]): { headerRows: number[]; columns: { x0: number; x1: number; kind?: string; label?: string }[] }[] {
+  const rows = buildRows(input, method, pdfLines);
+  const headers = detectHeaders(rows);
+  buildModels(rows, headers);
+  return [...headers.values()].map((h) => ({
+    headerRows: h.rows,
+    columns: (h.model?.columns ?? []).map((c) => ({ x0: round(c.x0, 1), x1: round(c.x1, 1), kind: c.kind, label: c.label })),
+  }));
+}
+
 export function parseInvoiceText(input: { text: string; lines?: string[] }, method: 'pdf-texto' | 'ocr', pdfLines?: PdfTextLine[]): ExtractedInvoice {
   return parseInvoiceReading(input, method, pdfLines).invoice;
 }
@@ -1977,141 +2921,21 @@ export function parseInvoiceReading(input: { text: string; lines?: string[] }, m
   const rawText = input.text || rows.map((r) => r.text).join('\n');
   const warnings: string[] = [];
 
-  // 1) Zonas: cabeceras de tabla y filas de cierre
-  const headers = new Map<number, TableHeader>();
-  for (const row of rows) {
-    const h = detectTableHeader(row);
-    if (h) headers.set(row.i, h);
-  }
+  // 1) Zonas: cabeceras de tabla (con sus filas de etiquetas y su modelo de columnas) y filas de cierre
+  const headers = detectHeaders(rows);
+  buildModels(rows, headers);
   const firstHeader = headers.size ? Math.min(...headers.keys()) : -1;
 
-  // 2) Recorrido de filas
-  const parsed: ParsedLine[] = [];
-  const extras: { description: string; amount: number }[] = [];
-  const excluded = new Set<number>();
-  let header: TableHeader | undefined;
-  let state: 'pre' | 'table' | 'post' | 'paused' = firstHeader >= 0 ? 'pre' : 'table';
-  let pending: Row[] = [];
-  let lastLineRow = -1;
-  let tableEnd = -1;
-
-  const flushPendingInto = (target: ParsedLine | undefined) => {
-    if (!pending.length) return;
-    if (target) {
-      const extra = pending.map((r) => collapseSpaces(r.text)).join(' ');
-      target.description = collapseSpaces(`${target.description} ${extra}`);
-      target.rows.push(...pending.map((r) => r.i));
-    }
-    pending = [];
-  };
-
-  for (const row of rows) {
-    const f = row.f.trim();
-    if (!f) continue;
-    const h = headers.get(row.i);
-    if (h) {
-      flushPendingInto(parsed[parsed.length - 1]);
-      header = h;
-      state = 'table';
-      excluded.add(row.i);
-      continue;
-    }
-    if (state === 'pre') continue;
-    if (PAUSE_RE.test(f)) {
-      flushPendingInto(parsed[parsed.length - 1]);
-      state = 'paused';
-      excluded.add(row.i);
-      continue;
-    }
-    if (state === 'paused') {
-      if (RESUME_RE.test(f)) state = 'table';
-      excluded.add(row.i);
-      continue;
-    }
-    if (RESUME_RE.test(f)) {
-      excluded.add(row.i);
-      continue;
-    }
-    if (isStopRow(row)) {
-      flushPendingInto(parsed[parsed.length - 1]);
-      if (state === 'table') tableEnd = row.i;
-      state = 'post';
-      continue;
-    }
-    if (state === 'post' && firstHeader >= 0) continue;
-    if (isMetaRow(row)) {
-      excluded.add(row.i);
-      continue;
-    }
-    const inTable = firstHeader >= 0;
-    const descPart = fold(row.text.replace(/^\s*\S*\d\S*\s+/, '')).trim();
-    // Portes, envases, fianzas: fuera de las líneas pero cuentan en el cuadre
-    const codeless = leadingCode(row.words).end ? fold(row.words.slice(leadingCode(row.words).end).map((w) => w.raw).join(' ')) : fold(row.text.trim());
-    if (EXTRA_RE.test(codeless) || EXTRA_RE.test(descPart)) {
-      const nums = numbersIn(row).filter((t) => !t.n.pct);
-      const money = nums.filter((t) => t.n.dec === 2 || t.n.cur);
-      const amount = money.length ? money[money.length - 1].value : nums.length ? nums[nums.length - 1].value : 0;
-      if (amount) extras.push({ description: collapseSpaces(row.text), amount });
-      excluded.add(row.i);
-      continue;
-    }
-    // Descuento en línea aparte ("DTO PROMO  -1,19")
-    if (DISCOUNT_ROW_RE.test(codeless) && parsed.length && lastLineRow >= 0) {
-      const nums = numbersIn(row).filter((t) => !t.n.pct);
-      const pctTok = numbersIn(row).find((t) => t.n.pct);
-      const amountTok = nums[nums.length - 1];
-      const prev = parsed[parsed.length - 1];
-      if (amountTok && Math.abs(amountTok.value) < Math.abs(prev.total)) {
-        const gross = prev.total;
-        prev.total = round(gross - Math.abs(amountTok.value), 2);
-        const base = prev.quantity * prev.unitPrice;
-        prev.discountPct = base > 0 ? round((1 - prev.total / base) * 100, 2) : pctTok?.value;
-        prev.rows.push(row.i);
-        excluded.add(row.i);
-        continue;
-      }
-    }
-    const res = parseRow(row, header, inTable);
-    if (res.line) {
-      const line = res.line;
-      // Sin cabecera de tabla, sólo filas validadas y con descripción
-      if (firstHeader < 0 && (!line.validated || line.description.replace(/[^\p{L}]/gu, '').length < 3)) {
-        pending = [];
-        continue;
-      }
-      if (pending.length) {
-        const shortDesc = line.description.replace(/[^\p{L}]/gu, '').length < 3;
-        if (shortDesc) {
-          // La descripción estaba en la(s) fila(s) anterior(es)
-          line.description = collapseSpaces(`${pending.map((r) => r.text).join(' ')} ${line.description}`);
-          line.rows.unshift(...pending.map((r) => r.i));
-          pending = [];
-        } else {
-          const prev = parsed[parsed.length - 1];
-          const sectionLike = pending.length === 1 && isAllCaps(pending[0].text) && pending[0].words.length <= 3 && !pending[0].words.some((w) => w.num);
-          if (prev && !sectionLike) flushPendingInto(prev);
-          else pending = [];
-        }
-      }
-      parsed.push(line);
-      lastLineRow = row.i;
-      continue;
-    }
-    if (res.textOnly && parsed.length + 1 > 0 && (state === 'table' || firstHeader < 0)) {
-      // Posible continuación de la descripción anterior (o anticipo de la siguiente)
-      if (firstHeader < 0 && !parsed.length) continue;
-      const prev = parsed[parsed.length - 1];
-      const tooFar = prev && row.i - prev.rows[prev.rows.length - 1] > 3 + pending.length;
-      if (!tooFar && row.words.length <= 16) pending.push(row);
-      continue;
+  // 2) Recorrido de filas (sin cabecera de tabla: segunda pasada con las columnas votadas por las filas que cuadran)
+  let walk = walkRows(rows, headers);
+  if (!headers.size) {
+    const forced = votedHeader(walk.parsed, rows);
+    if (forced) {
+      const alt = walkRows(rows, headers, forced);
+      if (alt.parsed.length >= walk.parsed.length) walk = alt;
     }
   }
-  if (pending.length && parsed.length) {
-    const prev = parsed[parsed.length - 1];
-    const sectionLike = pending.every((r) => isAllCaps(r.text) && r.words.length <= 3 && !r.words.some((w) => w.num));
-    if (!sectionLike && pending[0].i - prev.rows[prev.rows.length - 1] <= 2) flushPendingInto(prev);
-    pending = [];
-  }
+  const { parsed, extras, tableEnd, header, amountOnly } = walk;
 
   // 3) Cabecera del documento y totales
   const firstLineRow = parsed.length ? Math.min(...parsed.flatMap((l) => l.rows)) : rows.length;
@@ -2134,6 +2958,12 @@ export function parseInvoiceReading(input: { text: string; lines?: string[] }, m
   const lineSum = () => round(parsed.reduce((s, l) => s + l.total, 0), 2);
   const target = totals.subtotal !== undefined ? round(totals.subtotal - extrasSum + (totals.globalDiscount ?? 0), 2) : undefined;
   if (target !== undefined && parsed.some((l) => !l.validated)) repairWithSubtotal(parsed, rows, header, target);
+  // Tickets: artículos sueltos ("QUESO CREMA 2KG   8,78 A") que sólo se pueden validar con la base imponible o el total
+  if (amountOnly.length && !sumMatches(lineSum(), target ?? NaN)) {
+    const goals = [target, totals.total !== undefined ? round(totals.total - extrasSum, 2) : undefined].filter((g): g is number => g !== undefined);
+    const added = addAmountOnlyLines(parsed, amountOnly, goals, totals.vatCodes);
+    if (added) warnings.push(added === 1 ? '1 artículo suelto (sin cantidad × precio) se ha validado con la base imponible' : `${added} artículos sueltos (sin cantidad × precio) se han validado con la base imponible`);
+  }
 
   // 6) Precios con IVA incluido (tickets / facturas simplificadas)
   let vatIncluded = false;

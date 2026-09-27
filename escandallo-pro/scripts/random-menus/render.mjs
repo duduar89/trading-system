@@ -159,7 +159,9 @@ export function generateDesign(rng, content) {
   const nSections = content.sections.length;
   let columns = Number(rng.weighted({ 1: 0.5, 2: 0.38, 3: 0.12 }));
   if (columns > nSections) columns = Math.max(1, nSections);
-  const bodyKind = theme.dark && themeKey === 'chalk' ? rng.weighted({ script: 0.45, sans: 0.3, condensed: 0.25 }) : rng.weighted({ serif: 0.4, sans: 0.34, condensed: 0.07, script: 0.06, mono: 0.06, display: 0.07 });
+  // Letra manuscrita en el cuerpo: sobre todo en pizarras, pero la mayoría de las pizarras de hostelería usan rotulación
+  // de imprenta; la manuscrita muy informal es un caso límite para cualquier OCR
+  const bodyKind = theme.dark && themeKey === 'chalk' ? rng.weighted({ script: 0.25, sans: 0.45, condensed: 0.3 }) : rng.weighted({ serif: 0.41, sans: 0.35, condensed: 0.07, script: 0.03, mono: 0.06, display: 0.08 });
   const body = pickFont(rng, bodyKind);
   const heading = rng.chance(0.4) ? body : pickFont(rng, rng.weighted({ display: 0.35, serif: 0.25, sans: 0.2, script: 0.12, condensed: 0.08 }));
   const priceFont = rng.chance(0.75) ? body : pickFont(rng, rng.weighted({ sans: 0.4, serif: 0.3, condensed: 0.3 }));
@@ -277,21 +279,21 @@ function dishHtml(dish, design, rng, ctx) {
   const style = design.rowStyle;
   if (ctx.multi) {
     const lead = style.startsWith('leaders') ? `<span class="lead">${style === 'leaders-dots' ? esc(design.leaderChar.repeat(200)) : ''}</span>` : '<span class="fill"></span>';
-    return `<div class="dish"><div class="row">${name}${algBeforePrice ? ` ${algBeforePrice}` : ''}${lead}${colsHtml}</div>${descBlock}${below}</div>`;
+    return `<div class="dish"><div class="row"><span class="nm">${name}${algBeforePrice ? ` ${algBeforePrice}` : ''}</span>${lead}${colsHtml}</div>${descBlock}${below}</div>`;
   }
   switch (style) {
     case 'leaders-dots':
     case 'leaders-border':
-      return `<div class="dish"><div class="row">${name}${algBeforePrice ? ` ${algBeforePrice}` : ''}<span class="lead">${style === 'leaders-dots' ? esc(design.leaderChar.repeat(200)) : ''}</span>${pricesHtml}</div>${descBlock}${below}</div>`;
+      return `<div class="dish"><div class="row"><span class="nm">${name}${algBeforePrice ? ` ${algBeforePrice}` : ''}</span><span class="lead">${style === 'leaders-dots' ? esc(design.leaderChar.repeat(200)) : ''}</span>${pricesHtml}</div>${descBlock}${below}</div>`;
     case 'right':
-      return `<div class="dish"><div class="row">${name}${algBeforePrice ? ` ${algBeforePrice}` : ''}<span class="fill"></span>${pricesHtml}</div>${descBlock}${below}</div>`;
+      return `<div class="dish"><div class="row"><span class="nm">${name}${algBeforePrice ? ` ${algBeforePrice}` : ''}</span><span class="fill"></span>${pricesHtml}</div>${descBlock}${below}</div>`;
     case 'inline':
-      return `<div class="dish"><div class="row inline">${name}${algBeforePrice ? ` ${algBeforePrice}` : ''}<span class="sep">${esc(design.inlineSep).replace(/ /g, '&nbsp;')}</span>${pricesHtml}</div>${descBlock}${below}</div>`;
+      return `<div class="dish"><div class="row inline"><span class="nm">${name}${algBeforePrice ? ` ${algBeforePrice}` : ''}</span><span class="sep">${esc(design.inlineSep).replace(/ /g, '&nbsp;')}</span>${pricesHtml}</div>${descBlock}${below}</div>`;
     case 'before':
       return `<div class="dish before"><div class="row"><span class="price pre">${esc(priceTexts[0])}</span><span class="nm">${name}${algBeforePrice ? ` ${algBeforePrice}` : ''}</span></div>${descBlock ? `<div class="indent">${descBlock}</div>` : ''}${below ? `<div class="indent">${below}</div>` : ''}</div>`;
     case 'below':
     default:
-      return `<div class="dish"><div class="row">${name}${algBeforePrice ? ` ${algBeforePrice}` : ''}</div>${descBlock}${below}<div class="price-below">${esc(priceTexts[0])}</div></div>`;
+      return `<div class="dish"><div class="row"><span class="nm">${name}${algBeforePrice ? ` ${algBeforePrice}` : ''}</span></div>${descBlock}${below}<div class="price-below">${esc(priceTexts[0])}</div></div>`;
   }
 }
 
@@ -398,7 +400,7 @@ export function renderMenu(content, design, rng) {
     .lead { flex: 1 1 0; width: 0; overflow: hidden; white-space: nowrap; margin: 0 8px; color: ${c.muted}; ${design.rowStyle === 'leaders-border' ? `border-bottom: 2px dotted ${c.muted}; transform: translateY(-0.3em);` : ''} min-width: 20px; }
     .fill { flex: 1; min-width: 24px; }
     .price { font-family: '${design.fonts.price}', serif; font-weight: ${design.priceWeight}; color: ${design.priceColor}; white-space: nowrap; }
-    .row.inline { display: block; }
+    .row.inline { display: block; } .nm { min-width: 0; }
     .before .pre { display: inline-block; min-width: ${Math.round(ds * 3.4)}px; text-align: ${design.beforeAlign}; margin-right: ${Math.round(ds * 0.9)}px; flex: none; }
     .before .indent { padding-left: ${Math.round(ds * 4.3)}px; }
     .price-below { font-family: '${design.fonts.price}', serif; font-weight: ${design.priceWeight}; color: ${design.priceColor}; font-size: ${ds}px; text-align: ${design.belowAlign}; margin-top: 2px; }

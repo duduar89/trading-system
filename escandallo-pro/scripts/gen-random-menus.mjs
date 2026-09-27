@@ -27,7 +27,7 @@ import { generateDesign, renderMenu } from './random-menus/render.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** Sube la versión al cambiar el generador: las cartas ya generadas con otra versión se regeneran. */
-export const GEN_VERSION = 5;
+export const GEN_VERSION = 7;
 export const TUNE_SEEDS = range(1, 60);
 export const HOLDOUT_SEEDS = range(1001, 1040);
 export const DEFAULT_OUT = join(ROOT, 'node_modules/.cache/escandallo-random-menus');

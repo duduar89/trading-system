@@ -105,3 +105,100 @@ export function median(values: readonly number[]): number {
   const m = s.length >> 1;
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
+
+/** Palabras de cabeceras y etiquetas de factura para recomponer texto espaciado letra a letra. */
+const SPACED_VOCAB = [
+  'datos', 'fiscales', 'del', 'de', 'la', 'el', 'los', 'las', 'y', 'a', 'en', 'por', 'para', 'con', 'sin',
+  'cliente', 'clientes', 'factura', 'facturas', 'venta', 'compra', 'albaran', 'valorado', 'entrega', 'nota', 'ticket',
+  'simplificada', 'rectificativa', 'abono', 'original', 'copia', 'duplicado', 'proforma', 'fecha', 'numero', 'n', 'no',
+  'total', 'totales', 'base', 'imponible', 'iva', 'cuota', 'importe', 'neto', 'bruto', 'forma', 'pago', 'vencimiento',
+  'proveedor', 'destinatario', 'direccion', 'envio', 'facturar', 'codigo', 'descripcion', 'cantidad', 'precio', 'unidad',
+  'unidades', 'observaciones', 'pedido', 'ruta', 'pagina', 'hoja', 'sr', 'sres', 'resumen', 'desglose', 'impuestos',
+  'suma', 'sigue', 'anterior', 'pagar', 'euros', 'eur', 'datos', 'emisor', 'receptor', 'documento', 'lote', 'caducidad',
+];
+const SPACED_SET = new Set(SPACED_VOCAB);
+
+/** Segmenta una cadena plegada sin espacios en palabras del vocabulario (programación dinámica); undefined si no se puede. */
+function segmentWords(s: string): string[] | undefined {
+  const n = s.length;
+  const best: (string[] | undefined)[] = new Array(n + 1).fill(undefined);
+  best[0] = [];
+  for (let i = 1; i <= n; i++) {
+    for (let j = Math.max(0, i - 14); j < i; j++) {
+      const prev = best[j];
+      if (!prev) continue;
+      const w = s.slice(j, i);
+      if (!SPACED_SET.has(w)) continue;
+      const cand = [...prev, w];
+      // Menos palabras = segmentación más natural ("facturas" antes que "factura" + "s")
+      if (!best[i] || cand.length < (best[i] as string[]).length) best[i] = cand;
+    }
+  }
+  return best[n];
+}
+
+/**
+ * Recompone el texto espaciado letra a letra (letter-spacing de CSS, rótulos): pdf.js lo entrega con un espacio entre
+ * cada letra ("D AT O S D E L C L I E N T E") y se pierden los espacios entre palabras. Los tramos de 3 o más trozos de
+ * 1–2 letras se unen y se vuelven a separar con el vocabulario de las etiquetas de factura ("DATOS DEL CLIENTE"); si
+ * no se puede, se dejan unidos ("FACTURADEVENTA" sigue sin coincidir, pero "FACTURA" sí).
+ */
+export function despaceLetters(text: string): string {
+  text = despaceTriples(text);
+  if (!/(?:^|\s)[\p{L}./:]{1,2}\s[\p{L}./:]{1,2}\s[\p{L}./:]{1,2}(?:\s|$)/u.test(text)) return text;
+  return text.replace(/(?<![\p{L}\d./:])[\p{L}./:]{1,2}(?: [\p{L}./:]{1,2}){2,}(?![\p{L}\d./:])/gu, (run) => {
+    const joined = run.replace(/ /g, '');
+    if (joined.replace(/[^\p{L}]/gu, '').length < 3 || joined.length < 4) return run;
+    // Cada tramo de letras se separa en palabras; los signos se conservan ("SR./SRES.", "CLIENTE / DIRECCIÓN DE ENTREGA")
+    const parts = joined.match(/\p{L}+|[./:]/gu) ?? [joined];
+    let out = '';
+    parts.forEach((part, k) => {
+      if (!/\p{L}/u.test(part)) {
+        if (part === '/') {
+          const long = (parts[k - 1]?.length ?? 0) >= 4 && (parts[k + 1]?.length ?? 0) >= 4;
+          out += long ? ' / ' : '/';
+        } else out += part;
+        return;
+      }
+      const words = segmentWords(fold(part));
+      if (!words) {
+        out += part;
+        return;
+      }
+      let i = 0;
+      out += words
+        .map((w) => {
+          const piece = part.slice(i, i + w.length);
+          i += w.length;
+          return piece;
+        })
+        .join(' ');
+    });
+    return out;
+  });
+}
+
+/**
+ * Variante con trozos de hasta 3 letras ("CL IEN TE"): sólo se unen si casi ningún trozo es una palabra por sí mismo
+ * y el conjunto se puede segmentar entero con el vocabulario (así "DE LA MAR" o "PAN DE AJO" no se tocan).
+ */
+function despaceTriples(text: string): string {
+  if (!/(?:^|\s)\p{L}{1,3}\s\p{L}{1,3}\s\p{L}{1,3}(?:\s|$)/u.test(text)) return text;
+  return text.replace(/(?<![\p{L}\d])\p{L}{1,3}(?: \p{L}{1,3}){2,}(?![\p{L}\d])/gu, (run) => {
+    const tokens = run.split(' ');
+    if (tokens.every((t) => t.length <= 2)) return run;
+    const words = tokens.filter((t) => SPACED_SET.has(fold(t))).length;
+    if (words > tokens.length / 3) return run;
+    const joined = tokens.join('');
+    const seg = segmentWords(fold(joined));
+    if (!seg) return run;
+    let i = 0;
+    return seg
+      .map((w) => {
+        const piece = joined.slice(i, i + w.length);
+        i += w.length;
+        return piece;
+      })
+      .join(' ');
+  });
+}

@@ -19,7 +19,7 @@
  *   --ocr       mide también la ruta OCR con las primeras --ocr-count semillas del conjunto (foto o PDF escaneado)
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -48,6 +48,8 @@ const genHash = createHash('sha1').update(readFileSync(join(ROOT, 'scripts/gen-r
 const PDF_CACHE = join(ROOT, `node_modules/.cache/escandallo-random/${genHash}`);
 const OCR_CACHE = join(ROOT, 'node_modules/.cache/escandallo-random-ocr');
 mkdirSync(PDF_CACHE, { recursive: true });
+// Las cachés de versiones anteriores del generador ya no sirven
+for (const d of readdirSync(dirname(PDF_CACHE))) if (d !== genHash) rmSync(join(dirname(PDF_CACHE), d), { recursive: true, force: true });
 mkdirSync(OCR_CACHE, { recursive: true });
 
 // ───────────────────────────── Módulos de la app ─────────────────────────────
