@@ -10,6 +10,7 @@ import {
   inkSpan,
   inkThreshold,
   lineFromCtc,
+  markSuperscripts,
   minAreaRect,
   paddleRecognize,
   parseCharDict,
@@ -17,13 +18,17 @@ import {
   recBatchInput,
   REC_HEIGHT,
   rectCorners,
+  splitAfterPunctuation,
   splitByGaps,
+  splitSuperscript,
   stripLeaders,
+  toSuperscript,
   unclipRect,
   type CtcChar,
   type PaddleRunner,
   type TextQuad,
 } from './paddleOcr';
+import type { TessLine } from './ocrLayout';
 
 // ───────────────────────────── Utilidades de prueba ─────────────────────────────
 
@@ -181,6 +186,21 @@ describe('decodificación CTC', () => {
     expect(out[0]).toMatchObject({ start: 0, end: 1 });
     expect(out[3]).toMatchObject({ char: ' ', start: 5, end: 6 });
   });
+
+  it('recupera el espacio que la red ha visto pero no ha elegido («Ensaladade» → «Ensalada de»)', () => {
+    const dict = ['a', 'b'];
+    const C = 4;
+    // a · (blanco con 35 % de espacio) · b
+    const rows = [
+      [0, 0.9, 0, 0],
+      [0.6, 0, 0, 0.35],
+      [0, 0, 0.9, 0],
+    ];
+    const probs = Float32Array.from(rows.flat());
+    expect(ctcDecode(probs, 0, 3, C, dict).map((c) => c.char).join('')).toBe('ab');
+    expect(ctcDecode(probs, 0, 3, C, dict, 0.3).map((c) => c.char).join('')).toBe('a b');
+    expect(ctcDecode(probs, 0, 3, C, dict, 0.5).map((c) => c.char).join('')).toBe('ab');
+  });
 });
 
 describe('palabras con su caja', () => {
@@ -276,6 +296,117 @@ describe('palabras con su caja', () => {
     expect(price.bbox).toEqual({ x0: 700, y0: 224, x1: 800, y1: 276 });
     expect(line?.baseline?.y0).toBe(276);
     expect(line?.text).toBe('Sopa – con 18,50');
+  });
+});
+
+describe('signos, volados y adornos', () => {
+  const text = (groups: CtcChar[][]) => groups.map((g) => g.map((c) => c.char).join(''));
+
+  it('separa lo que va pegado detrás de un signo, sin tocar los decimales', () => {
+    const seq = (t: string) => chars([...t].map((c, i) => [c, i] as [string, number]));
+    expect(text(splitAfterPunctuation([seq('2.Mejillones'), seq('adobo.Producto'), seq('12,50'), seq('(6'), seq('uds.)'), seq('D.O.Ca.Rioja'), seq('D.O.')]))).toEqual([
+      '2.',
+      'Mejillones',
+      'adobo.',
+      'Producto',
+      '12,50',
+      '(6',
+      'uds.)',
+      'D.O.Ca.',
+      'Rioja',
+      'D.O.',
+    ]);
+  });
+
+  it('aparta las cifras voladas pegadas a una palabra («wasabi³⁴»)', () => {
+    // «wasabi» de 10..70 × 12..38 y «34» volado en 76..90 × 8..22
+    const g = crop(120, [
+      [10, 70, 12, 38],
+      [76, 90, 8, 22],
+    ]);
+    const cs = chars([
+      ['w', 2],
+      ['a', 3],
+      ['s', 4],
+      ['a', 5],
+      ['b', 6],
+      ['i', 8],
+      ['3', 10],
+      ['4', 11],
+    ]);
+    expect(text(splitSuperscript(cs, g, 120, inkThreshold(g) as number, 8, 0, 120))).toEqual(['wasabi', '34']);
+    // Cifras a la altura del texto (un precio pegado): no son voladas
+    const g2 = crop(120, [
+      [10, 70, 12, 38],
+      [76, 100, 12, 38],
+    ]);
+    expect(splitSuperscript(cs, g2, 120, inkThreshold(g2) as number, 8, 0, 120)).toHaveLength(1);
+  });
+
+  it('parte un precio o un icono pegados tras un hueco claro («pibil12,00», «2020•»)', () => {
+    // 5 letras juntas (hueco 2) y, tras un hueco de 12, «12,00»
+    const blobs: [number, number, number, number][] = [];
+    const cs: CtcChar[] = [];
+    let u = 4;
+    for (const [i, ch] of [...'pibil12,00'].entries()) {
+      blobs.push([u, u + 7, 10, 38]);
+      cs.push({ char: ch, start: Math.round((u + 3) / 8), end: Math.round((u + 3) / 8), prob: 0.9 });
+      u += i === 4 ? 21 : 9;
+    }
+    const g = crop(140, blobs);
+    expect(text(splitByGaps(cs, g, 140, inkThreshold(g) as number, 10, 38, 8))).toEqual(['pibil', '12,00']);
+    const g3 = crop(80, [
+      [4, 40, 10, 38],
+      [52, 60, 20, 28],
+    ]);
+    const cs3 = chars([
+      ['2', 0],
+      ['0', 1],
+      ['2', 3],
+      ['0', 4],
+      ['•', 7],
+    ]);
+    expect(text(splitByGaps(cs3, g3, 80, inkThreshold(g3) as number, 10, 38, 8))).toEqual(['2020', '•']);
+  });
+
+  it('marca como superíndices los números volados de alérgenos, en su renglón o en uno aparte', () => {
+    const line = (words: [string, number, number, number, number][], base: number): TessLine => ({
+      text: words.map((w) => w[0]).join(' '),
+      bbox: { x0: words[0][1], y0: Math.min(...words.map((w) => w[2])), x1: words[words.length - 1][3], y1: base },
+      baseline: { x0: words[0][1], y0: base, x1: words[words.length - 1][3], y1: base },
+      words: words.map(([t, x0, y0, x1, y1]) => ({ text: t, confidence: 95, bbox: { x0, y0, x1, y1 } })),
+    });
+    const lines = [
+      line(
+        [
+          ['Tabla', 100, 70, 180, 100],
+          ['ibérica', 190, 70, 300, 100],
+          ['4,10', 310, 68, 350, 84],
+        ],
+        100,
+      ),
+      line(
+        [
+          ['Gambas', 100, 170, 200, 200],
+          ['en', 210, 180, 240, 200],
+        ],
+        200,
+      ),
+      line([['1,4', 250, 166, 280, 182]], 182),
+      line(
+        [
+          ['Pulpo', 100, 270, 180, 300],
+          ['18', 600, 272, 630, 300],
+        ],
+        300,
+      ),
+    ];
+    const out = markSuperscripts(lines);
+    expect(out[0].words.map((w) => w.text)).toEqual(['Tabla', 'ibérica', '⁴ ¹⁰']);
+    expect(out[2].words[0].text).toBe('¹ ⁴');
+    // El precio a la altura del texto no se toca
+    expect(out[3].words[1].text).toBe('18');
+    expect(toSuperscript('14712')).toBe('¹⁴⁷¹²');
   });
 });
 

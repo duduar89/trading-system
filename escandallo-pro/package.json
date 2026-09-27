@@ -21,6 +21,7 @@
     "dexie-react-hooks": "^4.4.0",
     "exceljs": "^4.4.0",
     "lucide-react": "^1.48.0",
+    "onnxruntime-web": "^1.30.0",
     "pdfjs-dist": "^5.7.284",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

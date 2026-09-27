@@ -5,9 +5,9 @@ import type { OcrBox, TessLine, TessPage, TessWord } from './ocrLayout';
  * Lector PaddleOCR (PP-OCRv5: detección DB + reconocimiento CRNN/SVTR con decodificación CTC), lógica pura.
  *
  * Aquí no hay ONNX Runtime ni DOM: las redes se inyectan (`PaddleRunner`), así que lo usan igual el navegador
- * (onnxruntime-web en un worker, ver `paddleEngine.ts`) y el banco de pruebas en Node (onnxruntime-node). Todo lo
- * demás (preparar los tensores, sacar las cajas del mapa de probabilidad, recortar cada renglón, decodificar el texto
- * y situar cada palabra) está aquí y tiene tests.
+ * (onnxruntime-web en un worker, ver `paddleEngine.ts`) y los bancos de pruebas en Node (el mismo onnxruntime-web, ver
+ * scripts/paddle-node.mjs). Todo lo demás (preparar los tensores, sacar las cajas del mapa de probabilidad, recortar
+ * cada renglón, decodificar el texto, situar cada palabra y ajustar su caja a la tinta) está aquí y tiene tests.
  *
  * La salida imita la de Tesseract (`TessPage`: bloques → renglones → palabras con su caja), de modo que el resto del
  * canal (filas por posición, columnas de la carta, parser) no distingue qué motor ha leído la foto.
@@ -19,7 +19,7 @@ export interface PaddleTensor {
   dims: readonly number[];
 }
 
-/** Ejecuta las dos redes (se inyecta: onnxruntime-web en el navegador, onnxruntime-node en las pruebas). */
+/** Ejecuta las dos redes (se inyecta: onnxruntime-web en un worker del navegador o en los bancos de pruebas). */
 export interface PaddleRunner {
   /** Detección: entrada [1, 3, H, W] → mapa de probabilidad de texto [1, 1, H, W]. */
   detect(input: Float32Array, height: number, width: number): Promise<PaddleTensor>;
@@ -44,11 +44,17 @@ export interface PaddleOptions {
   maxBoxes?: number;
   /** Probabilidad de espacio a partir de la cual se separan dos caracteres aunque la red no lo haya elegido. */
   spaceProb?: number;
+  /** Buscar precios cortos que la detección se haya dejado (ver `isolatedInkBoxes`). */
+  rescuePrices?: boolean;
 }
 
-/** Parámetros por defecto de PP-OCRv5 (los de PaddleOCR 3). */
+/**
+ * Parámetros por defecto (los de PaddleOCR 3 para PP-OCRv5, salvo el tamaño de detección: la imagen preparada ya trae el
+ * texto a ~36 px de alto, y detectar sobre una versión reducida a 1280 px es igual de preciso en las cartas, separa mejor
+ * los renglones de las fotos borrosas y cuesta la mitad de cálculo y memoria).
+ */
 export const PADDLE_DEFAULTS: Required<PaddleOptions> = {
-  detMaxSide: 2400,
+  detMaxSide: 1280,
   detThresh: 0.3,
   boxThresh: 0.6,
   unclipRatio: 1.5,
@@ -56,6 +62,7 @@ export const PADDLE_DEFAULTS: Required<PaddleOptions> = {
   maxRecRatio: 40,
   maxBoxes: 3000,
   spaceProb: 0.3,
+  rescuePrices: true,
 };
 
 export const REC_HEIGHT = 48;
@@ -84,10 +91,10 @@ export interface TextQuad {
  * texto con un carácter por línea. En YAML los caracteres especiales van entre comillas simples ('' = comilla).
  */
 export function parseCharDict(source: string): string[] {
-  const text = source.replace(/^﻿/, '');
+  const text = source.replace(/^\uFEFF/, '');
   const lines = text.split(/\r?\n/);
   const start = lines.findIndex((l) => /^\s*character_dict:\s*$/.test(l));
-  if (start < 0) return lines.filter((l, i) => l.length > 0 || i < lines.length - 1).map((l) => l.replace(/\r$/, ''));
+  if (start < 0) return lines.filter((l, i) => l.length > 0 || i < lines.length - 1);
   const out: string[] = [];
   const indent = /^(\s*)/.exec(lines[start])?.[1].length ?? 0;
   for (let i = start + 1; i < lines.length; i++) {
@@ -299,6 +306,43 @@ function quadScore(prob: Float32Array, w: number, h: number, q: [Point, Point, P
 }
 
 /**
+ * Tramos de columnas de una componente del mapa de DB, separados por los rellenos de puntos (o filetes) que la red une
+ * al texto: «Croquetas ·········· 9,50» sale como una sola mancha, con el relleno como una banda fina. Donde la ocupación
+ * de las columnas cae por debajo del 40 % de la altura durante más de 1,5 alturas, se corta (y el relleno se descarta):
+ * el nombre y el precio quedan en cajas aparte, sin los puntos, que confunden al reconocedor.
+ */
+export function splitLeaderRuns(pix: Int32Array, count: number, width: number, minX: number, maxX: number, minY: number, maxY: number): [number, number][] {
+  const h = maxY - minY + 1;
+  const w = maxX - minX + 1;
+  if (w < 4 * h || w < 12) return [[minX, maxX]];
+  const occ = new Uint16Array(w);
+  for (let k = 0; k < count; k++) {
+    const idx = pix[k];
+    const y = (idx / width) | 0;
+    occ[idx - y * width - minX]++;
+  }
+  const dense = (x: number) => occ[x] >= 0.4 * h;
+  const minRun = Math.max(3, Math.round(1.5 * h));
+  const out: [number, number][] = [];
+  let segStart = -1;
+  let sparse = 0;
+  let lastDense = -1;
+  for (let x = 0; x < w; x++) {
+    if (dense(x)) {
+      if (segStart < 0) segStart = x;
+      else if (sparse >= minRun) {
+        out.push([minX + segStart, minX + lastDense]);
+        segStart = x;
+      }
+      sparse = 0;
+      lastDense = x;
+    } else if (segStart >= 0) sparse++;
+  }
+  if (segStart >= 0) out.push([minX + segStart, minX + lastDense]);
+  return out.length ? out : [[minX, maxX]];
+}
+
+/**
  * Cajas de texto a partir del mapa de probabilidad de DB (lo que hace `DBPostProcess` de PaddleOCR): umbral,
  * componentes conexas, rectángulo mínimo, puntuación media, expansión («unclip») y vuelta a la escala original.
  */
@@ -318,31 +362,65 @@ export function dbBoxes(
   const n = width * height;
   const labels = new Int32Array(n);
   const stack = new Int32Array(n);
+  const pix = new Int32Array(n);
   const out: TextQuad[] = [];
-  let label = 0;
-  for (let start = 0; start < n && out.length < maxBoxes; start++) {
-    if (labels[start] || prob[start] <= thresh) continue;
-    label++;
-    // Relleno por inundación (8-vecindad) guardando los extremos de cada fila de la componente
-    let top = 0;
-    stack[top++] = start;
-    labels[start] = label;
-    let minY = Infinity;
-    let maxY = -Infinity;
+  /** Caja de un conjunto de píxeles de la componente (rectángulo mínimo, puntuación, expansión, escala). */
+  const boxFrom = (list: Int32Array, from: number, to: number, x0: number, x1: number) => {
     const rowMin = new Map<number, number>();
     const rowMax = new Map<number, number>();
-    let count = 0;
-    while (top > 0) {
-      const idx = stack[--top];
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (let k = from; k < to; k++) {
+      const idx = list[k];
       const y = (idx / width) | 0;
       const x = idx - y * width;
-      count++;
+      if (x < x0 || x > x1) continue;
       if (y < minY) minY = y;
       if (y > maxY) maxY = y;
       const lo = rowMin.get(y);
       if (lo === undefined || x < lo) rowMin.set(y, x);
       const hi = rowMax.get(y);
       if (hi === undefined || x > hi) rowMax.set(y, x);
+    }
+    if (!Number.isFinite(minY) || maxY - minY < minSize - 1) return;
+    const pts: Point[] = [];
+    for (let y = minY; y <= maxY; y++) {
+      const lo = rowMin.get(y);
+      const hi = rowMax.get(y);
+      if (lo === undefined || hi === undefined) continue;
+      pts.push({ x: lo, y }, { x: hi, y });
+    }
+    const rect = minAreaRect(pts);
+    if (!rect || Math.min(rect.width, rect.height) < minSize) return;
+    const score = quadScore(prob, width, height, rectCorners(rect));
+    if (score < boxThresh) return;
+    const big = unclipRect(rect, ratio);
+    if (Math.min(big.width, big.height) < minSize + 2) return;
+    const [tl, tr, br, bl] = rectCorners(big).map((p) => ({ x: Math.max(0, Math.min(width, p.x)) * sx, y: Math.max(0, Math.min(height, p.y)) * sy }));
+    out.push({ tl, tr, br, bl, score });
+  };
+  let label = 0;
+  for (let start = 0; start < n && out.length < maxBoxes; start++) {
+    if (labels[start] || prob[start] <= thresh) continue;
+    label++;
+    // Relleno por inundación (8-vecindad) guardando los píxeles de la componente
+    let top = 0;
+    stack[top++] = start;
+    labels[start] = label;
+    let count = 0;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    while (top > 0) {
+      const idx = stack[--top];
+      pix[count++] = idx;
+      const y = (idx / width) | 0;
+      const x = idx - y * width;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
       for (let dy = -1; dy <= 1; dy++) {
         const yy = y + dy;
         if (yy < 0 || yy >= height) continue;
@@ -357,21 +435,7 @@ export function dbBoxes(
       }
     }
     if (count < 4 || maxY - minY < minSize - 1) continue;
-    const pts: Point[] = [];
-    for (let y = minY; y <= maxY; y++) {
-      const lo = rowMin.get(y);
-      const hi = rowMax.get(y);
-      if (lo === undefined || hi === undefined) continue;
-      pts.push({ x: lo, y }, { x: hi, y });
-    }
-    const rect = minAreaRect(pts);
-    if (!rect || Math.min(rect.width, rect.height) < minSize) continue;
-    const score = quadScore(prob, width, height, rectCorners(rect));
-    if (score < boxThresh) continue;
-    const big = unclipRect(rect, ratio);
-    if (Math.min(big.width, big.height) < minSize + 2) continue;
-    const [tl, tr, br, bl] = rectCorners(big).map((p) => ({ x: Math.max(0, Math.min(width, p.x)) * sx, y: Math.max(0, Math.min(height, p.y)) * sy }));
-    out.push({ tl, tr, br, bl, score });
+    for (const [a, b] of splitLeaderRuns(pix, count, width, minX, maxX, minY, maxY)) boxFrom(pix, 0, count, a, b);
   }
   // Orden de lectura aproximado: de arriba abajo y, en la misma franja, de izquierda a derecha
   out.sort((a, b) => {
@@ -691,7 +755,12 @@ export function stripLeaders(groups: CtcChar[][]): CtcChar[][] {
     // Puntos delante de una cifra: relleno si vienen detrás de más relleno o son dos o más
     let lead = 0;
     while (lead < b && LEADER_CHAR.test(g[lead].char)) lead++;
-    if (lead > 0 && lead < b && /\d/.test(g[lead].char) && (prevLeader || lead >= 2)) a = lead;
+    const rest = g
+      .slice(lead)
+      .map((c) => c.char)
+      .join('');
+    // Un precio nunca empieza por punto: «.5,00» es el último punto del relleno pegado al precio
+    if (lead > 0 && lead < b && /\d/.test(g[lead].char) && (prevLeader || lead >= 2 || /^\d{1,3}[.,]\d{2}\b/.test(rest))) a = lead;
     // Puntos delante de una letra: relleno o el número de un plato numerado que la red no ha leído (".Tortilla")
     else if (lead >= 1 && lead < b && /\p{L}/u.test(g[lead].char)) a = lead;
     // Puntos detrás de una letra o cifra (dos o más): relleno
@@ -707,14 +776,23 @@ export function stripLeaders(groups: CtcChar[][]): CtcChar[][] {
 /**
  * Espacio que falta detrás de un signo («2.Mejillones», «adobo.Producto de proximidad», «tomate,cebolla»): se parte la
  * palabra detrás de «.», «,», «;», «:» o «)» cuando antes hay una letra o cifra y después una letra. Las cifras
- * decimales («12,50») no se tocan.
+ * decimales («12,50») y las siglas con iniciales («D.O.Ca.Rioja» → «D.O.Ca.» «Rioja») se respetan.
  */
 export function splitAfterPunctuation(groups: CtcChar[][]): CtcChar[][] {
   const out: CtcChar[][] = [];
   for (const g of groups) {
     let from = 0;
+    /** Inicio del trozo actual (desde el último signo): una inicial suelta («D.O.Ca.») no se separa. */
+    let token = 0;
     for (let i = 1; i + 1 < g.length; i++) {
-      if (/[.,;:)]/.test(g[i].char) && /[\p{L}\d]/u.test(g[i - 1].char) && /\p{L}/u.test(g[i + 1].char)) {
+      if (!/[.,;:)]/.test(g[i].char)) continue;
+      const piece = g
+        .slice(token, i)
+        .map((c) => c.char)
+        .join('');
+      token = i + 1;
+      const initial = /^\p{L}$/u.test(piece);
+      if (!initial && /[\p{L}\d]/u.test(g[i - 1].char) && /\p{L}/u.test(g[i + 1].char)) {
         out.push(g.slice(from, i + 1));
         from = i + 1;
       }
@@ -834,6 +912,32 @@ export function findDash(gray: Float32Array, width: number, thr: number, u0: num
 }
 
 /**
+ * Caracteres situados fuera del renglón: con un renglón corto y mucho relleno en el lote, la red a veces emite el texto
+ * en instantes que caen en el relleno. Entonces se reparten, conservando sus proporciones, sobre la tinta del renglón
+ * (así ninguna palabra se queda con una caja vacía en el borde).
+ */
+export function remapOutside(chars: CtcChar[], crop: Float32Array | undefined, thr: number | undefined, usedWidth: number, colsPerStep: number): CtcChar[] {
+  if (!chars.length || !crop || thr === undefined) return chars;
+  const c0 = chars[0].start * colsPerStep;
+  const c1 = (chars[chars.length - 1].end + 1) * colsPerStep;
+  if (c1 <= usedWidth + colsPerStep) return chars;
+  const v0 = Math.floor(REC_HEIGHT * 0.15);
+  const v1 = Math.ceil(REC_HEIGHT * 0.85);
+  const inkAt = (u: number) => {
+    for (let v = v0; v < v1; v++) if (crop[v * usedWidth + u] < thr) return true;
+    return false;
+  };
+  let L = 0;
+  while (L < usedWidth && !inkAt(L)) L++;
+  let R = usedWidth - 1;
+  while (R > L && !inkAt(R)) R--;
+  if (R <= L) return chars;
+  const k = (R + 1 - L) / Math.max(1, c1 - c0);
+  const at = (step: number) => (L + (step * colsPerStep - c0) * k) / colsPerStep;
+  return chars.map((c) => ({ ...c, start: at(c.start), end: at(c.end + 1) - 1 / colsPerStep }));
+}
+
+/**
  * Renglón leído → renglón al estilo Tesseract: palabras separadas por los espacios que emite la red, cada una con su
  * caja y su confianza (0–100). La caja sale de los instantes de la CTC y, si se pasa el renglón muestreado (`crop`), se
  * ajusta a la tinta. `usedWidth`/`tensorWidth`: ancho útil del renglón y ancho del tensor; `steps`: instantes de salida.
@@ -844,16 +948,16 @@ export function lineFromCtc(q: TextQuad, chars: CtcChar[], usedWidth: number, te
   // Avance típico por carácter (en instantes): cuánto puede extenderse la tinta de una letra más allá de su instante
   const span = chars.length > 1 ? (chars[chars.length - 1].start - chars[0].start) / (chars.length - 1) : 2;
   const reach = Math.max(1, Math.min(4, span)) * colsPerStep;
+  const thr = crop ? inkThreshold(crop) : undefined;
   const raw: CtcChar[][] = [];
   let cur: CtcChar[] = [];
-  for (const c of chars) {
+  for (const c of remapOutside(chars, crop, thr, usedWidth, colsPerStep)) {
     if (c.char === ' ') {
       if (cur.length) raw.push(cur);
       cur = [];
     } else cur.push(c);
   }
   if (cur.length) raw.push(cur);
-  const thr = crop ? inkThreshold(crop) : undefined;
   let groups = splitAfterPunctuation(stripLeaders(raw));
   // Límites de cada grupo: no invadir el instante del carácter vecino
   const bounds = (list: CtcChar[][], k: number) => ({
@@ -952,14 +1056,22 @@ export function toSuperscript(text: string): string {
  * mismo renglón como si la red los ha detectado como un renglón aparte, pegado al final del nombre.
  */
 export function markSuperscripts(lines: TessLine[]): TessLine[] {
-  const textWords = (l: TessLine) => l.words.filter((w) => /\p{L}{2,}/u.test(w.text));
-  const heightOf = (l: TessLine) => {
-    const ws = textWords(l);
-    if (!ws.length) return 0;
-    const hs = ws.map((w) => w.bbox.y1 - w.bbox.y0).sort((a, b) => a - b);
-    return hs[hs.length >> 1];
+  // Referencia: las palabras sin trazos bajos (g, j, p, q, y…), cuya base es la línea base y cuya altura no se infla
+  const textWords = (l: TessLine) => {
+    const ws = l.words.filter((w) => /\p{L}{2,}/u.test(w.text));
+    const flat = ws.filter((w) => !/[gjpqyçµ,;]/.test(w.text));
+    return flat.length ? flat : ws;
   };
-  const baseOf = (l: TessLine) => (l.baseline ? (l.baseline.y0 + l.baseline.y1) / 2 : l.bbox.y1);
+  const medianOf = (values: number[]) => {
+    const v = [...values].sort((a, b) => a - b);
+    return v.length ? v[v.length >> 1] : 0;
+  };
+  const heightOf = (l: TessLine) => medianOf(textWords(l).map((w) => w.bbox.y1 - w.bbox.y0));
+  const baseOf = (l: TessLine) => {
+    const ws = textWords(l);
+    if (ws.length) return medianOf(ws.map((w) => w.bbox.y1));
+    return l.baseline ? (l.baseline.y0 + l.baseline.y1) / 2 : l.bbox.y1;
+  };
   const raised = (w: TessWord, host: { h: number; base: number }) =>
     NUMERIC_WORD.test(w.text) && /\d/.test(w.text) && host.h > 0 && w.bbox.y1 - w.bbox.y0 < 0.8 * host.h && w.bbox.y1 <= host.base - 0.25 * host.h;
   return lines.map((l) => {
@@ -980,6 +1092,160 @@ export function markSuperscripts(lines: TessLine[]): TessLine[] {
     return { ...l, words, text: words.map((w) => w.text).join(' ') };
   });
 }
+
+/** Umbral de Otsu de una imagen (histograma muestreado). */
+function otsuOf(img: GrayImage): number {
+  const hist = new Float64Array(256);
+  const step = Math.max(1, Math.floor((img.width * img.height) / 400_000));
+  for (let i = 0; i < img.data.length; i += step) hist[img.data[i]]++;
+  let total = 0;
+  let sum = 0;
+  for (let i = 0; i < 256; i++) {
+    total += hist[i];
+    sum += i * hist[i];
+  }
+  let wB = 0;
+  let sumB = 0;
+  let best = -1;
+  let thr = 128;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (!wB) continue;
+    const wF = total - wB;
+    if (!wF) break;
+    sumB += t * hist[t];
+    const d = sumB / wB - (sum - sumB) / wF;
+    const between = wB * wF * d * d;
+    if (between > best) {
+      best = between;
+      thr = t + 0.5;
+    }
+  }
+  return thr;
+}
+
+/**
+ * Tinta aislada que la red de detección no ha recogido: sobre todo precios cortos alineados a la derecha («7», «10 €»)
+ * detrás de una línea de puntos, que DB pierde con facilidad. Se buscan manchas compactas del tamaño del texto, fuera de
+ * las cajas ya detectadas, que sean lo último de su renglón (a la derecha de una caja de texto a su altura). Son sólo
+ * candidatas: `paddleRecognize` las lee y se queda únicamente con las que resultan ser un precio.
+ * `grid`: lado en píxeles de la celda de la rejilla reducida sobre la que se buscan.
+ */
+export function isolatedInkBoxes(img: GrayImage, quads: readonly TextQuad[], grid: number): TextQuad[] {
+  if (!quads.length) return [];
+  const g = Math.max(1, Math.round(grid));
+  const W = Math.ceil(img.width / g);
+  const H = Math.ceil(img.height / g);
+  const thr = otsuOf(img);
+  // Rejilla: tinta si el píxel más oscuro de la celda pasa el umbral
+  const ink = new Uint8Array(W * H);
+  for (let cy = 0; cy < H; cy++) {
+    const y1 = Math.min(img.height, (cy + 1) * g);
+    for (let cx = 0; cx < W; cx++) {
+      const x1 = Math.min(img.width, (cx + 1) * g);
+      let min = 255;
+      for (let y = cy * g; y < y1 && min >= thr; y++) {
+        const row = y * img.width;
+        for (let x = cx * g; x < x1; x++) if (img.data[row + x] < min) min = img.data[row + x];
+      }
+      if (min < thr) ink[cy * W + cx] = 1;
+    }
+  }
+  // Fuera lo ya detectado (caja envolvente de cada detección, con un pequeño margen)
+  const boxes = quads.map((q) => ({
+    x0: Math.min(q.tl.x, q.bl.x),
+    x1: Math.max(q.tr.x, q.br.x),
+    y0: Math.min(q.tl.y, q.tr.y),
+    y1: Math.max(q.bl.y, q.br.y),
+  }));
+  for (const b of boxes) {
+    const x0 = Math.max(0, Math.floor(b.x0 / g) - 1);
+    const x1 = Math.min(W, Math.ceil(b.x1 / g) + 1);
+    const y0 = Math.max(0, Math.floor(b.y0 / g) - 1);
+    const y1 = Math.min(H, Math.ceil(b.y1 / g) + 1);
+    for (let y = y0; y < y1; y++) ink.fill(0, y * W + x0, y * W + x1);
+  }
+  // Altura típica del texto: la de las cajas detectadas sin la expansión de DB (≈ 65 %)
+  const hs = boxes.map((b) => b.y1 - b.y0).sort((a, b) => a - b);
+  const textH = hs[hs.length >> 1] * 0.65;
+  // Manchas (8-vecindad)
+  const seen = new Uint8Array(W * H);
+  const stack = new Int32Array(W * H);
+  const blobs: { x0: number; x1: number; y0: number; y1: number; n: number }[] = [];
+  for (let start = 0; start < W * H; start++) {
+    if (!ink[start] || seen[start]) continue;
+    let top = 0;
+    stack[top++] = start;
+    seen[start] = 1;
+    let bx0 = Infinity;
+    let bx1 = -Infinity;
+    let by0 = Infinity;
+    let by1 = -Infinity;
+    let n = 0;
+    while (top > 0) {
+      const idx = stack[--top];
+      const y = (idx / W) | 0;
+      const x = idx - y * W;
+      n++;
+      if (x < bx0) bx0 = x;
+      if (x > bx1) bx1 = x;
+      if (y < by0) by0 = y;
+      if (y > by1) by1 = y;
+      for (let dy = -1; dy <= 1; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= H) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= W) continue;
+          const j = yy * W + xx;
+          if (ink[j] && !seen[j]) {
+            seen[j] = 1;
+            stack[top++] = j;
+          }
+        }
+      }
+    }
+    const b = { x0: bx0 * g, x1: (bx1 + 1) * g, y0: by0 * g, y1: (by1 + 1) * g, n };
+    const h = b.y1 - b.y0;
+    const w = b.x1 - b.x0;
+    // Del tamaño de una cifra o un «€», compacta, no pegada al borde de la foto
+    if (h < 0.45 * textH || h > 1.5 * textH || w > 1.5 * textH || bx0 <= 0 || bx1 >= W - 1 || by0 <= 0 || by1 >= H - 1) continue;
+    if (n * g * g < 0.12 * w * h) continue;
+    blobs.push(b);
+  }
+  // Cifras sueltas de un mismo precio («1» «0» «€»): se unen las manchas vecinas del mismo renglón
+  blobs.sort((a, b) => a.x0 - b.x0);
+  const merged: typeof blobs = [];
+  for (const b of blobs) {
+    const cy = (b.y0 + b.y1) / 2;
+    const prev = merged.find((m) => b.x0 - m.x1 < 0.6 * textH && b.x0 >= m.x0 && Math.abs((m.y0 + m.y1) / 2 - cy) < 0.4 * textH);
+    if (prev) {
+      prev.x1 = Math.max(prev.x1, b.x1);
+      prev.y0 = Math.min(prev.y0, b.y0);
+      prev.y1 = Math.max(prev.y1, b.y1);
+      prev.n += b.n;
+    } else merged.push({ ...b });
+  }
+  const out: TextQuad[] = [];
+  for (const m of merged) {
+    if (m.x1 - m.x0 > 5 * textH) continue;
+    const cy = (m.y0 + m.y1) / 2;
+    // Lo último de su renglón: hay texto detectado a su izquierda, a su altura, y nada detectado a su derecha
+    const row = boxes.filter((b) => cy > b.y0 && cy < b.y1);
+    if (!row.some((b) => b.x1 <= m.x0 + 0.2 * textH) || row.some((b) => b.x0 >= m.x1 - 0.2 * textH && b.x0 - m.x1 < 3 * textH)) continue;
+    const padX = 0.35 * textH;
+    const padY = 0.3 * textH;
+    const x0 = Math.max(0, m.x0 - padX);
+    const x1 = Math.min(img.width, m.x1 + padX);
+    const y0 = Math.max(0, m.y0 - padY);
+    const y1 = Math.min(img.height, m.y1 + padY);
+    out.push({ tl: { x: x0, y: y0 }, tr: { x: x1, y: y0 }, br: { x: x1, y: y1 }, bl: { x: x0, y: y1 }, score: 0 });
+  }
+  return out;
+}
+
+/** Lectura de una mancha rescatada que se acepta: un precio claro. */
+const RESCUED_PRICE = /^[€$]?\s?\d{1,3}(?:[.,]\d{1,2})?\s?[€$]?$/;
 
 // ───────────────────────────── Canal completo ─────────────────────────────
 
@@ -1016,6 +1282,10 @@ export async function paddleRecognize(
     scaleY: img.height / mh,
     maxBoxes: o.maxBoxes,
   });
+  // Precios cortos que la detección se ha dejado (se leen y sólo se conservan si son un precio)
+  const rescued = o.rescuePrices ? isolatedInkBoxes(img, quads, img.width / mw) : [];
+  const firstRescued = quads.length;
+  quads.push(...rescued);
   const t1 = now();
   onProgress?.(0.3);
   // Lotes de renglones de proporción parecida (menos relleno = menos cálculo)
@@ -1033,7 +1303,9 @@ export async function paddleRecognize(
     const classes = res.dims[2];
     group.forEach((g, j) => {
       const chars = ctcDecode(res.data, j * steps * classes, steps, classes, dict, o.spaceProb);
-      lines[g.i] = lineFromCtc(quads[g.i], chars, batch.widths[j], batch.width, steps, batch.crops[j]);
+      const line = lineFromCtc(quads[g.i], chars, batch.widths[j], batch.width, steps, batch.crops[j]);
+      // Mancha rescatada: sólo si se lee con claridad como un precio
+      lines[g.i] = g.i < firstRescued || (line && RESCUED_PRICE.test(line.text ?? '') && (line.confidence ?? 0) >= 80) ? line : undefined;
     });
     onProgress?.(0.3 + (0.7 * Math.min(order.length, k + o.recBatch)) / Math.max(1, order.length));
   }

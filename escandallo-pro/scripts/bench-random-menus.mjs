@@ -4,8 +4,10 @@
  * cada semilla es una carta distinta (contenido, diseño y degradación de la foto al azar) con su verdad de referencia.
  *
  * Mismo canal que la app:
- *  - Fotos (limpia y degradada) y PDF escaneados: escala de grises (lado ≤ 3200 px) → preparación (imageOps.ts) →
- *    tesseract.js con las pasadas de ocrPipeline.ocrMenu → parseMenuOcr (cajas de palabras) + mergeMenuPasses.
+ *  - Fotos (limpia y degradada) y PDF escaneados: escala de grises (lado ≤ 3200 px) → polaridad (pizarras) → preparación
+ *    (imageOps.ts) → lector PaddleOCR (scripts/paddle-node.mjs: el mismo onnxruntime-web, modelos y código que la app) y
+ *    tesseract.js de segunda opinión con las pasadas de ocrPipeline.ocrMenu → parseMenuOcr (cajas de palabras) +
+ *    mergeMenuPasses. Con --engine=tesseract, el canal anterior (sólo Tesseract; la polaridad, con --polarity).
  *  - PDF con texto: pdf.js (legacy) → filas (layout.ts) → orden por columnas (ocrLayout.columnsReadingOrder) →
  *    parseMenuText(…, 'pdf-texto').
  *
@@ -18,7 +20,10 @@
  * Uso: node scripts/bench-random-menus.mjs [--set=tune|holdout|all] [--seeds=1-10] [--kinds=clean,degraded,pdf]
  *                                         [--jobs=2] [--features] [--verbose] [--reveal] [--json=<archivo>] [--no-cache]
  *                                         [--fast] [--polarity] [--pdf-boxes] [--extract-dir=<ruta>] [--assert]
- *   --fast      reutiliza las lecturas de tesseract ya hechas sin repetir la preparación de imagen (para afinar el parser)
+ *                                         [--engine=paddle|tesseract]
+ *   --engine    paddle (por defecto, como la app: PaddleOCR y Tesseract de reserva) o tesseract (sólo Tesseract)
+ *   --fast      reutiliza las lecturas de tesseract ya hechas sin repetir la preparación de imagen (para afinar el parser;
+ *               sólo con --engine=tesseract: las lecturas de Paddle tienen su propia caché)
  *   --polarity  invierte antes del preprocesado las cartas de fondo oscuro (menuImage.normalizeMenuPolarity, pendiente
  *               de integrar en el canal de la app)
  *   --pdf-boxes PDF con texto: también las posiciones de la capa de texto (menuUtils.pdfLinesToMenuBoxes, integración
@@ -75,8 +80,19 @@ const extractIndex = await load(`${EX}/index.ts`);
 const menuParser = await load(`${EX}/menuParser.ts`);
 const menuImage = await load(`${EX}/menuImage.ts`);
 const menuUtils = await load(`${EX}/menuUtils.ts`);
-/** --polarity: pizarras y cartas de fondo oscuro invertidas antes del preprocesado (cambio de contrato solicitado). */
-const POLARITY = !!args.polarity;
+/** Motor de las fotos: paddle (como la app) o tesseract (canal anterior). */
+const ENGINE = args.engine === 'tesseract' ? 'tesseract' : 'paddle';
+/** Polaridad (pizarras y cartas de fondo oscuro invertidas antes del preprocesado): la app la aplica siempre. */
+const POLARITY = !!args.polarity || ENGINE === 'paddle';
+const paddle =
+  ENGINE === 'paddle'
+    ? await (await import('./paddle-node.mjs')).createPaddleReader({
+        paddleOcr: await load(`${EX}/paddleOcr.ts`),
+        paddleModel: await load(`${EX}/paddleModel.ts`),
+        imageOps,
+        noCache: !!args['no-cache'],
+      })
+    : undefined;
 const pdfjs = await import(join(ROOT, 'node_modules/pdfjs-dist/legacy/build/pdf.mjs'));
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
@@ -210,13 +226,15 @@ async function menuFromImages(images) {
   if (POLARITY) src.update('polaridad');
   const srcKey = src.digest('hex');
   const passIds = typeof args['pass-ids'] === 'string' ? args['pass-ids'].split(',') : undefined;
+  const allPasses = paddle ? pipeline.MENU_PASSES_PADDLE : pipeline.MENU_PASSES;
   const opts = {
     merge: menuParser.mergeMenuPasses,
     quality: menuParser.menuQuality,
+    ...(paddle ? pipeline.MENU_PADDLE_OPTIONS : { passes: allPasses }),
     ...(args.passes ? { maxPasses: Number(args.passes) } : {}),
-    ...(passIds ? { passes: passIds.map((id) => pipeline.MENU_PASSES.find((p) => p.id === id)).filter(Boolean) } : {}),
+    ...(passIds ? { passes: passIds.map((id) => allPasses.find((p) => p.id === id)).filter(Boolean) } : {}),
   };
-  if (args.fast) {
+  if (args.fast && !paddle) {
     const calls = new Map();
     let miss = false;
     const fastBackend = {
@@ -248,6 +266,7 @@ async function menuFromImages(images) {
   }
   const calls = new Map();
   const indexing = {
+    ...(paddle ? { recognizePaddle: (image) => paddle.recognize(image) } : {}),
     async recognize(image, psm) {
       const n = calls.get(psm) ?? 0;
       calls.set(psm, n + 1);
@@ -412,7 +431,9 @@ if (args.features && REVEAL) {
     log(`  ${pad(k, 14)} ${parts.filter(Boolean).join(' · ')}`);
   }
 }
-log(`OCR: ${ocrStats.calls} lecturas (${ocrStats.cached} de caché, ${(ocrStats.ms / 1000).toFixed(0)} s de tesseract) · total ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+log(
+  `OCR: ${ocrStats.calls} lecturas de Tesseract (${ocrStats.cached} de caché, ${(ocrStats.ms / 1000).toFixed(0)} s)${paddle ? ` · ${paddle.stats.calls} de PaddleOCR (${paddle.stats.cached} de caché, ${(paddle.stats.ms / 1000).toFixed(0)} s)` : ''} · motor ${ENGINE} · total ${((Date.now() - t0) / 1000).toFixed(0)} s`,
+);
 if (args.json) {
   const dump = REVEAL ? results.map(({ menu, ...r }) => ({ ...r, entries: menu?.entries })) : results.map((r) => ({ seed: r.seed, group: r.group, accuracy: r.score?.accuracy }));
   writeFileSync(resolve(String(args.json)), JSON.stringify(dump, null, 1));

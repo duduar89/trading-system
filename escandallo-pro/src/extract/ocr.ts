@@ -3,9 +3,10 @@ import type { PdfTextLine } from './pdf';
 import { encodePgm, grayToRgba, rgbaToGray, stretchContrast, type GrayImage, type OcrPrepOptions } from './imageOps';
 import { ocrPagesToResult, type LayoutMode, type TessPage } from './ocrLayout';
 import {
-  MENU_MIN_PASSES_PADDLE,
+  INVOICE_PASSES,
+  INVOICE_PASSES_PADDLE,
+  MENU_PADDLE_OPTIONS,
   MENU_PASSES,
-  MENU_PASSES_PADDLE,
   ocrInvoice,
   ocrMenu,
   preparePages,
@@ -22,9 +23,10 @@ import type { PrepRequest, PrepResponse } from './prep.worker';
 
 /**
  * OCR local con tesseract.js (idioma 'spa', modelos LSTM "best_int": los más precisos que admite tesseract.js) y, para
- * las cartas, el lector PaddleOCR (PP-OCRv5 latino sobre ONNX Runtime Web, ver paddleEngine.ts), que lee mucho mejor
- * las fotos reales (letra decorativa, pizarras, fotos torcidas o borrosas); Tesseract queda de segunda opinión y de
- * reserva si el navegador no puede con Paddle.
+ * las cartas y las fotos de facturas, el lector PaddleOCR (PP-OCRv5 latino sobre ONNX Runtime Web, ver
+ * paddleEngine.ts), que lee mucho mejor las fotos reales (letra decorativa, pizarras, fotos torcidas o borrosas).
+ * Tesseract queda de reserva (cartas) o para cuadrar importes (facturas), y como único motor si el navegador no puede
+ * con Paddle.
  * Gratis y en el dispositivo: la imagen nunca sale del navegador. Se carga bajo demanda (import dinámico) porque pesa;
  * los modelos se descargan la primera vez y quedan en caché para trabajar sin conexión.
  *
@@ -372,18 +374,25 @@ export async function ocrImages(images: Blob[], onProgress?: ProgressFn, opts: O
 /**
  * OCR de una factura (fotos o páginas renderizadas) con reintentos guiados por la validación aritmética.
  * Devuelve la factura interpretada y el OCR de la mejor lectura.
+ * `engine`: 'auto' (fotos: PaddleOCR primero si el navegador puede, y Tesseract para cuadrar) o 'tesseract' (por
+ * defecto; PDF escaneados, donde Paddle no mejora de forma consistente).
  */
-export async function ocrInvoiceImages(images: Blob[], onProgress?: ProgressFn, opts: { maxPasses?: number; prep?: OcrPrepOptions } = {}): Promise<InvoiceOcrOutcome> {
+export async function ocrInvoiceImages(
+  images: Blob[],
+  onProgress?: ProgressFn,
+  opts: { maxPasses?: number; prep?: OcrPrepOptions; engine?: 'auto' | 'tesseract' } = {},
+): Promise<InvoiceOcrOutcome> {
   if (!images.length) throw new Error('No hay imágenes que leer');
   const pages = await preparedFrom(images, slice(onProgress, 0, 0.1), opts.prep);
   const p = slice(onProgress, 0.1, 1);
-  return enqueue(() => ocrInvoice(pages, browserBackend(p), { onProgress: p, maxPasses: opts.maxPasses }));
+  const paddle = opts.engine === 'auto' && paddleSupported();
+  return enqueue(() => ocrInvoice(pages, browserBackend(p, { paddle }), { onProgress: p, maxPasses: opts.maxPasses, passes: paddle ? INVOICE_PASSES_PADDLE : INVOICE_PASSES }));
 }
 
 /**
  * OCR de una carta con detección de columnas; `parse` interpreta el texto y las cajas (parser de cartas).
- * Motor: PaddleOCR primero (si el navegador puede) y Tesseract como segunda opinión y de reserva; `engine: 'tesseract'`
- * lee sólo con Tesseract.
+ * Motor: PaddleOCR (si el navegador puede) y Tesseract de reserva (si Paddle no carga o se queda corto);
+ * `engine: 'tesseract'` lee sólo con Tesseract.
  */
 export async function ocrMenuImages(
   images: Blob[],
@@ -402,10 +411,8 @@ export async function ocrMenuImages(
   const pages = await preparedFrom(images, slice(onProgress, 0, 0.1), { normalizePolarity: true, ...opts.prep });
   const p = slice(onProgress, 0.1, 1);
   const paddle = opts.engine !== 'tesseract' && paddleSupported();
-  const passes = paddle ? MENU_PASSES_PADDLE : MENU_PASSES;
-  return enqueue(() =>
-    ocrMenu(pages, browserBackend(p, { paddle }), parse, { onProgress: p, passes, minPasses: paddle ? MENU_MIN_PASSES_PADDLE : 1, maxPasses: opts.maxPasses, merge: opts.merge, quality: opts.quality }),
-  );
+  const engine = paddle ? MENU_PADDLE_OPTIONS : { passes: MENU_PASSES };
+  return enqueue(() => ocrMenu(pages, browserBackend(p, { paddle }), parse, { onProgress: p, ...engine, maxPasses: opts.maxPasses, merge: opts.merge, quality: opts.quality }));
 }
 
 /** Convierte una salida de Tesseract ya obtenida en OcrResult (útil para reprocesar sin volver a reconocer). */

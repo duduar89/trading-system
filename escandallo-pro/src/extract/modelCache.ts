@@ -10,6 +10,9 @@
 
 export const MODEL_CACHE = 'escandallo-lector-v1';
 
+/** Tiempo máximo sin recibir datos durante una descarga antes de abandonarla. */
+const STALL_MS = 30_000;
+
 export interface FetchAsset {
   url: string;
   /** Tamaño esperado en bytes (sirve para el progreso; si `strict`, también para validar). */
@@ -102,9 +105,35 @@ export async function cachedAsset(asset: FetchAsset, onBytes?: BytesFn): Promise
       // Caché inaccesible (modo privado, cuota): se descarga sin guardar
     }
   }
-  const res = await fetch(asset.url, { credentials: 'omit' });
-  if (!res.ok) throw new Error(`No se ha podido descargar ${asset.url.split('/').pop()} (HTTP ${res.status})`);
-  const buf = await readBody(res, asset.size, (received, total) => onBytes?.(received, total, false));
+  // Descarga vigilada: si la conexión se queda parada (sin recibir nada en STALL_MS), se aborta y quien llama sigue con
+  // otro motor en vez de esperar indefinidamente
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
+  let stalled = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = () => {
+    if (!ctrl) return;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      stalled = true;
+      ctrl.abort();
+    }, STALL_MS);
+  };
+  let buf: ArrayBuffer;
+  let res: Response;
+  try {
+    arm();
+    res = await fetch(asset.url, { credentials: 'omit', signal: ctrl?.signal });
+    if (!res.ok) throw new Error(`No se ha podido descargar ${asset.url.split('/').pop()} (HTTP ${res.status})`);
+    buf = await readBody(res, asset.size, (received, total) => {
+      arm();
+      onBytes?.(received, total, false);
+    });
+  } catch (err) {
+    if (stalled) throw new Error(`La descarga de ${asset.url.split('/').pop()} se ha detenido: revisa la conexión`);
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
   if (!(await verifyAsset(buf, asset))) throw new Error(`La descarga de ${asset.url.split('/').pop()} está incompleta o dañada`);
   if (useCache) {
     try {

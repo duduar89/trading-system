@@ -11,7 +11,8 @@
  *  - PDF con texto: pdf.js (legacy) → filas (layout.ts) → parseInvoicePages.
  *  - Fotos y PDF escaneados: render a imagen → degradación con Chromium (giro, perspectiva, sombra, desenfoque,
  *    ruido, JPEG, baja resolución; parámetros aleatorios con la semilla) → imageOps + tesseract.js con las pasadas y la
- *    validación aritmética de ocrPipeline.ts. Las lecturas de tesseract se guardan en caché.
+ *    validación aritmética de ocrPipeline.ts; en las fotos, primero el lector PaddleOCR (scripts/paddle-node.mjs), como
+ *    la app (--engine=tesseract: sólo Tesseract). Las lecturas de ambos motores se guardan en caché.
  *
  * Uso: node scripts/bench-random.mjs [--set=tuning|heldout] [--seeds=1-40] [--ocr] [--ocr-count=30] [--no-text]
  *                                    [--verbose] [--only=<plantilla|rasgo>] [--json=<archivo>] [--regen]
@@ -19,6 +20,7 @@
  *   --ocr       mide también la ruta OCR con las primeras --ocr-count semillas del conjunto (foto o PDF escaneado)
  *   --dump=<dir> guarda el texto leído por el OCR de cada documento (sólo semillas de ajuste)
  *   --font-scale=<k> variante de maquetación de las semillas de ajuste (letra ×k: otras roturas de línea y de página)
+ *   --engine=paddle|tesseract  motor de las fotos (por defecto paddle, como la app; los PDF escaneados, siempre Tesseract)
  */
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -198,6 +200,17 @@ const backend = {
     return slim;
   },
 };
+
+/** Fotos: lector PaddleOCR primero, como la app (--engine=tesseract: sólo Tesseract). */
+const paddle =
+  args.ocr && args.engine !== 'tesseract'
+    ? await (await import('./paddle-node.mjs')).createPaddleReader({
+        paddleOcr: await server.ssrLoadModule('/src/extract/paddleOcr.ts'),
+        paddleModel: await server.ssrLoadModule('/src/extract/paddleModel.ts'),
+        imageOps,
+      })
+    : undefined;
+const photoBackend = paddle ? { ...backend, recognizePaddle: (image) => paddle.recognize(image) } : backend;
 
 /** Parámetros de degradación aleatorios pero deterministas para cada semilla. */
 function variantFor(seed, pages, template) {
@@ -383,7 +396,7 @@ try {
       let r;
       if (v.pdf) r = await ocrInvoiceFromPdf(await scannedPdf(shots));
       else {
-        const outcome = await pipeline.ocrInvoice(pipeline.preparePages([await loadGray(shots[0].jpeg)]), backend);
+        const outcome = await pipeline.ocrInvoice(pipeline.preparePages([await loadGray(shots[0].jpeg)]), photoBackend, paddle ? { passes: pipeline.INVOICE_PASSES_PADDLE } : {});
         r = { inv: outcome.invoice, passes: outcome.passes, rows: outcome.ocr.rows };
       }
       results.push({ group: v.pdf ? 'escaneo' : 'foto', seed, expected, ms: Date.now() - ts, inv: r.inv, score: scoreInvoice(r.inv, expected), rawText: r.inv?.rawText });

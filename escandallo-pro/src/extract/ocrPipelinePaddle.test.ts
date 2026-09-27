@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ExtractedMenu, ProgressInfo } from '../types';
 import { createGray, type OcrPrepInfo } from './imageOps';
 import type { TessPage } from './ocrLayout';
-import { MENU_PASSES, MENU_PASSES_PADDLE, ocrMenu, type OcrBackend, type PreparedPage } from './ocrPipeline';
+import { INVOICE_PASSES_PADDLE, MENU_PADDLE_OPTIONS, MENU_PASSES, MENU_PASSES_PADDLE, ocrInvoice, ocrMenu, type OcrBackend, type PreparedPage } from './ocrPipeline';
 
 const CW = 12;
 
@@ -106,6 +106,16 @@ describe('ocrMenu con el lector PaddleOCR', () => {
     expect(out.menu.entries.map((e) => e.name)).toEqual(['Croquetas', 'Pulpo', 'Bravas', 'Tarta']);
   });
 
+  it('con las opciones de la app, Tesseract sólo entra de reserva: no por confianza baja, sí si Paddle se queda corto', async () => {
+    const unsure = (text: string): ExtractedMenu => ({ ...parse(text), entries: parse(text).entries.map((e) => ({ ...e, confidence: 0.5 })) });
+    const ok = backend({ paddle: RICH });
+    await ocrMenu(pages(), ok, unsure, { ...MENU_PADDLE_OPTIONS });
+    expect(ok.calls).toEqual(['paddle']);
+    const short = backend({ paddle: POOR });
+    await ocrMenu(pages(), short, unsure, { ...MENU_PADDLE_OPTIONS });
+    expect(short.calls).toEqual(['paddle', 'tesseract:3']);
+  });
+
   it('un fallo de Tesseract se sigue propagando', async () => {
     const b: OcrBackend = {
       async recognize() {
@@ -113,5 +123,45 @@ describe('ocrMenu con el lector PaddleOCR', () => {
       },
     };
     await expect(ocrMenu(pages(), b, parse, { passes: MENU_PASSES })).rejects.toThrow('sin memoria');
+  });
+});
+
+describe('ocrInvoice con el lector PaddleOCR (fotos de facturas)', () => {
+  const HEAD = ['Frutas García S.L.            CIF: B28123456', 'Nº Factura: FV-9         Fecha: 18/09/2026', 'Código   Descripción              Cantidad   Ud.   Precio   Importe'];
+  const FOOT = ['Base imponible   45,19', 'IVA 4%   1,81', 'TOTAL FACTURA   47,00'];
+  const good = [
+    ...HEAD,
+    '1102   TOMATE PERA CAT.I         12,400   KG     1,85     22,94',
+    '1201   AJO MORADO                 2,000   KG     5,90     11,80',
+    '1307   LIMONES MALLA 1KG          3,000   UD     1,95      5,85',
+    '1410   PEREJIL MANOJO             8,000   UD     0,575     4,60',
+    ...FOOT,
+  ].join('\n');
+  const bad = good.replace('5,90     11,80', '5,40     11,30');
+
+  it('si la lectura de Paddle cuadra, no hace falta Tesseract', async () => {
+    const b = backend({ paddle: good, tess: bad });
+    const out = await ocrInvoice(pages(), b, { passes: INVOICE_PASSES_PADDLE });
+    expect(b.calls).toEqual(['paddle']);
+    expect(out.invoice.lines).toHaveLength(4);
+    expect(out.passes[0]).toMatchObject({ id: 'paddle', engine: 'paddle' });
+  });
+
+  it('si Paddle no cuadra, Tesseract rescata y se combinan las lecturas', async () => {
+    const b = backend({ paddle: bad, tess: good });
+    const out = await ocrInvoice(pages(), b, { passes: INVOICE_PASSES_PADDLE });
+    expect(b.calls).toEqual(['paddle', 'tesseract:6']);
+    expect(out.invoice.lines.find((l) => /AJO/.test(l.description))?.total).toBe(11.8);
+  });
+
+  it('si Paddle falla o no está, se lee con Tesseract como siempre', async () => {
+    const failing = backend({ paddle: new Error('Lector no disponible'), tess: good });
+    const out = await ocrInvoice(pages(), failing, { passes: INVOICE_PASSES_PADDLE });
+    expect(failing.calls).toEqual(['paddle', 'tesseract:6']);
+    expect(out.invoice.lines).toHaveLength(4);
+    expect(out.passes[0].failed).toMatch(/no disponible/);
+    const none = backend({ tess: good });
+    await ocrInvoice(pages(), none, { passes: INVOICE_PASSES_PADDLE });
+    expect(none.calls).toEqual(['tesseract:6']);
   });
 });

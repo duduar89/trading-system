@@ -55,11 +55,24 @@ export const MENU_PASSES: readonly OcrPass[] = [
 /** Pasada del lector PaddleOCR (la primera en las cartas cuando el navegador puede usarlo). */
 export const PADDLE_PASS: OcrPass = { id: 'paddle', psm: '3', binarize: false, engine: 'paddle' };
 
-/** Cartas con el lector PaddleOCR: primero Paddle; Tesseract, como segunda opinión y de reserva. */
+/**
+ * Fotos de facturas con el lector PaddleOCR: primero Paddle y, si la aritmética no cuadra, las lecturas de rescate de
+ * Tesseract, combinadas línea a línea por la validación (`mergeInvoiceReadings`). Medido en fotos de facturas: más
+ * líneas exactas y bastante mejor cabecera en los tres conjuntos (ajuste, reservado y nunca visto). En los PDF
+ * escaneados el resultado es irregular (mejor en unos conjuntos, peor en otros), así que ahí se sigue con Tesseract.
+ */
+export const INVOICE_PASSES_PADDLE: readonly OcrPass[] = [PADDLE_PASS, ...INVOICE_PASSES];
+
+/** Cartas con el lector PaddleOCR: primero Paddle; las pasadas de Tesseract, sólo de reserva. */
 export const MENU_PASSES_PADDLE: readonly OcrPass[] = [PADDLE_PASS, ...MENU_PASSES];
 
-/** Pasadas mínimas con Paddle: 1 = Tesseract sólo si la lectura de Paddle se queda corta. */
-export const MENU_MIN_PASSES_PADDLE = 1;
+/**
+ * Cartas con Paddle: la lectura de Paddle basta en cuanto trae al menos 4 platos con precio (sin exigir confianza: sus
+ * platos sin precio no significan que falten renglones, como en Tesseract). Tesseract sólo entra si Paddle no carga o
+ * se queda corto. Medido: añadir siempre la segunda opinión de Tesseract y combinar las lecturas no mejora (en las
+ * cartas reservadas empeora 1–2 puntos) y cuesta una o varias pasadas más.
+ */
+export const MENU_PADDLE_OPTIONS = { passes: MENU_PASSES_PADDLE, minPasses: 1, minConfidence: 0 } as const;
 
 export interface PreparedPage {
   image: GrayImage;
@@ -226,34 +239,48 @@ async function withDarkRegions(read: TessPage, page: PreparedPage, backend: OcrB
   return { ...read, blocks };
 }
 
-/** OCR de una factura con reintentos guiados por la validación aritmética. */
+/**
+ * OCR de una factura con reintentos guiados por la validación aritmética. Las pasadas de PaddleOCR (fotos de
+ * facturas, ver `INVOICE_PASSES_PADDLE`) se saltan si el motor no está disponible o falla al cargar.
+ */
 export async function ocrInvoice(pagesIn: PreparedPage[], backend: OcrBackend, opts: PipelineOptions = {}): Promise<InvoiceOcrOutcome> {
   const pages = pagesIn.map(prepareInvoicePage);
-  const passes = (opts.passes ?? INVOICE_PASSES).slice(0, Math.max(1, opts.maxPasses ?? Infinity));
+  const requested = (opts.passes ?? INVOICE_PASSES).filter((p) => p.engine !== 'paddle' || !!backend.recognizePaddle);
+  const passes = requested.slice(0, Math.max(1, opts.maxPasses ?? Infinity));
   const now = opts.now ?? (() => Date.now());
   const base = opts.stage ?? 'Leyendo texto (OCR)…';
   const readings: { reading: InvoiceReading; ocr: OcrResult }[] = [];
   const reports: PassReport[] = [];
   let best: { inv: ExtractedInvoice; ocr: OcrResult } | undefined;
+  let lastError: unknown;
   for (let k = 0; k < passes.length; k++) {
     const pass = passes[k];
     const t0 = now();
-    const stage = stageFor(base, k);
-    // La primera pasada ocupa la mayor parte de la barra; las de rescate, el resto
-    const from = k === 0 ? 0 : 0.8 + (0.2 * (k - 1)) / Math.max(1, passes.length - 1);
-    const to = k === 0 ? 0.8 : 0.8 + (0.2 * k) / Math.max(1, passes.length - 1);
-    const ocr = await recognizePages(pages, backend, pass, 'table', (f) => opts.onProgress?.({ stage, progress: from + (to - from) * f }));
+    // Tramos de la barra por lectura HECHA: la primera ocupa la mayor parte; las de rescate, el resto
+    const n = readings.length;
+    const stage = stageFor(base, n);
+    const from = n === 0 ? 0 : 0.8 + (0.2 * (n - 1)) / Math.max(1, passes.length - 1);
+    const to = n === 0 ? 0.8 : 0.8 + (0.2 * n) / Math.max(1, passes.length - 1);
+    let ocr: OcrResult;
+    try {
+      ocr = await recognizePages(pages, backend, pass, 'table', (f) => opts.onProgress?.({ stage, progress: from + (to - from) * f }));
+    } catch (err) {
+      if (pass.engine !== 'paddle') throw err;
+      lastError = err;
+      reports.push({ id: pass.id, psm: pass.psm, binarize: pass.binarize, lines: 0, validated: 0, quality: 0, ms: now() - t0, engine: 'paddle', failed: err instanceof Error ? err.message : String(err) });
+      continue;
+    }
     const reading = parseInvoiceReading({ text: ocr.text }, 'ocr', ocr.rows);
     const inv = reading.invoice;
     readings.push({ reading, ocr });
-    reports.push({ id: pass.id, psm: pass.psm, binarize: pass.binarize, lines: inv.lines.length, validated: validatedCount(inv), quality: invoiceQuality(inv), ms: now() - t0 });
+    reports.push({ id: pass.id, psm: pass.psm, binarize: pass.binarize, lines: inv.lines.length, validated: validatedCount(inv), quality: invoiceQuality(inv), ms: now() - t0, engine: pass.engine ?? 'tesseract' });
     // Combinación de todas las lecturas hasta ahora (la mejor como base)
     const ordered = [...readings].sort((a, b) => invoiceQuality(b.reading.invoice) - invoiceQuality(a.reading.invoice));
     const merged = ordered.length > 1 ? mergeInvoiceReadings(ordered.map((r) => r.reading)).invoice : ordered[0].reading.invoice;
     best = { inv: merged, ocr: ordered[0].ocr };
     if (invoiceLooksComplete(merged)) break;
   }
-  if (!best) throw new Error('No se ha podido leer el documento');
+  if (!best) throw lastError instanceof Error ? lastError : new Error('No se ha podido leer el documento');
   return { invoice: { ...best.inv, method: 'ocr', rawText: best.ocr.text }, ocr: best.ocr, passes: reports };
 }
 
@@ -286,6 +313,8 @@ export async function ocrMenu(
     minEntries?: number;
     /** Pasadas que se hacen siempre, aunque la primera ya parezca completa (segunda opinión). Por defecto 1. */
     minPasses?: number;
+    /** Confianza media mínima de los platos con precio para dar la carta por leída (por defecto 0,6). */
+    minConfidence?: number;
     /** Combina las lecturas de varias pasadas (p. ej. `mergeMenuPasses` del parser de cartas). */
     merge?: (menus: ExtractedMenu[]) => ExtractedMenu;
     /** Calidad de una lectura (por defecto `menuQuality` de este módulo). */
@@ -298,6 +327,7 @@ export async function ocrMenu(
   const base = opts.stage ?? 'Leyendo texto (OCR)…';
   const minEntries = opts.minEntries ?? 4;
   const minPasses = opts.minPasses ?? 1;
+  const minConfidence = opts.minConfidence ?? 0.6;
   const quality = opts.quality ?? menuQuality;
   const reports: PassReport[] = [];
   const menus: ExtractedMenu[] = [];
@@ -331,7 +361,7 @@ export async function ocrMenu(
     result = opts.merge && menus.length > 1 ? opts.merge(menus) : best.menu;
     const pricedAll = result.entries.filter((e) => e.price !== undefined && e.price > 0);
     const avgConf = pricedAll.length ? pricedAll.reduce((s, e) => s + (e.confidence ?? 0.7), 0) / pricedAll.length : 0;
-    if (menus.length >= minPasses && pricedAll.length >= minEntries && avgConf >= 0.6) break;
+    if (menus.length >= minPasses && pricedAll.length >= minEntries && avgConf >= minConfidence) break;
   }
   if (!best || !result) throw lastError instanceof Error ? lastError : new Error('No se ha podido leer la carta');
   return { menu: { ...result, method: 'ocr', rawText: best.ocr.text }, ocr: best.ocr, passes: reports };

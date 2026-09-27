@@ -153,8 +153,9 @@ async function aiInvoice(file: Blob, mediaType: string, settings: AppSettings, o
   return undefined;
 }
 
-async function ocrInvoiceFrom(images: Blob[], onProgress: ProgressFn | undefined): Promise<ExtractedInvoice[]> {
-  const outcome = await ocrInvoiceImages(images, onProgress);
+/** OCR de una factura: `photo` = foto (lector PaddleOCR primero, si el navegador puede); si no, PDF escaneado. */
+async function ocrInvoiceFrom(images: Blob[], onProgress: ProgressFn | undefined, photo = false): Promise<ExtractedInvoice[]> {
+  const outcome = await ocrInvoiceImages(images, onProgress, { engine: photo ? 'auto' : 'tesseract' });
   const extra: string[] = [];
   if (outcome.ocr.confidence > 0 && outcome.ocr.confidence < 60) extra.push(LOW_CONFIDENCE_WARNING);
   // Varias facturas en un mismo PDF escaneado
@@ -226,7 +227,7 @@ export async function extractInvoicesFromFile(
     }
   }
   onProgress?.({ stage: 'Reconociendo texto…', progress: useAi ? 0.5 : 0 });
-  const ocr = await ocrInvoiceFrom([file], scoped(onProgress, useAi ? 0.5 : 0, 1));
+  const ocr = await ocrInvoiceFrom([file], scoped(onProgress, useAi ? 0.5 : 0, 1), true);
   onProgress?.({ stage: 'Factura leída', progress: 1 });
   return ocr.map((inv) => withWarnings(inv, warnings));
 }

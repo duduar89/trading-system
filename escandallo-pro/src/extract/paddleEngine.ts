@@ -130,6 +130,8 @@ export function getPaddleEngine(onLoad?: ProgressFn): Promise<PaddleEngine> {
           break;
         case 'ready':
           resolve(engine);
+          // Si después no se le pide nada, se libera igualmente al cabo de un rato
+          if (!pending.size) scheduleIdle();
           break;
         case 'progress':
           pending.get(msg.id)?.onProgress?.(msg.fraction);

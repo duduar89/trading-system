@@ -52,6 +52,26 @@ describe('caché de modelos', () => {
     await expect(cachedAsset({ url: 'https://e/x.onnx' })).rejects.toThrow(/HTTP 404/);
   });
 
+  it('abandona una descarga que se queda parada (para seguir con otro motor)', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal('caches', undefined);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_url: string, init?: RequestInit) =>
+            new Promise<Response>((_res, rej) => init?.signal?.addEventListener('abort', () => rej(new DOMException('abortada', 'AbortError')))),
+        ),
+      );
+      const p = cachedAsset({ url: 'https://e/lento.onnx' });
+      const check = expect(p).rejects.toThrow(/se ha detenido/);
+      await vi.advanceTimersByTimeAsync(31_000);
+      await check;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('guarda en su caché la primera vez y después no vuelve a descargar', async () => {
     const store = new Map<string, Response>();
     const cache = {

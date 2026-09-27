@@ -5,13 +5,16 @@
  * Ejecuta en Node el mismo canal que usa la app en el navegador:
  *  - PDF con texto: pdf.js (build "legacy") → reconstrucción de filas (src/extract/layout.ts) → parser de facturas.
  *  - PDF escaneado / fotos: render/decodificación → preparación de la imagen (src/extract/imageOps.ts) →
- *    tesseract.js (Node) con las mismas pasadas y la misma validación aritmética (src/extract/ocrPipeline.ts).
+ *    tesseract.js (Node) con las mismas pasadas y la misma validación aritmética (src/extract/ocrPipeline.ts); en las
+ *    fotos de facturas y de cartas, primero el lector PaddleOCR (scripts/paddle-node.mjs, como la app; --engine=tesseract
+ *    para medir sólo Tesseract).
  * sobre los documentos de public/samples y sobre variantes DEGRADADAS generadas con Playwright/Chromium
  * (giro, perspectiva, desenfoque, ruido, compresión JPEG, baja resolución y un "PDF escaneado" sólo imagen).
  *
  * Verdad de referencia: tests/fixtures/bench/expected.json.
  *
  * Uso:  node scripts/bench-extraction.mjs [--only=<texto>] [--no-ocr] [--no-menus] [--menu-text-only] [--keep=<dir>] [--json=<archivo>] [--verbose]
+ *                                         [--engine=paddle|tesseract]
  */
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -132,6 +135,18 @@ const backend = {
     return res.data;
   },
 };
+
+/** Fotos (facturas y cartas): lector PaddleOCR primero, como la app (--engine=tesseract: sólo Tesseract). */
+const paddle =
+  args.engine !== 'tesseract' && !args['no-ocr']
+    ? await (await import('./paddle-node.mjs')).createPaddleReader({
+        paddleOcr: await load('/src/extract/paddleOcr.ts'),
+        paddleModel: await load('/src/extract/paddleModel.ts'),
+        imageOps,
+      })
+    : undefined;
+const photoBackend = paddle ? { ...backend, recognizePaddle: (image) => paddle.recognize(image) } : backend;
+const menuImage = paddle ? await load('/src/extract/menuImage.ts') : undefined;
 
 // ───────────────────────────── Variantes degradadas con Chromium ─────────────────────────────
 
@@ -293,17 +308,18 @@ async function runInvoiceImage(name, jpeg, variant) {
   const t0 = Date.now();
   const gray = await loadGray(jpeg);
   const pages = pipeline.preparePages([gray]);
-  const outcome = await pipeline.ocrInvoice(pages, backend);
+  const outcome = await pipeline.ocrInvoice(pages, photoBackend, paddle ? { passes: pipeline.INVOICE_PASSES_PADDLE } : {});
   return { name, variant, method: 'ocr (foto)', ms: Date.now() - t0, inv: outcome.invoice, passes: outcome.passes, prep: pages[0].info };
 }
 
 async function runMenuImage(name, bytes, variant) {
   const t0 = Date.now();
   const gray = await loadGray(bytes);
-  const pages = pipeline.preparePages([gray]);
+  // Como la app: con Paddle, las cartas oscuras (pizarras) se invierten antes de preparar
+  const pages = pipeline.preparePages([menuImage ? menuImage.normalizeMenuPolarity(gray).image : gray]);
   // Mismo camino que la app (index.ts): texto por columnas + cajas de palabras y combinación de pasadas del parser
   const parse = args['menu-text-only'] ? (t) => menuParser.parseMenuText(t, 'ocr') : extractIndex.parseMenuOcr;
-  const outcome = await pipeline.ocrMenu(pages, backend, parse, { merge: menuParser.mergeMenuPasses, quality: menuParser.menuQuality });
+  const outcome = await pipeline.ocrMenu(pages, photoBackend, parse, { merge: menuParser.mergeMenuPasses, quality: menuParser.menuQuality, ...(paddle ? pipeline.MENU_PADDLE_OPTIONS : {}) });
   return { name, variant, method: 'ocr (foto)', ms: Date.now() - t0, menu: outcome.menu, passes: outcome.passes, prep: pages[0].info, rawText: outcome.ocr.text };
 }
 

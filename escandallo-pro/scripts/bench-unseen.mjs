@@ -16,7 +16,9 @@
  *
  * Uso: node scripts/bench-unseen.mjs [--only=<texto>] [--no-ocr] [--no-menus] [--no-invoices] [--no-cache]
  *                                    [--keep=<dir>] [--json=<archivo>] [--verbose] [--assert] [--polarity]
- *   --polarity  cartas: invierte las de fondo oscuro antes del preprocesado (menuImage.normalizeMenuPolarity)
+ *                                    [--engine=paddle|tesseract]
+ *   --engine    fotos (cartas y facturas): paddle (por defecto, como la app: lector PaddleOCR primero) o tesseract
+ *   --polarity  cartas con --engine=tesseract: invierte las de fondo oscuro antes del preprocesado (con paddle, siempre)
  *   --assert  termina con código 1 si no se alcanzan los objetivos (PDF texto ≥ 97 % líneas y ≥ 95 % cabecera,
  *             degradadas ≥ 93 %, cartas ≥ 95 %).
  */
@@ -328,12 +330,27 @@ async function invoiceFromPdf(bytes) {
 }
 
 async function invoiceFromImage(jpeg) {
-  const outcome = await pipeline.ocrInvoice(pipeline.preparePages([await loadGray(jpeg)]), backend);
+  // Fotos de facturas: lector PaddleOCR primero (como la app); los PDF escaneados siguen sólo con Tesseract
+  const photoBackend = paddle ? { ...backend, recognizePaddle: (image) => paddle.recognize(image) } : backend;
+  const outcome = await pipeline.ocrInvoice(pipeline.preparePages([await loadGray(jpeg)]), photoBackend, paddle ? { passes: pipeline.INVOICE_PASSES_PADDLE } : {});
   return { inv: outcome.invoice, method: 'ocr foto', passes: outcome.passes };
 }
 
-/** --polarity: pizarras y cartas de fondo oscuro invertidas antes del preprocesado (menuImage.ts; integración solicitada). */
-const menuImage = args.polarity ? await load('/src/extract/menuImage.ts') : undefined;
+/**
+ * Cartas: motor como la app (--engine=paddle, por defecto: lector PaddleOCR con Tesseract de reserva y polaridad
+ * normalizada) o sólo Tesseract (--engine=tesseract; la polaridad, con --polarity).
+ */
+const MENU_ENGINE = args.engine === 'tesseract' ? 'tesseract' : 'paddle';
+const menuImage = args.polarity || MENU_ENGINE === 'paddle' ? await load('/src/extract/menuImage.ts') : undefined;
+const paddle =
+  MENU_ENGINE === 'paddle' && !args['no-ocr']
+    ? await (await import('./paddle-node.mjs')).createPaddleReader({
+        paddleOcr: await load('/src/extract/paddleOcr.ts'),
+        paddleModel: await load('/src/extract/paddleModel.ts'),
+        imageOps,
+        noCache: !!args['no-cache'],
+      })
+    : undefined;
 
 async function menuFromImages(images) {
   const grays = [];
@@ -341,7 +358,12 @@ async function menuFromImages(images) {
     const g = await loadGray(img);
     grays.push(menuImage ? menuImage.normalizeMenuPolarity(g).image : g);
   }
-  const outcome = await pipeline.ocrMenu(pipeline.preparePages(grays), backend, extractIndex.parseMenuOcr, { merge: menuParser.mergeMenuPasses, quality: menuParser.menuQuality });
+  const menuBackend = paddle ? { ...backend, recognizePaddle: (image) => paddle.recognize(image) } : backend;
+  const outcome = await pipeline.ocrMenu(pipeline.preparePages(grays), menuBackend, extractIndex.parseMenuOcr, {
+    merge: menuParser.mergeMenuPasses,
+    quality: menuParser.menuQuality,
+    ...(paddle ? pipeline.MENU_PADDLE_OPTIONS : {}),
+  });
   return { menu: outcome.menu, passes: outcome.passes, rawText: outcome.ocr.text };
 }
 
