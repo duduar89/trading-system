@@ -180,10 +180,57 @@ const backend = {
   },
 };
 
+/**
+ * Índice rápido (--fast): imagen de origen + página + modo → clave de la caché de tesseract. Evita repetir la
+ * preparación de imagen al afinar el parser (válido mientras no cambie imageOps; sin --fast se recalcula todo).
+ */
+const INDEX = join(CACHE, 'index');
+mkdirSync(INDEX, { recursive: true });
+
 async function menuFromImages(images) {
+  const src = createHash('sha1');
+  for (const img of images) src.update(img);
+  const srcKey = src.digest('hex');
+  const opts = { merge: menuParser.mergeMenuPasses, quality: menuParser.menuQuality };
+  if (args.fast) {
+    const calls = new Map();
+    let miss = false;
+    const fastBackend = {
+      async recognize(_image, psm) {
+        const n = calls.get(psm) ?? 0;
+        calls.set(psm, n + 1);
+        const ptr = join(INDEX, `${srcKey}-${n}-${psm}`);
+        if (!existsSync(ptr)) {
+          miss = true;
+          throw new Error('fuera del índice');
+        }
+        ocrStats.calls++;
+        ocrStats.cached++;
+        return JSON.parse(readFileSync(join(CACHE, `${readFileSync(ptr, 'utf8').trim()}.json`), 'utf8'));
+      },
+    };
+    const dummy = images.map(() => ({ image: { width: 1, height: 1, data: new Uint8ClampedArray([255]) }, info: { scale: 1, lineHeight: 36 } }));
+    try {
+      const outcome = await pipeline.ocrMenu(dummy, fastBackend, extractIndex.parseMenuOcr, opts);
+      return { menu: outcome.menu, passes: outcome.passes.map((p) => p.id), rawText: outcome.ocr.text };
+    } catch (err) {
+      if (!miss) throw err;
+    }
+  }
   const grays = [];
   for (const img of images) grays.push(await loadGray(img));
-  const outcome = await pipeline.ocrMenu(pipeline.preparePages(grays), backend, extractIndex.parseMenuOcr, { merge: menuParser.mergeMenuPasses, quality: menuParser.menuQuality });
+  const calls = new Map();
+  const indexing = {
+    async recognize(image, psm) {
+      const n = calls.get(psm) ?? 0;
+      calls.set(psm, n + 1);
+      const page = await backend.recognize(image, psm);
+      const key = createHash('sha1').update(Buffer.from(imageOps.encodePgm(image))).update(`psm${psm}`).digest('hex');
+      writeFileSync(join(INDEX, `${srcKey}-${n}-${psm}`), key);
+      return page;
+    },
+  };
+  const outcome = await pipeline.ocrMenu(pipeline.preparePages(grays), indexing, extractIndex.parseMenuOcr, opts);
   return { menu: outcome.menu, passes: outcome.passes.map((p) => p.id), rawText: outcome.ocr.text };
 }
 

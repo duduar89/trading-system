@@ -27,7 +27,7 @@ import { generateDesign, renderMenu } from './random-menus/render.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** Sube la versión al cambiar el generador: las cartas ya generadas con otra versión se regeneran. */
-export const GEN_VERSION = 4;
+export const GEN_VERSION = 5;
 export const TUNE_SEEDS = range(1, 60);
 export const HOLDOUT_SEEDS = range(1001, 1040);
 export const DEFAULT_OUT = join(ROOT, 'node_modules/.cache/escandallo-random-menus');
@@ -56,7 +56,7 @@ export function seedsFor(args) {
 export const seedDir = (out, seed) => join(out, `s${String(seed).padStart(4, '0')}`);
 
 /** Parámetros de la foto degradada (flujo propio de la semilla). */
-function degradation(seed, width, height) {
+function degradation(seed, width, height, dishSize) {
   const rng = new Rng(`${seed}:foto`);
   const scan = rng.chance(0.2);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -69,7 +69,7 @@ function degradation(seed, width, height) {
       blur: rng.float(0.2, 0.55),
       noise: rng.float(0.02, 0.06),
       jpeg: rng.int(65, 85),
-      long: rng.int(1700, 2400),
+      long: Math.max(rng.int(1700, 2400), Math.ceil((13 / dishSize) * Math.max(width, height))),
       margin: 0,
       background: '#ffffff',
       shade: 'none',
@@ -77,8 +77,10 @@ function degradation(seed, width, height) {
       grayscale: true,
     };
   }
-  const res = rng.weighted({ high: 0.5, mid: 0.35, low: 0.15 });
-  const long = res === 'high' ? rng.int(2200, 2800) : res === 'mid' ? rng.int(1600, 2200) : rng.int(1150, 1600);
+  const res = rng.weighted({ high: 0.45, mid: 0.4, low: 0.15 });
+  let long = res === 'high' ? rng.int(2200, 3000) : res === 'mid' ? rng.int(1600, 2200) : rng.int(1200, 1600);
+  // Foto legible (quien fotografía la carta encuadra para que se lea): letra de los platos de al menos ~12 px
+  long = Math.max(long, Math.ceil((12 / dishSize) * Math.max(width, height)));
   return {
     kind: 'photo',
     rotate: clamp(rng.normal() * 1.6, -4, 4),
@@ -184,13 +186,24 @@ export async function generateSeed(browser, kb, seed, out, force = false) {
   mkdirSync(dir, { recursive: true });
   const content = generateContent(new Rng(`${seed}:contenido`), kb);
   const design = generateDesign(new Rng(`${seed}:diseno`), content);
-  const { html, width, expected } = renderMenu(content, design, new Rng(`${seed}:detalles`));
   const pdfText = new Rng(`${seed}:pdf`).chance(0.3);
-
-  const page = await browser.newPage({ viewport: { width, height: 1000 }, deviceScaleFactor: 1 });
-  await page.setContent(html, { waitUntil: 'load' });
-  await page.evaluate(() => document.fonts.ready);
-  const height = await page.evaluate(() => Math.ceil(document.documentElement.scrollHeight));
+  // Formato de carta real (A4, A3, díptico, DL): si el contenido sale demasiado alargado se reparte en más columnas
+  let rendered;
+  let height = 0;
+  let page;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    rendered = renderMenu(content, design, new Rng(`${seed}:detalles`));
+    page = await browser.newPage({ viewport: { width: rendered.width, height: 1000 }, deviceScaleFactor: 1 });
+    await page.setContent(rendered.html, { waitUntil: 'load' });
+    await page.evaluate(() => document.fonts.ready);
+    height = await page.evaluate(() => Math.ceil(document.documentElement.scrollHeight));
+    if (height <= 2.1 * rendered.width || design.columns >= Math.min(3, content.sections.length)) break;
+    await page.close();
+    design.columns++;
+    design.width = Math.round(design.width * (design.columns === 2 ? 1.3 : 1.25));
+    design.dishSize = Math.min(design.dishSize, design.columns === 3 ? 22 : 26);
+  }
+  const { html, width, expected } = rendered;
   await page.setViewportSize({ width, height });
   const clean = await page.screenshot({ type: 'jpeg', quality: new Rng(`${seed}:jpeg`).int(82, 92), fullPage: true });
   if (pdfText) {
@@ -199,7 +212,7 @@ export async function generateSeed(browser, kb, seed, out, force = false) {
   }
   await page.close();
 
-  const deg = degradation(seed, width, height);
+  const deg = degradation(seed, width, height, design.dishSize);
   const shot = await degrade(browser, clean, { width, height }, deg);
   if (deg.kind === 'scan') writeFileSync(join(dir, 'scan.pdf'), await scannedPdf(browser, shot));
   else writeFileSync(join(dir, 'photo.jpg'), shot.jpeg);
