@@ -60,7 +60,7 @@ export default function Reports() {
     <div className="animate-fade-in">
       <PageHeader eyebrow="Informes" title={current.label} subtitle={current.subtitle} />
 
-      <div ref={tabsRef} className="-mx-4 mb-5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+      <div ref={tabsRef} className="-mx-4 mb-5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 scroll-fade-x">
         <Segmented<Tab>
           value={tab}
           onChange={setTab}

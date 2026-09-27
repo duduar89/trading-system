@@ -43,7 +43,7 @@ function SideNav() {
       <div className="px-3 pb-3">
         <WorkspaceSwitcher />
       </div>
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
+      <nav aria-label="Secciones" className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
         {NAV.map(({ to, label, icon: Icon, ...rest }) => (
           <NavLink
             key={to}
@@ -52,7 +52,7 @@ function SideNav() {
             className={({ isActive }) =>
               clsx(
                 'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition',
-                isActive ? 'bg-brand-500 text-white shadow-glow' : 'text-ink-2 hover:bg-surface-2 hover:text-ink',
+                isActive ? 'bg-brand-600 text-white shadow-glow' : 'text-ink-2 hover:bg-surface-2 hover:text-ink',
               )
             }
           >
@@ -63,7 +63,7 @@ function SideNav() {
       </nav>
       <div className="m-3 rounded-2xl border border-line bg-surface-2 p-3.5">
         <div className="flex items-center gap-2 text-xs font-bold text-ink">
-          <Sparkles className={clsx('size-4', aiOn ? 'text-ai' : 'text-muted')} />
+          <Sparkles className={clsx('size-4', aiOn ? 'text-ai-ink' : 'text-muted')} />
           {aiOn ? 'IA opcional activada' : 'Lectura gratis'}
         </div>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">
@@ -97,7 +97,7 @@ function MobileBottomNav() {
   const more = NAV.filter((n) => !mainTos.includes(n.to) && n.to !== '/carta');
   return (
     <>
-      <nav className="no-print pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/92 backdrop-blur-xl lg:hidden">
+      <nav aria-label="Navegación inferior" className="no-print pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/92 backdrop-blur-xl lg:hidden">
         <div className="mx-auto grid max-w-lg grid-cols-5 items-end px-2 pt-1.5">
           {main.slice(0, 2).map(({ to, label, icon: Icon, ...rest }) => (
             <NavLink key={to} to={to} end={'end' in rest ? rest.end : false} className="flex flex-col items-center gap-0.5 py-1">
@@ -209,10 +209,14 @@ function QuickActions() {
 
 function OfflineBanner() {
   const online = useOnline();
+  const settings = useAppSettings();
   if (online) return null;
+  // La IA es opcional y viene desactivada: sólo se menciona a quien la tiene activada.
+  const aiOn = settings.aiEnabled && !!settings.apiKey;
   return (
-    <div className="no-print flex items-center justify-center gap-2 bg-ink px-4 py-1.5 text-xs font-semibold text-bg">
-      <WifiOff className="size-3.5" /> Sin conexión: todo sigue funcionando en local (la IA no está disponible).
+    <div role="status" className="no-print flex items-center justify-center gap-2 bg-ink px-4 py-1.5 text-center text-xs font-semibold text-bg">
+      <WifiOff className="size-3.5 shrink-0" aria-hidden />
+      {aiOn ? 'Sin conexión: todo sigue funcionando en tu dispositivo (la IA opcional vuelve con la conexión).' : 'Sin conexión: todo sigue funcionando en tu dispositivo.'}
     </div>
   );
 }

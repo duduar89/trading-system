@@ -66,7 +66,7 @@ export function NewDishModal({ open, initialKind = 'plato', sections, onClose }:
           if (res.proposed > 0) toast.success(`«${dish.name}» creado con propuesta`, 'Revisa las líneas en violeta: gramajes, mermas e ingrediente vinculado.');
           else toast.info(`«${dish.name}» creado`, 'No encontramos una receta parecida: añade los ingredientes a mano.');
         } catch (e) {
-          toast.error('Plato creado, pero no se pudo proponer la receta', errorMessage(e));
+          toast.error('Plato creado, pero no se ha podido proponer la receta', errorMessage(e));
         }
       } else {
         toast.success(kind === 'plato' ? 'Plato creado' : 'Elaboración creada', dish.name);
@@ -74,7 +74,7 @@ export function NewDishModal({ open, initialKind = 'plato', sections, onClose }:
       onClose();
       navigate(`/platos/${dish.id}`);
     } catch (e) {
-      toast.error('No se pudo crear', errorMessage(e));
+      toast.error('No se ha podido crear', errorMessage(e));
       setBusy(null);
     }
   };

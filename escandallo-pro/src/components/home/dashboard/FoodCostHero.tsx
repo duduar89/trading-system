@@ -7,13 +7,13 @@ import { Card, cx } from '../../ui';
 import { businessStatus, foodCostScale, type StatusCounts } from '../insights';
 
 const STATUS_TEXT: Record<FoodCostStatus, { title: string; tone: string; icon: typeof CheckCircle2 }> = {
-  ok: { title: 'En objetivo', tone: 'text-ok', icon: CheckCircle2 },
-  warn: { title: 'Atención', tone: 'text-warn', icon: AlertTriangle },
-  bad: { title: 'Por encima del objetivo', tone: 'text-bad', icon: XCircle },
+  ok: { title: 'En objetivo', tone: 'text-ok-ink', icon: CheckCircle2 },
+  warn: { title: 'Atención', tone: 'text-warn-ink', icon: AlertTriangle },
+  bad: { title: 'Por encima del objetivo', tone: 'text-bad-ink', icon: XCircle },
   none: { title: 'Sin datos suficientes', tone: 'text-muted', icon: Target },
 };
 
-const VALUE_TONE: Record<FoodCostStatus, string> = { ok: 'text-ok', warn: 'text-warn', bad: 'text-bad', none: 'text-muted' };
+const VALUE_TONE: Record<FoodCostStatus, string> = { ok: 'text-ok-ink', warn: 'text-warn-ink', bad: 'text-bad-ink', none: 'text-muted' };
 
 /**
  * Cifra protagonista del panel: food cost medio frente al objetivo, con el semáforo en una regla
@@ -114,7 +114,7 @@ export function FoodCostHero({
               <span className="font-semibold text-ink-2">
                 {counts.total} plato{counts.total === 1 ? '' : 's'} con escandallo
               </span>
-              <Link to="/platos" className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline dark:text-brand-400">
+              <Link to="/platos" className="inline-flex items-center gap-1 font-semibold text-brand-ink hover:underline">
                 Ver escandallos <ArrowRight className="size-3.5" />
               </Link>
             </div>
@@ -125,15 +125,15 @@ export function FoodCostHero({
             </div>
             <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
               <li className="flex items-center gap-1.5">
-                <CheckCircle2 className="size-3.5 text-ok" aria-hidden />
+                <CheckCircle2 className="size-3.5 text-ok-ink" aria-hidden />
                 <span className="tabular font-bold text-ink">{counts.ok}</span> en objetivo
               </li>
               <li className="flex items-center gap-1.5">
-                <AlertTriangle className="size-3.5 text-warn" aria-hidden />
+                <AlertTriangle className="size-3.5 text-warn-ink" aria-hidden />
                 <span className="tabular font-bold text-ink">{counts.warn}</span> atención
               </li>
               <li className="flex items-center gap-1.5">
-                <XCircle className="size-3.5 text-bad" aria-hidden />
+                <XCircle className="size-3.5 text-bad-ink" aria-hidden />
                 <span className="tabular font-bold text-ink">{counts.bad}</span> en rojo
               </li>
             </ul>

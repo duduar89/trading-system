@@ -23,7 +23,7 @@ import type { DishFcRow, ReviewItem } from '../insights';
 
 function PanelFooterLink({ to, children }: { to: string; children: ReactNode }) {
   return (
-    <Link to={to} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400">
+    <Link to={to} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-ink hover:underline">
       {children} <ArrowRight className="size-4" />
     </Link>
   );
@@ -32,7 +32,7 @@ function PanelFooterLink({ to, children }: { to: string; children: ReactNode }) 
 function PanelEmpty({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
   return (
     <div className="flex flex-col items-center rounded-xl bg-surface-2 px-4 py-8 text-center">
-      <div className="mb-2 flex size-10 items-center justify-center rounded-full bg-ok-soft text-ok">{icon}</div>
+      <div className="mb-2 flex size-10 items-center justify-center rounded-full bg-ok-soft text-ok-ink">{icon}</div>
       <div className="text-sm font-semibold text-ink">{title}</div>
       <p className="mt-0.5 max-w-xs text-xs text-muted">{text}</p>
     </div>
@@ -70,7 +70,7 @@ export function PriceAlertsPanel({
         }
       />
       {error ? (
-        <p className="rounded-xl bg-bad-soft px-3 py-2 text-sm text-ink-2">No se pudieron calcular las alertas: {error}</p>
+        <p className="rounded-xl bg-bad-soft px-3 py-2 text-sm text-ink-2">No se han podido calcular las alertas: {error}</p>
       ) : alerts.length === 0 ? (
         <PanelEmpty
           icon={<CheckCircle2 className="size-5" />}
@@ -89,7 +89,7 @@ export function PriceAlertsPanel({
                     <span
                       className={cx(
                         'flex size-9 shrink-0 items-center justify-center rounded-xl',
-                        up ? 'bg-bad-soft text-bad' : 'bg-ok-soft text-ok',
+                        up ? 'bg-bad-soft text-bad-ink' : 'bg-ok-soft text-ok-ink',
                       )}
                     >
                       {up ? <TrendingUp className="size-4" /> : <TrendingDown className="size-4" />}
@@ -159,7 +159,7 @@ export function AttentionPanel({ rows, className }: { rows: DishFcRow[]; classNa
                       <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted">PVP sugerido</span>
                       <span className="tabular block text-sm font-bold text-ink">{fmtEur(r.suggestedPrice)}</span>
                       {priceGap != null && priceGap > 0.004 && (
-                        <span className="tabular block text-[10px] font-semibold text-bad">{fmtSignedEur(priceGap)}</span>
+                        <span className="tabular block text-[10px] font-semibold text-bad-ink">{fmtSignedEur(priceGap)}</span>
                       )}
                     </span>
                   </Link>
@@ -181,7 +181,7 @@ const REVIEW_ICON: Record<ReviewItem['kind'], ReactNode> = {
   carta: <Camera className="size-4" />,
   plato: <ChefHat className="size-4" />,
 };
-const REVIEW_TONE: Record<ReviewItem['tone'], string> = { warn: 'bg-warn-soft text-warn', bad: 'bg-bad-soft text-bad', ai: 'bg-ai-soft text-ai' };
+const REVIEW_TONE: Record<ReviewItem['tone'], string> = { warn: 'bg-warn-soft text-warn-ink', bad: 'bg-bad-soft text-bad-ink', ai: 'bg-ai-soft text-ai-ink' };
 
 /** Tareas pendientes: facturas por revisar, cartas por importar y escandallos propuestos sin revisar. */
 export function ReviewPanel({ items, className }: { items: ReviewItem[]; className?: string }) {

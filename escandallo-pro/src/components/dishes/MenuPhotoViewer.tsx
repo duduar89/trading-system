@@ -50,12 +50,12 @@ export function MenuPhotoViewer({ images, className }: { images: Blob[]; classNa
       <div className="relative overflow-hidden rounded-2xl border border-line bg-surface-2 shadow-card">
         {isPdf(blob) ? (
           <div className="flex aspect-[3/4] flex-col items-center justify-center gap-3 p-6 text-center">
-            <div className="flex size-16 items-center justify-center rounded-2xl bg-bad-soft text-bad">
+            <div className="flex size-16 items-center justify-center rounded-2xl bg-bad-soft text-bad-ink">
               <FileText className="size-8" />
             </div>
             <div className="text-sm font-semibold text-ink">Carta en PDF</div>
             {url && (
-              <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400">
+              <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-ink hover:underline">
                 Abrir el PDF <ExternalLink className="size-3.5" />
               </a>
             )}

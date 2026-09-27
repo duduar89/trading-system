@@ -90,7 +90,7 @@ export function WasteBreakdown({ cost, portions }: { cost: DishCost; portions: n
         )}
 
         {rowsWithWaste.length > TOP && (
-          <button type="button" onClick={() => setShowAll((s) => !s)} className="mt-3 text-xs font-semibold text-brand-600 hover:underline dark:text-brand-400">
+          <button type="button" onClick={() => setShowAll((s) => !s)} className="mt-3 text-xs font-semibold text-brand-ink hover:underline">
             {showAll ? 'Ver menos' : `Ver los ${rowsWithWaste.length} ingredientes con merma`}
           </button>
         )}

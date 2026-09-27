@@ -40,7 +40,7 @@ export function SelectBox({
       <span
         className={clsx(
           'flex size-5 items-center justify-center rounded-md border-2 transition',
-          checked ? 'border-brand-500 bg-brand-500 text-white' : partial ? 'border-brand-500 bg-brand-500/15 text-brand-600' : 'border-line-strong bg-surface hover:border-brand-400',
+          checked ? 'border-brand-500 bg-brand-500 text-white' : partial ? 'border-brand-500 bg-brand-500/15 text-brand-ink' : 'border-line-strong bg-surface hover:border-brand-400',
         )}
       >
         {checked && <Check className="size-3.5" strokeWidth={3} />}
@@ -95,7 +95,7 @@ export function DishCard({
             )}
             {dish.section && <span className="truncate">{dish.section}</span>}
             {dish.status === 'revisado' && (
-              <span className="inline-flex items-center gap-0.5 text-ok normal-case tracking-normal">
+              <span className="inline-flex items-center gap-0.5 text-ok-ink normal-case tracking-normal">
                 <Check className="size-3" /> Revisado
               </span>
             )}
@@ -145,7 +145,7 @@ export function DishCard({
         {dish.items.length ? (
           <div>
             <div className="mb-1.5 flex items-start justify-between gap-2 text-xs">
-              <span className={clsx('flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 font-semibold', missing ? 'text-warn' : 'text-ink-2')}>
+              <span className={clsx('flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 font-semibold', missing ? 'text-warn-ink' : 'text-ink-2')}>
                 {missing ? (
                   <span className="inline-flex items-center gap-1">
                     <AlertTriangle className="size-3.5" /> {missing} sin precio
@@ -155,7 +155,7 @@ export function DishCard({
                 )}
                 {estimated > 0 && (
                   <span
-                    className="inline-flex items-center gap-0.5 whitespace-nowrap font-semibold text-info"
+                    className="inline-flex items-center gap-0.5 whitespace-nowrap font-semibold text-info-ink"
                     title="Precio de referencia orientativo: sube tus facturas y el coste pasará a ser el real."
                   >
                     <CircleDashed className="size-3" aria-hidden /> {estimated} {estimated === 1 ? 'estimado' : 'estimados'}
@@ -188,7 +188,7 @@ function Metric({ label, value, missing = '—', tone }: { label: string; value?
   return (
     <div className="min-w-0">
       <dt className="text-[10px] font-bold uppercase tracking-wide text-muted">{label}</dt>
-      <dd className={clsx('truncate font-semibold', value ? (tone === 'bad' ? 'text-bad' : 'text-ink') : 'text-xs text-warn')}>{value ?? missing}</dd>
+      <dd className={clsx('truncate font-semibold', value ? (tone === 'bad' ? 'text-bad-ink' : 'text-ink') : 'text-xs text-warn-ink')}>{value ?? missing}</dd>
     </div>
   );
 }

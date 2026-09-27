@@ -139,7 +139,7 @@ export function YieldLinkCard({
           <div className="rounded-xl bg-surface-2 px-3.5 py-4 text-sm text-muted">
             Todavía ningún escandallo lleva este producto. Cuando lo añadas a un plato, su coste saldrá con el rendimiento real.
             <div className="mt-2">
-              <Link to="/platos" className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline dark:text-brand-400">
+              <Link to="/platos" className="inline-flex items-center gap-1 font-semibold text-brand-ink hover:underline">
                 Ir a escandallos <ArrowRight className="size-3.5" />
               </Link>
             </div>
@@ -149,7 +149,7 @@ export function YieldLinkCard({
             {changed.length > 0 && (
               <p className="mb-2.5 text-xs text-ink-2">
                 {linked ? 'Sin esta prueba' : 'Con esta prueba'}, {changed.length === 1 ? 'el coste por ración cambiaría' : 'el coste medio por ración cambiaría'}{' '}
-                <strong className={cx('font-bold', avgDelta > 0 ? 'text-bad' : 'text-ok')}>
+                <strong className={cx('font-bold', avgDelta > 0 ? 'text-bad-ink' : 'text-ok-ink')}>
                   {avgDelta > 0 ? '+' : '−'}
                   {fmtEur(Math.abs(avgDelta))}
                 </strong>
@@ -180,7 +180,7 @@ export function YieldLinkCard({
                         {Math.abs(delta) > 0.0005 ? (
                           <div className="text-[11px] text-muted">
                             {altLabel}: {fmtEur(i.alt.costPerPortion)}{' '}
-                            <span className={cx('font-semibold', delta > 0 ? 'text-bad' : 'text-ok')}>
+                            <span className={cx('font-semibold', delta > 0 ? 'text-bad-ink' : 'text-ok-ink')}>
                               ({delta > 0 ? '+' : '−'}
                               {fmtEur(Math.abs(delta))})
                             </span>
@@ -195,7 +195,7 @@ export function YieldLinkCard({
               })}
             </ul>
             {(impacts?.length ?? 0) > 6 && (
-              <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-2 text-xs font-semibold text-brand-600 hover:underline dark:text-brand-400">
+              <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-2 text-xs font-semibold text-brand-ink hover:underline">
                 {showAll ? 'Ver menos' : `Ver los ${impacts?.length} platos`}
               </button>
             )}

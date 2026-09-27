@@ -50,13 +50,13 @@ export function PriceTargetTool({
             </div>
             <div className="text-right">
               <div className="text-[11px] font-bold uppercase tracking-wide text-muted">Margen / ración</div>
-              <div className="tabular font-display text-xl font-extrabold text-ok">{fmtEur(margin)}</div>
+              <div className="tabular font-display text-xl font-extrabold text-ok-ink">{fmtEur(margin)}</div>
             </div>
           </div>
 
           <label htmlFor={id} className="mt-5 flex items-center justify-between text-xs font-semibold text-ink-2">
             <span>Food cost deseado</span>
-            <span className="tabular rounded-lg bg-brand-500/12 px-2 py-0.5 font-display text-sm font-extrabold text-brand-600 dark:text-brand-400">{fmtPctNb(pct, 1)}</span>
+            <span className="tabular rounded-lg bg-brand-500/12 px-2 py-0.5 font-display text-sm font-extrabold text-brand-ink">{fmtPctNb(pct, 1)}</span>
           </label>
           <div className="mt-2">
             <input
@@ -83,7 +83,7 @@ export function PriceTargetTool({
                 onClick={() => setPct(p)}
                 className={clsx(
                   'tabular h-10 min-w-12 rounded-xl border px-3 text-xs font-bold transition',
-                  pct === p ? 'border-brand-500 bg-brand-500/10 text-brand-600 dark:text-brand-400' : 'border-line bg-surface text-ink-2 hover:border-line-strong',
+                  pct === p ? 'border-brand-500 bg-brand-500/10 text-brand-ink' : 'border-line bg-surface text-ink-2 hover:border-line-strong',
                 )}
               >
                 {p} %

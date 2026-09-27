@@ -43,7 +43,7 @@ export function InvoiceMock({ className, compact }: { className?: string; compac
           <div className="font-display text-sm font-bold text-ink">Distribuciones Norte S.L.</div>
           <div className="text-[10px] text-muted">Nº F-2026/0918 · 18 sep 2026</div>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full bg-ok-soft px-2 py-0.5 text-[10px] font-bold text-ok">
+        <span className="inline-flex items-center gap-1 rounded-full bg-ok-soft px-2 py-0.5 text-[10px] font-bold text-ok-ink">
           <Check className="size-3" /> Cuadra
         </span>
       </div>
@@ -146,11 +146,11 @@ export function EscandalloMock({ className, compact }: { className?: string; com
     <div className={clsx('relative overflow-hidden rounded-2xl border border-line bg-surface p-4 shadow-pop', className)} aria-hidden>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-500">Escandallo</div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-ink">Escandallo</div>
           <div className="truncate font-display text-[15px] font-bold text-ink">Solomillo al Pedro Ximénez</div>
           <div className="text-[10px] text-muted">PVP carta 28,50 € · 1 ración</div>
         </div>
-        <div className="shrink-0 rounded-xl bg-ok px-2.5 py-1.5 text-center text-white shadow-[0_10px_30px_-10px_rgb(16_185_129/0.9)]">
+        <div className="shrink-0 rounded-xl bg-ok-solid px-2.5 py-1.5 text-center text-white shadow-[0_10px_30px_-10px_rgb(16_185_129/0.9)]">
           <div className="tabular font-display text-[26px] font-extrabold leading-none">27 %</div>
           <div className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-white/85">Food cost</div>
         </div>

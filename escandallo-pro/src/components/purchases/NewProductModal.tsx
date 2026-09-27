@@ -71,7 +71,7 @@ export function NewProductModal({ open, onClose, onCreated }: { open: boolean; o
       onCreated?.(p);
       close();
     } catch (err) {
-      toast.error('No se pudo crear el ingrediente', errorMessage(err));
+      toast.error('No se ha podido crear el ingrediente', errorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -108,7 +108,7 @@ export function NewProductModal({ open, onClose, onCreated }: { open: boolean; o
 
         {kb && (
           <div className="flex items-start gap-3 rounded-xl border border-ai/30 bg-ai-soft p-3 text-sm animate-fade-in">
-            <Sparkles className="mt-0.5 size-4 shrink-0 text-ai" />
+            <Sparkles className="mt-0.5 size-4 shrink-0 text-ai-ink" />
             <div className="min-w-0 text-ink-2">
               <div className="font-semibold text-ink">Lo conocemos: {kb.name}</div>
               <div className="mt-0.5 text-xs">

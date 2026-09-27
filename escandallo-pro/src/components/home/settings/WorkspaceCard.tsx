@@ -63,7 +63,7 @@ function DeleteWorkspaceDialog({ ws, open, onClose }: { ws: Workspace; open: boo
       await deleteWorkspace(ws.id);
       toast.success(`«${ws.name}» eliminado`, other ? `Ahora estás en «${other.name}».` : undefined);
     } catch (e) {
-      toast.error('No se pudo eliminar el restaurante', errorMessage(e));
+      toast.error('No se ha podido eliminar el restaurante', errorMessage(e));
       setBusy(false);
     }
   };
@@ -92,7 +92,7 @@ function DeleteWorkspaceDialog({ ws, open, onClose }: { ws: Workspace; open: boo
     >
       <div className="space-y-4">
         <div className="flex gap-3 rounded-xl bg-bad-soft p-3 text-sm text-ink-2">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad" />
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-bad-ink" />
           <p>
             Se borrarán <strong className="text-ink">todas</strong> las facturas, ingredientes, escandallos y pruebas de merma de «{ws.name}» de este
             dispositivo. No se puede deshacer. Si quieres conservarlos, descarga antes una copia de seguridad.
@@ -139,7 +139,7 @@ export function WorkspaceCard({ ws, id }: { ws: Workspace; id?: string }) {
       setDraft(null);
       toast.success('Datos del restaurante guardados');
     } catch (e) {
-      toast.error('No se pudieron guardar los cambios', errorMessage(e));
+      toast.error('No se han podido guardar los cambios', errorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -159,7 +159,7 @@ export function WorkspaceCard({ ws, id }: { ws: Workspace; id?: string }) {
           <div className="truncate text-xs text-muted">{[d.businessType, d.city].filter(Boolean).join(' · ') || 'Espacio de trabajo'}</div>
         </div>
       </div>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Nombre" error={draft ? nameError : undefined} className="sm:col-span-2">
           <Input value={d.name} onChange={(e) => set({ name: e.target.value })} maxLength={80} />
         </Field>
@@ -212,7 +212,7 @@ export function WorkspaceCard({ ws, id }: { ws: Workspace; id?: string }) {
       <div className="mt-5 flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
         <Button
           variant="ghost"
-          className="text-bad! hover:bg-bad-soft! hover:text-bad!"
+          className="text-bad-ink! hover:bg-bad-soft! hover:text-bad-ink!"
           icon={<Trash2 className="size-4" />}
           onClick={() => setDeleting(true)}
         >

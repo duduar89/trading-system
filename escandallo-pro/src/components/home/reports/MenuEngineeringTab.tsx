@@ -5,7 +5,7 @@ import type { SymbolType } from 'recharts';
 import { menuEngineering, type MenuEngineeringRow } from '../../../core/analytics';
 import type { MenuEngineeringClass } from '../../../types';
 import { MENU_CLASS_LABELS } from '../../../lib/labels';
-import { fmtEur, fmtNum, fmtPct } from '../../../lib/format';
+import { fmtEur, fmtNum, fmtPct, fmtPctFixed } from '../../../lib/format';
 import { Badge, Button, Callout, Card, CardHeader, EmptyState, Stat, Table, Td, Th, cx } from '../../ui';
 import { ChartLegend, HBarList, QuadrantScatter, useChartTheme, type QuadrantGroup } from '../../charts';
 import { safeCompute } from '../shared';
@@ -14,10 +14,10 @@ import type { ReportsData } from './useReportsData';
 const CLASS_ORDER: MenuEngineeringClass[] = ['estrella', 'caballo', 'enigma', 'perro'];
 const CLASS_SHAPE: Record<MenuEngineeringClass, SymbolType> = { estrella: 'star', caballo: 'triangle', enigma: 'diamond', perro: 'circle' };
 const CLASS_SOFT: Record<MenuEngineeringClass, string> = {
-  estrella: 'bg-ok-soft text-ok',
-  caballo: 'bg-warn-soft text-warn',
-  enigma: 'bg-info-soft text-info',
-  perro: 'bg-bad-soft text-bad',
+  estrella: 'bg-ok-soft text-ok-ink',
+  caballo: 'bg-warn-soft text-warn-ink',
+  enigma: 'bg-info-soft text-info-ink',
+  perro: 'bg-bad-soft text-bad-ink',
 };
 
 function ShapeIcon({ shape, color }: { shape: SymbolType; color: string }) {
@@ -41,7 +41,7 @@ export function MenuEngineeringTab({ data }: { data: ReportsData }) {
 
   if (result.error) {
     return (
-      <Callout tone="bad" icon={<AlertTriangle className="size-4" />} title="No se pudo calcular la ingeniería de menú">
+      <Callout tone="bad" icon={<AlertTriangle className="size-4" />} title="No se ha podido calcular la ingeniería de menú">
         {result.error}
       </Callout>
     );
@@ -92,7 +92,7 @@ export function MenuEngineeringTab({ data }: { data: ReportsData }) {
           <Stat
             label="Estrellas"
             value={
-              <span className="text-ok">
+              <span className="text-ok-ink">
                 {byClass.get('estrella')!.length}
                 <span className="ml-1 text-base font-bold text-muted">/ {rows.length}</span>
               </span>
@@ -105,7 +105,7 @@ export function MenuEngineeringTab({ data }: { data: ReportsData }) {
           <Stat
             label="Margen sobre la media"
             value={
-              <span className="text-ok">
+              <span className="text-ok-ink">
                 {highMargin}
                 <span className="ml-1 text-base font-bold text-muted">/ {rows.length}</span>
               </span>
@@ -272,7 +272,7 @@ export function MenuEngineeringTab({ data }: { data: ReportsData }) {
                   {me.hasVolumeData ? fmtEur(r.totalMargin) : '—'}
                 </Td>
                 <Td align="right" className="whitespace-nowrap">
-                  {fmtPct(r.foodCostPct)}
+                  {fmtPctFixed(r.foodCostPct)}
                 </Td>
                 <Td>
                   {me.hasVolumeData ? (

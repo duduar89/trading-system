@@ -79,7 +79,7 @@ export function useChartColors(): ChartColors {
   return {
     series: dark ? '#f5501a' : '#ff5a1f',
     grid: read('--t-line', dark ? '#222c39' : '#e6e9ee'),
-    axis: read('--t-muted', dark ? '#8a97a8' : '#677486'),
+    axis: read('--t-muted', dark ? '#8a97a8' : '#5f6b7c'),
     surface: read('--t-surface', dark ? '#121821' : '#ffffff'),
     ink: read('--t-ink', dark ? '#f3f5f8' : '#0b0f14'),
   };

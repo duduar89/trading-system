@@ -189,7 +189,7 @@ export default function Dishes() {
       toast.success(`${ids.length} ${ids.length === 1 ? 'escandallo revisado' : 'escandallos revisados'}`);
       setSelected(new Set());
     } catch (e) {
-      toast.error('No se pudieron marcar', errorMessage(e));
+      toast.error('No se han podido marcar', errorMessage(e));
     } finally {
       setBulkBusy(false);
     }
@@ -202,7 +202,7 @@ export default function Dishes() {
       toast.success(`${ids.length} ${ids.length === 1 ? 'escandallo eliminado' : 'escandallos eliminados'}`);
       setSelected(new Set());
     } catch (e) {
-      toast.error('No se pudieron eliminar', errorMessage(e));
+      toast.error('No se han podido eliminar', errorMessage(e));
     } finally {
       setBulkBusy(false);
     }
@@ -370,7 +370,7 @@ export default function Dishes() {
               </div>
             </div>
             {(sections.length > 0 || hasNoSection) && (
-              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="toolbar" aria-label="Secciones">
+              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 scroll-fade-x" role="toolbar" aria-label="Secciones">
                 <Chip active={section === undefined} onClick={() => setSection(undefined)}>
                   Todas
                 </Chip>
@@ -392,8 +392,9 @@ export default function Dishes() {
           </div>
 
           {/* ── Listado ── */}
+          <h2 className="sr-only">Listado de escandallos</h2>
           {loading ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }, (_, i) => (
                 <DishCardSkeleton key={i} />
               ))}
@@ -419,7 +420,7 @@ export default function Dishes() {
               }
             />
           ) : view === 'cards' || !wide ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {visible.map((d) => (
                 <DishCard
                   key={d.id}
@@ -470,7 +471,7 @@ export default function Dishes() {
               <Button size="md" variant="outline" icon={<CheckCheck className="size-4" />} onClick={markReviewed} loading={bulkBusy} aria-label="Marcar revisado">
                 <span className="max-sm:hidden">Marcar revisado</span>
               </Button>
-              <Button size="md" variant="outline" icon={<Trash2 className="size-4 text-bad" />} onClick={() => setConfirmDelete(true)} disabled={bulkBusy} aria-label="Eliminar">
+              <Button size="md" variant="outline" icon={<Trash2 className="size-4 text-bad-ink" />} onClick={() => setConfirmDelete(true)} disabled={bulkBusy} aria-label="Eliminar">
                 <span className="max-sm:hidden">Eliminar</span>
               </Button>
             </div>
@@ -500,9 +501,9 @@ export default function Dishes() {
 }
 
 const FC_CHIPS: { value: FoodCostFilter; label: string; dot: string; active: string }[] = [
-  { value: 'bad', label: 'En rojo', dot: 'bg-bad', active: 'border-bad/50 bg-bad-soft text-bad' },
-  { value: 'warn', label: 'En ámbar', dot: 'bg-warn', active: 'border-warn/50 bg-warn-soft text-warn' },
-  { value: 'ok', label: 'En verde', dot: 'bg-ok', active: 'border-ok/50 bg-ok-soft text-ok' },
+  { value: 'bad', label: 'En rojo', dot: 'bg-bad', active: 'border-bad/50 bg-bad-soft text-bad-ink' },
+  { value: 'warn', label: 'En ámbar', dot: 'bg-warn', active: 'border-warn/50 bg-warn-soft text-warn-ink' },
+  { value: 'ok', label: 'En verde', dot: 'bg-ok', active: 'border-ok/50 bg-ok-soft text-ok-ink' },
   { value: 'sin', label: 'Sin food cost', dot: 'bg-line-strong', active: 'border-line-strong bg-surface-2 text-ink' },
 ];
 
@@ -525,7 +526,7 @@ function FoodCostFilterBar({
     sin: 'Sin PVP o sin ingredientes con precio',
   };
   return (
-    <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Filtrar por food cost">
+    <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 scroll-fade-x" role="group" aria-label="Filtrar por food cost">
       <span className="shrink-0 pr-1 text-xs font-bold uppercase tracking-wide text-muted">Food cost</span>
       {FC_CHIPS.filter((c) => c.value !== 'sin' || counts.sin > 0 || value === 'sin').map((c) => {
         const active = value === c.value;
@@ -591,7 +592,7 @@ function EmptyHero({ onCamera, onNew }: { onCamera: () => void; onNew: () => voi
           Crear un plato a mano
         </Button>
       </div>
-      <div className="mx-auto mt-8 grid max-w-2xl gap-3 text-left sm:grid-cols-3">
+      <div className="mx-auto mt-8 grid grid-cols-1 max-w-2xl gap-3 text-left sm:grid-cols-3">
         {[
           { icon: <Camera className="size-4" />, t: 'Foto de la carta', d: 'Platos, secciones y PVP leídos solos.' },
           { icon: <Sparkles className="size-4" />, t: 'Receta propuesta', d: 'Gramajes y mermas típicos de cada plato.' },

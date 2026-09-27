@@ -113,7 +113,7 @@ export function TotalsBar({ check, onUseLinesSum, disabled }: { check: TotalsChe
   const tone = check.status === 'ok' ? 'ok' : check.status === 'warn' ? 'warn' : 'info';
   const styles = { ok: 'border-ok/30 bg-ok-soft', warn: 'border-warn/40 bg-warn-soft', info: 'border-line bg-surface' };
   const Icon = check.status === 'ok' ? CheckCircle2 : check.status === 'warn' ? AlertTriangle : Info;
-  const iconTone = { ok: 'text-ok', warn: 'text-warn', info: 'text-info' };
+  const iconTone = { ok: 'text-ok-ink', warn: 'text-warn-ink', info: 'text-info-ink' };
   return (
     <div className={clsx('rounded-2xl border p-3.5 sm:p-4', styles[tone])} role="status">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -142,12 +142,12 @@ export function TotalsBar({ check, onUseLinesSum, disabled }: { check: TotalsChe
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <div className="tabular text-right">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-muted">Suma de líneas</div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-ink-2">Suma de líneas</div>
             <div className="font-display text-lg font-extrabold text-ink">{fmtEur(check.linesSum)}</div>
           </div>
           {check.subtotal != null && (
             <div className="tabular text-right">
-              <div className="text-[10px] font-bold uppercase tracking-wide text-muted">Base imponible</div>
+              <div className="text-[10px] font-bold uppercase tracking-wide text-ink-2">Base imponible</div>
               <div className="font-display text-lg font-extrabold text-ink">{fmtEur(check.subtotal)}</div>
             </div>
           )}

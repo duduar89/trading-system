@@ -31,6 +31,7 @@ import { addInvoiceFiles, createManualInvoice, deleteInvoice, processInvoice } f
 import { aiAvailable } from '../extract/index';
 import { fmtDate, fmtEur, fmtNum, fmtPct } from '../lib/format';
 import { todayIso } from '../lib/id';
+import { comparisonDetail, comparisonHint } from '../core/periods';
 import { InvoiceStatusBadge, MethodBadge } from '../components/purchases/badges';
 import { QueuePanel } from '../components/purchases/ProcessingQueue';
 import { DropdownMenu } from '../components/purchases/DropdownMenu';
@@ -95,7 +96,7 @@ export default function Invoices() {
             `${dup.number ? `La nº ${dup.number}` : 'Una igual'} de ${dup.supplierName || name || 'este proveedor'} ya está en tus facturas${dup.status === 'confirmada' ? ' y confirmada' : ''}. Revísala antes de confirmar.`,
           );
         else if (inv.status === 'revision') toast.success('Factura lista para revisar', name);
-        else if (inv.status === 'error') toast.error('No se pudo leer una factura', inv.error ?? name);
+        else if (inv.status === 'error') toast.error('No se ha podido leer una factura', inv.error ?? name);
       })
       .catch(() => undefined);
   }, [queue?.running]);
@@ -123,7 +124,8 @@ export default function Invoices() {
   const list = useMemo(() => filterInvoices(invoices ?? [], filter, query), [invoices, filter, query]);
   const duplicates = useMemo(() => duplicateInvoiceIds(invoices ?? []), [invoices]);
   const aiOn = aiAvailable(settings);
-  const spendTrend = pctChange(stats.prevMonthSpend, stats.monthSpend);
+  // Mes hasta hoy frente al mismo periodo del mes anterior (no contra el mes anterior entero, que engaña a mitad de mes).
+  const spendTrend = pctChange(stats.prevPeriodSpend, stats.monthSpend);
 
   const onFiles = async (files: File[]) => {
     if (!files.length) return;
@@ -134,7 +136,7 @@ export default function Invoices() {
         toast.info('Factura en cola', 'La estamos leyendo en tu dispositivo. Te avisamos al terminar.');
       else toast.info(`${ids.length} facturas en cola`, 'Se leen una tras otra en tu dispositivo. Puedes seguir trabajando.');
     } catch (e) {
-      toast.error('No se pudieron añadir las facturas', errorMessage(e));
+      toast.error('No se han podido añadir las facturas', errorMessage(e));
     } finally {
       setUploading(false);
     }
@@ -146,7 +148,7 @@ export default function Invoices() {
       const id = await createManualInvoice();
       navigate(`/facturas/${id}`);
     } catch (e) {
-      toast.error('No se pudo crear la factura', errorMessage(e));
+      toast.error('No se ha podido crear la factura', errorMessage(e));
       setCreating(false);
     }
   };
@@ -157,7 +159,7 @@ export default function Invoices() {
       // El resultado se avisa al terminar la lectura (ver el seguimiento de la cola).
       await processInvoice(inv.id);
     } catch (e) {
-      toast.error('No se pudo volver a leer la factura', errorMessage(e));
+      toast.error('No se ha podido volver a leer la factura', errorMessage(e));
     }
   };
 
@@ -166,7 +168,7 @@ export default function Invoices() {
       await deleteInvoice(inv.id);
       toast.success('Factura eliminada');
     } catch (e) {
-      toast.error('No se pudo eliminar la factura', errorMessage(e));
+      toast.error('No se ha podido eliminar la factura', errorMessage(e));
     }
   };
 
@@ -212,11 +214,13 @@ export default function Invoices() {
                 : undefined
             }
             hint={
-              spendTrend != null
-                ? 'frente al mes anterior'
-                : stats.monthPendingSpend > 0
-                  ? `${fmtEur(stats.monthPendingSpend)} por revisar`
-                  : 'facturas confirmadas y por revisar'
+              spendTrend != null && stats.comparison ? (
+                <span title={comparisonDetail(stats.comparison)}>{comparisonHint(stats.comparison)}</span>
+              ) : stats.monthPendingSpend > 0 ? (
+                `${fmtEur(stats.monthPendingSpend)} por revisar`
+              ) : (
+                'facturas confirmadas y por revisar'
+              )
             }
           />
           <Stat
@@ -227,7 +231,7 @@ export default function Invoices() {
             className="lg:order-3"
             hint={
               stats.errors > 0 ? (
-                <span className="font-semibold text-bad">{stats.errors} con error</span>
+                <span className="font-semibold text-bad-ink">{stats.errors} con error</span>
               ) : stats.inProgress > 0 ? (
                 `${stats.inProgress} leyéndose ahora`
               ) : stats.toReview > 0 ? (
@@ -342,7 +346,7 @@ export default function Invoices() {
       ) : (
         <section aria-label="Listado de facturas">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 scroll-fade-x">
               <Segmented
                 value={filter}
                 onChange={setFilter}
@@ -354,7 +358,10 @@ export default function Invoices() {
                     label: `Por revisar${stats.toReview + stats.inProgress ? ` · ${stats.toReview + stats.inProgress}` : ''}`,
                   },
                   { value: 'confirmadas', label: 'Confirmadas' },
-                  { value: 'error', label: `Con error${stats.errors ? ` · ${stats.errors}` : ''}` },
+                  // «Con error» sólo cuando hay alguna: en el móvil caben las demás sin desplazar la barra.
+                  ...(stats.errors > 0 || filter === 'error'
+                    ? [{ value: 'error' as const, label: `Con error${stats.errors ? ` · ${stats.errors}` : ''}` }]
+                    : []),
                 ]}
               />
             </div>
@@ -366,7 +373,7 @@ export default function Invoices() {
               Ninguna factura coincide con el filtro.{' '}
               <button
                 type="button"
-                className="font-semibold text-brand-600 underline dark:text-brand-400"
+                className="font-semibold text-brand-ink underline"
                 onClick={() => {
                   setFilter('todas');
                   setQuery('');
@@ -524,7 +531,7 @@ function InvoiceTable({
             <Td className="max-w-[280px]">
               <Link
                 to={`/facturas/${inv.id}`}
-                className="block truncate font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400"
+                className="block truncate font-semibold text-ink hover:text-brand-ink"
               >
                 {invoiceTitle(inv)}
               </Link>
@@ -541,7 +548,7 @@ function InvoiceTable({
                 {duplicates.has(inv.id) && <DuplicateBadge />}
               </div>
               {inv.status === 'error' && inv.error && (
-                <div className="mt-1 max-w-[220px] truncate text-xs text-bad" title={inv.error}>
+                <div className="mt-1 max-w-[220px] truncate text-xs text-bad-ink" title={inv.error}>
                   {inv.error}
                 </div>
               )}
@@ -590,11 +597,11 @@ function InvoiceCard({
           <div className="mt-2 truncate font-display text-base font-bold text-ink">{invoiceTitle(inv)}</div>
           <div className="tabular mt-0.5 text-xs text-muted">
             {fmtDate(inv.date)}
-            {inv.number ? ` · Nº ${inv.number}` : ''}
+            {inv.number ? ` · Nº\u00a0${inv.number}` : ''}
             {inv.lines.length ? ` · ${inv.lines.length} ${inv.lines.length === 1 ? 'línea' : 'líneas'}` : ''}
           </div>
           {inv.status === 'error' && inv.error && (
-            <div className="mt-1.5 flex items-start gap-1 text-xs text-bad">
+            <div className="mt-1.5 flex items-start gap-1 text-xs text-bad-ink">
               <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
               <span className="line-clamp-2">{inv.error}</span>
             </div>
@@ -649,7 +656,7 @@ function EmptyInvoices() {
   return (
     <div className="hero-mesh overflow-hidden rounded-3xl border border-line bg-surface p-6 shadow-card sm:p-10">
       <div className="mx-auto max-w-2xl text-center">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok-soft px-3 py-1 text-xs font-bold text-ok">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok-soft px-3 py-1 text-xs font-bold text-ok-ink">
           <ShieldCheck className="size-3.5" /> Gratis · en tu dispositivo · sin enviar tus datos a nadie
         </span>
         <h2 className="mt-4 font-display text-2xl font-extrabold text-ink sm:text-3xl">
@@ -660,7 +667,7 @@ function EmptyInvoices() {
           confirmas. Cada factura mantiene al día el coste de todos tus platos.
         </p>
       </div>
-      <div className="mx-auto mt-8 grid max-w-4xl gap-3 sm:grid-cols-3">
+      <div className="mx-auto mt-8 grid grid-cols-1 max-w-4xl gap-3 sm:grid-cols-3">
         {ways.map((w, i) => (
           <div key={w.title} className="rounded-2xl border border-line bg-surface/90 p-4 backdrop-blur">
             <div className="flex items-center gap-3">

@@ -42,7 +42,7 @@ export default function Menu() {
       const id = await addMenuScan(ok);
       navigate(`/carta/${id}`);
     } catch (e) {
-      toast.error('No se pudo leer la carta', errorMessage(e));
+      toast.error('No se ha podido leer la carta', errorMessage(e));
       setAdding(false);
     }
   };
@@ -53,9 +53,9 @@ export default function Menu() {
 
       {/* ── Hero ── */}
       <section className="hero-mesh relative mb-8 overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-card sm:p-8">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:items-center">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:items-center">
           <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok-soft px-2.5 py-1 text-[11px] font-bold text-ok">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-ok/30 bg-ok-soft px-2.5 py-1 text-[11px] font-bold text-ok-ink">
               <ShieldCheck className="size-3.5" /> Gratis, en tu dispositivo, sin enviar tus datos a nadie
             </div>
             <h2 className="mt-3 font-display text-[26px] font-extrabold leading-tight text-ink sm:text-4xl">
@@ -78,7 +78,7 @@ export default function Menu() {
           </div>
 
           <div className="relative">
-            <div className={clsx('grid gap-3 sm:grid-cols-2', adding && 'pointer-events-none opacity-40')}>
+            <div className={clsx('grid grid-cols-1 gap-3 sm:grid-cols-2', adding && 'pointer-events-none opacity-40')}>
               <div className={clsx('rounded-[1.4rem] transition', highlight && 'ring-4 ring-brand-500/35 shadow-glow')}>
                 <FileDrop
                   accept="image/*"
@@ -110,7 +110,7 @@ export default function Menu() {
               </div>
             )}
             <p className="mt-3 flex items-start gap-2 text-xs text-muted">
-              <Lightbulb className="mt-px size-4 shrink-0 text-warn" />
+              <Lightbulb className="mt-px size-4 shrink-0 text-warn-ink" />
               Para una lectura perfecta: carta plana, de frente y con buena luz, sin reflejos y una página por foto.
             </p>
           </div>
@@ -119,7 +119,7 @@ export default function Menu() {
 
       {/* ── Cartas leídas ── */}
       {scans === undefined ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 3 }, (_, i) => (
             <div key={i} className="h-64 animate-pulse-soft rounded-2xl bg-surface shadow-card" />
           ))}
@@ -134,7 +134,7 @@ export default function Menu() {
               {scans.length} {scans.length === 1 ? 'carta' : 'cartas'}
             </span>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {scans.map((s) => (
               <ScanCard key={s.id} scan={s} onDelete={() => setToDelete(s)} />
             ))}
@@ -157,7 +157,7 @@ export default function Menu() {
             await deleteMenuScan(toDelete.id);
             toast.success('Carta eliminada');
           } catch (e) {
-            toast.error('No se pudo eliminar', errorMessage(e));
+            toast.error('No se ha podido eliminar', errorMessage(e));
           }
         }}
       />
@@ -213,7 +213,7 @@ function ScanCard({ scan, onDelete }: { scan: MenuScan; onDelete: () => void }) 
             )}
           </p>
         </div>
-        <IconButton label={`Eliminar ${scan.name}`} onClick={onDelete} className="relative z-[2] -mr-1 size-10 hover:text-bad">
+        <IconButton label={`Eliminar ${scan.name}`} onClick={onDelete} className="relative z-[2] -mr-1 size-10 hover:text-bad-ink">
           <Trash2 className="size-4" />
         </IconButton>
         <ChevronRight className="mt-2.5 size-4 shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-ink" aria-hidden />
@@ -233,7 +233,7 @@ function HowItWorks() {
       <h2 id="how-title" className="mb-3 font-display text-xl font-extrabold text-ink">
         Cómo funciona
       </h2>
-      <ol className="grid gap-4 md:grid-cols-3">
+      <ol className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {steps.map((s) => (
           <li key={s.n} className="relative overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-card">
             <span className="absolute right-4 top-3 font-display text-[64px] font-extrabold leading-none text-brand-500/12" aria-hidden>

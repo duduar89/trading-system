@@ -46,7 +46,7 @@ function MenuReviewScreen() {
   const saver = useAutosave<MenuEntry[]>(
     (list) => (id ? saveMenuScanPatch(id, { entries: list }) : Promise.resolve()),
     400,
-    (e) => toast.error('No se pudieron guardar los cambios', errorMessage(e)),
+    (e) => toast.error('No se han podido guardar los cambios', errorMessage(e)),
   );
   const { isPending, schedule, flush } = saver;
 
@@ -93,7 +93,7 @@ function MenuReviewScreen() {
   if (!scan) return <ReviewSkeleton />;
 
   const runReprocess = (mode: 'local' | 'ai') => {
-    processMenuScan(scan.id, { forceLocal: mode === 'local' }).catch((e) => toast.error('No se pudo leer la carta', errorMessage(e)));
+    processMenuScan(scan.id, { forceLocal: mode === 'local' }).catch((e) => toast.error('No se ha podido leer la carta', errorMessage(e)));
     setEntries(null);
   };
 
@@ -122,7 +122,7 @@ function MenuReviewScreen() {
       );
       navigate(`/platos?recientes=1&propuestos=${withRecipe}`);
     } catch (e) {
-      toast.error('No se pudo importar la carta', errorMessage(e));
+      toast.error('No se ha podido importar la carta', errorMessage(e));
     } finally {
       setImporting(false);
     }
@@ -158,11 +158,11 @@ function MenuReviewScreen() {
               </Button>
             )}
             {aiOn && (
-              <Button variant="outline" icon={<Sparkles className="size-4 text-ai" />} onClick={() => setReprocess('ai')}>
+              <Button variant="outline" icon={<Sparkles className="size-4 text-ai-ink" />} onClick={() => setReprocess('ai')}>
                 Leer con IA
               </Button>
             )}
-            <IconButton label="Eliminar esta carta" onClick={() => setConfirmDelete(true)} className="size-10 border border-line text-bad hover:bg-bad-soft hover:text-bad">
+            <IconButton label="Eliminar esta carta" onClick={() => setConfirmDelete(true)} className="size-10 border border-line text-bad-ink hover:bg-bad-soft hover:text-bad-ink">
               <Trash2 className="size-4" />
             </IconButton>
           </div>
@@ -173,7 +173,7 @@ function MenuReviewScreen() {
         <ScanningState scanId={scan.id} image={scan.images[0]} pages={scan.images.length} ai={aiOn} startedAt={scan.createdAt} onRetry={() => runReprocess('local')} />
       ) : scan.status === 'error' ? (
         <Card className="mx-auto max-w-2xl text-center">
-          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-bad-soft text-bad">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-bad-soft text-bad-ink">
             <XCircle className="size-7" />
           </div>
           <h2 className="mt-4 font-display text-xl font-extrabold text-ink">No hemos podido leer esta carta</h2>
@@ -209,7 +209,7 @@ function MenuReviewScreen() {
             )}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
             {!desktop && (
               <Segmented<'platos' | 'foto'>
                 value={pane}
@@ -291,7 +291,7 @@ function MenuReviewScreen() {
             toast.success('Carta eliminada');
             navigate('/carta', { replace: true });
           } catch (e) {
-            toast.error('No se pudo eliminar', errorMessage(e));
+            toast.error('No se ha podido eliminar', errorMessage(e));
           }
         }}
       />
@@ -304,7 +304,7 @@ function ReviewSkeleton() {
     <div className="animate-pulse-soft space-y-5" aria-busy="true" aria-label="Cargando carta">
       <div className="h-5 w-20 rounded bg-line" />
       <div className="h-8 w-1/2 rounded-xl bg-line" />
-      <div className="grid gap-6 lg:grid-cols-[5fr_7fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="aspect-[3/4] rounded-2xl bg-surface shadow-card" />
         <div className="space-y-3">
           {Array.from({ length: 5 }, (_, i) => (

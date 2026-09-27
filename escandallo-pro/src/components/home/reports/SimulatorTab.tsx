@@ -117,7 +117,7 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
                 <span
                   className={cx(
                     'inline-flex items-center gap-1 rounded-xl px-3 py-1.5 font-display text-xl font-extrabold',
-                    up ? 'bg-bad-soft text-bad' : pct < 0 ? 'bg-ok-soft text-ok' : 'bg-surface-2 text-muted',
+                    up ? 'bg-bad-soft text-bad-ink' : pct < 0 ? 'bg-ok-soft text-ok-ink' : 'bg-surface-2 text-muted',
                   )}
                 >
                   {up ? <TrendingUp className="size-5" /> : pct < 0 ? <TrendingDown className="size-5" /> : null}
@@ -151,7 +151,7 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
                     className={cx(
                       'h-9 rounded-full border px-3 text-xs font-bold transition',
                       Math.abs(pct - q) < 0.01
-                        ? 'border-brand-500 bg-brand-500 text-white'
+                        ? 'border-brand-600 bg-brand-600 text-white'
                         : 'border-line bg-surface-2 text-ink-2 hover:border-line-strong',
                     )}
                   >
@@ -165,7 +165,7 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
       </Card>
 
       {sim?.error ? (
-        <Callout tone="bad" icon={<AlertTriangle className="size-4" />} title="No se pudo simular">
+        <Callout tone="bad" icon={<AlertTriangle className="size-4" />} title="No se ha podido simular">
           {sim.error}
         </Callout>
       ) : (
@@ -184,10 +184,10 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
                 {
                   label: 'Food cost medio',
                   value: fmtPp(summary.avgDeltaFc),
-                  tone: (summary.avgDeltaFc ?? 0) > 0.05 ? 'text-bad' : (summary.avgDeltaFc ?? 0) < -0.05 ? 'text-ok' : 'text-ink',
+                  tone: (summary.avgDeltaFc ?? 0) > 0.05 ? 'text-bad-ink' : (summary.avgDeltaFc ?? 0) < -0.05 ? 'text-ok-ink' : 'text-ink',
                 },
-                { label: 'Empeoran de color', value: String(summary.worsened), tone: summary.worsened ? 'text-bad' : 'text-ink' },
-                { label: 'Mejoran de color', value: String(summary.improved), tone: summary.improved ? 'text-ok' : 'text-ink' },
+                { label: 'Empeoran de color', value: String(summary.worsened), tone: summary.worsened ? 'text-bad-ink' : 'text-ink' },
+                { label: 'Mejoran de color', value: String(summary.improved), tone: summary.improved ? 'text-ok-ink' : 'text-ink' },
               ].map((k) => (
                 <div key={k.label} className="rounded-2xl border border-line bg-surface p-4 shadow-card">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted">{k.label}</div>
@@ -235,7 +235,7 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
                         <span
                           className={cx(
                             'tabular shrink-0 text-sm font-bold',
-                            r.deltaCost > 0.0005 ? 'text-bad' : r.deltaCost < -0.0005 ? 'text-ok' : 'text-ink',
+                            r.deltaCost > 0.0005 ? 'text-bad-ink' : r.deltaCost < -0.0005 ? 'text-ok-ink' : 'text-ink',
                           )}
                         >
                           {fmtSignedEur(r.deltaCost)}
@@ -279,7 +279,7 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
                           align="right"
                           className={cx(
                             'whitespace-nowrap font-semibold',
-                            r.deltaCost > 0.0005 ? 'text-bad' : r.deltaCost < -0.0005 ? 'text-ok' : 'text-ink',
+                            r.deltaCost > 0.0005 ? 'text-bad-ink' : r.deltaCost < -0.0005 ? 'text-ok-ink' : 'text-ink',
                           )}
                         >
                           {fmtSignedEur(r.deltaCost)}

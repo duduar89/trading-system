@@ -20,7 +20,8 @@
   --color-brand-300: #ffa274;
   --color-brand-400: #ff7a3d;
   --color-brand-500: #ff5a1f;
-  --color-brand-600: #ed3f0b;
+  /* 600+: tonos con los que el texto blanco cumple WCAG AA (≥ 4,5:1): botones, pestañas activas, píldoras con texto. */
+  --color-brand-600: #d63b0e;
   --color-brand-700: #c42d0b;
   --color-brand-800: #9c2611;
   --color-brand-900: #7e2312;
@@ -36,6 +37,23 @@
   --color-info-soft: color-mix(in oklab, #3b82f6 14%, transparent);
   --color-ai: #8b5cf6;
   --color-ai-soft: color-mix(in oklab, #8b5cf6 14%, transparent);
+
+  /*
+   * Tinta de estado para TEXTO (text-ok-ink…): los tonos vivos de arriba son para rellenos, barras, puntos e iconos;
+   * como texto no llegan al contraste AA. La tinta cambia con el tema (oscura en claro, clara en oscuro).
+   */
+  --color-ok-ink: var(--t-ok-ink);
+  --color-warn-ink: var(--t-warn-ink);
+  --color-bad-ink: var(--t-bad-ink);
+  --color-info-ink: var(--t-info-ink);
+  --color-ai-ink: var(--t-ai-ink);
+  --color-brand-ink: var(--t-brand-ink);
+  /* Rellenos sólidos con texto blanco encima (≥ 4,5:1 en ambos temas). */
+  --color-ok-solid: #047052;
+  --color-warn-solid: #a34a07;
+  --color-bad-solid: #be123c;
+  /* Texto sobre rellenos de datos saturados (barras, tramos): casi negro en ambos temas (≥ 4,5:1 sobre verde, azul o rojo). */
+  --color-on-fill: #0b0f14;
 
   /* Tokens semánticos que dependen del tema */
   --color-bg: var(--t-bg);
@@ -81,9 +99,15 @@
   --t-elevated: #ffffff;
   --t-ink: #0b0f14;
   --t-ink-2: #2a3441;
-  --t-muted: #677486;
+  --t-muted: #5f6b7c;
   --t-line: #e6e9ee;
   --t-line-strong: #d3d8e0;
+  --t-ok-ink: #047052;
+  --t-warn-ink: #a34a07;
+  --t-bad-ink: #be123c;
+  --t-info-ink: #1d4ed8;
+  --t-ai-ink: #6d28d9;
+  --t-brand-ink: #c42d0b;
   color-scheme: light;
 }
 
@@ -97,6 +121,12 @@
   --t-muted: #8a97a8;
   --t-line: #222c39;
   --t-line-strong: #2e3a4a;
+  --t-ok-ink: #34d399;
+  --t-warn-ink: #fbbf24;
+  --t-bad-ink: #fb7185;
+  --t-info-ink: #60a5fa;
+  --t-ai-ink: #a78bfa;
+  --t-brand-ink: #ff7a3d;
   color-scheme: dark;
 }
 
@@ -128,6 +158,18 @@ body {
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--t-line-strong) transparent;
+}
+
+/* Barras que se desplazan en horizontal en el móvil (pestañas, filtros): los bordes se difuminan para indicar que hay más. */
+@media (max-width: 639.98px) {
+  .scroll-fade-x {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+    scrollbar-width: none;
+  }
+  .scroll-fade-x::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* Fondo decorativo del hero */

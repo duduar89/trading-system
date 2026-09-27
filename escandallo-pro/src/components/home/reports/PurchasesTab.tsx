@@ -17,7 +17,7 @@ export function PurchasesTab({ data }: { data: ReportsData }) {
 
   if (data.stats.error) {
     return (
-      <Callout tone="bad" icon={<AlertTriangle className="size-4" />} title="No se pudo calcular el informe de compras">
+      <Callout tone="bad" icon={<AlertTriangle className="size-4" />} title="No se ha podido calcular el informe de compras">
         {data.stats.error}
       </Callout>
     );

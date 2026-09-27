@@ -126,12 +126,12 @@ export function DropdownMenu({
                 }}
                 className={clsx(
                   'flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-surface-2 focus:bg-surface-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-45',
-                  it.tone === 'danger' ? 'text-bad' : 'text-ink',
+                  it.tone === 'danger' ? 'text-bad-ink' : 'text-ink',
                 )}
               >
                 {it.icon && (
                   <span
-                    className={clsx('mt-0.5 shrink-0', it.tone === 'ai' ? 'text-ai' : it.tone === 'danger' ? 'text-bad' : 'text-muted')}
+                    className={clsx('mt-0.5 shrink-0', it.tone === 'ai' ? 'text-ai-ink' : it.tone === 'danger' ? 'text-bad-ink' : 'text-muted')}
                   >
                     {it.icon}
                   </span>

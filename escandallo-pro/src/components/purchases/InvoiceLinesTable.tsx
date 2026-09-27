@@ -116,7 +116,7 @@ export function InvoiceLinesTable({
           ref={addRef}
           type="button"
           onClick={onAdd}
-          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line-strong text-sm font-semibold text-muted transition hover:border-brand-400 hover:bg-brand-500/5 hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-brand-500 dark:hover:text-brand-400"
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line-strong text-sm font-semibold text-muted transition hover:border-brand-400 hover:bg-brand-500/5 hover:text-brand-ink focus-visible:outline-2 focus-visible:outline-brand-500"
         >
           <Plus className="size-4" /> Añadir línea
         </button>
@@ -200,7 +200,7 @@ const LineCard = memo(function LineCard({
             <button
               type="button"
               onClick={() => onRemove(line.id)}
-              className="inline-flex size-9 items-center justify-center rounded-xl text-muted transition hover:bg-bad-soft hover:text-bad"
+              className="inline-flex size-9 items-center justify-center rounded-xl text-muted transition hover:bg-bad-soft hover:text-bad-ink"
               aria-label={`Eliminar la línea ${index + 1}`}
               title="Eliminar línea"
             >
@@ -395,18 +395,18 @@ function RealPrice({ line, product, conversion }: { line: InvoiceLine; product?:
             )}
           </div>
           {conversion?.kind === 'convert' && product && inProductUnit != null && (
-            <div className="mt-0.5 text-[11px] text-info" title={conversion.assumption}>
+            <div className="mt-0.5 text-[11px] text-info-ink" title={conversion.assumption}>
               = {fmtEurPrecise(inProductUnit)}/{product.baseUnit} al aplicarlo
             </div>
           )}
           {conversion?.kind === 'incompatible' && product && (
-            <div className="mt-0.5 text-[11px] font-semibold text-bad">
+            <div className="mt-0.5 text-[11px] font-semibold text-bad-ink">
               No se aplicará: {product.name} va en {perUnitLabel(product.baseUnit)}
             </div>
           )}
         </>
       ) : (
-        <div className="flex items-center gap-1.5 text-sm font-semibold text-warn">
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-warn-ink">
           <AlertTriangle className="size-4" /> Sin calcular
         </div>
       )}
@@ -552,7 +552,7 @@ function MatchCell({
             size="md"
             variant="outline"
             className="shrink-0 px-3"
-            icon={<Check className="size-4 text-ok" />}
+            icon={<Check className="size-4 text-ok-ink" />}
             onClick={() => onPatch({ matchStatus: 'vinculado' })}
             aria-label={`Sí, es ${product.name}`}
           >

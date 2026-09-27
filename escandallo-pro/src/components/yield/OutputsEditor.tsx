@@ -103,12 +103,12 @@ export function OutputsEditor({
                     className="min-w-0 flex-1"
                   />
                   <span className="tabular w-12 shrink-0 text-right text-xs font-semibold text-ink-2 @min-[44rem]:hidden">{fmtPct(share, 1)}</span>
-                  <IconButton label={`Quitar ${o.name || 'salida'}`} onClick={() => remove(o.id)} className="-mr-1 size-10 shrink-0 hover:text-bad @min-[44rem]:hidden">
+                  <IconButton label={`Quitar ${o.name || 'salida'}`} onClick={() => remove(o.id)} className="-mr-1 size-10 shrink-0 hover:text-bad-ink @min-[44rem]:hidden">
                     <Trash2 className="size-4" />
                   </IconButton>
                 </div>
                 <div className="order-6 hidden justify-end @min-[44rem]:flex">
-                  <IconButton label={`Quitar ${o.name || 'salida'}`} onClick={() => remove(o.id)} className="size-10 hover:text-bad">
+                  <IconButton label={`Quitar ${o.name || 'salida'}`} onClick={() => remove(o.id)} className="size-10 hover:text-bad-ink">
                     <Trash2 className="size-4" />
                   </IconButton>
                 </div>
@@ -201,11 +201,11 @@ export function OutputsEditor({
         >
           <div className="flex items-start gap-2.5">
             {remaining < -0.0005 ? (
-              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-bad" />
+              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-bad-ink" />
             ) : remaining > 0.0005 ? (
-              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn" />
+              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn-ink" />
             ) : (
-              <CircleCheck className="mt-0.5 size-4 shrink-0 text-ok" />
+              <CircleCheck className="mt-0.5 size-4 shrink-0 text-ok-ink" />
             )}
             <div>
               <div className="font-semibold text-ink">

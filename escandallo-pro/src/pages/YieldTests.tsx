@@ -66,9 +66,9 @@ export default function YieldTests() {
       {/* Hero explicativo */}
       <Card padded={false} className="relative mb-6 overflow-hidden">
         <div className="hero-mesh pointer-events-none absolute inset-0 opacity-70" aria-hidden />
-        <div className="relative grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-10">
+        <div className="relative grid grid-cols-1 gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-10">
           <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-brand-600 backdrop-blur-sm dark:text-brand-400">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/80 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-brand-ink backdrop-blur-sm">
               <Scale className="size-3.5" /> Merma por pieza y por plato
             </div>
             <h2 className="mt-3 font-display text-2xl font-extrabold leading-tight text-ink sm:text-[28px]">

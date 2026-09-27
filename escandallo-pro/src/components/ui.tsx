@@ -6,6 +6,7 @@ import {
   forwardRef,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -18,7 +19,7 @@ import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { Loader2, X, UploadCloud, Info } from 'lucide-react';
 import type { FoodCostStatus } from '../core/costing';
-import { fmtPct } from '../lib/format';
+import { fmtPctFixed } from '../lib/format';
 
 export { clsx as cx };
 
@@ -38,15 +39,16 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const btnVariants: Record<ButtonVariant, string> = {
   primary:
-    'bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700 shadow-[0_8px_24px_-10px_rgb(255_90_31/0.8)] disabled:shadow-none',
+    'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 shadow-[0_8px_24px_-10px_rgb(255_90_31/0.8)] disabled:shadow-none',
   secondary: 'bg-ink text-bg hover:opacity-90 active:opacity-80',
   outline: 'border border-line-strong bg-surface text-ink hover:bg-surface-2 active:bg-line',
   ghost: 'text-ink-2 hover:bg-surface-2 hover:text-ink active:bg-line',
-  danger: 'bg-bad text-white hover:brightness-95 active:brightness-90',
-  ai: 'bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white hover:brightness-110 shadow-[0_8px_24px_-10px_rgb(139_92_246/0.8)]',
+  danger: 'bg-bad-solid text-white hover:brightness-110 active:brightness-95',
+  ai: 'bg-gradient-to-r from-violet-700 to-fuchsia-700 text-white hover:brightness-110 shadow-[0_8px_24px_-10px_rgb(139_92_246/0.8)]',
 };
 const btnSizes: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-xs gap-1.5 rounded-lg',
+  // En pantallas táctiles (puntero grueso) los botones pequeños crecen a 40 px de alto para que se acierten con el dedo.
+  sm: 'h-8 px-3 text-xs gap-1.5 rounded-lg pointer-coarse:h-10',
   md: 'h-10 px-4 text-sm gap-2 rounded-xl',
   lg: 'h-12 px-5 text-[15px] gap-2 rounded-xl',
   xl: 'h-14 px-7 text-base gap-2.5 rounded-2xl',
@@ -89,7 +91,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={clsx(
-        'inline-flex size-9 items-center justify-center rounded-xl text-muted transition hover:bg-surface-2 hover:text-ink active:bg-line disabled:opacity-40',
+        'inline-flex size-9 items-center justify-center rounded-xl text-muted transition hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 active:bg-line disabled:opacity-40 pointer-coarse:size-10',
         className,
       )}
       {...rest}
@@ -129,7 +131,7 @@ export function CardHeader({ title, subtitle, action, icon }: { title: ReactNode
       <div className="flex min-w-0 items-start gap-3">
         {icon && <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">{icon}</div>}
         <div className="min-w-0">
-          <h3 className="font-display text-base font-bold text-ink sm:text-lg">{title}</h3>
+          <h2 className="font-display text-base font-bold text-ink sm:text-lg">{title}</h2>
           {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
         </div>
       </div>
@@ -152,7 +154,7 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        {eyebrow && <div className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-brand-500">{eyebrow}</div>}
+        {eyebrow && <div className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-brand-ink">{eyebrow}</div>}
         <h1 className="font-display text-2xl font-extrabold text-ink sm:text-3xl">{title}</h1>
         {subtitle && <p className="mt-1 max-w-2xl text-sm text-muted sm:text-[15px]">{subtitle}</p>}
       </div>
@@ -182,11 +184,11 @@ export function Stat({
 }) {
   const toneRing: Record<string, string> = {
     default: 'bg-surface-2 text-ink-2',
-    ok: 'bg-ok-soft text-ok',
-    warn: 'bg-warn-soft text-warn',
-    bad: 'bg-bad-soft text-bad',
+    ok: 'bg-ok-soft text-ok-ink',
+    warn: 'bg-warn-soft text-warn-ink',
+    bad: 'bg-bad-soft text-bad-ink',
     brand: 'bg-brand-500/12 text-brand-500',
-    ai: 'bg-ai-soft text-ai',
+    ai: 'bg-ai-soft text-ai-ink',
   };
   return (
     <Card className={clsx('relative overflow-hidden', className)}>
@@ -200,7 +202,7 @@ export function Stat({
           <span
             className={clsx(
               'rounded-md px-1.5 py-0.5 font-semibold',
-              trend.good === undefined ? 'bg-surface-2 text-ink-2' : trend.good ? 'bg-ok-soft text-ok' : 'bg-bad-soft text-bad',
+              trend.good === undefined ? 'bg-surface-2 text-ink-2' : trend.good ? 'bg-ok-soft text-ok-ink' : 'bg-bad-soft text-bad-ink',
             )}
           >
             {trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '•'} {trend.value}
@@ -217,12 +219,12 @@ export function Stat({
 export type BadgeTone = 'neutral' | 'ok' | 'warn' | 'bad' | 'info' | 'brand' | 'ai';
 const badgeTones: Record<BadgeTone, string> = {
   neutral: 'bg-surface-2 text-ink-2 border-line',
-  ok: 'bg-ok-soft text-ok border-transparent',
-  warn: 'bg-warn-soft text-warn border-transparent',
-  bad: 'bg-bad-soft text-bad border-transparent',
-  info: 'bg-info-soft text-info border-transparent',
-  brand: 'bg-brand-500/12 text-brand-600 dark:text-brand-400 border-transparent',
-  ai: 'bg-ai-soft text-ai border-transparent',
+  ok: 'bg-ok-soft text-ok-ink border-transparent',
+  warn: 'bg-warn-soft text-warn-ink border-transparent',
+  bad: 'bg-bad-soft text-bad-ink border-transparent',
+  info: 'bg-info-soft text-info-ink border-transparent',
+  brand: 'bg-brand-500/12 text-brand-ink border-transparent',
+  ai: 'bg-ai-soft text-ai-ink border-transparent',
 };
 
 export function Badge({ tone = 'neutral', children, className, icon }: { tone?: BadgeTone; children: ReactNode; className?: string; icon?: ReactNode }) {
@@ -240,16 +242,16 @@ const fcTone: Record<FoodCostStatus, BadgeTone> = { ok: 'ok', warn: 'warn', bad:
 export function FoodCostBadge({ pct, status, size = 'md' }: { pct?: number; status: FoodCostStatus; size?: 'md' | 'lg' }) {
   if (size === 'lg') {
     const colors: Record<FoodCostStatus, string> = {
-      ok: 'bg-ok text-white',
-      warn: 'bg-warn text-white',
-      bad: 'bg-bad text-white',
+      ok: 'bg-ok-solid text-white',
+      warn: 'bg-warn-solid text-white',
+      bad: 'bg-bad-solid text-white',
       none: 'bg-surface-2 text-muted',
     };
-    return <span className={clsx('tabular inline-flex items-center rounded-xl px-3 py-1.5 font-display text-lg font-extrabold', colors[status])}>{fmtPct(pct)}</span>;
+    return <span className={clsx('tabular inline-flex items-center rounded-xl px-3 py-1.5 font-display text-lg font-extrabold', colors[status])}>{fmtPctFixed(pct)}</span>;
   }
   return (
     <Badge tone={fcTone[status]} className="tabular">
-      {fmtPct(pct)}
+      {fmtPctFixed(pct)}
     </Badge>
   );
 }
@@ -261,7 +263,7 @@ export function Field({ label, hint, error, children, className }: { label?: Rea
     <label className={clsx('block', className)}>
       {label && <span className="mb-1.5 block text-xs font-semibold text-ink-2">{label}</span>}
       {children}
-      {error ? <span className="mt-1 block text-xs text-bad">{error}</span> : hint ? <span className="mt-1 block text-xs text-muted">{hint}</span> : null}
+      {error ? <span className="mt-1 block text-xs text-bad-ink">{error}</span> : hint ? <span className="mt-1 block text-xs text-muted">{hint}</span> : null}
     </label>
   );
 }
@@ -374,7 +376,11 @@ export function Switch({ checked, onChange, label, description }: { checked: boo
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={clsx('relative h-6 w-11 shrink-0 rounded-full transition', checked ? 'bg-brand-500' : 'bg-line-strong')}
+        className={clsx(
+          // before: amplía la zona táctil a 40 px sin cambiar el tamaño visible
+          "relative h-6 w-11 shrink-0 rounded-full transition before:absolute before:-inset-2 before:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
+          checked ? 'bg-brand-600' : 'bg-line-strong',
+        )}
       >
         <span className={clsx('absolute top-0.5 size-5 rounded-full bg-white shadow transition-all', checked ? 'left-[22px]' : 'left-0.5')} />
       </button>
@@ -382,7 +388,7 @@ export function Switch({ checked, onChange, label, description }: { checked: boo
   );
 }
 
-/** Control segmentado (pestañas compactas). */
+/** Control segmentado (pestañas compactas). Flechas izquierda/derecha, Inicio y Fin para moverse entre opciones. */
 export function Segmented<T extends string>({
   value,
   onChange,
@@ -396,17 +402,28 @@ export function Segmented<T extends string>({
   className?: string;
   size?: 'sm' | 'md';
 }) {
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const idx = options.findIndex((o) => o.value === value);
+    const next =
+      e.key === 'ArrowRight' ? (idx + 1) % options.length : e.key === 'ArrowLeft' ? (idx - 1 + options.length) % options.length : e.key === 'Home' ? 0 : e.key === 'End' ? options.length - 1 : -1;
+    if (next < 0 || next === idx) return;
+    e.preventDefault();
+    onChange(options[next]!.value);
+    const buttons = e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    buttons[next]?.focus();
+  };
   return (
-    <div className={clsx('inline-flex rounded-xl border border-line bg-surface-2 p-1', className)} role="tablist">
-      {options.map((o) => (
+    <div className={clsx('inline-flex rounded-xl border border-line bg-surface-2 p-1', className)} role="tablist" onKeyDown={onKeyDown}>
+      {options.map((o, i) => (
         <button
           key={o.value}
           type="button"
           role="tab"
           aria-selected={value === o.value}
+          tabIndex={i === Math.max(0, options.findIndex((x) => x.value === value)) ? 0 : -1}
           onClick={() => onChange(o.value)}
           className={clsx(
-            'inline-flex items-center gap-1.5 rounded-lg font-semibold transition',
+            'inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-500 pointer-coarse:min-h-10',
             size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-1.5 text-sm',
             value === o.value ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink',
           )}
@@ -450,7 +467,7 @@ export function EmptyState({
   return (
     <div className={clsx('flex flex-col items-center justify-center rounded-2xl border border-dashed border-line-strong bg-surface/60 px-6 py-14 text-center', className)}>
       {icon && <div className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-500">{icon}</div>}
-      <h3 className="font-display text-lg font-bold text-ink">{title}</h3>
+      <h2 className="font-display text-lg font-bold text-ink">{title}</h2>
       {description && <p className="mt-1 max-w-md text-sm text-muted">{description}</p>}
       {action && <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
@@ -465,7 +482,7 @@ export function Callout({ tone = 'info', title, children, icon, className }: { t
     ok: 'border-ok/30 bg-ok-soft',
     ai: 'border-ai/30 bg-ai-soft',
   };
-  const iconTones = { info: 'text-info', warn: 'text-warn', bad: 'text-bad', ok: 'text-ok', ai: 'text-ai' };
+  const iconTones = { info: 'text-info-ink', warn: 'text-warn-ink', bad: 'text-bad-ink', ok: 'text-ok-ink', ai: 'text-ai-ink' };
   return (
     <div className={clsx('flex gap-3 rounded-xl border p-3.5 text-sm', tones[tone], className)}>
       <div className={clsx('mt-0.5 shrink-0', iconTones[tone])}>{icon ?? <Info className="size-4" />}</div>
@@ -479,6 +496,17 @@ export function Callout({ tone = 'info', title, children, icon, className }: { t
 
 // ───────────────────────────── Modal / Drawer ─────────────────────────────
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+
+function focusablesIn(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null || el === document.activeElement);
+}
+
+/**
+ * Diálogo modal accesible: nombre (título), foco inicial dentro, Tab/Mayús+Tab atrapados en el diálogo, Escape para
+ * cerrar y devolución del foco al elemento que lo abrió.
+ */
 export function Modal({
   open,
   onClose,
@@ -487,6 +515,7 @@ export function Modal({
   children,
   footer,
   size = 'md',
+  ariaLabel,
 }: {
   open: boolean;
   onClose: () => void;
@@ -495,31 +524,99 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  /** Nombre accesible si el diálogo no tiene título visible. */
+  ariaLabel?: string;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const subtitleId = useId();
+  const onCloseRef = useRef(onClose);
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const onKey = (e: KeyboardEvent) => {
+      const panel = panelRef.current;
+      // Sólo responde el diálogo de más arriba (puede haber uno abierto encima de otro).
+      const dialogs = document.querySelectorAll('[data-ep-modal]');
+      if (!panel || dialogs[dialogs.length - 1] !== panel) return;
+      if (e.key === 'Escape') {
+        // Si lo ha gestionado un desplegable abierto desde el diálogo, se cierra sólo el desplegable.
+        const a = document.activeElement;
+        const inPopover = a instanceof HTMLElement && !panel.contains(a) && !!a.closest('[role="dialog"], [role="listbox"], [role="menu"]');
+        if (!e.defaultPrevented && !inPopover) onCloseRef.current();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = focusablesIn(panel);
+      if (!items.length) {
+        e.preventDefault();
+        panel.focus();
+        return;
+      }
+      const first = items[0]!;
+      const last = items[items.length - 1]!;
+      const active = document.activeElement;
+      const inside = panel.contains(active);
+      // Desplegables abiertos desde el diálogo (se pintan fuera, en <body>): gestionan su propio teclado.
+      if (!inside && active instanceof HTMLElement && active.closest('[role="dialog"], [role="listbox"], [role="menu"]')) return;
+      if (e.shiftKey && (!inside || active === first || active === panel)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (!inside || active === last)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    // Foco inicial: si el contenido no ha enfocado ya algo (autoFocus), el propio diálogo (se anuncia su título).
+    const raf = requestAnimationFrame(() => {
+      const panel = panelRef.current;
+      if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
+    });
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
+      if (opener && opener.isConnected) opener.focus({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   const widths = { sm: 'sm:max-w-md', md: 'sm:max-w-xl', lg: 'sm:max-w-3xl', xl: 'sm:max-w-5xl', full: 'sm:max-w-[min(1400px,96vw)]' };
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 animate-fade-in bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={clsx('relative flex max-h-[94dvh] w-full animate-slide-up flex-col rounded-t-3xl border border-line bg-elevated shadow-pop sm:rounded-3xl', widths[size])}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
+      <div className="absolute inset-0 animate-fade-in bg-black/50 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        aria-describedby={subtitle ? subtitleId : undefined}
+        aria-label={title ? undefined : (ariaLabel ?? 'Diálogo')}
+        tabIndex={-1}
+        data-ep-modal=""
+        className={clsx('relative flex max-h-[94dvh] w-full animate-slide-up flex-col rounded-t-3xl border border-line bg-elevated shadow-pop outline-none sm:rounded-3xl', widths[size])}
+      >
         {(title || subtitle) && (
           <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
             <div className="min-w-0">
-              {title && <h2 className="font-display text-lg font-bold text-ink">{title}</h2>}
-              {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
+              {title && (
+                <h2 id={titleId} className="font-display text-lg font-bold text-ink">
+                  {title}
+                </h2>
+              )}
+              {subtitle && (
+                <p id={subtitleId} className="mt-0.5 text-sm text-muted">
+                  {subtitle}
+                </p>
+              )}
             </div>
-            <IconButton label="Cerrar" onClick={onClose}>
+            <IconButton label="Cerrar" onClick={onClose} className="-mr-1 shrink-0">
               <X className="size-5" />
             </IconButton>
           </div>
@@ -651,11 +748,47 @@ export function FileDrop({
 
 // ───────────────────────────── Tabla ─────────────────────────────
 
-export function Table({ children, className }: { children: ReactNode; className?: string }) {
+/** true mientras el contenido desborda el contenedor (hay que desplazarse para verlo todo). */
+function useOverflowing<T extends HTMLElement>(): [React.RefObject<T | null>, boolean] {
+  const ref = useRef<T>(null);
+  const [over, setOver] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const check = () => setOver(el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, over];
+}
+
+/**
+ * Zona con desplazamiento accesible: cuando el contenido desborda, se puede enfocar con el teclado (Tab) y desplazar con
+ * las flechas, y se anuncia como región con nombre. Si no desborda, no añade paradas de tabulación.
+ */
+export function ScrollArea({ children, className, label }: { children: ReactNode; className?: string; label: string }) {
+  const [ref, over] = useOverflowing<HTMLDivElement>();
   return (
-    <div className={clsx('overflow-x-auto rounded-2xl border border-line bg-surface', className)}>
-      <table className="tabular w-full min-w-full border-collapse text-sm">{children}</table>
+    <div
+      ref={ref}
+      className={clsx('focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500', className)}
+      tabIndex={over ? 0 : undefined}
+      role={over ? 'region' : undefined}
+      aria-label={over ? label : undefined}
+    >
+      {children}
     </div>
+  );
+}
+
+export function Table({ children, className, label = 'Tabla' }: { children: ReactNode; className?: string; label?: string }) {
+  return (
+    <ScrollArea className={clsx('overflow-x-auto rounded-2xl border border-line bg-surface', className)} label={`${label} (desplázate para ver todas las columnas)`}>
+      <table className="tabular w-full min-w-full border-collapse text-sm">{children}</table>
+    </ScrollArea>
   );
 }
 export function Th({ children, className, align = 'left' }: { children?: ReactNode; className?: string; align?: 'left' | 'right' | 'center' }) {
@@ -693,11 +826,18 @@ export function Divider({ className }: { className?: string }) {
 export function SearchInput({ value, onChange, placeholder = 'Buscar…', className }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
   return (
     <div className={clsx('relative', className)}>
-      <svg className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <circle cx="11" cy="11" r="7" />
         <path d="m20 20-3.5-3.5" />
       </svg>
-      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={clsx(inputBase, 'h-10 pl-9')} />
+      <input
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder.replace(/…$/, '')}
+        className={clsx(inputBase, 'h-10 pl-9 [&::-webkit-search-cancel-button]:cursor-pointer')}
+      />
     </div>
   );
 }

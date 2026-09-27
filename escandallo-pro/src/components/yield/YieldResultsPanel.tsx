@@ -8,9 +8,9 @@ import { PieceBar } from './PieceBar';
 /** Tono del factor de sobrecoste (€/kg útil frente a compra). */
 function factorTone(f: number): string {
   if (!(f > 0)) return 'text-muted';
-  if (f >= 2) return 'text-bad';
-  if (f >= 1.4) return 'text-warn';
-  return 'text-ok';
+  if (f >= 2) return 'text-bad-ink';
+  if (f >= 1.4) return 'text-warn-ink';
+  return 'text-ok-ink';
 }
 
 /** Resultados en vivo de la prueba: rendimiento, mermas, coste real y merma por ración. */
@@ -106,13 +106,13 @@ export function YieldResultsPanel({ test, result, currentProductPrice }: { test:
 
       {/* Por ración */}
       <div className="rounded-2xl border border-brand-500/25 bg-brand-500/5 p-4">
-        <div className="text-[11px] font-bold uppercase tracking-wide text-brand-600 dark:text-brand-400">Merma por ración</div>
+        <div className="text-[11px] font-bold uppercase tracking-wide text-brand-ink">Merma por ración</div>
         {portion && portion > 0 && result.portions != null && result.grossPerPortionKg != null ? (
           <>
             <p className="mt-1.5 text-[15px] leading-snug text-ink">
               Para servir <strong className="whitespace-nowrap">{fmtKg(portion)}</strong> necesitas comprar{' '}
               <strong className="whitespace-nowrap">{fmtKg(result.grossPerPortionKg)}</strong>:{' '}
-              <strong className="whitespace-nowrap text-bad">{fmtKg(result.wastePerPortionKg)}</strong> se quedan por el camino
+              <strong className="whitespace-nowrap text-bad-ink">{fmtKg(result.wastePerPortionKg)}</strong> se quedan por el camino
               {hasPrice && result.wasteCostPerPortion != null && (
                 <>
                   {' '}
@@ -170,7 +170,7 @@ function BigNumber({ label, value, caption, tone, bar }: { label: string; value:
 function MiniStat({ label, value, tone, strong, hint }: { label: string; value: string; tone?: 'bad'; strong?: boolean; hint?: string }) {
   return (
     <div className="min-w-0 rounded-xl bg-surface px-3 py-2.5 shadow-card" title={hint}>
-      <div className={cx('truncate font-display text-lg font-extrabold', tone === 'bad' ? 'text-bad' : strong ? 'text-brand-600 dark:text-brand-400' : 'text-ink')}>{value}</div>
+      <div className={cx('truncate font-display text-lg font-extrabold', tone === 'bad' ? 'text-bad-ink' : strong ? 'text-brand-ink' : 'text-ink')}>{value}</div>
       <div className="truncate text-[11px] font-medium text-muted">{label}</div>
     </div>
   );

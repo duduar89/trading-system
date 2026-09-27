@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { BarChart3, Camera, ChevronDown, ChevronUp, FileText, PieChart, Receipt } from 'lucide-react';
 import type { BusinessSettings, IngredientCategory } from '../../../types';
 import { CATEGORY_LABELS } from '../../../lib/labels';
-import { fmtEur, fmtPct } from '../../../lib/format';
+import { fmtEur, fmtPct, fmtPctFixed } from '../../../lib/format';
 import { Button, Card, CardHeader } from '../../ui';
 import { ChartEmpty, ChartLegend, ColumnChart, HBarList, fmtEurAxis, statusColor, useChartTheme, STATUS_LEGEND } from '../../charts';
 import { monthLabel } from '../dates';
@@ -45,7 +45,7 @@ export function FoodCostByDishCard({ rows, business, className }: { rows: DishFc
               label: r.name,
               sublabel: [r.section, `coste ${fmtEur(r.costPerPortion)} · PVP ${fmtEur(r.menuPrice)}`].filter(Boolean).join(' · '),
               value: r.foodCostPct,
-              display: fmtPct(r.foodCostPct),
+              display: fmtPctFixed(r.foodCostPct),
               tone: r.status,
               to: `/platos/${r.id}`,
               title: `${r.name}: food cost ${fmtPct(r.foodCostPct)} (${STATUS_LEGEND[r.status === 'none' ? 'ok' : r.status]})`,

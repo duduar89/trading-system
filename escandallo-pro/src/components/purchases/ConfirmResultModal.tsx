@@ -164,7 +164,7 @@ export function ConfirmResultModal({
                   <div className="truncate text-sm font-semibold text-ink">{dish.name}</div>
                   <div className="tabular text-xs text-muted">
                     Coste ración {fmtEur(before.costPerPortion)} → {fmtEur(after.costPerPortion)}{' '}
-                    <span className={delta > 0 ? 'font-semibold text-bad' : 'font-semibold text-ok'}>
+                    <span className={delta > 0 ? 'font-semibold text-bad-ink' : 'font-semibold text-ok-ink'}>
                       ({delta > 0 ? '+' : ''}
                       {fmtEur(delta)})
                     </span>

@@ -20,7 +20,7 @@ export function ProgressBody({ progress, ai, noun = 'platos' }: { progress: Task
   return (
     <div className="py-2">
       <div className="flex items-center gap-4">
-        <div className={clsx('relative flex size-14 shrink-0 items-center justify-center rounded-2xl', ai ? 'bg-ai-soft text-ai' : 'bg-brand-500/12 text-brand-500')}>
+        <div className={clsx('relative flex size-14 shrink-0 items-center justify-center rounded-2xl', ai ? 'bg-ai-soft text-ai-ink' : 'bg-brand-500/12 text-brand-500')}>
           {ai ? <Sparkles className="size-7 animate-pulse-soft" /> : <ChefHat className="size-7 animate-pulse-soft" />}
           <span className={clsx('absolute inset-0 animate-ping rounded-2xl opacity-20', ai ? 'bg-ai' : 'bg-brand-500')} aria-hidden />
         </div>
@@ -117,7 +117,7 @@ export function ProposeModal({
       setPhase('done');
       onDone?.(res);
     } catch (e) {
-      toast.error('No se pudieron proponer los ingredientes', errorMessage(e));
+      toast.error('No se han podido proponer los ingredientes', errorMessage(e));
       setPhase('options');
     }
   };
@@ -151,7 +151,7 @@ export function ProposeModal({
       {phase === 'options' && (
         <div className="space-y-4">
           <div className={clsx('flex items-start gap-3 rounded-2xl border p-3.5', willUseAI ? 'border-ai/30 bg-ai-soft' : 'border-ok/30 bg-ok-soft')}>
-            {willUseAI ? <Sparkles className="mt-0.5 size-5 shrink-0 text-ai" /> : <ShieldCheck className="mt-0.5 size-5 shrink-0 text-ok" />}
+            {willUseAI ? <Sparkles className="mt-0.5 size-5 shrink-0 text-ai-ink" /> : <ShieldCheck className="mt-0.5 size-5 shrink-0 text-ok-ink" />}
             <div className="text-sm text-ink-2">
               {willUseAI ? (
                 <>
@@ -204,7 +204,7 @@ export function ProposeModal({
       {phase === 'done' && result && (
         <div className="space-y-4 py-1">
           <div className="flex items-center gap-4">
-            <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-ok-soft text-ok">
+            <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-ok-soft text-ok-ink">
               <CheckCircle2 className="size-7" />
             </div>
             <div>

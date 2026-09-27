@@ -56,7 +56,7 @@ export function ScanningState({
   return (
     <Card className="hero-mesh overflow-hidden" padded={false}>
       <style>{KEYFRAMES}</style>
-      <div className="grid gap-6 p-5 sm:p-8 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] md:items-center">
+      <div className="grid grid-cols-1 gap-6 p-5 sm:p-8 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] md:items-center">
         <div className="relative mx-auto aspect-[3/4] w-full max-w-[320px] overflow-hidden rounded-2xl border border-line bg-surface-2 shadow-pop">
           {url ? (
             <img src={url} alt="Carta que se está leyendo" className="size-full object-cover" />

@@ -234,6 +234,27 @@ describe('lista de facturas', () => {
   it('invoiceStats: el mes anterior de enero es diciembre del año previo', () => {
     const s = invoiceStats([invoice({ date: '2025-12-20', subtotal: 12 })], '2026-01-05');
     expect(s.prevMonthSpend).toBe(12);
+    expect(s.prevPeriodSpend).toBe(0);
+    expect(s.comparison?.previous).toEqual({ from: '2025-12-01', to: '2025-12-05' });
+  });
+  it('invoiceStats: el mes en curso se compara con el mismo periodo del anterior, no con el mes entero', () => {
+    // Compras regulares de 100 € cada 5 días: el día 25 de septiembre llevamos lo mismo que el 25 de agosto.
+    const regular = (month: string, days: number[]) =>
+      days.map((d) => invoice({ id: `${month}-${d}`, date: `${month}-${String(d).padStart(2, '0')}`, status: 'confirmada', subtotal: 100 }));
+    const list = [...regular('2026-08', [1, 6, 11, 16, 21, 26, 31]), ...regular('2026-09', [1, 6, 11, 16, 21])];
+    const s = invoiceStats(list, '2026-09-25');
+    expect(s.monthSpend).toBe(500);
+    expect(s.prevMonthSpend).toBe(700);
+    expect(s.prevPeriodSpend).toBe(500);
+    expect(pctChange(s.prevPeriodSpend, s.monthSpend)).toBeCloseTo(0);
+    // El día 3 no parece que el gasto se haya desplomado
+    const early = invoiceStats(list.filter((i) => i.date <= '2026-09-03'), '2026-09-03');
+    expect(early.prevPeriodSpend).toBe(100);
+    expect(pctChange(early.prevPeriodSpend, early.monthSpend)).toBeCloseTo(0);
+    // Último día del mes: meses completos
+    const end = invoiceStats(list, '2026-09-30');
+    expect(end.comparison?.fullMonth).toBe(true);
+    expect(end.prevPeriodSpend).toBe(700);
   });
 });
 

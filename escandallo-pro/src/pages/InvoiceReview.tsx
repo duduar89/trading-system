@@ -120,7 +120,7 @@ function InvoiceReviewScreen() {
     } catch (e) {
       dirtyRef.current = true;
       setSaveState('error');
-      toast.error('No se pudo guardar la factura', errorMessage(e));
+      toast.error('No se ha podido guardar la factura', errorMessage(e));
     }
   }, [id]);
   const [scheduleSave, flushSave, cancelSave] = useDebouncedAction(() => void save(), 1200);
@@ -164,7 +164,7 @@ function InvoiceReviewScreen() {
       setLineFilter('todas');
       setFocusLineId(line.id);
     } catch (e) {
-      toast.error('No se pudo añadir la línea', errorMessage(e));
+      toast.error('No se ha podido añadir la línea', errorMessage(e));
     }
   }, [updateDraft]);
 
@@ -223,10 +223,10 @@ function InvoiceReviewScreen() {
     try {
       await processInvoice(id, { forceLocal });
       const fresh = await db().invoices.get(id);
-      if (fresh?.status === 'error') toast.error('No se pudo leer la factura', fresh.error);
+      if (fresh?.status === 'error') toast.error('No se ha podido leer la factura', fresh.error);
       else toast.success('Factura leída de nuevo', 'Revisa las líneas antes de confirmar.');
     } catch (e) {
-      toast.error('No se pudo volver a leer la factura', errorMessage(e));
+      toast.error('No se ha podido volver a leer la factura', errorMessage(e));
     }
   };
 
@@ -236,7 +236,7 @@ function InvoiceReviewScreen() {
       await updateInvoice(id, { status: 'revision', error: undefined, method: invoice?.method ?? 'manual' });
       if (!draftRef.current?.lines.length) onAddLine();
     } catch (e) {
-      toast.error('No se pudo abrir el editor', errorMessage(e));
+      toast.error('No se ha podido abrir el editor', errorMessage(e));
     }
   };
 
@@ -272,7 +272,7 @@ function InvoiceReviewScreen() {
       const sameList = afterList.filter((p) => linkedIds.has(p.id) && !touched.includes(p));
       setOutcome({ ...res, rows: diffPrices(snapshot, [...touched, ...sameList]), costsBefore });
     } catch (e) {
-      toast.error('No se pudo confirmar la factura', errorMessage(e));
+      toast.error('No se ha podido confirmar la factura', errorMessage(e));
     } finally {
       setConfirming(false);
     }
@@ -298,7 +298,7 @@ function InvoiceReviewScreen() {
       toast.success('Factura eliminada');
       navigate('/facturas');
     } catch (e) {
-      toast.error('No se pudo eliminar la factura', errorMessage(e));
+      toast.error('No se ha podido eliminar la factura', errorMessage(e));
     }
   };
 
@@ -383,7 +383,7 @@ function InvoiceReviewScreen() {
         subtitle={
           <span className="tabular">
             {fmtDate(draft.date)}
-            {draft.number ? ` · Nº ${draft.number}` : ''} · {draft.lines.length} {draft.lines.length === 1 ? 'línea' : 'líneas'}
+            {draft.number ? ` · Nº\u00a0${draft.number}` : ''} · {draft.lines.length} {draft.lines.length === 1 ? 'línea' : 'líneas'}
             {check && check.linesSum > 0
               ? ` · ${fmtEur(draft.subtotal && draft.subtotal > 0 ? draft.subtotal : check.linesSum)} sin IVA`
               : ''}
@@ -501,7 +501,7 @@ function InvoiceReviewScreen() {
         </div>
       )}
 
-      <div className={clsx('grid gap-6', hasDoc && showDoc && wide && 'grid-cols-[minmax(0,5fr)_minmax(0,7fr)]')}>
+      <div className={clsx('grid gap-6', hasDoc && showDoc && wide ? 'grid-cols-[minmax(0,5fr)_minmax(0,7fr)]' : 'grid-cols-1')}>
         {hasDoc && showDoc && wide && (
           <div>
             <div className="sticky top-6">
@@ -554,7 +554,7 @@ function InvoiceReviewScreen() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {summary && summary.suggested > 0 && (
-                    <Button size="sm" variant="outline" icon={<CheckCheck className="size-3.5 text-ok" />} onClick={acceptAllSuggestions}>
+                    <Button size="sm" variant="outline" icon={<CheckCheck className="size-3.5 text-ok-ink" />} onClick={acceptAllSuggestions}>
                       Aceptar sugerencias
                     </Button>
                   )}
@@ -592,7 +592,7 @@ function InvoiceReviewScreen() {
                   Nada por aquí: {lineFilter === 'decidir' ? 'todas las líneas están decididas' : 'ninguna línea tiene avisos'}.{' '}
                   <button
                     type="button"
-                    className="font-semibold text-brand-600 underline dark:text-brand-400"
+                    className="font-semibold text-brand-ink underline"
                     onClick={() => setLineFilter('todas')}
                   >
                     Ver todas
@@ -706,27 +706,32 @@ function ConfirmBar({
   if (credits > 0) notes.push(`${credits} ${credits === 1 ? 'abono no cambia' : 'abonos no cambian'} precios`);
   if (mismatches > 0) notes.push(`${mismatches} no se ${mismatches === 1 ? 'podrá' : 'podrán'} aplicar (unidad distinta)`);
   return (
-    <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 lg:bottom-4 lg:pr-20 2xl:pr-0">
+    // Con el documento al lado la columna es estrecha: el resumen pasa a dos líneas en vez de cortarse.
+    <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 lg:bottom-4">
       <div className="flex items-center gap-3 rounded-2xl border border-line bg-elevated/95 p-2.5 shadow-pop backdrop-blur-xl sm:p-3.5">
         <div className="hidden min-w-0 flex-1 px-1 sm:block">
-          <div className="truncate text-sm font-semibold text-ink">
-            {priced} {priced === 1 ? 'precio listo' : 'precios listos'}
+          <div className="flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold text-ink">
+            <span className="whitespace-nowrap">
+              {priced} {priced === 1 ? 'precio listo' : 'precios listos'}
+            </span>
             {created > 0 && (
-              <span className="text-brand-600 dark:text-brand-400">
-                {' '}
+              <span className="whitespace-nowrap text-brand-ink">
                 · {created} {created === 1 ? 'ingrediente nuevo' : 'ingredientes nuevos'}
               </span>
             )}
           </div>
-          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted">
+          <div className="mt-0.5 flex items-start gap-1.5 text-xs text-muted">
             {notes.length ? (
               <>
-                <AlertTriangle className={clsx('size-3.5 shrink-0', mismatches || duplicate ? 'text-bad' : 'text-warn')} />
-                <span className="truncate">{notes.join(' · ')}</span>
+                <AlertTriangle className={clsx('mt-px size-3.5 shrink-0', mismatches || duplicate ? 'text-bad-ink' : 'text-warn-ink')} />
+                <span className="line-clamp-2" title={notes.join(' · ')}>
+                  {notes.join(' · ')}
+                </span>
               </>
             ) : (
               <>
-                <ShieldCheck className="size-3.5 shrink-0 text-ok" /> Todo listo: tus escandallos se actualizan al momento.
+                <ShieldCheck className="mt-px size-3.5 shrink-0 text-ok-ink" />
+                <span>Todo listo: tus escandallos se actualizan al momento.</span>
               </>
             )}
           </div>

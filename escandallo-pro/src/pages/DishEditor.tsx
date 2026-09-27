@@ -67,7 +67,7 @@ export default function DishEditor() {
       ownStamp.current = (await db().dishes.get(d.id))?.updatedAt;
     },
     400,
-    (e) => toast.error('No se pudieron guardar los cambios', errorMessage(e)),
+    (e) => toast.error('No se han podido guardar los cambios', errorMessage(e)),
   );
   const { isPending, schedule, flush } = saver;
 
@@ -158,7 +158,7 @@ export default function DishEditor() {
       toast.success('Escandallo duplicado', `«${copy.name}» listo para editar.`);
       navigate(`/platos/${copy.id}`);
     } catch (e) {
-      toast.error('No se pudo duplicar', errorMessage(e));
+      toast.error('No se ha podido duplicar', errorMessage(e));
     } finally {
       setBusy(null);
     }
@@ -169,7 +169,7 @@ export default function DishEditor() {
       toast.success('Escandallo eliminado', draft.name);
       navigate('/platos', { replace: true });
     } catch (e) {
-      toast.error('No se pudo eliminar', errorMessage(e));
+      toast.error('No se ha podido eliminar', errorMessage(e));
     }
   };
   const doRematch = async () => {
@@ -180,7 +180,7 @@ export default function DishEditor() {
       if (n > 0) toast.success(`${n} ${n === 1 ? 'ingrediente vinculado' : 'ingredientes vinculados'}`, 'Revisa las líneas marcadas en violeta.');
       else toast.info('No hemos encontrado coincidencias', 'Elige el ingrediente en la lista o créalo desde la propia línea.');
     } catch (e) {
-      toast.error('No se pudo vincular', errorMessage(e));
+      toast.error('No se ha podido vincular', errorMessage(e));
     } finally {
       setBusy(null);
     }
@@ -268,7 +268,7 @@ export default function DishEditor() {
             <Button variant="outline" icon={<Copy className="size-4" />} onClick={doDuplicate} loading={busy === 'dup'} className="max-sm:px-3" aria-label="Duplicar">
               <span className="max-sm:hidden">Duplicar</span>
             </Button>
-            <IconButton label="Eliminar escandallo" onClick={() => setConfirmDelete(true)} className="size-10 border border-line text-bad hover:bg-bad-soft hover:text-bad">
+            <IconButton label="Eliminar escandallo" onClick={() => setConfirmDelete(true)} className="size-10 border border-line text-bad-ink hover:bg-bad-soft hover:text-bad-ink">
               <Trash2 className="size-4" />
             </IconButton>
           </div>
@@ -317,7 +317,7 @@ export default function DishEditor() {
         </section>
 
         {/* ── Merma + panel lateral ── */}
-        <div className="grid gap-6 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <div className="space-y-6 lg:col-span-7">
             <WasteBreakdown cost={cost} portions={draft.portions} />
             {wideLg && fichaCard}
@@ -375,7 +375,7 @@ export default function DishEditor() {
             <Card>
               <CardHeader title="Alérgenos" subtitle="Se calculan solos a partir de los ingredientes vinculados y sus elaboraciones." />
               <AllergenChips allergens={cost.allergens} />
-              {draft.items.some((i) => !i.ref) && <p className="mt-3 text-xs text-warn">Hay ingredientes sin vincular: sus alérgenos no se cuentan todavía.</p>}
+              {draft.items.some((i) => !i.ref) && <p className="mt-3 text-xs text-warn-ink">Hay ingredientes sin vincular: sus alérgenos no se cuentan todavía.</p>}
             </Card>
 
             {!isPlato && (
@@ -386,7 +386,7 @@ export default function DishEditor() {
                     const c = ctx.cache.get(u.id);
                     return (
                       <li key={u.id}>
-                        <Link to={`/platos/${u.id}`} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm hover:text-brand-600">
+                        <Link to={`/platos/${u.id}`} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm hover:text-brand-ink">
                           <span className="truncate font-semibold text-ink">{u.name}</span>
                           <span className="tabular text-xs text-muted">{c ? fmtEur(c.costPerPortion) : ''}</span>
                         </Link>
@@ -468,7 +468,7 @@ function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => vo
       <button
         type="button"
         onClick={onRetry}
-        className="inline-flex items-center gap-1 rounded-full bg-bad-soft px-2 py-0.5 text-[11px] font-semibold text-bad hover:underline"
+        className="inline-flex items-center gap-1 rounded-full bg-bad-soft px-2 py-0.5 text-[11px] font-semibold text-bad-ink hover:underline"
         aria-live="polite"
       >
         <CloudOff className="size-3" /> Sin guardar · Reintentar
@@ -480,7 +480,7 @@ function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => vo
       className={clsx(
         'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
         state === 'saving' && 'bg-surface-2 text-muted',
-        state === 'saved' && 'bg-ok-soft text-ok',
+        state === 'saved' && 'bg-ok-soft text-ok-ink',
       )}
       aria-live="polite"
     >

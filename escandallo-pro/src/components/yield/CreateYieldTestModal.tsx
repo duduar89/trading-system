@@ -162,7 +162,7 @@ export function CreateYieldTestModal({
           </div>
           {tpl?.tip && (
             <div className="mt-2 flex gap-2 rounded-xl bg-surface-2 px-3 py-2.5 text-xs text-ink-2">
-              <Lightbulb className="mt-0.5 size-3.5 shrink-0 text-warn" />
+              <Lightbulb className="mt-0.5 size-3.5 shrink-0 text-warn-ink" />
               <span>{tpl.tip}</span>
             </div>
           )}
@@ -268,7 +268,7 @@ function TemplateChip({ active, onClick, emoji, label }: { active: boolean; onCl
       onClick={onClick}
       className={cx(
         'inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition',
-        active ? 'border-brand-500 bg-brand-500 text-white shadow-glow' : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
+        active ? 'border-brand-600 bg-brand-600 text-white shadow-glow' : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
       )}
     >
       <span aria-hidden className="flex items-center">
@@ -282,7 +282,7 @@ function TemplateChip({ active, onClick, emoji, label }: { active: boolean; onCl
 function PreviewNum({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div>
-      <div className={cx('font-display text-xl font-extrabold sm:text-2xl', highlight ? 'text-brand-600 dark:text-brand-400' : 'text-ink')}>{value}</div>
+      <div className={cx('font-display text-xl font-extrabold sm:text-2xl', highlight ? 'text-brand-ink' : 'text-ink')}>{value}</div>
       <div className="text-[11px] text-muted">{label}</div>
     </div>
   );

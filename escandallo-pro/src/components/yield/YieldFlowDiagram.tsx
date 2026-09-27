@@ -49,7 +49,7 @@ export function YieldFlowDiagram({ className }: { className?: string }) {
               <span
                 className={cx(
                   'flex size-8 shrink-0 items-center justify-center rounded-xl',
-                  i === 0 ? 'bg-surface-2 text-ink-2' : i === 3 ? 'bg-ok-soft text-ok' : 'bg-brand-500/12 text-brand-500',
+                  i === 0 ? 'bg-surface-2 text-ink-2' : i === 3 ? 'bg-ok-soft text-ok-ink' : 'bg-brand-500/12 text-brand-500',
                 )}
               >
                 <s.icon className="size-4" />

@@ -183,12 +183,12 @@ function EntryRow({
             className="h-8 w-32 rounded-lg border border-line bg-surface-2 px-2 text-[11px] font-semibold text-ink-2 focus:border-brand-500 focus:outline-none"
           />
           {low && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-warn-soft px-2 py-0.5 text-[10px] font-bold text-warn" title="La lectura de esta línea es dudosa: compárala con la foto">
+            <span className="inline-flex items-center gap-1 rounded-full bg-warn-soft px-2 py-0.5 text-[10px] font-bold text-warn-ink" title="La lectura de esta línea es dudosa: compárala con la foto">
               <AlertTriangle className="size-3" /> Revisa
             </span>
           )}
           {entry.dishId && (
-            <Link to={`/platos/${entry.dishId}`} className="inline-flex items-center gap-1 rounded-full bg-ok-soft px-2 py-0.5 text-[10px] font-bold text-ok hover:underline">
+            <Link to={`/platos/${entry.dishId}`} className="inline-flex items-center gap-1 rounded-full bg-ok-soft px-2 py-0.5 text-[10px] font-bold text-ok-ink hover:underline">
               Ya importado <ExternalLink className="size-3" />
             </Link>
           )}
@@ -208,7 +208,7 @@ function EntryRow({
         />
       </div>
       <div className="col-start-4 row-start-1 flex items-start justify-end">
-        <IconButton label={`Quitar ${entry.name || 'plato'}`} onClick={onRemove} className="size-10 hover:text-bad">
+        <IconButton label={`Quitar ${entry.name || 'plato'}`} onClick={onRemove} className="size-10 hover:text-bad-ink">
           <Trash2 className="size-4" />
         </IconButton>
       </div>

@@ -60,7 +60,7 @@ export function MergeProductsModal({
       onMerged?.(keep.id, remove.id);
       onClose();
     } catch (e) {
-      toast.error('No se pudieron fusionar', errorMessage(e));
+      toast.error('No se han podido fusionar', errorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -83,7 +83,7 @@ export function MergeProductsModal({
         </>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Ingrediente que se conserva">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Ingrediente que se conserva">
         {pair.map((p) => {
           const on = p.id === keep.id;
           return (
@@ -103,7 +103,7 @@ export function MergeProductsModal({
                 <span
                   className={clsx(
                     'text-[11px] font-bold uppercase tracking-wide',
-                    on ? 'text-brand-600 dark:text-brand-400' : 'text-muted',
+                    on ? 'text-brand-ink' : 'text-muted',
                   )}
                 >
                   {on ? 'Se conserva' : 'Se fusiona'}

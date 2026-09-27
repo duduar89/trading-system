@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
+import clsx from 'clsx';
 import { ArrowLeft, History, Merge, PackageSearch, PencilLine, Receipt, Trash2, TriangleAlert } from 'lucide-react';
 import type { Allergen, BaseUnit, ID, IngredientCategory, Product } from '../types';
 import { db } from '../db';
@@ -14,7 +15,8 @@ import { fmtDate, fmtEurPrecise, fmtNum } from '../lib/format';
 import { CategoryBadge } from '../components/purchases/CategoryBadge';
 import { ChangePct, EstimatedBadge, PriceTrendChip, SaveIndicator } from '../components/purchases/badges';
 import { isEstimatedPrice, userNotes } from '../components/purchases/estimated';
-import { PriceHistoryChart, SOURCE_LABELS } from '../components/purchases/PriceHistoryChart';
+import { SOURCE_LABELS } from '../components/purchases/sourceLabels';
+import { ChartSkeleton } from '../components/charts';
 import { AliasEditor, ChangePriceModal } from '../components/purchases/ProductEditors';
 import { PriceSimulator, UsageCard, YieldCard } from '../components/purchases/ProductInsights';
 import { MergeProductsModal } from '../components/purchases/MergeProductsModal';
@@ -22,6 +24,9 @@ import { ProductPicker } from '../components/purchases/ProductPicker';
 import { useDebouncedAction } from '../components/purchases/hooks';
 import { pctChange, priceTrends, sortPricePoints } from '../components/purchases/logic';
 import { AmountInput } from '../components/purchases/AmountInput';
+import { UnitChangeModal } from '../components/purchases/UnitChangeModal';
+import { dishesUsingProduct } from '../core/analytics';
+import { isInProductUnit } from '../core/pricePoints';
 
 type FormDraft = Pick<
   Product,
@@ -38,6 +43,9 @@ type FormDraft = Pick<
   | 'allergens'
 >;
 type SaveState = 'idle' | 'saving' | 'saved' | 'dirty' | 'error';
+
+// El gráfico (recharts) se carga aparte: la ficha se pinta al instante y el gráfico llega después.
+const PriceHistoryChart = lazy(() => import('../components/purchases/PriceHistoryChart').then((m) => ({ default: m.PriceHistoryChart })));
 
 const UNIT_WORD: Record<BaseUnit, string> = { kg: 'kilo', l: 'litro', ud: 'unidad' };
 
@@ -78,7 +86,6 @@ export default function ProductDetail() {
 
   const [form, setForm] = useState<FormDraft | null>(null);
   const loadedId = useRef<ID | null>(null);
-  const initialUnit = useRef<BaseUnit | null>(null);
   // Cambios pendientes de guardar, ligados al producto al que pertenecen.
   const pending = useRef<{ id: ID; patch: Partial<Product> } | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -86,6 +93,7 @@ export default function ProductDetail() {
   const [mergeWith, setMergeWith] = useState<Product | null>(null);
   const [askDelete, setAskDelete] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [unitTarget, setUnitTarget] = useState<BaseUnit | null>(null);
 
   const persist = useCallback(async () => {
     const job = pending.current;
@@ -99,7 +107,7 @@ export default function ProductDetail() {
       const next = pending.current as { id: ID; patch: Partial<Product> } | null;
       pending.current = next && next.id === job.id ? { id: job.id, patch: { ...job.patch, ...next.patch } } : (next ?? job);
       setSaveState('error');
-      toast.error('No se pudieron guardar los cambios', errorMessage(e));
+      toast.error('No se han podido guardar los cambios', errorMessage(e));
     }
   }, []);
   const [schedule, flush] = useDebouncedAction(() => void persist(), 700);
@@ -109,7 +117,6 @@ export default function ProductDetail() {
       // Al cambiar de ingrediente (p. ej. tras fusionar), se guarda antes lo pendiente del anterior.
       if (pending.current) flush();
       loadedId.current = product.id;
-      initialUnit.current = product.baseUnit;
       setForm(toForm(product));
       setSaveState('idle');
     }
@@ -127,9 +134,23 @@ export default function ProductDetail() {
     schedule();
   };
 
-  const trend = useMemo(() => (id ? priceTrends(points ?? []).get(id) : undefined), [points, id]);
+  // Precios en la unidad actual: los de una unidad anterior no convertible se listan, pero no se comparan.
+  const comparable = useMemo(() => (points ?? []).filter((p) => isInProductUnit(p, product ?? undefined)), [points, product]);
+  const trend = useMemo(() => (id ? priceTrends(comparable).get(id) : undefined), [comparable, id]);
   const supplierNames = useMemo(() => new Map((suppliers ?? []).map((s) => [s.id, s.name])), [suppliers]);
   const history = useMemo(() => sortPricePoints(points ?? []).reverse(), [points]);
+  const dishCount = useMemo(() => (product && dishes ? dishesUsingProduct(dishes, product.id).size : 0), [dishes, product]);
+
+  /** El cambio de unidad no se guarda al vuelo: primero se avisa de qué pasará con el precio y el histórico. */
+  const requestUnit = (to: BaseUnit) => {
+    if (!product || to === product.baseUnit) return;
+    if (!(product.pricePerBase > 0) && !(points ?? []).length) {
+      change('baseUnit', to);
+      return;
+    }
+    flush();
+    setUnitTarget(to);
+  };
 
   const onDelete = async () => {
     if (!product) return;
@@ -138,7 +159,7 @@ export default function ProductDetail() {
       toast.success('Ingrediente eliminado', product.name);
       navigate('/ingredientes');
     } catch (e) {
-      toast.error('No se pudo eliminar', errorMessage(e));
+      toast.error('No se ha podido eliminar', errorMessage(e));
     }
   };
 
@@ -165,7 +186,7 @@ export default function ProductDetail() {
   }
 
   const unit = form.baseUnit;
-  const unitChanged = initialUnit.current != null && unit !== initialUnit.current && product.pricePerBase > 0;
+  const foreignPoints = history.filter((p) => !isInProductUnit(p, product)).length;
   const shownHistory = showAllHistory ? history : history.slice(0, 6);
   const estimated = isEstimatedPrice(product);
 
@@ -184,7 +205,7 @@ export default function ProductDetail() {
         actions={<SaveIndicator state={saveState} />}
       />
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-w-0 space-y-5">
           {/* Precio */}
           <Card className="relative overflow-hidden">
@@ -200,7 +221,7 @@ export default function ProductDetail() {
                       <PriceTrendChip trend={trend} baseUnit={product.baseUnit} className="text-xs" />
                     </div>
                   ) : (
-                    <div className="mt-1 font-display text-3xl font-extrabold text-warn">Sin precio</div>
+                    <div className="mt-1 font-display text-3xl font-extrabold text-warn-ink">Sin precio</div>
                   )}
                   {estimated ? (
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
@@ -224,9 +245,11 @@ export default function ProductDetail() {
                 </Button>
               </div>
 
-              {history.length >= 2 && (
+              {comparable.filter((p) => p.pricePerBase > 0).length >= 2 && (
                 <div className="mt-5">
-                  <PriceHistoryChart points={points ?? []} baseUnit={product.baseUnit} supplierNames={supplierNames} />
+                  <Suspense fallback={<ChartSkeleton height={240} label="evolución del precio" />}>
+                    <PriceHistoryChart points={points ?? []} baseUnit={product.baseUnit} supplierNames={supplierNames} />
+                  </Suspense>
                 </div>
               )}
             </div>
@@ -262,16 +285,22 @@ export default function ProductDetail() {
                     </thead>
                     <tbody>
                       {shownHistory.map((pt, i) => {
-                        const prev = history[i + 1];
+                        const own = isInProductUnit(pt, product);
+                        // Variación frente al precio anterior en la misma unidad (los de otra unidad no se comparan).
+                        const prev = own ? history.slice(i + 1).find((q) => isInProductUnit(q, product)) : undefined;
                         return (
-                          <tr key={pt.id} className="border-t border-line">
+                          <tr key={pt.id} className={clsx('border-t border-line', !own && 'text-muted')}>
                             <td className="whitespace-nowrap py-2 pr-2 text-ink-2">{fmtDate(pt.date)}</td>
-                            <td className="whitespace-nowrap px-2 py-2 text-right font-semibold text-ink">
+                            <td className={clsx('whitespace-nowrap px-2 py-2 text-right font-semibold', own ? 'text-ink' : 'text-muted line-through decoration-1')}>
                               {fmtEurPrecise(pt.pricePerBase)}
-                              <span className="text-xs font-normal text-muted">/{product.baseUnit}</span>
+                              <span className="text-xs font-normal text-muted">/{pt.baseUnit ?? product.baseUnit}</span>
                             </td>
                             <td className="whitespace-nowrap px-2 py-2 text-right">
-                              {prev ? (
+                              {!own ? (
+                                <span className="text-xs font-semibold text-muted" title="Precio anterior a un cambio de unidad: no se compara">
+                                  otra unidad
+                                </span>
+                              ) : prev ? (
                                 <ChangePct pct={pctChange(prev.pricePerBase, pt.pricePerBase)} />
                               ) : (
                                 <span className="text-xs text-muted">—</span>
@@ -281,7 +310,7 @@ export default function ProductDetail() {
                               {pt.invoiceId ? (
                                 <Link
                                   to={`/facturas/${pt.invoiceId}`}
-                                  className="inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline max-sm:-my-2 max-sm:size-10 max-sm:justify-center dark:text-brand-400"
+                                  className="inline-flex items-center gap-1 font-semibold text-brand-ink hover:underline max-sm:-my-2 max-sm:size-10 max-sm:justify-center"
                                   title={pt.rawDescription ? `Ver factura · ${pt.rawDescription}` : 'Ver factura'}
                                 >
                                   <Receipt className="size-3.5" /> <span className="max-sm:sr-only">Factura</span>
@@ -303,7 +332,7 @@ export default function ProductDetail() {
                   <button
                     type="button"
                     onClick={() => setShowAllHistory((s) => !s)}
-                    className="mt-2 min-h-10 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                    className="mt-2 min-h-10 text-sm font-semibold text-brand-ink hover:underline"
                   >
                     {showAllHistory ? 'Ver menos' : `Ver los ${history.length} precios`}
                   </button>
@@ -336,18 +365,19 @@ export default function ProductDetail() {
                   </Select>
                 </Field>
                 <Field label="Se compra por">
-                  <Select value={form.baseUnit} onChange={(e) => change('baseUnit', e.target.value as BaseUnit)}>
+                  <Select value={form.baseUnit} onChange={(e) => requestUnit(e.target.value as BaseUnit)}>
                     <option value="kg">Kilo (kg)</option>
                     <option value="l">Litro (l)</option>
                     <option value="ud">Unidad (ud)</option>
                   </Select>
                 </Field>
               </div>
-              {unitChanged && (
+              {foreignPoints > 0 && (
                 <p className="flex items-start gap-2 rounded-xl bg-warn-soft px-3 py-2 text-xs text-ink-2">
-                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warn" />
-                  Cambiar la unidad no convierte el precio: {fmtEurPrecise(product.pricePerBase)} pasará a ser por {unit}. Revisa el precio
-                  y las recetas que lo usan.
+                  <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warn-ink" />
+                  {foreignPoints === 1 ? 'Un precio del histórico está' : `${fmtNum(foreignPoints, 0)} precios del histórico están`} en otra unidad
+                  (anterior al cambio a {unit}): se {foreignPoints === 1 ? 'conserva' : 'conservan'} como referencia, fuera de alertas y gráficos.
+                  Indica el peso por unidad o la densidad y vuelve a elegir la unidad anterior si quieres recuperarlos.
                 </p>
               )}
               <div className="grid grid-cols-2 gap-3">
@@ -454,7 +484,7 @@ export default function ProductDetail() {
               </div>
               <Button
                 variant="ghost"
-                className="text-bad hover:bg-bad-soft hover:text-bad"
+                className="text-bad-ink hover:bg-bad-soft hover:text-bad-ink"
                 icon={<Trash2 className="size-4" />}
                 onClick={() => setAskDelete(true)}
               >
@@ -466,6 +496,22 @@ export default function ProductDetail() {
       </div>
 
       {priceOpen && <ChangePriceModal product={product} open onClose={() => setPriceOpen(false)} />}
+      {unitTarget && (
+        <UnitChangeModal
+          product={product}
+          to={unitTarget}
+          points={points ?? []}
+          tests={tests ?? []}
+          dishCount={dishCount}
+          onClose={() => setUnitTarget(null)}
+          onApplied={(r) => {
+            setUnitTarget(null);
+            // La ficha refleja lo aplicado sin volver a guardarlo.
+            setForm((f) => (f ? { ...f, baseUnit: r.baseUnit, unitWeightKg: r.unitWeightKg, densityKgPerL: r.densityKgPerL } : f));
+            if (!r.convertible && !(r.newPrice > 0)) setPriceOpen(true);
+          }}
+        />
+      )}
       <MergeProductsModal
         pair={mergeWith ? [product, mergeWith] : null}
         defaultKeepId={product.id}

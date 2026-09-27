@@ -6,6 +6,8 @@ import type { BaseUnit, Dish, DishCost, ID, IngredientCategory, Invoice, Invoice
 import type { Cell, ColumnMapping } from '../../extract/spreadsheet';
 import { approxEqual, round } from '../../core/numbers';
 import { roundPct, shownFoodCostPct } from '../../core/costing';
+import { inRange, monthToDateComparison, type PeriodComparison } from '../../core/periods';
+import { isInProductUnit } from '../../core/pricePoints';
 import { fmtNum } from '../../lib/format';
 import { isEstimatedPrice } from './estimated';
 
@@ -174,8 +176,15 @@ export interface InvoiceStats {
   monthSpend: number;
   /** Parte del gasto del mes que aún está por revisar. */
   monthPendingSpend: number;
-  /** Gasto sin IVA del mes anterior (mismas reglas) para comparar. */
+  /** Gasto sin IVA del mes anterior completo (mismas reglas). */
   prevMonthSpend: number;
+  /**
+   * Gasto sin IVA del mismo periodo del mes anterior (del día 1 al mismo día que hoy): es la cifra con la que se compara
+   * el gasto del mes en curso para que la tendencia no engañe a mitad de mes.
+   */
+  prevPeriodSpend: number;
+  /** Periodos comparados (undefined si `today` no es una fecha válida). */
+  comparison?: PeriodComparison;
   toReview: number;
   inProgress: number;
   errors: number;
@@ -191,7 +200,18 @@ function shiftMonth(ym: string, delta: number): string {
 export function invoiceStats(invoices: Invoice[], today: string): InvoiceStats {
   const month = today.slice(0, 7);
   const prev = shiftMonth(month, -1);
-  const s: InvoiceStats = { monthCount: 0, monthSpend: 0, monthPendingSpend: 0, prevMonthSpend: 0, toReview: 0, inProgress: 0, errors: 0 };
+  const comparison = monthToDateComparison(today);
+  const s: InvoiceStats = {
+    monthCount: 0,
+    monthSpend: 0,
+    monthPendingSpend: 0,
+    prevMonthSpend: 0,
+    prevPeriodSpend: 0,
+    comparison,
+    toReview: 0,
+    inProgress: 0,
+    errors: 0,
+  };
   // Una copia por revisar de otra factura (el PDF y la foto de la misma) no suma gasto: sería contar dos veces la misma compra.
   // Se cuenta la confirmada o, si ninguna lo está, la más antigua. Las confirmadas cuentan siempre (quien confirma las dos dice
   // que son distintas).
@@ -214,12 +234,15 @@ export function invoiceStats(invoices: Invoice[], today: string): InvoiceStats {
         if (inv.status === 'revision') s.monthPendingSpend += amount;
       }
     } else if (ym === prev && counts) {
-      s.prevMonthSpend += invoiceNetAmount(inv);
+      const amount = invoiceNetAmount(inv);
+      s.prevMonthSpend += amount;
+      if (comparison && inRange(inv.date, comparison.previous)) s.prevPeriodSpend += amount;
     }
   }
   s.monthSpend = round(s.monthSpend, 2);
   s.monthPendingSpend = round(s.monthPendingSpend, 2);
   s.prevMonthSpend = round(s.prevMonthSpend, 2);
+  s.prevPeriodSpend = round(s.prevPeriodSpend, 2);
   return s;
 }
 
@@ -326,6 +349,7 @@ export function mergedPricePreview(
   for (const p of points) {
     if (p.productId !== keep.id && p.productId !== remove.id) continue;
     if (!(p.pricePerBase > 0) || !Number.isFinite(p.pricePerBase)) continue;
+    if (!isInProductUnit(p, p.productId === keep.id ? keep : remove)) continue;
     if (!best || p.date > best.date || (p.date === best.date && p.id > best.id)) best = p;
   }
   const convert = (v: number) => Math.round(v * factor * 1e6) / 1e6;

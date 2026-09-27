@@ -5,13 +5,9 @@ import type { BaseUnit, PricePoint } from '../../types';
 import { fmtDate, fmtEurPrecise, fmtNum } from '../../lib/format';
 import { useChartColors } from './hooks';
 import { niceTicks, sortPricePoints } from './logic';
+import { SOURCE_LABELS } from './sourceLabels';
 
-export const SOURCE_LABELS: Record<PricePoint['source'], string> = {
-  factura: 'Factura',
-  manual: 'Precio manual',
-  hoja: 'Tarifa importada',
-  demo: 'Demostración',
-};
+export { SOURCE_LABELS };
 
 interface Datum {
   ts: number;
@@ -47,7 +43,8 @@ export function PriceHistoryChart({
   const data: Datum[] = useMemo(
     () =>
       sortPricePoints(points)
-        .filter((p) => p.pricePerBase > 0)
+        // Sólo precios en la unidad actual: los de una unidad anterior no convertible no se pueden comparar.
+        .filter((p) => p.pricePerBase > 0 && (!p.baseUnit || p.baseUnit === baseUnit))
         .map((p) => ({
           ts: toTs(p.date),
           price: p.pricePerBase,
@@ -56,7 +53,7 @@ export function PriceHistoryChart({
           supplier: p.supplierId ? supplierNames.get(p.supplierId) : undefined,
           description: p.rawDescription,
         })),
-    [points, supplierNames],
+    [points, supplierNames, baseUnit],
   );
 
   if (data.length < 2) return null;

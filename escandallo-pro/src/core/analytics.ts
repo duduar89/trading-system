@@ -1,5 +1,6 @@
 import type { BusinessSettings, Dish, DishCost, ID, Invoice, InvoiceLine, MenuEngineeringClass, PricePoint, Product, IngredientCategory, BaseUnit } from '../types';
 import { costDish, dishTargetPct, foodCostStatus, roundPct, type CostingContext } from './costing';
+import { isInProductUnit } from './pricePoints';
 
 /**
  * Analítica de negocio: ingeniería de menú, alertas de precio y KPIs del panel.
@@ -141,7 +142,8 @@ export function priceAlerts(products: Product[], pricePoints: PricePoint[], thre
   const threshold = Math.abs(thresholdPct);
   const alerts: PriceAlert[] = [];
   for (const product of products) {
-    const list = byProduct.get(product.id);
+    // Sólo precios en la unidad actual del producto (los de una unidad anterior no se comparan: 12 €/kg ≠ 3 €/ud).
+    const list = byProduct.get(product.id)?.filter(({ p }) => isInProductUnit(p, product));
     if (!list || list.length < 2) continue;
     list.sort((a, b) => (a.p.date < b.p.date ? -1 : a.p.date > b.p.date ? 1 : a.order - b.order));
     const current = list[list.length - 1].p;
@@ -225,7 +227,7 @@ function lineAmount(l: InvoiceLine): number {
 }
 
 /** Base imponible de una factura: la declarada o, si falta, la suma de sus líneas (sin las ignoradas). */
-function invoiceSpend(inv: Invoice): number {
+export function invoiceSpend(inv: Invoice): number {
   if (inv.subtotal != null && Number.isFinite(inv.subtotal) && inv.subtotal !== 0) return inv.subtotal;
   return inv.lines.filter((l) => l.matchStatus !== 'ignorado').reduce((s, l) => s + lineAmount(l), 0);
 }

@@ -41,7 +41,7 @@ export interface ChartTheme {
 const LIGHT = {
   ink: '#0b0f14',
   ink2: '#2a3441',
-  muted: '#677486',
+  muted: '#5f6b7c',
   line: '#e6e9ee',
   lineStrong: '#d3d8e0',
   surface: '#ffffff',

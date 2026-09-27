@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Download, Upload } from 'lucide-react';
 import { exportWorkspace, importWorkspace } from '../../db';
-import { downloadBlob } from '../../lib/export';
 import { toast, errorMessage } from '../../state/store';
 import { switchWorkspace } from '../WorkspaceSwitcher';
 import { Button, type ButtonProps } from '../ui';
@@ -12,6 +11,8 @@ import { backupFileName, backupSummary, parseBackup } from './settingsLogic';
 export async function downloadWorkspaceBackup(workspaceId: string): Promise<void> {
   const backup = await exportWorkspace(workspaceId);
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  // Import diferido: el módulo de exportación (Excel/CSV) no hace falta para pintar la bienvenida ni los ajustes.
+  const { downloadBlob } = await import('../../lib/export');
   downloadBlob(blob, backupFileName(backup.workspace.name));
   const s = backupSummary(backup);
   toast.success(
@@ -40,7 +41,7 @@ export function ExportBackupButton({
         try {
           await downloadWorkspaceBackup(workspaceId);
         } catch (e) {
-          toast.error('No se pudo exportar la copia', errorMessage(e));
+          toast.error('No se ha podido exportar la copia', errorMessage(e));
         } finally {
           setBusy(false);
         }
@@ -70,7 +71,7 @@ export function RestoreBackupButton({ label = 'Restaurar copia', ...rest }: Omit
       const s = backupSummary(backup);
       toast.success(`«${ws.name}» restaurado`, `${s.products} ingredientes y ${s.dishes} platos recuperados.`);
     } catch (e) {
-      toast.error('No se pudo restaurar la copia', errorMessage(e));
+      toast.error('No se ha podido restaurar la copia', errorMessage(e));
     } finally {
       setBusy(false);
     }

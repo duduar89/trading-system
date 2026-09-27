@@ -4,6 +4,7 @@ import { ChefHat, Coins, Flame, Receipt, Scale, Tags } from 'lucide-react';
 import { fmtEur, fmtPct } from '../../../lib/format';
 import { ProgressBar, Stat, cx } from '../../ui';
 import { monthLabel } from '../dates';
+import { comparisonDetail, comparisonHint, currentPeriodLabel, monthName } from '../../../core/periods';
 import { fmtSignedPct } from '../shared';
 import type { SpendTrend, StatusCounts } from '../insights';
 
@@ -62,7 +63,7 @@ export function DashboardKpis({
           className={tileCls}
           label="Platos en rojo"
           value={
-            <span className={counts.bad > 0 ? 'text-bad' : undefined}>
+            <span className={counts.bad > 0 ? 'text-bad-ink' : undefined}>
               {counts.bad}
               <span className="ml-1 text-base font-bold text-muted">/ {counts.total}</span>
             </span>
@@ -91,20 +92,21 @@ export function DashboardKpis({
           tone="default"
           hint={
             spend ? (
-              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                {spend.changePct != null && (
-                  <span
-                    className="tabular whitespace-nowrap rounded-md bg-surface-2 px-1.5 py-0.5 font-semibold text-ink-2"
-                    title={`Frente a ${monthLabel(spend.previousMonth, 'long')}`}
-                  >
-                    {spend.changePct > 0.05 ? '▲' : spend.changePct < -0.05 ? '▼' : '•'}{' '}
-                    {fmtSignedPct(spend.changePct, Math.abs(spend.changePct) >= 10 ? 0 : 1)}
-                  </span>
+              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5" title={spend.comparison ? comparisonDetail(spend.comparison) : undefined}>
+                {spend.changePct != null && spend.comparison ? (
+                  <>
+                    <span className="tabular whitespace-nowrap rounded-md bg-surface-2 px-1.5 py-0.5 font-semibold text-ink-2">
+                      {spend.changePct > 0.05 ? '▲' : spend.changePct < -0.05 ? '▼' : '•'}{' '}
+                      {fmtSignedPct(spend.changePct, Math.abs(spend.changePct) >= 10 ? 0 : 1)}
+                    </span>
+                    <span>
+                      {spend.inProgress ? '' : `${monthName(spend.month)}, `}
+                      {comparisonHint(spend.comparison)}
+                    </span>
+                  </>
+                ) : (
+                  <span>{spend.comparison ? currentPeriodLabel(spend.comparison) : monthLabel(spend.month, 'long')}</span>
                 )}
-                <span className="whitespace-nowrap">
-                  {monthLabel(spend.month)}
-                  {spend.inProgress ? ' · en curso' : ''}
-                </span>
               </span>
             ) : (
               'sin facturas confirmadas'

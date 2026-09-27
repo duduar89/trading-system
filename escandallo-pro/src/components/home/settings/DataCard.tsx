@@ -74,7 +74,7 @@ export function DataCard({ workspaceId, id }: { workspaceId?: string; id?: strin
       </div>
 
       <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-line p-4 sm:flex-row sm:items-center">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-ai-soft text-ai">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-ai-soft text-ai-ink">
           <PlayCircle className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
@@ -105,7 +105,7 @@ export function DataCard({ workspaceId, id }: { workspaceId?: string; id?: strin
                 : 'Si el dispositivo se queda sin espacio, el navegador podría borrar datos. Protégelos o haz copias periódicas.'}
             </p>
             {storage.persisted ? (
-              <span className="inline-flex items-center gap-1 text-xs font-bold text-ok">
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-ok-ink">
                 <ShieldCheck className="size-4" /> Protegido
               </span>
             ) : (

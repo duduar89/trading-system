@@ -12,6 +12,7 @@ import {
   fillMonths,
   foodCostScale,
   lastMonthSpend,
+  spendTrend,
   onboardingSteps,
   parseBucketLabel,
   prettyBucketLabel,
@@ -196,6 +197,38 @@ describe('gasto', () => {
     expect(t.inProgress).toBe(false);
     expect(lastMonthSpend([])).toBeUndefined();
     expect(lastMonthSpend([{ month: '2026-05', total: 0 }])).toBeUndefined();
+  });
+  it('spendTrend: mes en curso frente al mismo periodo del mes anterior', () => {
+    const inv = (id: string, date: string, subtotal: number, status: Invoice['status'] = 'confirmada') =>
+      ({ id, date, subtotal, status, supplierName: 'P', lines: [], createdAt: `${date}T10:00:00Z` }) as Invoice;
+    const invoices = [
+      inv('a1', '2026-08-03', 400),
+      inv('a2', '2026-08-20', 600),
+      inv('a3', '2026-08-28', 900),
+      inv('s1', '2026-09-04', 500),
+      inv('s2', '2026-09-18', 550),
+      inv('r1', '2026-09-19', 999, 'revision'),
+    ];
+    const amount = (i: Invoice) => i.subtotal ?? 0;
+    const t = spendTrend(invoices, '2026-09-25', amount)!;
+    expect(t.month).toBe('2026-09');
+    expect(t.inProgress).toBe(true);
+    expect(t.total).toBe(1050);
+    // 1–25 ago = 400 + 600 (la del 28 queda fuera): +5 %, no −45 % frente a los 1.900 € de agosto entero
+    expect(t.previousTotal).toBe(1000);
+    expect(t.changePct).toBeCloseTo(5);
+    expect(t.comparison?.fullMonth).toBe(false);
+    // Sin compras este mes: último mes cerrado frente al anterior completo
+    const past = spendTrend(invoices.filter((i) => i.date < '2026-09-01'), '2026-09-25', amount)!;
+    expect(past.month).toBe('2026-08');
+    expect(past.inProgress).toBe(false);
+    expect(past.comparison?.fullMonth).toBe(true);
+    expect(past.previousTotal).toBeUndefined();
+    expect(past.changePct).toBeUndefined();
+    // Una fecha futura mal leída no desplaza el panel
+    const future = spendTrend([...invoices, inv('f', '2027-05-01', 50)], '2026-09-25', amount)!;
+    expect(future.month).toBe('2026-09');
+    expect(spendTrend([], '2026-09-25', amount)).toBeUndefined();
   });
   it('fillMonths rellena huecos', () => {
     expect(

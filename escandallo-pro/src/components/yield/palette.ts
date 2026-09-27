@@ -44,7 +44,7 @@ export function fillStyle(key: SegmentKey | CascadeStep['tone']): CSSProperties 
   return { backgroundColor: color };
 }
 
-/** Tramos con relleno saturado sobre los que el texto blanco es legible en ambos temas. */
+/** Tramos con relleno saturado sobre los que cabe la etiqueta de % (en `text-on-fill`, casi negro: AA en ambos temas). */
 export function whiteTextFits(key: SegmentKey | CascadeStep['tone']): boolean {
   return key === 'principal' || key === 'subproducto' || key === 'desperdicio';
 }

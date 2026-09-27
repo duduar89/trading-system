@@ -108,7 +108,7 @@ export function YieldCard({ product, tests }: { product: Product; tests: YieldTe
       await updateProduct(product.id, { yieldTestId: id });
       toast.success(id ? 'Prueba vinculada' : 'Prueba desvinculada', id ? 'Sus mermas mandan ahora en todos los escandallos.' : undefined);
     } catch (e) {
-      toast.error('No se pudo actualizar', errorMessage(e));
+      toast.error('No se ha podido actualizar', errorMessage(e));
     }
   };
 
@@ -119,7 +119,7 @@ export function YieldCard({ product, tests }: { product: Product; tests: YieldTe
         <>
           <Link
             to={`/mermas/${linked.id}`}
-            className="mb-3 block truncate text-sm font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400"
+            className="mb-3 block truncate text-sm font-semibold text-ink hover:text-brand-ink"
           >
             {linked.name} · {fmtDate(linked.date)}
           </Link>
@@ -233,7 +233,7 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
                 onClick={() => bump(p)}
                 className={clsx(
                   'tabular h-10 min-w-12 rounded-xl border px-2.5 text-xs font-bold transition',
-                  p < 0 ? 'border-ok/40 text-ok hover:bg-ok-soft' : 'border-bad/30 text-bad hover:bg-bad-soft',
+                  p < 0 ? 'border-ok/40 text-ok-ink hover:bg-ok-soft' : 'border-bad/30 text-bad-ink hover:bg-bad-soft',
                 )}
               >
                 {p > 0 ? '+' : ''}
@@ -268,7 +268,7 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
                 {newlyOver > 0 && (
                   <>
                     {' · '}
-                    <span className="font-semibold text-bad">
+                    <span className="font-semibold text-bad-ink">
                       {newlyOver} {newlyOver === 1 ? 'pasaría' : 'pasarían'} a rojo
                     </span>
                   </>
@@ -276,7 +276,7 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
                 {backInRange > 0 && (
                   <>
                     {' · '}
-                    <span className="font-semibold text-ok">
+                    <span className="font-semibold text-ok-ink">
                       {backInRange} {backInRange === 1 ? 'saldría' : 'saldrían'} del rojo
                     </span>
                   </>
@@ -342,7 +342,7 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
                       <td className="max-w-[200px] py-2 pr-2">
                         <Link
                           to={`/platos/${r.dishId}`}
-                          className="block truncate font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400"
+                          className="block truncate font-semibold text-ink hover:text-brand-ink"
                         >
                           {r.name}
                         </Link>

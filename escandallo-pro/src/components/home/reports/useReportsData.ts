@@ -14,6 +14,7 @@ import {
   useYieldTests,
 } from '../../../state/hooks';
 import { safeCompute } from '../shared';
+import { comparablePricePoints } from '../../../core/pricePoints';
 
 export interface ReportsData {
   workspace?: Workspace;
@@ -50,7 +51,8 @@ export function useReportsData(): ReportsData | undefined {
       dishes,
       products,
       invoices,
-      pricePoints,
+      // Sólo precios en la unidad actual de su producto (los de una unidad anterior no convertible no se comparan).
+      pricePoints: comparablePricePoints(pricePoints, products),
       suppliers,
       yieldTests,
       ctx,

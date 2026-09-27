@@ -65,6 +65,7 @@ export function PieceBar({ segments, grossKg, compact }: { segments: PieceSegmen
           {visible.map((s) => (
             <div
               key={s.key}
+              role="img"
               tabIndex={compact ? -1 : 0}
               onPointerEnter={() => !compact && setActive(s.key)}
               onPointerLeave={() => setActive((a) => (a === s.key ? null : a))}
@@ -78,7 +79,7 @@ export function PieceBar({ segments, grossKg, compact }: { segments: PieceSegmen
               style={{ ...fillStyle(s.key), flexGrow: s.share, flexBasis: 0 }}
             >
               {!compact && whiteTextFits(s.key) && s.share >= 0.14 && (
-                <span className="tabular pointer-events-none px-1 text-xs font-bold text-white">{fmtPct(s.share * 100, 0)}</span>
+                <span className="tabular pointer-events-none px-1 text-xs font-bold text-on-fill">{fmtPct(s.share * 100, 0)}</span>
               )}
             </div>
           ))}

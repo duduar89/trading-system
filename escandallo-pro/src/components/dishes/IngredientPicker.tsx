@@ -194,7 +194,7 @@ function OptionRow({
         <span className="flex items-center gap-1.5">
           <span className="truncate text-sm font-semibold text-ink">{option.name}</span>
           {option.kind === 'dish' && (
-            <span className="shrink-0 rounded-full bg-info-soft px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-info">elaboración</span>
+            <span className="shrink-0 rounded-full bg-info-soft px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-info-ink">elaboración</span>
           )}
         </span>
         {option.matchedOn && <span className="block truncate text-xs text-muted">≈ {option.matchedOn}</span>}
@@ -211,7 +211,7 @@ function OptionRow({
             {isEstimatedPrice(p) && <EstimatedBadge short />}
           </span>
         ) : (
-          <span className="rounded-full bg-warn-soft px-1.5 py-0.5 font-semibold text-warn">sin precio</span>
+          <span className="rounded-full bg-warn-soft px-1.5 py-0.5 font-semibold text-warn-ink">sin precio</span>
         )}
       </span>
     </button>

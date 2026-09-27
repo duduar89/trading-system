@@ -127,7 +127,7 @@ function CreateWorkspaceForm({ onCancel }: { onCancel: () => void }) {
       navigate('/');
       toast.success(`¡Bienvenido a «${ws.name}»!`, 'Empieza subiendo una factura o fotografiando tu carta.');
     } catch (err) {
-      toast.error('No se pudo crear el restaurante', errorMessage(err));
+      toast.error('No se ha podido crear el restaurante', errorMessage(err));
       setBusy(false);
     }
   };
@@ -201,6 +201,7 @@ export default function Welcome() {
     requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
   };
 
+  const Root = hasWorkspace ? 'div' : 'main';
   const ctaCls = 'h-auto! min-h-14 w-full whitespace-normal! px-5! py-3 text-center leading-tight sm:w-auto sm:whitespace-nowrap! sm:px-7!';
   const ctas = (where: 'hero' | 'footer') => (
     <div className={cx('flex flex-col gap-3 sm:flex-row sm:flex-wrap', where === 'footer' && 'sm:justify-center')}>
@@ -214,7 +215,8 @@ export default function Welcome() {
   );
 
   return (
-    <div className={cx('relative', !hasWorkspace && 'min-h-dvh bg-bg')}>
+    // Sin restaurante la bienvenida es la página entera (su propio <main>); con restaurante vive dentro del Layout.
+    <Root className={cx('relative', !hasWorkspace && 'min-h-dvh bg-bg')}>
       <style>{WELCOME_MOCK_CSS}</style>
 
       {/* Barra superior */}
@@ -260,7 +262,7 @@ export default function Welcome() {
             <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-2">
               {['Sin registro', 'Sin tarjeta ni cuotas', 'Funciona sin conexión'].map((t) => (
                 <li key={t} className="flex items-center gap-1.5">
-                  <Check className="size-4 text-ok" aria-hidden />
+                  <Check className="size-4 text-ok-ink" aria-hidden />
                   {t}
                 </li>
               ))}
@@ -279,13 +281,13 @@ export default function Welcome() {
       {/* Cómo funciona */}
       <section className={cx('mx-auto max-w-6xl', hasWorkspace ? 'py-12' : 'px-4 py-16 sm:px-6')} aria-labelledby="como-funciona">
         <div className="mx-auto max-w-2xl text-center">
-          <div className="text-xs font-bold uppercase tracking-[0.16em] text-brand-500">Cómo funciona</div>
+          <div className="text-xs font-bold uppercase tracking-[0.16em] text-brand-ink">Cómo funciona</div>
           <h2 id="como-funciona" className="mt-2 font-display text-3xl font-extrabold text-ink sm:text-4xl">
             Tres pasos. Cero hojas de cálculo.
           </h2>
           <p className="mt-3 text-muted">Lo que antes llevaba días de teclear precios ahora está listo antes del servicio.</p>
         </div>
-        <ol className="mt-10 grid gap-5 md:grid-cols-3">
+        <ol className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-3">
           {STEPS.map((s, i) => (
             <li key={s.n} className="relative">
               <Card className="flex h-full flex-col overflow-hidden" padded={false}>
@@ -295,7 +297,7 @@ export default function Welcome() {
                 </div>
                 <div className="p-5">
                   <div className="flex items-center gap-3">
-                    <span className="flex size-8 items-center justify-center rounded-full bg-brand-500 font-display text-sm font-extrabold text-white shadow-glow">
+                    <span className="flex size-8 items-center justify-center rounded-full bg-brand-600 font-display text-sm font-extrabold text-white shadow-glow">
                       {s.n}
                     </span>
                     <h3 className="font-display text-lg font-bold text-ink">{s.title}</h3>
@@ -319,13 +321,13 @@ export default function Welcome() {
       {/* Funcionalidades */}
       <section className={cx('mx-auto max-w-6xl', hasWorkspace ? 'pb-12' : 'px-4 pb-16 sm:px-6')} aria-labelledby="funciones">
         <div className="mx-auto max-w-2xl text-center">
-          <div className="text-xs font-bold uppercase tracking-[0.16em] text-brand-500">Todo incluido</div>
+          <div className="text-xs font-bold uppercase tracking-[0.16em] text-brand-ink">Todo incluido</div>
           <h2 id="funciones" className="mt-2 font-display text-3xl font-extrabold text-ink sm:text-4xl">
             Pensado para cocinas de verdad
           </h2>
           <p className="mt-3 text-muted">Para restaurantes independientes, grupos y consultoras de hostelería que gestionan varios clientes.</p>
         </div>
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map((f) => (
             <Card
               key={f.title}
@@ -368,6 +370,6 @@ export default function Welcome() {
           </p>
         )}
       </section>
-    </div>
+    </Root>
   );
 }

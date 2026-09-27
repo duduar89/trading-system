@@ -5,7 +5,7 @@ import { priceAlerts } from '../../../core/analytics';
 import type { ID, PricePoint } from '../../../types';
 import { CATEGORY_LABELS } from '../../../lib/labels';
 import { fmtDate, perUnitLabel } from '../../../lib/format';
-import { Badge, Callout, Card, CardHeader, EmptyState, SearchInput, Table, Td, Th, cx } from '../../ui';
+import { Badge, Callout, Card, CardHeader, EmptyState, ScrollArea, SearchInput, Table, Td, Th, cx } from '../../ui';
 import { ChartEmpty, TrendLine, fmtEurAxis } from '../../charts';
 import { shortDay } from '../dates';
 import { priceSeries, priceSummary } from '../insights';
@@ -82,7 +82,7 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
         action={
           <Link
             to="/facturas?nuevo=1"
-            className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand-500 px-4 text-sm font-semibold text-white hover:bg-brand-600"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white hover:bg-brand-700"
           >
             Subir facturas <ArrowRight className="size-4" />
           </Link>
@@ -145,7 +145,7 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
                 action={
                   <Link
                     to={`/ingredientes/${selected.id}`}
-                    className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-brand-ink hover:underline"
                   >
                     Ficha <ArrowRight className="size-4" />
                   </Link>
@@ -157,7 +157,7 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
                   {
                     label: 'Variación',
                     value: series.length > 1 ? fmtSignedPct(summary.changePct) : '—',
-                    tone: summary.changePct > 0.05 ? 'text-bad' : summary.changePct < -0.05 ? 'text-ok' : 'text-ink',
+                    tone: summary.changePct > 0.05 ? 'text-bad-ink' : summary.changePct < -0.05 ? 'text-ok-ink' : 'text-ink',
                   },
                   { label: 'Mínimo', value: fmtUnitPrice(summary.min) },
                   { label: 'Máximo', value: fmtUnitPrice(summary.max) },
@@ -186,7 +186,7 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
               ) : (
                 <ChartEmpty title="Solo hay un precio registrado" description="Con la próxima factura de este ingrediente verás su evolución." />
               )}
-              <div className="mt-4 max-h-64 overflow-y-auto rounded-xl border border-line">
+              <ScrollArea className="mt-4 max-h-64 overflow-y-auto rounded-xl border border-line" label="Histórico de precios">
                 <table className="tabular w-full text-sm">
                   <thead>
                     <tr className="bg-surface-2 text-[11px] uppercase tracking-wide text-muted">
@@ -206,7 +206,7 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
                           <td className="px-3 py-2 text-right font-semibold text-ink">
                             {fmtUnitPrice(p.price)}
                             {ch != null && Math.abs(ch) >= 0.05 && (
-                              <span className={cx('ml-1.5 text-[11px] font-bold', ch > 0 ? 'text-bad' : 'text-ok')}>{fmtSignedPct(ch)}</span>
+                              <span className={cx('ml-1.5 text-[11px] font-bold', ch > 0 ? 'text-bad-ink' : 'text-ok-ink')}>{fmtSignedPct(ch)}</span>
                             )}
                           </td>
                           <td className="hidden max-w-[180px] truncate px-3 py-2 text-ink-2 sm:table-cell">
@@ -221,7 +221,7 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
                     })}
                   </tbody>
                 </table>
-              </div>
+              </ScrollArea>
             </>
           ) : (
             <ChartEmpty title="Elige un ingrediente" description="Selecciona un ingrediente de la lista para ver la evolución de su precio." />
@@ -240,7 +240,7 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
         {alerts.error ? (
           <div className="px-4 pb-4 sm:px-5">
             <Callout tone="bad" icon={<AlertTriangle className="size-4" />}>
-              No se pudieron calcular los cambios: {alerts.error}
+              No se han podido calcular los cambios: {alerts.error}
             </Callout>
           </div>
         ) : !alerts.value?.length ? (
@@ -265,9 +265,9 @@ export function PriceEvolutionTab({ data }: { data: ReportsData }) {
                     <Td className="max-w-[240px]">
                       <span className="flex items-center gap-2 font-semibold text-ink">
                         {up ? (
-                          <TrendingUp className="size-4 shrink-0 text-bad" aria-hidden />
+                          <TrendingUp className="size-4 shrink-0 text-bad-ink" aria-hidden />
                         ) : (
-                          <TrendingDown className="size-4 shrink-0 text-ok" aria-hidden />
+                          <TrendingDown className="size-4 shrink-0 text-ok-ink" aria-hidden />
                         )}
                         <span className="truncate">{a.productName}</span>
                       </span>

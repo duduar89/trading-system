@@ -29,7 +29,7 @@ export function QueuePanel({ queue, invoices }: { queue: QueueState | null; invo
     >
       <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-info to-brand-500" />
       <div className="flex flex-col gap-3 p-4 pl-5 sm:flex-row sm:items-center sm:gap-5">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-info-soft text-info">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-info-soft text-info-ink">
           <ScanLine className="size-5 animate-pulse-soft" />
         </div>
         <div className="min-w-0 flex-1">
@@ -41,7 +41,7 @@ export function QueuePanel({ queue, invoices }: { queue: QueueState | null; invo
             <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 text-sm text-muted">
               <Link
                 to={`/facturas/${runningId}`}
-                className="max-w-full truncate font-semibold text-ink-2 hover:text-brand-600 dark:hover:text-brand-400"
+                className="max-w-full truncate font-semibold text-ink-2 hover:text-brand-ink"
               >
                 {invoiceLabel(running)}
               </Link>
@@ -51,7 +51,7 @@ export function QueuePanel({ queue, invoices }: { queue: QueueState | null; invo
           <ProgressBar value={progress ?? 0.18} tone="brand" className={progress == null ? 'mt-2.5 animate-pulse-soft' : 'mt-2.5'} />
         </div>
         <div className="flex items-center gap-1.5 text-xs text-muted sm:max-w-[220px]">
-          <ShieldCheck className="size-4 shrink-0 text-ok" />
+          <ShieldCheck className="size-4 shrink-0 text-ok-ink" />
           Gratis y en tu dispositivo. Puedes seguir trabajando mientras tanto.
         </div>
       </div>
@@ -88,7 +88,7 @@ export function InvoiceProcessing({ invoice, queue }: { invoice: Invoice; queue:
         {progress != null && <div className="tabular mt-1.5 text-xs font-semibold text-muted">{Math.round(progress * 100)} %</div>}
       </div>
       <p className="mx-auto mt-6 flex max-w-md items-center justify-center gap-1.5 text-xs text-muted">
-        <ShieldCheck className="size-4 shrink-0 text-ok" />
+        <ShieldCheck className="size-4 shrink-0 text-ok-ink" />
         Gratis, en tu dispositivo y sin enviar tus datos a nadie. La primera lectura prepara el lector y tarda unos segundos más.
       </p>
     </div>

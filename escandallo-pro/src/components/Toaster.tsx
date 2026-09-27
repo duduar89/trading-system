@@ -19,10 +19,10 @@ export function Toaster() {
             <Icon
               className={clsx(
                 'mt-0.5 size-5 shrink-0',
-                t.tone === 'success' && 'text-ok',
-                t.tone === 'error' && 'text-bad',
-                t.tone === 'info' && 'text-info',
-                t.tone === 'ai' && 'text-ai',
+                t.tone === 'success' && 'text-ok-ink',
+                t.tone === 'error' && 'text-bad-ink',
+                t.tone === 'info' && 'text-info-ink',
+                t.tone === 'ai' && 'text-ai-ink',
               )}
             />
             <div className="min-w-0 flex-1">

@@ -17,7 +17,7 @@ export function OnboardingChecklist({ steps, doneCount, workspaceName }: { steps
       <Card className="relative overflow-hidden" padded={false}>
         <div className="hero-mesh pointer-events-none absolute inset-x-0 top-0 h-56 opacity-60" aria-hidden />
         <div className="relative p-5 sm:p-7">
-          <div className="text-xs font-bold uppercase tracking-[0.14em] text-brand-500">Puesta en marcha</div>
+          <div className="text-xs font-bold uppercase tracking-[0.14em] text-brand-ink">Puesta en marcha</div>
           <h2 className="mt-1 font-display text-2xl font-extrabold text-ink sm:text-3xl">
             Vamos a calcular el food cost {workspaceName ? <>de «{workspaceName}»</> : 'de tu carta'}
           </h2>
@@ -27,7 +27,7 @@ export function OnboardingChecklist({ steps, doneCount, workspaceName }: { steps
           </p>
           <div className="mt-5 flex items-center gap-3">
             <ProgressBar value={doneCount / steps.length} className="h-2.5 max-w-xs" />
-            <span className="tabular text-sm font-semibold text-ink-2">
+            <span className="tabular shrink-0 whitespace-nowrap text-sm font-semibold text-ink-2">
               {doneCount} de {steps.length}
             </span>
           </div>
@@ -48,7 +48,7 @@ export function OnboardingChecklist({ steps, doneCount, workspaceName }: { steps
                     <span
                       className={cx(
                         'flex size-11 shrink-0 items-center justify-center rounded-2xl',
-                        s.done ? 'bg-ok text-white' : isNext ? 'bg-brand-500 text-white' : 'bg-surface-2 text-muted',
+                        s.done ? 'bg-ok-solid text-white' : isNext ? 'bg-brand-600 text-white' : 'bg-surface-2 text-muted',
                       )}
                       aria-hidden
                     >
@@ -57,7 +57,7 @@ export function OnboardingChecklist({ steps, doneCount, workspaceName }: { steps
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-muted">
                         Paso {i + 1}
-                        {s.done && <span className="rounded-full bg-ok-soft px-1.5 py-0.5 text-[10px] text-ok">Hecho</span>}
+                        {s.done && <span className="rounded-full bg-ok-soft px-1.5 py-0.5 text-[10px] text-ok-ink">Hecho</span>}
                       </div>
                       <div
                         className={cx('font-display text-base font-bold sm:text-lg', s.done ? 'text-muted line-through decoration-2' : 'text-ink')}
@@ -85,7 +85,7 @@ export function OnboardingChecklist({ steps, doneCount, workspaceName }: { steps
 
       <div className="flex flex-col gap-4">
         <Card className="relative overflow-hidden">
-          <div className="flex size-11 items-center justify-center rounded-2xl bg-ai-soft text-ai">
+          <div className="flex size-11 items-center justify-center rounded-2xl bg-ai-soft text-ai-ink">
             <PlayCircle className="size-6" />
           </div>
           <h3 className="mt-3 font-display text-lg font-bold text-ink">¿Prefieres verlo antes con datos?</h3>
@@ -99,7 +99,7 @@ export function OnboardingChecklist({ steps, doneCount, workspaceName }: { steps
         <Card>
           <ul className="space-y-3 text-sm">
             <li className="flex gap-3">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-ok-soft text-ok">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-ok-soft text-ok-ink">
                 <Lock className="size-4" />
               </span>
               <span>
@@ -108,7 +108,7 @@ export function OnboardingChecklist({ steps, doneCount, workspaceName }: { steps
               </span>
             </li>
             <li className="flex gap-3">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-info-soft text-info">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-info-soft text-info-ink">
                 <WifiOff className="size-4" />
               </span>
               <span>
@@ -137,7 +137,7 @@ export function OnboardingBanner({ steps, doneCount, onDismiss }: { steps: Onboa
           <Icon className="size-5" />
         </span>
         <div className="min-w-0">
-          <div className="text-xs font-bold uppercase tracking-wide text-brand-500">
+          <div className="text-xs font-bold uppercase tracking-wide text-brand-ink">
             Siguiente paso · {doneCount} de {steps.length} completados
           </div>
           <div className="font-semibold text-ink">{next.title}</div>

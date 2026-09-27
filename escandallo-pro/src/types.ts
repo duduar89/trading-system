@@ -182,6 +182,13 @@ export interface PricePoint {
   source: 'factura' | 'manual' | 'demo' | 'hoja';
   /** Descripción original de la línea de factura. */
   rawDescription?: string;
+  /**
+   * Unidad en la que está expresado `pricePerBase` cuando NO es la unidad actual del producto: precios anteriores a un
+   * cambio de unidad (kg → ud…) que no se pudieron convertir por falta de peso por unidad o densidad. Si falta, el
+   * precio está en la unidad del producto. Los de otra unidad se conservan como referencia, pero no cuentan para el
+   * precio vigente, las alertas de subida ni los gráficos (ver `core/pricePoints`).
+   */
+  baseUnit?: BaseUnit;
 }
 
 /** Formato de envase detectado en la descripción: "Caja 6x1L" → { count: 6, size: 1, unit: 'l' }. */

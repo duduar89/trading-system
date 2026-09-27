@@ -1,8 +1,10 @@
-import type { BaseUnit, ID, Invoice, PricePoint, Product, Supplier } from '../types';
+import type { BaseUnit, ID, Invoice, PricePoint, Product, Supplier, YieldTest } from '../types';
 import type { KbIngredient } from '../kb/ingredients';
 import { db, type WorkspaceDB } from '../db';
 import { normalizeText, toSearchKey } from '../core/matching';
 import { convertToBase } from '../core/units';
+import { isInProductUnit, pointUnit } from '../core/pricePoints';
+import { fmtDate, fmtEurPrecise } from '../lib/format';
 import { nowIso, todayIso, uid } from '../lib/id';
 
 /**
@@ -191,7 +193,8 @@ export async function recomputeCurrentPrice(productId: ID, wdb: WorkspaceDB = db
     const product = await wdb.products.get(productId);
     if (!product) return undefined;
     const points = await wdb.pricePoints.where('productId').equals(productId).toArray();
-    const valid = points.filter((p) => p.pricePerBase > 0 && Number.isFinite(p.pricePerBase));
+    // Los precios de una unidad anterior (no convertibles) no pueden ser el precio vigente.
+    const valid = points.filter((p) => p.pricePerBase > 0 && Number.isFinite(p.pricePerBase) && isInProductUnit(p, product));
     if (!valid.length) {
       if (product.priceSource === 'factura' || product.priceSource === 'hoja') {
         await wdb.products.update(productId, { priceSource: 'manual', lastPurchaseDate: undefined, updatedAt: nowIso() });
@@ -234,10 +237,19 @@ export async function createProduct(data: Partial<Product> & { name: string }, f
   return wdb.transaction('rw', wdb.products, wdb.pricePoints, () => insertProductIn(wdb, product, firstPrice));
 }
 
-/** Actualiza campos (recalcula searchKey si cambia el nombre; updatedAt siempre). */
+/**
+ * Actualiza campos (recalcula searchKey si cambia el nombre; updatedAt siempre).
+ *
+ * Cambio de unidad de compra (`baseUnit`): ver `planBaseUnitChange`. Si se puede convertir (peso por unidad para
+ * ud ⇄ kg, densidad para l ⇄ kg, ambos para ud ⇄ l; se usan los del propio patch si los trae) se convierten el precio
+ * vigente y todo el histórico. Si no, el histórico se conserva marcado con su unidad (fuera de alertas y gráficos) y el
+ * producto se queda sin precio (o con el último que ya estuviera en la nueva unidad) para no escandallar 12 €/kg como
+ * 12 €/ud. Si deja de comprarse por kg, sus pruebas de rendimiento fijan como precio de compra el último €/kg.
+ * Un `pricePerBase` explícito en el mismo patch manda sobre el convertido.
+ */
 export async function updateProduct(id: ID, patch: Partial<Product>): Promise<void> {
   const wdb = db();
-  await wdb.transaction('rw', wdb.products, async () => {
+  await wdb.transaction('rw', [wdb.products, wdb.pricePoints, wdb.yieldTests], async () => {
     const current = await wdb.products.get(id);
     if (!current) throw new Error('El producto ya no existe');
     const next: Partial<Product> = { ...patch };
@@ -257,9 +269,171 @@ export async function updateProduct(id: ID, patch: Partial<Product>): Promise<vo
     if ('allergens' in patch) next.allergens = [...new Set(patch.allergens ?? [])];
     if ('unitWeightKg' in patch) next.unitWeightKg = positive(patch.unitWeightKg);
     if ('densityKgPerL' in patch) next.densityKgPerL = positive(patch.densityKgPerL);
+    if (patch.baseUnit && patch.baseUnit !== current.baseUnit) {
+      await applyBaseUnitChangeIn(wdb, current, patch.baseUnit, next, 'pricePerBase' in patch);
+    } else if ('baseUnit' in patch) {
+      delete next.baseUnit;
+    }
     next.updatedAt = nowIso();
     await wdb.products.update(id, next);
   });
+}
+
+// ───────────────────────────── Cambio de unidad de compra ─────────────────────────────
+
+const UNIT_WORDS: Record<BaseUnit, string> = { kg: 'kilo', l: 'litro', ud: 'unidad' };
+
+/** Dato que falta para convertir precios entre dos unidades. */
+export type UnitConversionNeed = 'unitWeightKg' | 'densityKgPerL' | 'both';
+
+/**
+ * Factor ESTRICTO para pasar un precio de `from` a `to` (precio_to = precio_from × factor): exige el dato real, sin
+ * suponer densidad 1 (un aceite a 5 €/l no son 5 €/kg). Devuelve el factor o qué dato falta.
+ */
+export function strictPriceFactor(
+  from: BaseUnit,
+  to: BaseUnit,
+  props: { unitWeightKg?: number; densityKgPerL?: number },
+): { factor: number } | { missing: UnitConversionNeed } {
+  if (from === to) return { factor: 1 };
+  const w = positive(props.unitWeightKg);
+  const d = positive(props.densityKgPerL);
+  const pair = new Set([from, to]);
+  const needsWeight = pair.has('ud');
+  const needsDensity = pair.has('l');
+  if ((needsWeight && !w) || (needsDensity && !d)) {
+    return { missing: needsWeight && needsDensity && !w && !d ? 'both' : needsWeight && !w ? 'unitWeightKg' : 'densityKgPerL' };
+  }
+  const conv = priceConversionFactor(from, to, { unitWeightKg: w, densityKgPerL: d });
+  return conv ? { factor: conv.factor } : { missing: 'both' };
+}
+
+/** Qué pasará con el precio y el histórico al cambiar la unidad de compra (para avisar antes de aplicarlo). */
+export interface BaseUnitChangePlan {
+  from: BaseUnit;
+  to: BaseUnit;
+  /** true si el precio vigente se convierte a la nueva unidad. */
+  convertible: boolean;
+  /** Factor precio_nuevo = precio_actual × factor (si es convertible). */
+  factor?: number;
+  /** Dato que falta para convertir. */
+  missing?: UnitConversionNeed;
+  /** Precio vigente antes y después del cambio (0 = se queda sin precio). */
+  oldPrice: number;
+  newPrice: number;
+  /** El nuevo precio sale del último del histórico que ya estaba en la nueva unidad (vuelta a una unidad anterior). */
+  priceFromHistory?: PricePoint;
+  /** Precios del histórico que se convierten, que ya estaban en la nueva unidad y que se conservan en otra unidad. */
+  convertedPoints: number;
+  restoredPoints: number;
+  keptPoints: number;
+  /** Histórico resultante (sólo los precios que cambian). */
+  pointUpdates: PricePoint[];
+}
+
+const round6 = (v: number) => Math.round(v * 1e6) / 1e6;
+
+/**
+ * Plan del cambio de unidad de compra de un producto. Función pura (la usa la ficha para avisar antes de aplicar y
+ * `updateProduct` para aplicarlo). `props` = peso por unidad y densidad a usar (por defecto los del producto).
+ */
+export function planBaseUnitChange(
+  product: Pick<Product, 'baseUnit' | 'pricePerBase' | 'unitWeightKg' | 'densityKgPerL'>,
+  to: BaseUnit,
+  points: PricePoint[],
+  props: { unitWeightKg?: number; densityKgPerL?: number } = product,
+): BaseUnitChangePlan {
+  const from = product.baseUnit;
+  const main = strictPriceFactor(from, to, props);
+  const oldPrice = product.pricePerBase > 0 ? product.pricePerBase : 0;
+  const pointUpdates: PricePoint[] = [];
+  let convertedPoints = 0;
+  let restoredPoints = 0;
+  let keptPoints = 0;
+  const inNewUnit: PricePoint[] = [];
+  for (const p of points) {
+    const unit = pointUnit(p, from);
+    if (unit === to) {
+      if (p.baseUnit) {
+        restoredPoints++;
+        const { baseUnit: _unit, ...rest } = p;
+        pointUpdates.push(rest);
+        inNewUnit.push(rest);
+      } else inNewUnit.push(p);
+      continue;
+    }
+    const f = strictPriceFactor(unit, to, props);
+    if ('factor' in f) {
+      convertedPoints++;
+      const { baseUnit: _unit, ...rest } = p;
+      const converted = { ...rest, pricePerBase: round6(p.pricePerBase * f.factor) };
+      pointUpdates.push(converted);
+      inNewUnit.push(converted);
+    } else {
+      keptPoints++;
+      if (p.baseUnit !== unit) pointUpdates.push({ ...p, baseUnit: unit });
+    }
+  }
+  if ('factor' in main) {
+    return { from, to, convertible: true, factor: main.factor, oldPrice, newPrice: round6(oldPrice * main.factor), convertedPoints, restoredPoints, keptPoints, pointUpdates };
+  }
+  const valid = inNewUnit.filter((p) => p.pricePerBase > 0 && Number.isFinite(p.pricePerBase)).sort(comparePoints);
+  const latest = valid[valid.length - 1];
+  return {
+    from,
+    to,
+    convertible: false,
+    missing: main.missing,
+    oldPrice,
+    newPrice: latest?.pricePerBase ?? 0,
+    priceFromHistory: latest,
+    convertedPoints,
+    restoredPoints,
+    keptPoints,
+    pointUpdates,
+  };
+}
+
+/** Aplica el cambio de unidad dentro de la transacción de `updateProduct` (rellena `next` y actualiza histórico y pruebas). */
+async function applyBaseUnitChangeIn(wdb: WorkspaceDB, current: Product, to: BaseUnit, next: Partial<Product>, explicitPrice: boolean): Promise<void> {
+  const props = {
+    unitWeightKg: 'unitWeightKg' in next ? next.unitWeightKg : current.unitWeightKg,
+    densityKgPerL: 'densityKgPerL' in next ? next.densityKgPerL : current.densityKgPerL,
+  };
+  const points = await wdb.pricePoints.where('productId').equals(current.id).toArray();
+  const plan = planBaseUnitChange(current, to, points, props);
+  if (plan.pointUpdates.length) await wdb.pricePoints.bulkPut(plan.pointUpdates);
+  next.baseUnit = to;
+  if (!explicitPrice) {
+    next.pricePerBase = plan.newPrice;
+    if (!plan.convertible) {
+      if (plan.priceFromHistory) {
+        next.priceSource = plan.priceFromHistory.source;
+        next.lastPurchaseDate = plan.priceFromHistory.date;
+      } else if (plan.oldPrice > 0) {
+        // Sin precio en la nueva unidad: deja de atribuirse a una compra hasta que se registre uno.
+        next.priceSource = 'manual';
+        next.lastPurchaseDate = undefined;
+        if (current.notes === ESTIMATED_PRICE_NOTE) next.notes = undefined;
+      }
+    }
+  }
+  // Pruebas de rendimiento: calculan con el precio €/kg del producto mientras se compre por kg. Si deja de comprarse por
+  // kg, fijan como precio de compra el último €/kg para que sus costes no cambien de golpe.
+  if (current.baseUnit === 'kg' && to !== 'kg' && current.pricePerBase > 0) {
+    const tests = await wdb.yieldTests.where('productId').equals(current.id).toArray();
+    const linked = current.yieldTestId && !tests.some((t) => t.id === current.yieldTestId) ? await wdb.yieldTests.get(current.yieldTestId) : undefined;
+    const all: YieldTest[] = linked ? [...tests, linked] : tests;
+    const note = `Precio de compra fijado en ${fmtEurPrecise(current.pricePerBase)}/kg el ${fmtDate(todayIso())}: «${current.name}» pasa a comprarse por ${UNIT_WORDS[to]}.`;
+    const now = nowIso();
+    const updated = all.map((t) => ({
+      ...t,
+      purchasePricePerKg: current.pricePerBase,
+      notes: t.notes?.includes(note) ? t.notes : [t.notes?.trim(), note].filter(Boolean).join('\n'),
+      updatedAt: now,
+    }));
+    if (updated.length) await wdb.yieldTests.bulkPut(updated);
+  }
 }
 
 /** Registra un precio dentro de una transacción ya abierta (ver setProductPrice). */
@@ -388,11 +562,19 @@ export async function mergeProducts(keepId: ID, removeId: ID): Promise<void> {
     }
     const now = nowIso();
 
-    // Histórico de precios (convertido a la unidad del producto que se conserva)
+    // Histórico de precios (convertido a la unidad del producto que se conserva). Los que estaban en una unidad anterior
+    // del duplicado se convierten desde esa unidad o, si no se puede, se conservan marcados con ella.
     const points = await wdb.pricePoints.where('productId').equals(removeId).toArray();
     if (points.length) {
+      const props = mergeConversionProps(keep, remove);
       await wdb.pricePoints.bulkPut(
-        points.map((p) => ({ ...p, productId: keepId, pricePerBase: Math.round(p.pricePerBase * conv.factor * 1e6) / 1e6 })),
+        points.map((p) => {
+          const unit = pointUnit(p, remove.baseUnit);
+          const { baseUnit: _unit, ...rest } = p;
+          const f = unit === remove.baseUnit ? conv : priceConversionFactor(unit, keep.baseUnit, props);
+          if (!f) return { ...p, productId: keepId, baseUnit: unit };
+          return { ...rest, productId: keepId, pricePerBase: Math.round(p.pricePerBase * f.factor * 1e6) / 1e6 };
+        }),
       );
     }
 

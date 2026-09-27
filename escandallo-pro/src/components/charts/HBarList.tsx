@@ -38,9 +38,9 @@ const barTones: Record<HBarTone, string> = {
 };
 
 const statusIcons: Partial<Record<HBarTone, ReactNode>> = {
-  ok: <CheckCircle2 className="size-3.5 text-ok" aria-hidden />,
-  warn: <AlertTriangle className="size-3.5 text-warn" aria-hidden />,
-  bad: <XCircle className="size-3.5 text-bad" aria-hidden />,
+  ok: <CheckCircle2 className="size-3.5 text-ok-ink" aria-hidden />,
+  warn: <AlertTriangle className="size-3.5 text-warn-ink" aria-hidden />,
+  bad: <XCircle className="size-3.5 text-bad-ink" aria-hidden />,
 };
 
 export function HBarList({

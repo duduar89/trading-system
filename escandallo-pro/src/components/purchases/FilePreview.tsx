@@ -155,7 +155,7 @@ export function FilePreview({
         {current === 'doc' && url && kind === 'pdf' && pdf.failed && !inlinePdf && (
           <Placeholder icon={<FileText className="size-6" />} title="Abre el PDF para verlo">
             Este navegador no muestra PDF dentro de la página.{' '}
-            <a href={url} target="_blank" rel="noreferrer" className="font-semibold text-brand-600 underline dark:text-brand-400">
+            <a href={url} target="_blank" rel="noreferrer" className="font-semibold text-brand-ink underline">
               Ábrelo en una pestaña nueva
             </a>
             {hasText ? ' o compara con el texto leído.' : '.'}
@@ -182,7 +182,7 @@ export function FilePreview({
               <>
                 {' '}
                 o{' '}
-                <a href={url} download={fileName} className="font-semibold text-brand-600 underline dark:text-brand-400">
+                <a href={url} download={fileName} className="font-semibold text-brand-ink underline">
                   descargar el original
                 </a>
               </>

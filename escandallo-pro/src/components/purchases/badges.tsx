@@ -52,7 +52,7 @@ export function PriceTrendChip({ trend, baseUnit, className }: { trend?: PriceTr
       title={title}
       className={clsx(
         'tabular inline-flex items-center gap-0.5 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-bold',
-        up ? 'bg-bad-soft text-bad' : 'bg-ok-soft text-ok',
+        up ? 'bg-bad-soft text-bad-ink' : 'bg-ok-soft text-ok-ink',
         className,
       )}
     >
@@ -72,7 +72,7 @@ export function ChangePct({ pct, className }: { pct?: number; className?: string
     <span
       className={clsx(
         'tabular inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-bold',
-        up ? 'text-bad' : 'text-ok',
+        up ? 'text-bad-ink' : 'text-ok-ink',
         className,
       )}
     >
@@ -115,7 +115,7 @@ export function Hint({
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
-  const tones = { warn: 'text-warn', info: 'text-info', bad: 'text-bad' };
+  const tones = { warn: 'text-warn-ink', info: 'text-info-ink', bad: 'text-bad-ink' };
   return (
     <span className={clsx('relative inline-flex', className)} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <button
@@ -154,7 +154,7 @@ export function SaveIndicator({ state }: { state: 'idle' | 'saving' | 'saved' | 
       )}
       {state === 'saved' && (
         <>
-          <Check className="size-3.5 text-ok" /> Guardado
+          <Check className="size-3.5 text-ok-ink" /> Guardado
         </>
       )}
       {state === 'dirty' && (
@@ -164,7 +164,7 @@ export function SaveIndicator({ state }: { state: 'idle' | 'saving' | 'saved' | 
       )}
       {state === 'error' && (
         <>
-          <AlertTriangle className="size-3.5 text-bad" /> No se pudo guardar
+          <AlertTriangle className="size-3.5 text-bad-ink" /> No se ha podido guardar
         </>
       )}
     </span>
@@ -177,7 +177,7 @@ export function EstimatedBadge({ className, short }: { className?: string; short
     <span
       title={ESTIMATED_PRICE_HINT}
       className={clsx(
-        'inline-flex shrink-0 cursor-help items-center gap-1 whitespace-nowrap rounded-full border border-dashed border-info/50 bg-info-soft px-1.5 py-px font-sans text-[10px] font-semibold text-info',
+        'inline-flex shrink-0 cursor-help items-center gap-1 whitespace-nowrap rounded-full border border-dashed border-info/50 bg-info-soft px-1.5 py-px font-sans text-[10px] font-semibold text-info-ink',
         className,
       )}
     >

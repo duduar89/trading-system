@@ -40,7 +40,7 @@ export function BusinessCard({ id }: { id?: string }) {
       setDraft(null);
       toast.success('Ajustes de negocio guardados', 'Todos los escandallos se han recalculado con los nuevos valores.');
     } catch (e) {
-      toast.error('No se pudieron guardar los ajustes', errorMessage(e));
+      toast.error('No se han podido guardar los ajustes', errorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -92,13 +92,13 @@ export function BusinessCard({ id }: { id?: string }) {
         </div>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
           <span>
-            <span className="font-semibold text-ok">Verde</span> hasta {fmtPct(t, 1)}
+            <span className="font-semibold text-ok-ink">Verde</span> hasta {fmtPct(t, 1)}
           </span>
           <span>
-            <span className="font-semibold text-warn">Ámbar</span> hasta {fmtPct(w, 1)}
+            <span className="font-semibold text-warn-ink">Ámbar</span> hasta {fmtPct(w, 1)}
           </span>
           <span>
-            <span className="font-semibold text-bad">Rojo</span> por encima
+            <span className="font-semibold text-bad-ink">Rojo</span> por encima
           </span>
         </div>
         {example != null && (

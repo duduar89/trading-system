@@ -89,7 +89,9 @@ export function YieldTestList({ rows }: { rows: YieldRow[] }) {
                 <Th align="right">Merma total</Th>
                 <Th align="right">Coste real</Th>
                 <Th align="center">Estado</Th>
-                <Th />
+                <Th>
+                  <span className="sr-only">Acciones</span>
+                </Th>
               </tr>
             </thead>
             <tbody>
@@ -110,7 +112,7 @@ export function YieldTestList({ rows }: { rows: YieldRow[] }) {
                         <Link
                           to={`/mermas/${r.test.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="block truncate font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400"
+                          className="block truncate font-semibold text-ink hover:text-brand-ink"
                         >
                           {r.test.name}
                         </Link>
@@ -164,7 +166,7 @@ export function YieldTestList({ rows }: { rows: YieldRow[] }) {
                       </div>
                     </div>
                     {r.linked && (
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ok-soft text-ok" title="Se usa en tus escandallos">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ok-soft text-ok-ink" title="Se usa en tus escandallos">
                         <Link2 className="size-4" />
                         <span className="sr-only">Se usa en tus escandallos</span>
                       </span>
@@ -200,7 +202,7 @@ function CostCell({ row }: { row: YieldRow }) {
       <span className="text-xs text-muted">/kg útil</span>
       <div className="text-[11px] text-muted">
         compra {fmtEur(row.price)} ·{' '}
-        <span className={cx('font-semibold', row.factor >= 2 ? 'text-bad' : row.factor >= 1.4 ? 'text-warn' : 'text-ink-2')}>×{fmtNum(row.factor, 2)}</span>
+        <span className={cx('font-semibold', row.factor >= 2 ? 'text-bad-ink' : row.factor >= 1.4 ? 'text-warn-ink' : 'text-ink-2')}>×{fmtNum(row.factor, 2)}</span>
       </div>
     </div>
   );
@@ -225,7 +227,7 @@ function LinkBadge({ row }: { row: YieldRow }) {
 function MiniNum({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="min-w-0 rounded-xl bg-surface-2 px-2.5 py-2">
-      <div className={cx('truncate font-display font-extrabold', strong ? 'text-base text-brand-600 dark:text-brand-400' : 'text-base text-ink')}>{value}</div>
+      <div className={cx('truncate font-display font-extrabold', strong ? 'text-base text-brand-ink' : 'text-base text-ink')}>{value}</div>
       <div className="truncate text-[10px] font-medium text-muted">{label}</div>
     </div>
   );

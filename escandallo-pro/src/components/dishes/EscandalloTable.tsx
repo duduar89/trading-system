@@ -168,7 +168,7 @@ export function EscandalloTable({ dish, cost, ctx, products, business, onItemsCh
       if (p.pricePerBase > 0) toast.success(`Ingrediente «${p.name}» creado`, `Precio de referencia ${fmtPrice(p.pricePerBase)} ${perUnitLabel(p.baseUnit)}: se actualizará con tu próxima factura.`);
       else toast.info(`Ingrediente «${p.name}» creado`, 'Indica su precio en Ingredientes o sube una factura donde aparezca.');
     } catch (e) {
-      toast.error('No se pudo crear el ingrediente', errorMessage(e));
+      toast.error('No se ha podido crear el ingrediente', errorMessage(e));
     }
   };
 
@@ -228,7 +228,7 @@ export function EscandalloTable({ dish, cost, ctx, products, business, onItemsCh
       {suggestedCount > 0 && (
         <div className="flex flex-col gap-3 rounded-2xl border border-ai/30 bg-ai-soft p-3.5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-2.5 text-sm text-ink-2">
-            <Sparkles className="mt-0.5 size-4 shrink-0 text-ai" />
+            <Sparkles className="mt-0.5 size-4 shrink-0 text-ai-ink" />
             <div>
               <span className="font-semibold text-ink">
                 {suggestedCount} {suggestedCount === 1 ? 'línea propuesta' : 'líneas propuestas'}
@@ -244,7 +244,7 @@ export function EscandalloTable({ dish, cost, ctx, products, business, onItemsCh
 
       {wide ? (
         <div className="overflow-x-auto rounded-2xl border border-line bg-surface shadow-card">
-          <table className="tabular w-full min-w-[960px] border-collapse text-sm">
+          <table className="tabular w-full min-w-[1040px] table-fixed border-collapse text-sm">
             <thead>
               <tr className="bg-surface-2 text-[11px] font-bold uppercase tracking-wide text-muted">
                 <HeadCell className="pl-4 text-left">Ingrediente</HeadCell>
@@ -302,7 +302,7 @@ export function EscandalloTable({ dish, cost, ctx, products, business, onItemsCh
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {items.map((item, i) => (
               <MobileRow key={item.id} {...rowProps(item, i)} />
             ))}
@@ -414,7 +414,7 @@ function LinkChip({ item, info, setItem }: Pick<RowProps, 'item' | 'info' | 'set
   }
   if (!item.ref) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-warn">
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-warn-ink">
         <AlertTriangle className="size-3.5" /> Sin vincular: elige un ingrediente de la lista
       </span>
     );
@@ -426,18 +426,18 @@ function LinkChip({ item, info, setItem }: Pick<RowProps, 'item' | 'info' | 'set
     <span className="inline-flex max-w-full items-center gap-1 text-xs text-muted">
       <span aria-hidden>{sub ? '🍲' : product ? CATEGORY_LABELS[product.category]?.emoji : '❓'}</span>
       {to ? (
-        <Link to={to} className="truncate font-medium text-ink-2 underline-offset-2 hover:text-brand-600 hover:underline">
+        <Link to={to} className="truncate font-medium text-ink-2 underline-offset-2 hover:text-brand-ink hover:underline">
           {name}
         </Link>
       ) : (
-        <span className="truncate font-medium text-bad">{name}</span>
+        <span className="truncate font-medium text-bad-ink">{name}</span>
       )}
-      {sub && <span className="rounded-full bg-info-soft px-1.5 text-[10px] font-bold text-info">elab.</span>}
-      {unsure && <span className="shrink-0 rounded-full bg-warn-soft px-1.5 text-[10px] font-bold text-warn">¿es este?</span>}
+      {sub && <span className="rounded-full bg-info-soft px-1.5 text-[10px] font-bold text-info-ink">elab.</span>}
+      {unsure && <span className="shrink-0 rounded-full bg-warn-soft px-1.5 text-[10px] font-bold text-warn-ink">¿es este?</span>}
       <button
         type="button"
         onClick={() => setItem({ ref: undefined, matchScore: undefined })}
-        className="ml-0.5 shrink-0 rounded p-0.5 text-muted hover:bg-surface-2 hover:text-bad"
+        className="ml-0.5 shrink-0 rounded p-0.5 text-muted hover:bg-surface-2 hover:text-bad-ink"
         aria-label="Desvincular ingrediente"
         title="Desvincular"
       >
@@ -483,7 +483,7 @@ function WasteInput({
             <RotateCcw className="size-2.5" /> manual
           </button>
         ) : source === 'prueba' && testId ? (
-          <Link to={`/mermas/${testId}`} className="rounded bg-ok-soft px-1 text-ok hover:underline" title="Merma real de tu prueba de rendimiento">
+          <Link to={`/mermas/${testId}`} className="rounded bg-ok-soft px-1 text-ok-ink hover:underline" title="Merma real de tu prueba de rendimiento">
             prueba
           </Link>
         ) : source === 'producto' ? (
@@ -564,7 +564,7 @@ function PriceCell({ info }: { info: LineInfo }) {
           </Link>
         )}
         {usable != null && (
-          <span className="text-[10px] font-semibold text-ok" title="Coste real por kg limpio según tu prueba de rendimiento (ya descuenta lo que recuperas en subproductos): es el que se aplica al peso neto">
+          <span className="text-[10px] font-semibold text-ok-ink" title="Coste real por kg limpio según tu prueba de rendimiento (ya descuenta lo que recuperas en subproductos): es el que se aplica al peso neto">
             {fmtPrice(usable)} /kg útil
           </span>
         )}
@@ -573,12 +573,12 @@ function PriceCell({ info }: { info: LineInfo }) {
   }
   if (product) {
     return (
-      <Link to={`/ingredientes/${product.id}`} className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn hover:underline">
+      <Link to={`/ingredientes/${product.id}`} className="rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn-ink hover:underline">
         Sin precio
       </Link>
     );
   }
-  if (sub) return <span className="text-xs font-semibold text-warn">Sin coste</span>;
+  if (sub) return <span className="text-xs font-semibold text-warn-ink">Sin coste</span>;
   return <span className="text-muted">—</span>;
 }
 
@@ -604,12 +604,12 @@ function WarningsButton({ warnings }: { warnings: string[] }) {
   return (
     <>
       <span ref={ref} className="inline-flex">
-        <IconButton label={`Avisos: ${warnings.join('. ')}`} onClick={() => setOpen((o) => !o)} className="text-warn hover:text-warn" aria-expanded={open}>
+        <IconButton label={`Avisos: ${warnings.join('. ')}`} onClick={() => setOpen((o) => !o)} className="text-warn-ink hover:text-warn-ink" aria-expanded={open}>
           <AlertTriangle className="size-4" />
         </IconButton>
       </span>
       <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end" minWidth={260} className="p-3">
-        <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-warn">Revisa esta línea</div>
+        <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-warn-ink">Revisa esta línea</div>
         <ul className="space-y-1.5 text-sm text-ink-2">
           {warnings.map((w) => (
             <li key={w} className="flex gap-2">
@@ -649,7 +649,7 @@ function RowMenu(p: RowProps) {
               {cost.netPrice ? 'Indica cantidad y vincula el ingrediente para calcularlo.' : 'Indica el PVP de carta del plato para calcularlo.'}
             </p>
           ) : max <= 0 ? (
-            <p className="mt-1 text-xs text-bad">Aunque fuera gratis, el resto de ingredientes ya supera el {fmtPctNb(target, 0)} de food cost.</p>
+            <p className="mt-1 text-xs text-bad-ink">Aunque fuera gratis, el resto de ingredientes ya supera el {fmtPctNb(target, 0)} de food cost.</p>
           ) : (
             <>
               <div className="tabular mt-1 font-display text-xl font-extrabold text-ink">
@@ -661,7 +661,7 @@ function RowMenu(p: RowProps) {
                   <>
                     {' '}
                     · ahora pagas{' '}
-                    <span className={clsx('font-semibold', current > max ? 'text-bad' : 'text-ok')}>
+                    <span className={clsx('font-semibold', current > max ? 'text-bad-ink' : 'text-ok-ink')}>
                       {fmtPrice(current)} {perUnitLabel(unit)}
                     </span>
                   </>
@@ -700,7 +700,7 @@ function RowMenu(p: RowProps) {
 function AcceptButton({ item, setItem }: Pick<RowProps, 'item' | 'setItem'>) {
   if (!item.suggested) return null;
   return (
-    <IconButton label="Aceptar la propuesta" onClick={() => setItem({ suggested: false })} className="bg-ai-soft text-ai hover:bg-ai hover:text-white">
+    <IconButton label="Aceptar la propuesta" onClick={() => setItem({ suggested: false })} className="bg-ai-soft text-ai-ink hover:bg-ai hover:text-white">
       <Check className="size-4" />
     </IconButton>
   );

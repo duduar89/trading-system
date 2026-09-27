@@ -213,7 +213,7 @@ function Editor({ initial, allTests }: { initial: YieldTest; allTests: YieldTest
         </Link>
         <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <div className="text-xs font-bold uppercase tracking-[0.14em] text-brand-500">Prueba de rendimiento</div>
+            <div className="text-xs font-bold uppercase tracking-[0.14em] text-brand-ink">Prueba de rendimiento</div>
             <h1 className="line-clamp-2 font-display text-2xl font-extrabold text-ink sm:text-3xl">{draft.name.trim() || 'Prueba sin nombre'}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
               <span>{product?.name ?? 'Sin producto'}</span>
@@ -227,7 +227,7 @@ function Editor({ initial, allTests }: { initial: YieldTest; allTests: YieldTest
             <Button variant="outline" icon={<Copy className="size-4" />} onClick={duplicate} loading={duplicating}>
               Duplicar
             </Button>
-            <Button variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 className="size-4" />} onClick={() => setConfirmDelete(true)}>
+            <Button variant="ghost" className="text-bad-ink hover:bg-bad-soft hover:text-bad-ink" icon={<Trash2 className="size-4" />} onClick={() => setConfirmDelete(true)}>
               Borrar
             </Button>
           </div>
@@ -254,7 +254,7 @@ function Editor({ initial, allTests }: { initial: YieldTest; allTests: YieldTest
         {result.wastePerPortionKg != null && <SummaryItem label="Merma/ración" value={fmtKg(result.wastePerPortionKg)} className="hidden min-[400px]:block" />}
       </a>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_440px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_440px]">
         {/* ── Formulario ── */}
         <div className="min-w-0 space-y-5">
           <Card>
@@ -281,13 +281,13 @@ function Editor({ initial, allTests }: { initial: YieldTest; allTests: YieldTest
                           {product.pricePerBase > 0 ? `${fmtEurPrecise(product.pricePerBase)} / ${product.baseUnit} en factura` : 'Sin precio todavía'}
                         </span>
                       </span>
-                      <span className="text-xs font-semibold text-brand-600 dark:text-brand-400">Cambiar</span>
+                      <span className="text-xs font-semibold text-brand-ink">Cambiar</span>
                     </>
                   ) : (
                     <>
                       <PackageSearch className="size-5 text-muted" />
                       <span className="flex-1 text-sm text-muted">Elige el producto de tus facturas</span>
-                      <span className="text-xs font-semibold text-brand-600 dark:text-brand-400">Elegir</span>
+                      <span className="text-xs font-semibold text-brand-ink">Elegir</span>
                     </>
                   )}
                 </button>
@@ -321,7 +321,7 @@ function Editor({ initial, allTests }: { initial: YieldTest; allTests: YieldTest
                     }}
                     className={cx(
                       'mt-1 inline-flex min-h-10 items-center rounded-lg px-2 text-left text-xs font-semibold transition',
-                      pricePrompt != null ? 'animate-pulse-soft bg-brand-500 text-white' : 'text-brand-600 hover:bg-brand-500/10 dark:text-brand-400',
+                      pricePrompt != null ? 'animate-pulse-soft bg-brand-600 text-white' : 'text-brand-ink hover:bg-brand-500/10',
                     )}
                   >
                     Usar precio actual del producto ({fmtEurPrecise(productPrice)}/kg)
@@ -359,7 +359,7 @@ function Editor({ initial, allTests }: { initial: YieldTest; allTests: YieldTest
           <Card>
             <CardHeader icon={<Flame className="size-4" />} title="Cocción y ración" subtitle="Para saber cuánto pierde al cocinar y cuánta merma lleva cada plato." />
             <div className="@container">
-              <div className="grid gap-5 @min-[46rem]:grid-cols-2">
+              <div className="grid grid-cols-1 gap-5 @min-[46rem]:grid-cols-2">
                 <div>
                   <Field label="Merma de cocción" hint="Peso que pierde la parte aprovechable al cocinarla">
                     <NumberInput value={draft.cookingLossPct} onValue={(v) => patch({ cookingLossPct: v ?? 0 })} min={0} decimals={1} suffix="%" placeholder="0" />
@@ -367,7 +367,7 @@ function Editor({ initial, allTests }: { initial: YieldTest; allTests: YieldTest
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {COOKING_PRESETS.map((c) => (
                       <Chip key={c.label} active={draft.cookingLossPct === c.pct} onClick={() => patch({ cookingLossPct: c.pct })}>
-                        {c.label} {c.pct > 0 && <span className="tabular opacity-70">{c.pct} %</span>}
+                        {c.label} {c.pct > 0 && <span className="tabular font-normal">{c.pct} %</span>}
                       </Chip>
                     ))}
                   </div>
@@ -449,13 +449,13 @@ function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => vo
   if (state === 'idle') return null;
   if (state === 'error')
     return (
-      <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 text-xs font-semibold text-bad hover:underline">
+      <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 text-xs font-semibold text-bad-ink hover:underline">
         <CloudAlert className="size-3.5" /> Sin guardar · reintentar
       </button>
     );
   if (state === 'saved')
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-ok" role="status">
+      <span className="inline-flex items-center gap-1 text-xs text-ok-ink" role="status">
         <CloudCheck className="size-3.5" /> Guardado
       </span>
     );
@@ -469,7 +469,7 @@ function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => vo
 function SummaryItem({ label, value, strong, className }: { label: string; value: string; strong?: boolean; className?: string }) {
   return (
     <div className={cx('min-w-0', className)}>
-      <div className={cx('truncate font-display text-base font-extrabold leading-tight sm:text-lg', strong ? 'text-brand-600 dark:text-brand-400' : 'text-ink')}>{value}</div>
+      <div className={cx('truncate font-display text-base font-extrabold leading-tight sm:text-lg', strong ? 'text-brand-ink' : 'text-ink')}>{value}</div>
       <div className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted">{label}</div>
     </div>
   );
@@ -483,7 +483,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       aria-pressed={active}
       className={cx(
         'inline-flex h-10 items-center gap-1 rounded-full border px-3 text-xs font-semibold transition active:scale-95',
-        active ? 'border-brand-500 bg-brand-500/10 text-brand-700 dark:text-brand-300' : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
+        active ? 'border-brand-500 bg-brand-500/10 text-brand-ink' : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
       )}
     >
       {children}
@@ -496,7 +496,7 @@ function EditorSkeleton() {
     <div className="animate-fade-in space-y-5" aria-busy="true" aria-label="Cargando prueba">
       <div className="h-4 w-40 animate-pulse-soft rounded bg-line" />
       <div className="h-9 w-72 max-w-full animate-pulse-soft rounded-lg bg-line" />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-5">
           <div className="h-72 animate-pulse-soft rounded-2xl border border-line bg-surface" />
           <div className="h-80 animate-pulse-soft rounded-2xl border border-line bg-surface" />

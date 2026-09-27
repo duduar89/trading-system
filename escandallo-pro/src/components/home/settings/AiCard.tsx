@@ -39,7 +39,7 @@ export function AiCard({ id }: { id?: string }) {
       await updateAppSettings(patch);
       if (message) toast.success(message);
     } catch (e) {
-      toast.error('No se pudo guardar', errorMessage(e));
+      toast.error('No se ha podido guardar', errorMessage(e));
     }
   };
 
@@ -94,10 +94,10 @@ export function AiCard({ id }: { id?: string }) {
             <p className="mt-0.5 text-sm text-ink-2">
               Funciona en tu dispositivo, sin conexión y sin enviar tus datos a nadie. Esto es lo que ya tienes sin IA:
             </p>
-            <ul className="mt-2 grid gap-1 text-sm text-ink-2 sm:grid-cols-2">
+            <ul className="mt-2 grid grid-cols-1 gap-1 text-sm text-ink-2 sm:grid-cols-2">
               {FREE_FEATURES.map((f) => (
                 <li key={f} className="flex items-start gap-1.5">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok" aria-hidden />
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok-ink" aria-hidden />
                   {f}
                 </li>
               ))}
@@ -195,7 +195,7 @@ export function AiCard({ id }: { id?: string }) {
                 href="https://console.anthropic.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-8 items-center gap-1 px-2 text-xs font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                className="inline-flex h-8 items-center gap-1 px-2 text-xs font-semibold text-brand-ink hover:underline"
               >
                 Conseguir una clave en console.anthropic.com <ExternalLink className="size-3.5" />
               </a>
@@ -209,9 +209,9 @@ export function AiCard({ id }: { id?: string }) {
                 role="status"
               >
                 {testResult.ok ? (
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok" />
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-ok-ink" />
                 ) : (
-                  <XCircle className="mt-0.5 size-4 shrink-0 text-bad" />
+                  <XCircle className="mt-0.5 size-4 shrink-0 text-bad-ink" />
                 )}
                 {testResult.message}
               </div>

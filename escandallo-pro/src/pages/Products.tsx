@@ -17,6 +17,7 @@ import { isEstimatedPrice } from '../components/purchases/estimated';
 import { NewProductModal } from '../components/purchases/NewProductModal';
 import { MergeProductsModal } from '../components/purchases/MergeProductsModal';
 import { ImportPriceListModal } from '../components/purchases/ImportPriceListModal';
+import { comparablePricePoints } from '../core/pricePoints';
 import {
   DEFAULT_PRODUCT_FILTERS,
   filterProducts,
@@ -66,7 +67,8 @@ export default function Products() {
     }
   }, [params, setParams]);
 
-  const trends = useMemo(() => priceTrends(points ?? []), [points]);
+  // Tendencias sólo con precios en la unidad actual de cada producto (tras un cambio de unidad no convertible).
+  const trends = useMemo(() => priceTrends(comparablePricePoints(points ?? [], products ?? [])), [points, products]);
   const supplierNames = useMemo(() => new Map((suppliers ?? []).map((s) => [s.id, s.name])), [suppliers]);
   const list = useMemo(() => filterProducts(products ?? [], filters, trends), [products, filters, trends]);
   const stats = useMemo(
@@ -108,7 +110,7 @@ export default function Products() {
       }
     }
     setSelected(new Set());
-    if (failed) toast.error(`No se pudieron eliminar ${failed} ingredientes`);
+    if (failed) toast.error(`No se han podido eliminar ${failed} ingredientes`);
     else toast.success(ids.length === 1 ? 'Ingrediente eliminado' : `${ids.length} ingredientes eliminados`);
   };
 
@@ -119,7 +121,7 @@ export default function Products() {
       const blob = await exportProductsXlsx(products ?? [], suppliers ?? []);
       downloadBlob(blob, `ingredientes-${todayIso()}.xlsx`);
     } catch (e) {
-      toast.error('No se pudo exportar', errorMessage(e));
+      toast.error('No se ha podido exportar', errorMessage(e));
     } finally {
       setExporting(false);
     }
@@ -238,7 +240,7 @@ export default function Products() {
                   aria-label="Categoría"
                   className="sm:w-52"
                 >
-                  <option value="todas">Todas las categorías</option>
+                  <option value="todas">Categorías</option>
                   {CATEGORIES.filter((c) => categoryCounts.has(c)).map((c) => (
                     <option key={c} value={c}>
                       {CATEGORY_LABELS[c].emoji} {CATEGORY_LABELS[c].label} ({categoryCounts.get(c)})
@@ -463,7 +465,7 @@ function FilterChip({
       className={clsx(
         'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition',
         active
-          ? 'border-brand-500 bg-brand-500 text-white shadow-glow'
+          ? 'border-brand-600 bg-brand-600 text-white shadow-glow'
           : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink',
       )}
     >
@@ -544,7 +546,7 @@ function ProductRow({
           <div className="min-w-0">
             <Link
               to={`/ingredientes/${p.id}`}
-              className="block max-w-[340px] truncate font-semibold text-ink hover:text-brand-600 dark:hover:text-brand-400"
+              className="block max-w-[340px] truncate font-semibold text-ink hover:text-brand-ink"
             >
               {p.name}
             </Link>

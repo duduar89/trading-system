@@ -102,25 +102,25 @@ export function DishListTable({
                   <SelectBox checked={selected.has(d.id)} onChange={() => onToggle(d.id)} label={`Seleccionar ${d.name}`} />
                 </td>
                 <td className="max-w-[320px] border-b border-line px-3 py-2.5">
-                  <Link to={`/platos/${d.id}`} className="flex items-center gap-2 font-semibold text-ink hover:text-brand-600">
-                    {!isPlato && <FlaskConical className="size-3.5 shrink-0 text-info" aria-label="Elaboración" />}
+                  <Link to={`/platos/${d.id}`} className="flex items-center gap-2 font-semibold text-ink hover:text-brand-ink">
+                    {!isPlato && <FlaskConical className="size-3.5 shrink-0 text-info-ink" aria-label="Elaboración" />}
                     <span className="truncate">{d.name}</span>
-                    {d.status === 'revisado' && <Check className="size-3.5 shrink-0 text-ok" aria-label="Revisado" />}
-                    {sug > 0 && <Sparkles className="size-3.5 shrink-0 text-ai" aria-label={`${sug} líneas por revisar`} />}
+                    {d.status === 'revisado' && <Check className="size-3.5 shrink-0 text-ok-ink" aria-label="Revisado" />}
+                    {sug > 0 && <Sparkles className="size-3.5 shrink-0 text-ai-ink" aria-label={`${sug} líneas por revisar`} />}
                   </Link>
                 </td>
                 <td className="hidden border-b border-line px-3 py-2.5 text-ink-2 md:table-cell">{d.section ?? <span className="text-muted">—</span>}</td>
                 <td className="border-b border-line px-3 py-2.5 text-right text-ink-2">
-                  {isPlato ? d.menuPrice ? fmtEur(d.menuPrice) : <span className="text-xs font-semibold text-warn">Sin PVP</span> : <span className="text-muted">—</span>}
+                  {isPlato ? d.menuPrice ? fmtEur(d.menuPrice) : <span className="text-xs font-semibold text-warn-ink">Sin PVP</span> : <span className="text-muted">—</span>}
                 </td>
                 <td className="border-b border-line px-3 py-2.5 text-right font-semibold text-ink">
                   <span className="inline-flex items-center justify-end gap-1">
-                    {est > 0 && c && c.costPerPortion > 0 && <CircleDashed className="size-3.5 shrink-0 text-info xl:hidden" aria-label={estLabel} role="img" />}
+                    {est > 0 && c && c.costPerPortion > 0 && <CircleDashed className="size-3.5 shrink-0 text-info-ink xl:hidden" aria-label={estLabel} role="img" />}
                     {c && c.costPerPortion > 0 ? fmtEur(c.costPerPortion) : '—'}
                   </span>
                 </td>
                 <td className="border-b border-line px-3 py-2.5 text-right">{isPlato ? <FoodCostBadge pct={fc} status={st} /> : <span className="text-muted">—</span>}</td>
-                <td className={clsx('border-b border-line px-3 py-2.5 text-right', margin != null && margin < 0 ? 'text-bad' : 'text-ink-2')}>
+                <td className={clsx('border-b border-line px-3 py-2.5 text-right', margin != null && margin < 0 ? 'text-bad-ink' : 'text-ink-2')}>
                   {margin != null ? fmtEur(margin) : '—'}
                 </td>
                 <td className="hidden border-b border-line px-3 py-2.5 text-right text-ink-2 lg:table-cell">{c && c.grossKgPerPortion > 0 ? fmtPctNb(c.wastePct, 0) : '—'}</td>
@@ -128,7 +128,7 @@ export function DishListTable({
                   {d.items.length ? (
                     <div className="flex items-center gap-2">
                       <ProgressBar value={c?.completeness ?? 0} tone={missing ? 'warn' : 'ok'} className="h-1.5" />
-                      <span className={clsx('w-20 shrink-0 text-xs', missing ? 'font-semibold text-warn' : est ? 'font-semibold text-info' : 'text-muted')} title={est && !missing ? estLabel : undefined}>
+                      <span className={clsx('w-20 shrink-0 text-xs', missing ? 'font-semibold text-warn-ink' : est ? 'font-semibold text-info-ink' : 'text-muted')} title={est && !missing ? estLabel : undefined}>
                         {missing ? `${missing} sin precio` : est ? `${est} ${est === 1 ? 'estimado' : 'estimados'}` : 'Completo'}
                       </span>
                     </div>

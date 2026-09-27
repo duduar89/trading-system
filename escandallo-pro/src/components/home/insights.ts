@@ -17,6 +17,7 @@ import type {
 } from '../../types';
 import { dishCostStatus, foodCostStatus, shownFoodCostPct, type FoodCostStatus } from '../../core/costing';
 import { computeYield } from '../../core/yield';
+import { fullMonthComparison, inRange, monthToDateComparison, periodChangePct, type PeriodComparison } from '../../core/periods';
 import { prevMonth } from './dates';
 
 // ───────────────────────────── Semáforo ─────────────────────────────
@@ -158,11 +159,55 @@ export interface SpendTrend {
   month: string;
   total: number;
   previousMonth: string;
+  /** Gasto del periodo con el que se compara (el mismo periodo del mes anterior si el mes está en curso). */
   previousTotal?: number;
-  /** Variación % respecto al mes anterior (undefined si no hay mes anterior con gasto). */
+  /** Variación % respecto al periodo comparado (undefined si en ese periodo no hubo gasto). */
   changePct?: number;
   /** true si `month` es el mes natural en curso (dato parcial). */
   inProgress: boolean;
+  /** Periodos comparados (para explicar la cifra: "frente al mismo periodo de agosto"). */
+  comparison?: PeriodComparison;
+}
+
+/**
+ * Gasto de compras para el panel sin comparaciones engañosas:
+ *  - Si este mes ya hay compras, el mes hasta hoy frente al MISMO PERIODO del mes anterior (1–25 sep frente a
+ *    1–25 ago), no frente al mes anterior entero.
+ *  - Si no, el último mes con compras (ya cerrado) frente al mes anterior completo.
+ * `amount` da el importe de cada factura (base imponible); sólo cuentan las confirmadas. `today` en 'YYYY-MM-DD'.
+ */
+export function spendTrend(invoices: Invoice[], today: string, amount: (inv: Invoice) => number): SpendTrend | undefined {
+  const byMonth = new Map<string, number>();
+  const confirmed = invoices.filter((inv) => inv.status === 'confirmada' && /^\d{4}-\d{2}-\d{2}/.test(inv.date ?? ''));
+  for (const inv of confirmed) {
+    const v = amount(inv);
+    if (!Number.isFinite(v)) continue;
+    const month = inv.date.slice(0, 7);
+    byMonth.set(month, (byMonth.get(month) ?? 0) + v);
+  }
+  const thisMonth = today.slice(0, 7);
+  // Último mes con gasto sin pasar del actual (una fecha futura mal leída no debe desplazar el panel).
+  const months = [...byMonth.entries()].filter(([m, total]) => total > 0 && m <= thisMonth).map(([m]) => m);
+  const month = months.sort().pop();
+  if (!month) return undefined;
+  const inProgress = month === thisMonth;
+  const comparison = inProgress ? monthToDateComparison(today) : fullMonthComparison(month);
+  if (!comparison) return undefined;
+  const total = byMonth.get(month) ?? 0;
+  const prev = confirmed.reduce((sum, inv) => {
+    const v = amount(inv);
+    return inRange(inv.date, comparison.previous) && Number.isFinite(v) ? sum + v : sum;
+  }, 0);
+  const previousTotal = prev > 0 ? Math.round(prev * 100) / 100 : undefined;
+  return {
+    month,
+    total: Math.round(total * 100) / 100,
+    previousMonth: comparison.previousMonth,
+    previousTotal,
+    changePct: periodChangePct(previousTotal, total),
+    inProgress,
+    comparison,
+  };
 }
 
 /** Gasto del último mes con datos y su variación respecto al mes natural anterior. */
@@ -296,7 +341,7 @@ export function reviewQueue(invoices: Invoice[], dishes: Dish[], menuScans: Menu
         kind: 'factura',
         id: inv.id,
         title: inv.supplierName || inv.fileName || 'Factura',
-        subtitle: inv.error ? `No se pudo leer: ${inv.error}` : 'No se pudo leer: revísala a mano',
+        subtitle: inv.error ? `No se ha podido leer: ${inv.error}` : 'No se ha podido leer: revísala a mano',
         to: `/facturas/${inv.id}`,
         tone: 'bad',
         date: inv.createdAt,

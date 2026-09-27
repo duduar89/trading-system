@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { AlertTriangle, Camera, FileText } from 'lucide-react';
-import { dashboardStats, priceAlerts } from '../core/analytics';
+import { dashboardStats, invoiceSpend, priceAlerts } from '../core/analytics';
 import { useBusiness, useCurrentWorkspace, useDishCosts, useDishes, useInvoices, useMenuScans, usePricePoints, useProducts } from '../state/hooks';
 import { useUI } from '../state/store';
+import { todayIso } from '../lib/id';
 import { Button, Callout, PageHeader } from '../components/ui';
 import { CardSkeleton, Skeleton, safeCompute } from '../components/home/shared';
-import { greetingFor, longDate, monthKey } from '../components/home/dates';
-import { countByStatus, dishFoodCostRows, dishesNeedingAttention, lastMonthSpend, onboardingSteps, reviewQueue } from '../components/home/insights';
+import { greetingFor, longDate } from '../components/home/dates';
+import { countByStatus, dishFoodCostRows, dishesNeedingAttention, onboardingSteps, reviewQueue, spendTrend } from '../components/home/insights';
 import { FoodCostHero } from '../components/home/dashboard/FoodCostHero';
 import { DashboardKpis } from '../components/home/dashboard/DashboardKpis';
 import { BucketsCard, CategorySpendCard, FoodCostByDishCard, MonthlySpendCard } from '../components/home/dashboard/DashboardCharts';
@@ -90,7 +91,8 @@ export default function Dashboard() {
       completeDishes,
       attention: dishesNeedingAttention(rows),
       review: reviewQueue(invoices, dishes, menuScans),
-      spend: stats.value ? lastMonthSpend(stats.value.monthlySpend, monthKey(new Date())) : undefined,
+      // Mes hasta hoy frente al mismo periodo del mes anterior (el mes anterior entero engaña a mitad de mes).
+      spend: safeCompute(() => spendTrend(invoices, todayIso(), invoiceSpend)).value,
       productsWithPrice: products.filter((p) => p.pricePerBase > 0).length,
       isEmpty: products.length === 0 && dishes.length === 0,
     };
@@ -166,7 +168,7 @@ export default function Dashboard() {
       )}
 
       {data.stats.error && (
-        <Callout tone="bad" icon={<AlertTriangle className="size-4" />} title="No se pudieron calcular algunos indicadores">
+        <Callout tone="bad" icon={<AlertTriangle className="size-4" />} title="No se han podido calcular algunos indicadores">
           {data.stats.error}. El resto del panel sigue funcionando; si persiste, exporta una copia de seguridad desde Ajustes.
         </Callout>
       )}

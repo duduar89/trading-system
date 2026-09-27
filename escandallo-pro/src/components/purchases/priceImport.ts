@@ -54,7 +54,7 @@ export function planPriceImport(rows: PriceRow[], products: Product[], createMis
       pricePerBase = n.pricePerBase;
       warnings = n.warnings ?? [];
     } catch (e) {
-      warnings = [e instanceof Error ? e.message : 'No se pudo calcular el precio'];
+      warnings = [e instanceof Error ? e.message : 'No se ha podido calcular el precio'];
     }
     let name = row.description;
     try {

@@ -78,15 +78,14 @@ export function YieldProductPicker({
     <div className="space-y-2" ref={rootRef}>
       <SearchInput value={query} onChange={setQuery} placeholder="Busca el producto de tus facturas…" />
       {results.length > 0 && <div className="px-1 pt-1 text-[11px] font-bold uppercase tracking-wide text-muted">{title}</div>}
-      <ul className="max-h-64 space-y-1 overflow-y-auto pr-0.5" role="listbox" aria-label="Productos">
+      <ul className="max-h-64 space-y-1 overflow-y-auto pr-0.5" aria-label="Productos">
         {results.map((p) => {
           const selected = p.id === value;
           return (
             <li key={p.id}>
               <button
                 type="button"
-                role="option"
-                aria-selected={selected}
+                aria-pressed={selected}
                 onClick={() => onChange(selected ? undefined : p)}
                 className={cx(
                   'flex min-h-11 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition',
@@ -126,7 +125,7 @@ export function YieldProductPicker({
       )}
       {list.length === 0 && !query.trim() && (
         <p className="rounded-xl bg-surface-2 px-3 py-3 text-xs text-muted">
-          Aún no tienes ingredientes. <Link to="/facturas?nuevo=1" className="font-semibold text-brand-600 hover:underline dark:text-brand-400">Sube una factura</Link>{' '}
+          Aún no tienes ingredientes. <Link to="/facturas?nuevo=1" className="font-semibold text-brand-ink hover:underline">Sube una factura</Link>{' '}
           (se leen gratis en tu dispositivo) o escribe el nombre para crearlo. También puedes hacer la prueba sin producto y vincularla después.
         </p>
       )}

@@ -56,7 +56,7 @@ export function useDemoLoader(): [() => Promise<void>, boolean] {
       navigate('/');
       toast.success(`«${ws.name}» listo`, 'Explora el panel, los escandallos y los informes con datos reales de ejemplo.');
     } catch (e) {
-      toast.error('No se pudo cargar el restaurante de ejemplo', errorMessage(e));
+      toast.error('No se ha podido cargar el restaurante de ejemplo', errorMessage(e));
     } finally {
       setLoading(false);
     }

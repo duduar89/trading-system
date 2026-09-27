@@ -90,7 +90,7 @@ export function ImportPriceListModal({
       setFileName(f.name);
       setStep('map');
     } catch (e) {
-      toast.error('No se pudo leer el archivo', errorMessage(e));
+      toast.error('No se ha podido leer el archivo', errorMessage(e));
     } finally {
       setReading(false);
     }
@@ -165,7 +165,7 @@ export function ImportPriceListModal({
     }
     setResult(res);
     setStep('done');
-    if (res.failed) toast.error(res.failed === 1 ? '1 fila no se pudo importar' : `${res.failed} filas no se pudieron importar`);
+    if (res.failed) toast.error(res.failed === 1 ? '1 fila no se ha podido importar' : `${res.failed} filas no se han podido importar`);
     else
       toast.success(
         'Tarifa importada',
@@ -221,7 +221,7 @@ export function ImportPriceListModal({
 
       {step === 'map' && (
         <div className="space-y-5">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {sheets.length > 1 && (
               <Field label="Hoja">
                 <Select
@@ -296,7 +296,7 @@ export function ImportPriceListModal({
                 </Field>
               ))}
             </div>
-            {!hasPrice && <p className="mt-2 text-sm font-semibold text-bad">Indica la columna de precio unitario o de importe.</p>}
+            {!hasPrice && <p className="mt-2 text-sm font-semibold text-bad-ink">Indica la columna de precio unitario o de importe.</p>}
           </div>
 
           <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-2 p-3.5 sm:flex-row sm:items-center sm:justify-between">
@@ -418,7 +418,7 @@ export function ImportPriceListModal({
             </div>
           </div>
           {result.failed > 0 && (
-            <p className={clsx('mt-4 text-sm font-semibold text-bad')}>{result.failed === 1 ? '1 fila no se pudo importar.' : `${result.failed} filas no se pudieron importar.`}</p>
+            <p className={clsx('mt-4 text-sm font-semibold text-bad-ink')}>{result.failed === 1 ? '1 fila no se ha podido importar.' : `${result.failed} filas no se han podido importar.`}</p>
           )}
           <p className="mx-auto mt-4 max-w-sm text-sm text-muted">
             Hemos rellenado mermas y alérgenos típicos de los ingredientes nuevos. Tus escandallos ya usan los precios nuevos.

@@ -22,11 +22,31 @@ function initials(name: string) {
     .join('');
 }
 
+/**
+ * Oscurece un color de acento (hex) lo justo para que las iniciales en blanco se lean con contraste AA (≥ 4,5:1):
+ * los acentos vivos (naranja, verde, ámbar…) se quedan en su tono pero más profundos.
+ */
+export function readableAccent(hex: string | undefined): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex ?? '');
+  if (!m) return '#0b0f14';
+  const rgb = [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
+  const lum = (c: number[]) => {
+    const [r, g, b] = c.map((v) => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  let c = rgb;
+  for (let k = 0; k < 20 && 1.05 / (lum(c) + 0.05) < 4.6; k++) c = c.map((v) => Math.round(v * 0.93));
+  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
 export function WorkspaceAvatar({ name, color, size = 'md' }: { name: string; color?: string; size?: 'sm' | 'md' }) {
   return (
     <span
       className={clsx('flex shrink-0 items-center justify-center rounded-lg font-display font-bold text-white', size === 'sm' ? 'size-6 text-[10px]' : 'size-8 text-xs')}
-      style={{ background: color ?? '#0b0f14' }}
+      style={{ background: readableAccent(color) }}
     >
       {initials(name) || <Store className="size-4" />}
     </span>
@@ -154,7 +174,7 @@ export function WorkspaceSwitcher({ compact }: { compact?: boolean }) {
               setOpen(false);
               setCreating(true);
             }}
-            className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold text-brand-600 hover:bg-surface-2 dark:text-brand-400"
+            className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold text-brand-ink hover:bg-surface-2"
           >
             <Plus className="size-4" /> Nuevo restaurante o cliente
           </button>

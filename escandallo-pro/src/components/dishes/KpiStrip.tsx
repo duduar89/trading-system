@@ -29,14 +29,14 @@ function Completeness({ cost, estimated = 0 }: { cost: DishCost; estimated?: num
   const missing = cost.items.filter((i) => !i.resolved).length;
   const est =
     estimated > 0 ? (
-      <span className="inline-flex items-center gap-1 text-info" title="Precio de referencia orientativo: sube tus facturas y el coste pasará a ser el real.">
+      <span className="inline-flex items-center gap-1 text-info-ink" title="Precio de referencia orientativo: sube tus facturas y el coste pasará a ser el real.">
         <CircleDashed className="size-3.5" /> {estimated} con precio estimado
       </span>
     ) : null;
   if (!missing)
     return (
       <span className="flex flex-col gap-0.5">
-        <span className="inline-flex items-center gap-1 text-ok">
+        <span className="inline-flex items-center gap-1 text-ok-ink">
           <CheckCircle2 className="size-3.5" /> Todos los ingredientes con precio
         </span>
         {est}
@@ -44,7 +44,7 @@ function Completeness({ cost, estimated = 0 }: { cost: DishCost; estimated?: num
     );
   return (
     <span className="flex flex-col gap-0.5">
-      <span className="inline-flex items-center gap-1 text-warn">
+      <span className="inline-flex items-center gap-1 text-warn-ink">
         <AlertTriangle className="size-3.5" /> {missing} sin precio o sin vincular
       </span>
       {est}
@@ -175,7 +175,7 @@ export function KpiStrip({
         label="Margen bruto"
         hint={cost.multiplier != null ? `Multiplicador ×${fmtNum(cost.multiplier, 2)}` : margin == null && cost.netPrice ? 'Añade ingredientes con precio' : 'Por ración, sin IVA'}
       >
-        <div className={clsx('font-display text-2xl font-extrabold', margin != null && margin < 0 ? 'text-bad' : 'text-ink')}>{fmtEur(margin)}</div>
+        <div className={clsx('font-display text-2xl font-extrabold', margin != null && margin < 0 ? 'text-bad-ink' : 'text-ink')}>{fmtEur(margin)}</div>
         {margin != null && cost.grossMarginPct != null && <div className="text-xs font-semibold text-ink-2">{fmtPctNb(cost.grossMarginPct)} del PVP sin IVA</div>}
       </Tile>
       <Tile label="PVP sugerido" hint={`Para un food cost del ${fmtPctNb(target, 0)}`}>

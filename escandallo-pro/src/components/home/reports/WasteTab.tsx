@@ -53,7 +53,7 @@ export function WasteTab({ data }: { data: ReportsData }) {
             icon={<FlaskConical className="size-4" />}
             tone="ai"
             hint={
-              <span className="inline-flex items-center gap-1 font-semibold text-brand-600 dark:text-brand-400">
+              <span className="inline-flex items-center gap-1 font-semibold text-brand-ink">
                 Ver mermas <ArrowRight className="size-3" />
               </span>
             }
@@ -159,7 +159,7 @@ export function WasteTab({ data }: { data: ReportsData }) {
                   <Td align="right" className="whitespace-nowrap font-semibold text-ink">
                     {p.pricePerBase > 0 ? `${fmtUnitPrice(p.realPricePerUsable)}/${p.baseUnit}` : '—'}
                   </Td>
-                  <Td align="right" className="whitespace-nowrap font-semibold text-bad">
+                  <Td align="right" className="whitespace-nowrap font-semibold text-bad-ink">
                     {p.lossPerBase > 0 ? `${fmtUnitPrice(p.lossPerBase)}/${p.baseUnit}` : '—'}
                   </Td>
                   <Td>{p.source === 'prueba' ? <Badge tone="ok">Prueba real</Badge> : <Badge tone="neutral">Estimada</Badge>}</Td>
@@ -172,7 +172,7 @@ export function WasteTab({ data }: { data: ReportsData }) {
 
       {noTest.length > 0 && (
         <Card className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-ai-soft text-ai">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-ai-soft text-ai-ink">
             <FlaskConical className="size-6" />
           </span>
           <div className="min-w-0 flex-1">

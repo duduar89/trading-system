@@ -25,6 +25,12 @@ export function fmtPct(v: number | undefined | null, decimals = 1): string {
   return `${num(decimals).format(v)} %`;
 }
 
+/** Porcentaje con decimales fijos para columnas y listas, donde las cifras deben alinearse: 44 → "44,0 %". */
+export function fmtPctFixed(v: number | undefined | null, decimals = 1): string {
+  if (v == null || !Number.isFinite(v)) return '—';
+  return `${new Intl.NumberFormat('es-ES', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(v)} %`;
+}
+
 export function fmtNum(v: number | undefined | null, decimals = 2): string {
   if (v == null || !Number.isFinite(v)) return '—';
   return num(decimals).format(v);

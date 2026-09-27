@@ -24,14 +24,14 @@ export function AliasEditor({ product }: { product: Product }) {
       await addProductAlias(product.id, alias);
       setText('');
     } catch (e) {
-      toast.error('No se pudo añadir el nombre', errorMessage(e));
+      toast.error('No se ha podido añadir el nombre', errorMessage(e));
     }
   };
   const remove = async (alias: string) => {
     try {
       await updateProduct(product.id, { aliases: product.aliases.filter((a) => a !== alias) });
     } catch (e) {
-      toast.error('No se pudo quitar el nombre', errorMessage(e));
+      toast.error('No se ha podido quitar el nombre', errorMessage(e));
     }
   };
   return (
@@ -48,7 +48,7 @@ export function AliasEditor({ product }: { product: Product }) {
               <button
                 type="button"
                 onClick={() => void remove(a)}
-                className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-bad-soft hover:text-bad"
+                className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-bad-soft hover:text-bad-ink"
                 aria-label={`Quitar «${a}»`}
               >
                 <X className="size-3" />
@@ -101,7 +101,7 @@ export function ChangePriceModal({ product, open, onClose }: { product: Product;
       toast.success('Precio actualizado', `${product.name}: ${fmtEurPrecise(price)}/${product.baseUnit}`);
       onClose();
     } catch (e) {
-      toast.error('No se pudo cambiar el precio', errorMessage(e));
+      toast.error('No se ha podido cambiar el precio', errorMessage(e));
     } finally {
       setSaving(false);
     }

@@ -20,7 +20,7 @@ export function AppearanceCard({ id }: { id?: string }) {
           try {
             await updateAppSettings({ theme });
           } catch (e) {
-            toast.error('No se pudo cambiar el tema', errorMessage(e));
+            toast.error('No se ha podido cambiar el tema', errorMessage(e));
           }
         }}
         options={[
@@ -71,7 +71,7 @@ export function AboutCard({ id }: { id?: string }) {
         <LogoMark className="size-12" />
         <div className="min-w-0 flex-1">
           <div className="font-display text-lg font-extrabold text-ink">
-            Escandallo<span className="text-brand-500">Pro</span> <span className="text-sm font-bold text-muted">versión 1.0</span>
+            Escandallo<span className="text-brand-500" data-logotype>Pro</span> <span className="text-sm font-bold text-muted">versión 1.0</span>
           </div>
           <div className="text-sm text-muted">Food cost, escandallos y mermas para hostelería. Tus datos, en tu dispositivo.</div>
         </div>
@@ -94,7 +94,7 @@ export function AboutCard({ id }: { id?: string }) {
         <p className="mt-0.5 text-sm text-muted">
           Acceso directo desde la pantalla de inicio, a pantalla completa y funcionando sin conexión, incluida la lectura de facturas y cartas.
         </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {INSTALL_STEPS.map((s) => (
             <div key={s.title} className="rounded-2xl border border-line p-3.5">
               <div className="flex items-center gap-2 text-sm font-semibold text-ink">

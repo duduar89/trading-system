@@ -27,7 +27,7 @@ export function TemplateGallery({ onPick }: { onPick: (tpl: YieldTemplate) => vo
 
   return (
     <div>
-      <div className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <div className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 scroll-fade-x">
         <Segmented<Family>
           value={family}
           onChange={setFamily}

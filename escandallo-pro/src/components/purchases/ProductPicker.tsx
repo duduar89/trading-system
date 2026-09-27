@@ -290,7 +290,7 @@ function PickerPanel({
             isActive ? 'border-brand-400 bg-brand-500/8' : 'border-dashed border-line-strong',
           )}
         >
-          <div className="mb-2 flex items-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold text-brand-ink">
             <Plus className="size-3.5" /> Crear nuevo ingrediente
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -322,7 +322,7 @@ function PickerPanel({
               type="button"
               onClick={() => choose(o)}
               disabled={!effectiveCreateName.trim()}
-              className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand-500 px-3.5 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:opacity-50"
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-3.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
             >
               Crear
             </button>
@@ -369,7 +369,7 @@ function PickerPanel({
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5">
               <span className="truncate text-sm font-semibold text-ink">{p.name}</span>
-              {selected && <Check className="size-4 shrink-0 text-ok" aria-label="Seleccionado" />}
+              {selected && <Check className="size-4 shrink-0 text-ok-ink" aria-label="Seleccionado" />}
             </span>
             {o.hit.matchedOn && <span className="block truncate text-[11px] text-muted">por «{o.hit.matchedOn}»</span>}
           </span>

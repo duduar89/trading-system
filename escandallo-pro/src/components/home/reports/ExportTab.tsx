@@ -66,7 +66,7 @@ export function ExportTab({ data }: { data: ReportsData }) {
         toast.success('Excel de ingredientes descargado', `${data.products.length} ingredientes con su precio y merma.`);
       }
     } catch (e) {
-      toast.error('No se pudo exportar', errorMessage(e));
+      toast.error('No se ha podido exportar', errorMessage(e));
     } finally {
       setBusy(null);
     }
@@ -77,7 +77,7 @@ export function ExportTab({ data }: { data: ReportsData }) {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <ExportCard
           icon={<FileSpreadsheet className="size-6" />}
-          tone="bg-ok-soft text-ok"
+          tone="bg-ok-soft text-ok-ink"
           title="Excel de escandallos"
           description="Resumen de toda la carta (PVP, coste, food cost, margen, merma y PVP sugerido) y una hoja con la ficha técnica de cada plato."
           meta={`${platos} platos · ${elaboraciones} elaboraciones`}
@@ -114,7 +114,7 @@ export function ExportTab({ data }: { data: ReportsData }) {
         />
         <ExportCard
           icon={<Database className="size-6" />}
-          tone="bg-info-soft text-info"
+          tone="bg-info-soft text-info-ink"
           title="Copia de seguridad"
           description="Todo el restaurante en un archivo JSON para guardarlo, pasarlo a otro dispositivo o restaurarlo desde Ajustes."
           meta={`${data.invoices.length} facturas · ${data.yieldTests.length} pruebas de rendimiento`}
