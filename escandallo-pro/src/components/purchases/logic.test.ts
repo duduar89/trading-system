@@ -141,7 +141,17 @@ describe('líneas de factura', () => {
       line({ id: 'c', matchStatus: 'nuevo', pricePerBase: 0 }),
       line({ id: 'd', matchStatus: 'ignorado', pricePerBase: 5 }),
     ]);
-    expect(s).toEqual({ total: 4, linked: 1, suggested: 1, created: 1, ignored: 1, withWarnings: 1, priced: 2 });
+    expect(s).toEqual({ total: 4, linked: 1, suggested: 1, created: 1, ignored: 1, withWarnings: 1, priced: 2, credits: 0 });
+  });
+
+  it('summarizeLines no cuenta los abonos como precios listos (al confirmar no cambian precios)', () => {
+    const s = summarizeLines([
+      line({ id: 'a', matchStatus: 'vinculado', pricePerBase: 2, quantity: 10, total: 20 }),
+      line({ id: 'b', matchStatus: 'vinculado', pricePerBase: 5, quantity: 1, total: -5 }),
+      line({ id: 'c', matchStatus: 'nuevo', pricePerBase: 1.9, quantity: -2, total: -3.8 }),
+      line({ id: 'd', matchStatus: 'ignorado', pricePerBase: 1, quantity: -1, total: -1 }),
+    ]);
+    expect(s).toMatchObject({ priced: 1, credits: 2, ignored: 1 });
   });
 });
 
@@ -380,6 +390,8 @@ describe('productUsage', () => {
     ({
       dishId,
       foodCostPct: fc,
+      // Un food cost sólo se muestra si hay coste por ración (core/costing.shownFoodCostPct).
+      costPerPortion: 1,
       items: items.map((i) => ({ itemId: i.itemId, cost: i.cost, costSharePct: i.share })),
     }) as unknown as DishCost;
   const costs = new Map<string, DishCost>([

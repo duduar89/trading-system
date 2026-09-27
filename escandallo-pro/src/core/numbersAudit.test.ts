@@ -3,8 +3,10 @@
  * anidadas, pruebas de rendimiento extremas, IVA, raciones) con el resultado calculado a mano.
  */
 import { describe, expect, it } from 'vitest';
-import type { BusinessSettings, Dish, Product, RecipeItem, YieldTest } from '../types';
-import { buildCostingContext, costDish, foodCostStatus } from './costing';
+import type { BusinessSettings, Dish, PricePoint, Product, RecipeItem, YieldTest } from '../types';
+import { buildCostingContext, costDish, dishCostStatus, foodCostStatus, maxAffordablePrice, shownFoodCostPct } from './costing';
+import { priceAlerts } from './analytics';
+import { priceTrends } from '../components/purchases/logic';
 
 const business: BusinessSettings = {
   id: 'business',
@@ -202,5 +204,97 @@ describe('IVA, raciones y PVP', () => {
     expect(c.grossMargin).toBeUndefined();
     expect(c.warnings).toContain('Falta el PVP de carta');
     expect(c.suggestedPrice).toBe(11);
+  });
+});
+
+describe('pruebas de rendimiento sin precio en el producto', () => {
+  it('la línea costeada con el precio de la prueba cuenta como resuelta y muestra ese precio (no «sin precio» con coste)', () => {
+    const sinPrecio = product({ id: 'rape', pricePerBase: 0, yieldTestId: 'y-rape' });
+    const y: YieldTest = {
+      id: 'y-rape',
+      name: 'Rape',
+      productId: 'rape',
+      date: '2026-01-01',
+      grossWeightKg: 2,
+      purchasePricePerKg: 10,
+      outputs: [{ id: 'a', name: 'Cola', weightKg: 1, kind: 'principal' }],
+      cookingLossPct: 0,
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+    };
+    const d = dish({ id: 'd', menuPrice: 22, items: [item({ id: 'r', ref: ref('rape'), quantity: 100, unit: 'g' })] });
+    const c = costDish(d, buildCostingContext([sinPrecio], [d], [y], business));
+    // 100 g limpios → 200 g brutos a 10 €/kg = 2 €
+    expect(c.items[0].cost).toBeCloseTo(2, 9);
+    expect(c.items[0].resolved).toBe(true);
+    expect(c.items[0].pricePerBase).toBe(10);
+    expect(c.items[0].warnings).toEqual([]);
+    expect(c.completeness).toBe(1);
+    expect(c.warnings).toEqual([]);
+  });
+});
+
+describe('elaboraciones que no se pueden convertir', () => {
+  it('una elaboración que rinde en unidades pedida en gramos explica el motivo (no habla del «producto»)', () => {
+    const cebollaSinPeso = product({ id: 'x', pricePerBase: 5 });
+    const e = dish({ id: 'e', kind: 'elaboracion', yieldQty: 10, yieldUnit: 'ud', items: [item({ id: 'a', ref: ref('x'), quantity: 1, unit: 'kg' })] });
+    const d = dish({ id: 'd', items: [item({ id: 'b', ref: sub('e'), quantity: 50, unit: 'g' })] });
+    const line = costDish(d, buildCostingContext([cebollaSinPeso], [e, d], [], business)).items[0];
+    expect(line.resolved).toBe(false);
+    expect(line.warnings).toHaveLength(1);
+    expect(line.warnings[0]).toMatch(/elaboración/);
+    expect(line.warnings[0]).not.toMatch(/producto/);
+  });
+});
+
+describe('objetivo de food cost del plato', () => {
+  it('un objetivo propio de 0 % no existe: se usa el del negocio (PVP sugerido y precio máximo coherentes con la ficha)', () => {
+    const d = dish({ id: 'p', menuPrice: 11, targetFoodCostPct: 0, items: [item({ id: 's', ref: ref('sal'), quantity: 6, unit: 'kg' })] });
+    const c = costDish(d, buildCostingContext([sal], [d], [], business));
+    expect(c.targetFoodCostPct).toBe(30);
+    expect(c.suggestedPrice).toBe(11);
+    expect(maxAffordablePrice(c, 's', d, business)).toBeCloseTo(0.5, 9);
+  });
+});
+
+describe('semáforo de un escandallo (mismo criterio en toda la app)', () => {
+  const ctxFor = (d: Dish) => buildCostingContext([sal], [d], [], business);
+  const plato = (extra: Partial<Dish>) => dish({ id: 'p', menuPrice: 11, items: [item({ id: 's', ref: ref('sal'), quantity: 8, unit: 'kg' })], ...extra });
+
+  it('con objetivo propio, la franja ámbar del negocio (5 puntos) se desplaza con él', () => {
+    // 4 € sobre 10 € sin IVA = 40 %
+    const d = plato({ targetFoodCostPct: 38 });
+    const c = costDish(d, ctxFor(d));
+    expect(c.foodCostPct).toBeCloseTo(40, 9);
+    expect(dishCostStatus(c, business)).toBe('warn');
+    const general = plato({});
+    expect(dishCostStatus(costDish(general, ctxFor(general)), business)).toBe('bad');
+  });
+
+  it('sin coste por ración no hay food cost que clasificar (nunca un 0 % en verde)', () => {
+    const d = plato({ items: [] });
+    const c = costDish(d, ctxFor(d));
+    expect(c.foodCostPct).toBe(0);
+    expect(shownFoodCostPct(c)).toBeUndefined();
+    expect(dishCostStatus(c, business)).toBe('none');
+    expect(dishCostStatus(undefined, business)).toBe('none');
+  });
+});
+
+describe('alertas de precio: mismo criterio que la tendencia del producto', () => {
+  const pp = (date: string, pricePerBase: number, id: string): PricePoint => ({ id, productId: 'x', date, pricePerBase, source: 'factura' });
+  const x = product({ id: 'x', name: 'Aceite' });
+
+  it('una diferencia de redondeo (< 0,1 %) no tapa la subida real respecto al precio anterior distinto', () => {
+    const pts = [pp('2026-01-01', 10, 'a'), pp('2026-02-01', 12, 'b'), pp('2026-03-01', 12.005, 'c')];
+    const [alert] = priceAlerts([x], pts, 5);
+    expect(alert).toMatchObject({ previousPrice: 10, currentPrice: 12.005, previousDate: '2026-01-01' });
+    expect(alert.changePct).toBeCloseTo(priceTrends(pts).get('x')!.changePct!, 9);
+  });
+
+  it('el umbral se compara con la variación que se muestra (una décima): «+5,0 %» con umbral del 5 % avisa', () => {
+    expect(priceAlerts([x], [pp('2026-01-01', 1, 'a'), pp('2026-02-01', 1.0496, 'b')], 5)).toHaveLength(1);
+    expect(priceAlerts([x], [pp('2026-01-01', 1, 'a'), pp('2026-02-01', 1.0494, 'b')], 5)).toEqual([]);
+    expect(priceAlerts([x], [pp('2026-01-01', 1, 'a'), pp('2026-02-01', 0.9504, 'b')], 5)).toHaveLength(1);
   });
 });

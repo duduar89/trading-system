@@ -5,6 +5,7 @@
 import type { BaseUnit, Dish, DishCost, ID, IngredientCategory, Invoice, InvoiceLine, PackSize, PricePoint, Product } from '../../types';
 import type { Cell, ColumnMapping } from '../../extract/spreadsheet';
 import { approxEqual, round } from '../../core/numbers';
+import { roundPct, shownFoodCostPct } from '../../core/costing';
 import { fmtNum } from '../../lib/format';
 import { isEstimatedPrice } from './estimated';
 
@@ -133,19 +134,23 @@ export interface LineSummary {
   created: number;
   ignored: number;
   withWarnings: number;
-  /** Líneas que se convertirán en precio al confirmar (no ignoradas y con €/ud base > 0). */
+  /** Líneas que se convertirán en precio al confirmar (no ignoradas, con €/ud base > 0 y que no son abonos). */
   priced: number;
+  /** Abonos y devoluciones (cantidad o importe negativos): al confirmar no cambian precios (services/invoices.confirmInvoice). */
+  credits: number;
 }
 
 export function summarizeLines(lines: InvoiceLine[]): LineSummary {
-  const s: LineSummary = { total: lines.length, linked: 0, suggested: 0, created: 0, ignored: 0, withWarnings: 0, priced: 0 };
+  const s: LineSummary = { total: lines.length, linked: 0, suggested: 0, created: 0, ignored: 0, withWarnings: 0, priced: 0, credits: 0 };
   for (const l of lines) {
     if (l.matchStatus === 'vinculado') s.linked++;
     else if (l.matchStatus === 'sugerido') s.suggested++;
     else if (l.matchStatus === 'nuevo') s.created++;
     else s.ignored++;
     if (l.warnings?.length) s.withWarnings++;
-    if (l.matchStatus !== 'ignorado' && (l.pricePerBase ?? 0) > 0) s.priced++;
+    if (l.matchStatus === 'ignorado') continue;
+    if (l.quantity < 0 || l.total < 0) s.credits++;
+    else if ((l.pricePerBase ?? 0) > 0) s.priced++;
   }
   return s;
 }
@@ -505,7 +510,8 @@ export function productStats(products: Product[], trends: Map<ID, PriceTrend>, a
   for (const p of products) {
     if (p.pricePerBase > 0) withPrice++;
     const t = trends.get(p.id);
-    if (t?.changePct != null && t.changePct >= alertPct && daysBetween(t.currentDate, today) <= 90) recentRises++;
+    // Mismo umbral que las alertas: la subida que se muestra (una décima), «+5,0 %» cuenta con un umbral del 5 %.
+    if (t?.changePct != null && roundPct(t.changePct) >= alertPct && daysBetween(t.currentDate, today) <= 90) recentRises++;
   }
   return { total: products.length, withPrice, withoutPrice: products.length - withPrice, recentRises };
 }
@@ -543,7 +549,7 @@ export function productUsage(productId: ID, dishes: Dish[], costs: Map<ID, DishC
       }
     }
     const portions = dish.portions > 0 ? dish.portions : 1;
-    out.push({ dish, costPerPortion: cost / portions, sharePct: share, foodCostPct: dc?.foodCostPct });
+    out.push({ dish, costPerPortion: cost / portions, sharePct: share, foodCostPct: shownFoodCostPct(dc) });
   }
   // Uso indirecto: platos que llevan una elaboración que contiene el producto.
   const byId = new Map(dishes.map((d) => [d.id, d]));
@@ -561,7 +567,7 @@ export function productUsage(productId: ID, dishes: Dish[], costs: Map<ID, DishC
       if (direct.has(dish.id) || seen.has(dish.id)) continue;
       if (!dish.items.some((i) => i.ref?.type === 'dish' && i.ref.id === subId)) continue;
       seen.add(dish.id);
-      out.push({ dish, costPerPortion: 0, sharePct: 0, foodCostPct: costs?.get(dish.id)?.foodCostPct, via: viaName });
+      out.push({ dish, costPerPortion: 0, sharePct: 0, foodCostPct: shownFoodCostPct(costs?.get(dish.id)), via: viaName });
       if (dish.kind === 'elaboracion') {
         containing.set(dish.id, viaName);
         queue.push(dish.id);

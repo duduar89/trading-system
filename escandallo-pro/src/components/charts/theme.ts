@@ -110,11 +110,16 @@ export const STATUS_LEGEND: Record<Exclude<FoodCostStatus, 'none'>, string> = {
   bad: 'Por encima',
 };
 
-/** Formato compacto de euros para ejes: 1.250 € → "1,3 mil €". */
+/**
+ * Formato compacto de euros para ejes: 1.250 € → "1,25 mil €". Con los decimales justos para que una marca del eje no
+ * se lea como otra cifra (una marca en 2.250 € no puede decir "2,3 mil €", ni una en 12.500 € "13 mil €").
+ */
 export function fmtEurAxis(v: number): string {
   const a = Math.abs(v);
-  if (a >= 1_000_000) return `${(v / 1_000_000).toLocaleString('es-ES', { maximumFractionDigits: 1 })} M€`;
-  if (a >= 10_000) return `${Math.round(v / 1000).toLocaleString('es-ES')} mil €`;
-  if (a >= 1000) return `${(v / 1000).toLocaleString('es-ES', { maximumFractionDigits: 1 })} mil €`;
-  return `${v.toLocaleString('es-ES', { maximumFractionDigits: a < 10 ? 2 : 0 })} €`;
+  // Espacios duros: el eje de recharts parte la etiqueta por los espacios normales ("2,25 mil" / "€" en dos líneas).
+  const nb = (s: string) => s.replace(/ /g, '\u00a0');
+  if (a >= 1_000_000) return nb(`${(v / 1_000_000).toLocaleString('es-ES', { maximumFractionDigits: 2 })} M€`);
+  if (a >= 10_000) return nb(`${(v / 1000).toLocaleString('es-ES', { maximumFractionDigits: 1 })} mil €`);
+  if (a >= 1000) return nb(`${(v / 1000).toLocaleString('es-ES', { maximumFractionDigits: 2 })} mil €`);
+  return nb(`${v.toLocaleString('es-ES', { maximumFractionDigits: a < 10 ? 2 : 0 })} €`);
 }

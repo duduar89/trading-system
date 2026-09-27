@@ -1,5 +1,5 @@
 import type { BusinessSettings, Dish, DishCost, ID, Invoice, InvoiceLine, MenuEngineeringClass, PricePoint, Product, IngredientCategory, BaseUnit } from '../types';
-import { costDish, foodCostStatus, roundPct, type CostingContext } from './costing';
+import { costDish, dishTargetPct, foodCostStatus, roundPct, type CostingContext } from './costing';
 
 /**
  * Analítica de negocio: ingeniería de menú, alertas de precio y KPIs del panel.
@@ -105,12 +105,19 @@ export interface PriceAlert {
   affectedPlatoIds: ID[];
 }
 
-/** Dos precios se consideran iguales si difieren menos de 0,01 céntimos. */
-const PRICE_EPS = 1e-4;
+/**
+ * Dos precios se consideran iguales si difieren menos de un 0,1 % (o de 0,005 céntimos): ruido de redondeo del €/ud base,
+ * no un cambio de precio. Mismo criterio que la tendencia de la ficha del producto (components/purchases/logic.priceTrends),
+ * para que una diferencia de redondeo no tape la subida real respecto a la compra anterior.
+ */
+function samePrice(a: number, b: number): boolean {
+  return Math.abs(a - b) <= Math.max(0.00005, Math.abs(b) * 0.001);
+}
 
 /**
  * Compara, para cada producto, su último precio con el anterior (distinto) del histórico.
- * Devuelve las variaciones con |changePct| ≥ thresholdPct, ordenadas por mayor subida primero.
+ * Devuelve las variaciones con |changePct| ≥ thresholdPct (redondeada a la décima, como se muestra), ordenadas por mayor
+ * subida primero.
  * A igualdad de fecha manda el orden del array (el último registrado es el más reciente).
  */
 export function priceAlerts(products: Product[], pricePoints: PricePoint[], thresholdPct: number, dishes: Dish[] = []): PriceAlert[] {
@@ -140,14 +147,15 @@ export function priceAlerts(products: Product[], pricePoints: PricePoint[], thre
     const current = list[list.length - 1].p;
     let previous: PricePoint | undefined;
     for (let i = list.length - 2; i >= 0; i--) {
-      if (Math.abs(list[i].p.pricePerBase - current.pricePerBase) > PRICE_EPS) {
+      if (!samePrice(list[i].p.pricePerBase, current.pricePerBase)) {
         previous = list[i].p;
         break;
       }
     }
     if (!previous) continue;
     const changePct = ((current.pricePerBase - previous.pricePerBase) / previous.pricePerBase) * 100;
-    if (Math.abs(changePct) + 1e-9 < threshold) continue;
+    // Se compara la variación que se muestra (una décima): un «+5,0 %» con umbral del 5 % es una alerta.
+    if (roundPct(Math.abs(changePct)) < threshold) continue;
     const affectedPlatoIds = [...dishesUsingProduct(dishes, product.id)].filter((id) => kindById.get(id) === 'plato');
     alerts.push({
       productId: product.id,
@@ -273,7 +281,7 @@ export function dashboardStats(args: {
       wRevenue += net * u;
     }
     // Mismo semáforo que la ficha del plato: con objetivo propio, la franja ámbar del negocio se desplaza con él.
-    const target = d.targetFoodCostPct ?? business.targetFoodCostPct;
+    const target = dishTargetPct(d, business);
     const band = Math.max(0, business.warningFoodCostPct - business.targetFoodCostPct);
     const status = foodCostStatus(fc, target, target + band);
     if (status === 'ok') ok++;

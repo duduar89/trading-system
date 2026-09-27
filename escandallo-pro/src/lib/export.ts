@@ -1,6 +1,6 @@
 import type { Cell, Fill, Worksheet, Workbook } from 'exceljs';
 import type { Dish, DishCost, ItemCost, Product, Supplier, BusinessSettings, Workspace } from '../types';
-import { costDish, foodCostStatus, type CostingContext, type FoodCostStatus } from '../core/costing';
+import { costDish, dishCostStatus, foodCostWarningBand, type CostingContext, type FoodCostStatus } from '../core/costing';
 import { dishesUsingProduct } from '../core/analytics';
 import { UNIT_LABELS } from '../core/units';
 import { ALLERGEN_LABELS, BASIS_LABELS, CATEGORY_LABELS } from './labels';
@@ -160,13 +160,15 @@ function setWidths(ws: Worksheet, widths: number[]): void {
 
 /**
  * Semáforo de food cost como formato condicional (se recalcula si se editan los valores en Excel), con los mismos
- * umbrales que la app (core/costing.foodCostStatus): verde ≤ objetivo, ámbar ≤ umbral de atención, rojo por encima.
- * `target` es el objetivo en tanto por uno o una referencia relativa a la primera fila del rango (p. ej. "J5").
+ * umbrales que la app (core/costing.dishCostStatus): verde ≤ objetivo, ámbar ≤ objetivo + franja de atención del negocio
+ * (umbral − objetivo, que se desplaza con el objetivo propio del plato), rojo por encima.
+ * `target` es el objetivo en tanto por uno o una referencia relativa a la primera fila del rango (p. ej. "J5");
+ * `bandPct` son los puntos de la franja ámbar.
  */
-function foodCostRules(ws: Worksheet, ref: string, firstCell: string, target: number | string, warningPct: number): void {
+function foodCostRules(ws: Worksheet, ref: string, firstCell: string, target: number | string, bandPct: number): void {
   const t = typeof target === 'number' ? String(Math.round(target * 1e6) / 1e6) : target;
-  const w = String(Math.round((warningPct / 100) * 1e6) / 1e6);
-  const upper = `MAX(${t},${w})`;
+  const band = Math.round((Math.max(0, bandPct) / 100) * 1e6) / 1e6;
+  const upper = band > 0 ? `${t}+${band}` : t;
   // Se compara la cifra mostrada (formato 0,0 % = 3 decimales en tanto por uno), igual que core/costing.foodCostStatus.
   const shown = `ROUND(${firstCell},3)`;
   const style = (s: Exclude<FoodCostStatus, 'none'>) => ({
@@ -270,7 +272,7 @@ function addDishSheet(
   sheets: Map<string, string>,
 ): void {
   const { dish, cost } = info;
-  const status = foodCostStatus(cost.foodCostPct, cost.targetFoodCostPct, business.warningFoodCostPct);
+  const status = dishCostStatus(cost, business);
   const ws = wb.addWorksheet(info.sheet, {
     properties: { tabColor: { argb: TAB_COLORS[dish.kind === 'plato' ? status : 'none'] } },
     pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
@@ -333,7 +335,8 @@ function addDishSheet(
       FMT_PCT,
     ],
     ['PVP sugerido (IVA incl.)', formula(suggestedFormula, num(cost.suggestedPrice)), FMT_EUR],
-    ['Merma por ración (kg)', cost.wasteKgPerPortion, FMT_QTY],
+    // Sin líneas con peso (todo en unidades sin peso por unidad) no hay merma en kg que mostrar: en blanco, como en la app.
+    ['Merma por ración (kg)', cost.grossKgPerPortion > 0 ? cost.wasteKgPerPortion : '', FMT_QTY],
     ['Coste de la merma por ración', formula(`IF(B5>0,SUM(P${firstLine}:P${lastLine})/B5,0)`, cost.wasteCostPerPortion), FMT_EUR],
   ];
   right.forEach(([l, v, fmt, bold], i) => {
@@ -343,7 +346,7 @@ function addDishSheet(
     label(ws.getCell(r, 5), l);
     value(ws.getCell(r, 8), v, fmt, bold);
   });
-  foodCostRules(ws, 'H4', 'H4', 'H5', business.warningFoodCostPct);
+  foodCostRules(ws, 'H4', 'H4', 'H5', foodCostWarningBand(business));
 
   // Alérgenos y rendimiento
   label(ws.getCell(11, 1), 'Alérgenos');
@@ -550,8 +553,8 @@ export async function exportEscandallosXlsx(args: {
         FMT_PCT,
       ],
       [formula(`${ref}!${info.suggestedCell}`, num(cost.suggestedPrice)), FMT_EUR],
-      [cost.wasteKgPerPortion, FMT_QTY],
-      [cost.wastePct / 100, FMT_PCT],
+      [cost.grossKgPerPortion > 0 ? cost.wasteKgPerPortion : '', FMT_QTY],
+      [cost.grossKgPerPortion > 0 ? cost.wastePct / 100 : '', FMT_PCT],
       [cost.wasteCostPerPortion, FMT_EUR],
       [cost.completeness, '0%'],
       [dish.status === 'revisado' ? 'Revisado' : 'Borrador'],
@@ -572,7 +575,7 @@ export async function exportEscandallosXlsx(args: {
   if (!infos.length) summary.getCell(headerRow + 1, 1).value = 'No hay platos que exportar';
   summary.autoFilter = { from: { row: headerRow, column: 1 }, to: { row: lastRow, column: headers.length } };
   // Cada plato se compara con su propio objetivo (columna J), que puede diferir del general del negocio.
-  foodCostRules(summary, `I${headerRow + 1}:I${lastRow}`, `I${headerRow + 1}`, `J${headerRow + 1}`, business.warningFoodCostPct);
+  foodCostRules(summary, `I${headerRow + 1}:I${lastRow}`, `I${headerRow + 1}`, `J${headerRow + 1}`, foodCostWarningBand(business));
   if (infos.length) {
     const avgRow = summary.getRow(lastRow + 2);
     avgRow.getCell(1).value = 'Media de la carta';
@@ -589,7 +592,7 @@ export async function exportEscandallosXlsx(args: {
       cell.fill = solid(SOFT);
       cell.border = { top: { style: 'thin', color: { argb: LINE } } };
     }
-    foodCostRules(summary, `I${lastRow + 2}`, `I${lastRow + 2}`, `J${lastRow + 2}`, business.warningFoodCostPct);
+    foodCostRules(summary, `I${lastRow + 2}`, `I${lastRow + 2}`, `J${lastRow + 2}`, foodCostWarningBand(business));
   }
 
   // ── Ingredientes ──

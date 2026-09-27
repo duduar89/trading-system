@@ -617,7 +617,9 @@ describe('mergeProducts y deleteProduct', () => {
     const kg = await createProduct({ name: 'Limón', baseUnit: 'kg', unitWeightKg: 0.125, pricePerBase: 2, lastPurchaseDate: '2026-01-01' });
     const ud = await createProduct({ name: 'Limones sueltos', baseUnit: 'ud', pricePerBase: 0.3, lastPurchaseDate: '2026-02-01' });
     await mergeProducts(kg.id, ud.id);
-    expect((await db().products.get(kg.id))?.pricePerBase).toBeCloseTo(2.4, 6);
+    // El €/ud del duplicado se pasa a €/kg con el peso de SUS unidades (el que describe a qué se refiere su precio) y, si no
+    // lo tiene, con el del que se conserva (services/products.mergeConversionProps).
+    expect((await db().products.get(kg.id))?.pricePerBase).toBeCloseTo(0.3 / (ud.unitWeightKg ?? 0.125), 6);
 
     const a = rawProduct({ name: 'Bolsa de hielo', baseUnit: 'ud' });
     const b = rawProduct({ name: 'Hielo en cubitos', baseUnit: 'kg' });
@@ -1706,11 +1708,12 @@ describe('exportación: semáforo, enlaces y casos límite', () => {
 
     const cfs = (summary as unknown as { conditionalFormattings: CF[] }).conditionalFormattings;
     const main = cfs.find((c) => c.ref === 'I5:I7')!;
-    // El semáforo compara la cifra mostrada (0,0 %), igual que la app
+    // El semáforo compara la cifra mostrada (0,0 %), igual que la app, y la franja ámbar del negocio (35 − 30 = 5 puntos)
+    // se desplaza con el objetivo propio de cada plato (columna J), como en la ficha, el listado y el panel.
     expect(main.rules.map((r) => r.formulae[0])).toEqual([
       'AND(ISNUMBER(I5),ROUND(I5,3)<=J5)',
-      'AND(ISNUMBER(I5),ROUND(I5,3)>J5,ROUND(I5,3)<=MAX(J5,0.35))',
-      'AND(ISNUMBER(I5),ROUND(I5,3)>MAX(J5,0.35))',
+      'AND(ISNUMBER(I5),ROUND(I5,3)>J5,ROUND(I5,3)<=J5+0.05)',
+      'AND(ISNUMBER(I5),ROUND(I5,3)>J5+0.05)',
     ]);
     expect(main.rules.map((r) => r.style.fill?.bgColor?.argb)).toEqual(['FFDCFCE7', 'FFFEF3C7', 'FFFEE2E2']);
 

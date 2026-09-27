@@ -15,7 +15,7 @@ import type {
   Product,
   YieldTest,
 } from '../../types';
-import { foodCostStatus, type FoodCostStatus } from '../../core/costing';
+import { dishCostStatus, foodCostStatus, shownFoodCostPct, type FoodCostStatus } from '../../core/costing';
 import { computeYield } from '../../core/yield';
 import { prevMonth } from './dates';
 
@@ -416,7 +416,9 @@ export function productWasteRows(products: Product[], yieldTests: YieldTest[], d
         cleaning = r.totalWastePct;
         cooking = test.cookingLossPct ?? cooking;
         source = 'prueba';
-        realPrice = r.costPerUsableKg;
+        // El €/kg útil sólo es el precio real de los que se compran por kg (como en core/costing); en ud o l la tabla
+        // muestra €/ud o €/l, así que se calcula con el % de la prueba sobre su propio precio.
+        if (p.baseUnit === 'kg') realPrice = r.costPerUsableKg;
       }
     }
     cleaning = Math.min(99, Math.max(0, cleaning));
@@ -536,10 +538,11 @@ export function simulationRows(
         costBefore: s.before.costPerPortion,
         costAfter: s.after.costPerPortion,
         deltaCost: s.after.costPerPortion - s.before.costPerPortion,
-        fcBefore: s.before.foodCostPct,
-        fcAfter: s.after.foodCostPct,
-        statusBefore: dishStatus(s.before, business),
-        statusAfter: dishStatus(s.after, business),
+        // Sin coste (p. ej. el ingrediente aún no tenía precio) no hay food cost de partida: ni «0 %» ni semáforo verde.
+        fcBefore: shownFoodCostPct(s.before),
+        fcAfter: shownFoodCostPct(s.after),
+        statusBefore: dishCostStatus(s.before, business),
+        statusAfter: dishCostStatus(s.after, business),
         suggestedBefore: s.before.suggestedPrice,
         suggestedAfter: s.after.suggestedPrice,
       };

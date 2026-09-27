@@ -148,7 +148,10 @@ export function MonthlySpendCard({ monthly, className }: { monthly: { month: str
   const last = data[data.length - 1];
   const max = data.reduce((m, d) => Math.max(m, d.value), 0);
   const maxKey = data.find((d) => d.value === max)?.key;
-  const avg = data.length ? data.reduce((s, d) => s + d.value, 0) / data.length : 0;
+  // Media de los meses con compras (los huecos del eje suelen ser facturas sin subir, no meses sin gasto), igual que la
+  // «Media mensual» del informe de compras.
+  const active = data.filter((d) => d.value > 0);
+  const avg = active.length ? active.reduce((s, d) => s + d.value, 0) / active.length : 0;
   return (
     <Card className={className}>
       <CardHeader

@@ -59,7 +59,9 @@ export function PurchasesTab({ data }: { data: ReportsData }) {
   const catTotal = stats.spendByCategory.reduce((s, c) => s + c.total, 0);
   const supTotal = stats.spendBySupplier.reduce((s, c) => s + c.total, 0);
   const top = stats.topProductsBySpend.slice(0, 12);
-  const topTotal = stats.topProductsBySpend.reduce((s, p) => s + p.total, 0);
+  // «% del gasto en ingredientes» sobre TODAS las líneas de producto (las mismas que el reparto por categoría), no sobre
+  // la suma de los primeros de la lista: con el top 10 como total, los porcentajes salían inflados y sumaban 100 %.
+  const topTotal = catTotal;
   const last = monthly[monthly.length - 1];
 
   return (

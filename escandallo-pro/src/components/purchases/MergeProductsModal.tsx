@@ -6,7 +6,7 @@ import type { ID, PricePoint, Product } from '../../types';
 import { Button, Modal } from '../ui';
 import { db } from '../../db';
 import { fmtDate, fmtEurPrecise } from '../../lib/format';
-import { mergeProducts, priceConversionFactor } from '../../services/products';
+import { mergeConversionProps, mergeProducts, priceConversionFactor } from '../../services/products';
 import { errorMessage, toast } from '../../state/store';
 import { CategoryBadge } from './CategoryBadge';
 import { mergedPricePreview } from './logic';
@@ -48,10 +48,7 @@ export function MergeProductsModal({
   if (!pair) return null;
   const keep = pair.find((p) => p.id === keepId) ?? pair[0];
   const remove = pair.find((p) => p.id !== keep.id) ?? pair[1];
-  const conv = priceConversionFactor(remove.baseUnit, keep.baseUnit, {
-    unitWeightKg: keep.unitWeightKg ?? remove.unitWeightKg,
-    densityKgPerL: keep.densityKgPerL ?? remove.densityKgPerL,
-  });
+  const conv = priceConversionFactor(remove.baseUnit, keep.baseUnit, mergeConversionProps(keep, remove));
   const after = points && conv ? mergedPricePreview(keep, remove, points, conv.factor) : undefined;
   const priceChanges = !!after && Math.abs(after.price - keep.pricePerBase) > 1e-9;
 

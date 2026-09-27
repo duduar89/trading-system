@@ -9,7 +9,7 @@ import { normalizeInvoiceLine } from '../src/core/pack';
 import { priceAlerts } from '../src/core/analytics';
 import { buildCostingContext, costAllDishes } from '../src/core/costing';
 import { uid } from '../src/lib/id';
-import { createProduct } from '../src/services/products';
+import { createProduct, mergeConversionProps, mergeProducts } from '../src/services/products';
 import { confirmInvoice, deleteInvoice, newInvoiceLine } from '../src/services/invoices';
 import { createDish, newRecipeItem } from '../src/services/dishes';
 import { exportEscandallosXlsx } from '../src/lib/export';
@@ -153,5 +153,93 @@ describe('exportación a Excel: mismas cifras que la app', () => {
     expect((sheet.getCell('H4').value as { result: unknown }).result ?? '').toBe('');
     expect((sheet.getCell('H6').value as { result: unknown }).result ?? '').toBe('');
     expect((sheet.getCell('H4').value as { formula: string }).formula).toBe('IF(AND(ISNUMBER(B8),B8>0,B9>0),B9/B8,"")');
+  });
+});
+
+describe('confirmInvoice: abonos', () => {
+  it('una línea de abono con importe negativo no fija el precio del producto aunque la cantidad venga en positivo', async () => {
+    const tomate = await createProduct({ name: 'Tomate pera', baseUnit: 'kg', pricePerBase: 1.8, lastPurchaseDate: '2026-01-10' });
+    const inv = rawInvoice({
+      lines: [
+        line('TOMATE PERA', 10, 'kg', 1.9, 19, { productId: tomate.id, matchStatus: 'vinculado' }),
+        // Abono por mal estado: 1 kg × 5 € = −5 € (el signo sólo en el importe)
+        line('ABONO TOMATE PERA MAL ESTADO', 1, 'kg', 5, -5, { productId: tomate.id, matchStatus: 'vinculado' }),
+        // Devolución clásica: cantidad e importe negativos
+        line('DEVOLUCION TOMATE PERA', -2, 'kg', 1.9, -3.8, { productId: tomate.id, matchStatus: 'vinculado' }),
+      ],
+    });
+    await db().invoices.add(inv);
+    expect(await confirmInvoice(inv.id)).toEqual({ created: 0, updated: 1, skipped: 2 });
+    expect((await db().products.get(tomate.id))?.pricePerBase).toBeCloseTo(1.9, 6);
+    const points = await db().pricePoints.where('invoiceId').equals(inv.id).toArray();
+    expect(points.map((p) => p.pricePerBase)).toEqual([1.9]);
+  });
+});
+
+describe('exportación a Excel: semáforo igual que en la app', () => {
+  async function loadWorkbook(blob: Blob) {
+    const mod = (await import('exceljs')) as typeof import('exceljs') & { default?: typeof import('exceljs') };
+    const ExcelJS = mod.default ?? mod;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await blob.arrayBuffer());
+    return wb;
+  }
+  type CF = { ref: string; rules: { formulae: string[] }[] };
+
+  it('con objetivo propio, la franja ámbar se desplaza con él (pestaña y formato condicional) y sin peso no hay «0 %» de merma', async () => {
+    await updateBusinessSettings({ targetFoodCostPct: 30, warningFoodCostPct: 35 });
+    const gamba = await createProduct({ name: 'Gamba roja', baseUnit: 'kg', pricePerBase: 40, wastePct: 0 });
+    const pan = await createProduct({ name: 'Pan de hogaza', baseUnit: 'ud', pricePerBase: 1.2 });
+    // 100 g × 40 € = 4 € sobre 10 € sin IVA = 40 %: con objetivo 38 % y franja de 5 puntos → ámbar (hasta 43 %)
+    await createDish({
+      name: 'Gambas',
+      menuPrice: 11,
+      targetFoodCostPct: 38,
+      items: [{ ...newRecipeItem({ name: 'Gamba', quantity: 100, unit: 'g', basis: 'neta' }), ref: { type: 'product', id: gamba.id } }],
+    });
+    await createDish({
+      name: 'Tostada',
+      menuPrice: 4.4,
+      items: [{ ...newRecipeItem({ name: 'Pan', quantity: 1, unit: 'ud', basis: 'neta' }), ref: { type: 'product', id: pan.id } }],
+    });
+    const products = await db().products.toArray();
+    const dishes = await db().dishes.toArray();
+    const business = { ...(await db().business.get('business'))!, targetFoodCostPct: 30, warningFoodCostPct: 35 };
+    const ctx = buildCostingContext(products, dishes, [], business);
+    const costs = costAllDishes(ctx);
+    const wb = await loadWorkbook(await exportEscandallosXlsx({ workspace: { id: 'w', name: 'Casa', createdAt: NOW, updatedAt: NOW }, dishes, costs, ctx, business }));
+    const summary = wb.getWorksheet('Resumen')!;
+    const cfs = (summary as unknown as { conditionalFormattings: CF[] }).conditionalFormattings;
+    expect(cfs.find((c) => c.ref === 'I5:I6')!.rules.map((r) => r.formulae[0])).toEqual([
+      'AND(ISNUMBER(I5),ROUND(I5,3)<=J5)',
+      'AND(ISNUMBER(I5),ROUND(I5,3)>J5,ROUND(I5,3)<=J5+0.05)',
+      'AND(ISNUMBER(I5),ROUND(I5,3)>J5+0.05)',
+    ]);
+    const sheet = wb.getWorksheet('Gambas')!;
+    // Ámbar en la pestaña (como en la ficha de la app), no rojo
+    expect(sheet.properties.tabColor?.argb).toBe('FFF59E0B');
+    const dishCf = (sheet as unknown as { conditionalFormattings: CF[] }).conditionalFormattings.find((c) => c.ref === 'H4')!;
+    expect(dishCf.rules[1].formulae[0]).toBe('AND(ISNUMBER(H4),ROUND(H4,3)>H5,ROUND(H4,3)<=H5+0.05)');
+    // La tostada (pan por unidades sin peso) no tiene datos de peso: merma en blanco, no «0,0 %»
+    const tostada = [5, 6].map((r) => summary.getRow(r)).find((r) => (r.getCell(1).value as { text: string }).text === 'Tostada')!;
+    expect(tostada.getCell(14).value ?? '').toBe('');
+    expect(tostada.getCell(15).value ?? '').toBe('');
+  });
+});
+
+describe('fusionar productos con distinta unidad', () => {
+  it('los precios por unidad del duplicado se pasan a €/kg con SU peso por unidad (no con el peso orientativo del otro)', async () => {
+    // «Limón» por kg trae el peso medio de la base de conocimiento; la malla declara el peso real de sus limones (150 g).
+    const limonKg = await createProduct({ name: 'Limón', baseUnit: 'kg', pricePerBase: 2, lastPurchaseDate: '2026-01-01' });
+    const malla = await createProduct({ name: 'Limones malla', baseUnit: 'ud', pricePerBase: 0.3, unitWeightKg: 0.15, lastPurchaseDate: '2026-02-01' });
+    expect(limonKg.unitWeightKg).toBeDefined();
+    expect(limonKg.unitWeightKg).not.toBe(0.15);
+    expect(mergeConversionProps(limonKg, malla).unitWeightKg).toBe(0.15);
+    await mergeProducts(limonKg.id, malla.id);
+    // 0,30 €/ud ÷ 0,15 kg = 2 €/kg: mismo precio, sin subida falsa del 25 %
+    expect((await db().products.get(limonKg.id))?.pricePerBase).toBeCloseTo(2, 6);
+    const points = await db().pricePoints.toArray();
+    expect(points.map((p) => p.pricePerBase).sort()).toEqual([2, 2]);
+    expect(priceAlerts(await db().products.toArray(), points, 5)).toEqual([]);
   });
 });

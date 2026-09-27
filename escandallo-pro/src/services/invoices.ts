@@ -625,7 +625,7 @@ export async function updateInvoice(id: ID, patch: Partial<Invoice>): Promise<vo
  * varias líneas (formatos, ofertas…), registra un único precio: la media ponderada por cantidad en su unidad base.
  * Marca status 'confirmada'. Idempotente: re-confirmar no duplica PricePoints de la misma factura.
  * Si la unidad de la línea no coincide con la del producto se convierte (densidad, peso por unidad); si no se puede,
- * la línea se omite con un aviso. `skipped` cuenta las líneas ignoradas, sin precio o con unidad incompatible.
+ * la línea se omite con un aviso. `skipped` cuenta las líneas ignoradas, sin precio, de abono o con unidad incompatible.
  */
 export async function confirmInvoice(id: ID): Promise<{ created: number; updated: number; skipped: number }> {
   const wdb = db();
@@ -675,7 +675,10 @@ export async function confirmInvoice(id: ID): Promise<{ created: number; updated
       const warnings = (line.warnings ?? []).filter((w) => !CONFIRM_WARNING_PREFIXES.some((p) => w.startsWith(p)));
       const price = line.pricePerBase;
       const hasPrice = typeof price === 'number' && Number.isFinite(price) && price > 0 && !!line.baseUnit;
-      if (line.matchStatus === 'ignorado' || !hasPrice || line.quantity < 0) {
+      // Abonos y devoluciones (cantidad o importe negativos) no son un precio de compra: 1 kg × 5 € = −5 € por mal estado no
+      // puede fijar el tomate a 5 €/kg.
+      const isCredit = line.quantity < 0 || (Number.isFinite(line.total) && line.total < 0);
+      if (line.matchStatus === 'ignorado' || !hasPrice || isCredit) {
         skipped++;
         lines.push({ ...line, warnings });
         continue;

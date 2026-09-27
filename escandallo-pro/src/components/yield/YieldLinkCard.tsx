@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { ArrowRight, ChefHat, Link2, PackageSearch } from 'lucide-react';
 import type { BusinessSettings, Dish, DishCost, ID, Product, YieldTest } from '../../types';
 import { Badge, Button, Callout, Card, CardHeader, FoodCostBadge, Switch, cx } from '../ui';
-import { buildCostingContext, costAllDishes, foodCostStatus, type CostingContext } from '../../core/costing';
+import { buildCostingContext, costAllDishes, dishCostStatus, shownFoodCostPct, type CostingContext } from '../../core/costing';
 import { fmtDate, fmtEur } from '../../lib/format';
 
 interface DishImpact {
@@ -159,8 +159,8 @@ export function YieldLinkCard({
             <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
               {visible.map((i) => {
                 const delta = i.alt.costPerPortion - i.now.costPerPortion;
-                const target = i.dish.targetFoodCostPct ?? business.targetFoodCostPct;
-                const status = foodCostStatus(i.now.foodCostPct, target, business.warningFoodCostPct);
+                const fc = shownFoodCostPct(i.now);
+                const status = dishCostStatus(i.now, business);
                 return (
                   <li key={i.dish.id}>
                     <Link to={`/platos/${i.dish.id}`} className="flex items-center gap-3 px-3 py-2.5 transition hover:bg-surface-2">
@@ -175,7 +175,7 @@ export function YieldLinkCard({
                       <div className="tabular shrink-0 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <span className="text-sm font-bold text-ink">{fmtEur(i.now.costPerPortion)}</span>
-                          {i.dish.kind === 'plato' && i.now.foodCostPct != null && <FoodCostBadge pct={i.now.foodCostPct} status={status} />}
+                          {i.dish.kind === 'plato' && fc != null && <FoodCostBadge pct={fc} status={status} />}
                         </div>
                         {Math.abs(delta) > 0.0005 ? (
                           <div className="text-[11px] text-muted">

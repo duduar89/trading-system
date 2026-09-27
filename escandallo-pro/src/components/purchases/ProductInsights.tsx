@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { ArrowRight, Calculator, ChefHat, Link2, Plus, Scale, Unlink } from 'lucide-react';
 import type { Dish, DishCost, ID, Product, YieldTest } from '../../types';
 import { Badge, Button, Card, CardHeader, FoodCostBadge } from '../ui';
-import { foodCostStatus, type CostingContext } from '../../core/costing';
+import { dishCostStatus, dishTargetPct, foodCostStatus, foodCostWarningBand, shownFoodCostPct, type CostingContext } from '../../core/costing';
 import { computeYield } from '../../core/yield';
 import { simulatePriceChange } from '../../core/analytics';
 import { useBusiness } from '../../state/hooks';
@@ -51,11 +51,9 @@ export function UsageCard({
       ) : (
         <ul className="-mx-1 divide-y divide-line">
           {usage.map((u) => {
-            const status = foodCostStatus(
-              u.foodCostPct,
-              u.dish.targetFoodCostPct ?? business.targetFoodCostPct,
-              business.warningFoodCostPct,
-            );
+            // Mismo semáforo que la ficha del plato (objetivo propio con la franja ámbar del negocio desplazada).
+            const target = dishTargetPct(u.dish, business);
+            const status = foodCostStatus(u.foodCostPct, target, target + foodCostWarningBand(business));
             return (
               <li key={u.dish.id}>
                 <Link to={`/platos/${u.dish.id}`} className="flex items-center gap-3 rounded-xl px-1 py-2.5 transition hover:bg-surface-2">
@@ -205,9 +203,8 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
   const rows = sim.rows;
   const base = product.pricePerBase;
   const bump = (pct: number) => base > 0 && setPrice(Math.round(base * (1 + pct / 100) * 10000) / 10000);
-  const band = Math.max(0, business.warningFoodCostPct - business.targetFoodCostPct);
-  const statusOf = (c: { foodCostPct?: number; targetFoodCostPct: number }) =>
-    foodCostStatus(c.foodCostPct, c.targetFoodCostPct, c.targetFoodCostPct + band);
+  // Sin coste (el ingrediente aún no tenía precio) no hay food cost de partida: ni «0 %» ni verde.
+  const statusOf = (c: { foodCostPct?: number; costPerPortion: number; targetFoodCostPct: number }) => dishCostStatus(c, business);
   const changed = deferred != null && Math.abs(deferred - base) >= 1e-9;
   // Platos que pasarían a rojo con el precio simulado (los que ya estaban en rojo no cuentan como "nuevos").
   const newlyOver = rows.filter((r) => r.after.foodCostPct != null && statusOf(r.after) === 'bad' && statusOf(r.before) !== 'bad').length;
@@ -308,9 +305,9 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
                         <span>Elaboración · coste por ración</span>
                       ) : r.after.foodCostPct != null ? (
                         <span className="inline-flex items-center gap-1">
-                          <FoodCostBadge pct={r.before.foodCostPct} status={statusOf(r.before)} />
+                          <FoodCostBadge pct={shownFoodCostPct(r.before)} status={statusOf(r.before)} />
                           <ArrowRight className="size-3" />
-                          <FoodCostBadge pct={r.after.foodCostPct} status={statusOf(r.after)} />
+                          <FoodCostBadge pct={shownFoodCostPct(r.after)} status={statusOf(r.after)} />
                         </span>
                       ) : (
                         <span>Sin PVP</span>
@@ -358,9 +355,9 @@ export function PriceSimulator({ product, ctx }: { product: Product; ctx: Costin
                       <td className="whitespace-nowrap px-2 py-2 text-right">
                         {!elab && r.after.foodCostPct != null ? (
                           <span className="inline-flex items-center gap-1">
-                            <FoodCostBadge pct={r.before.foodCostPct} status={statusOf(r.before)} />
+                            <FoodCostBadge pct={shownFoodCostPct(r.before)} status={statusOf(r.before)} />
                             <ArrowRight className="size-3 text-muted" />
-                            <FoodCostBadge pct={r.after.foodCostPct} status={statusOf(r.after)} />
+                            <FoodCostBadge pct={shownFoodCostPct(r.after)} status={statusOf(r.after)} />
                           </span>
                         ) : (
                           <span className="text-xs text-muted">{elab ? '—' : 'sin PVP'}</span>

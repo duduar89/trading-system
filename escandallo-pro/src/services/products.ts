@@ -357,6 +357,21 @@ export function priceConversionFactor(
 
 const UNIT_NAMES: Record<BaseUnit, string> = { kg: 'kg', l: 'litros', ud: 'unidades' };
 
+/**
+ * Peso por unidad y densidad con los que se pasan los precios de `remove` a la unidad de `keep` al fusionarlos: manda el
+ * dato del producto cuya unidad se convierte (el peso de SUS unidades si se compra por ud, SU densidad si se compra por l).
+ * «Limones malla» a 0,30 €/ud de 150 g son 2 €/kg aunque «Limón» por kg tenga el peso medio orientativo de otra fruta.
+ */
+export function mergeConversionProps(
+  keep: Pick<Product, 'baseUnit' | 'unitWeightKg' | 'densityKgPerL'>,
+  remove: Pick<Product, 'baseUnit' | 'unitWeightKg' | 'densityKgPerL'>,
+): { unitWeightKg?: number; densityKgPerL?: number } {
+  return {
+    unitWeightKg: remove.baseUnit === 'ud' ? (remove.unitWeightKg ?? keep.unitWeightKg) : (keep.unitWeightKg ?? remove.unitWeightKg),
+    densityKgPerL: remove.baseUnit === 'l' ? (remove.densityKgPerL ?? keep.densityKgPerL) : (keep.densityKgPerL ?? remove.densityKgPerL),
+  };
+}
+
 /** Fusiona duplicados: mueve histórico, alias y vínculos de recetas/facturas de `removeId` a `keepId`, y borra `removeId`. */
 export async function mergeProducts(keepId: ID, removeId: ID): Promise<void> {
   if (!keepId || !removeId || keepId === removeId) throw new Error('Elige dos productos distintos para fusionar');
@@ -364,11 +379,7 @@ export async function mergeProducts(keepId: ID, removeId: ID): Promise<void> {
   await wdb.transaction('rw', [wdb.products, wdb.pricePoints, wdb.dishes, wdb.invoices, wdb.yieldTests], async () => {
     const [keep, remove] = await Promise.all([wdb.products.get(keepId), wdb.products.get(removeId)]);
     if (!keep || !remove) throw new Error('Uno de los productos ya no existe');
-    const props = {
-      unitWeightKg: keep.unitWeightKg ?? remove.unitWeightKg,
-      densityKgPerL: keep.densityKgPerL ?? remove.densityKgPerL,
-    };
-    const conv = priceConversionFactor(remove.baseUnit, keep.baseUnit, props);
+    const conv = priceConversionFactor(remove.baseUnit, keep.baseUnit, mergeConversionProps(keep, remove));
     if (!conv) {
       throw new Error(
         `No se pueden fusionar: «${remove.name}» se compra en ${UNIT_NAMES[remove.baseUnit]} y «${keep.name}» en ${UNIT_NAMES[keep.baseUnit]}. ` +

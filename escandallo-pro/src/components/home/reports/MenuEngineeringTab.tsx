@@ -192,7 +192,7 @@ export function MenuEngineeringTab({ data }: { data: ReportsData }) {
                 sublabel: `food cost ${fmtPct(r.foodCostPct)}`,
                 value: Math.max(0, r.contributionMargin),
                 display: fmtEur(r.contributionMargin),
-                tone: r.contributionMargin >= me.avgMargin ? 'ok' : 'warn',
+                tone: r.profitability === 'alta' ? 'ok' : 'warn',
                 to: `/platos/${r.dishId}`,
                 title: `${r.name}: margen ${fmtEur(r.contributionMargin)}`,
               }))}
@@ -280,15 +280,13 @@ export function MenuEngineeringTab({ data }: { data: ReportsData }) {
                       {MENU_CLASS_LABELS[r.class].emoji} {MENU_CLASS_LABELS[r.class].label}
                     </Badge>
                   ) : (
-                    <Badge tone={r.contributionMargin >= me.avgMargin ? 'ok' : 'warn'}>
-                      {r.contributionMargin >= me.avgMargin ? 'Margen alto' : 'Margen bajo'}
-                    </Badge>
+                    <Badge tone={r.profitability === 'alta' ? 'ok' : 'warn'}>{r.profitability === 'alta' ? 'Margen alto' : 'Margen bajo'}</Badge>
                   )}
                 </Td>
                 <Td className="text-xs text-muted">
                   {me.hasVolumeData
                     ? MENU_CLASS_LABELS[r.class].advice
-                    : r.contributionMargin >= me.avgMargin
+                    : r.profitability === 'alta'
                       ? 'Deja más margen que la media: dale visibilidad y recomiéndalo en sala.'
                       : 'Deja menos margen que la media: revisa gramajes, proveedor o precio.'}
                 </Td>

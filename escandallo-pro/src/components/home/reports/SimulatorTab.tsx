@@ -224,7 +224,7 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
                                 ? ' · elaboración'
                                 : ''}
                           </span>
-                          {r.fcBefore != null && (
+                          {(r.fcBefore != null || r.fcAfter != null) && (
                             <span className="mt-1 flex items-center gap-1.5">
                               <FoodCostBadge pct={r.fcBefore} status={r.statusBefore} />
                               <ArrowRight className="size-3 text-muted" aria-label="pasa a" />
@@ -265,14 +265,14 @@ export function SimulatorTab({ data }: { data: ReportsData }) {
                           </span>
                         </Td>
                         <Td>
-                          {r.fcBefore != null ? (
+                          {r.fcBefore != null || r.fcAfter != null ? (
                             <span className="inline-flex items-center gap-1.5">
                               <FoodCostBadge pct={r.fcBefore} status={r.statusBefore} />
                               <ArrowRight className="size-3.5 text-muted" aria-label="pasa a" />
                               <FoodCostBadge pct={r.fcAfter} status={r.statusAfter} />
                             </span>
                           ) : (
-                            <span className="text-xs text-muted">{r.kind === 'elaboracion' ? 'elaboración (sin PVP)' : 'sin PVP'}</span>
+                            <span className="text-xs text-muted">{r.kind === 'elaboracion' ? 'elaboración (sin PVP)' : r.menuPrice ? 'sin coste' : 'sin PVP'}</span>
                           )}
                         </Td>
                         <Td

@@ -192,7 +192,14 @@ export function costItem(item: RecipeItem, ctx: CostingContext, stack: Set<ID> =
       pricePerBase = subCost.costPerPortion; // 1 ud = 1 ración de la elaboración
     }
     const conv = convertToBase(item.quantity, item.unit, baseUnit, {});
-    if (!conv.ok) return emptyItem(item, [conv.error ?? 'Unidad incompatible con la elaboración']);
+    if (!conv.ok) {
+      // Una elaboración no tiene "peso por unidad": el motivo es su rendimiento, no un dato del producto.
+      return emptyItem(item, [
+        baseUnit === 'ud'
+          ? 'La elaboración se mide por unidades (raciones): indica la cantidad en ud o su rendimiento en kg o l'
+          : `La elaboración rinde en ${baseUnit}: indica la cantidad en peso o volumen`,
+      ]);
+    }
     if (conv.assumption) warnings.push(conv.assumption);
     // En elaboraciones la merma ya está dentro de su propio escandallo; sólo aplicamos la de la línea.
     const wastePct = item.wastePct ?? 0;
@@ -238,9 +245,11 @@ export function costItem(item: RecipeItem, ctx: CostingContext, stack: Set<ID> =
 
   const waste = effectiveWaste(item, product, ctx);
   const q = applyWaste(conv.value, item.basis, waste.wastePct, waste.cookingLossPct);
-  const price = product.pricePerBase;
+  const viaTest = waste.source === 'prueba' && !!waste.yieldResult && product.baseUnit === 'kg';
+  // Sin precio en el producto, la prueba de rendimiento calcula con el suyo (effectiveWaste): la línea tiene precio.
+  const price = product.pricePerBase > 0 ? product.pricePerBase : viaTest ? Math.max(0, waste.yieldTest?.purchasePricePerKg ?? 0) : 0;
   let cost: number;
-  if (waste.source === 'prueba' && waste.yieldResult && product.baseUnit === 'kg') {
+  if (viaTest && waste.yieldResult) {
     // Coste real por kg aprovechable (descuenta subproductos) aplicado al peso neto.
     cost = q.net * waste.yieldResult.costPerUsableKg;
     if (price > 0 && waste.yieldResult.byproductValue >= waste.yieldResult.grossCost) {
@@ -274,6 +283,11 @@ export function costItem(item: RecipeItem, ctx: CostingContext, stack: Set<ID> =
     wasteSource: waste.source,
     warnings,
   };
+}
+
+/** Food cost objetivo de un plato: el suyo si lo tiene (> 0 %) y, si no, el del negocio (igual que la ficha del plato). */
+export function dishTargetPct(dish: Pick<Dish, 'targetFoodCostPct'>, business: Pick<BusinessSettings, 'targetFoodCostPct'>): number {
+  return dish.targetFoodCostPct != null && dish.targetFoodCostPct > 0 ? dish.targetFoodCostPct : business.targetFoodCostPct;
 }
 
 /** Redondea hacia arriba al múltiplo de `step` (p. ej. 0,5 €). */
@@ -313,7 +327,7 @@ export function costDish(dish: Dish, ctx: CostingContext, stack: Set<ID> = new S
     wasteCost += i.wasteCost;
   }
 
-  const target = dish.targetFoodCostPct ?? ctx.business.targetFoodCostPct;
+  const target = dishTargetPct(dish, ctx.business);
   const vat = dish.saleVatPct ?? ctx.business.defaultSaleVatPct;
   const warnings: string[] = [];
   const result: DishCost = {
@@ -400,6 +414,29 @@ export function foodCostStatus(pct: number | undefined, target: number, warning:
   return 'bad';
 }
 
+/** Food cost que tiene sentido mostrar: sin coste por ración (receta vacía o sin precios) no hay food cost, no un 0 %. */
+export function shownFoodCostPct(cost: Pick<DishCost, 'foodCostPct' | 'costPerPortion'> | undefined): number | undefined {
+  return cost && cost.costPerPortion > 0 && cost.foodCostPct != null && Number.isFinite(cost.foodCostPct) ? cost.foodCostPct : undefined;
+}
+
+/**
+ * Semáforo de un escandallo con el mismo criterio en toda la app (ficha, listados, panel, informes, Excel): objetivo del
+ * plato (el de su DishCost) y franja ámbar del negocio (umbral de atención − objetivo) desplazada con él. Sin coste por
+ * ración no hay food cost que clasificar ('none').
+ */
+export function dishCostStatus(
+  cost: Pick<DishCost, 'foodCostPct' | 'costPerPortion' | 'targetFoodCostPct'> | undefined,
+  business: Pick<BusinessSettings, 'targetFoodCostPct' | 'warningFoodCostPct'>,
+): FoodCostStatus {
+  const target = cost?.targetFoodCostPct ?? business.targetFoodCostPct;
+  return foodCostStatus(shownFoodCostPct(cost), target, target + foodCostWarningBand(business));
+}
+
+/** Puntos de la franja ámbar del negocio (umbral de atención − objetivo, nunca negativa). */
+export function foodCostWarningBand(business: Pick<BusinessSettings, 'targetFoodCostPct' | 'warningFoodCostPct'>): number {
+  return Math.max(0, business.warningFoodCostPct - business.targetFoodCostPct);
+}
+
 /**
  * Precio máximo de compra (€/ud base) de un ingrediente para que el plato cumpla el objetivo,
  * manteniendo el resto de costes. Útil para negociar con proveedores.
@@ -407,7 +444,7 @@ export function foodCostStatus(pct: number | undefined, target: number, warning:
 export function maxAffordablePrice(dishCost: DishCost, itemId: ID, dish: Dish, business: BusinessSettings): number | undefined {
   const item = dishCost.items.find((i) => i.itemId === itemId);
   if (!item || !dishCost.netPrice || !(item.grossQty > 0)) return undefined;
-  const target = dish.targetFoodCostPct ?? business.targetFoodCostPct;
+  const target = dishTargetPct(dish, business);
   const portions = dish.portions > 0 ? dish.portions : 1;
   const allowedTotal = (dishCost.netPrice * target) / 100 * portions;
   const others = dishCost.totalCost - item.cost;

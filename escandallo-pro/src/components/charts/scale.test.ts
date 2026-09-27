@@ -17,11 +17,19 @@ describe('niceScale', () => {
 });
 
 describe('fmtEurAxis', () => {
+  // Espacios duros (\u00a0) para que el eje no parta la etiqueta en dos líneas.
+  const sp = (s: string) => s.replace(/ /g, '\u00a0');
   it('compacta miles y millones', () => {
-    expect(fmtEurAxis(600)).toBe('600 €');
-    expect(fmtEurAxis(1800)).toBe('1,8 mil €');
-    expect(fmtEurAxis(24000)).toBe('24 mil €');
-    expect(fmtEurAxis(2_500_000)).toBe('2,5 M€');
-    expect(fmtEurAxis(4.5)).toBe('4,5 €');
+    expect(fmtEurAxis(600)).toBe(sp('600 €'));
+    expect(fmtEurAxis(1800)).toBe(sp('1,8 mil €'));
+    expect(fmtEurAxis(24000)).toBe(sp('24 mil €'));
+    expect(fmtEurAxis(2_500_000)).toBe(sp('2,5 M€'));
+    expect(fmtEurAxis(4.5)).toBe(sp('4,5 €'));
+  });
+  it('no redondea las marcas intermedias a otra cifra (2.250 € no es «2,3 mil €») ni las parte en dos líneas', () => {
+    expect(fmtEurAxis(2250)).toBe(sp('2,25 mil €'));
+    expect(fmtEurAxis(12_500)).toBe(sp('12,5 mil €'));
+    expect(fmtEurAxis(2_250_000)).toBe(sp('2,25 M€'));
+    expect(fmtEurAxis(2250)).not.toContain(' ');
   });
 });

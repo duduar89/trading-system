@@ -617,7 +617,8 @@ function InvoiceReviewScreen() {
                   priced={summary.priced}
                   created={summary.created}
                   suggested={summary.suggested}
-                  unpriced={summary.total - summary.ignored - summary.priced}
+                  unpriced={summary.total - summary.ignored - summary.priced - summary.credits}
+                  credits={summary.credits}
                   mismatches={mismatches}
                   duplicate={!!duplicate}
                   onConfirm={onConfirmClick}
@@ -681,6 +682,7 @@ function ConfirmBar({
   created,
   suggested,
   unpriced,
+  credits = 0,
   mismatches,
   duplicate,
   onConfirm,
@@ -691,6 +693,8 @@ function ConfirmBar({
   created: number;
   suggested: number;
   unpriced: number;
+  /** Abonos o devoluciones: no cambian precios al confirmar. */
+  credits?: number;
   mismatches: number;
   duplicate?: boolean;
   onConfirm: () => void;
@@ -699,6 +703,7 @@ function ConfirmBar({
   if (duplicate) notes.push('parece una factura repetida');
   if (suggested > 0) notes.push(`${suggested} ${suggested === 1 ? 'sugerencia se aplicará' : 'sugerencias se aplicarán'} tal cual`);
   if (unpriced > 0) notes.push(`${unpriced} sin precio se ${unpriced === 1 ? 'omitirá' : 'omitirán'}`);
+  if (credits > 0) notes.push(`${credits} ${credits === 1 ? 'abono no cambia' : 'abonos no cambian'} precios`);
   if (mismatches > 0) notes.push(`${mismatches} no se ${mismatches === 1 ? 'podrá' : 'podrán'} aplicar (unidad distinta)`);
   return (
     <div className="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 lg:bottom-4 lg:pr-20 2xl:pr-0">

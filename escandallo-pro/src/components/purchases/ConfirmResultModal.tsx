@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { ArrowRight, CheckCircle2, ChefHat, FileText, Sparkles, X } from 'lucide-react';
 import type { Dish, DishCost, ID } from '../../types';
 import { Badge, Button, FoodCostBadge, IconButton, Modal } from '../ui';
-import { foodCostStatus } from '../../core/costing';
+import { dishCostStatus, shownFoodCostPct } from '../../core/costing';
 import { useBusiness } from '../../state/hooks';
 import { fmtEur, fmtEurPrecise, fmtNum } from '../../lib/format';
 import { ChangePct } from './badges';
@@ -47,14 +47,13 @@ export function ConfirmResultModal({
       const delta = a.costPerPortion - b.costPerPortion;
       if (Math.abs(delta) >= 0.005) out.push({ dish: d, before: b, after: a, delta });
     }
-    const fcRise = (i: (typeof out)[number]) => (i.after.foodCostPct ?? 0) - (i.before.foodCostPct ?? 0);
+    const fcRise = (i: (typeof out)[number]) => (shownFoodCostPct(i.after) ?? 0) - (shownFoodCostPct(i.before) ?? 0);
     return out.sort((x, y) => fcRise(y) - fcRise(x) || y.delta - x.delta);
   }, [outcome, costsAfter, dishes]);
 
   if (!outcome) return null;
-  const overTarget = impacted.filter(
-    (i) => i.dish.kind === 'plato' && foodCostStatus(i.after.foodCostPct, i.after.targetFoodCostPct, business.warningFoodCostPct) === 'bad',
-  ).length;
+  // Mismo semáforo que la ficha del plato (objetivo propio con la franja ámbar del negocio desplazada).
+  const overTarget = impacted.filter((i) => i.dish.kind === 'plato' && dishCostStatus(i.after, business) === 'bad').length;
 
   return (
     <Modal
@@ -141,7 +140,7 @@ export function ConfirmResultModal({
         <p className="mb-5 text-sm text-muted">
           {fmtNum(unchanged, 0)} {unchanged === 1 ? 'ingrediente mantiene' : 'ingredientes mantienen'} el mismo precio
           {outcome.skipped > 0
-            ? ` · ${outcome.skipped} ${outcome.skipped === 1 ? 'línea omitida' : 'líneas omitidas'} (ignoradas o sin precio)`
+            ? ` · ${outcome.skipped} ${outcome.skipped === 1 ? 'línea omitida' : 'líneas omitidas'} (ignoradas, sin precio o abonos)`
             : ''}
           .
         </p>
@@ -171,17 +170,11 @@ export function ConfirmResultModal({
                     </span>
                   </div>
                 </div>
-                {dish.kind === 'plato' && after.foodCostPct != null && (
+                {dish.kind === 'plato' && shownFoodCostPct(after) != null && (
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <FoodCostBadge
-                      pct={before.foodCostPct}
-                      status={foodCostStatus(before.foodCostPct, before.targetFoodCostPct, business.warningFoodCostPct)}
-                    />
+                    <FoodCostBadge pct={shownFoodCostPct(before)} status={dishCostStatus(before, business)} />
                     <ArrowRight className="size-3.5 text-muted" />
-                    <FoodCostBadge
-                      pct={after.foodCostPct}
-                      status={foodCostStatus(after.foodCostPct, after.targetFoodCostPct, business.warningFoodCostPct)}
-                    />
+                    <FoodCostBadge pct={shownFoodCostPct(after)} status={dishCostStatus(after, business)} />
                   </div>
                 )}
                 {dish.kind === 'elaboracion' && <Badge>Elaboración</Badge>}
