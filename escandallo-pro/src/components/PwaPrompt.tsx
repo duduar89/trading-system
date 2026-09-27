@@ -34,7 +34,7 @@ export function PwaPrompt() {
 
   if (needRefresh) {
     return (
-      <div className="no-print fixed inset-x-4 bottom-24 z-[70] mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-line bg-elevated p-3.5 shadow-pop lg:bottom-6 lg:left-6 lg:right-auto">
+      <div className="no-print fixed inset-x-4 top-[calc(env(safe-area-inset-top)+4.25rem)] z-[70] mx-auto flex max-w-md animate-slide-up items-center gap-3 rounded-2xl border border-line bg-elevated p-3.5 shadow-pop lg:top-auto lg:bottom-6 lg:left-6 lg:right-auto">
         <RefreshCw className="size-5 shrink-0 text-brand-500" />
         <div className="min-w-0 flex-1 text-sm font-semibold text-ink">Hay una nueva versión disponible</div>
         <Button size="sm" onClick={() => updateServiceWorker(true)}>
@@ -49,7 +49,7 @@ export function PwaPrompt() {
 
   if (installEvt && !dismissed) {
     return (
-      <div className="no-print fixed inset-x-4 bottom-24 z-[70] mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-line bg-elevated p-3.5 shadow-pop lg:bottom-6 lg:left-6 lg:right-auto">
+      <div className="no-print fixed inset-x-4 top-[calc(env(safe-area-inset-top)+4.25rem)] z-[70] mx-auto flex max-w-md animate-slide-up items-center gap-3 rounded-2xl border border-line bg-elevated p-3.5 shadow-pop lg:top-auto lg:bottom-6 lg:left-6 lg:right-auto">
         <Download className="size-5 shrink-0 text-brand-500" />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-ink">Instala Escandallo Pro</div>
