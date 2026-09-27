@@ -1,7 +1,10 @@
 /** Formateadores es-ES compartidos por toda la UI. */
 
-const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const eur4 = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 4 });
+// es-ES no agrupa los miles con 4 cifras ("2263,47 €") pero sí con 5 ("18.673,67 €"): en importes forzamos el punto
+// de miles siempre para que las cifras de una misma pantalla se lean igual. Navegadores antiguos ignoran la opción.
+const grouping = { useGrouping: 'always' } as unknown as Intl.NumberFormatOptions;
+const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2, ...grouping });
+const eur4 = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 4, ...grouping });
 const num = (d: number) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: d });
 
 /** 12,50 € */

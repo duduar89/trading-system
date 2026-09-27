@@ -79,6 +79,8 @@ export interface WasteRow {
   servedKg: number;
   cleaningKg: number;
   cookingKg: number;
+  /** Merma interna de una elaboración usada en la línea (sus propios ingredientes). */
+  nestedKg: number;
   totalKg: number;
   /** % de merma sobre el bruto de la línea. */
   wastePct: number;
@@ -107,16 +109,19 @@ export function wasteBreakdown(cost: DishCost, portions: number): WasteSummary {
     const kgPerBase = it.grossKg / it.grossQty;
     const cleaningKg = Math.max(0, it.cleaningWasteQty * kgPerBase) / p;
     const cookingKg = Math.max(0, it.cookingWasteQty * kgPerBase) / p;
-    const totalKg = cleaningKg + cookingKg;
+    const nestedKg = Math.max(0, it.nestedWasteKg ?? 0) / p;
+    const totalKg = cleaningKg + cookingKg + nestedKg;
+    const grossKg = (it.grossKg + (it.nestedWasteKg ?? 0)) / p;
     rows.push({
       itemId: it.itemId,
       name: it.name,
-      grossKg: it.grossKg / p,
+      grossKg,
       servedKg: it.servedKg / p,
       cleaningKg,
       cookingKg,
+      nestedKg,
       totalKg,
-      wastePct: it.totalWastePct,
+      wastePct: nestedKg > 0 && grossKg > 0 ? (totalKg / grossKg) * 100 : it.totalWastePct,
       wasteCost: it.wasteCost / p,
     });
   }

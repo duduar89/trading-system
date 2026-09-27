@@ -206,8 +206,28 @@ export function costItem(item: RecipeItem, ctx: CostingContext, stack: Set<ID> =
     const cookingLossPct = item.cookingLossPct ?? 0;
     const q = applyWaste(conv.value, item.basis, wastePct, cookingLossPct);
     const cost = q.gross * pricePerBase;
-    const grossKg = baseToKg(q.gross, baseUnit);
-    const servedKg = baseToKg(q.served, baseUnit);
+    const subPortions = sub.portions > 0 ? sub.portions : 1;
+    // 1 ud de elaboración = 1 ración suya: su peso es lo que sirve cada ración (si se conoce).
+    const udKg = baseUnit === 'ud' && subCost.servedKgPerPortion > 0 ? subCost.servedKgPerPortion : undefined;
+    const grossKg = baseToKg(q.gross, baseUnit, { unitWeightKg: udKg });
+    const servedKg = baseToKg(q.served, baseUnit, { unitWeightKg: udKg });
+    // Merma interna de la elaboración (de la compra de sus ingredientes a la elaboración terminada), proporcional a
+    // la parte del lote que usa esta línea: así la merma total del plato incluye la de sus salsas, fondos y masas.
+    let nestedWasteKg: number | undefined;
+    let nestedWasteCost: number | undefined;
+    const batchQty = yieldQty && yieldUnit ? yieldQty : subPortions;
+    if (batchQty > 0 && q.gross > 0) {
+      const share = q.gross / batchQty;
+      const innerGrossKg = subCost.grossKgPerPortion * subPortions;
+      const innerServedKg = subCost.servedKgPerPortion * subPortions;
+      const yieldKg = yieldQty && yieldUnit ? baseToKg(yieldQty, yieldUnit) : undefined;
+      const outKg = yieldKg != null && yieldKg > 0 && yieldKg <= innerGrossKg ? yieldKg : innerServedKg;
+      const innerWasteKg = Math.max(0, innerGrossKg - outKg);
+      if (innerGrossKg > 0 && innerWasteKg > 1e-9) {
+        nestedWasteKg = innerWasteKg * share;
+        nestedWasteCost = Math.max(0, subCost.wasteCostPerPortion * subPortions * share);
+      }
+    }
     if (subCost.completeness < 1) warnings.push('La elaboración tiene ingredientes sin precio');
     if (!(pricePerBase > 0)) warnings.push('La elaboración no tiene coste');
     return {
@@ -224,13 +244,15 @@ export function costItem(item: RecipeItem, ctx: CostingContext, stack: Set<ID> =
       totalWasteQty: q.gross - q.served,
       totalWastePct: q.gross > 0 ? ((q.gross - q.served) / q.gross) * 100 : 0,
       cost,
-      wasteCost: Math.max(0, cost - q.served * pricePerBase),
+      wasteCost: Math.max(0, cost - q.served * pricePerBase) + (nestedWasteCost ?? 0),
       grossKg,
       servedKg,
       costSharePct: 0,
       appliedWastePct: wastePct,
       appliedCookingLossPct: cookingLossPct,
       wasteSource: item.wastePct != null ? 'linea' : 'ninguna',
+      nestedWasteKg,
+      nestedWasteCost,
       warnings,
     };
   }
@@ -321,7 +343,8 @@ export function costDish(dish: Dish, ctx: CostingContext, stack: Set<ID> = new S
   let wasteCost = 0;
   for (const i of items) {
     if (i.grossKg != null && i.servedKg != null) {
-      grossKg += i.grossKg;
+      // El bruto de una elaboración incluye lo que se perdió al prepararla (su merma interna).
+      grossKg += i.grossKg + (i.nestedWasteKg ?? 0);
       servedKg += i.servedKg;
     }
     wasteCost += i.wasteCost;

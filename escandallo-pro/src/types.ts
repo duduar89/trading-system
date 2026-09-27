@@ -460,6 +460,12 @@ export interface ItemCost {
   appliedCookingLossPct: number;
   /** De dónde sale la merma aplicada. */
   wasteSource: 'prueba' | 'linea' | 'producto' | 'ninguna';
+  /**
+   * Sólo en líneas de elaboración: merma interna de sus ingredientes (limpieza, despiece y cocción hasta obtener la
+   * elaboración terminada), en kg y en €, proporcional a la cantidad que usa esta línea. Se suma a la merma del plato.
+   */
+  nestedWasteKg?: number;
+  nestedWasteCost?: number;
   warnings: string[];
 }
 

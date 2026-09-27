@@ -589,3 +589,40 @@ describe('maxAffordablePrice', () => {
     expect(maxAffordablePrice(costDish(caro, ctx), 'no-existe', caro, business)).toBeUndefined();
   });
 });
+
+describe('merma interna de elaboraciones en la merma del plato', () => {
+  const business = { id: 'business', targetFoodCostPct: 30, warningFoodCostPct: 35, defaultSaleVatPct: 10, priceAlertPct: 5, currency: 'EUR', priceRounding: 0.5 } as const;
+  const now = '2026-01-01T00:00:00.000Z';
+  const cebolla = { id: 'ceb', name: 'Cebolla', searchKey: 'cebolla', aliases: [], category: 'verdura', baseUnit: 'kg', pricePerBase: 1, priceSource: 'manual', wastePct: 10, cookingLossPct: 50, allergens: [], createdAt: now, updatedAt: now } as const;
+  const carne = { id: 'car', name: 'Carne', searchKey: 'carne', aliases: [], category: 'carne', baseUnit: 'kg', pricePerBase: 20, priceSource: 'manual', wastePct: 0, cookingLossPct: 0, allergens: [], createdAt: now, updatedAt: now } as const;
+  // Sofrito: 1 kg de cebolla bruta → 0,9 kg limpia → 0,45 kg servida; rendimiento declarado 0,45 kg.
+  const sofrito = {
+    id: 'sof', name: 'Sofrito', kind: 'elaboracion', saleVatPct: 10, portions: 1, yieldQty: 0.45, yieldUnit: 'kg',
+    items: [{ id: 's1', name: 'Cebolla', ref: { type: 'product', id: 'ceb' }, quantity: 1, unit: 'kg', basis: 'bruta' }],
+    status: 'revisado', source: 'manual', createdAt: now, updatedAt: now,
+  } as const;
+  const plato = {
+    id: 'pl', name: 'Guiso', kind: 'plato', saleVatPct: 10, portions: 1, menuPrice: 11,
+    items: [
+      { id: 'p1', name: 'Carne', ref: { type: 'product', id: 'car' }, quantity: 200, unit: 'g', basis: 'neta' },
+      { id: 'p2', name: 'Sofrito', ref: { type: 'dish', id: 'sof' }, quantity: 90, unit: 'g', basis: 'neta' },
+    ],
+    status: 'revisado', source: 'manual', createdAt: now, updatedAt: now,
+  } as const;
+
+  it('suma al bruto y al coste de merma del plato la parte proporcional de la merma del sofrito', () => {
+    const ctx = buildCostingContext([cebolla, carne] as never, [sofrito, plato] as never, [], business as never);
+    const c = costDish(plato as never, ctx);
+    const line = c.items.find((i) => i.itemId === 'p2')!;
+    // Usa 0,09 kg de 0,45 kg → 20 % del lote; merma interna del lote = 1 − 0,45 = 0,55 kg → 0,11 kg.
+    expect(line.nestedWasteKg).toBeCloseTo(0.11, 6);
+    // Coste de merma del sofrito = 1 € − 0,45 kg × 1 €/kg = 0,55 € → 20 % = 0,11 €.
+    expect(line.nestedWasteCost).toBeCloseTo(0.11, 6);
+    // Plato: bruto = 0,2 (carne) + 0,09 + 0,11 (sofrito con su merma) = 0,4 kg; servido = 0,29 kg.
+    expect(c.grossKgPerPortion).toBeCloseTo(0.4, 6);
+    expect(c.servedKgPerPortion).toBeCloseTo(0.29, 6);
+    expect(c.wasteKgPerPortion).toBeCloseTo(0.11, 6);
+    // El coste del plato no cambia: la merma del sofrito ya estaba dentro de su precio por kg.
+    expect(c.totalCost).toBeCloseTo(4 + 0.09 * (1 / 0.45), 6);
+  });
+});

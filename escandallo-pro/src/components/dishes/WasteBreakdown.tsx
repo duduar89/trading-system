@@ -13,6 +13,8 @@ import { wasteBreakdown, type WasteRow, fmtPctNb } from './logic';
 const SERIES = {
   cleaning: { label: 'Limpieza / despiece', bar: 'bg-[#2a78d6] dark:bg-[#3987e5]' },
   cooking: { label: 'Cocción', bar: 'bg-[#eb6834] dark:bg-[#d95926]' },
+  /* Merma interna de elaboraciones (salsas, fondos, masas): gris neutro, distinguible por luminosidad. */
+  nested: { label: 'Dentro de la elaboración', bar: 'bg-[#8a96a8] dark:bg-[#6b7888]' },
 } as const;
 
 const TOP = 8;
@@ -64,7 +66,7 @@ export function WasteBreakdown({ cost, portions }: { cost: DishCost; portions: n
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-sm font-bold text-ink">Por ingrediente (por ración)</h4>
           <div className="flex items-center gap-3 text-xs text-ink-2" aria-label="Leyenda">
-            {(['cleaning', 'cooking'] as const).map((k) => (
+            {(summary.rows.some((r) => r.nestedKg > 1e-7) ? (['cleaning', 'cooking', 'nested'] as const) : (['cleaning', 'cooking'] as const)).map((k) => (
               <span key={k} className="inline-flex items-center gap-1.5">
                 <span className={clsx('size-2.5 rounded-[3px]', SERIES[k].bar)} aria-hidden />
                 {SERIES[k].label}
@@ -153,10 +155,14 @@ function Tile({ label, value, hint, tone }: { label: string; value: string; hint
 
 function WasteBar({ row, max, active, onActive }: { row: WasteRow; max: number; active: boolean; onActive: (on: boolean) => void }) {
   const width = max > 0 ? (row.totalKg / max) * 100 : 0;
-  const cleanShare = row.totalKg > 0 ? (row.cleaningKg / row.totalKg) * 100 : 0;
-  const hasClean = row.cleaningKg > 1e-7;
-  const hasCook = row.cookingKg > 1e-7;
-  const label = `${row.name || 'Sin nombre'}: merma ${fmtKg(row.totalKg)} por ración (${fmtPctNb(row.wastePct)} del bruto); limpieza ${fmtKg(row.cleaningKg)}, cocción ${fmtKg(row.cookingKg)}; coste ${fmtEur(row.wasteCost)}`;
+  const segments = (
+    [
+      ['cleaning', row.cleaningKg],
+      ['cooking', row.cookingKg],
+      ['nested', row.nestedKg],
+    ] as const
+  ).filter(([, kg]) => kg > 1e-7);
+  const label = `${row.name || 'Sin nombre'}: merma ${fmtKg(row.totalKg)} por ración (${fmtPctNb(row.wastePct)} del bruto); limpieza ${fmtKg(row.cleaningKg)}, cocción ${fmtKg(row.cookingKg)}${row.nestedKg > 1e-7 ? `, dentro de la elaboración ${fmtKg(row.nestedKg)}` : ''}; coste ${fmtEur(row.wasteCost)}`;
   return (
     <li
       tabIndex={0}
@@ -170,8 +176,13 @@ function WasteBar({ row, max, active, onActive }: { row: WasteRow; max: number; 
       <span className={clsx('truncate text-sm', active ? 'font-semibold text-ink' : 'text-ink-2')}>{row.name || 'Sin nombre'}</span>
       <span className="flex h-3 items-center" aria-hidden>
         <span className={clsx('flex h-3 gap-[2px] transition-[filter]', active && 'brightness-110')} style={{ width: `${Math.max(width, 1.5)}%` }}>
-          {hasClean && <span className={clsx('h-full', SERIES.cleaning.bar, !hasCook && 'rounded-r-[4px]')} style={{ width: hasCook ? `${cleanShare}%` : '100%' }} />}
-          {hasCook && <span className={clsx('h-full flex-1 rounded-r-[4px]', SERIES.cooking.bar)} />}
+          {segments.map(([key, kg], idx) => (
+            <span
+              key={key}
+              className={clsx('h-full', SERIES[key].bar, idx === segments.length - 1 && 'rounded-r-[4px]')}
+              style={{ width: `${row.totalKg > 0 ? (kg / row.totalKg) * 100 : 0}%` }}
+            />
+          ))}
         </span>
       </span>
       <span className="tabular whitespace-nowrap text-right text-xs">
@@ -186,6 +197,7 @@ function WasteBar({ row, max, active, onActive }: { row: WasteRow; max: number; 
           <span className="block font-semibold text-ink">{row.name || 'Sin nombre'}</span>
           <TipRow swatch={SERIES.cleaning.bar} label="Limpieza" value={fmtKg(row.cleaningKg)} />
           <TipRow swatch={SERIES.cooking.bar} label="Cocción" value={fmtKg(row.cookingKg)} />
+          {row.nestedKg > 1e-7 && <TipRow swatch={SERIES.nested.bar} label="En la elaboración" value={fmtKg(row.nestedKg)} />}
           <span className="mt-1 flex justify-between border-t border-line pt-1 text-ink-2">
             <span>Bruto → servido</span>
             <span className="tabular font-semibold text-ink">
