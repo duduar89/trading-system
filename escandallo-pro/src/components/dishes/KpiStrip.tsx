@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
-import { CheckCircle2, AlertTriangle, Wand2 } from 'lucide-react';
+import { CheckCircle2, CircleDashed, AlertTriangle, Wand2 } from 'lucide-react';
 import type { BaseUnit, BusinessSettings, Dish, DishCost } from '../../types';
 import { fmtEur, fmtKg, fmtNum } from '../../lib/format';
 import { Button, FoodCostBadge, NumberInput, Select } from '../ui';
@@ -24,18 +24,30 @@ function Tile({ label, children, hint, className, tone }: { label: ReactNode; ch
   );
 }
 
-function Completeness({ cost }: { cost: DishCost }) {
+function Completeness({ cost, estimated = 0 }: { cost: DishCost; estimated?: number }) {
   if (!cost.items.length) return <span>Sin ingredientes todavía</span>;
   const missing = cost.items.filter((i) => !i.resolved).length;
+  const est =
+    estimated > 0 ? (
+      <span className="inline-flex items-center gap-1 text-info" title="Precio de referencia orientativo: sube tus facturas y el coste pasará a ser el real.">
+        <CircleDashed className="size-3.5" /> {estimated} con precio estimado
+      </span>
+    ) : null;
   if (!missing)
     return (
-      <span className="inline-flex items-center gap-1 text-ok">
-        <CheckCircle2 className="size-3.5" /> Todos los ingredientes con precio
+      <span className="flex flex-col gap-0.5">
+        <span className="inline-flex items-center gap-1 text-ok">
+          <CheckCircle2 className="size-3.5" /> Todos los ingredientes con precio
+        </span>
+        {est}
       </span>
     );
   return (
-    <span className="inline-flex items-center gap-1 text-warn">
-      <AlertTriangle className="size-3.5" /> {missing} sin precio o sin vincular
+    <span className="flex flex-col gap-0.5">
+      <span className="inline-flex items-center gap-1 text-warn">
+        <AlertTriangle className="size-3.5" /> {missing} sin precio o sin vincular
+      </span>
+      {est}
     </span>
   );
 }
@@ -58,12 +70,15 @@ export function KpiStrip({
   business,
   onChange,
   usedInCount = 0,
+  estimated = 0,
 }: {
   dish: Dish;
   cost: DishCost;
   business: BusinessSettings;
   onChange: (patch: Partial<Dish>) => void;
   usedInCount?: number;
+  /** Líneas con precio estimado (ingrediente sin factura, también dentro de sus elaboraciones). */
+  estimated?: number;
 }) {
   const target = targetOf(dish, business);
   const vat = dish.saleVatPct ?? business.defaultSaleVatPct;
@@ -76,7 +91,7 @@ export function KpiStrip({
     const yu = dish.yieldUnit ?? 'kg';
     return (
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
-        <Tile label="Coste total receta" tone="brand" className="col-span-2 md:col-span-1" hint={<Completeness cost={cost} />}>
+        <Tile label="Coste total receta" tone="brand" className="col-span-2 md:col-span-1" hint={<Completeness cost={cost} estimated={estimated} />}>
           <div className="font-display text-3xl font-extrabold text-ink sm:text-4xl">{fmtEur(cost.totalCost)}</div>
         </Tile>
         <Tile label="Rendimiento" hint="Cantidad final que sale de la receta">
@@ -128,7 +143,7 @@ export function KpiStrip({
         className="col-span-2 md:col-span-1"
         hint={
           <span className="flex flex-col gap-0.5">
-            <Completeness cost={cost} />
+            <Completeness cost={cost} estimated={estimated} />
             {portions > 1 && (
               <span>
                 Receta {fmtEur(cost.totalCost)} · {portions} raciones

@@ -86,6 +86,7 @@ export const KB_CARNES: KbIngredient[] = [
 
   // ── Aves ──
   ing('Pollo entero', 'carne', 'kg', 30, 30, 3.2, { aka: ['pollo', 'pollo limpio', 'pollo fresco', 'pollo asado', 'pollos'] }),
+  ing('Carcasa de pollo', 'carne', 'kg', 0, 0, 1.2, { aka: ['carcasas de pollo', 'huesos de pollo', 'esqueleto de pollo', 'carcasa de ave', 'huesos de ave', 'carcasas de ave'] }),
   ing('Pollo de corral', 'carne', 'kg', 30, 30, 6, { aka: ['pollo campero', 'pollo de caserio', 'pollo corral', 'pollo ecologico'] }),
   ing('Pollo troceado', 'carne', 'kg', 5, 30, 3.8, { aka: ['pollo en trozos', 'pollo troceado para guisar', 'pollo cortado'] }),
   ing('Pechuga de pollo', 'carne', 'kg', 5, 22, 7.5, { aka: ['pechuga', 'filete de pechuga', 'pechugas de pollo', 'pechuga de pollo fileteada', 'filete de pollo', 'pollo fileteado'] }),

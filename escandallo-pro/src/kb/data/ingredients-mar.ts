@@ -8,6 +8,10 @@ import { ing } from './build';
 export const KB_MAR: KbIngredient[] = [
   // ── Pescado blanco y azul ──
   ing('Merluza entera', 'pescado', 'kg', 50, 15, 9.5, { aka: ['merluza de pincho', 'merluza fresca entera', 'merluza del cantabrico', 'merluza gallega', 'merluza con cabeza'], alg: ['pescado'] }),
+  ing('Espinas y cabezas de pescado', 'pescado', 'kg', 0, 0, 1.5, {
+    aka: ['espinas de pescado', 'cabezas de pescado', 'raspas de pescado', 'morralla', 'espinas para fumet', 'pescado para caldo', 'cabezas y espinas'],
+    alg: ['pescado'],
+  }),
   ing('Lomo de merluza', 'pescado', 'kg', 3, 15, 16, {
     aka: ['merluza', 'lomos de merluza', 'merluza lomo', 'merluza en lomos', 'supremas de merluza', 'rodaja de merluza', 'rodajas de merluza', 'medallon de merluza', 'cogote de merluza', 'merluza limpia'],
     alg: ['pescado'],

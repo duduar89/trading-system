@@ -80,11 +80,12 @@ export function MenuEntriesEditor({ entries, onChange, knownSections }: { entrie
 
       {groups.map((g) => {
         const allOn = g.entries.every((e) => e.selected);
+        const someOn = !allOn && g.entries.some((e) => e.selected);
         const inGroup = (e: MenuEntry) => normalize(e.section?.trim() || FALLBACK) === normalize(g.section);
         return (
           <section key={g.section} className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card" aria-label={g.section}>
             <header className="flex items-center gap-1 border-b border-line bg-surface-2 py-1 pl-1.5 pr-2">
-              <SelectBox checked={allOn} onChange={() => setAll(!allOn, inGroup)} label={`${allOn ? 'Quitar' : 'Seleccionar'} toda la sección ${g.section}`} />
+              <SelectBox checked={allOn} mixed={someOn} onChange={() => setAll(!allOn, inGroup)} label={`${allOn ? 'Quitar' : 'Seleccionar'} toda la sección ${g.section}`} />
               <h3 className="min-w-0 flex-1 truncate font-display text-[15px] font-bold text-ink">{g.section}</h3>
               <span className="text-xs font-semibold text-muted">
                 {g.entries.filter((e) => e.selected).length}/{g.entries.length}

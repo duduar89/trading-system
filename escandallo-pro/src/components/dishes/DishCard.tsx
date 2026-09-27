@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import clsx from 'clsx';
-import { Check, CircleDashed, FlaskConical, Sparkles, AlertTriangle } from 'lucide-react';
+import { Check, CircleDashed, FlaskConical, Minus, Sparkles, AlertTriangle } from 'lucide-react';
 import type { BusinessSettings, Dish, DishCost } from '../../types';
 import { fmtEur } from '../../lib/format';
 import { AllergenChips } from '../Allergens';
@@ -9,13 +9,26 @@ import { dishFoodCostStatus, fmtPctNb, fmtPrice, shownFoodCost, shownMargin } fr
 
 const STRIPE = { ok: 'bg-ok', warn: 'bg-warn', bad: 'bg-bad', none: 'bg-line-strong' } as const;
 
-/** Casilla de selección accesible (sin navegar al pulsarla). */
-export function SelectBox({ checked, onChange, label, className }: { checked: boolean; onChange: () => void; label: string; className?: string }) {
+/** Casilla de selección accesible (sin navegar al pulsarla). `mixed`: selección parcial de un grupo. */
+export function SelectBox({
+  checked,
+  onChange,
+  label,
+  className,
+  mixed = false,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+  className?: string;
+  mixed?: boolean;
+}) {
+  const partial = mixed && !checked;
   return (
     <button
       type="button"
       role="checkbox"
-      aria-checked={checked}
+      aria-checked={partial ? 'mixed' : checked}
       aria-label={label}
       onClick={(e) => {
         e.preventDefault();
@@ -27,10 +40,11 @@ export function SelectBox({ checked, onChange, label, className }: { checked: bo
       <span
         className={clsx(
           'flex size-5 items-center justify-center rounded-md border-2 transition',
-          checked ? 'border-brand-500 bg-brand-500 text-white' : 'border-line-strong bg-surface hover:border-brand-400',
+          checked ? 'border-brand-500 bg-brand-500 text-white' : partial ? 'border-brand-500 bg-brand-500/15 text-brand-600' : 'border-line-strong bg-surface hover:border-brand-400',
         )}
       >
         {checked && <Check className="size-3.5" strokeWidth={3} />}
+        {partial && <Minus className="size-3.5" strokeWidth={3} />}
       </span>
     </button>
   );
@@ -130,8 +144,8 @@ export function DishCard({
       <div className="flex flex-1 flex-col gap-2.5 px-5 py-3">
         {dish.items.length ? (
           <div>
-            <div className="mb-1.5 flex items-center justify-between text-xs">
-              <span className={clsx('font-semibold', missing ? 'text-warn' : 'text-ink-2')}>
+            <div className="mb-1.5 flex items-start justify-between gap-2 text-xs">
+              <span className={clsx('flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 font-semibold', missing ? 'text-warn' : 'text-ink-2')}>
                 {missing ? (
                   <span className="inline-flex items-center gap-1">
                     <AlertTriangle className="size-3.5" /> {missing} sin precio
@@ -141,14 +155,14 @@ export function DishCard({
                 )}
                 {estimated > 0 && (
                   <span
-                    className="ml-1.5 inline-flex items-center gap-0.5 font-semibold text-info"
+                    className="inline-flex items-center gap-0.5 whitespace-nowrap font-semibold text-info"
                     title="Precio de referencia orientativo: sube tus facturas y el coste pasará a ser el real."
                   >
                     <CircleDashed className="size-3" aria-hidden /> {estimated} {estimated === 1 ? 'estimado' : 'estimados'}
                   </span>
                 )}
               </span>
-              {hasWaste && <span className="text-muted">Merma {fmtPctNb(cost.wastePct, 0)}</span>}
+              {hasWaste && <span className="shrink-0 whitespace-nowrap text-muted">Merma {fmtPctNb(cost.wastePct, 0)}</span>}
             </div>
             <ProgressBar value={cost?.completeness ?? 0} tone={missing ? 'warn' : 'ok'} className="h-1.5" />
           </div>

@@ -33,7 +33,7 @@ import { Button, EmptyState, IconButton, NumberInput, Select } from '../ui';
 import { IngredientPicker } from './IngredientPicker';
 import { MenuItem, Popover } from './Popover';
 import { useMediaQuery } from './hooks';
-import { fmtPrice, isSearchFragment, moveItem, normalize, patchItem, targetOf, type IngredientOption, fmtPctNb } from './logic';
+import { fmtPrice, isSearchFragment, moveItem, normalize, patchItem, targetOf, type IngredientOption, fmtPctNb, usableCostPerKg } from './logic';
 
 const BASES: QtyBasis[] = ['neta', 'bruta', 'cocinada'];
 
@@ -550,6 +550,7 @@ function BasisSelect({ item, setItem, index }: Pick<RowProps, 'item' | 'setItem'
 
 function PriceCell({ info }: { info: LineInfo }) {
   const { ic, product, sub } = info;
+  const usable = usableCostPerKg(ic);
   if (ic?.pricePerBase && ic.pricePerBase > 0) {
     return (
       <span className="inline-flex flex-col items-end gap-0.5 whitespace-nowrap">
@@ -561,6 +562,11 @@ function PriceCell({ info }: { info: LineInfo }) {
           <Link to={`/ingredientes/${product?.id}`} className="rounded-full hover:opacity-80">
             <EstimatedBadge short />
           </Link>
+        )}
+        {usable != null && (
+          <span className="text-[10px] font-semibold text-ok" title="Coste real por kg limpio según tu prueba de rendimiento (ya descuenta lo que recuperas en subproductos): es el que se aplica al peso neto">
+            {fmtPrice(usable)} /kg útil
+          </span>
         )}
       </span>
     );

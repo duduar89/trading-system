@@ -1,8 +1,9 @@
-import type { Allergen, DishProposal, IngredientCategory, ProposedIngredient, QtyBasis, QtyUnit } from '../types';
+import type { Allergen, BaseUnit, DishKind, DishProposal, IngredientCategory, ProposedIngredient, QtyBasis, QtyUnit } from '../types';
 import type { KbRecipe, KbRecipeItem } from './recipes';
 import { KB_RECIPES } from './recipes';
 import { type KbIngredient, findKbIngredient, kbIngredientIndex, scanPhrases } from './ingredients';
 import { KB_PREPARATIONS, type KbPreparation } from './data/preparations';
+import { KB_ELABORATIONS, type KbElaboration } from './data/elaborations';
 import type { ItemTuple } from './data/build';
 import {
   COOKING_METHODS,
@@ -1258,21 +1259,111 @@ function cloneProposal(p: DishProposal): DishProposal {
 }
 
 /**
+ * Elaboración que ES una de las elaboraciones básicas de la base (salsa, guarnición, sofrito…) por su nombre completo:
+ * se propone su propia receta y no la del plato que la lleva ("Salsa de pimienta" no es el solomillo a la pimienta ni
+ * "Salsa brava" las patatas bravas). Las palabras de relleno ("casera", "de la casa") ya no cuentan como contenido.
+ */
+function proposeFromPreparation(name: string, nameToks: DishToken[], found: Detection[], negated: Detection[]): DishProposal | undefined {
+  const content = nameToks.filter((t) => !t.negated).map((t) => t.t);
+  if (!content.length) return undefined;
+  const det = found.find((d) => d.inName && d.target.kind === 'prep' && d.tokens.length === content.length && d.tokens.every((t, i) => t === content[i]));
+  if (!det || det.target.kind !== 'prep') return undefined;
+  const prep = det.target.prep;
+  const items = prep.items.map((it) => fromRecipeItem(it)).filter((p) => {
+    const kb = kbByName(p.name);
+    return !kb || !isNegated(kb, negated);
+  });
+  if (!items.length) return undefined;
+  return {
+    dishName: name.trim(),
+    portions: 1,
+    ingredients: items,
+    allergens: allergensOf(items),
+    source: 'plantilla',
+    templateName: prep.name,
+    confidence: 0.85,
+  };
+}
+
+let ELABORATION_INDEX: Map<string, KbElaboration> | undefined;
+function elaborationIndex(): Map<string, KbElaboration> {
+  if (ELABORATION_INDEX) return ELABORATION_INDEX;
+  const m = new Map<string, KbElaboration>();
+  for (const e of KB_ELABORATIONS) {
+    for (const text of [e.name, ...(e.aliases ?? [])]) {
+      const key = contentTokens(text)
+        .map((t) => t.t)
+        .join(' ');
+      if (key && !m.has(key)) m.set(key, e);
+    }
+  }
+  ELABORATION_INDEX = m;
+  return m;
+}
+
+/**
+ * Elaboración de base (fondo, fumet, alioli, crema pastelera, masa…) por su nombre completo: receta por lote con su
+ * rendimiento (ver `kbElaborationYield`), en lugar del producto comprado hecho o de un plato parecido.
+ */
+function proposeFromElaboration(name: string, nameToks: DishToken[], negated: Detection[]): DishProposal | undefined {
+  const key = nameToks
+    .filter((t) => !t.negated)
+    .map((t) => t.t)
+    .join(' ');
+  const e = key ? elaborationIndex().get(key) : undefined;
+  if (!e) return undefined;
+  const items = e.items.map((it) => fromRecipeItem(it)).filter((p) => {
+    const kb = kbByName(p.name);
+    return !kb || !isNegated(kb, negated);
+  });
+  if (!items.length) return undefined;
+  const proposal: DishProposal = {
+    dishName: name.trim(),
+    portions: 1,
+    ingredients: items,
+    allergens: allergensOf(items),
+    source: 'plantilla',
+    templateName: e.name,
+    confidence: 0.9,
+  };
+  if (e.procedure) proposal.procedure = e.procedure;
+  return proposal;
+}
+
+/**
+ * Rendimiento del lote de una propuesta hecha con una elaboración de base de la receta local (p. ej. el fondo oscuro:
+ * 2 l), para escalarla al rendimiento que indique el usuario o fijárselo si no indica ninguno. undefined si la propuesta
+ * no viene de una de ellas (las cantidades de las demás plantillas son por ración).
+ */
+export function kbElaborationYield(proposal: Pick<DishProposal, 'source' | 'templateName' | 'ingredients'>): { qty: number; unit: BaseUnit } | undefined {
+  if (proposal.source !== 'plantilla' || !proposal.templateName) return undefined;
+  const e = KB_ELABORATIONS.find((x) => x.name === proposal.templateName);
+  if (!e) return undefined;
+  const names = new Set(e.items.map((i) => i.name));
+  if (!proposal.ingredients.length || !proposal.ingredients.every((i) => names.has(i.name))) return undefined;
+  return { qty: e.yieldQty, unit: e.yieldUnit };
+}
+
+/**
  * Propuesta de escandallo sin IA: usa la receta tipo si el parecido es alto (source 'plantilla');
  * si no, detecta ingredientes mencionados en nombre y descripción ("con", "y", "de", "al", "sobre"…) y
  * asigna gramajes por categoría/rol (proteína principal ~180 g neto, guarnición ~100 g, salsa ~40 ml…) más
  * básicos (aceite, sal) → source 'heuristica'. Siempre devuelve algo (aunque sea con confidence baja).
+ * `opts.kind = 'elaboracion'`: si el nombre es el de una elaboración básica (salsa o guarnición, por ración) o de base
+ * (fondo, fumet, emulsión, masa…, por lote con su rendimiento), se propone esa sub-receta en lugar del plato que la lleva
+ * o del producto comprado hecho.
  */
-export function proposeDishLocal(name: string, description?: string): DishProposal {
-  const key = `${name}\u0000${description ?? ''}`;
+export function proposeDishLocal(name: string, description?: string, opts: { kind?: DishKind } = {}): DishProposal {
+  const key = `${opts.kind ?? ''}\u0000${name}\u0000${description ?? ''}`;
   const cached = PROPOSAL_CACHE.get(key);
   if (cached) return cloneProposal(cached);
 
   const nameToks = tokenizeDishText(name, true);
   const descToks = description ? tokenizeDishText(description, false, 100) : [];
   const { found, negated } = detectAll(nameToks, descToks);
-  let proposal: DishProposal | undefined;
-  const match = nameToks.length ? matchRecipe(name, description, { nameToks, descToks, dets: found }) : undefined;
+  let proposal: DishProposal | undefined =
+    opts.kind === 'elaboracion' ? (proposeFromPreparation(name, nameToks, found, negated) ?? proposeFromElaboration(name, nameToks, negated)) : undefined;
+  const match = !proposal && nameToks.length ? matchRecipe(name, description, { nameToks, descToks, dets: found }) : undefined;
   if (match && match.score >= KB_TEMPLATE_THRESHOLD && !(isVeggie(nameToks, descToks) && hasAnimalProtein(match.recipe))) {
     proposal = proposeFromTemplate(name, match, found, negated);
   }

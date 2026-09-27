@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import clsx from 'clsx';
-import { ArrowDown, ArrowUp, Check, FlaskConical, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, CircleDashed, FlaskConical, Sparkles } from 'lucide-react';
 import type { BusinessSettings, Dish, DishCost, ID } from '../../types';
 import { fmtEur } from '../../lib/format';
 import { FoodCostBadge, ProgressBar } from '../ui';
@@ -37,6 +37,7 @@ export function DishListTable({
   selected,
   onToggle,
   onToggleAll,
+  estimated,
 }: {
   dishes: Dish[];
   costs: Map<ID, DishCost>;
@@ -47,6 +48,8 @@ export function DishListTable({
   selected: Set<ID>;
   onToggle: (id: ID) => void;
   onToggleAll: () => void;
+  /** Líneas por plato cuyo ingrediente aún tiene el precio orientativo (sin factura): su coste es una estimación. */
+  estimated?: Map<ID, number>;
 }) {
   const allSelected = dishes.length > 0 && dishes.every((d) => selected.has(d.id));
   return (
@@ -91,6 +94,8 @@ export function DishListTable({
             const isPlato = d.kind === 'plato';
             const missing = c ? c.items.filter((i) => !i.resolved).length : 0;
             const sug = d.items.filter((i) => i.suggested).length;
+            const est = estimated?.get(d.id) ?? 0;
+            const estLabel = `${est} ${est === 1 ? 'precio estimado' : 'precios estimados'}: sube tus facturas y el coste pasará a ser el real`;
             return (
               <tr key={d.id} className={clsx('group transition-colors hover:bg-surface-2/70', selected.has(d.id) && 'bg-brand-500/5')}>
                 <td className="border-b border-line py-1 pl-2">
@@ -108,7 +113,12 @@ export function DishListTable({
                 <td className="border-b border-line px-3 py-2.5 text-right text-ink-2">
                   {isPlato ? d.menuPrice ? fmtEur(d.menuPrice) : <span className="text-xs font-semibold text-warn">Sin PVP</span> : <span className="text-muted">—</span>}
                 </td>
-                <td className="border-b border-line px-3 py-2.5 text-right font-semibold text-ink">{c && c.costPerPortion > 0 ? fmtEur(c.costPerPortion) : '—'}</td>
+                <td className="border-b border-line px-3 py-2.5 text-right font-semibold text-ink">
+                  <span className="inline-flex items-center justify-end gap-1">
+                    {est > 0 && c && c.costPerPortion > 0 && <CircleDashed className="size-3.5 shrink-0 text-info xl:hidden" aria-label={estLabel} role="img" />}
+                    {c && c.costPerPortion > 0 ? fmtEur(c.costPerPortion) : '—'}
+                  </span>
+                </td>
                 <td className="border-b border-line px-3 py-2.5 text-right">{isPlato ? <FoodCostBadge pct={fc} status={st} /> : <span className="text-muted">—</span>}</td>
                 <td className={clsx('border-b border-line px-3 py-2.5 text-right', margin != null && margin < 0 ? 'text-bad' : 'text-ink-2')}>
                   {margin != null ? fmtEur(margin) : '—'}
@@ -118,7 +128,9 @@ export function DishListTable({
                   {d.items.length ? (
                     <div className="flex items-center gap-2">
                       <ProgressBar value={c?.completeness ?? 0} tone={missing ? 'warn' : 'ok'} className="h-1.5" />
-                      <span className={clsx('w-16 shrink-0 text-xs', missing ? 'font-semibold text-warn' : 'text-muted')}>{missing ? `${missing} sin precio` : 'Completo'}</span>
+                      <span className={clsx('w-20 shrink-0 text-xs', missing ? 'font-semibold text-warn' : est ? 'font-semibold text-info' : 'text-muted')} title={est && !missing ? estLabel : undefined}>
+                        {missing ? `${missing} sin precio` : est ? `${est} ${est === 1 ? 'estimado' : 'estimados'}` : 'Completo'}
+                      </span>
                     </div>
                   ) : (
                     <span className="text-xs text-muted">Sin ingredientes</span>

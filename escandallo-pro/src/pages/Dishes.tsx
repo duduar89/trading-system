@@ -48,6 +48,7 @@ import {
   filterByFoodCost,
   foodCostCounts,
   parseFoodCostFilter,
+  estimatedLinesByDish,
 } from '../components/dishes/logic';
 
 const SORTS: { value: DishSort; label: string }[] = [
@@ -129,16 +130,10 @@ export default function Dishes() {
   const hasNoSection = useMemo(() => all.some((d) => (kind === 'todos' || d.kind === kind) && !d.section?.trim()), [all, kind]);
   const stats = useMemo(() => (costs ? dishListStats(all, costs, business) : undefined), [all, costs, business]);
   const fcCounts = useMemo(() => (costs ? foodCostCounts(all, costs, business) : undefined), [all, costs, business]);
-  // Líneas con precio orientativo (ingrediente creado con precio estimado y aún sin factura), por plato.
+  // Líneas con precio orientativo (ingrediente con precio estimado y aún sin factura, o elaboración que lo lleva), por plato.
   const estimatedByDish = useMemo(() => {
-    const out = new Map<ID, number>();
     const products = dc?.ctx.products;
-    if (!products) return out;
-    for (const d of all) {
-      const n = d.items.filter((it) => it.ref?.type === 'product' && isEstimatedPrice(products.get(it.ref.id))).length;
-      if (n) out.set(d.id, n);
-    }
-    return out;
+    return products ? estimatedLinesByDish(all, products, isEstimatedPrice) : new Map<ID, number>();
   }, [all, dc]);
   const visible = useMemo(() => {
     if (!costs) return [];
@@ -449,6 +444,7 @@ export default function Dishes() {
               selected={selected}
               onToggle={toggle}
               onToggleAll={toggleAll}
+              estimated={estimatedByDish}
             />
           )}
           {!loading && visible.length > 0 && (

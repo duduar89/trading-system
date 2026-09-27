@@ -13,7 +13,7 @@ import type {
   QtyUnit,
   YieldTest,
 } from '../src/types';
-import { createWorkspace, db, getCurrentWorkspaceId, setCurrentWorkspaceId, updateAppSettings, updateBusinessSettings, workspaceDb } from '../src/db';
+import { DEFAULT_BUSINESS_SETTINGS, createWorkspace, db, getCurrentWorkspaceId, setCurrentWorkspaceId, updateAppSettings, updateBusinessSettings, workspaceDb } from '../src/db';
 import { toSearchKey, AUTO_LINK_THRESHOLD, SUGGEST_THRESHOLD } from '../src/core/matching';
 import { normalizeInvoiceLine } from '../src/core/pack';
 import { buildCostingContext, costAllDishes } from '../src/core/costing';
@@ -788,6 +788,90 @@ describe('proposeForDishes', () => {
     expect(res.usedAI).toBe(false);
     expect(res.proposed).toBe(1);
     expect(res.warnings[0]).toMatch(/Sin conexión/);
+  });
+
+  it('elaboración con rendimiento declarado: la receta por ración se escala hasta producir ese rendimiento', async () => {
+    // Regresión: «Salsa de pimienta» que rinde 0,5 l recibía la receta de una ración (≈ 0,1 l) y su €/l salía 5 veces más barato.
+    const plain = { wastePct: 0, cookingLossPct: 0, densityKgPerL: 1 };
+    const nata = await createProduct({ name: 'Nata para cocinar', baseUnit: 'l', pricePerBase: 2.3, ...plain });
+    const brandy = await createProduct({ name: 'Brandy', baseUnit: 'l', pricePerBase: 12, ...plain });
+    const pimienta = await createProduct({ name: 'Pimienta verde en grano', baseUnit: 'kg', pricePerBase: 25, wastePct: 0, cookingLossPct: 0 });
+    const cebolla = await createProduct({ name: 'Cebolla', baseUnit: 'kg', pricePerBase: 1.2, wastePct: 10, cookingLossPct: 20 });
+    const salsa = await createDish({ name: 'Salsa de pimienta', kind: 'elaboracion', yieldQty: 0.5, yieldUnit: 'l' });
+    const sinRendimiento = await createDish({ name: 'Salsa de pimienta', kind: 'elaboracion', portions: 2 });
+    const porUnidades = await createDish({ name: 'Salsa de pimienta', kind: 'elaboracion', yieldQty: 10, yieldUnit: 'ud' });
+    proposeLocal.mockImplementation((name) =>
+      proposal(name, [ing('Nata para cocinar', 60, 'ml'), ing('Brandy', 10, 'ml'), ing('Pimienta verde en grano', 5), ing('Cebolla', 25)]),
+    );
+    await proposeForDishes([salsa.id, sinRendimiento.id, porUnidades.id], {});
+    const s = await db().dishes.get(salsa.id);
+    // Lo servido: 60 ml + 10 ml + 5 g + 25 g · (1 − 20 %) = 95 g por ración → × 0,5/0,095
+    const f = 0.5 / 0.095;
+    expect(s?.items.map((i) => i.ref?.id)).toEqual([nata.id, brandy.id, pimienta.id, cebolla.id]);
+    expect(s?.items[0].quantity).toBeCloseTo(60 * f, 1);
+    expect(s?.items[2].quantity).toBeCloseTo(5 * f, 2);
+    const ctx = buildCostingContext(await db().products.toArray(), await db().dishes.toArray(), [], DEFAULT_BUSINESS_SETTINGS);
+    const cost = costAllDishes(ctx).get(salsa.id);
+    expect(cost?.servedKgPerPortion).toBeCloseTo(0.5, 3);
+    expect(cost?.pricePerYieldUnit).toBeCloseTo((0.06 * 2.3 + 0.01 * 12 + 0.005 * 25 + (0.025 / 0.9) * 1.2) * f / 0.5, 2);
+    // Sin rendimiento se escala por raciones; con rendimiento en unidades no hay forma de medirlo y se deja como viene.
+    expect((await db().dishes.get(sinRendimiento.id))?.items[0].quantity).toBe(120);
+    expect((await db().dishes.get(porUnidades.id))?.items[0].quantity).toBe(60);
+  });
+
+  it('elaboración de base por lote: sin rendimiento se le pone el de la receta; con rendimiento se escala a él', async () => {
+    // Regresión: un fondo o un fumet escalado por "lo servido" daba un €/l disparatado (el agua no es un ingrediente).
+    const actual = await vi.importActual<typeof import('../src/kb/propose')>('../src/kb/propose');
+    proposeLocal.mockImplementation(actual.proposeDishLocal); // otras pruebas dejan una propuesta fija
+    const sinRendimiento = await createDish({ name: 'Fondo oscuro', kind: 'elaboracion' });
+    const unLitro = await createDish({ name: 'Fondo oscuro de ternera', kind: 'elaboracion', yieldQty: 1, yieldUnit: 'l' });
+    const enKilos = await createDish({ name: 'Fumet de pescado', kind: 'elaboracion', yieldQty: 1.5, yieldUnit: 'kg' });
+    const res = await proposeForDishes([sinRendimiento.id, unLitro.id, enKilos.id], { createMissing: true });
+    expect(res.proposed).toBe(3);
+    const a = await db().dishes.get(sinRendimiento.id);
+    expect(a).toMatchObject({ yieldQty: 2, yieldUnit: 'l' });
+    expect(a?.items.find((i) => i.name === 'Huesos de ternera')).toMatchObject({ quantity: 2, unit: 'kg', basis: 'bruta' });
+    const b = await db().dishes.get(unLitro.id);
+    expect(b).toMatchObject({ yieldQty: 1, yieldUnit: 'l' });
+    expect(b?.items.find((i) => i.name === 'Huesos de ternera')?.quantity).toBe(1);
+    expect(b?.items.find((i) => i.name === 'Vino tinto joven')).toMatchObject({ quantity: 125, unit: 'ml' });
+    const c = await db().dishes.get(enKilos.id);
+    expect(c?.items.find((i) => i.name === 'Espinas y cabezas de pescado')?.quantity).toBe(0.75);
+    expect(c?.items.every((i) => i.ref?.type === 'product')).toBe(true);
+    // €/l del fondo: el coste de la receta entre sus 2 l (no entre la suma de lo "servido").
+    const ctx = buildCostingContext(await db().products.toArray(), await db().dishes.toArray(), [], DEFAULT_BUSINESS_SETTINGS);
+    const cost = costAllDishes(ctx).get(sinRendimiento.id);
+    expect(cost?.pricePerYieldUnit).toBeCloseTo((cost?.totalCost ?? 0) / 2, 9);
+    expect(cost?.pricePerYieldUnit).toBeGreaterThan(1);
+    expect(cost?.pricePerYieldUnit).toBeLessThan(6);
+  });
+
+  it('al crear los que faltan no deja vínculos dudosos con otro ingrediente (vino blanco por tinto, pimienta verde por negra)', async () => {
+    // Regresión: el «Fondo oscuro» salía con el vino tinto vinculado al «Vino blanco» y la pimienta negra a la verde («¿es este?»).
+    const blanco = await createProduct({ name: 'Vino blanco', baseUnit: 'l', pricePerBase: 4.5 });
+    const verde = await createProduct({ name: 'Pimienta verde en grano', baseUnit: 'kg', pricePerBase: 25 });
+    const pera = await createProduct({ name: 'Tomate pera', baseUnit: 'kg', pricePerBase: 1.85 });
+    const d = await createDish({ name: 'Guiso de prueba' });
+    proposeLocal.mockImplementation((name) =>
+      proposal(name, [ing('Vino tinto joven', 250, 'ml'), ing('Pimienta negra en grano', 2), ing('Tomate', 100), ing('Vino blanco', 50, 'ml')]),
+    );
+    // Sin crear los que faltan, las sugerencias se quedan para que el usuario decida.
+    await proposeForDishes([d.id], {});
+    const before = await db().dishes.get(d.id);
+    const weak = before?.items.filter((i) => i.ref && (i.matchScore ?? 1) < AUTO_LINK_THRESHOLD) ?? [];
+    expect(weak.map((i) => i.name)).toEqual(expect.arrayContaining(['Vino tinto joven', 'Pimienta negra en grano']));
+    await proposeForDishes([d.id], { replace: true, createMissing: true });
+    const after = await db().dishes.get(d.id);
+    const products = new Map((await db().products.toArray()).map((p) => [p.id, p]));
+    const refName = (n: string) => products.get(after?.items.find((i) => i.name === n)?.ref?.id ?? '')?.name;
+    expect(refName('Vino tinto joven')).toBe('Vino tinto joven');
+    expect(refName('Pimienta negra en grano')).toBe('Pimienta negra en grano');
+    expect(products.get(after?.items.find((i) => i.name === 'Vino tinto joven')?.ref?.id ?? '')?.notes).toBe(ESTIMATED_PRICE_NOTE);
+    // Los vínculos buenos se conservan: el mismo producto y la variante del mismo ingrediente («Tomate» ⇄ «Tomate pera»).
+    expect(after?.items.find((i) => i.name === 'Vino blanco')?.ref?.id).toBe(blanco.id);
+    const tomate = after?.items.find((i) => i.name === 'Tomate');
+    if (before?.items.find((i) => i.name === 'Tomate')?.ref?.id === pera.id) expect(tomate?.ref?.id).toBe(pera.id);
+    expect(products.has(verde.id)).toBe(true);
   });
 
   it('rematchDish vincula las líneas sin producto con los productos nuevos', async () => {

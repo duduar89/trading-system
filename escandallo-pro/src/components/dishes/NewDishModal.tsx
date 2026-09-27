@@ -35,7 +35,12 @@ export function NewDishModal({ open, initialKind = 'plato', sections, onClose }:
     setYieldUnit('kg');
     setPropose(true);
     setBusy(null);
-    const t = setTimeout(() => nameRef.current?.focus(), 60);
+    const t = setTimeout(() => {
+      // No robar el foco si ya se está escribiendo en otro campo del diálogo (el usuario ha sido más rápido).
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active !== nameRef.current && active.matches('input, select, textarea') && active.closest('[role="dialog"]')) return;
+      nameRef.current?.focus();
+    }, 60);
     return () => clearTimeout(t);
   }, [open, initialKind]);
 

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { DishProposal, ProposedIngredient, QtyBasis } from '../types';
 import { QTY_UNITS } from '../core/units';
 import { kbIngredientIndex } from './ingredients';
-import { KB_TEMPLATE_THRESHOLD, findKbRecipe, proposeDishLocal } from './propose';
+import { KB_TEMPLATE_THRESHOLD, findKbRecipe, kbElaborationYield, proposeDishLocal } from './propose';
+import { KB_ELABORATIONS } from './data/elaborations';
 
 function item(p: DishProposal, name: string): ProposedIngredient | undefined {
   return p.ingredients.find((i) => i.name === name);
@@ -493,5 +494,75 @@ describe('proposeDishLocal: calidad global y rendimiento', () => {
     const p90 = times[Math.floor(times.length * 0.9)];
     expect(avg).toBeLessThan(10);
     expect(p90).toBeLessThan(30);
+  });
+});
+
+describe('proposeDishLocal · elaboraciones', () => {
+  it('una elaboración con nombre de salsa o guarnición recibe su propia receta, no la del plato que la lleva', () => {
+    // Regresión: «Salsa de pimienta» proponía el solomillo a la pimienta entero (con carne y patatas) y «Salsa brava», las bravas.
+    const pimienta = proposeDishLocal('Salsa de pimienta', undefined, { kind: 'elaboracion' });
+    expectWellFormed(pimienta);
+    expect(pimienta.templateName).toBe('Salsa a la pimienta');
+    expect(names(pimienta)).toEqual(expect.arrayContaining(['Nata para cocinar', 'Pimienta verde en grano']));
+    expect(names(pimienta)).not.toContain('Solomillo de ternera');
+    expect(names(pimienta)).not.toContain('Patata');
+    const brava = proposeDishLocal('Salsa brava casera', undefined, { kind: 'elaboracion' });
+    expectWellFormed(brava);
+    expect(brava.templateName).toBe('Salsa brava');
+    expect(names(brava)).not.toContain('Patata');
+    expect(proposeDishLocal('Bechamel', undefined, { kind: 'elaboracion' }).templateName).toBe('Bechamel');
+    // "sin…" también retira ingredientes de la sub-receta
+    expect(names(proposeDishLocal('Salsa de pimienta sin brandy', undefined, { kind: 'elaboracion' }))).not.toContain('Brandy');
+  });
+
+  it('los platos de carta y las elaboraciones sin nombre de sub-receta siguen con la receta tipo', () => {
+    expect(names(proposeDishLocal('Solomillo de ternera a la pimienta'))).toContain('Solomillo de ternera');
+    expect(names(proposeDishLocal('Patatas bravas', undefined, { kind: 'plato' }))).toContain('Patata');
+    const croquetas = proposeDishLocal('Croquetas de jamón', undefined, { kind: 'elaboracion' });
+    expect(croquetas.source).toBe('plantilla');
+    expect(names(croquetas)).toContain('Leche entera');
+  });
+});
+
+describe('proposeDishLocal · elaboraciones de base (por lote)', () => {
+  it('fondos, fumet, emulsiones, cremas y masas tienen su receta por lote y su rendimiento', () => {
+    // Regresión: «Crema pastelera» proponía una crema de verduras (caldo, puerro, patata) y «Fumet de pescado», comprarlo hecho.
+    const cases: [string, string, string[], number, string][] = [
+      ['Fondo oscuro de ternera', 'Fondo oscuro', ['Huesos de ternera', 'Zanahoria', 'Vino tinto joven'], 2, 'l'],
+      ['Caldo de pollo casero', 'Fondo blanco de ave', ['Carcasa de pollo', 'Puerro'], 3, 'l'],
+      ['Fumet de pescado', 'Fumet de pescado', ['Espinas y cabezas de pescado', 'Vino blanco'], 3, 'l'],
+      ['Crema pastelera', 'Crema pastelera', ['Leche entera', 'Huevo', 'Azúcar', 'Maicena'], 1, 'kg'],
+      ['Alioli', 'Alioli', ['Ajo', 'Huevo', 'Aceite de girasol'], 0.5, 'kg'],
+      ['Masa de pizza', 'Masa de pizza', ['Harina de fuerza', 'Levadura fresca'], 1, 'kg'],
+    ];
+    for (const [name, template, must, qty, unit] of cases) {
+      const p = proposeDishLocal(name, undefined, { kind: 'elaboracion' });
+      expectWellFormed(p);
+      expect(p.templateName, name).toBe(template);
+      expect(names(p), name).toEqual(expect.arrayContaining(must));
+      expect(p.procedure, name).toBeTruthy();
+      expect(kbElaborationYield(p), name).toEqual({ qty, unit });
+    }
+    expect(names(proposeDishLocal('Crema pastelera', undefined, { kind: 'elaboracion' }))).not.toContain('Caldo de verduras');
+    // "sin…" retira ingredientes también aquí, y lo retirado deja de contar como receta de lote completa sólo si no es suya
+    const sinHuevo = proposeDishLocal('Alioli sin huevo', undefined, { kind: 'elaboracion' });
+    expect(names(sinHuevo)).not.toContain('Huevo');
+    expect(kbElaborationYield(sinHuevo)).toEqual({ qty: 0.5, unit: 'kg' });
+  });
+
+  it('sólo para elaboraciones: en un plato de carta siguen siendo el producto o la receta de siempre', () => {
+    expect(proposeDishLocal('Alioli').templateName).not.toBe('Alioli');
+    expect(kbElaborationYield(proposeDishLocal('Patatas bravas'))).toBeUndefined();
+    // Una salsa por ración no es una receta por lote
+    expect(kbElaborationYield(proposeDishLocal('Salsa de pimienta', undefined, { kind: 'elaboracion' }))).toBeUndefined();
+  });
+
+  it('los datos de las elaboraciones de base son coherentes', () => {
+    for (const e of KB_ELABORATIONS) {
+      expect(e.yieldQty, e.name).toBeGreaterThan(0);
+      expect(['kg', 'l'], e.name).toContain(e.yieldUnit);
+      expect(e.items.length, e.name).toBeGreaterThanOrEqual(2);
+      for (const it of e.items) expect(kbIngredientIndex().byName.has(it.name), `${e.name}: ${it.name}`).toBe(true);
+    }
   });
 });

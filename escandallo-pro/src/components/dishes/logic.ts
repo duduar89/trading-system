@@ -1,7 +1,7 @@
 /**
  * Lógica pura del flujo carta → platos → escandallo (sin React ni BD), para poder probarla a fondo.
  */
-import type { BaseUnit, BusinessSettings, Dish, DishCost, ID, MenuEntry, Product, RecipeItem } from '../../types';
+import type { BaseUnit, BusinessSettings, Dish, DishCost, ID, ItemCost, MenuEntry, Product, RecipeItem } from '../../types';
 import { costDish, foodCostStatus, type CostingContext, type FoodCostStatus } from '../../core/costing';
 import { rankMatches } from '../../core/matching';
 import { fmtEur, fmtEurPrecise, fmtPct } from '../../lib/format';
@@ -275,6 +275,44 @@ export function dishListStats(dishes: Dish[], costs: Map<ID, DishCost>, business
     }
   }
   return { dishes: n, elaborations: el, avgFoodCost: withFc ? sum / withFc : undefined, red, warn, noPrice, incomplete, suggestedLines };
+}
+
+/**
+ * Líneas de cada plato cuyo coste es todavía orientativo: ingrediente con precio estimado (sin factura) o elaboración
+ * que lleva alguno, a cualquier profundidad. Sirve para avisar en los listados de que el coste aún no es el real.
+ */
+export function estimatedLinesByDish(dishes: Iterable<Dish>, products: Map<ID, Product>, isEstimated: (p: Product | undefined) => boolean): Map<ID, number> {
+  const byId = new Map<ID, Dish>();
+  for (const d of dishes) byId.set(d.id, d);
+  const memo = new Map<ID, boolean>();
+  const lineEstimated = (it: RecipeItem, stack: Set<ID>): boolean => {
+    if (it.ref?.type === 'product') return isEstimated(products.get(it.ref.id));
+    if (it.ref?.type !== 'dish' || stack.has(it.ref.id)) return false;
+    const sub = byId.get(it.ref.id);
+    if (!sub) return false;
+    const known = memo.get(sub.id);
+    if (known !== undefined) return known;
+    stack.add(sub.id);
+    const res = sub.items.some((x) => lineEstimated(x, stack));
+    stack.delete(sub.id);
+    memo.set(sub.id, res);
+    return res;
+  };
+  const out = new Map<ID, number>();
+  for (const d of byId.values()) {
+    const n = d.items.filter((it) => lineEstimated(it, new Set([d.id]))).length;
+    if (n) out.set(d.id, n);
+  }
+  return out;
+}
+
+/**
+ * €/kg útil de la prueba de rendimiento con el que se costea una línea (coste = neto × €/kg útil, que ya descuenta los
+ * subproductos), para mostrarlo junto al precio de compra y que el coste de la línea cuadre a la vista. undefined si no aplica.
+ */
+export function usableCostPerKg(ic: ItemCost | undefined): number | undefined {
+  if (!ic || ic.wasteSource !== 'prueba' || ic.baseUnit !== 'kg' || !(ic.netQty > 0) || !(ic.cost > 0)) return undefined;
+  return ic.cost / ic.netQty;
 }
 
 /** Secciones existentes, en orden alfabético y sin duplicados (ignorando mayúsculas/tildes). */

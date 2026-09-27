@@ -3,7 +3,7 @@ import { ALLERGEN_LABELS, BASIS_LABELS } from '../../lib/labels';
 import { UNIT_LABELS } from '../../core/units';
 import { fmtBaseQty, fmtDate, fmtEur, fmtKg, fmtNum } from '../../lib/format';
 import { todayIso } from '../../lib/id';
-import { fmtPctNb, fmtPrice, shownFoodCost, shownMargin, targetOf } from './logic';
+import { fmtPctNb, fmtPrice, shownFoodCost, shownMargin, targetOf, usableCostPerKg } from './logic';
 
 /**
  * Marca para impresión con colores planos: los degradados con id de otras copias del logo (ocultas al imprimir)
@@ -104,6 +104,7 @@ export function PrintSheet({ dish, cost, business, workspace }: { dish: Dish; co
         <tbody>
           {dish.items.map((it) => {
             const ic = byId.get(it.id);
+            const usable = usableCostPerKg(ic);
             return (
               <tr key={it.id} className="border-b border-black/15 align-top">
                 <td className="py-1.5 pr-2 font-semibold">{it.name || '—'}</td>
@@ -113,7 +114,10 @@ export function PrintSheet({ dish, cost, business, workspace }: { dish: Dish; co
                 <td className="px-2 py-1.5 text-right">{ic && ic.grossQty > 0 ? fmtBaseQty(ic.grossQty, ic.baseUnit) : '—'}</td>
                 <td className="px-2 py-1.5 text-right">{ic && ic.netQty > 0 ? fmtBaseQty(ic.netQty, ic.baseUnit) : '—'}</td>
                 <td className="px-2 py-1.5 text-right">{ic && ic.grossQty > 0 ? fmtPctNb(ic.totalWastePct, 0) : '—'}</td>
-                <td className="px-2 py-1.5 text-right">{ic?.pricePerBase ? `${fmtPrice(ic.pricePerBase)}/${ic.baseUnit}` : 'sin precio'}</td>
+                <td className="px-2 py-1.5 text-right">
+                  {ic?.pricePerBase ? `${fmtPrice(ic.pricePerBase)}/${ic.baseUnit}` : 'sin precio'}
+                  {usable != null && <div className="text-[9px] text-black/60">{fmtPrice(usable)}/kg útil (prueba)</div>}
+                </td>
                 <td className="py-1.5 pl-2 text-right font-semibold">{ic ? fmtEur(ic.cost) : '—'}</td>
               </tr>
             );

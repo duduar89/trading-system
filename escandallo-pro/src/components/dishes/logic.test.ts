@@ -7,6 +7,8 @@ import {
   dishListStats,
   editablePatch,
   entriesSummary,
+  estimatedLinesByDish,
+  usableCostPerKg,
   filterByFoodCost,
   filterDishes,
   foodCostCounts,
@@ -314,5 +316,70 @@ describe('formato', () => {
     expect(fmtPrice(undefined)).toBe('—');
     expect(fmtPctNb(30, 0)).toBe('30 %');
     expect(fmtPctNb(undefined)).toBe('—');
+  });
+});
+
+describe('estimatedLinesByDish', () => {
+  it('cuenta las líneas con precio estimado, también las que llegan a través de elaboraciones (a cualquier profundidad)', () => {
+    const est = new Set(['p-nata']);
+    const prods = new Map<string, Product>([
+      ['p-nata', product({ id: 'p-nata', name: 'Nata para cocinar', baseUnit: 'l', pricePerBase: 2.3 })],
+      ['p-sol', product({ id: 'p-sol', name: 'Solomillo', pricePerBase: 33.5 })],
+    ]);
+    const base = dish({ id: 'd-base', name: 'Base de nata', kind: 'elaboracion', items: [item({ id: 'b1', name: 'Nata', ref: { type: 'product', id: 'p-nata' } })] });
+    const salsa = dish({ id: 'd-salsa', name: 'Salsa', kind: 'elaboracion', items: [item({ id: 's1', name: 'Base', ref: { type: 'dish', id: 'd-base' } })] });
+    const plato = dish({
+      id: 'd-plato',
+      name: 'Solomillo a la pimienta',
+      items: [
+        item({ id: 'x1', name: 'Solomillo', ref: { type: 'product', id: 'p-sol' } }),
+        item({ id: 'x2', name: 'Salsa', ref: { type: 'dish', id: 'd-salsa' } }),
+        item({ id: 'x3', name: 'Nata', ref: { type: 'product', id: 'p-nata' } }),
+        item({ id: 'x4', name: 'Sin vincular' }),
+      ],
+    });
+    // Ciclo (inválido, pero no debe colgarse): A usa B y B usa A.
+    const a = dish({ id: 'd-a', name: 'A', kind: 'elaboracion', items: [item({ id: 'a1', name: 'B', ref: { type: 'dish', id: 'd-b' } })] });
+    const b = dish({ id: 'd-b', name: 'B', kind: 'elaboracion', items: [item({ id: 'b1', name: 'A', ref: { type: 'dish', id: 'd-a' } })] });
+    const out = estimatedLinesByDish([plato, salsa, base, a, b], prods, (p) => !!p && est.has(p.id));
+    expect(out.get('d-plato')).toBe(2);
+    expect(out.get('d-salsa')).toBe(1);
+    expect(out.get('d-base')).toBe(1);
+    expect(out.has('d-a')).toBe(false);
+    expect(out.has('d-b')).toBe(false);
+    // Con la factura, el precio deja de ser estimado y desaparece el aviso en cascada.
+    expect(estimatedLinesByDish([plato, salsa, base], prods, () => false).size).toBe(0);
+  });
+});
+
+describe('usableCostPerKg', () => {
+  it('con prueba de rendimiento, el €/kg útil aplicado al neto; sin ella, nada', () => {
+    const yieldTest = {
+      id: 'y1',
+      name: 'Solomillo entero',
+      productId: 'p-sol',
+      date: '2026-09-20',
+      grossWeightKg: 2.5,
+      purchasePricePerKg: 33.5,
+      cookingLossPct: 18,
+      outputs: [
+        { id: 'o1', name: 'Corazón', kind: 'principal' as const, weightKg: 1.55 },
+        { id: 'o2', name: 'Cordón', kind: 'subproducto' as const, weightKg: 0.325, valuePerKg: 9 },
+        { id: 'o3', name: 'Grasa', kind: 'desperdicio' as const, weightKg: 0.375 },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    };
+    const sol = product({ id: 'p-sol', name: 'Solomillo de ternera', pricePerBase: 33.5, wastePct: 18, yieldTestId: 'y1' });
+    const d = dish({ id: 'd1', name: 'Solomillo', items: [item({ id: 'i1', name: 'Solomillo', quantity: 180, ref: { type: 'product', id: 'p-sol' } })] });
+    const ctx = buildCostingContext([sol], [d], [yieldTest], business);
+    const ic = costDish(d, ctx).items[0];
+    const expected = (2.5 * 33.5 - 0.325 * 9) / 1.55;
+    expect(usableCostPerKg(ic)).toBeCloseTo(expected, 9);
+    expect(ic.cost).toBeCloseTo(0.18 * expected, 9);
+    // Sin prueba (merma de la línea) se costea por el bruto: no hay €/kg útil que mostrar.
+    const manual = dish({ id: 'd2', name: 'Solomillo', items: [item({ id: 'i2', name: 'Solomillo', quantity: 180, wastePct: 10, ref: { type: 'product', id: 'p-sol' } })] });
+    expect(usableCostPerKg(costDish(manual, buildCostingContext([sol], [manual], [yieldTest], business)).items[0])).toBeUndefined();
+    expect(usableCostPerKg(undefined)).toBeUndefined();
   });
 });

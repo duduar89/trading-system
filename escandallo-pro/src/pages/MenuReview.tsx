@@ -239,7 +239,7 @@ function MenuReviewScreen() {
                   label={wide ? 'Proponer ingredientes automáticamente' : 'Proponer receta'}
                   description={wide ? (aiOn ? 'Con tu IA opcional o la base de recetas local' : 'Receta tipo con gramajes y mermas. Gratis, en tu dispositivo.') : undefined}
                 />
-                <div className={propose ? '' : 'pointer-events-none opacity-50'}>
+                <div className={propose ? '' : 'pointer-events-none opacity-50'} inert={!propose}>
                   <Switch
                     checked={createMissing}
                     onChange={setCreateMissing}

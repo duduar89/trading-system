@@ -32,7 +32,8 @@ import { PriceTargetTool } from '../components/dishes/PriceTargetTool';
 import { PrintSheet } from '../components/dishes/PrintSheet';
 import { ProposeModal } from '../components/dishes/ProposeModal';
 import { useAutosave, useMediaQuery, type SaveState } from '../components/dishes/hooks';
-import { costDraft, editablePatch, sectionsOf, usedIn, fmtPctNb } from '../components/dishes/logic';
+import { costDraft, editablePatch, estimatedLinesByDish, sectionsOf, usedIn, fmtPctNb } from '../components/dishes/logic';
+import { isEstimatedPrice } from '../components/purchases/estimated';
 
 const VAT_OPTIONS = [10, 21, 4, 0];
 
@@ -105,6 +106,11 @@ export default function DishEditor() {
   const cost = useMemo(() => (draft && ctx ? costDraft(ctx, draft) : undefined), [ctx, draft]);
   const sections = useMemo(() => sectionsOf(allDishes ?? []), [allDishes]);
   const users = useMemo(() => (draft && ctx ? usedIn(draft.id, ctx.dishes.values()) : []), [ctx, draft]);
+  const estimated = useMemo(() => {
+    if (!draft || !ctx) return 0;
+    const dishes = [...ctx.dishes.values()].filter((d) => d.id !== draft.id).concat(draft);
+    return estimatedLinesByDish(dishes, ctx.products, isEstimatedPrice).get(draft.id) ?? 0;
+  }, [ctx, draft]);
 
   const [proposeOpen, setProposeOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -275,7 +281,7 @@ export default function DishEditor() {
           </div>
         )}
         <div ref={setKpiEl} className="z-20 mb-6 lg:sticky lg:top-0 lg:-mx-2 lg:bg-bg/95 lg:px-2 lg:py-3 lg:backdrop-blur-xl">
-          <KpiStrip dish={draft} cost={cost} business={business} onChange={update} usedInCount={users.length} />
+          <KpiStrip dish={draft} cost={cost} business={business} onChange={update} usedInCount={users.length} estimated={estimated} />
         </div>
 
         {/* ── Escandallo ── */}

@@ -1,8 +1,9 @@
-import type { Dish, DishProposal, ID, ItemRef, Product, ProposedIngredient, QtyBasis, RecipeItem } from '../types';
+import type { BaseUnit, BusinessSettings, Dish, DishProposal, ID, ItemRef, Product, ProposedIngredient, QtyBasis, RecipeItem, YieldTest } from '../types';
 import type { CatalogProduct, RecipeRequestDish } from '../ai/recipes';
 import { db, getAppSettings, getBusinessSettings } from '../db';
-import { SUGGEST_THRESHOLD, normalizeText, rankMatches, toSearchKey } from '../core/matching';
-import { QTY_UNITS } from '../core/units';
+import { AUTO_LINK_THRESHOLD, SUGGEST_THRESHOLD, normalizeText, rankMatches, toSearchKey } from '../core/matching';
+import { QTY_UNITS, baseToKg } from '../core/units';
+import { buildCostingContext, costDish } from '../core/costing';
 import { aiAvailable } from '../extract/index';
 import { nowIso, uid } from '../lib/id';
 import { ESTIMATED_PRICE_NOTE, createProduct, loadKbFinder, type KbFinder } from './products';
@@ -262,6 +263,63 @@ export function proposalToItems(proposal: DishProposal, products: Product[], ela
   return items;
 }
 
+/**
+ * Elaboración con rendimiento declarado en peso o volumen (0,5 l de salsa, 2 kg de masa): las recetas tipo vienen por
+ * ración, así que se escalan para que lo que sale de la receta (lo servido, tras mermas de limpieza y cocción) sume el
+ * rendimiento indicado. Sin esto, el coste de una ración se dividiría entre un rendimiento que la receta no produce
+ * y el €/l de la elaboración (y el de todos los platos que la usan) saldría varias veces más barato.
+ * Devuelve las mismas líneas si no hay rendimiento en kg/l o no se puede estimar lo servido.
+ */
+export function scaleItemsToYield(
+  dish: Pick<Dish, 'id' | 'kind' | 'yieldQty' | 'yieldUnit'>,
+  items: RecipeItem[],
+  data: { products: Product[]; dishes: Dish[]; yieldTests: YieldTest[]; business: BusinessSettings },
+): RecipeItem[] {
+  if (dish.kind !== 'elaboracion' || !(finiteOr(dish.yieldQty, 0) > 0) || dish.yieldUnit === 'ud' || !items.length) return items;
+  const targetKg = baseToKg(dish.yieldQty as number, dish.yieldUnit ?? 'kg');
+  if (!targetKg) return items;
+  const ctx = buildCostingContext(data.products, data.dishes, data.yieldTests, data.business);
+  // Receta de una sola "ración" = la receta completa; id propio para no cruzarse con la caché del plato real.
+  const draft: Dish = {
+    id: `__rendimiento__${dish.id}`,
+    name: '',
+    kind: 'elaboracion',
+    saleVatPct: 0,
+    portions: 1,
+    items,
+    status: 'borrador',
+    source: 'manual',
+    createdAt: '',
+    updatedAt: '',
+  };
+  const servedKg = costDish(draft, ctx).servedKgPerPortion;
+  if (!(servedKg > 0)) return items;
+  const factor = targetKg / servedKg;
+  if (!Number.isFinite(factor) || Math.abs(factor - 1) < 0.005) return items;
+  return items.map((it) => ({ ...it, quantity: roundQty(it.quantity * factor) }));
+}
+
+/**
+ * Receta por lote que ya trae su rendimiento (`batch`, p. ej. 2 l de fondo oscuro): si la elaboración declara un
+ * rendimiento en kg o l, las cantidades se escalan a él (densidad 1 entre kg y l); si no declara ninguno, se le pone el
+ * de la receta para que su €/kg o €/l salga bien desde el principio. Con rendimiento en unidades no hay equivalencia
+ * y se deja como está.
+ */
+export function fitToBatchYield(
+  dish: Pick<Dish, 'yieldQty' | 'yieldUnit'>,
+  items: RecipeItem[],
+  batch: { qty: number; unit: BaseUnit },
+): { items: RecipeItem[]; yieldQty?: number; yieldUnit?: BaseUnit } {
+  if (!(batch.qty > 0)) return { items };
+  const declared = finiteOr(dish.yieldQty, 0);
+  if (!(declared > 0)) return { items, yieldQty: roundQty(batch.qty), yieldUnit: batch.unit };
+  const unit = dish.yieldUnit ?? 'kg';
+  if (unit === 'ud' || batch.unit === 'ud') return { items };
+  const factor = declared / batch.qty; // kg ⇄ l con densidad 1, como el resto de agregados de peso
+  if (!Number.isFinite(factor) || Math.abs(factor - 1) < 0.005) return { items };
+  return { items: items.map((it) => ({ ...it, quantity: roundQty(it.quantity * factor) })) };
+}
+
 /** Elaboraciones que un plato puede usar como ingrediente (ni él mismo ni las que ya lo usan a él). */
 function elaborationsFor(dish: Dish, all: Dish[]): Dish[] {
   return all.filter((d) => d.kind === 'elaboracion' && d.id !== dish.id && !d.items.some((it) => it.ref?.type === 'dish' && it.ref.id === dish.id));
@@ -327,15 +385,17 @@ export async function proposeForDishes(
 
   // 2) Base de recetas local (gratis) para el resto
   const pending = targets.filter((d) => !proposals.has(d.id));
+  let batchYieldOf: ((p: DishProposal) => { qty: number; unit: BaseUnit } | undefined) | undefined;
   if (pending.length) {
     const failed: string[] = [];
     let failure = '';
     try {
-      const { proposeDishLocal } = await import('../kb/propose');
+      const { proposeDishLocal, kbElaborationYield } = await import('../kb/propose');
+      batchYieldOf = kbElaborationYield;
       pending.forEach((d, i) => {
         progress(proposals.size, pending.length === 1 ? `Buscando la receta de «${d.name}»…` : `Recetario local: ${i + 1} de ${pending.length}…`);
         try {
-          const proposal = proposeDishLocal(d.name, d.description);
+          const proposal = proposeDishLocal(d.name, d.description, { kind: d.kind });
           if (proposal?.ingredients?.length) proposals.set(d.id, proposal);
           else failed.push(d.name);
         } catch (err) {
@@ -359,6 +419,7 @@ export async function proposeForDishes(
   const createdByKb = new Map<string, Product>();
   let createdCount = 0;
   let proposed = 0;
+  let yieldData: { yieldTests: YieldTest[]; business: BusinessSettings } | undefined;
 
   for (const target of targets) {
     const proposal = proposals.get(target.id);
@@ -371,7 +432,11 @@ export async function proposeForDishes(
 
     if (kbFind) {
       for (const item of items) {
-        if (item.ref) continue;
+        if (item.ref) {
+          if (!isDoubtfulOtherIngredient(item, products, kbFind)) continue;
+          delete item.ref;
+          delete item.matchScore;
+        }
         const ing = proposal.ingredients.find((i) => cleanName(i.name) === item.name);
         const product = await ensureEstimatedProduct(item.name, ing, products, createdByKb, kbFind);
         if (!product) continue;
@@ -384,11 +449,27 @@ export async function proposeForDishes(
       }
     }
 
-    const patch: Partial<Dish> = { items, status: 'borrador', updatedAt: nowIso() };
+    const patch: Partial<Dish> = { status: 'borrador', updatedAt: nowIso() };
+    let finalItems = items;
+    const batch = dish.kind === 'elaboracion' ? batchYieldOf?.(proposal) : undefined;
+    if (batch) {
+      // Receta por lote con su rendimiento (fondos, masas…): se escala al rendimiento indicado o se le pone el suyo.
+      const portionsFactor = (dish.portions > 0 ? dish.portions : 1) / (proposal.portions > 0 ? proposal.portions : 1);
+      const fit = fitToBatchYield(dish, items, { qty: batch.qty * portionsFactor, unit: batch.unit });
+      finalItems = fit.items;
+      if (fit.yieldQty) {
+        patch.yieldQty = fit.yieldQty;
+        patch.yieldUnit = fit.yieldUnit;
+      }
+    } else if (dish.kind === 'elaboracion' && finiteOr(dish.yieldQty, 0) > 0) {
+      yieldData ??= { yieldTests: await wdb.yieldTests.toArray(), business: await getBusinessSettings(wdb) };
+      finalItems = scaleItemsToYield(dish, items, { products, dishes: allDishes, ...yieldData });
+    }
+    patch.items = finalItems;
     const procedure = cleanName(proposal.procedure) ? proposal.procedure?.trim() : undefined;
     if (procedure && !cleanName(dish.procedure)) patch.procedure = procedure;
     await wdb.dishes.update(dish.id, patch);
-    if (items.length) proposed++;
+    if (finalItems.length) proposed++;
   }
 
   if (createdCount > 0) {
@@ -398,6 +479,32 @@ export async function proposeForDishes(
   }
   progress(total, 'Propuesta lista');
   return { proposed, usedAI, warnings };
+}
+
+/** Palabras significativas de un nombre de ficha (sin preposiciones ni artículos). */
+function kbNameWords(name: string): string[] {
+  return normalizeText(name)
+    .split(' ')
+    .filter((w) => w.length > 2);
+}
+
+/**
+ * Vínculo dudoso (por debajo del umbral de vínculo automático) con un producto que la base de conocimiento reconoce
+ * como OTRO ingrediente de la misma familia: «Vino tinto joven» → «Vino blanco», «Pimienta negra en grano» → «Pimienta
+ * verde en grano». Al crear los que faltan es mejor el ingrediente correcto con precio estimado que el precio de otro.
+ * No se considera distinto si un nombre de ficha contiene al otro («Tomate» ⇄ «Tomate pera», «Queso» ⇄ «Queso manchego»).
+ */
+function isDoubtfulOtherIngredient(item: RecipeItem, products: Product[], kbFind: KbFinder): boolean {
+  if (item.ref?.type !== 'product' || (item.matchScore ?? 1) >= AUTO_LINK_THRESHOLD) return false;
+  const refId = item.ref.id;
+  const linked = products.find((p) => p.id === refId);
+  const mine = kbFind(item.name);
+  const theirs = linked ? kbFind(linked.name) : undefined;
+  if (!mine || !theirs || mine.name === theirs.name) return false;
+  const a = kbNameWords(mine.name);
+  const b = kbNameWords(theirs.name);
+  const contains = (x: string[], y: string[]) => y.every((w) => x.includes(w));
+  return !contains(a, b) && !contains(b, a);
 }
 
 /**
