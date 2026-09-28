@@ -10,7 +10,12 @@
     "typecheck": "tsc -b --pretty false",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "node e2e/run-all.mjs --build",
+    "test:all": "npm test && node e2e/run-all.mjs --build --a11y --perf",
+    "bench": "node scripts/bench-extraction.mjs && node scripts/bench-menu.mjs",
+    "bench:unseen": "node scripts/bench-unseen.mjs",
+    "bench:random": "node scripts/bench-random.mjs && node scripts/bench-random-menus.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -33,6 +38,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@tesseract.js-data/spa": "^1.0.0",
     "@types/node": "^22.20.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

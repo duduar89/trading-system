@@ -29,7 +29,7 @@ function post(msg: PaddleWorkerResponse, transfer: Transferable[] = []): void {
 async function load(baseUrl: string): Promise<Loaded> {
   const ort = (await import(/* @vite-ignore */ ortModuleUrl)) as typeof Ort;
   const model = paddleModelFiles(baseUrl);
-  const files = [ortWasmAsset(ort.env.versions.web ?? ort.env.versions.common), model.det, model.rec, model.dict];
+  const files = [ortWasmAsset(baseUrl), model.det, model.rec, model.dict];
   const total = files.reduce((s, f) => s + (f.size ?? 0), 0);
   const done = new Map<string, number>();
   let downloading = false;

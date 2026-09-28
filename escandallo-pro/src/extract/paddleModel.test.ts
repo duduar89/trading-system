@@ -21,7 +21,7 @@ describe('archivos del modelo', () => {
   });
 
   it('el binario WebAssembly sale de la CDN con la misma versión que el motor JS', () => {
-    expect(ortWasmAsset('1.30.0').url).toBe('https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort-wasm-simd-threaded.wasm');
+    expect(ortWasmAsset('https://app.example.com/escandallo/').url).toBe('https://app.example.com/escandallo/ocr-runtime/ort/ort-wasm-simd-threaded.wasm');
   });
 });
 

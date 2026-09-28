@@ -28,7 +28,8 @@ import { useAppSettings, useInvoices } from '../state/hooks';
 import { errorMessage, toast } from '../state/store';
 import * as invoiceService from '../services/invoices';
 import { addInvoiceFiles, createManualInvoice, deleteInvoice, processInvoice } from '../services/invoices';
-import { aiAvailable } from '../extract/index';
+import { loadSampleFiles, SAMPLE_INVOICES } from '../lib/samples';
+import { aiAvailable } from '../extract/kinds';
 import { fmtDate, fmtEur, fmtNum, fmtPct } from '../lib/format';
 import { todayIso } from '../lib/id';
 import { comparisonDetail, comparisonHint } from '../core/periods';
@@ -306,6 +307,27 @@ export default function Invoices() {
           <span className="mt-1 hidden text-sm text-muted sm:inline">Para tickets o albaranes</span>
         </button>
       </div>
+
+      {empty && (
+        <p className="-mt-2 mb-6 text-center text-sm text-muted">
+          ¿No tienes ninguna a mano?{' '}
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={async () => {
+              try {
+                await onFiles(await loadSampleFiles(SAMPLE_INVOICES));
+              } catch (e) {
+                toast.error('No se han podido cargar los ejemplos', errorMessage(e));
+              }
+            }}
+            className="font-semibold text-brand-600 underline decoration-brand-500/40 underline-offset-2 hover:decoration-brand-500 disabled:opacity-60 dark:text-brand-400"
+          >
+            Prueba con 3 facturas de ejemplo
+          </button>{' '}
+          y mira cómo se leen gratis en tu dispositivo.
+        </p>
+      )}
 
       {!aiOn && !calloutDismissed && !empty && (
         <Callout

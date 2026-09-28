@@ -6,6 +6,7 @@ import type { MenuScan } from '../types';
 import { useMenuScans } from '../state/hooks';
 import { errorMessage, toast } from '../state/store';
 import { addMenuScan, deleteMenuScan } from '../services/menus';
+import { loadSampleFiles, SAMPLE_MENU } from '../lib/samples';
 import { fmtDate } from '../lib/format';
 import { Badge, ConfirmDialog, FileDrop, IconButton, PageHeader, Spinner } from '../components/ui';
 import { useObjectUrl } from '../components/dishes/hooks';
@@ -112,6 +113,23 @@ export default function Menu() {
             <p className="mt-3 flex items-start gap-2 text-xs text-muted">
               <Lightbulb className="mt-px size-4 shrink-0 text-warn-ink" />
               Para una lectura perfecta: carta plana, de frente y con buena luz, sin reflejos y una página por foto.
+            </p>
+            <p className="mt-2 text-xs text-muted">
+              ¿Sin la carta a mano?{' '}
+              <button
+                type="button"
+                disabled={adding}
+                onClick={async () => {
+                  try {
+                    await onFiles(await loadSampleFiles([SAMPLE_MENU]));
+                  } catch (e) {
+                    toast.error('No se ha podido cargar el ejemplo', errorMessage(e));
+                  }
+                }}
+                className="font-semibold text-brand-600 underline decoration-brand-500/40 underline-offset-2 hover:decoration-brand-500 disabled:opacity-60 dark:text-brand-400"
+              >
+                Prueba con una carta de ejemplo
+              </button>
             </p>
           </div>
         </div>

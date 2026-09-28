@@ -24,7 +24,7 @@ import { Badge, Button, Callout, ConfirmDialog, EmptyState, PageHeader, Segmente
 import { useAppSettings, useDishCosts, useDishes, useInvoices, useProducts, useSuppliers } from '../state/hooks';
 import { errorMessage, toast } from '../state/store';
 import { confirmInvoice, deleteInvoice, newInvoiceLine, processInvoice, refreshInvoiceMatches, updateInvoice } from '../services/invoices';
-import { aiAvailable } from '../extract/index';
+import { aiAvailable } from '../extract/kinds';
 import { fmtDate, fmtEur } from '../lib/format';
 import { FilePreview } from '../components/purchases/FilePreview';
 import { InvoiceLinesTable, type LinePatchMeta } from '../components/purchases/InvoiceLinesTable';

@@ -81,6 +81,16 @@ interface LoggerMessage {
   progress: number;
 }
 
+/**
+ * Worker, núcleo WebAssembly y modelo español de Tesseract servidos por la propia app (copiados de node_modules al
+ * construir, ver vite.config.ts): sin CDN externos, así la lectura funciona en redes restringidas y sin conexión.
+ */
+function tesseractAssetPaths(): { workerPath?: string; corePath?: string; langPath?: string } {
+  if (typeof document === 'undefined') return {};
+  const abs = (p: string) => new URL(p, document.baseURI).href;
+  return { workerPath: abs('ocr-runtime/tesseract/worker.min.js'), corePath: abs('ocr-runtime/tesseract/core/'), langPath: abs('ocr-runtime/tessdata') };
+}
+
 const IDLE_MS = 90_000;
 let workerPromise: Promise<TesseractWorker> | undefined;
 let idleTimer: ReturnType<typeof setTimeout> | undefined;
@@ -110,6 +120,7 @@ async function getWorker(): Promise<TesseractWorker> {
       const worker = await T.createWorker('spa', 1, {
         logger: (m: LoggerMessage) => progressSink?.(m),
         errorHandler: () => undefined,
+        ...tesseractAssetPaths(),
       });
       await worker.setParameters({ preserve_interword_spaces: '1', user_defined_dpi: '300' });
       return worker;

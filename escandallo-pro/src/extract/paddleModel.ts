@@ -41,9 +41,15 @@ export function paddleModelFiles(baseUrl: string): PaddleModelFiles {
 /** Tamaño aproximado del binario WebAssembly de ONNX Runtime (sólo para la barra de progreso). */
 const ORT_WASM_SIZE = 14_239_897;
 
-/** Binario WebAssembly de ONNX Runtime Web de la misma versión que el motor JS (CDN con caché del service worker). */
-export function ortWasmAsset(version: string): FetchAsset {
-  return { url: `https://cdn.jsdelivr.net/npm/onnxruntime-web@${version}/dist/ort-wasm-simd-threaded.wasm`, size: ORT_WASM_SIZE };
+/** Ruta (relativa a la raíz de la app) del binario de ONNX Runtime Web, copiado de node_modules al construir. */
+export const ORT_WASM_PATH = 'ocr-runtime/ort/ort-wasm-simd-threaded.wasm';
+
+/**
+ * Binario WebAssembly de ONNX Runtime Web, servido por la propia app (misma versión que el motor JS empaquetado,
+ * sin depender de ningún CDN: funciona también en redes que bloquean servicios externos).
+ */
+export function ortWasmAsset(baseUrl: string): FetchAsset {
+  return { url: new URL(ORT_WASM_PATH, baseUrl).href, size: ORT_WASM_SIZE };
 }
 
 /** Descarga total de la primera vez (para avisar al usuario): motor + modelos. */

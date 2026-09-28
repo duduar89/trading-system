@@ -5,7 +5,7 @@ import type { MenuEntry } from '../types';
 import { useAppSettings, useDishes, useMenuScans } from '../state/hooks';
 import { errorMessage, toast } from '../state/store';
 import { deleteMenuScan, importMenuEntries, processMenuScan } from '../services/menus';
-import { aiAvailable } from '../extract/index';
+import { aiAvailable } from '../extract/kinds';
 import { db } from '../db';
 import { METHOD_LABELS } from '../lib/labels';
 import { fmtDate } from '../lib/format';

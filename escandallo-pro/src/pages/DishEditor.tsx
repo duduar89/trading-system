@@ -20,7 +20,7 @@ import type { Dish, DishKind } from '../types';
 import { useAppSettings, useBusiness, useCostingContext, useCurrentWorkspace, useDish, useDishes, useProducts } from '../state/hooks';
 import { errorMessage, toast } from '../state/store';
 import { deleteDish, duplicateDish, rematchDish, updateDish } from '../services/dishes';
-import { aiAvailable } from '../extract/index';
+import { aiAvailable } from '../extract/kinds';
 import { db } from '../db';
 import { fmtEur } from '../lib/format';
 import { AllergenChips } from '../components/Allergens';

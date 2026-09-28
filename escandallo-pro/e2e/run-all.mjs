@@ -31,6 +31,7 @@ const SCRIPTS = [
   { name: 'offline', file: 'e2e/offline.mjs', args: (base) => [base], ok: (code) => code === 0, timeoutMin: 5 },
   { name: 'compras', file: 'e2e/compras.mjs', args: (base) => [base, join(OUT, 'compras')], ok: (code) => code === 0, timeoutMin: 30 },
   { name: 'carta', file: 'e2e/carta.mjs', args: (base) => [base, join(OUT, 'carta')], ok: (code) => code === 0, timeoutMin: 30 },
+  { name: 'lector-paddle', file: 'e2e/lector-paddle.mjs', args: (base) => [base, join(OUT, 'lector-paddle')], ok: (code) => code === 0, timeoutMin: 20 },
   { name: 'a11y', file: 'e2e/a11y.mjs', args: (base) => [base], ok: (code) => code === 0, timeoutMin: 15, optional: 'a11y' },
   { name: 'perf', file: 'e2e/perf.mjs', args: (base) => [base, DIST], ok: (code) => code === 0, timeoutMin: 5, optional: 'perf' },
 ];

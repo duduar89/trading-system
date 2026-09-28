@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { FlaskConical, Sparkles, UtensilsCrossed } from 'lucide-react';
 import type { BaseUnit, DishKind } from '../../types';
 import { createDish, proposeForDishes } from '../../services/dishes';
-import { aiAvailable } from '../../extract/index';
+import { aiAvailable } from '../../extract/kinds';
 import { useAppSettings } from '../../state/hooks';
 import { errorMessage, toast } from '../../state/store';
 import { Button, Field, Input, Modal, NumberInput, Segmented, Select, Switch } from '../ui';

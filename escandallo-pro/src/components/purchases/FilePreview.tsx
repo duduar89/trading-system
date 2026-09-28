@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { ExternalLink, EyeOff, FileQuestion, FileText, ImageOff, Maximize2, Minimize2, ScanText } from 'lucide-react';
 import { Segmented, Spinner } from '../ui';
-import { fileKind } from '../../extract/index';
+import { fileKind } from '../../extract/kinds';
 import { useObjectUrl } from './hooks';
 
 /** Páginas de un PDF renderizadas a imagen con pdf.js (funciona igual en escritorio, Android e iOS). */

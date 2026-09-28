@@ -4,7 +4,7 @@ import { db, getAppSettings, getBusinessSettings } from '../db';
 import { AUTO_LINK_THRESHOLD, SUGGEST_THRESHOLD, normalizeText, rankMatches, toSearchKey } from '../core/matching';
 import { QTY_UNITS, baseToKg } from '../core/units';
 import { buildCostingContext, costDish } from '../core/costing';
-import { aiAvailable } from '../extract/index';
+import { aiAvailable } from '../extract/kinds';
 import { nowIso, uid } from '../lib/id';
 import { ESTIMATED_PRICE_NOTE, createProduct, loadKbFinder, type KbFinder } from './products';
 

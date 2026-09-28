@@ -1,7 +1,7 @@
 import type { Dish, ExtractedMenu, ID, MenuEntry, MenuScan, ProgressInfo } from '../types';
 import { db, getAppSettings, getBusinessSettings, getCurrentWorkspaceId, metaDb, workspaceDb, type WorkspaceDB } from '../db';
 import { normalizeText } from '../core/matching';
-import { extractMenuFromFiles, fileKind } from '../extract/index';
+import { fileKind } from '../extract/kinds';
 import { preprocessImage } from '../extract/ocr';
 import { fmtDate } from '../lib/format';
 import { nowIso, todayIso, uid } from '../lib/id';
@@ -199,11 +199,13 @@ async function readScan(wdb: WorkspaceDB, id: ID, opts: { forceLocal?: boolean }
     const extraWarnings: string[] = [];
     let result: ExtractedMenu;
     try {
+      const { extractMenuFromFiles } = await import('../extract/index');
       result = await extractMenuFromFiles(files, { settings, onProgress, forceLocal });
     } catch (err) {
       // Red de seguridad: si la IA opcional falla, se lee gratis en el dispositivo.
       if (isAbortError(err) || forceLocal || !isAIError(err)) throw err;
       extraWarnings.push(`La IA no ha podido leer la carta (${errorText(err, 'error desconocido')}): se ha leído gratis en tu dispositivo`);
+      const { extractMenuFromFiles } = await import('../extract/index');
       result = await extractMenuFromFiles(files, { settings, onProgress, forceLocal: true });
     }
     const entries = toEntries(result.entries);

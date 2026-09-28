@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { ChefHat, Sparkles, ShieldCheck, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { ID } from '../../types';
 import { proposeForDishes } from '../../services/dishes';
-import { aiAvailable } from '../../extract/index';
+import { aiAvailable } from '../../extract/kinds';
 import { useAppSettings } from '../../state/hooks';
 import { errorMessage, toast } from '../../state/store';
 import { Badge, Button, Callout, Modal, ProgressBar, Switch } from '../ui';

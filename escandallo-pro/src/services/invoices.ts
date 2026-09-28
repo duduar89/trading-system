@@ -2,7 +2,7 @@ import type { BaseUnit, ExtractedInvoice, ID, Invoice, InvoiceLine, Product, Pro
 import { db, getAppSettings, getCurrentWorkspaceId, metaDb, workspaceDb, type WorkspaceDB } from '../db';
 import { AUTO_LINK_THRESHOLD, SUGGEST_THRESHOLD, cleanProductName, rankMatches, toSearchKey } from '../core/matching';
 import { normalizeInvoiceLine } from '../core/pack';
-import { aiAvailable, extractInvoicesFromFile, fileKind } from '../extract/index';
+import { aiAvailable, fileKind } from '../extract/kinds';
 import { nowIso, todayIso, uid } from '../lib/id';
 import {
   addProductAliasIn,
@@ -518,11 +518,14 @@ async function processInvoiceIn(wdb: WorkspaceDB, id: ID, opts: { forceLocal?: b
     const extraWarnings: string[] = [];
     let extracted: ExtractedInvoice[];
     try {
+      // El lector (parsers + OCR) se descarga sólo al leer el primer documento
+      const { extractInvoicesFromFile } = await import('../extract/index');
       extracted = await extractInvoicesFromFile(file, { settings, onProgress: opts.onProgress, forceLocal });
     } catch (err) {
       // Red de seguridad: si la IA opcional falla, se lee gratis en el dispositivo.
       if (isAbortError(err) || forceLocal || !aiAvailable(settings) || !isAIError(err)) throw err;
       extraWarnings.push(`La IA no ha podido leer la factura (${errorText(err, 'error desconocido')}): se ha leído gratis en tu dispositivo`);
+      const { extractInvoicesFromFile } = await import('../extract/index');
       extracted = await extractInvoicesFromFile(file, { settings, onProgress: opts.onProgress, forceLocal: true });
     }
     extracted = (extracted ?? []).filter(Boolean);
