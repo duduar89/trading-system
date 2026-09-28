@@ -36,7 +36,14 @@ src/
     ocrPipeline.ts    OCR en varias pasadas (tabla / bloque / binarizado) hasta que las cuentas cuadran
     ocrLayout.ts      Filas de tabla y columnas de carta a partir de las cajas de palabras del OCR
     ocrFixes.ts       Correcciones de OCR validadas (O↔0, S↔5, «G» leída como «6», palabras pegadas…)
-    menuUtils.ts      Ayudas del parser de cartas (precios, secciones, ruido)
+    menuUtils.ts      Ayudas del parser de cartas (columnas, precios, secciones, ruido de iconos)
+    menuImage.ts      Cartas oscuras y pizarras: normalización de polaridad antes del OCR
+    tableModel.ts     Modelo de tabla de facturas: columnas tipadas por cabecera y posición (cantidad, kilos, lote…)
+    paddleOcr.ts      Adaptador de PaddleOCR (PP-OCRv5): cajas de detección y reconocimiento → palabras/líneas
+    paddleEngine.ts   Motor PaddleOCR en un worker (paddle.worker.ts) con ONNX Runtime Web; respaldo a Tesseract
+    paddleModel.ts    Rutas y huellas de los modelos (public/ocr-models) y del binario de ONNX Runtime
+    modelCache.ts     Descarga con verificación (tamaño/SHA-256) y caché propia de modelos para uso sin conexión
+    kinds.ts          Utilidades ligeras (tipo de archivo, IA disponible) sin arrastrar los parsers
     index.ts          Orquestador: texto PDF → OCR (IA opcional, desactivada por defecto) con caída automática a local
   ai/                 Claude: client (salida estructurada), invoice, menu, recipes
   kb/                 Base de conocimiento local: ingredientes (mermas, alérgenos, pesos) y recetas tipo
@@ -48,14 +55,21 @@ src/
 ```
 
 ## Extracción gratuita y local
-La lectura de facturas y cartas funciona 100 % en el dispositivo y sin coste: capa de texto de pdf.js con
-reconstrucción de columnas, OCR con tesseract.js (modelo español más preciso) tras un preprocesado de imagen,
-y validación aritmética (cantidad × precio × (1 − dto) = importe; suma de líneas = base imponible) que decide entre
-lecturas alternativas y corrige errores típicos del OCR solo cuando las cuentas lo demuestran.
+La lectura de facturas y cartas funciona 100 % en el dispositivo y sin coste:
+- **PDF con texto**: pdf.js (build legacy) → filas y columnas por posición (layout.ts, tableModel.ts) → parser.
+- **Fotos**: preprocesado en un worker (papel/perspectiva, iluminación, enderezado, bandas oscuras invertidas, rayas de
+  tabla borradas) → **PaddleOCR PP-OCRv5** (detección móvil + reconocedor latino, ONNX Runtime Web) como motor principal
+  y **Tesseract** (modelo español best_int) en pasadas de respaldo, combinadas línea a línea por la validación aritmética.
+- **PDF escaneados**: render a 300 ppp → Tesseract con varias pasadas.
+- **Validación aritmética**: cantidad × precio × (1 − dto) = importe y Σ líneas = base imponible deciden entre lecturas
+  y autorizan correcciones de OCR (dígitos, decimales perdidos, «G» leída como «6»…).
+- Motores (worker y núcleo de Tesseract, binario de ONNX Runtime) y modelos se sirven desde la propia app: el plugin
+  `escandallo-ocr-runtime` de vite.config.ts los copia de node_modules al construir (`/ocr-runtime/`), y los modelos
+  PP-OCRv5 viven en `public/ocr-models/` (Apache-2.0). Se cachean al primer uso (fuera de la precarga del service worker).
 
-Benchmark (`node scripts/bench-extraction.mjs` y `node scripts/bench-menu.mjs`) sobre `public/samples` y variantes
-degradadas generadas (foto girada, perspectiva, sombra fuerte, baja resolución, PDF escaneado, fax con ruido):
-PDF con texto 100 % de líneas exactas, fotos y escaneos 100 %, cartas 100 % (cabeceras 100 %).
+Benchmarks (`npm run bench`, `npm run bench:random`, `node scripts/bench-unseen.mjs`), medidos en semillas reservadas del
+generador procedural (nunca inspeccionadas al ajustar): facturas PDF con texto 97,4 % líneas exactas (cabeceras 99,9 %),
+fotos y escaneos ~90 %, cartas en foto ~80 % limpia / ~79 % degradada; `public/samples` 100 %.
 
 ## Convenciones
 - Importes en EUR **sin IVA**, salvo `Dish.menuPrice` (PVP de carta con IVA). Porcentajes 0–100.
@@ -73,3 +87,9 @@ PDF con texto 100 % de líneas exactas, fotos y escaneos 100 %, cartas 100 % (ca
 - Coste línea = bruto · €/ud base (o neto · coste €/kg útil de la prueba de rendimiento, que descuenta subproductos).
 - Food cost = coste ración / (PVP / (1 + IVA)). PVP sugerido = coste / objetivo · (1 + IVA), redondeado hacia arriba.
 - Merma por plato = Σ (bruto − servido) por ración, en kg y en € (coste − servido · precio).
+
+## Pruebas
+- `npm test`: tests unitarios (vitest + fake-indexeddb) de cálculo, extracción, recetario, servicios y lógica de UI.
+- `npm run test:e2e`: construye y ejecuta con Playwright `e2e/smoke.mjs` (todas las pantallas), `offline.mjs` (PWA sin
+  conexión), `compras.mjs` (facturas PDF/foto/CSV → precios), `carta.mjs` (foto de carta → escandallos → mermas → ficha),
+  `lector-paddle.mjs` (motor OCR) y `perf.mjs` (presupuesto de carga). `e2e/a11y.mjs` pasa axe-core por todas las rutas.
