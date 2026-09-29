@@ -7,7 +7,10 @@
 function redondearAbajo(x, incremento) {
   if (!incremento || incremento <= 0) return x;
   const decimales = Math.max(0, Math.ceil(-Math.log10(incremento)) + 2);
-  const n = Math.floor(x / incremento + 1e-9);
+  // x / incremento arrastra el error de coma flotante de x (167,363836 / 1e-9 =
+  // 167363835999,99997): la holgura tiene que ser relativa al cociente.
+  const q = x / incremento;
+  const n = Math.floor(q + Math.max(1e-9, Math.abs(q) * 1e-14));
   return Number((n * incremento).toFixed(decimales));
 }
 
