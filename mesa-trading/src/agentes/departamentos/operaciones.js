@@ -22,10 +22,10 @@ const { metricasMesa, sharpeRodante, alarmaDeriva } = require('../../aprendizaje
 const plantillas = require('../plantillas');
 const { anadirJSONL, leerJSONL } = require('../../util/almacen');
 const { redondearAbajo } = require('../../util/numeros');
-const { diaUTC, MIN, HORA, DIA } = require('../../util/reloj');
+const { diaUTC, MIN, DIA } = require('../../util/reloj');
 const f = require('../../util/formato');
 const log = require('../../util/log').crear('operaciones');
-const { EPS, etiqueta, isoCompacto, agenteDePuesto } = require('./comun');
+const { EPS, etiqueta, isoCompacto } = require('./comun');
 
 const ESTADOS_FINALES = new Set(['ejecutada', 'cancelada', 'rechazada', 'caducada']);
 const POLVO_USD = 0.01;           // lo que queda tras cerrar y vale menos de un céntimo es redondeo
@@ -499,6 +499,5 @@ async function killSwitch(ctx, motivo) {
 }
 
 module.exports = {
-  Ejecutor, conciliarCadaLatido, cierreDiario, informeSemanal, killSwitch, valorMesa, pnlMesaTotal, sharpes90, anotarCurva,
-  GRAVES_PARA_PAUSAR, agenteDePuesto, HORA,
+  Ejecutor, conciliarCadaLatido, cierreDiario, informeSemanal, killSwitch, valorMesa, pnlMesaTotal, sharpes90, anotarCurva, GRAVES_PARA_PAUSAR,
 };

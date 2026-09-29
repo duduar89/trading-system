@@ -17,8 +17,14 @@ const PASO = 5 * 60_000;
 
 logMod.fijarNivel('silencio');
 
+// Las carpetas temporales se borran al acabar el proceso de pruebas.
+const creadas = [];
+process.on('exit', () => { for (const c of creadas) { try { fs.rmSync(c, { recursive: true, force: true }); } catch (_) { /* ya no está */ } } });
+
 function carpetaTemporal(prefijo = 'mesa-prueba-') {
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefijo));
+  const c = fs.mkdtempSync(path.join(os.tmpdir(), prefijo));
+  creadas.push(c);
+  return c;
 }
 
 function llmApagado() {

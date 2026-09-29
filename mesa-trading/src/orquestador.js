@@ -25,7 +25,7 @@ const { EventEmitter } = require('events');
 const path = require('path');
 const universoMod = require('./mercado/universo');
 const calendario = require('./mercado/calendario');
-const { mesasIniciales, FAMILIAS } = require('./estrategias');
+const { mesasIniciales } = require('./estrategias');
 const { reasignar } = require('./aprendizaje/asignador');
 const { metricasMesa, sharpeRodante } = require('./aprendizaje/evaluador');
 const { crearBenchmarks, valorarBenchmarks } = require('./cartera/benchmarks');
@@ -1052,4 +1052,4 @@ class Orquestador extends EventEmitter {
   }
 }
 
-module.exports = { Orquestador, VERSION_ESTADO, siguienteHora, siguienteLunes, siguienteMes, FAMILIAS };
+module.exports = { Orquestador, VERSION_ESTADO, siguienteHora, siguienteLunes, siguienteMes };
