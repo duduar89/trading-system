@@ -17,6 +17,8 @@
     "cron": "node servidor/cron.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.129.0",
+    "@anthropic-ai/vertex-sdk": "^0.20.0",
     "express": "^5.2.1",
     "mysql2": "^3.24.5"
   },
