@@ -52,7 +52,7 @@ fi
 
 N="$(date +%Y%m%d-%H%M%S)"
 echo "▸ Copia de la base antes de tocar nada"
-"${SSH[@]}" "cd $APP_DIR && bash scripts/copia-bd.sh antes-de-$N"
+"${SSH[@]}" "cd $APP_DIR && if [ -f scripts/copia-bd.sh ] && [ -f .env ]; then bash scripts/copia-bd.sh antes-de-$N; else echo '   primera subida: no hay base que copiar'; fi"
 
 echo "▸ Subiendo el código"
 "${SSH[@]}" "mkdir -p ~/respaldo-iemec && if [ -d $APP_DIR/servidor ]; then tar czf ~/respaldo-iemec/build-$N.tgz -C $APP_DIR package.json servidor motor sql scripts semillas 2>/dev/null || true; fi; ls -1t ~/respaldo-iemec/build-*.tgz 2>/dev/null | tail -n +11 | xargs -r rm -f"
