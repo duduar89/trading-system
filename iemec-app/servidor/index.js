@@ -7,6 +7,7 @@ const express = require('express');
 const { version } = require('../package.json');
 const config = require('./config');
 const db = require('./db');
+const { rutasPublicas } = require('./rutas/publicas');
 
 // El despliegue deja aquí el commit que sube: así /api/version dice qué hay de verdad arriba.
 const COMMIT = (() => {
@@ -33,6 +34,8 @@ function crearApp({ pool = db.pool } = {}) {
       res.status(503).json({ ok: false, bd: false, error: err.code || 'sin_bd' });
     }
   });
+
+  app.use(rutasPublicas({ pool }));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'No existe esa ruta de la API' }));
 

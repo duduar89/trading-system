@@ -9,6 +9,7 @@ const db = require('./db');
 const cola = require('./cola');
 const agenda = require('./agenda');
 const repesca = require('./repesca/motor');
+const resenas = require('./resenas');
 const { crearIa } = require('./integraciones/ia');
 const { crearWhatsApp } = require('./integraciones/whatsapp');
 const T = require('../motor/tiempo');
@@ -20,6 +21,7 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
     retencionesCaducadas: await agenda.caducarRetenciones(pool, ahora),
     seguimientos: (await repesca.procesarSeguimientos(d, { ahora })).length,
     secuencias: (await repesca.avanzarSecuencias(d, { ahora })).length,
+    peticionesResena: (await resenas.enviarPeticionesPendientes(d, { ahora })).length,
     cola: await cola.procesar(pool, {}, { ahora }),
   }), { ahora });
   Object.assign(informe, r.ejecutado ? r.resultado : { saltado: 'otro cron en marcha' });
