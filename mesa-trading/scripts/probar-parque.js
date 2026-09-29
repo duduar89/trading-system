@@ -1,0 +1,90 @@
+'use strict';
+// Casos conocidos del parqué (interfaz). Cada uno con su resultado calculado a
+// mano; imprime OK/FALLO y sale con código 1 si alguno falla.
+//   node scripts/probar-parque.js
+
+const iso = require('../web/js/iso.js');
+const cifras = require('../web/js/cifras.js');
+const mapa = require('../web/js/mapa.js');
+const dibujo = require('../web/js/dibujo.js');
+const pers = require('../web/js/personajes.js');
+const { crearMaqueta } = require('../web/js/maqueta.js');
+const formato = require('../src/util/formato.js');
+
+let fallos = 0;
+function caso(nombre, obtenido, esperado, tolerancia) {
+  const ok = typeof esperado === 'number' && typeof obtenido === 'number'
+    ? Math.abs(obtenido - esperado) <= (tolerancia || 1e-9)
+    : JSON.stringify(obtenido) === JSON.stringify(esperado);
+  if (!ok) fallos++;
+  console.log(`${ok ? 'OK   ' : 'FALLO'} ${nombre}: ${JSON.stringify(obtenido)}${ok ? '' : ` (esperado ${JSON.stringify(esperado)})`}`);
+}
+
+// 1. Proyección 2:1: x = (col − fila)·32 ; y = (col + fila)·16 − z.
+caso('proyectar(3, 1)', iso.proyectar(3, 1), { x: 64, y: 64 });
+caso('proyectar(28, 0, 88): esquina derecha en lo alto de la pared', iso.proyectar(28, 0, 88), { x: 896, y: 360 });
+caso('desproyectar(64, 64)', iso.desproyectar(64, 64), { col: 3, fila: 1 });
+
+// 2. Formato: el navegador escribe las cifras igual que el servidor.
+caso('usd(99.999)', cifras.usd(99999), '99.999 $');
+caso('usd(−1)', cifras.usd(-1), '-1,00 $');
+caso('pct(0,0019, signo)', cifras.pct(0.0019, { signo: true }), '+0,19 %');
+caso('precio(0,1234) de DOGE', cifras.precio(0.1234), '0,1234');
+caso('usd igual que src/util/formato', cifras.usd(100503.27), formato.usd(100503.27));
+caso('cuenta atrás de 83 min', cifras.cuentaAtras(83 * 60000), '01:23');
+caso('cuenta atrás de 30 s (redondea arriba)', cifras.cuentaAtras(30000), '00:01');
+caso('suavizar(0,5) = 1 − 0,5³', cifras.suavizar(0.5), 0.875);
+
+// 3. Monitores: umbral ±0,1 % y destellos de 2 s.
+const pos = p => ({ posicion: { pnlAbiertoPct: p } });
+caso('monitor con +0,15 %', dibujo.estadoMonitor(pos(0.0015), null, 0), 'verde');
+caso('monitor con −0,15 %', dibujo.estadoMonitor(pos(-0.0015), null, 0), 'rojo');
+caso('monitor con +0,05 %', dibujo.estadoMonitor(pos(0.0005), null, 0), 'plano');
+caso('monitor sin posición', dibujo.estadoMonitor({ posicion: null }, null, 0), 'sin');
+caso('monitor 1,5 s después de una orden', dibujo.estadoMonitor(pos(0.01), { tipo: 'orden', hasta: 2000 }, 1500), 'orden');
+caso('monitor 2,5 s después de una orden', dibujo.estadoMonitor(pos(0.01), { tipo: 'orden', hasta: 2000 }, 2500), 'verde');
+
+// 4. Bocadillos: 6 s + 60 ms/carácter, tope 12 s.
+caso('bocadillo de 50 caracteres', pers.duracionBocadillo('x'.repeat(50)), 9000);
+caso('bocadillo de 150 caracteres', pers.duracionBocadillo('x'.repeat(150)), 12000);
+caso('bocadillo partido en ≤ 40', pers.partirTexto('Sin posición en SOL. Esperando a que SMA 7-25 dé LONG con filtro 200 (4H).'),
+  ['Sin posición en SOL. Esperando a que SMA', '7-25 dé LONG con filtro 200 (4H).']);
+
+// 5. Plano con las 4 mesas iniciales.
+const T0 = Date.UTC(2026, 8, 29, 12);
+const maqueta = crearMaqueta({ semilla: 7, ahora: T0 });
+const inst = maqueta.instantanea();
+const plano = mapa.construirMapa(inst);
+const btc = plano.puestos.get('tendencia-BTC');
+// Ancho de puesto = min(2,5; 15,2/6) = 2,5 y hueco 0,28 → tablero de 2,6 + 0,14 a 2,6 + 2,5 − 0,14.
+caso('primer tablero del parqué, col inicial', btc.c0, 2.74);
+caso('primer tablero del parqué, col final', btc.c1, 4.96);
+caso('filas del parqué (paso 3)', Array.from(new Set(Array.from(plano.puestos.values()).map(p => p.f0))), [3.2, 6.2, 9.2, 12.2]);
+const sitios = mapa.asignarSitios(plano, inst.agentes, inst.departamentos);
+caso('silla de la Presidenta en dirección', [sitios.get('cio').col, sitios.get('cio').fila], [23.5, 2.45]);
+caso('operador de momentum-SOL en la silla de su puesto', sitios.get('puesto-momentum-SOL').puestoId, 'momentum-SOL');
+caso('elevación de la tarima de macro en (20,1; 6) = 14·0,1/0,35', mapa.elevacionEn(20.1, 6), 4);
+
+// 6. Ruta de dirección al comité: sale por la puerta (20; 2) y entra por (15; 16).
+const r = mapa.ruta(plano, { col: 23.5, fila: 2.45 }, { col: 18.55, fila: 19.1 });
+let puertaDireccion = null; let puertaComite = null;
+for (let k = 0; k < r.length - 1; k++) {
+  const a = r[k]; const b = r[k + 1];
+  if ((a.col - 20) * (b.col - 20) < 0) puertaDireccion = a.fila + (b.fila - a.fila) * (20 - a.col) / (b.col - a.col);
+  if ((a.fila - 16) * (b.fila - 16) < 0) puertaComite = a.col + (b.col - a.col) * (16 - a.fila) / (b.fila - a.fila);
+}
+caso('cruza col 20 dentro de la puerta de dirección (2 ± 0,75)', Math.abs(puertaDireccion - 2) < 0.75, true);
+caso('cruza fila 16 dentro de la puerta del comité (15 ± 0,75)', Math.abs(puertaComite - 15) < 0.75, true);
+
+// 7. Maqueta: la contabilidad cuadra y la forma es la de §7.
+const valor = inst.posiciones.reduce((s, p) => s + p.cantidad * p.precio, 0);
+caso('patrimonio = efectivo + Σ valor de posiciones', maqueta._interno.efectivo() + valor, maqueta._interno.patrimonio(), 1e-6);
+caso('exposición bruta = Σ valor / patrimonio', inst.cabecera.exposicionBrutaPct, valor / maqueta._interno.patrimonio(), 1e-9);
+caso('24 campos de primer nivel en la instantánea', Object.keys(inst).length, 24);
+caso('puestos de la maqueta (3 + 6 + 2 + 3)', inst.puestos.length, 14);
+const comprado = maqueta.comando('megafono', { texto: 'pausa SOL 6 h' });
+caso('Megáfono «pausa SOL 6 h»', comprado.datos.directivas, [{ tipo: 'pausar_activo', simbolo: 'SOL/USD', horas: 6 }]);
+caso('kill switch sin escribir KILL', maqueta.comando('kill', { confirmacion: 'kil' }).ok, false);
+
+console.log(fallos ? `\n${fallos} caso(s) con FALLO` : '\nTodos los casos cuadran.');
+process.exit(fallos ? 1 : 0);

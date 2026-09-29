@@ -57,7 +57,11 @@ const LIMITES_DUROS = Object.freeze({
   maxOrdenesMinuto: 10,            // protege de un bucle que dispare órdenes (Alpaca admite 200/min)
   maxOrdenesMesaHora: 4,           // una mesa que se vuelve loca se congela sola
   minNocionalOrden: 10,            // por debajo de 10 $ la comisión de cripto se come la operación
-  maxAntiguedadPrecioSegCripto: 180,
+  // El venue cripto de Alpaca es poco líquido: ETH llegó a tener la cotización
+  // con 8 min de antigüedad (29-sep-2026). Las señales van en velas de 4 h y 1 d
+  // y la orden es a mercado con control de desvío, así que 15 min basta para
+  // detectar un dato caído sin vetar aperturas buenas.
+  maxAntiguedadPrecioSegCripto: 900,
   maxAntiguedadPrecioSegAcciones: 120,
   desvioMaxPrecio: 0.02,           // si el precio se ha movido > 2 % desde la decisión, se vuelve a decidir
   penalizacionPapel: 0.001,        // 0,1 % por lado que se resta al medir mesas: el papel llena mejor que la realidad

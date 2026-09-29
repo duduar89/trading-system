@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0f1424">
+  <title>Parqué · Mesa de agentes</title>
+  <meta name="description" content="Parqué isométrico de la mesa de trading de agentes: quién hace qué, en directo.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2l9 5v10l-9 5-9-5V7z' fill='%231d4ed8'/%3E%3Cpath d='M12 2l9 5-9 5-9-5z' fill='%2360a5fa'/%3E%3C/svg%3E">
+  <script>
+    // Si el servidor sirve esta página en «/», los recursos viven en «/web/…» (§7).
+    if (location.protocol !== 'file:' && location.pathname === '/') document.write('<base href="/web/">');
+  </script>
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="barra" id="barra">
+      <div class="marca" aria-label="Mesa de agentes">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l9 5v10l-9 5-9-5V7z" fill="#1d4ed8"/><path d="M12 2l9 5-9 5-9-5z" fill="#60a5fa"/><path d="M12 12v10l9-5V7z" fill="#1e3a8a"/></svg>
+        <span>Parqué</span>
+        <span class="pildora maqueta" id="p-maqueta" hidden title="Datos inventados para trabajar la interfaz">MAQUETA</span>
+      </div>
+      <div class="cifras">
+        <div class="cifra"><span class="rotulo">Patrimonio</span><span class="valor" id="v-patrimonio">—</span></div>
+        <div class="cifra"><span class="rotulo">Resultado hoy</span><span class="valor-linea"><span class="valor" id="v-resultado">—</span> <span class="sub" id="v-resultado-pct"></span></span></div>
+        <div class="cifra"><span class="rotulo">Caída</span><span class="valor" id="v-caida">—</span></div>
+        <div class="cifra secundaria"><span class="rotulo">Exposición</span><span class="valor" id="v-exposicion">—</span></div>
+        <div class="cifra secundaria"><span class="rotulo">Posiciones</span><span class="valor" id="v-posiciones">—</span></div>
+      </div>
+      <div class="pildoras" id="pildoras">
+        <span class="pildora gris" id="p-regimen">—</span>
+        <span class="pildora gris" id="p-fg">F&amp;G —</span>
+        <span class="pildora gris" id="p-comite">Comité —</span>
+        <span class="pildora ambar" id="p-nivel" hidden></span>
+        <span class="pildora gris" id="p-modo">—</span>
+        <span class="pildora gris" id="p-llm">LLM —</span>
+      </div>
+    </header>
+
+    <aside class="lateral" id="lateral" aria-label="Departamentos">
+      <div class="lateral-cab">
+        <button class="asa" id="asa" type="button" aria-expanded="false" aria-controls="lateral" aria-label="Abrir o cerrar el panel de departamentos"><span></span></button>
+        <h2>Departamentos</h2>
+        <span class="contador" id="contador" title="Mensajes recibidos">0</span>
+      </div>
+      <div class="chips" id="chips" role="toolbar" aria-label="Filtrar mensajes por departamento"></div>
+      <div class="feed" id="feed" role="log" aria-live="polite" aria-relevant="additions" tabindex="0"></div>
+      <button class="nuevos" id="nuevos" type="button" hidden>Nuevos ↓</button>
+    </aside>
+
+    <main class="escena" id="escena">
+      <canvas id="lienzo" role="img" aria-label="Parqué isométrico de la mesa: pulsa un puesto o una persona para ver su ficha. Arrastra para mover, rueda o pellizco para acercar." tabindex="0"></canvas>
+      <div class="franja" id="franja" role="status" hidden>Sin conexión con la mesa, reintentando…</div>
+      <div class="avisos" id="avisos" aria-label="Avisos"></div>
+      <section class="tarjeta" id="tarjeta" hidden aria-labelledby="tarjeta-titulo"></section>
+    </main>
+
+    <nav class="botonera" id="botonera" aria-label="Mandos de la mesa">
+      <div class="acciones" id="acciones"></div>
+      <div class="camara" id="camara" aria-label="Cámara"></div>
+    </nav>
+  </div>
+
+  <dialog class="modal" id="modal" aria-labelledby="modal-titulo">
+    <div class="modal-cuerpo" id="modal-cuerpo"></div>
+  </dialog>
+  <div class="tostadas" id="tostadas" aria-live="polite"></div>
+
+  <script src="js/cifras.js"></script>
+  <script src="js/iso.js"></script>
+  <script src="js/mapa.js"></script>
+  <script src="js/dibujo.js"></script>
+  <script src="js/personajes.js"></script>
+  <script src="js/paneles.js"></script>
+  <script src="js/maqueta.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

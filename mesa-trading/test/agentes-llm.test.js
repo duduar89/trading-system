@@ -1,0 +1,348 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+const Anthropic = require('@anthropic-ai/sdk');
+
+const {
+  crearLLM, costeDeUso, validarEsquema, esquemaParaApi, construirPeticion, estimarCosteMaximo, tarifaDe,
+} = require('../src/agentes/llm');
+const { RelojSimulado, DIA, diaUTC } = require('../src/util/reloj');
+const { leerJSONL } = require('../src/util/almacen');
+const { mensaje, fetchFalso, carpetaTemporal, relojFijo } = require('./agentes-ayuda');
+
+const T0 = Date.UTC(2026, 8, 29, 12, 0, 0);
+const ESQUEMA = {
+  type: 'object',
+  properties: { modo: { type: 'string', enum: ['NORMAL', 'DEFENSIVO'] }, razon: { type: 'string', maxLength: 200 } },
+  required: ['modo', 'razon'],
+  additionalProperties: false,
+};
+const PETICION = {
+  proposito: 'prueba',
+  sistema: 'Eres la presidenta del comité.',
+  entrada: { patrimonio: 100000, caida: -0.02 },
+  instrucciones: 'Decide el modo.',
+  esquema: ESQUEMA,
+};
+const BUENO = JSON.stringify({ modo: 'NORMAL', razon: 'Sin alertas.' });
+
+function llmCon(respuestas, opciones = {}) {
+  const fetch = fetchFalso(respuestas);
+  const llm = crearLLM({ apiKey: 'sk-prueba', reloj: relojFijo(T0), presupuestoDiaUsd: 5, fetch, ...opciones });
+  return { llm, fetch };
+}
+
+test('sin clave: inactivo, todo devuelve sin_clave y no hay red', async () => {
+  let llamadas = 0;
+  const llm = crearLLM({ apiKey: '', fetch: async () => { llamadas++; throw new Error('no debería llamar'); } });
+  assert.equal(llm.activo, false);
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  assert.equal(r.ok, false);
+  assert.equal(r.motivo, 'sin_clave');
+  assert.equal(llamadas, 0);
+  assert.equal(llm.gastoHoy(), 0);
+  assert.equal(llm.estado().activo, false);
+});
+
+test('opus-5-5 (comité): cuerpo exacto con beta, fallbacks, effort medium, formato y caché', async () => {
+  const { llm, fetch } = llmCon(mensaje({ texto: BUENO }));
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  assert.equal(r.ok, true, r.detalle);
+  assert.deepEqual(r.datos, { modo: 'NORMAL', razon: 'Sin alertas.' });
+  const { url, cabeceras, cuerpo } = fetch.llamadas[0];
+  assert.match(url, /\/v1\/messages\?beta=true$/);
+  assert.equal(cabeceras['anthropic-beta'], 'server-side-fallback-2026-07-01');
+  assert.deepEqual(cuerpo, {
+    model: 'claude-opus-5-5',
+    max_tokens: 2000,
+    fallbacks: 'default',
+    output_config: {
+      effort: 'medium',
+      format: {
+        type: 'json_schema',
+        // maxLength no lo admite la API: se quita al enviar (y se valida en local).
+        schema: {
+          type: 'object',
+          properties: { modo: { type: 'string', enum: ['NORMAL', 'DEFENSIVO'] }, razon: { type: 'string' } },
+          required: ['modo', 'razon'],
+          additionalProperties: false,
+        },
+      },
+    },
+    system: [{ type: 'text', text: 'Eres la presidenta del comité.', cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: 'Decide el modo.\n\nDatos (JSON):\n{"patrimonio":100000,"caida":-0.02}' }],
+  });
+  assert.equal('thinking' in cuerpo, false);
+  assert.equal('temperature' in cuerpo, false);
+});
+
+test('opus-5-5 (agentes): esfuerzo low por defecto y el explícito manda', async () => {
+  const { llm, fetch } = llmCon(mensaje({ texto: BUENO }));
+  await llm.pedirJSON({ ...PETICION, uso: 'agentes' });
+  assert.equal(fetch.llamadas[0].cuerpo.output_config.effort, 'low');
+  await llm.pedirJSON({ ...PETICION, uso: 'agentes', esfuerzo: 'high' });
+  assert.equal(fetch.llamadas[1].cuerpo.output_config.effort, 'high');
+  await llm.pedirJSON({ ...PETICION, uso: 'agentes', esfuerzo: 'turbo' });
+  assert.equal(fetch.llamadas[2].cuerpo.output_config.effort, 'low');
+});
+
+test('haiku-4-5: endpoint estable, sin effort, sin fallbacks ni betas', async () => {
+  const { llm, fetch } = llmCon(mensaje({ texto: BUENO, model: 'claude-haiku-4-5' }), { modeloAgentes: 'claude-haiku-4-5' });
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'agentes', maxTokens: 800 });
+  assert.equal(r.ok, true, r.detalle);
+  const { url, cabeceras, cuerpo } = fetch.llamadas[0];
+  assert.match(url, /\/v1\/messages$/);
+  assert.equal(cabeceras['anthropic-beta'], undefined);
+  assert.deepEqual(Object.keys(cuerpo).sort(), ['max_tokens', 'messages', 'model', 'output_config', 'system']);
+  assert.equal(cuerpo.model, 'claude-haiku-4-5');
+  assert.equal(cuerpo.max_tokens, 800);
+  assert.deepEqual(Object.keys(cuerpo.output_config), ['format']);
+  assert.equal(cuerpo.system[0].cache_control.type, 'ephemeral');
+});
+
+test('los cuatro modelos con salvavidas van por beta; el resto no', () => {
+  for (const m of ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-opus-5', 'claude-fable-5-1']) {
+    assert.equal(construirPeticion({ modelo: m, maxTokens: 10, esfuerzo: 'low', sistema: 's', contenido: 'c', esquema: {} }).via, 'beta', m);
+  }
+  for (const m of ['claude-haiku-4-5', 'claude-opus-4-8', 'claude-sonnet-4-6']) {
+    const p = construirPeticion({ modelo: m, maxTokens: 10, esfuerzo: 'low', sistema: 's', contenido: 'c', esquema: {} });
+    assert.equal(p.via, 'estable', m);
+    assert.equal('effort' in p.cuerpo.output_config, false);
+    assert.equal('fallbacks' in p.cuerpo, false);
+  }
+});
+
+test('coste con usage y la tabla: casos calculados a mano', () => {
+  const usage = { input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 2000, cache_creation_input_tokens: 1000 };
+  // opus-5-5: 1000·4 + 500·20 + 2000·0,20 + 1000·5 = 4000 + 10000 + 400 + 5000 = 19.400 $/MTok → 0,0194 $
+  assert.ok(Math.abs(costeDeUso(usage, 'claude-opus-5-5').costeUsd - 0.0194) < 1e-12);
+  // haiku-4-5: 1000·1 + 500·5 + 2000·0,10 + 1000·1,25 = 1000 + 2500 + 200 + 1250 = 4.950 → 0,00495 $
+  assert.ok(Math.abs(costeDeUso(usage, 'claude-haiku-4-5').costeUsd - 0.00495) < 1e-12);
+  // sonnet-5-5: 1000·2 + 500·10 + 2000·0,2 + 1000·2,5 = 2000 + 5000 + 400 + 2500 = 9.900 → 0,0099 $
+  assert.ok(Math.abs(costeDeUso(usage, 'claude-sonnet-5-5').costeUsd - 0.0099) < 1e-12);
+  // opus-5: 5000 + 12500 + 1000 + 6250 = 24.750 → 0,02475 $ · fable-5-1: 10000 + 25000 + 500 + 12500 = 48.000 → 0,048 $
+  assert.ok(Math.abs(costeDeUso(usage, 'claude-opus-5').costeUsd - 0.02475) < 1e-12);
+  assert.ok(Math.abs(costeDeUso(usage, 'claude-fable-5-1').costeUsd - 0.048) < 1e-12);
+  // Con salvavidas se suman los tramos, cada uno a su tarifa:
+  // opus-5-5 rechaza tras leer 1000 (1000·4 = 4000) + opus-4-8 responde (1000·5 + 500·25 = 17.500) → 21.500 → 0,0215 $
+  const conTramos = {
+    input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 0, cache_creation_input_tokens: 0,
+    iterations: [
+      { type: 'message', model: 'claude-opus-5-5', input_tokens: 1000, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      { type: 'fallback_message', model: 'claude-opus-4-8', input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+    ],
+  };
+  const c = costeDeUso(conTramos, 'claude-opus-5-5');
+  assert.ok(Math.abs(c.costeUsd - 0.0215) < 1e-12);
+  assert.deepEqual(c.tokens, { entrada: 2000, salida: 500, cacheLectura: 0, cacheEscritura: 0 });
+  // Modelo desconocido: a la tarifa más cara (fable-5-1) para no quedarse corto.
+  assert.equal(tarifaDe('claude-nuevo-9').conocida, false);
+  assert.equal(tarifaDe('claude-opus-5-5-20260901').tarifa.entrada, 4);
+});
+
+test('la llamada devuelve coste y tokens, suma al gasto y se apunta en llm-costes.jsonl', async () => {
+  const dir = carpetaTemporal();
+  const rutaCostes = path.join(dir, 'llm-costes.jsonl');
+  const { llm } = llmCon(mensaje({ texto: BUENO }), { rutaCostes });
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  assert.ok(Math.abs(r.costeUsd - 0.0194) < 1e-12);
+  assert.equal(r.modelo, 'claude-opus-5-5');
+  assert.deepEqual(r.tokens, { entrada: 1000, salida: 500, cacheLectura: 2000, cacheEscritura: 1000 });
+  assert.ok(Math.abs(llm.gastoHoy() - 0.0194) < 1e-12);
+  const filas = leerJSONL(rutaCostes);
+  assert.equal(filas.length, 1);
+  const fila = filas[0];
+  assert.deepEqual(Object.keys(fila).sort(),
+    ['cacheEscritura', 'cacheLectura', 'costeUsd', 'entrada', 'modelo', 'motivo', 'ms', 'ok', 'proposito', 'salida', 't'].sort());
+  assert.equal(fila.t, T0);
+  assert.equal(fila.proposito, 'prueba');
+  assert.equal(fila.ok, true);
+  assert.equal(llm.estado().llamadasHoy, 1);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('tope diario: corta ANTES de llamar si el máximo estimado no cabe', async () => {
+  // Máximo de salida: 2000 tokens · 20 $/MTok = 0,04 $ > 0,01 $ de tope.
+  const { llm, fetch } = llmCon(mensaje({ texto: BUENO }), { presupuestoDiaUsd: 0.01 });
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  assert.equal(r.ok, false);
+  assert.equal(r.motivo, 'presupuesto');
+  assert.equal(fetch.llamadas.length, 0);
+});
+
+test('tope diario: el gasto acumulado cuenta, sobrevive a un reinicio y se reinicia al cambiar el día UTC', async () => {
+  const dir = carpetaTemporal();
+  const rutaCostes = path.join(dir, 'llm-costes.jsonl');
+  const reloj = relojFijo(T0);
+  const fetch = fetchFalso(mensaje({ texto: BUENO }));
+  const base = { apiKey: 'sk-prueba', reloj, presupuestoDiaUsd: 0.05, fetch, rutaCostes };
+  const llm = crearLLM(base);
+  const p = { ...PETICION, uso: 'comite', maxTokens: 1000 };
+  // Cada llamada estima ≈ 0,02 $ de salida (1000 · 20/1e6) y cuesta 0,0194 $.
+  assert.equal((await llm.pedirJSON(p)).ok, true);   // 0      + 0,0203 ≤ 0,05
+  assert.equal((await llm.pedirJSON(p)).ok, true);   // 0,0194 + 0,0203 ≤ 0,05
+  const tercera = await llm.pedirJSON(p);            // 0,0388 + 0,0203 > 0,05
+  assert.equal(tercera.motivo, 'presupuesto');
+  assert.equal(fetch.llamadas.length, 2);
+  // Reinicio: el gasto del día sale del fichero.
+  const otro = crearLLM(base);
+  assert.ok(Math.abs(otro.gastoHoy() - 0.0388) < 1e-12);
+  assert.equal((await otro.pedirJSON(p)).motivo, 'presupuesto');
+  // Día siguiente (UTC): presupuesto nuevo.
+  reloj.avanzar(DIA);
+  assert.equal(otro.gastoHoy(), 0);
+  assert.equal((await otro.pedirJSON(p)).ok, true);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('con reloj simulado el día del presupuesto es el real (el dinero es real)', async () => {
+  const dir = carpetaTemporal();
+  const rutaCostes = path.join(dir, 'llm-costes.jsonl');
+  const reloj = new RelojSimulado(Date.UTC(2020, 0, 1));
+  const llm = crearLLM({ apiKey: 'sk-prueba', reloj, presupuestoDiaUsd: 5, fetch: fetchFalso(mensaje({ texto: BUENO })), rutaCostes });
+  await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  reloj.avanzar(10 * DIA);   // la demo acelera días; el gasto no se reinicia
+  assert.ok(llm.gastoHoy() > 0.019);
+  assert.equal(diaUTC(leerJSONL(rutaCostes)[0].t), diaUTC(Date.now()));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('refusal: motivo rechazo, sin leer el contenido, y el coste cuenta', async () => {
+  const { llm } = llmCon(mensaje({ stop_reason: 'refusal', content: [], stop_details: { type: 'refusal', category: 'cyber', explanation: 'x' } }));
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  assert.equal(r.ok, false);
+  assert.equal(r.motivo, 'rechazo');
+  assert.match(r.detalle, /cyber/);
+  assert.ok(llm.gastoHoy() > 0);
+});
+
+test('max_tokens: motivo error aunque el texto parezca JSON', async () => {
+  const { llm } = llmCon(mensaje({ stop_reason: 'max_tokens', texto: '{"modo":"NORM' }));
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  assert.equal(r.motivo, 'error');
+  assert.match(r.detalle, /max_tokens/);
+});
+
+test('JSON que no valida el esquema: motivo esquema', async () => {
+  for (const texto of [
+    JSON.stringify({ modo: 'ATAQUE', razon: 'x' }),               // fuera del enum
+    JSON.stringify({ modo: 'NORMAL' }),                             // falta required
+    JSON.stringify({ modo: 'NORMAL', razon: 'x', extra: 1 }),       // additionalProperties
+    JSON.stringify({ modo: 'NORMAL', razon: 'x'.repeat(201) }),     // maxLength (solo en local)
+    'esto no es JSON',
+  ]) {
+    const { llm } = llmCon(mensaje({ texto }));
+    const r = await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+    assert.equal(r.ok, false, texto);
+    assert.equal(r.motivo, 'esquema', texto);
+  }
+});
+
+test('401: desactiva el LLM, lo dice y las siguientes no hacen red', async () => {
+  const { llm, fetch } = llmCon({ status: 401, cuerpo: { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } } });
+  assert.equal(llm.activo, true);
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  assert.equal(r.ok, false);
+  assert.equal(r.motivo, 'error');
+  assert.match(r.detalle, /401/);
+  assert.equal(llm.activo, false);
+  assert.match(llm.estado().ultimoError, /401/);
+  const r2 = await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  assert.equal(r2.motivo, 'sin_clave');
+  assert.equal(fetch.llamadas.length, 1);
+});
+
+test('429 y fallo de conexión: error sin desactivar', async () => {
+  const { llm } = llmCon({ status: 429, cuerpo: { type: 'error', error: { type: 'rate_limit_error', message: 'lento' } } });
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  assert.equal(r.motivo, 'error');
+  assert.match(r.detalle, /429/);
+  assert.equal(llm.activo, true);
+
+  const cliente = { beta: { messages: { create: async () => { throw new Anthropic.APIConnectionError({ message: 'sin red' }); } } } };
+  const llm2 = crearLLM({ cliente, reloj: relojFijo(T0) });
+  const r2 = await llm2.pedirJSON({ ...PETICION, uso: 'comite' });
+  assert.equal(r2.motivo, 'error');
+  assert.match(r2.detalle, /conexión/);
+  assert.equal(llm2.activo, true);
+});
+
+test('primer bloque de texto aunque antes vengan thinking y fallback', async () => {
+  const content = [
+    { type: 'thinking', thinking: '', signature: 's' },
+    { type: 'fallback', from: { model: 'claude-opus-5-5' }, to: { model: 'claude-opus-4-8' } },
+    { type: 'text', text: BUENO },
+  ];
+  const { llm } = llmCon(mensaje({ content, model: 'claude-opus-4-8' }));
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  assert.equal(r.ok, true, r.detalle);
+  assert.equal(r.modelo, 'claude-opus-4-8');
+});
+
+test('estimación del máximo: caracteres/3 de entrada + maxTokens de salida', () => {
+  // 300 caracteres → 100 tokens · 4 $ + 1000 · 20 $ = 400 + 20.000 = 20.400 $/MTok → 0,0204 $
+  const e = estimarCosteMaximo({ modelo: 'claude-opus-5-5', sistema: 'a'.repeat(100), contenido: 'b'.repeat(198), esquema: {}, maxTokens: 1000 });
+  assert.ok(Math.abs(e - 0.0204) < 1e-12);   // '{}' = 2 caracteres: 100 + 198 + 2 = 300
+});
+
+test('validador mínimo: tipos, required, enum, additionalProperties, items, anyOf', () => {
+  const esq = {
+    type: 'object',
+    properties: {
+      n: { type: 'integer' },
+      x: { type: 'number', minimum: 0, maximum: 1 },
+      l: { type: 'array', items: { type: 'string', enum: ['a', 'b'] } },
+      o: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    },
+    required: ['n', 'l'],
+    additionalProperties: false,
+  };
+  assert.deepEqual(validarEsquema({ n: 3, x: 0.5, l: ['a'], o: null }, esq), []);
+  assert.equal(validarEsquema({ n: 3.5, l: [] }, esq).length, 1);
+  assert.equal(validarEsquema({ n: 3, l: ['c'] }, esq).length, 1);
+  assert.equal(validarEsquema({ n: 3, l: [], x: 2 }, esq).length, 1);
+  assert.equal(validarEsquema({ n: 3, l: [], o: 5 }, esq).length, 1);
+  assert.equal(validarEsquema({ l: [] }, esq).length, 1);
+  assert.equal(validarEsquema({ n: 1, l: [], z: 1 }, esq).length, 1);
+  assert.equal(validarEsquema([], esq).length, 1);
+  assert.equal(validarEsquema({ n: NaN, l: [] }, esq).length, 1);
+});
+
+test('esquema para la API: quita rangos y longitudes y exige additionalProperties false', () => {
+  const api = esquemaParaApi({
+    type: 'object',
+    properties: { a: { type: 'number', minimum: 0 }, b: { type: 'object', properties: { c: { type: 'string', maxLength: 3 } } } },
+    required: ['a'],
+  });
+  assert.deepEqual(api, {
+    type: 'object',
+    properties: { a: { type: 'number' }, b: { type: 'object', properties: { c: { type: 'string' } }, additionalProperties: false } },
+    required: ['a'],
+    additionalProperties: false,
+  });
+});
+
+test('fijarModelos, fijarPresupuesto y forma de estado()', async () => {
+  const { llm, fetch } = llmCon(mensaje({ texto: BUENO, model: 'claude-haiku-4-5' }));
+  assert.deepEqual(Object.keys(llm.estado()).sort(),
+    ['activo', 'gastoHoyUsd', 'llamadasHoy', 'modeloAgentes', 'modeloComite', 'presupuestoDiaUsd', 'ultimoError'].sort());
+  llm.fijarModelos({ modeloAgentes: 'claude-haiku-4-5' });
+  assert.equal(llm.estado().modeloAgentes, 'claude-haiku-4-5');
+  assert.equal(llm.estado().modeloComite, 'claude-opus-5-5');
+  await llm.pedirJSON({ ...PETICION, uso: 'agentes' });
+  assert.equal(fetch.llamadas[0].cuerpo.model, 'claude-haiku-4-5');
+  assert.equal(llm.fijarPresupuesto(1.5), 1.5);
+  assert.equal(llm.estado().presupuestoDiaUsd, 1.5);
+  assert.throws(() => llm.fijarPresupuesto(-1), RangeError);
+  assert.throws(() => llm.fijarPresupuesto('mucho'), RangeError);
+});
+
+test('entrada no serializable: error sin lanzar y sin red', async () => {
+  const { llm, fetch } = llmCon(mensaje({ texto: BUENO }));
+  const ciclo = {}; ciclo.yo = ciclo;
+  const r = await llm.pedirJSON({ ...PETICION, entrada: ciclo });
+  assert.equal(r.motivo, 'error');
+  assert.equal(fetch.llamadas.length, 0);
+});
