@@ -1,0 +1,52 @@
+# Comprobaciones de iemec-app en cada push que la toque: pruebas contra una MariaDB de verdad, lint
+# y compilación del panel. Si algo sale en rojo, la vuelta del loop no está cerrada.
+name: IEMEC · comprobar
+
+on:
+  push:
+    paths: ['iemec-app/**', '.github/workflows/iemec-*.yml']
+  pull_request:
+    paths: ['iemec-app/**']
+  workflow_dispatch:
+
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: iemec-app
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: raiz_ci
+          MARIADB_USER: iemec
+          MARIADB_PASSWORD: iemec_ci
+          MARIADB_DATABASE: iemec_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: raiz_ci
+      DB_NAME: iemec_test
+      IEMEC_EXIGIR_BD: '1'
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # El package-lock puede venir de Windows (portátil): se resuelve desde package.json, como en CIFRA.
+      - name: Dependencias
+        run: rm -f package-lock.json && npm install --no-audit --no-fund
+      - name: Pruebas (con MariaDB)
+        run: npm test
+      - name: Lint
+        run: npm run lint
+      - name: Compilar el panel
+        run: npm run build

@@ -1,0 +1,84 @@
+# Despliegue de iemec-app al cPanel de la clínica. A mano y solo a mano, como CIFRA:
+#   · probar (por defecto): pruebas + compilar + enseñar qué cambiaría. No toca el servidor.
+#   · subir: copia de la base, migraciones, código nuevo, reinicio y comprobación desde dentro.
+# Una vez, antes de la primera vez: `bash iemec-app/scripts/secretos-despliegue.sh` desde tu terminal
+# (crea una clave SSH solo para esto y guarda en GitHub los secretos IEMEC_SSH_KEY, IEMEC_SSH_HOST,
+# IEMEC_SSH_USER, IEMEC_KNOWN_HOSTS e IEMEC_DOMINIO). Ni la clave ni las contraseñas pasan por un chat.
+# Ojo: GitHub solo ofrece «Run workflow» si este fichero está en la rama por defecto del repositorio.
+name: IEMEC · desplegar
+
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'probar = sin tocar el servidor · subir = publicar'
+        type: choice
+        options: [probar, subir]
+        default: probar
+      motivo:
+        description: 'Qué se sube (queda en el registro)'
+        required: false
+        default: ''
+
+concurrency:
+  group: iemec-produccion
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: iemec-app
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: raiz_ci
+          MARIADB_DATABASE: iemec_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASSWORD: raiz_ci
+      DB_NAME: iemec_test
+      IEMEC_EXIGIR_BD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Dependencias
+        run: rm -f package-lock.json && npm install --no-audit --no-fund
+      - name: Pruebas (si algo cae, no se sube nada)
+        run: NODE_ENV=test npm test
+      - name: Compilar el panel
+        run: npm run build
+      - name: Preparar SSH
+        env:
+          IEMEC_SSH_KEY: ${{ secrets.IEMEC_SSH_KEY }}
+          IEMEC_KNOWN_HOSTS: ${{ secrets.IEMEC_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$IEMEC_SSH_KEY" ] || [ -z "$IEMEC_KNOWN_HOSTS" ]; then
+            echo "::error::Faltan los secretos IEMEC_SSH_KEY / IEMEC_KNOWN_HOSTS. Ejecuta 'bash iemec-app/scripts/secretos-despliegue.sh'."
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$IEMEC_SSH_KEY" > ~/.ssh/iemec_deploy && chmod 600 ~/.ssh/iemec_deploy
+          printf '%s\n' "$IEMEC_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Desplegar (${{ inputs.modo }})
+        env:
+          MODO: ${{ inputs.modo }}
+          MOTIVO: ${{ inputs.motivo }}
+          SSH_HOST: ${{ secrets.IEMEC_SSH_HOST }}
+          SSH_USER: ${{ secrets.IEMEC_SSH_USER }}
+          DOMINIO: ${{ secrets.IEMEC_DOMINIO }}
+          SSH_CLAVE: ~/.ssh/iemec_deploy
+        run: bash scripts/desplegar.sh "$MODO"
