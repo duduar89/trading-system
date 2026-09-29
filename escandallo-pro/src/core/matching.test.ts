@@ -544,3 +544,20 @@ describe('cleanProductName: facturas reales de un restaurante nuevo (QA compras)
     expect(cleanProductName(input)).toBe(expected);
   });
 });
+
+describe('marcas propias de mayorista delante del nombre', () => {
+  it.each([
+    ['METRO Chef Patata lavada agata calibre 50/80 caja 12kg', 'Patata'],
+    ['METRO Chef Aceite de oliva virgen extra en bidón 5 L', 'Aceite de oliva virgen extra'],
+    ['METRO Chef Aceite girasol alto oléico 5 Litros', 'Aceite de girasol'],
+    ['METRO Chef queso crema cubo 2 Kg', 'Queso crema'],
+    ['METRO Chef Salsa alioli en bidón 1,85 L', 'Alioli'],
+    ['aro Pimentón dulce en bote 800g', 'Pimentón dulce'],
+  ])('«%s» se vincula a «%s»', (line, product) => {
+    expect(similarity(line, product)).toBeGreaterThanOrEqual(AUTO_LINK_THRESHOLD);
+  });
+
+  it('una anchoa «en aceite de oliva» no es el aceite, aunque el OCR lea «anch04»', () => {
+    expect(similarity('Usisa anch04 del cantábrico en aceite de oliva 500 gne', 'Aceite de oliva virgen extra')).toBeLessThan(SUGGEST_THRESHOLD);
+  });
+});

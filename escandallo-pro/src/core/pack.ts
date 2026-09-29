@@ -9,7 +9,8 @@ type PackUnit = PackSize['unit'];
 
 const SIZE_UNITS: Record<string, PackUnit> = {
   kg: 'kg', kgs: 'kg', kgr: 'kg', kilo: 'kg', kilos: 'kg', kilogramo: 'kg', kilogramos: 'kg', k: 'kg',
-  g: 'g', gr: 'g', grs: 'g', grm: 'g', gramo: 'g', gramos: 'g',
+  // (gn / gne: gramos netos / netos escurridos, como los imprimen los mayoristas: "frasco 860gn", "500 gne")
+  g: 'g', gr: 'g', grs: 'g', grm: 'g', gramo: 'g', gramos: 'g', gn: 'g', gne: 'g',
   l: 'l', lt: 'l', lts: 'l', ltr: 'l', litro: 'l', litros: 'l',
   cl: 'cl', centilitro: 'cl', centilitros: 'cl',
   ml: 'ml', cc: 'ml', mililitro: 'ml', mililitros: 'ml',
@@ -196,7 +197,7 @@ const BILLED: Record<string, { kind: BilledKind; factor: number }> = (() => {
     for (const k of keys.split(/\s+/)) map[k] = { kind, factor };
   };
   add('kg kgs kgr kilo kilos kilogramo kilogramos k', 'mass');
-  add('g gr grs grm gramo gramos', 'mass', 0.001);
+  add('g gr grs grm gramo gramos gn gne', 'mass', 0.001);
   add('l lt lts ltr litro litros', 'volume');
   add('dl', 'volume', 0.1);
   add('cl', 'volume', 0.01);

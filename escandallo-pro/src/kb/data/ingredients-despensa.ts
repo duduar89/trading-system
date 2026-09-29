@@ -32,7 +32,7 @@ export const KB_LACTEOS: KbIngredient[] = [
   ing('Queso manchego curado', 'lacteo', 'kg', 3, 0, 17, { aka: ['manchego', 'queso manchego', 'queso curado', 'manchego curado', 'queso de oveja curado', 'queso viejo'], alg: ['lacteos'] }),
   ing('Queso manchego semicurado', 'lacteo', 'kg', 3, 0, 13, { aka: ['manchego semicurado', 'queso de oveja semicurado'], alg: ['lacteos'] }),
   ing('Queso semicurado', 'lacteo', 'kg', 3, 0, 9.5, { aka: ['queso', 'queso semi', 'queso de mezcla', 'queso semicurado de mezcla', 'queso tierno', 'queso de vaca'], alg: ['lacteos'] }),
-  ing('Queso de cabra', 'lacteo', 'kg', 3, 0, 11, { aka: ['rulo de cabra', 'rulo', 'queso de cabra en rulo', 'queso de cabra fresco', 'chevre'], alg: ['lacteos'] }),
+  ing('Queso de cabra', 'lacteo', 'kg', 3, 0, 11, { aka: ['rulo de cabra', 'rulo', 'queso de cabra en rulo', 'queso de cabra fresco', 'chevre', 'payoyo', 'payoya', 'queso payoyo'], alg: ['lacteos'] }),
   ing('Queso azul', 'lacteo', 'kg', 3, 0, 12, { aka: ['gorgonzola', 'roquefort', 'stilton', 'queso gorgonzola', 'queso roquefort', 'valdeon', 'queso de valdeon'], alg: ['lacteos'] }),
   ing('Queso de Cabrales', 'lacteo', 'kg', 3, 0, 24, { aka: ['cabrales', 'queso cabrales', 'queso picon'], alg: ['lacteos'] }),
   ing('Queso Idiazábal', 'lacteo', 'kg', 3, 0, 18, { aka: ['idiazabal', 'queso idiazabal ahumado', 'idiazabal ahumado'], alg: ['lacteos'] }),

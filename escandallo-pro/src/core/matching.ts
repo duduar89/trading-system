@@ -115,9 +115,10 @@ export function normalizeText(s: string): string {
 /** OCR: "P0LLO" → "pollo", "LECHE 5EMI"… sólo si el resultado es una palabra culinaria conocida. */
 function fixOcrToken(tok: string): string {
   const letters = tok.replace(/[^a-z]/g, '').length;
-  if (letters < 3 || /[2-46-9]/.test(tok) || tok.replace(/[a-z]/g, '').length > 2) return tok;
+  if (letters < 3 || /[236-9]/.test(tok) || tok.replace(/[a-z]/g, '').length > 2) return tok;
+  // (la «a» leída como «4»: "anch04" → "anchoa")
   for (const one of ['l', 'i']) {
-    const fixed = tok.replace(/0/g, 'o').replace(/5/g, 's').replace(/1/g, one);
+    const fixed = tok.replace(/0/g, 'o').replace(/5/g, 's').replace(/4/g, 'a').replace(/1/g, one);
     if (KNOWN.has(fixed) || KNOWN.has(singularize(fixed))) return fixed;
   }
   return tok;
@@ -148,7 +149,7 @@ function correctTypo(t: string): string {
 function preprocess(raw: string): string {
   let s = ` ${basicNormalize(raw)} `;
   const hasDigit = /\d/.test(s);
-  if (hasDigit) s = s.replace(/\b[a-z]*[015][a-z]*(?:[015][a-z]*)?\b/g, (t) => (/[a-z]{2}/.test(t) ? fixOcrToken(t) : t));
+  if (hasDigit) s = s.replace(/\b[a-z]*[0145][a-z]*(?:[0145][a-z]*)?\b/g, (t) => (/[a-z]{2}/.test(t) ? fixOcrToken(t) : t));
   if (s.includes('/')) {
     s = s.replace(/\bs\s*\/\s*([hpeglsca])\b/g, (_m, c: string) => ` sin ${SLASH_SIN[c]} `);
     s = s.replace(/\bc\s*\/\s*([hpc])\b/g, (_m, c: string) => ` con ${SLASH_CON[c]} `);

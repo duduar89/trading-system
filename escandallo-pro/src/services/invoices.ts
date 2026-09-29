@@ -30,7 +30,7 @@ export { recomputeCurrentPrice };
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Prefijos de los avisos que añade la confirmación (se sustituyen al volver a confirmar). */
-const CONFIRM_WARNING_PREFIXES = ['No se ha actualizado el precio', 'Precio convertido de'];
+const CONFIRM_WARNING_PREFIXES = ['No se ha actualizado el precio', 'Precio convertido de', 'No se ha vinculado a'];
 const MISSING_DATE_WARNING = 'No se ha detectado la fecha de la factura: revísala antes de confirmar';
 const NO_LINES_WARNING = 'No se han encontrado líneas de producto: añádelas a mano o vuelve a leer la factura';
 
@@ -699,6 +699,19 @@ export async function confirmInvoice(id: ID): Promise<{ created: number; updated
       const lineUnit = line.baseUnit as BaseUnit;
       const description = line.description.trim();
       let product = line.productId && line.matchStatus !== 'nuevo' ? byId.get(line.productId) : undefined;
+      // Una sugerencia dudosa (no vinculada con seguridad) cuyo precio no encaja con el del producto (más de ×3) no es ese
+      // producto: "Pimiento caramelizado frasco" a 16,67 €/kg no puede fijar el «Pimiento rojo» de 2,20 €/kg. Se crea aparte.
+      if (product && line.matchStatus === 'sugerido' && product.pricePerBase > 0) {
+        const c = priceConversionFactor(lineUnit, product.baseUnit, product);
+        const next = c ? price * c.factor : undefined;
+        if (!next || Math.max(next / product.pricePerBase, product.pricePerBase / next) > 3) {
+          const fmt = (v: number, u: BaseUnit) => `${v.toFixed(2).replace('.', ',')} €/${u}`;
+          warnings.push(
+            `No se ha vinculado a «${product.name}»: su precio (${fmt(product.pricePerBase, product.baseUnit)}) no encaja con el de la línea${next ? ` (${fmt(next, product.baseUnit)})` : ''}; se ha creado como producto nuevo`,
+          );
+          product = undefined;
+        }
+      }
 
       if (!product) {
         const name = cleanStr(line.suggestedName) ?? safeCleanName(description) ?? description;

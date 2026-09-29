@@ -107,6 +107,7 @@ export const HYPERNYMS: Record<string, Set<string>> = {
   ),
   pasta: new Set(words('espagueti macarron tallarin fideo lasana canelon ravioli tortellini penne fusilli noodle')),
   pimiento: new Set(words('piquillo padron lamuyo choricero morron')),
+  salsa: new Set(words('alioli mayonesa ketchup romesco pesto bechamel tartara barbacoa')),
 };
 
 // ───────────────────────────── Ruido ─────────────────────────────
@@ -123,7 +124,7 @@ export const PACK_WORDS = new Set(
     brick tetrabrik tetra pack pk paquete paq pqt pq malla granel bote tarro frasco cubo barqueta tarrina envase estuche sobre
     bidon barril blister fardo palet pallet barra rueda cuna loncha trozo taco diente rama ramita manojo ramillete hoja
     punado chorro chorrito cucharada cucharadita pizca taza vaso copa unidad ud uds u un und unds unid pieza pza pz kg kgs kilo k
-    gr grs grm g gramo mg l lts ltr litro ml cl cc docena dz doc media medio cuarto x aprox approx aproximado pv racion porcion
+    gr grs grm g gn gne gramo mg l lts ltr litro ml cl cc docena dz doc media medio cuarto x aprox approx aproximado pv racion porcion
     individual monodosis dosis tubo spray rollo cartucho keg tercio quinto magnum formato familiar ahorro maxi peso variable
     neto bruto tara retornable
   `),
@@ -132,7 +133,7 @@ export const PACK_WORDS = new Set(
 /** Marcas, origen, marketing, calibres y referencias. */
 export const NOISE_WORDS = new Set(
   words(`
-    hacendado makro aro gourmet premium calidad seleccion selecto select especial eroski dia carrefour auchan alcampo lidl
+    hacendado makro metro rioba aro gourmet premium calidad seleccion selecto select especial eroski dia carrefour auchan alcampo lidl
     mercadona pascual puleva danone president kaiku hochland nestle knorr avecrem heinz hellmanns ybarra carbonell koipe borges
     dcoop coosur maheso pescanova findus frudesa bonduelle campofrio navidul argal revilla tarradellas piara calvo isabel albo
     orlando solis apis barilla garofalo bimbo panrico chef horeca hosteleria profesional foodservice food service fs nacional nac

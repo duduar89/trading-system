@@ -15,6 +15,8 @@ describe('parsePackSize', () => {
     ['AGUA 1,5L X 6', { count: 6, size: 1.5, unit: 'l' }],
     ['ZUMO 200ML X 12 UDS', { count: 12, size: 200, unit: 'ml' }],
     ['PATATA AGRIA SACO 25 KG', { count: 1, size: 25, unit: 'kg' }],
+    ['METRO Chef pimiento caramelizado frasco 860gn', { count: 1, size: 860, unit: 'g' }],
+    ['Anchoa del cantábrico en aceite de oliva 500 gne', { count: 1, size: 500, unit: 'g' }],
     ['VINO BLANCO 0,75L', { count: 1, size: 0.75, unit: 'l' }],
     ['VINO TINTO 75CL', { count: 1, size: 75, unit: 'cl' }],
     ['MANTEQUILLA 1/2 KG', { count: 1, size: 0.5, unit: 'kg' }],

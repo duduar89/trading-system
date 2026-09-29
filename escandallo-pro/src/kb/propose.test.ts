@@ -566,3 +566,14 @@ describe('proposeDishLocal · elaboraciones de base (por lote)', () => {
     }
   });
 });
+
+describe('listas cerradas en la carta', () => {
+  it('«Tabla de quesos — payoya, azul y brie»: los quesos nombrados sustituyen a los de la receta tipo, con la misma ración', () => {
+    const base = proposeDishLocal('Tabla de quesos');
+    const listed = proposeDishLocal('Tabla de quesos', 'Payoya, azul y brie');
+    const cheeses = (p: DishProposal) => p.ingredients.filter((i) => /^Queso/.test(i.name));
+    expect(cheeses(listed).map((i) => i.name).sort()).toEqual(['Queso azul', 'Queso brie', 'Queso de cabra']);
+    const grams = (p: DishProposal) => cheeses(p).reduce((s, i) => s + i.quantity, 0);
+    expect(grams(listed)).toBeCloseTo(grams(base), 0);
+  });
+});

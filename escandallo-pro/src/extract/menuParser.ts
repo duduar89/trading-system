@@ -246,13 +246,15 @@ function analyze(row: MenuRow, ctx: { leading: boolean } = { leading: false }): 
 
 /** Separa "Pulpo a la gallega – con cachelos y pimentón" en nombre y descripción. */
 function splitInlineDescription(name: string): { name: string; description?: string } {
+  // (nunca dentro de un paréntesis abierto: "Tabla de quesos (payoya, azul y brie)")
+  const insideParens = (head: string) => (head.match(/\(/g)?.length ?? 0) > (head.match(/\)/g)?.length ?? 0);
   const m = /^(.{6,}?)\s*(?::|\s[–-]\s|,\s)\s*(\S.*)$/.exec(name);
-  if (m && m[1].trim().split(/\s+/).length >= 2 && isDescriptionLike(m[2]) && !/^\d/.test(m[2])) {
+  if (m && !insideParens(m[1]) && m[1].trim().split(/\s+/).length >= 2 && isDescriptionLike(m[2]) && !/^\d/.test(m[2])) {
     return { name: m[1].trim(), description: m[2].trim() };
   }
   // Guion o punto entre nombre y descripción ("Natillas – Con galleta María", "Café solo. Café en grano")
   const d = /^(.{3,}?\p{L})(?:\s[–-]\s|\.\s|:\s)(\p{L}.*)$/u.exec(name);
-  if (d && d[2].trim().split(/\s+/).length >= 2 && !/\b[A-Z]\.?$|\b(?:d\.o|sta|avda|ctra)$/i.test(d[1])) {
+  if (d && !insideParens(d[1]) && d[2].trim().split(/\s+/).length >= 2 && !/\b[A-Z]\.?$|\b(?:d\.o|sta|avda|ctra)$/i.test(d[1])) {
     return { name: d[1].trim(), description: d[2].trim() };
   }
   const p = /^(.{6,}?)\s*\(([^()]{6,})\)$/.exec(name);

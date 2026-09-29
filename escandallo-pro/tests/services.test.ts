@@ -345,6 +345,27 @@ describe('confirmInvoice', () => {
     return { tomate, inv };
   }
 
+  it('una sugerencia dudosa con un precio que no encaja (×3) no cambia el producto: se crea aparte', async () => {
+    const pimiento = await createProduct({ name: 'Pimiento rojo', baseUnit: 'kg', pricePerBase: 2.2, lastPurchaseDate: '2026-01-10' });
+    const tomate = await createProduct({ name: 'Tomate corazón de buey', baseUnit: 'kg', pricePerBase: 4.5, lastPurchaseDate: '2026-01-10' });
+    const inv = rawInvoice({
+      lines: [
+        line('METRO Chef pimiento caramelizado frasco 860gn', 1, 'ud', 14.34, 14.34, { productId: pimiento.id, matchStatus: 'sugerido', matchScore: 0.81, suggestedName: 'Pimiento caramelizado' }),
+        line('METRO Chef Tomate rosa categoria I caja 4Kg', 1, 'caja', 14.73, 14.73, { productId: tomate.id, matchStatus: 'sugerido', matchScore: 0.57, suggestedName: 'Tomate rosa' }),
+      ],
+    });
+    await db().invoices.add(inv);
+    const res = await confirmInvoice(inv.id);
+    expect(res).toEqual({ created: 1, updated: 1, skipped: 0 });
+    expect((await db().products.get(pimiento.id))?.pricePerBase).toBe(2.2);
+    // El tomate (3,68 €/kg frente a 4,50 estimado) sí encaja
+    expect((await db().products.get(tomate.id))?.pricePerBase).toBeCloseTo(3.6825, 4);
+    const created = (await db().products.toArray()).find((p) => p.name === 'Pimiento caramelizado');
+    expect(created?.pricePerBase).toBeCloseTo(16.674, 2);
+    const saved = await db().invoices.get(inv.id);
+    expect(saved?.lines[0].warnings?.some((w) => /No se ha vinculado a «Pimiento rojo»/.test(w))).toBe(true);
+  });
+
   it('crea productos, registra precios, aprende alias y es idempotente', async () => {
     const { tomate, inv } = await setup();
     const res = await confirmInvoice(inv.id);

@@ -773,7 +773,7 @@ interface TemplateItem {
  * Receta tipo ajustada a lo que dice la carta. Devuelve undefined si la receta no explica el producto principal
  * del plato (p. ej. "Ensalada de gambas" contra una ensalada mixta genérica): entonces manda la heurística.
  */
-function proposeFromTemplate(name: string, match: RecipeMatch, found: Detection[], negated: Detection[]): DishProposal | undefined {
+function proposeFromTemplate(name: string, match: RecipeMatch, found: Detection[], negated: Detection[], description?: string): DishProposal | undefined {
   const { recipe, score } = match;
   const rawName = rawWords(name);
   const factor = portionFactor(rawName, found, recipe);
@@ -797,6 +797,18 @@ function proposeFromTemplate(name: string, match: RecipeMatch, found: Detection[
     if (named && !inDish && swapFamily(roleGroup(it.kb))) swappable.add(i);
   });
 
+  // Ingredientes que la carta nombra expresamente (para las listas: "quesos payoya, azul y brie"): detectados o con su
+  // palabra distintiva en el texto del plato ("azul" → Queso azul)
+  const detectedNames = new Set(found.flatMap((d) => (d.target.kind === 'ing' ? [d.target.ing.name] : [])));
+  const dishWords = new Set([...rawWords(name), ...rawWords(description ?? '')]);
+  const mentioned = {
+    has: (ingName: string) => {
+      if (detectedNames.has(ingName)) return true;
+      const kb = kbByName(ingName);
+      return !!kb && [...ingredientTokens(kb)].some((t) => !nameTokens.has(t) && !GENERIC_TOKENS.has(t) && dishWords.has(t));
+    },
+  };
+  const replaced = new Set<number>();
   const extras: ProposedIngredient[] = [];
   let replaceGarnish = false;
   const newSides: ProposedIngredient[] = [];
@@ -844,7 +856,16 @@ function proposeFromTemplate(name: string, match: RecipeMatch, found: Detection[
       items[i] = { src: { ...it.src, name: target.name }, p: substituteQty(it.p, it.kb, target, true), kb: target };
       continue;
     }
-    if (variants.length > 1) continue;
+    if (variants.length > 1) {
+      // Varias variantes en la receta (los quesos de una tabla): la de la carta sustituye a la primera que la carta no nombra
+      const free = variants.find(({ it, i }) => it.kb && !mentioned.has(it.kb.name) && !replaced.has(i));
+      if (free) {
+        const { it, i } = free;
+        items[i] = { src: { ...it.src, name: ing.name }, p: substituteQty(it.p, it.kb, ing, true), kb: ing };
+        replaced.add(i);
+      }
+      continue;
+    }
     // 3) Guarnición distinta mencionada en la carta
     if ((group === 'veg' || group === 'legume' || group === 'starch') && !d.head && items.some((it) => it.src.garnish)) {
       replaceGarnish = true;
@@ -859,6 +880,20 @@ function proposeFromTemplate(name: string, match: RecipeMatch, found: Detection[
 
   // Una receta genérica de una sola palabra ("ensalada", "hamburguesa") no explica "de gambas": mejor la heurística
   if (unexplainedMain && match.variant.length === 1) return undefined;
+
+  // Lista cerrada en la carta (dos o más variantes nombradas, "payoya, azul y brie"): fuera las de la receta que no nombra;
+  // su cantidad se reparte entre las nombradas (misma ración total)
+  const named = items.filter((it) => it.kb && mentioned.has(it.kb.name));
+  const namedVariants = named.filter((it) => named.some((o) => o !== it && o.kb && it.kb && isVariant(o.kb, it.kb)));
+  if (namedVariants.length >= 2) {
+    const drop = items.filter((it) => it.kb && !mentioned.has(it.kb.name) && !it.src.garnish && namedVariants.some((n) => n.kb && it.kb && isVariant(it.kb, n.kb)));
+    const freed = drop.reduce((s, it) => s + (it.p.unit === namedVariants[0].p.unit ? it.p.quantity : 0), 0);
+    if (drop.length) {
+      items = items.filter((it) => !drop.includes(it));
+      const share = freed / namedVariants.length;
+      for (const it of namedVariants) if (it.p.unit === namedVariants[0].p.unit) it.p = { ...it.p, quantity: roundQty(it.p.quantity + share, it.p.unit) };
+    }
+  }
 
   if (replaceGarnish) {
     // Se conserva la guarnición de la receta que la carta nombra expresamente ("… con patatas fritas y pimientos de Padrón")
@@ -1365,7 +1400,7 @@ export function proposeDishLocal(name: string, description?: string, opts: { kin
     opts.kind === 'elaboracion' ? (proposeFromPreparation(name, nameToks, found, negated) ?? proposeFromElaboration(name, nameToks, negated)) : undefined;
   const match = !proposal && nameToks.length ? matchRecipe(name, description, { nameToks, descToks, dets: found }) : undefined;
   if (match && match.score >= KB_TEMPLATE_THRESHOLD && !(isVeggie(nameToks, descToks) && hasAnimalProtein(match.recipe))) {
-    proposal = proposeFromTemplate(name, match, found, negated);
+    proposal = proposeFromTemplate(name, match, found, negated, description);
   }
   if (!proposal) {
     proposal = nameToks.length || descToks.length ? proposeHeuristic(name, nameToks, descToks, found, negated) : minimalProposal(name);
