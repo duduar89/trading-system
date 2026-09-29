@@ -46,6 +46,8 @@ export interface PaddleOptions {
   spaceProb?: number;
   /** Buscar precios cortos que la detección se haya dejado (ver `isolatedInkBoxes`). */
   rescuePrices?: boolean;
+  /** Separar los renglones que la detección une y cortar los curvados en trozos rectos (ver `splitComponentLines`). */
+  splitLines?: boolean;
 }
 
 /**
@@ -63,6 +65,7 @@ export const PADDLE_DEFAULTS: Required<PaddleOptions> = {
   maxBoxes: 3000,
   spaceProb: 0.3,
   rescuePrices: true,
+  splitLines: true,
 };
 
 export const REC_HEIGHT = 48;
@@ -308,8 +311,10 @@ function quadScore(prob: Float32Array, w: number, h: number, q: [Point, Point, P
 /**
  * Tramos de columnas de una componente del mapa de DB, separados por los rellenos de puntos (o filetes) que la red une
  * al texto: «Croquetas ·········· 9,50» sale como una sola mancha, con el relleno como una banda fina. Donde la ocupación
- * de las columnas cae por debajo del 40 % de la altura durante más de 1,5 alturas, se corta (y el relleno se descarta):
- * el nombre y el precio quedan en cajas aparte, sin los puntos, que confunden al reconocedor.
+ * de las columnas cae por debajo del 40 % del grosor del texto durante más de 1,5 grosores, se corta (y el relleno se
+ * descarta): el nombre y el precio quedan en cajas aparte, sin los puntos, que confunden al reconocedor.
+ * El grosor es el de las columnas con más tinta (percentil 90), no el alto de la mancha: en un renglón inclinado o
+ * curvado la mancha es mucho más alta que el texto y, medida con su alto, todo el renglón parecería relleno.
  */
 export function splitLeaderRuns(pix: Int32Array, count: number, width: number, minX: number, maxX: number, minY: number, maxY: number): [number, number][] {
   const h = maxY - minY + 1;
@@ -321,8 +326,12 @@ export function splitLeaderRuns(pix: Int32Array, count: number, width: number, m
     const y = (idx / width) | 0;
     occ[idx - y * width - minX]++;
   }
-  const dense = (x: number) => occ[x] >= 0.4 * h;
-  const minRun = Math.max(3, Math.round(1.5 * h));
+  const filled = Array.from(occ)
+    .filter((v) => v > 0)
+    .sort((a, b) => a - b);
+  const thick = Math.min(h, filled[Math.floor(filled.length * 0.9)] ?? h);
+  const dense = (x: number) => occ[x] >= 0.4 * thick;
+  const minRun = Math.max(3, Math.round(1.5 * thick));
   const out: [number, number][] = [];
   let segStart = -1;
   let sparse = 0;
@@ -342,6 +351,318 @@ export function splitLeaderRuns(pix: Int32Array, count: number, width: number, m
   return out.length ? out : [[minX, maxX]];
 }
 
+// ───────────────────────────── Renglones pegados y curvados ─────────────────────────────
+
+/** Trozo de una componente del mapa de DB: sus píxeles (índices del mapa) y, si se ha cortado a lo ancho, por dónde. */
+export interface ComponentPiece {
+  pix: Int32Array;
+  /** Columna del mapa por la que se ha cortado a la izquierda / a la derecha (la caja no se expande más allá). */
+  cutLeft?: number;
+  cutRight?: number;
+}
+
+/** Tramo vertical de píxeles de la componente en una columna (coordenadas locales, y1 incluida). */
+interface ColumnRun {
+  x: number;
+  y0: number;
+  y1: number;
+}
+
+/** Renglón seguido a lo ancho de la componente: centro de su tramo en cada columna limpia. */
+interface Strand {
+  xs: number[];
+  cs: number[];
+}
+
+/** Pendiente del final de un renglón seguido (últimas ~2 alturas), acotada. */
+function strandSlope(s: Strand, span: number): number {
+  const n = s.xs.length;
+  if (n < 2) return 0;
+  const last = n - 1;
+  let j = last;
+  while (j > 0 && s.xs[last] - s.xs[j - 1] <= span) j--;
+  if (j === last) j = last - 1;
+  const dx = s.xs[last] - s.xs[j];
+  return dx > 0 ? Math.max(-0.5, Math.min(0.5, (s.cs[last] - s.cs[j]) / dx)) : 0;
+}
+
+/** Suma de cuadrados de los residuos de la recta de mínimos cuadrados de los puntos [a, b) (sumas acumuladas). */
+function ssrOf(acc: { n: Float64Array; x: Float64Array; y: Float64Array; xx: Float64Array; xy: Float64Array; yy: Float64Array }, a: number, b: number): number {
+  const n = acc.n[b] - acc.n[a];
+  if (n < 3) return 0;
+  const sx = acc.x[b] - acc.x[a];
+  const sy = acc.y[b] - acc.y[a];
+  const sxx = acc.xx[b] - acc.xx[a] - (sx * sx) / n;
+  const sxy = acc.xy[b] - acc.xy[a] - (sx * sy) / n;
+  const syy = acc.yy[b] - acc.yy[a] - (sy * sy) / n;
+  return Math.max(0, sxx > 1e-9 ? syy - (sxy * sxy) / sxx : syy);
+}
+
+/**
+ * Separa los renglones que la red de detección une en una sola mancha y corta los renglones curvados en trozos rectos.
+ *
+ * En las fotos de facturas a página completa (letra pequeña, interlineado apretado, papel curvado o arrugado) dos
+ * renglones vecinos se tocan en el mapa de DB: su rectángulo mínimo abarca los dos y el reconocedor lee un revoltijo
+ * («que azu razalema queso»). Y un renglón largo y curvado queda en un rectángulo mucho más alto que él: su
+ * puntuación media no llega al mínimo y se pierde entero, o el reconocedor lee las letras subiendo y bajando.
+ *
+ * Método (sobre los tramos verticales de la componente en cada columna):
+ *  1. Grosor típico T del renglón: mediana de los tramos de las columnas con un solo tramo.
+ *  2. Los tramos limpios (≤ 1,7 T) se encadenan de columna en columna siguiendo el centro previsto con la pendiente
+ *     local: cada cadena larga es un renglón. Los tramos gruesos (donde dos renglones se tocan) no deciden nada.
+ *  3. Con dos o más renglones, cada píxel va al renglón cuyo eje le queda más cerca.
+ *  4. Cada renglón cuyo eje se aparta de una recta más de un tercio de T se corta, por la columna más estrecha (el hueco
+ *     entre palabras) cerca del mejor punto de corte, hasta que los trozos son rectos.
+ * Devuelve undefined si la componente ya es un solo renglón recto (lo habitual: nada cambia).
+ */
+export function splitComponentLines(pix: Int32Array, count: number, width: number, x0 = 0, x1 = Infinity): ComponentPiece[] | undefined {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let n = 0;
+  for (let k = 0; k < count; k++) {
+    const idx = pix[k];
+    const y = (idx / width) | 0;
+    const x = idx - y * width;
+    if (x < x0 || x > x1) continue;
+    n++;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const bw = maxX - minX + 1;
+  const bh = maxY - minY + 1;
+  if (n < 16 || bh < 4 || bw < 8 || bw * bh > 4e6) return undefined;
+  const mask = new Uint8Array(bw * bh);
+  for (let k = 0; k < count; k++) {
+    const idx = pix[k];
+    const y = (idx / width) | 0;
+    const x = idx - y * width;
+    if (x < x0 || x > x1) continue;
+    mask[(y - minY) * bw + (x - minX)] = 1;
+  }
+  // Tramos por columna
+  const runs: ColumnRun[] = [];
+  const colStart = new Int32Array(bw + 1);
+  for (let x = 0; x < bw; x++) {
+    colStart[x] = runs.length;
+    let start = -1;
+    for (let y = 0; y <= bh; y++) {
+      const on = y < bh && mask[y * bw + x] === 1;
+      if (on && start < 0) start = y;
+      if (!on && start >= 0) {
+        runs.push({ x, y0: start, y1: y - 1 });
+        start = -1;
+      }
+    }
+  }
+  colStart[bw] = runs.length;
+  // 1) Grosor típico
+  const single: number[] = [];
+  for (let x = 0; x < bw; x++) if (colStart[x + 1] - colStart[x] === 1) single.push(runs[colStart[x]].y1 - runs[colStart[x]].y0 + 1);
+  let T: number;
+  if (single.length >= Math.max(3, bw * 0.2)) {
+    single.sort((a, b) => a - b);
+    T = single[single.length >> 1];
+  } else {
+    const all = runs.map((r) => r.y1 - r.y0 + 1).sort((a, b) => a - b);
+    T = all[all.length >> 2] ?? bh;
+  }
+  T = Math.max(2, T);
+  const clean = (r: ColumnRun) => r.y1 - r.y0 + 1 <= 1.7 * T;
+  const multi = runs.some((r) => !clean(r)) || single.length < bw;
+  // Un solo renglón: basta con comprobar que es recto
+  const straightTol = Math.max(1.5, T / 3);
+  const minPiece = Math.max(6, 4 * T);
+  // 2) Renglones seguidos por los tramos limpios
+  const strands: Strand[] = [];
+  if (multi) {
+    const gap = Math.max(2, Math.round(2 * T));
+    const open: Strand[] = [];
+    for (let x = 0; x < bw; x++) {
+      const col = runs.slice(colStart[x], colStart[x + 1]).filter(clean);
+      if (!col.length) continue;
+      const pairs: { r: number; s: Strand; d: number }[] = [];
+      for (let i = 0; i < col.length; i++) {
+        const c = (col[i].y0 + col[i].y1) / 2;
+        for (const s of open) {
+          const lx = s.xs[s.xs.length - 1];
+          if (x - lx > gap) continue;
+          const pc = s.cs[s.cs.length - 1] + strandSlope(s, 2 * T) * (x - lx);
+          const d = Math.abs(c - pc);
+          if (d <= 0.6 * T) pairs.push({ r: i, s, d });
+        }
+      }
+      pairs.sort((a, b) => a.d - b.d);
+      const usedR = new Set<number>();
+      const usedS = new Set<Strand>();
+      for (const p of pairs) {
+        if (usedR.has(p.r) || usedS.has(p.s)) continue;
+        usedR.add(p.r);
+        usedS.add(p.s);
+        p.s.xs.push(x);
+        p.s.cs.push((col[p.r].y0 + col[p.r].y1) / 2);
+      }
+      for (let i = 0; i < col.length; i++) {
+        if (usedR.has(i)) continue;
+        const s = { xs: [x], cs: [(col[i].y0 + col[i].y1) / 2] };
+        open.push(s);
+        strands.push(s);
+      }
+    }
+    // Trozos del mismo renglón separados por un cruce largo: se unen si uno sigue la dirección del otro
+    strands.sort((a, b) => a.xs[0] - b.xs[0]);
+    for (let merged = true; merged; ) {
+      merged = false;
+      for (let i = 0; i < strands.length && !merged; i++) {
+        const a = strands[i];
+        const ax = a.xs[a.xs.length - 1];
+        for (let j = 0; j < strands.length; j++) {
+          const b = strands[j];
+          if (a === b || b.xs[0] <= ax || b.xs[0] - ax > 6 * T) continue;
+          const pc = a.cs[a.cs.length - 1] + strandSlope(a, 2 * T) * (b.xs[0] - ax);
+          if (Math.abs(b.cs[0] - pc) > 0.6 * T) continue;
+          a.xs.push(...b.xs);
+          a.cs.push(...b.cs);
+          strands.splice(j, 1);
+          merged = true;
+          break;
+        }
+      }
+    }
+  }
+  const real = strands.filter((s) => s.xs.length >= Math.max(3, 1.5 * T));
+  // Renglones apilados: dos renglones seguidos a la vez a lo largo de al menos 3 alturas (no un tilde o un volado)
+  const overlap = (a: Strand, b: Strand) => Math.min(a.xs[a.xs.length - 1], b.xs[b.xs.length - 1]) - Math.max(a.xs[0], b.xs[0]);
+  const stacked = real.some((a, i) => real.some((b, j) => j > i && overlap(a, b) >= 3 * T));
+  // 3) Cada píxel, al renglón más cercano
+  let groups: number[][];
+  if (stacked) {
+    const axes = real.map((s) => {
+      const c = new Float32Array(bw);
+      const out = new Float32Array(bw);
+      const first = s.xs[0];
+      const last = s.xs[s.xs.length - 1];
+      let k = 0;
+      const head = s.xs.length > 1 ? (s.cs[Math.min(s.xs.length - 1, Math.round(2 * T))] - s.cs[0]) / Math.max(1, s.xs[Math.min(s.xs.length - 1, Math.round(2 * T))] - first) : 0;
+      const tail = strandSlope(s, 2 * T);
+      for (let x = 0; x < bw; x++) {
+        if (x <= first) {
+          c[x] = s.cs[0] + Math.max(-0.5, Math.min(0.5, head)) * (x - first);
+          out[x] = first - x;
+        } else if (x >= last) {
+          c[x] = s.cs[s.cs.length - 1] + tail * (x - last);
+          out[x] = x - last;
+        } else {
+          while (k + 1 < s.xs.length && s.xs[k + 1] < x) k++;
+          const xa = s.xs[k];
+          const xb = s.xs[k + 1];
+          const t = xb > xa ? (x - xa) / (xb - xa) : 0;
+          c[x] = s.cs[k] * (1 - t) + s.cs[k + 1] * t;
+        }
+      }
+      return { c, out };
+    });
+    groups = real.map(() => []);
+    for (let k = 0; k < count; k++) {
+      const idx = pix[k];
+      const y = (idx / width) | 0;
+      const x = idx - y * width;
+      if (x < x0 || x > x1) continue;
+      const lx = x - minX;
+      const ly = y - minY;
+      let best = 0;
+      let bestCost = Infinity;
+      axes.forEach((a, i) => {
+        const cost = Math.abs(ly - a.c[lx]) + 0.3 * a.out[lx];
+        if (cost < bestCost) {
+          bestCost = cost;
+          best = i;
+        }
+      });
+      groups[best].push(idx);
+    }
+  } else {
+    const all: number[] = [];
+    for (let k = 0; k < count; k++) {
+      const idx = pix[k];
+      const x = idx % width;
+      if (x >= x0 && x <= x1) all.push(idx);
+    }
+    groups = [all];
+  }
+  // 4) Renglones curvados → trozos rectos
+  const pieces: ComponentPiece[] = [];
+  const cutPiece = (list: number[], cutLeft: number | undefined, cutRight: number | undefined, depth: number) => {
+    let gx0 = Infinity;
+    let gx1 = -Infinity;
+    for (const idx of list) {
+      const x = idx % width;
+      if (x < gx0) gx0 = x;
+      if (x > gx1) gx1 = x;
+    }
+    const gw = gx1 - gx0 + 1;
+    const cnt = new Float64Array(gw);
+    const sumY = new Float64Array(gw);
+    for (const idx of list) {
+      const y = (idx / width) | 0;
+      const x = idx - y * width - gx0;
+      cnt[x]++;
+      sumY[x] += y;
+    }
+    // Eje (centro de cada columna) y sumas acumuladas para las rectas de mínimos cuadrados
+    const acc = { n: new Float64Array(gw + 1), x: new Float64Array(gw + 1), y: new Float64Array(gw + 1), xx: new Float64Array(gw + 1), xy: new Float64Array(gw + 1), yy: new Float64Array(gw + 1) };
+    for (let x = 0; x < gw; x++) {
+      const has = cnt[x] > 0 ? 1 : 0;
+      const c = has ? sumY[x] / cnt[x] : 0;
+      acc.n[x + 1] = acc.n[x] + has;
+      acc.x[x + 1] = acc.x[x] + has * x;
+      acc.y[x + 1] = acc.y[x] + has * c;
+      acc.xx[x + 1] = acc.xx[x] + has * x * x;
+      acc.xy[x + 1] = acc.xy[x] + has * x * c;
+      acc.yy[x + 1] = acc.yy[x] + has * c * c;
+    }
+    const done = () => pieces.push({ pix: Int32Array.from(list), cutLeft, cutRight });
+    if (depth >= 3 || gw < 2 * minPiece) return done();
+    // ¿Recto? Mayor desviación del eje respecto de su recta
+    const nn = acc.n[gw];
+    const sx = acc.x[gw];
+    const sy = acc.y[gw];
+    const vxx = acc.xx[gw] - (sx * sx) / nn;
+    const slope = vxx > 1e-9 ? (acc.xy[gw] - (sx * sy) / nn) / vxx : 0;
+    const icpt = (sy - slope * sx) / nn;
+    let maxDev = 0;
+    for (let x = 0; x < gw; x++) if (cnt[x]) maxDev = Math.max(maxDev, Math.abs(sumY[x] / cnt[x] - (icpt + slope * x)));
+    if (maxDev <= straightTol) return done();
+    // Mejor corte en dos rectas y, cerca, la columna más estrecha (mejor entre palabras que por en medio de una letra)
+    let cut = -1;
+    let bestSsr = Infinity;
+    for (let c = Math.ceil(minPiece); c <= gw - Math.ceil(minPiece); c++) {
+      const s = ssrOf(acc, 0, c) + ssrOf(acc, c, gw);
+      if (s < bestSsr) {
+        bestSsr = s;
+        cut = c;
+      }
+    }
+    if (cut < 0) return done();
+    let narrow = cut;
+    for (let c = Math.max(Math.ceil(minPiece), cut - Math.round(1.5 * T)); c <= Math.min(gw - Math.ceil(minPiece), cut + Math.round(1.5 * T)); c++) {
+      if (cnt[c] < cnt[narrow] || (cnt[c] === cnt[narrow] && Math.abs(c - cut) < Math.abs(narrow - cut))) narrow = c;
+    }
+    const at = gx0 + narrow;
+    const left: number[] = [];
+    const right: number[] = [];
+    for (const idx of list) (idx % width < at ? left : right).push(idx);
+    if (!left.length || !right.length) return done();
+    cutPiece(left, cutLeft, at - 1, depth + 1);
+    cutPiece(right, at, cutRight, depth + 1);
+  };
+  for (const g of groups) if (g.length) cutPiece(g, undefined, undefined, 0);
+  return pieces.length > 1 ? pieces : undefined;
+}
+
 /**
  * Cajas de texto a partir del mapa de probabilidad de DB (lo que hace `DBPostProcess` de PaddleOCR): umbral,
  * componentes conexas, rectángulo mínimo, puntuación media, expansión («unclip») y vuelta a la escala original.
@@ -350,9 +671,10 @@ export function dbBoxes(
   prob: Float32Array,
   width: number,
   height: number,
-  opts: { thresh?: number; boxThresh?: number; unclipRatio?: number; scaleX?: number; scaleY?: number; maxBoxes?: number; minSize?: number } = {},
+  opts: { thresh?: number; boxThresh?: number; unclipRatio?: number; scaleX?: number; scaleY?: number; maxBoxes?: number; minSize?: number; splitLines?: boolean } = {},
 ): TextQuad[] {
   const thresh = opts.thresh ?? PADDLE_DEFAULTS.detThresh;
+  const splitLines = opts.splitLines ?? PADDLE_DEFAULTS.splitLines;
   const boxThresh = opts.boxThresh ?? PADDLE_DEFAULTS.boxThresh;
   const ratio = opts.unclipRatio ?? PADDLE_DEFAULTS.unclipRatio;
   const sx = opts.scaleX ?? 1;
@@ -364,8 +686,12 @@ export function dbBoxes(
   const stack = new Int32Array(n);
   const pix = new Int32Array(n);
   const out: TextQuad[] = [];
-  /** Caja de un conjunto de píxeles de la componente (rectángulo mínimo, puntuación, expansión, escala). */
-  const boxFrom = (list: Int32Array, from: number, to: number, x0: number, x1: number) => {
+  /**
+   * Caja de un conjunto de píxeles de la componente (rectángulo mínimo, puntuación, expansión, escala). En un trozo
+   * cortado a lo ancho (ver `splitComponentLines`) la caja no se expande por el lado del corte: el texto sigue en el
+   * trozo vecino y se leería dos veces.
+   */
+  const boxFrom = (list: Int32Array, from: number, to: number, x0: number, x1: number, cuts?: { left?: number; right?: number }) => {
     const rowMin = new Map<number, number>();
     const rowMax = new Map<number, number>();
     let minY = Infinity;
@@ -394,7 +720,14 @@ export function dbBoxes(
     if (!rect || Math.min(rect.width, rect.height) < minSize) return;
     const score = quadScore(prob, width, height, rectCorners(rect));
     if (score < boxThresh) return;
-    const big = unclipRect(rect, ratio);
+    let big = unclipRect(rect, ratio);
+    if (cuts && (cuts.left !== undefined || cuts.right !== undefined)) {
+      const d = (big.width - rect.width) / 2;
+      const eL = cuts.left !== undefined ? 0 : d;
+      const eR = cuts.right !== undefined ? 0 : d;
+      const shift = (eR - eL) / 2;
+      big = { ...big, width: rect.width + eL + eR, cx: rect.cx + rect.ux * shift, cy: rect.cy + rect.uy * shift };
+    }
     if (Math.min(big.width, big.height) < minSize + 2) return;
     const [tl, tr, br, bl] = rectCorners(big).map((p) => ({ x: Math.max(0, Math.min(width, p.x)) * sx, y: Math.max(0, Math.min(height, p.y)) * sy }));
     out.push({ tl, tr, br, bl, score });
@@ -435,7 +768,12 @@ export function dbBoxes(
       }
     }
     if (count < 4 || maxY - minY < minSize - 1) continue;
-    for (const [a, b] of splitLeaderRuns(pix, count, width, minX, maxX, minY, maxY)) boxFrom(pix, 0, count, a, b);
+    for (const [a, b] of splitLeaderRuns(pix, count, width, minX, maxX, minY, maxY)) {
+      // Renglones pegados o curvados: un trozo recto por renglón
+      const pieces = splitLines ? splitComponentLines(pix, count, width, a, b) : undefined;
+      if (!pieces) boxFrom(pix, 0, count, a, b);
+      else for (const p of pieces) boxFrom(p.pix, 0, p.pix.length, a, b, { left: p.cutLeft, right: p.cutRight });
+    }
   }
   // Orden de lectura aproximado: de arriba abajo y, en la misma franja, de izquierda a derecha
   out.sort((a, b) => {
@@ -1281,6 +1619,7 @@ export async function paddleRecognize(
     scaleX: img.width / mw,
     scaleY: img.height / mh,
     maxBoxes: o.maxBoxes,
+    splitLines: o.splitLines,
   });
   // Precios cortos que la detección se ha dejado (se leen y sólo se conservan si son un precio)
   const rescued = o.rescuePrices ? isolatedInkBoxes(img, quads, img.width / mw) : [];

@@ -12,7 +12,7 @@ agencias/consultoras de hostelería. Funciona en el móvil, la tablet y el orden
 
 | Paso | Qué ocurre |
 | --- | --- |
-| **1. Facturas** | Arrastra facturas en PDF, fotos del móvil, PDF escaneados o un Excel/CSV con tu listado de compras. Se leen proveedor, CIF, número, fecha, líneas, cantidades, formatos («caja 6×1 l», «saco 25 kg»), descuentos, IVA y totales; cada línea se valida (cantidad × precio × (1 − dto) = importe; suma de líneas = base imponible) y se calcula el **precio real por kg, litro o unidad**. Avisa de facturas repetidas y de líneas dudosas. |
+| **1. Facturas** | Arrastra facturas en PDF, fotos del móvil (también una factura larga en varias fotos), PDF escaneados o un Excel/CSV con tu listado de compras. Entiende también las facturas de mayoristas y cash & carry (artículos en dos filas con código de unidad, pesos, trazabilidad y total por página). Se leen proveedor, CIF, número, fecha, líneas, cantidades, formatos («caja 6×1 l», «saco 25 kg»), descuentos, IVA y totales; cada línea se valida (cantidad × precio × (1 − dto) = importe; suma de líneas = base imponible) y se calcula el **precio real por kg, litro o unidad**. Avisa de facturas repetidas y de líneas dudosas. |
 | **2. Base de ingredientes** | Cada línea se coteja con tus ingredientes (tolerante a abreviaturas de proveedor, plurales, marcas y calibres) y aprende tus nombres. Histórico de precios, **alertas de subida**, fusión de duplicados e importación de tarifas. |
 | **3. Foto de la carta** | Fotografía la carta (una o varias páginas, también pizarras) o sube el PDF: secciones, platos, descripciones y PVP, listos para revisar. |
 | **4. Propuesta de escandallo** | Para cada plato se proponen ingredientes con gramajes profesionales por ración (recetario local con 620 ingredientes y 300+ recetas tipo, o IA opcional) y se **cotejan con los productos de tus facturas**; lo que falte se crea con un precio estimado que se corrige solo al subir la factura. |
@@ -46,6 +46,9 @@ de facturas y cartas, con variantes degradadas: foto girada, perspectiva, sombra
 | Documentos de ejemplo (`public/samples`) | **100 %** |
 
 Siempre se muestra una pantalla de revisión antes de guardar nada, con las líneas dudosas marcadas.
+
+**Consejo para las fotos:** hazlas desde la app («Hacer foto») o, si llegan por WhatsApp, que te las envíen como
+*documento*: como foto, WhatsApp las reduce a 1600 px y la letra pequeña de una factura entera se pierde (la app lo avisa).
 
 ## IA opcional (Claude)
 

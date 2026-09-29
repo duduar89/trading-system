@@ -149,9 +149,228 @@ export function residualSlope(page: TessPage): number {
   return Math.max(-0.03, Math.min(0.03, s));
 }
 
-function toFragments(words: OcrWord[], slope: number): Frag[] {
+/**
+ * Enderezado local de la página: devuelve, para un punto (x, y) de una línea base, la altura a la que esa misma línea
+ * de texto cruza el margen izquierdo del texto. Así las palabras de una fila quedan a la misma altura aunque el papel
+ * esté curvado o arrugado y cada zona tenga su propia inclinación (con una pendiente única para toda la página, en una
+ * foto con la parte de arriba combada los importes de la derecha caían en la fila de abajo).
+ *
+ * Método: cada renglón largo (su línea base mide al menos 5 alturas de texto) aporta su pendiente; en una rejilla sobre
+ * la página (9 columnas, una fila cada 2 alturas) se toma la mediana ponderada de los renglones cercanos (peso = largo ×
+ * cercanía gaussiana, 3 alturas en vertical y un 30 % del ancho en horizontal) y la media de los que no se apartan de
+ * ella más de 2 puntos. La altura enderezada se obtiene siguiendo la corriente de ese campo desde el punto hasta el
+ * margen (integración por el punto medio). Con una pendiente constante equivale a restar pendiente · x, lo de siempre.
+ * Devuelve undefined si hay menos de 3 renglones largos (entonces se usa `residualSlope`).
+ */
+export interface SlopeField {
+  /** Pendiente local del texto en (x, y). */
+  slopeAt: (x: number, y: number) => number;
+  /** Altura enderezada: dónde cruza el margen izquierdo del texto la línea que pasa por (x, y). */
+  straighten: (x: number, y: number) => number;
+}
+
+export function pageSlopeField(page: TessPage): SlopeField | undefined {
+  const lines: TessLine[] = [];
+  for (const block of page.blocks ?? []) for (const par of block.paragraphs ?? []) for (const l of par.lines ?? []) if (l?.bbox) lines.push(l);
+  if (lines.length < 3) return undefined;
+  const heights = lines.map((l) => (l.rowAttributes?.rowHeight && l.rowAttributes.rowHeight > 0 ? l.rowAttributes.rowHeight : l.bbox.y1 - l.bbox.y0)).filter((h) => h > 0);
+  const lh = median0(heights);
+  if (!(lh > 0)) return undefined;
+  const px0 = Math.min(...lines.map((l) => l.bbox.x0));
+  const px1 = Math.max(...lines.map((l) => l.bbox.x1));
+  const py0 = Math.min(...lines.map((l) => l.bbox.y0));
+  const py1 = Math.max(...lines.map((l) => l.bbox.y1));
+  const pw = px1 - px0;
+  if (pw <= 0) return undefined;
+  const samples: { x0: number; x1: number; y: number; s: number; w: number }[] = [];
+  for (const l of lines) {
+    const b = l.baseline;
+    if (!b) continue;
+    const dx = b.x1 - b.x0;
+    if (dx < Math.max(3 * lh, 0.02 * pw)) continue;
+    const s = (b.y1 - b.y0) / dx;
+    if (Math.abs(s) > 0.15) continue;
+    samples.push({ x0: b.x0, x1: b.x1, y: (b.y0 + b.y1) / 2, s, w: dx * dx });
+  }
+  if (samples.length < 3) return undefined;
+  const sx = 0.15 * pw;
+  const sy = 2.5 * lh;
+  /** Pendiente robusta con pesos: mediana ponderada y media de los que no se apartan de ella. */
+  const robust = (ws: number[]): number | undefined => {
+    const idx = ws.map((_, i) => i).filter((i) => ws[i] > 1e-6);
+    const total = idx.reduce((a, i) => a + ws[i], 0);
+    if (!idx.length || total <= 1e-3) return undefined;
+    idx.sort((a, b) => samples[a].s - samples[b].s);
+    let acc = 0;
+    let med = samples[idx[idx.length - 1]].s;
+    for (const i of idx) {
+      acc += ws[i];
+      if (acc >= total / 2) {
+        med = samples[i].s;
+        break;
+      }
+    }
+    let sw = 0;
+    let ss = 0;
+    for (const i of idx) {
+      if (Math.abs(samples[i].s - med) > 0.02) continue;
+      sw += ws[i];
+      ss += ws[i] * samples[i].s;
+    }
+    return sw > 0 ? ss / sw : med;
+  };
+  const globalSlope = robust(samples.map((p) => p.w)) ?? 0;
+  const nx = 9;
+  const stepY = Math.max(2 * lh, (py1 - py0) / 200);
+  const ny = Math.max(2, Math.ceil((py1 - py0) / stepY) + 1);
+  const grid = new Float64Array(nx * ny);
+  for (let j = 0; j < ny; j++) {
+    const yn = py0 + j * stepY;
+    for (let i = 0; i < nx; i++) {
+      const xn = px0 + (i * pw) / (nx - 1);
+      const ws = samples.map((p) => {
+        const dx = xn < p.x0 ? p.x0 - xn : xn > p.x1 ? xn - p.x1 : 0;
+        const dy = yn - p.y;
+        return p.w * Math.exp(-0.5 * ((dx / sx) ** 2 + (dy / sy) ** 2));
+      });
+      grid[j * nx + i] = robust(ws) ?? globalSlope;
+    }
+  }
+  const slopeAt = (x: number, y: number) => {
+    const gx = Math.max(0, Math.min(nx - 1, ((x - px0) / pw) * (nx - 1)));
+    const gy = Math.max(0, Math.min(ny - 1, (y - py0) / stepY));
+    const i0 = Math.min(nx - 2, Math.floor(gx));
+    const j0 = Math.min(ny - 2, Math.floor(gy));
+    const fx = gx - i0;
+    const fy = gy - j0;
+    const a = grid[j0 * nx + i0] * (1 - fx) + grid[j0 * nx + i0 + 1] * fx;
+    const b = grid[(j0 + 1) * nx + i0] * (1 - fx) + grid[(j0 + 1) * nx + i0 + 1] * fx;
+    return a * (1 - fy) + b * fy;
+  };
+  const maxStep = pw / 24;
+  const straighten = (x: number, y: number) => {
+    const n = Math.max(1, Math.ceil(Math.abs(x - px0) / maxStep));
+    const h = (x - px0) / n;
+    let cx = x;
+    let cy = y;
+    for (let k = 0; k < n; k++) {
+      const s1 = slopeAt(cx, cy);
+      const s2 = slopeAt(cx - h / 2, cy - (s1 * h) / 2);
+      cy -= s2 * h;
+      cx -= h;
+    }
+    return cy;
+  };
+  return { slopeAt, straighten };
+}
+
+/**
+ * Altura de fila de cada renglón del OCR (clave «página:renglón»), encadenando los renglones de una misma fila por sus
+ * extremos: el final de un renglón y el principio del siguiente a su derecha tienen que coincidir en altura (enderezada)
+ * con una tolerancia de media altura de texto. Como sólo se compara lo que hay en el hueco entre los dos, un papel
+ * ondulado (la fila baja, sube y vuelve a bajar) no parte la fila, y todas las palabras de un mismo renglón (una caja
+ * del lector) van juntas aunque el renglón esté más inclinado que sus vecinos. Se enlazan sólo los pares que se eligen
+ * mutuamente (el mejor a la derecha de uno es el mejor a la izquierda del otro) y cada cadena recibe la altura media de
+ * sus renglones, ponderada por su largo.
+ */
+export function rowAnchors(words: OcrWord[], slope: number, field?: SlopeField): Map<string, number> {
+  const st = (x: number, y: number) => (field ? field.straighten(x, y) : y - slope * x);
+  const slopeAt = (x: number, y: number) => (field ? field.slopeAt(x, y) : slope);
+  interface Seg {
+    key: string;
+    page: number;
+    x0: number;
+    x1: number;
+    /** Línea base (sin enderezar) en los extremos del renglón. */
+    yl: number;
+    yr: number;
+    /** Altura enderezada del centro del renglón. */
+    ym: number;
+    h: number;
+  }
+  const byLine = new Map<string, OcrWord[]>();
+  for (const w of words) {
+    const key = `${w.page}:${w.line}`;
+    const list = byLine.get(key);
+    if (list) list.push(w);
+    else byLine.set(key, [w]);
+  }
+  const segs: Seg[] = [];
+  for (const [key, ws] of byLine) {
+    const x0 = Math.min(...ws.map((w) => w.bbox.x0));
+    const x1 = Math.max(...ws.map((w) => w.bbox.x1));
+    const b = ws[0].baseline;
+    const flat = median(ws.map((w) => w.baselineY ?? w.bbox.y1));
+    const yAt = b && b.x1 - b.x0 > 20 ? (x: number) => b.y0 + ((x - b.x0) * (b.y1 - b.y0)) / (b.x1 - b.x0) : () => flat;
+    const h = median(ws.map((w) => w.lineHeight ?? w.bbox.y1 - w.bbox.y0).filter((v) => v > 0)) || 1;
+    const xm = (x0 + x1) / 2;
+    segs.push({ key, page: ws[0].page, x0, x1, yl: yAt(x0), yr: yAt(x1), ym: st(xm, yAt(xm)), h });
+  }
+  const out = new Map<string, number>();
+  if (segs.length < 2) {
+    for (const s of segs) out.set(s.key, s.ym);
+    return out;
+  }
+  const pw = Math.max(...segs.map((s) => s.x1)) - Math.min(...segs.map((s) => s.x0));
+  const maxGap = Math.max(1, 0.4 * pw);
+  // Mejor vecino a la derecha y a la izquierda de cada renglón
+  const cost = (a: Seg, b: Seg): number => {
+    if (a.page !== b.page || b.x0 < a.x1 - 0.5 * Math.min(a.h, b.h) || b.x0 - a.x1 > maxGap) return Infinity;
+    // Sólo el hueco entre los dos: la altura del final de uno, llevada con la pendiente local hasta el principio del otro
+    const tol = 0.7 * Math.min(a.h, b.h);
+    const gap = b.x0 - a.x1;
+    const d = Math.abs(b.yl - a.yr - slopeAt(a.x1 + gap / 2, (a.yr + b.yl) / 2) * gap);
+    if (d > tol) return Infinity;
+    // Cuadra en altura y está cerca: cada 4 alturas de hueco pesan como una tolerancia entera de desajuste (cuanto más
+    // lejos, más se equivoca la previsión; y no se salta a un vecino que está en medio)
+    return d / tol + Math.max(0, gap) / (4 * Math.min(a.h, b.h));
+  };
+  const right = new Array<number>(segs.length).fill(-1);
+  const left = new Array<number>(segs.length).fill(-1);
+  const rightCost = new Array<number>(segs.length).fill(Infinity);
+  const leftCost = new Array<number>(segs.length).fill(Infinity);
+  for (let i = 0; i < segs.length; i++) {
+    for (let j = 0; j < segs.length; j++) {
+      if (i === j) continue;
+      const c = cost(segs[i], segs[j]);
+      if (!Number.isFinite(c)) continue;
+      if (c < rightCost[i]) {
+        rightCost[i] = c;
+        right[i] = j;
+      }
+      if (c < leftCost[j]) {
+        leftCost[j] = c;
+        left[j] = i;
+      }
+    }
+  }
+  const seen = new Uint8Array(segs.length);
+  for (let i = 0; i < segs.length; i++) {
+    if (seen[i]) continue;
+    // Principio de la cadena: sin enlace mutuo a la izquierda
+    let start = i;
+    for (let guard = 0; guard < segs.length && left[start] >= 0 && right[left[start]] === start && !seen[left[start]]; guard++) start = left[start];
+    const chain: number[] = [];
+    for (let k = start; k >= 0 && !seen[k]; k = right[k] >= 0 && left[right[k]] === k ? right[k] : -1) {
+      seen[k] = 1;
+      chain.push(k);
+    }
+    let sw = 0;
+    let sy = 0;
+    for (const k of chain) {
+      const w = Math.max(1, segs[k].x1 - segs[k].x0);
+      sw += w;
+      sy += w * segs[k].ym;
+    }
+    for (const k of chain) out.set(segs[k].key, sy / sw);
+  }
+  return out;
+}
+
+function toFragments(words: OcrWord[], slope: number, field?: SlopeField): Frag[] {
   const heights = words.map((w) => w.lineHeight ?? w.bbox.y1 - w.bbox.y0).filter((h) => h > 0);
   const typical = median(heights);
+  const anchors = rowAnchors(words, slope, field);
   const out: Frag[] = [];
   words.forEach((w) => {
     if (isNoiseWord(w, typical)) return;
@@ -176,7 +395,8 @@ function toFragments(words: OcrWord[], slope: number): Frag[] {
       x += lead * cw;
       width = Math.max(cw, width - (lead + trail) * cw);
     }
-    const y = (w.baselineY ?? w.bbox.y1) - slope * xc;
+    const base = w.baselineY ?? w.bbox.y1;
+    const y = anchors.get(`${w.page}:${w.line}`) ?? (field ? field.straighten(xc, base) : base - slope * xc);
     out.push({ str, x, width, y, height: w.lineHeight || w.bbox.y1 - w.bbox.y0, conf: w.confidence, box: w.bbox });
   });
   return out;
@@ -321,11 +541,13 @@ export interface RowsOptions {
   mode?: LayoutMode;
   /** Pendiente residual a corregir (ver residualSlope). */
   slope?: number;
+  /** Campo de pendientes local (ver pageSlopeField): si se da, sustituye a la pendiente única. */
+  field?: SlopeField;
 }
 
 /** Filas (con posiciones X por celda) de las palabras de UNA página. */
 export function wordsToRows(words: OcrWord[], page = 1, opts: RowsOptions = {}): (PdfTextLine & { confidence: number; bbox: OcrBox })[] {
-  const frags = toFragments(words, opts.slope ?? 0);
+  const frags = toFragments(words, opts.slope ?? 0, opts.field);
   if (!frags.length) return [];
   const lines = opts.mode === 'columns' ? columnLayout(frags, page, 2) : linesFrom(frags, page);
   return lines.map((l) => {
@@ -356,7 +578,7 @@ export function ocrPagesToResult(pages: { page: TessPage; pageNo?: number }[], m
     allWords.push(...words);
     const hasBoxes = words.length > 0;
     if (hasBoxes) {
-      const r = wordsToRows(words, p, { mode, slope: residualSlope(page) });
+      const r = wordsToRows(words, p, { mode, slope: residualSlope(page), field: pageSlopeField(page) });
       for (const row of r) {
         rows.push({ page: row.page, y: row.y, text: row.text, items: row.items });
         lines.push({ text: row.text, confidence: row.confidence, bbox: row.bbox });

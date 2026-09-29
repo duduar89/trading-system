@@ -5,6 +5,21 @@ import { Segmented, Spinner } from '../ui';
 import { fileKind } from '../../extract/kinds';
 import { useObjectUrl } from './hooks';
 
+/** URLs de las fotos de las páginas siguientes de una factura (se liberan al cambiar o desmontar). */
+function usePhotoUrls(blobs: Blob[] | undefined): string[] {
+  const [urls, setUrls] = useState<string[]>([]);
+  useEffect(() => {
+    if (!blobs?.length) {
+      setUrls([]);
+      return;
+    }
+    const list = blobs.map((b) => URL.createObjectURL(b));
+    setUrls(list);
+    return () => list.forEach((u) => URL.revokeObjectURL(u));
+  }, [blobs]);
+  return urls;
+}
+
 /** Páginas de un PDF renderizadas a imagen con pdf.js (funciona igual en escritorio, Android e iOS). */
 function usePdfPages(file: Blob | undefined, enabled: boolean): { pages: string[]; loading: boolean; failed: boolean } {
   const [state, setState] = useState<{ pages: string[]; loading: boolean; failed: boolean }>({ pages: [], loading: false, failed: false });
@@ -40,6 +55,7 @@ function usePdfPages(file: Blob | undefined, enabled: boolean): { pages: string[
  */
 export function FilePreview({
   file,
+  pages,
   fileName,
   fileType,
   rawText,
@@ -47,6 +63,8 @@ export function FilePreview({
   onHide,
 }: {
   file?: Blob;
+  /** Resto de fotos de una factura en varias páginas (la primera es `file`). */
+  pages?: Blob[];
   fileName?: string;
   fileType?: string;
   rawText?: string;
@@ -63,6 +81,7 @@ export function FilePreview({
   const [imgError, setImgError] = useState(false);
   const current = viewable ? tab : 'text';
   const pdf = usePdfPages(file, kind === 'pdf');
+  const photoPages = usePhotoUrls(kind === 'image' ? pages : undefined);
   // Visor de PDF integrado del navegador (no existe en Android ni en algunos navegadores): sólo entonces se usa un iframe.
   const inlinePdf = typeof navigator === 'undefined' || navigator.pdfViewerEnabled !== false;
   const zoomable = current === 'doc' && ((kind === 'image' && !imgError) || (kind === 'pdf' && pdf.pages.length > 0));
@@ -78,6 +97,7 @@ export function FilePreview({
           {kind === 'pdf' && pdf.pages.length > 1 && (
             <span className="shrink-0 text-xs font-medium text-muted">· {pdf.pages.length} páginas</span>
           )}
+          {photoPages.length > 0 && <span className="shrink-0 text-xs font-medium text-muted">· {photoPages.length + 1} páginas</span>}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {viewable && hasText && (
@@ -166,13 +186,28 @@ export function FilePreview({
             className={clsx('absolute inset-0 overflow-auto', zoom ? 'cursor-zoom-out' : 'flex cursor-zoom-in items-start justify-center p-3')}
             onClick={() => setZoom((z) => !z)}
           >
-            <img
-              src={url}
-              alt={`Factura original ${fileName ?? ''}`}
-              onError={() => setImgError(true)}
-              className={clsx('select-none', zoom ? 'max-w-none' : 'max-h-full max-w-full rounded-lg object-contain shadow-card')}
-              draggable={false}
-            />
+            {photoPages.length > 0 ? (
+              <div className={clsx('mx-auto space-y-3', zoom ? 'w-[200%] max-w-none' : 'w-full max-w-3xl')}>
+                {[url, ...photoPages].map((src, i) => (
+                  <img
+                    key={src}
+                    src={src}
+                    alt={`Página ${i + 1} de ${photoPages.length + 1} de ${fileName ?? 'la factura'}`}
+                    onError={() => setImgError(true)}
+                    className="w-full select-none rounded-lg bg-white shadow-card"
+                    draggable={false}
+                  />
+                ))}
+              </div>
+            ) : (
+              <img
+                src={url}
+                alt={`Factura original ${fileName ?? ''}`}
+                onError={() => setImgError(true)}
+                className={clsx('select-none', zoom ? 'max-w-none' : 'max-h-full max-w-full rounded-lg object-contain shadow-card')}
+                draggable={false}
+              />
+            )}
           </div>
         )}
         {current === 'doc' && kind === 'image' && imgError && (

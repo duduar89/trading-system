@@ -83,6 +83,8 @@ interface Row {
   cw: number;
   /** Texto de OCR (se permiten correcciones de cifras mal leídas validadas por la aritmética). */
   ocr?: boolean;
+  /** Filas unidas a esta (artículos de cash & carry en dos filas, restos de una fila partida por el OCR). */
+  absorbed?: number[];
 }
 
 type ColKind = ColumnKind;
@@ -158,6 +160,10 @@ interface ParsedLine {
   exactAlt?: { quantity: number; unitPrice: number };
   /** OCR: importe exacto (cantidad × precio) a una cifra de distancia del leído. */
   totalAlt?: number;
+  /** Línea de cash & carry (código de unidad y columnas Prec. Ud. / Cont. / Precio / Cant. / Importe). */
+  cc?: boolean;
+  /** Unidades por envase de la columna de contenido ("Cont P." = 24 en una caja de 24 latas). */
+  packCount?: number;
 }
 
 /** Porcentaje a 2 decimales, mitad hacia arriba sin el error de coma flotante (12,125 → 12,13, no 12,12). */
@@ -276,6 +282,11 @@ const RESUME_RE = /suma\s*anterior|viene\s*de\s*(?:la\s*)?(?:pagina|hoja)|anteri
 const META_RE =
   /^(?:\(?\s*)?(?:lote|lot|l\.?\s*:|n[ºo°]?\s*lote|cad\b|cad\.|caducidad|fecha\s*(?:de\s*)?cad|f\.?\s*cad|consumir|consumo\s*pref|origen\s*[:.]|pais\s*(?:de\s*origen)?\s*[:.]|fao|zona\s*(?:de\s*)?captura|zona\s*fao|arte\s*(?:de\s*)?pesca|metodo\s*(?:de\s*)?produccion|capturado|criado|especie|nombre\s*cient|n\.?\s*cient|denominacion\s*comercial|presentacion|peso\s*neto|temperatura|conservar|registro\s*sanitario|rgseaa|albaran|alb\.|pedido|s\/ref|su\s*ref|nuestra\s*ref|n\/ref|entrega|matadero|sala\s*de\s*despiece|nacido|sacrificado|despiece|n[ºo°]\s*(?:de\s*)?referencia|codigo\s*de\s*barras|ean\b|cat\.\s*(?:extra|i{1,3}|primera|segunda|[12])\b|categoria\s*:|calibre\s*:)/;
 const META_ANY_RE = /\b(?:lote|cad(?:ucidad)?|fao\s*\d{1,2}|f\.\s*cad|consumir\s*pref)\s*[:.]?\s*[a-z0-9]/;
+/**
+ * Trazabilidad y marcas de pedido de los cash & carry y mayoristas: "GTIN: 08436…  Lote: 0", "Qty: 1  LOT: 0",
+ * "*** Número de pedido 9-2365…", "Entregado a: …", "*** Fin de número de pedido". Nunca son líneas.
+ */
+const TRACE_RE = /^(?:[g6]?tin\s*[:.]|gtin\b|ean\s*[:.]|qty\s*[:.]|(?:n[uú]mero|num\.?|n[ºo°]\.?)\s*(?:de\s*)?pedido\b|fin\s*(?:de\s*)?(?:n[uú]mero\s*(?:de\s*)?)?pedido\b|entregad[oa]\s*(?:a|en)\b)/;
 /** Nombre científico de la especie en una sublínea de trazabilidad ("Merluccius merluccius · Zona FAO 27 · Arrastre"). */
 const SCIENTIFIC_RE = /^(?:\([A-Z][a-z]+ [a-z]{3,}(?: [a-z]{3,})?\)|[A-Z][a-z]+ [a-z]{3,}(?: [a-z]{3,})?\s*[·•,;|–]\s*\S)/;
 const EXTRA_RE =
@@ -1502,9 +1513,17 @@ function parseRowWithModel(row: Row, header: TableHeader): RowParse | undefined 
   return { line: markExactness(buildLine(row, 0, undefined, sol, strict, conf, [], header), sol, row) };
 }
 
-function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): RowParse {
+function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean, cc?: CcContext): RowParse {
   const words = row.words;
   if (!words.length) return {};
+  // Cash & carry: las columnas de la fila de importes van por orden tras el código de unidad (la inclinación de una
+  // foto desplaza las columnas y el modelo por posiciones no sirve)
+  const ccInfo = cc?.rows.get(row.i);
+  if (ccInfo && cc) {
+    // Sin la aritmética de sus columnas no se adivina con la de una fila normal (daría cantidades y precios cruzados)
+    const line = parseCcRow(row, ccInfo, cc);
+    return line ? { line } : {};
+  }
   if (header?.model) {
     const res = parseRowWithModel(row, header);
     if (res) return res;
@@ -1614,9 +1633,493 @@ function parseRow(row: Row, header: TableHeader | undefined, inTable: boolean): 
   return { line };
 }
 
+// ───────────────────────────── Cash & carry y mayoristas (artículos en dos filas) ─────────────────────────────
+
+/**
+ * Facturas de cash & carry y mayoristas de alimentación: cada artículo ocupa una fila de descripción (código de
+ * artículo o GTIN + texto, sin importes) y, debajo, una fila de importes que empieza por el CÓDIGO DE UNIDAD de venta
+ * («KG», «CJ», «BO», «MA»…) seguido de las columnas Prec. Ud. | Cont. | Precio | Cant. | Importe | IVA (código):
+ *   Precio = Prec. Ud. × Cont.   e   Importe = Precio × Cant.
+ * También la variante en una sola fila (descripción + código de unidad + números). Las dos relaciones juntas son una
+ * firma muy fuerte, así que el modo sólo se activa si varias filas del documento las cumplen. En las fotos, el papel
+ * curvado o inclinado parte una fila en dos (las últimas columnas caen en la fila de debajo): esos restos se unen a la
+ * fila de importes si no se solapan con ella.
+ */
+
+/** Código de unidad de venta (dos letras en mayúsculas delante de los precios) → unidad facturada. */
+const CC_UNIT_CODES: Record<string, string> = {
+  KG: 'kg', LT: 'l', UN: 'ud', UD: 'ud', PZ: 'ud', CJ: 'caja', CB: 'cubo', BO: 'bote', FR: 'frasco', TR: 'tarro', TA: 'tarrina', BD: 'bidon',
+  BT: 'bot', MA: 'malla', MJ: 'manojo', PQ: 'paquete', PK: 'paquete', SC: 'saco', BL: 'bolsa', BJ: 'bandeja', LA: 'lata', BR: 'brik',
+  GF: 'garrafa', ES: 'estuche', RL: 'rollo', SB: 'sobre', DC: 'docena', FD: 'fardo',
+};
+
+interface CcRowInfo {
+  /** Índice de la primera palabra de la zona de importes (el código de unidad o, si no se ha leído, el primer número). */
+  start: number;
+  /** Código de unidad leído ("KG", "CJ"…); undefined si el OCR no lo ha leído. */
+  code?: string;
+}
+
+/** Contexto del modo cash & carry de un documento (lo que tienen en común sus filas de importes). */
+interface CcContext {
+  /** Decimales habituales del precio por unidad (3 en «14,420»). */
+  puDec?: number;
+  /** Las filas llevan un código de IVA tras el importe. */
+  vat: boolean;
+  /** Filas de importes (ya unidas a su descripción y a sus restos) por índice de fila. */
+  rows: Map<number, CcRowInfo>;
+}
+
+/** Palabra que el OCR lee en lugar de un «1» en la zona de importes ("I", "l", "|", "X"). */
+function ccOne(w: Word): boolean {
+  return !w.num && /^[IilL|!¡X]$/.test(w.raw);
+}
+
+/** Resto sin valor en la zona de importes (letras sueltas, marcas de otras columnas: "HD", "a"). */
+function ccJunk(w: Word): boolean {
+  return !w.num && !/\d/.test(w.raw) && w.raw.replace(/[^\p{L}]/gu, '').length <= 2;
+}
+
+/** Número de la zona de importes (sin unidad pegada ni %). */
+function ccNum(w: Word): boolean {
+  return !!w.num && !w.num.pct && !w.num.unit && !w.num.perUnit;
+}
+
+function ccCode(w: Word): string | undefined {
+  if (w.num) return undefined;
+  const code = w.raw.replace(/[.:,;]+$/, '');
+  return CC_UNIT_CODES[code] !== undefined ? code : undefined;
+}
+
+/** ¿Números de una descripción (código de artículo, formatos "5 L", "800g", "4/5"), sin importes? */
+function ccDescNumbersOk(words: Word[]): boolean {
+  return words.every((w, k) => !w.num || !!w.num.unit || w.num.dec === 0 || (!w.num.cur && unitOf(words[k + 1]) !== undefined));
+}
+
+/**
+ * Índice del código de unidad de una fila de importes: el último código seguido sólo de números (y restos cortos del
+ * OCR), al menos dos y alguno con decimales, y sin importes delante. −1 si no lo es.
+ */
+function ccUnitIndex(row: Row): number {
+  const words = row.words;
+  for (let k = words.length - 1; k >= 0; k--) {
+    if (!ccCode(words[k])) continue;
+    const after = words.slice(k + 1);
+    if (!after.every((w) => ccNum(w) || ccJunk(w))) continue;
+    const nums = after.filter(ccNum);
+    if (nums.length < 2 || !nums.some((w) => (w.num?.dec ?? 0) >= 2)) continue;
+    return ccDescNumbersOk(words.slice(0, k)) ? k : -1;
+  }
+  return -1;
+}
+
+interface CcTok {
+  wi: number;
+  value: number;
+  dec: number;
+  raw: string;
+  /** Leído de otra forma (letra por cifra, punto decimal por coma). */
+  fixed?: string;
+}
+
+/** Números de la zona de importes (desde `from`), con los «1» leídos como letra. */
+function ccTokens(words: Word[], from: number): CcTok[] {
+  const out: CcTok[] = [];
+  for (let wi = from; wi < words.length; wi++) {
+    const w = words[wi];
+    if (ccOne(w)) out.push({ wi, value: 1, dec: 0, raw: w.raw, fixed: '1' });
+    else if (w.num && ccNum(w)) {
+      // "4.200": precio de tres decimales con punto (en estas columnas no hay miles sin céntimos)
+      if (w.num.dec === 0 && /^\d{1,3}\.\d{3}$/.test(w.raw)) out.push({ wi, value: w.num.value / 1000, dec: 3, raw: w.raw, fixed: w.raw.replace('.', ',') });
+      else out.push({ wi, value: w.num.value, dec: w.num.dec, raw: w.raw, fixed: w.num.fixed });
+    }
+  }
+  return out;
+}
+
+interface CcSol {
+  pu?: CcTok;
+  cp?: CcTok;
+  pr: CcTok;
+  ca: CcTok;
+  /** Importe leído (undefined si no se ha leído y sale de Precio × Cant.). */
+  im?: CcTok;
+  total: number;
+  vat?: CcTok;
+  /** Campos corregidos por la aritmética ('"8,020" → 8,820'). */
+  fixes: string[];
+  /** 1 = las cinco columnas; 2 = una corregida; 3 = importe ilegible; 4 = sin Prec. Ud. ni Cont. */
+  kind: 1 | 2 | 3 | 4;
+  score: number;
+}
+
+/** Prec. Ud. × Cont. = Precio (redondeado a céntimos). */
+function ccR1(pu: number, cp: number, pr: number): boolean {
+  return Math.abs(pu * cp - pr) <= 0.0101;
+}
+
+/** Precio × Cant. = Importe. */
+function ccR2(pr: number, ca: number, im: number): boolean {
+  return Math.abs(pr * ca - im) <= 0.0101 + 0.0005 * Math.abs(ca);
+}
+
+function ccTokDigits(t: CcTok): string {
+  return (t.fixed ?? t.raw).replace(/[^\d]/g, '');
+}
+
+/**
+ * Valor de `dec` decimales que cumple `ok` más parecido a lo leído (como mucho dos cifras cambiadas, misma longitud);
+ * undefined si no hay ninguno o si hay dos igual de cerca.
+ */
+function ccClosest(t: CcTok, lo: number, hi: number, dec: number, ok: (v: number) => boolean): { value: number; dist: number } | undefined {
+  const f = 10 ** dec;
+  const from = Math.ceil(lo * f - 1e-6);
+  const to = Math.floor(hi * f + 1e-6);
+  if (to < from || to - from > 50) return undefined;
+  const read = ccTokDigits(t);
+  let best: { value: number; dist: number } | undefined;
+  let tie = false;
+  for (let n = from; n <= to; n++) {
+    const v = n / f;
+    if (!(v > 0) || !ok(v)) continue;
+    const dist = digitDistance(read, digitsOf(v, dec));
+    if (dist > 2) continue;
+    if (!best || dist < best.dist) {
+      best = { value: v, dist };
+      tie = false;
+    } else if (dist === best.dist) tie = true;
+  }
+  return best && !tie ? best : undefined;
+}
+
+const ccFix = (t: CcTok, value: number, dec: number): { tok: CcTok; fix: string } => {
+  const fixed = value.toFixed(dec).replace('.', ',');
+  return { tok: { ...t, value, dec, fixed }, fix: `"${t.raw}" → ${fixed}` };
+};
+
+/**
+ * Asigna las columnas de una fila de importes con la aritmética: primero las cinco (dos relaciones), luego con una
+ * cifra mal leída que la otra relación determina, con el importe ilegible (Precio × Cant.) y, por último, sin
+ * Prec. Ud. ni Cont. (fuera de la foto). `ctx` aporta los decimales habituales del precio por unidad y si hay
+ * columna de IVA, para no confundir el código de IVA con una cantidad.
+ */
+function ccSolve(toks: CcTok[], ctx: Pick<CcContext, 'puDec' | 'vat'>): CcSol | undefined {
+  const n = toks.length;
+  const money = (t: CcTok) => t.dec === 2;
+  const vatAfter = (k: number) => {
+    const v = toks[k + 1];
+    return v && v.dec === 0 && Number.isInteger(v.value) && v.value >= 0 && v.value <= 9 && !v.fixed ? v : undefined;
+  };
+  const puPenalty = (pu: CcTok) => (ctx.puDec !== undefined && pu.dec !== ctx.puDec && !(pu.fixed && pu.dec === 0) ? 15 : 0);
+  let best: CcSol | undefined;
+  const consider = (s: CcSol) => {
+    if (!best || s.score > best.score) best = s;
+  };
+  // 1) Las cinco columnas
+  for (let a = 0; a < n; a++)
+    for (let b = a + 1; b < n; b++)
+      for (let c = b + 1; c < n; c++) {
+        if (!money(toks[c]) || !ccR1(toks[a].value, toks[b].value, toks[c].value)) continue;
+        for (let d = c + 1; d < n; d++)
+          for (let e = d + 1; e < n; e++) {
+            const [pu, cp, pr, ca, im] = [toks[a], toks[b], toks[c], toks[d], toks[e]];
+            if (!money(im) || ca.value <= 0 || !ccR2(pr.value, ca.value, im.value)) continue;
+            const gaps = a + (b - a - 1) + (c - b - 1) + (d - c - 1) + (e - d - 1);
+            const fixes = [pu, cp, ca].filter((t) => t.fixed).length;
+            const vat = vatAfter(e);
+            consider({ pu, cp, pr, ca, im, total: im.value, vat, fixes: [], kind: 1, score: 100 - gaps * 4 - fixes - puPenalty(pu) + (vat ? 2 : 0) });
+          }
+      }
+  if (best) return best;
+  // 2) Una cifra mal leída: la relación que se cumple determina el campo de la otra
+  for (let a = 0; a + 4 < n; a++) {
+    const [pu, cp, pr, ca, im] = toks.slice(a, a + 5);
+    if (!money(pr) || !money(im) || ca.value <= 0 || cp.value <= 0) continue;
+    const r1 = ccR1(pu.value, cp.value, pr.value);
+    const r2 = ccR2(pr.value, ca.value, im.value);
+    const vat = vatAfter(a + 4);
+    const base = { pr, ca, vat, kind: 2 as const };
+    if (r2 && !r1) {
+      const decPu = Math.max(pu.dec, 2);
+      const fp = ccClosest(pu, (pr.value - 0.0101) / cp.value, (pr.value + 0.0101) / cp.value, decPu, (v) => ccR1(v, cp.value, pr.value));
+      const fc = cp.fixed ? undefined : ccClosest(cp, (pr.value - 0.0101) / pu.value, (pr.value + 0.0101) / pu.value, cp.dec, (v) => ccR1(pu.value, v, pr.value));
+      const pick = fp && (!fc || fp.dist < fc.dist) ? { which: 'pu' as const, ...fp, dec: decPu } : fc && (!fp || fc.dist < fp.dist) ? { which: 'cp' as const, ...fc, dec: cp.dec } : undefined;
+      if (pick) {
+        const { tok, fix } = ccFix(pick.which === 'pu' ? pu : cp, pick.value, pick.dec);
+        consider({ ...base, pu: pick.which === 'pu' ? tok : pu, cp: pick.which === 'cp' ? tok : cp, im, total: im.value, fixes: [fix], score: 80 - pick.dist * 5 - a * 4 });
+      }
+    } else if (r1 && !r2) {
+      const fi = ccClosest(im, round(pr.value * ca.value, 2), round(pr.value * ca.value, 2), 2, () => true);
+      if (fi) {
+        const { tok, fix } = ccFix(im, fi.value, 2);
+        consider({ ...base, pu, cp, im: tok, total: fi.value, fixes: [fix], score: 80 - fi.dist * 5 - a * 4 });
+      } else if (ca.dec === 0 && Number.isInteger(round(im.value / pr.value, 6)) && digitDistance(ccTokDigits(ca), String(round(im.value / pr.value, 6))) === 1) {
+        const { tok, fix } = ccFix(ca, round(im.value / pr.value, 6), 0);
+        consider({ ...base, pu, cp, ca: tok, im, total: im.value, fixes: [fix], score: 75 - a * 4 });
+      }
+    }
+  }
+  if (best) return best;
+  // 3) Importe ilegible: Prec. Ud. × Cont. = Precio y la cantidad entera detrás (sin otro importe después)
+  for (let a = 0; a + 3 < n; a++)
+    for (let b = a + 1; b + 2 < n; b++) {
+      const [pu, cp] = [toks[a], toks[b]];
+      const pr = toks[b + 1];
+      const ca = toks[b + 2];
+      if (!money(pr) || !ccR1(pu.value, cp.value, pr.value) || ca.dec !== 0 || !(ca.value >= 1 && ca.value < 1000)) continue;
+      if (toks.slice(b + 3).some(money)) continue;
+      const vat = vatAfter(b + 2);
+      // Si el documento lleva código de IVA, la cantidad va seguida de él: un número final sin nada detrás puede ser el
+      // propio código o un importe cortado ("14" por 14,73)
+      if (ctx.vat && !vat && ca.value === Math.trunc(pr.value)) continue;
+      consider({ pu, cp, pr, ca, total: round(pr.value * ca.value, 2), vat, fixes: [], kind: 3, score: 60 - (b - a - 1) * 4 - a * 4 - puPenalty(pu) - (ctx.vat && !vat ? 10 : 0) });
+    }
+  // 4) Sin Prec. Ud. ni Cont. (perdidos por el OCR): Precio × Cant. = Importe
+  for (let c = 0; c + 2 < n && c <= 1; c++) {
+    const [pr, ca, im] = toks.slice(c, c + 3);
+    if (!money(pr) || !money(im) || ca.value <= 0 || !ccR2(pr.value, ca.value, im.value)) continue;
+    consider({ pr, ca, im, total: im.value, vat: vatAfter(c + 2), fixes: [], kind: 4, score: 50 - c * 4 });
+  }
+  return best;
+}
+
+/** Palabras de una fila unida: descripción (filas de arriba y la propia) y zona de importes (con los restos de debajo). */
+function ccMergeWords(target: Row, start: number, desc: Row[], spills: Row[]): { words: Word[]; start: number } {
+  const startX = target.words[start]?.x0 ?? Infinity;
+  const tag = (ws: Word[], src: number) => ws.map((w) => ({ ...w, seg: w.seg + src * 1000 }));
+  const byX = (a: Word, b: Word) => a.x0 - b.x0;
+  const head = desc.flatMap((r, k) => tag(r.words, k + 1));
+  const own = tag(target.words.slice(0, start), 0);
+  const amounts = tag(target.words.slice(start), 0);
+  spills.forEach((r, k) => {
+    for (const w of tag(r.words, desc.length + k + 1)) ((w.x0 + w.x1) / 2 < startX ? own : amounts).push(w);
+  });
+  own.sort(byX);
+  amounts.sort(byX);
+  return { words: [...head, ...own, ...amounts], start: head.length + own.length };
+}
+
+/** ¿Fila de descripción de un artículo (texto con su código y sus formatos, sin importes)? */
+function ccDescRow(row: Row): boolean {
+  if (!row.words.length || isMetaRow(row) || isStopRow(row) || ccUnitIndex(row) >= 0) return false;
+  const codeOnly = row.words.length === 1 && /^\d{5,14}$/.test(row.words[0].raw);
+  if (!codeOnly && !row.words.some((w) => !w.num && /\p{L}{3,}/u.test(w.raw))) return false;
+  return ccDescNumbersOk(row.words);
+}
+
+/** Resto suelto del OCR entre filas ("360", "001,", "a"): ni descripción ni importes. */
+function ccJunkRow(row: Row): boolean {
+  return row.words.length <= 2 && row.words.every((w) => w.raw.length <= 4 && !/\p{L}{3,}/u.test(w.raw));
+}
+
+/**
+ * ¿Resto de una fila de importes partida por el OCR? Sólo números en la zona de importes (a la derecha del código de
+ * unidad), como mucho un trozo de la descripción o el código de artículo a la izquierda, y nada que se solape con
+ * lo que ya tiene la fila.
+ */
+function ccSpill(row: Row, words: Word[], startX: number): boolean {
+  if (!row.words.length || ccUnitIndex(row) >= 0 || isMetaRow(row) || isStopRow(row)) return false;
+  const mid = (w: Word) => (w.x0 + w.x1) / 2;
+  const right = row.words.filter((w) => mid(w) >= startX);
+  if (!right.some(ccNum) || !right.every((w) => ccNum(w) || ccJunk(w))) return false;
+  if (row.words.some((w) => mid(w) < startX && !!w.num && !/^\d{4,14}$/.test(w.raw))) return false;
+  return !row.words.some((w) => words.some((t) => Math.min(w.x1, t.x1) - Math.max(w.x0, t.x0) > 0.3 * Math.max(1e-6, Math.min(w.x1 - w.x0, t.x1 - t.x0))));
+}
+
+/** Filas de debajo que son restos de la fila de importes `i` (hasta dos, pegadas en vertical). */
+function ccSpillRows(rows: Row[], i: number, start: number): Row[] {
+  const target = rows[i];
+  const startX = target.words[start]?.x0 ?? Infinity;
+  const out: Row[] = [];
+  let words = target.words;
+  for (let j = i + 1; j < rows.length && out.length < 2; j++) {
+    const r = rows[j];
+    if (r.page !== target.page) break;
+    if (!r.words.length) continue;
+    if (target.positional ? r.y - target.y > target.cw * 1.9 : j > i + 1) break;
+    if (!ccSpill(r, words, startX)) break;
+    out.push(r);
+    words = [...words, ...r.words];
+  }
+  return out;
+}
+
+/**
+ * Activa el modo cash & carry si varias filas cumplen las dos relaciones y une cada fila de importes con su fila de
+ * descripción (la de encima, si la propia no trae descripción) y con los restos partidos por el OCR (debajo). Las
+ * filas unidas quedan vacías y se anotan en `absorbed` de la fila de importes. Devuelve el contexto o undefined.
+ */
+function cashCarryPrepass(rows: Row[], headers: Map<number, TableHeader>): CcContext | undefined {
+  const headerRows = new Set([...headers.values()].flatMap((h) => h.rows));
+  const cands: { i: number; k: number }[] = [];
+  for (const row of rows) {
+    if (headerRows.has(row.i)) continue;
+    const k = ccUnitIndex(row);
+    if (k >= 0) cands.push({ i: row.i, k });
+  }
+  if (cands.length < 2) return undefined;
+  // Firma: filas con las cinco columnas (con sus restos de debajo, si los hay)
+  const pus: number[] = [];
+  let full = 0;
+  let vats = 0;
+  for (const c of cands) {
+    const merged = ccMergeWords(rows[c.i], c.k, [], ccSpillRows(rows, c.i, c.k));
+    const sol = ccSolve(ccTokens(merged.words, merged.start + 1), { vat: false });
+    if (sol?.kind !== 1 || !sol.pu) continue;
+    full++;
+    pus.push(sol.pu.dec);
+    if (sol.vat) vats++;
+  }
+  if (full < 2 && !(full >= 1 && cands.length >= 3)) return undefined;
+  const counts = new Map<number, number>();
+  for (const d of pus) counts.set(d, (counts.get(d) ?? 0) + 1);
+  const puDec = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const ctx: CcContext = { puDec, vat: vats >= full * 0.5, rows: new Map() };
+  const codeXs = cands.map((c) => rows[c.i].words[c.k].x0);
+  const codeX = median(codeXs);
+  const cw = median(cands.map((c) => rows[c.i].cw)) || 1;
+  const amountRow = new Map(cands.map((c) => [c.i, c.k]));
+  // Filas de importes cuyo código de unidad no se ha leído: un código desconocido en su columna ("ER" por «FR») o
+  // directamente los números, con las dos relaciones o la primera y la cantidad
+  for (const row of rows) {
+    if (amountRow.has(row.i) || headerRows.has(row.i) || !row.words.length || isMetaRow(row) || isStopRow(row)) continue;
+    const first = row.words[0];
+    let start = -1;
+    if (!first.num && /^[A-Z0-9]{1,3}$/.test(first.raw) && Math.abs(first.x0 - codeX) <= cw * 2.5) start = 0;
+    else if (ccNum(first) && first.x0 > codeX - cw) start = 0;
+    if (start < 0 || row.words.some((w, k) => k > 0 && !ccNum(w) && !ccJunk(w))) continue;
+    const toks = ccTokens(row.words, ccNum(first) ? 0 : 1);
+    const sol = ccSolve(toks, ctx);
+    if (sol && (sol.kind === 1 || sol.kind === 3)) amountRow.set(row.i, ccNum(first) ? -1 : 0);
+  }
+  for (const i of [...amountRow.keys()].sort((a, b) => a - b)) {
+    const target = rows[i];
+    const k = amountRow.get(i) as number;
+    // Sin código leído (fila que empieza por los números): la zona de importes empieza en la primera palabra
+    const start = Math.max(0, k);
+    const spills = ccSpillRows(rows, i, start);
+    const own = target.words.slice(0, start);
+    const ownDesc = own.some((w) => /\p{L}{2,}/u.test(w.raw)) || !!leadingCode(own.concat(target.words[start] ?? [])).end;
+    const desc: Row[] = [];
+    if (!ownDesc) {
+      for (let j = i - 1; j >= 0; j--) {
+        const r = rows[j];
+        if (headerRows.has(j) || r.page !== target.page || amountRow.has(j)) break;
+        if (!r.words.length || ccJunkRow(r)) continue;
+        if (!ccDescRow(r)) break;
+        desc.unshift(r);
+        // Una fila con su código de artículo; si la más cercana no lo trae, puede ser la segunda de una descripción larga
+        if (leadingCode(r.words).end || desc.length === 2) break;
+      }
+      // Dos filas sin código: sólo la de justo encima
+      if (desc.length === 2 && !leadingCode(desc[0].words).end) desc.shift();
+    }
+    const merged = ccMergeWords(target, start, desc, spills);
+    const absorbed = [...desc, ...spills];
+    // Restos sueltos entre la descripción y los importes ("360"): se consumen con el artículo
+    if (desc.length) for (let j = desc[desc.length - 1].i + 1; j < i; j++) if (rows[j].words.length && ccJunkRow(rows[j])) absorbed.push(rows[j]);
+    target.words = merged.words;
+    target.text = merged.words.map((w) => w.raw).join(' ');
+    target.f = fold(target.text);
+    target.absorbed = [...(target.absorbed ?? []), ...absorbed.flatMap((r) => [r.i, ...(r.absorbed ?? [])])];
+    for (const r of absorbed) {
+      r.words = [];
+      r.text = '';
+      r.f = '';
+    }
+    const code = k >= 0 ? ccCode(target.words[merged.start]) : undefined;
+    ctx.rows.set(i, { start: merged.start, code });
+  }
+  return ctx;
+}
+
+/** Línea de una fila de importes de cash & carry; undefined si la aritmética no cuadra (se prueba como fila normal). */
+function parseCcRow(row: Row, info: CcRowInfo, ctx: CcContext): ParsedLine | undefined {
+  const words = row.words;
+  const toks = ccTokens(words, info.code ? info.start + 1 : info.start);
+  const sol = ccSolve(toks, ctx);
+  if (!sol) return undefined;
+  const billed = info.code ? CC_UNIT_CODES[info.code] : undefined;
+  const warnings: string[] = [];
+  let confidence = sol.kind === 1 ? 1 : sol.kind === 4 ? 0.9 : 0.85;
+  if (sol.fixes.length) warnings.push(`Lectura corregida por la validación aritmética: ${sol.fixes.join(', ')}`);
+  if (sol.kind === 3) warnings.push('Importe ilegible: calculado como precio × cantidad');
+  // Al peso (o al volumen): la cantidad son los kilos (Cont. × Cant.) al precio por kilo; sin código leído, un
+  // contenido con decimales delata un artículo al peso
+  const weighed = billed === 'kg' || billed === 'l' || (!billed && !!sol.cp && sol.cp.dec === 3 && !Number.isInteger(sol.cp.value));
+  let quantity: number;
+  let unitPrice: number;
+  let unit: string;
+  let packCount: number | undefined;
+  if (weighed && sol.pu && sol.cp) {
+    quantity = round(sol.cp.value * sol.ca.value, 3);
+    unitPrice = sol.pu.value;
+    unit = billed ?? 'kg';
+  } else {
+    quantity = sol.ca.value;
+    unitPrice = sol.pr.value;
+    unit = weighed ? 'ud' : (billed ?? 'ud');
+    if (weighed) {
+      confidence = 0.7;
+      warnings.push('Falta el peso del artículo (columna de contenido ilegible): revisa la cantidad en kg');
+    } else if (sol.cp && sol.cp.dec === 0 && sol.cp.value > 1) packCount = sol.cp.value;
+  }
+  const descWords = words.slice(0, info.start);
+  const lc = leadingCode(descWords);
+  let code = lc.code;
+  let dw = descWords.slice(lc.end);
+  // Sólo el código de artículo (la descripción no se ha leído)
+  if (!code && dw.length === 1 && /^\d{5,14}$/.test(dw[0].raw)) {
+    code = dw[0].raw;
+    dw = [];
+  }
+  const description = collapseSpaces(dw.map((w) => w.raw).join(' ')).replace(/[\s.·:|_-]+$/, '').replace(/^[\s.·:|_-]+/, '');
+  const vatValue = sol.vat?.value;
+  return {
+    row: row.i,
+    rows: [row.i, ...(row.absorbed ?? [])],
+    code,
+    description,
+    quantity: round(quantity, 4),
+    unit: normUnit(unit),
+    unitPrice: round(unitPrice, 4),
+    total: round(sol.total, 2),
+    vatCode: vatValue !== undefined ? String(vatValue) : undefined,
+    confidence,
+    warnings,
+    validated: true,
+    descX: dw[0]?.x0,
+    cc: true,
+    packCount,
+  };
+}
+
 // ───────────────────────────── Cabecera del documento ─────────────────────────────
 
 const CIF_RE = /\b(?:ES[\s-]?)?([ABCDEFGHJKLMNPQRSUVW])[\s-]?(\d{7})[\s-]?([0-9A-J])\b/g;
+/** CIF impreso con separadores entre la provincia y el número ("A-28/647451", "A28 647451", "B-12.345.678"). */
+const CIF_SEP_RE = /\b(?:ES[\s-]?)?([ABCDEFGHJKLMNPQRSUVW])[\s./-]?(\d{2})[\s./-]?(\d{3})[\s./-]?(\d{2})[\s./-]?([0-9A-J])\b/g;
+/** Mismo formato con la letra mal leída por el OCR ("n-28/647451", "4-28/647451"): sólo sirve con un CIF conocido. */
+const CIF_SEP_OCR_RE = /(?:^|[\s:(])([A-Z0-9])[-./]\s?(\d{2})[-./\s]\s?(\d{5}[0-9A-J])\b/g;
+
+/**
+ * Mayoristas muy habituales en hostelería: CIF (verificado en sus facturas) → razón social canónica. El OCR estropea
+ * el rótulo ("Makre Distribucion…") y la letra del CIF; si el CIF o un nombre inequívoco los identifican y la marca no
+ * se ha leído bien, se pone la razón social canónica (si la marca se lee bien, manda la razón social impresa).
+ * Lista corta y sólo con datos comprobados.
+ */
+export const KNOWN_SUPPLIERS: readonly { taxId: string; name: string; brand: RegExp; match: RegExp }[] = [
+  { taxId: 'A28647451', name: 'Makro Distribución Mayorista, S.A.', brand: /\bmakro\b/, match: /\bmak\w{1,2}\s+distribuci\w*\s+mayorista\b/ },
+];
+
+/**
+ * Datos registrales del emisor ("Inscrita en el Registro Mercantil de Madrid, Tomo 3.669, Folio 86, Hoja M-61.688",
+ * "Merc. de Madrid, T. 3.669 L. 0 F. 86, Secc. 8.ª H. M-61.688"): ni número de factura ni fecha salen de ahí.
+ */
+const REGISTRY_RE =
+  /registro\s*mercantil|\breg\.?\s*merc|\br\.\s*m\.|\bmerc\.\s*(?:de\s*)?[a-z]|\binscrita\b|\binscripcion\s*\d|\btomo\s*\d|\bfolio\s*\d|\blibro\s*\d|\bhoja\s*(?:n[ºo°]\.?\s*)?[a-z]{1,2}-\s?\d|\bsecc(?:ion)?\.?\s*\d|\bt\.\s*\d[\d.]*\s*,?\s*(?:l\.|f\.)|\bf\.\s*\d+\s*,?\s*(?:secc|h\.)|\bh\.\s*[a-z]{1,2}-\s?\d/;
+/** Etiqueta del número de cliente ("N.cliente:", "Nº cliente", "Cód. cliente", "Cliente nº"). */
+const CUSTOMER_NO_RE = /\b(?:n[ºo°]?\.?\s*(?:de\s*)?cliente|cod(?:igo)?\.?\s*(?:de\s*)?cliente|cliente\s*n[ºo°]|num\.?\s*(?:de\s*)?cliente)\b/;
 const NIF_RE = /\b(?:ES[\s-]?)?(\d{8})[\s-]?([A-Z])\b/g;
 const NIE_RE = /\b([XYZ])[\s-]?(\d{7})[\s-]?([A-Z])\b/g;
 
@@ -1683,6 +2186,19 @@ function findTaxIds(rows: Row[]): TaxIdHit[] {
     while ((m = CIF_RE.exec(text))) {
       const id = `${m[1]}${m[2]}${m[3]}`;
       push(id, m.index, validCif(id));
+    }
+    CIF_SEP_RE.lastIndex = 0;
+    while ((m = CIF_SEP_RE.exec(text))) {
+      const id = `${m[1]}${m[2]}${m[3]}${m[4]}${m[5]}`;
+      if (validCif(id)) push(id, m.index, true);
+    }
+    if (row.ocr) {
+      CIF_SEP_OCR_RE.lastIndex = 0;
+      while ((m = CIF_SEP_OCR_RE.exec(text))) {
+        const digits = `${m[2]}${m[3]}`;
+        const known = KNOWN_SUPPLIERS.find((k) => k.taxId.slice(1) === digits);
+        if (known) push(known.taxId, m.index + m[0].indexOf(m[1]), true);
+      }
     }
     NIF_RE.lastIndex = 0;
     while ((m = NIF_RE.exec(text))) {
@@ -1770,7 +2286,7 @@ const COMPANY_SUFFIX_RE = /(?:^|[\s,.])(?:s\.?\s?l\.?\s?u?\.?|s\.?\s?a\.?\s?u?\.
 const BUSINESS_RE =
   /\b(?:distribuciones|distribucion|distribuidora|comercial|mayorista|mayoristas|frutas|verduras|hortalizas|carnes|carniceria|pescados|mariscos|bebidas|hermanos|hnos|hijos|grupo|alimentacion|alimentos|alimentaria|suministros|cash|carry|lacteos|panaderia|obrador|bodegas?|vinos|congelados|hosteleria|horeca|cooperativa|makro|mercadona|conservas|embutidos|charcuteria|quesos|aceites|almazara|cafes|importaciones|exclusivas|productos)\b/;
 const NOT_NAME_RE =
-  /^(?:factura|fra\b|albaran|ticket|original|copia|duplicado|pagina|pag\b|hoja|fecha|n[ºo°]|numero|num\b|cliente|datos|pedido|forma\s*de\s*pago|vencimiento|c\.?i\.?f|n\.?i\.?f|dni|tel|tlf|telf|telefono|movil|fax|email|e-mail|correo|web|www|http|iban|swift|bic|cuenta|entidad|domicilio|direccion|codigo|cod\b|serie|documento|simplificada|rectificativa|proforma|presupuesto|agente|ruta|vendedor|repartidor|hora|caja\b|terminal|operador|atendido|descripcion|concepto|cantidad|precio|importe|total|base|iva|inscrita|registro|r\.?m\.?|tomo|folio|seccion|pagare|transferencia|recibo|contado|giro|confirming|efectivo|tarjeta)\b/;
+  /^(?:factura|fra\b|albaran|ticket|original|copia|duplicado|pagina|pag\b|hoja|fecha|n[ºo°]|numero|num\b|cliente|n\.\s*cliente|datos|pedido|dto\b|dcto\b|descuento|pronto\s*pago|peso\b|bultos|envases|entregad[oa]|merc\.|forma\s*de\s*pago|vencimiento|c\.?i\.?f|n\.?i\.?f|dni|tel|tlf|telf|telefono|movil|fax|email|e-mail|correo|web|www|http|iban|swift|bic|cuenta|entidad|domicilio|direccion|codigo|cod\b|serie|documento|simplificada|rectificativa|proforma|presupuesto|agente|ruta|vendedor|repartidor|hora|caja\b|terminal|operador|atendido|descripcion|concepto|cantidad|precio|importe|total|base|iva|inscrita|registro|r\.?m\.?|tomo|folio|seccion|pagare|transferencia|recibo|contado|giro|confirming|efectivo|tarjeta)\b/;
 const ADDRESS_RE =
   /^(?:c\/|c\.\s|calle|avda|avenida|av\.|pza|plaza|paseo|ps\.|pso|ctra|carretera|pol\.|poligono|pg\.|p\.i\.|nave|camino|cmno|ronda|urb\.|urbanizacion|apartado|apdo|cp\b|c\.p\.|travesia|trav\.|glorieta|parque|mercado|mercamadrid|mercabarna|merca\w+|parcela|parc\.|local|edificio|edif\.|km\b|bloque|portal|piso)\b/;
 
@@ -1849,6 +2365,44 @@ function valueBelow(rows: Row[], ri: number, labelX: number): string | undefined
   return cand.w.raw;
 }
 
+/**
+ * OCR: paréntesis de cierre leído como «1», «l» o «|» tras un grupo de 3–4 cifras de un número de documento
+ * ("0/0(04710263/(2026)058214" → "0/0(047)0263/(2026)058214"). Sólo si hay paréntesis sin cerrar.
+ */
+export function repairDocNumberParens(value: string): string {
+  let out = value.replace(/[[{]/g, '(').replace(/[\]}]/g, ')');
+  for (let k = 0; k < 3; k++) {
+    if ((out.match(/\(/g) ?? []).length <= (out.match(/\)/g) ?? []).length) break;
+    const next = out.replace(/\((\d{3,4})[1lI|](?=[\d/(-])/, '($1)');
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
+/**
+ * Número de documento en la fila de debajo de un título suelto ("Factura" / "0/0 (047)0263/ (2026) 058214"): una tira
+ * de cifras con separadores (al menos 8 cifras), sin fechas ni identificadores fiscales. Se quitan los espacios que
+ * mete el OCR y se reparan los paréntesis.
+ */
+function numberRunBelow(rows: Row[], ri: number): string | undefined {
+  const next = rows[ri + 1];
+  if (!next || next.page !== rows[ri].page || REGISTRY_RE.test(next.f)) return undefined;
+  for (const seg of segmentsOf(next)) {
+    const run = docNumberRun(seg.text);
+    if (run) return run;
+  }
+  return undefined;
+}
+
+/** Tira de cifras con separadores de un número de documento (ver `numberRunBelow`), sin espacios y reparada. */
+function docNumberRun(text: string): string | undefined {
+  const run = repairDocNumberParens(text.replace(/\s+/g, ''));
+  if (!/^[A-Z]{0,4}[-/]?[\d/()\-.]+$/i.test(run) || !/[/()-]/.test(run) || run.replace(/\D/g, '').length < 8) return undefined;
+  if (parseDateEs(run) || hasTaxId(run) || /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}/.test(run)) return undefined;
+  return run;
+}
+
 function extractInvoiceNumber(rows: Row[]): string | undefined {
   let best: { value: string; score: number; row: Row } | undefined;
   const consider = (raw: string, score: number, ri: number) => {
@@ -1861,6 +2415,8 @@ function extractInvoiceNumber(rows: Row[]): string | undefined {
     if (!best || s > best.score) best = { value, score: s, row: rows[ri] };
   };
   rows.forEach((row, ri) => {
+    // Datos registrales ("T. 3.669 L. 0 F. 86, Secc. 8.ª H. M-61.688"): nunca el número de factura
+    if (REGISTRY_RE.test(row.f)) return;
     const text = row.text;
     const f = foldKeepLength(text);
     INVOICE_NUMBER_LABEL.lastIndex = 0;
@@ -1885,7 +2441,23 @@ function extractInvoiceNumber(rows: Row[]): string | undefined {
       // Un día seguido del mes ("26 de enero") es una fecha; "397,43" es un importe
       if (value && /^\d{1,2}$/.test(value) && /^\d{1,2}\s+de\s+[a-z]/i.test(fold(rest))) continue;
       if (value && /^\d+$/.test(value) && new RegExp(`^${value}[.,]\\d{2}(?!\\d)`).test(rest)) continue;
+      // Título suelto seguido, tras un hueco, del número con paréntesis (y los espacios que mete el OCR):
+      // "Factura    0/0 (047)0263/ (2026) 058214" — el primer trozo ("0/0") no es el número
+      const labelEnd = m.index + label.length;
+      const nextSeg = /factura|fra/.test(label) && !withNo && !f.slice(0, m.index).trim() ? segmentsOf(row).find((sg) => sg.x0 >= (row.positional ? xAtChar(row, labelEnd) : labelEnd)) : undefined;
+      const sameRow = nextSeg ? docNumberRun(nextSeg.text) : undefined;
+      if (sameRow && (!value || (sameRow.startsWith(value.replace(/[.,:;]+$/, '')) && sameRow.length > value.length))) {
+        consider(sameRow, 7, ri);
+        continue;
+      }
       if (!value || !/\d/.test(value)) {
+        // Título suelto en su fila ("Factura") con el número entero en la fila de debajo, aunque no esté alineado
+        const lone = /factura|fra/.test(label) && !withNo && !f.slice(0, m.index).trim() && !rest.replace(/[\s:.#]+/g, '');
+        const run = lone ? numberRunBelow(rows, ri) : undefined;
+        if (run) {
+          consider(run, 7, ri);
+          continue;
+        }
         // El título suelto ("FACTURA") no es una etiqueta de número fiable para el valor de debajo
         if (/factura|fra/.test(label) && !withNo) score = 3;
         value = valueBelow(rows, ri, row.positional ? xAtChar(row, m.index) : m.index);
@@ -2105,6 +2677,28 @@ export function isEan13(token: string): boolean {
   return (10 - (sum % 10)) % 10 === Number(token[12]);
 }
 
+/**
+ * ¿Identificador fiscal en la columna de la etiqueta del número de cliente ("N.cliente: 427…" y, una o dos filas
+ * debajo, "N.I.F.: B…")? En las facturas de cash & carry la caja del cliente va aparte de su razón social.
+ */
+function underCustomerNumber(rows: Row[], hit: TaxIdHit): boolean {
+  const row = rows[hit.row];
+  const cw = Math.max(row.cw, 1);
+  const own = segmentsOf(row)
+    .filter((sg) => sg.x0 <= hit.x + cw)
+    .pop();
+  if (!own) return false;
+  for (let k = hit.row; k >= Math.max(0, hit.row - 3); k--) {
+    const r = rows[k];
+    if (r.page !== row.page) break;
+    for (const sg of segmentsOf(r)) {
+      if (!CUSTOMER_NO_RE.test(fold(sg.text))) continue;
+      if (k === hit.row ? sg.x0 <= hit.x : Math.abs(sg.x0 - own.x0) <= Math.max(cw, r.cw) * 4) return true;
+    }
+  }
+  return false;
+}
+
 /** ¿La etiqueta del CIF/NIF de esta fila está justo debajo de una etiqueta de cliente (misma X) de la fila anterior? */
 function idUnderCustomerLabel(prev: Row, row: Row, idX: number): boolean {
   const label = segmentsOf(row)
@@ -2321,6 +2915,10 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
       // Caja de datos "Cliente | Bar X" / "NIF | B…": el NIF que va justo debajo de la etiqueta del cliente es suyo
       if (inZone && row && hit.row > 0 && idUnderCustomerLabel(allRows[hit.row - 1], row, hit.x)) score -= 12;
       if (inZone && supplierBlock && blockOfSeg(hit.row, hit.x) === supplierBlock) score += 6;
+      // En la columna de la etiqueta del número de cliente ("N.cliente: 427…" / "N.I.F.: B…"): es el del cliente
+      if (row && underCustomerNumber(allRows, hit)) score -= 12;
+      // Junto a los datos registrales (Registro Mercantil): siempre son del emisor
+      if (row && allRows.slice(Math.max(0, hit.row - 2), hit.row + 3).some((r) => r.page === row.page && REGISTRY_RE.test(r.f))) score += 4;
       if (footer.some((f) => f.id === hit.id)) score += 4;
       // En el pie, junto al nombre del proveedor ("José Pérez Gil · NIF 12345678Z")
       if (!inZone && nameKey && row && fold(row.text).replace(/[^a-z0-9]+/g, ' ').includes(nameKey)) score += 5;
@@ -2359,8 +2957,16 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
     }
   }
 
-  const headerText = zone.filter((r) => !META_ANY_RE.test(r.f)).map((r) => r.text).join('\n');
-  const date = findDate(headerText) ?? findDate(allRows.filter((r) => !excludeRows.has(r.i) && !META_ANY_RE.test(r.f)).map((r) => r.text).join('\n'));
+  // Fecha: nunca de los datos registrales ni de la trazabilidad
+  const dateRow = (r: Row) => !META_ANY_RE.test(r.f) && !REGISTRY_RE.test(r.f);
+  const headerText = zone.filter(dateRow).map((r) => r.text).join('\n');
+  const date = findDate(headerText) ?? findDate(allRows.filter((r) => !excludeRows.has(r.i) && dateRow(r)).map((r) => r.text).join('\n'));
+  // Rótulo pegado a la razón social que lo repite ("makro Makro Distribución Mayorista, S.A."): una sola vez
+  if (supplierName) supplierName = supplierName.replace(/^(\p{L}{3,})\s+(?=\1\b)/iu, '');
+  // Mayoristas conocidos: el CIF (o un nombre inequívoco) fija la razón social que el OCR estropea
+  const nameKey = fold(supplierName ?? '');
+  const known = KNOWN_SUPPLIERS.find((k) => k.taxId === supplierTaxId || k.match.test(nameKey));
+  if (known && !known.brand.test(nameKey)) supplierName = known.name;
   return { supplierName: supplierName || undefined, supplierTaxId, number, date };
 }
 
@@ -2377,7 +2983,7 @@ interface Totals {
 }
 
 const TOTAL_LABELS =
-  /(?<base>base\s*imp(?:onible)?\.?|b\.\s*imp(?:onible)?|total\s*base|bases?\s*imponibles?|base\s*i\.?v\.?a\.?|imponible)|(?<disc>dto\.?\s*(?:pronto\s*pago|p\.?\s*p\.?|comercial|global|factura)|descuento\s*(?:pronto\s*pago|comercial|global|factura|general)|pronto\s*pago)|(?<sub>subtotal|sub-total|suma\s*importes|total\s*bruto|importe\s*bruto|total\s*neto|importe\s*neto|neto\s*factura|total\s*lineas|total\s*productos|total\s*articulos)|(?<re>recargo\s*(?:de\s*)?equivalencia|cuota\s*r\.?\s*e\.?|r\.\s*e\.|rec\.\s*eq\.?)|(?<vat>cuota\s*(?:de\s*)?i\.?v\.?a\.?|total\s*i\.?v\.?a\.?|importe\s*i\.?v\.?a\.?|i\.?v\.?a\.?|impuestos?)|(?<total>total\s*(?:factura|fra\.?|a\s*pagar|documento|general|eur(?:os)?|€|importe|con\s*i\.?v\.?a|iva\s*incluido)|importe\s*total|liquido(?:\s*a\s*pagar)?|a\s*pagar|total)/g;
+  /(?<skip>peso\s*total|total\s*(?:de\s*)?(?:bultos|kilos|kgs?|peso|unidades|uds|cajas|envases|piezas)|(?:n[ºo°]\.?|numero)\s*(?:de\s*)?bultos)|(?<page>total\s*(?:de\s*)?(?:la\s*)?pag(?:ina)?\b\.?|suma\s*(?:de\s*)?(?:la\s*)?pagina|total\s*hoja|importe\s*(?:de\s*)?(?:la\s*)?pagina)|(?<base>base\s*imp(?:onible)?\.?|b\.\s*imp(?:onible)?|total\s*base|bases?\s*imponibles?|base\s*i\.?v\.?a\.?|imponible)|(?<disc>dto\.?\s*(?:pronto\s*pago|p\.?\s*p\.?|comercial|global|factura)|descuento\s*(?:pronto\s*pago|comercial|global|factura|general)|pronto\s*pago)|(?<sub>subtotal|sub-total|suma\s*importes|total\s*bruto|importe\s*bruto|total\s*neto|importe\s*neto|neto\s*factura|total\s*lineas|total\s*productos|total\s*articulos)|(?<re>recargo\s*(?:de\s*)?equivalencia|cuota\s*r\.?\s*e\.?|r\.\s*e\.|rec\.\s*eq\.?)|(?<vat>cuota\s*(?:de\s*)?i\.?v\.?a\.?|total\s*i\.?v\.?a\.?|importe\s*i\.?v\.?a\.?|i\.?v\.?a\.?|impuestos?)|(?<total>total\s*(?:factura|fra\.?|a\s*pagar|documento|general|eur(?:os)?|€|importe|con\s*i\.?v\.?a|iva\s*incluido)|importe\s*total|liquido(?:\s*a\s*pagar)?|a\s*pagar|total)/g;
 
 function numbersIn(row: Row): NumTok[] {
   return row.words
@@ -2392,7 +2998,7 @@ function parseTotals(rowsIn: Row[]): Totals {
   const vatCodes: Record<string, number> = {};
   const triples: { base: number; rate: number; vat: number }[] = [];
   const reTriples: { base: number; rate: number; vat: number }[] = [];
-  const labeled: Record<'base' | 'sub' | 'vat' | 're' | 'total' | 'disc', number[]> = { base: [], sub: [], vat: [], re: [], total: [], disc: [] };
+  const labeled: Record<'base' | 'sub' | 'vat' | 're' | 'total' | 'disc' | 'page' | 'skip', number[]> = { base: [], sub: [], vat: [], re: [], total: [], disc: [], page: [], skip: [] };
 
   for (let ri = 0; ri < rows.length; ri++) {
     const row = rows[ri];
@@ -2450,6 +3056,8 @@ function parseTotals(rowsIn: Row[]): Totals {
       labels.push({ kind, start: m.index, end: m.index + m[0].length });
     }
     labels.forEach((lab, li) => {
+      // "Peso total", "Total bultos": no son importes (sólo limitan el tramo de la etiqueta anterior)
+      if (lab.kind === 'skip') return;
       const endLimit = labels[li + 1]?.start ?? Infinity;
       const inRange = row.positional
         ? nums.filter((t) => {
@@ -2544,6 +3152,47 @@ function parseTotals(rowsIn: Row[]): Totals {
     }
   }
   return { subtotal, vatTotal, reTotal, total, globalDiscount: labeled.disc[0], rates, vatCodes };
+}
+
+/** "Total página 299,60", "Suma página", "Total hoja": subtotal (sin IVA) de las líneas de UNA página. */
+const PAGE_TOTAL_RE = /total\s*(?:de\s*)?(?:la\s*)?pag(?:ina)?\b|suma\s*(?:de\s*)?(?:la\s*)?pagina|total\s*hoja|importe\s*(?:de\s*)?(?:la\s*)?pagina/;
+
+/**
+ * Subtotales de página de las facturas de varias páginas (cash & carry): "Total página 299,60" o el importe del pie
+ * ("Número de bultos: 23 … Importe 299,60"). Uno por página (manda «Total página»). No son el total con IVA.
+ */
+function pageSubtotals(rows: Row[]): Map<number, number> {
+  const out = new Map<number, { value: number; strong: boolean }>();
+  for (const row of rows) {
+    const f = row.f.trim();
+    const strong = PAGE_TOTAL_RE.test(f);
+    if (!strong && !(PAGE_FOOTER_RE.test(f) && /\bimporte\b/.test(f))) continue;
+    const money = row.words.filter((w) => w.num && !w.num.pct && !w.num.unit && !w.num.perUnit && (w.num.dec === 2 || w.num.cur));
+    const value = money[money.length - 1]?.num?.value;
+    if (value === undefined) continue;
+    const prev = out.get(row.page);
+    if (!prev || strong || !prev.strong) out.set(row.page, { value, strong });
+  }
+  return new Map([...out.entries()].map(([p, v]) => [p, v.value]));
+}
+
+/** Etiqueta del descuento por pronto pago ("Dto. P.P.", "Descuento pronto pago"). */
+const PROMPT_PAY_RE = /\b(?:dto\.?|dcto\.?|descuento)\s*(?:de\s*)?(?:pronto\s*pago|p\.\s*p\.?|pp\b)|\bpronto\s*pago\b/;
+
+/**
+ * Descuento de pronto pago del resumen que no se ha podido asociar a su etiqueta (va en una columna del cuadro de IVA,
+ * repartido por tipos): si el documento lo menciona y la suma de líneas menos la base es un importe impreso junto a la
+ * etiqueta o un porcentaje redondo de la suma, es el descuento (no una línea que falte).
+ */
+function promptPayDiscount(rows: Row[], sum: number, subtotal: number): number | undefined {
+  const gap = round(sum - subtotal, 2);
+  if (gap < 0.03 || gap > sum * 0.12) return undefined;
+  const labelRows = rows.filter((r) => PROMPT_PAY_RE.test(r.f));
+  if (!labelRows.length) return undefined;
+  const near = labelRows.flatMap((r) => [r, rows[r.i + 1]].filter((x): x is Row => !!x && x.page === r.page));
+  if (near.some((r) => numbersIn(r).some((t) => !t.n.pct && Math.abs(Math.abs(t.value) - gap) <= 0.011))) return gap;
+  const pcts = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 7.5, 8, 10];
+  return pcts.some((p) => Math.abs(round((sum * p) / 100, 2) - gap) <= 0.031) ? gap : undefined;
 }
 
 /** Desplazamiento de carácter de una palabra en el texto de su fila. */
@@ -2922,7 +3571,7 @@ interface WalkResult {
 }
 
 /** Recorre las filas: líneas, portes y envases, descuentos en fila aparte y continuaciones de descripción. */
-function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: TableHeader): WalkResult {
+function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: TableHeader, cc?: CcContext): WalkResult {
   const headerRows = new Set([...headers.values()].flatMap((h) => h.rows));
   const firstHeader = headers.size ? Math.min(...headers.keys()) : -1;
   const parsed: ParsedLine[] = [];
@@ -2994,7 +3643,7 @@ function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: Table
     // (una fila que cuadra como línea se decide después con la descripción completa: "TÓNICA PREMIUM 20CL" /
     // "7407  ENVASE RETORNABLE  14  0,543  7,60" es un producto, no un cargo por envases)
     const extraLike = EXTRA_RE.test(codeless) || EXTRA_RE.test(descPart) || (descCol && EXTRA_RE.test(descCol));
-    if (extraLike && !parseRow(row, header, inTable).line?.validated) {
+    if (extraLike && !parseRow(row, header, inTable, cc).line?.validated) {
       // Importe: el último número con céntimos (nunca un formato "75cl" ni un entero suelto)
       const nums = numbersIn(row).filter((t) => !t.n.pct && !t.n.unit && !t.n.perUnit);
       const money = nums.filter((t) => t.n.dec === 2 || t.n.cur);
@@ -3022,13 +3671,18 @@ function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: Table
         continue;
       }
     }
-    const res = parseRow(row, header, inTable);
+    const res = parseRow(row, header, inTable, cc);
     zoneOf.set(row.i, zone);
+    // Cash & carry: cada artículo trae su código de unidad y sus descripciones ya van unidas a su fila de importes;
+    // una fila sin validar sin código de unidad es un resto (trazabilidad, pie, filas partidas por el OCR)
+    if (cc && res.line && !res.line.cc && !res.line.validated) continue;
     if (res.line) {
+      if (row.absorbed && !res.line.cc) res.line.rows.push(...row.absorbed);
       parsed.push(res.line);
       lastLineRow = row.i;
       continue;
     }
+    if (cc) continue;
     if (res.textOnly && (state === 'table' || firstHeader < 0)) textRows.push({ row, header });
     else if (!res.line && firstHeader < 0 && isAmountOnlyRow(row)) amountOnly.push(row);
   }
@@ -3046,7 +3700,7 @@ function walkRows(rows: Row[], headers: Map<number, TableHeader>, forced?: Table
   if (firstHeader < 0) {
     for (let k = parsed.length - 1; k >= 0; k--) {
       const l = parsed[k];
-      if (!l.validated || l.description.replace(/[^\p{L}]/gu, '').length < 3) parsed.splice(k, 1);
+      if (!l.validated || (!l.cc && l.description.replace(/[^\p{L}]/gu, '').length < 3)) parsed.splice(k, 1);
     }
   }
 
@@ -3107,9 +3761,13 @@ function isVatSummaryRow(row: Row): boolean {
   return false;
 }
 
+/** Pie de página de los cash & carry: "Número de bultos: 23  Peso Total: 8,778 KG  Envases: 0  Importe 299,60". */
+const PAGE_FOOTER_RE = /^(?:(?:n[ºo°]\.?\s*|numero\s*(?:de\s*)?|total\s*(?:de\s*)?)bultos|peso\s*total)\s*[:.]?\s*\d/;
+
 function isStopRow(row: Row): boolean {
   const f = row.f.trim();
   if (!f) return false;
+  if (PAGE_FOOTER_RE.test(f)) return true;
   if (DISCOUNT_ROW_RE.test(f.replace(/^[\d\s.-]+/, '')) && !/pronto\s*pago/.test(f)) return false;
   if (STOP_RE.test(f)) return true;
   // Cabecera del cuadro de IVA: "Tipo  Base  %IVA  Cuota"
@@ -3118,12 +3776,13 @@ function isStopRow(row: Row): boolean {
 }
 
 function isMetaRow(row: Row): boolean {
-  const f = row.f.trim();
-  if (META_RE.test(f)) return true;
+  // Marcas iniciales ("*** Número de pedido …", "· Lote: …")
+  const f = row.f.trim().replace(/^[*=#·•>\s-]+(?=\p{L})/u, '');
+  if (META_RE.test(f) || TRACE_RE.test(f)) return true;
   if (SCIENTIFIC_RE.test(row.text.trim()) && !row.words.some((w) => w.num && !w.num.pct && w.num.dec === 2)) return true;
   // "Lote: 23/456  Cad: 12/05/2025" en medio de la fila, sin importe
   if (META_ANY_RE.test(f) && !row.words.some((w) => w.num && w.num.dec === 2)) return true;
-  if (/^(?:pagina|pag\.?|hoja)\s*\d+/.test(f) || /\bpagina\s*\d+\s*(?:de|\/)\s*\d+/.test(f)) return true;
+  if (/^(?:pagina|pag\.?|hoja)\s*[:.]?\s*\d+/.test(f) || /\bpagina\s*\d+\s*(?:de|\/)\s*\d+/.test(f)) return true;
   return false;
 }
 
@@ -3385,9 +4044,12 @@ export function parseInvoiceReading(input: { text: string; lines?: string[] }, m
   buildModels(rows, headers);
   const firstHeader = headers.size ? Math.min(...headers.keys()) : -1;
 
+  // Cash & carry: artículos en dos filas con código de unidad (se unen antes de recorrer las filas)
+  const cc = cashCarryPrepass(rows, headers);
+
   // 2) Recorrido de filas (sin cabecera de tabla: segunda pasada con las columnas votadas por las filas que cuadran)
-  let walk = walkRows(rows, headers);
-  if (!headers.size) {
+  let walk = walkRows(rows, headers, undefined, cc);
+  if (!headers.size && !cc) {
     const forced = votedHeader(walk.parsed, rows);
     if (forced) {
       const alt = walkRows(rows, headers, forced);
@@ -3407,6 +4069,10 @@ export function parseInvoiceReading(input: { text: string; lines?: string[] }, m
   const totalsFrom = tableEnd >= 0 ? tableEnd : lastRow + 1;
   const totalsRows = rows.filter((r) => r.i >= totalsFrom && !lineRows.has(r.i));
   const totals = parseTotals(totalsRows.length ? totalsRows : rows.filter((r) => !lineRows.has(r.i) && r.i >= headerEnd));
+  // Una página suelta de una factura de varias (cash & carry): sin base ni total, el subtotal de sus páginas
+  // ("Total página") es la base de lo que muestra; nunca el total con IVA
+  const pageSubs = pageSubtotals(rows.filter((r) => !lineRows.has(r.i)));
+  if (totals.subtotal === undefined && totals.total === undefined && pageSubs.size) totals.subtotal = round([...pageSubs.values()].reduce((a, b) => a + b, 0), 2);
   const head = parseDocHeader(rows, headerEnd, rows, lineRows);
 
   // 4) IVA por código de línea
@@ -3418,6 +4084,10 @@ export function parseInvoiceReading(input: { text: string; lines?: string[] }, m
   // 5) Reparación con la base imponible: las líneas sin validar (hasta 3) se corrigen de forma que la suma cuadre
   const extrasSum = round(extras.reduce((s, e) => s + e.amount, 0), 2);
   const lineSum = () => round(parsed.reduce((s, l) => s + l.total, 0), 2);
+  if (totals.subtotal !== undefined && !totals.globalDiscount && parsed.length) {
+    const d = promptPayDiscount(rows, round(lineSum() + extrasSum, 2), totals.subtotal);
+    if (d !== undefined) totals.globalDiscount = d;
+  }
   const target = totals.subtotal !== undefined ? round(totals.subtotal - extrasSum + (totals.globalDiscount ?? 0), 2) : undefined;
   if (method === 'ocr') applyExactConvention(parsed, target);
   if (target !== undefined && parsed.some((l) => !l.validated)) repairWithSubtotal(parsed, rows, header, target);

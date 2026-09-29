@@ -22,14 +22,14 @@ import {
   X,
 } from 'lucide-react';
 import type { ID, Invoice } from '../types';
-import { Badge, Button, Callout, Card, ConfirmDialog, FileDrop, PageHeader, SearchInput, Segmented, Stat, Table, Td, Th } from '../components/ui';
+import { Badge, Button, Callout, Card, ConfirmDialog, FileDrop, Modal, PageHeader, SearchInput, Segmented, Stat, Table, Td, Th } from '../components/ui';
 import { db } from '../db';
 import { useAppSettings, useInvoices } from '../state/hooks';
 import { errorMessage, toast } from '../state/store';
 import * as invoiceService from '../services/invoices';
 import { addInvoiceFiles, createManualInvoice, deleteInvoice, processInvoice } from '../services/invoices';
 import { loadSampleFiles, SAMPLE_INVOICES } from '../lib/samples';
-import { aiAvailable } from '../extract/kinds';
+import { aiAvailable, fileKind } from '../extract/kinds';
 import { fmtDate, fmtEur, fmtNum, fmtPct } from '../lib/format';
 import { todayIso } from '../lib/id';
 import { comparisonDetail, comparisonHint } from '../core/periods';
@@ -70,6 +70,8 @@ export default function Invoices() {
   const [query, setQuery] = useState('');
   const [toDelete, setToDelete] = useState<Invoice | null>(null);
   const [uploading, setUploading] = useState(false);
+  // Varias fotos a la vez: ¿páginas de una misma factura o facturas distintas?
+  const [pagesAsk, setPagesAsk] = useState<File[] | null>(null);
   const [creating, setCreating] = useState(false);
   const [calloutDismissed, setCalloutDismissed] = useState(readDismissed);
 
@@ -128,12 +130,12 @@ export default function Invoices() {
   // Mes hasta hoy frente al mismo periodo del mes anterior (no contra el mes anterior entero, que engaña a mitad de mes).
   const spendTrend = pctChange(stats.prevPeriodSpend, stats.monthSpend);
 
-  const onFiles = async (files: File[]) => {
-    if (!files.length) return;
+  const addFiles = async (files: File[], asPages = false) => {
     setUploading(true);
     try {
-      const ids = await addInvoiceFiles(files);
-      if (ids.length === 1 && files.length === 1)
+      const ids = await addInvoiceFiles(files, { asPages });
+      if (asPages && ids.length === 1) toast.info('Factura en cola', `Leemos sus ${files.length} páginas juntas en tu dispositivo. Te avisamos al terminar.`);
+      else if (ids.length === 1 && files.length === 1)
         toast.info('Factura en cola', 'La estamos leyendo en tu dispositivo. Te avisamos al terminar.');
       else toast.info(`${ids.length} facturas en cola`, 'Se leen una tras otra en tu dispositivo. Puedes seguir trabajando.');
     } catch (e) {
@@ -141,6 +143,21 @@ export default function Invoices() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const onFiles = async (files: File[]) => {
+    if (!files.length) return;
+    if (files.length > 1 && files.every((f) => fileKind(f) === 'image')) {
+      setPagesAsk(files);
+      return;
+    }
+    await addFiles(files);
+  };
+
+  const answerPages = (asPages: boolean) => {
+    const files = pagesAsk;
+    setPagesAsk(null);
+    if (files) void addFiles(files, asPages);
   };
 
   const onManual = async () => {
@@ -424,6 +441,28 @@ export default function Invoices() {
           )}
         </section>
       )}
+
+      <Modal
+        open={!!pagesAsk}
+        onClose={() => setPagesAsk(null)}
+        title={`Has elegido ${pagesAsk?.length ?? 0} fotos`}
+        subtitle="¿Son páginas de una misma factura o facturas distintas?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => answerPages(false)}>
+              {pagesAsk?.length ?? 0} facturas distintas
+            </Button>
+            <Button onClick={() => answerPages(true)}>Una factura de {pagesAsk?.length ?? 0} páginas</Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-2">
+          Las facturas largas, como las de los mayoristas, ocupan varias fotos. Si las juntas, se leen como una sola factura: con las líneas de todas las
+          páginas y los totales de la última.
+        </p>
+        <p className="mt-2 text-sm text-muted">Elige las fotos en orden, empezando por la página 1.</p>
+      </Modal>
 
       <ConfirmDialog
         open={!!toDelete}

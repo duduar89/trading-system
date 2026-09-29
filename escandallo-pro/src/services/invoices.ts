@@ -385,9 +385,10 @@ function mimeFromName(name: string): string | undefined {
 /**
  * Crea facturas 'pendiente' con el archivo original y lanza su procesado en segundo plano (secuencial, en cola).
  * Un Excel/CSV con muchas facturas genera varias (al leerlo, la primera ocupa el lugar de la factura provisional).
- * Devuelve los ids creados (al menos uno por archivo).
+ * Devuelve los ids creados (al menos uno por archivo). Con `asPages`, varias fotos son las páginas de UNA factura
+ * (en el orden en que llegan) y se leen juntas.
  */
-export async function addInvoiceFiles(files: File[]): Promise<ID[]> {
+export async function addInvoiceFiles(files: File[], opts: { asPages?: boolean } = {}): Promise<ID[]> {
   const wsId = getCurrentWorkspaceId();
   if (!wsId) throw new Error('No hay espacio de trabajo activo');
   const nonEmpty = (files ?? []).filter((f) => f && f.size > 0);
@@ -395,6 +396,15 @@ export async function addInvoiceFiles(files: File[]): Promise<ID[]> {
   const supported = nonEmpty.filter((f) => fileKind(f) !== 'unknown');
   if (!supported.length) throw new Error('Formato no admitido: sube facturas en PDF, fotos (JPG, PNG…) o Excel/CSV');
   const now = nowIso();
+  if (opts.asPages && supported.length > 1 && supported.every((f) => fileKind(f) === 'image')) {
+    const [first, ...rest] = supported;
+    const inv: Invoice = { id: uid(), supplierName: '', date: todayIso(), fileName: first.name, file: first, extraPages: rest, status: 'pendiente', lines: [], createdAt: now };
+    const type = first.type || mimeFromName(first.name);
+    if (type) inv.fileType = type;
+    await db().invoices.add(inv);
+    void enqueue({ wsId, id: inv.id, forceLocal: false, onlyIfPending: true }, { skipIfRunning: true }).catch(() => undefined);
+    return [inv.id];
+  }
   const invoices: Invoice[] = supported.map((f) => {
     const inv: Invoice = {
       id: uid(),
@@ -520,13 +530,13 @@ async function processInvoiceIn(wdb: WorkspaceDB, id: ID, opts: { forceLocal?: b
     try {
       // El lector (parsers + OCR) se descarga sólo al leer el primer documento
       const { extractInvoicesFromFile } = await import('../extract/index');
-      extracted = await extractInvoicesFromFile(file, { settings, onProgress: opts.onProgress, forceLocal });
+      extracted = await extractInvoicesFromFile(file, { settings, onProgress: opts.onProgress, forceLocal, pages: inv.extraPages });
     } catch (err) {
       // Red de seguridad: si la IA opcional falla, se lee gratis en el dispositivo.
       if (isAbortError(err) || forceLocal || !aiAvailable(settings) || !isAIError(err)) throw err;
       extraWarnings.push(`La IA no ha podido leer la factura (${errorText(err, 'error desconocido')}): se ha leído gratis en tu dispositivo`);
       const { extractInvoicesFromFile } = await import('../extract/index');
-      extracted = await extractInvoicesFromFile(file, { settings, onProgress: opts.onProgress, forceLocal: true });
+      extracted = await extractInvoicesFromFile(file, { settings, onProgress: opts.onProgress, forceLocal: true, pages: inv.extraPages });
     }
     extracted = (extracted ?? []).filter(Boolean);
     if (!extracted.length) throw new Error('No se ha encontrado ninguna factura en el archivo');

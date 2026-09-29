@@ -527,6 +527,32 @@ describe('cola de lectura de facturas', () => {
     expect(extractInvoices.mock.calls[2][1].forceLocal).toBe(true);
   });
 
+  it('varias fotos como páginas de UNA factura: una sola factura que se lee con todas sus páginas, en orden', async () => {
+    extractInvoices.mockResolvedValue([extracted([exLine('TOMATE PERA CAJA 6KG', 1, 'caja', 9.87, 9.87), exLine('ACEITE GIRASOL 5L', 2, 'ud', 8.45, 16.9)])]);
+    const photo = (name: string) => new File([new Uint8Array([0xff, 0xd8, 0xff])], name, { type: 'image/jpeg' });
+    const [p1, p2, p3] = [photo('IMG-WA0084.jpg'), photo('IMG-WA0085.jpg'), photo('IMG-WA0086.jpg')];
+    const ids = await addInvoiceFiles([p1, p2, p3], { asPages: true });
+    expect(ids).toHaveLength(1);
+    await vi.waitFor(async () => expect((await db().invoices.get(ids[0]))?.status).toBe('revision'));
+    const inv = await db().invoices.get(ids[0]);
+    expect(await db().invoices.count()).toBe(1);
+    expect(inv?.fileName).toBe('IMG-WA0084.jpg');
+    expect(inv?.extraPages).toHaveLength(2);
+    expect(inv?.lines).toHaveLength(2);
+    const [file, opts] = extractInvoices.mock.calls[0];
+    expect(file.name).toBe('IMG-WA0084.jpg');
+    expect(opts.pages).toHaveLength(2);
+    // Sin la opción, cada foto es una factura; y un PDF nunca se junta con fotos
+    extractInvoices.mockClear();
+    expect(await addInvoiceFiles([photo('a.jpg'), photo('b.jpg')])).toHaveLength(2);
+    const pdf = new File([new Uint8Array([37, 80, 68, 70])], 'f.pdf', { type: 'application/pdf' });
+    expect(await addInvoiceFiles([photo('c.jpg'), pdf], { asPages: true })).toHaveLength(2);
+    // La copia de seguridad no lleva archivos
+    const { exportWorkspace, getCurrentWorkspaceId } = await import('../src/db');
+    const backup = JSON.stringify(await exportWorkspace(getCurrentWorkspaceId() as string));
+    expect(backup).not.toContain('extraPages');
+  });
+
   it('registra el error de lectura con un mensaje legible', async () => {
     extractInvoices.mockRejectedValue(new Error('El PDF está protegido con contraseña'));
     const inv = rawInvoice({ status: 'error', file: new Blob(['x'], { type: 'application/pdf' }), fileName: 'f.pdf', fileType: 'application/pdf' });

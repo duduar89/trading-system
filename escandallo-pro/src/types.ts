@@ -246,6 +246,8 @@ export interface Invoice {
   fileType?: string;
   /** Archivo original (PDF / imagen) guardado para poder volver a consultarlo. */
   file?: Blob;
+  /** Resto de páginas de una factura fotografiada en varias fotos (la primera es `file`), en orden. */
+  extraPages?: Blob[];
   status: InvoiceStatus;
   method?: ExtractionMethod;
   /** Base imponible. */

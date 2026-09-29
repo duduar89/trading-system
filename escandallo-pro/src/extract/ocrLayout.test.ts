@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PdfTextLine } from './pdf';
-import { columnsReadingOrder, isNoiseWord, ocrPagesToResult, pageWords, residualSlope, wordsToRows, type TessBlock, type TessLine, type TessPage } from './ocrLayout';
+import { columnsReadingOrder, isNoiseWord, ocrPagesToResult, pageSlopeField, pageWords, residualSlope, wordsToRows, type TessBlock, type TessLine, type TessPage } from './ocrLayout';
 
 const CW = 10;
 const H = 20;
@@ -144,5 +144,42 @@ describe('cartas a varias columnas', () => {
     expect(rows[1].confidence).toBeCloseTo(90, 0);
     expect(rows[1].bbox.x0).toBe(0);
     expect(rows[1].bbox.x1).toBe(460);
+  });
+});
+
+describe('papel curvado: inclinación local', () => {
+  /** Renglón sobre papel combado: la línea base baja `off(x)` píxeles (más cuanto más a la derecha). */
+  function curved(y: number, words: [string, number][], off: (x: number) => number): TessLine {
+    const ws = words.map(([text, x]) => {
+      const w = text.length * CW;
+      const by = y + off(x + w / 2);
+      return { text, confidence: 90, bbox: { x0: x, y0: Math.round(by - H), x1: x + w, y1: Math.round(by) } };
+    });
+    const x0 = ws[0].bbox.x0;
+    const x1 = ws[ws.length - 1].bbox.x1;
+    return {
+      text: words.map((w) => w[0]).join(' '),
+      confidence: 90,
+      bbox: { x0, y0: Math.min(...ws.map((w) => w.bbox.y0)), x1, y1: Math.max(...ws.map((w) => w.bbox.y1)) },
+      baseline: { x0, y0: y + off(x0), x1, y1: y + off(x1) },
+      rowAttributes: { rowHeight: H },
+      words: ws,
+    };
+  }
+
+  it('la descripción y los importes de cada artículo quedan en la misma fila aunque a la derecha bajen más de un renglón', () => {
+    // Parte de arriba de una foto con el papel combado: a la derecha las filas bajan hasta 28 px (más que la altura de la letra)
+    const off = (x: number) => 28 * (x / 820) ** 2;
+    const names = [['PATATA', 'AGRIA'], ['CEBOLLA', 'DULCE'], ['TOMATE', 'PERA'], ['PIMIENTO', 'ROJO'], ['AJO', 'MORADO'], ['PUERRO', 'LIMPIO']];
+    const left = names.map(([a, b], i) => curved(100 + i * 60, [[a, 0], [b, 100]], off));
+    const right = names.map((_, i) => curved(100 + i * 60, [['12,000', 450], ['KG', 540], ['1,20', 620], ['14,40', 760]], off));
+    const page = tpage([left, right]);
+    expect(pageSlopeField(page)).toBeDefined();
+    const res = ocrPagesToResult([{ page }]);
+    expect(res.rows).toHaveLength(names.length);
+    res.rows?.forEach((row, i) => {
+      expect(row.text).toContain(names[i][0]);
+      expect(row.text).toContain('14,40');
+    });
   });
 });

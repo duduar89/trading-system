@@ -25,7 +25,7 @@ vi.mock('../ai/menu', () => ({ aiExtractMenu: m.aiExtractMenu }));
 vi.mock('./spreadsheet', () => ({ readSpreadsheet: m.readSpreadsheet, guessColumnMapping: m.guessColumnMapping, sheetToInvoices: m.sheetToInvoices }));
 vi.mock('./menuParser', () => ({ parseMenuText: m.parseMenuText, mergeMenuPasses: m.mergeMenuPasses, menuQuality: m.menuQuality }));
 
-const { aiAvailable, dedupeMenuEntries, extractInvoicesFromFile, extractMenuFromFiles, fileKind, parseInvoicePages } = await import('./index');
+const { aiAvailable, dedupeMenuEntries, extractInvoicesFromFile, extractMenuFromFiles, fileKind, imagePixelSize, parseInvoicePages } = await import('./index');
 const { AIError } = await import('../ai/client');
 
 // ───────────────────────────── Datos ─────────────────────────────
@@ -175,6 +175,44 @@ describe('extractInvoicesFromFile · fotos, hojas y errores', () => {
     expect(inv.method).toBe('ocr');
     expect(inv.warnings.some((w) => w.includes('se lee con dificultad'))).toBe(true);
     expect(m.preprocessImage).not.toHaveBeenCalled();
+  });
+
+  /** Cabecera JPEG mínima: SOI, un APP0 y un SOF0 con el alto y el ancho dados. */
+  const jpegHeader = (w: number, h: number) => [0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03, 0, 0, 0, 0];
+
+  it('tamaño de una foto por su cabecera (JPEG y PNG), sin decodificarla', async () => {
+    expect(await imagePixelSize(new Blob([new Uint8Array(jpegHeader(899, 1599))]))).toEqual({ width: 899, height: 1599 });
+    const png = new Uint8Array(24);
+    png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+    new DataView(png.buffer).setUint32(16, 3024);
+    new DataView(png.buffer).setUint32(20, 4032);
+    expect(await imagePixelSize(new Blob([png]))).toEqual({ width: 3024, height: 4032 });
+    expect(await imagePixelSize(new Blob([new Uint8Array([1, 2, 3])]))).toBeUndefined();
+  });
+
+  it('foto comprimida (WhatsApp) que no cuadra: explica cómo conseguir una lectura mejor; si cuadra, no molesta', async () => {
+    const small = () => file('IMG-20260929-WA0084.jpg', 'image/jpeg', jpegHeader(899, 1599));
+    const unvalidated = ocrInvoice({ lines: [{ description: 'TOMATE', quantity: 2, unit: 'kg', unitPrice: 1, total: 2, confidence: 0.5, warnings: ['dudosa'] }], subtotal: 5 });
+    m.ocrInvoiceImages.mockResolvedValue({ invoice: unvalidated, ocr: { text: 'x', confidence: 85, lines: [] }, passes: [] });
+    const [inv] = await extractInvoicesFromFile(small(), { settings: settings() });
+    expect(inv.warnings.some((w) => /poca resolución/.test(w) && /como documento/.test(w))).toBe(true);
+    const complete = ocrInvoice({ lines: [{ description: 'TOMATE', quantity: 2, unit: 'kg', unitPrice: 1, total: 2, confidence: 1 }], subtotal: 2 });
+    m.ocrInvoiceImages.mockResolvedValue({ invoice: complete, ocr: { text: 'x', confidence: 85, lines: [] }, passes: [] });
+    const [ok] = await extractInvoicesFromFile(small(), { settings: settings() });
+    expect(ok.warnings.some((w) => /poca resolución/.test(w))).toBe(false);
+    // Foto de cámara a resolución completa: sin aviso aunque no cuadre
+    m.ocrInvoiceImages.mockResolvedValue({ invoice: unvalidated, ocr: { text: 'x', confidence: 85, lines: [] }, passes: [] });
+    const [big] = await extractInvoicesFromFile(file('IMG_1234.jpg', 'image/jpeg', jpegHeader(3024, 4032)), { settings: settings() });
+    expect(big.warnings.some((w) => /poca resolución/.test(w))).toBe(false);
+  });
+
+  it('factura en varias fotos: las lee juntas en el dispositivo (sin IA) y no las separa en varias facturas', async () => {
+    const pages = [jpgFile('p2.jpg'), jpgFile('p3.jpg')];
+    const res = await extractInvoicesFromFile(jpgFile('p1.jpg'), { settings: withAi, pages });
+    expect(res).toHaveLength(1);
+    expect(m.aiExtractInvoice).not.toHaveBeenCalled();
+    expect(m.ocrInvoiceImages.mock.calls[0][0]).toHaveLength(3);
+    expect(m.ocrInvoiceImages.mock.calls[0][0][0].name).toBe('p1.jpg');
   });
 
   it('foto con IA: la prepara (EXIF, tamaño) antes de enviarla', async () => {

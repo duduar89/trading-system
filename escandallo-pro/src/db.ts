@@ -166,7 +166,7 @@ export interface WorkspaceBackup {
     products: Product[];
     pricePoints: PricePoint[];
     suppliers: Supplier[];
-    invoices: Omit<Invoice, 'file'>[];
+    invoices: Omit<Invoice, 'file' | 'extraPages'>[];
     dishes: Dish[];
     yieldTests: YieldTest[];
     menuScans: Omit<MenuScan, 'images'>[];
@@ -197,7 +197,7 @@ export async function exportWorkspace(workspaceId: string): Promise<WorkspaceBac
       products,
       pricePoints,
       suppliers,
-      invoices: invoices.map(({ file: _file, ...rest }) => rest),
+      invoices: invoices.map(({ file: _file, extraPages: _pages, ...rest }) => rest),
       dishes,
       yieldTests,
       menuScans: menuScans.map(({ images: _images, ...rest }) => rest),

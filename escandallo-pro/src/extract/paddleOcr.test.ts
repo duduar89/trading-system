@@ -20,6 +20,7 @@ import {
   rectCorners,
   splitAfterPunctuation,
   splitByGaps,
+  splitComponentLines,
   splitSuperscript,
   stripLeaders,
   toSuperscript,
@@ -149,6 +150,52 @@ describe('geometría de las cajas', () => {
     expect(b.tl.y).toBeLessThan(20);
     expect(b.bl.y).toBeGreaterThan(38);
     expect(b.score).toBeGreaterThan(0.85);
+  });
+});
+
+describe('renglones pegados y curvados (foto de página completa)', () => {
+  const W = 400;
+  /** Píxeles (índices del mapa) de las franjas dadas por su centro en cada columna. */
+  const band = (x0: number, x1: number, center: (x: number) => number, half = 2): number[] => {
+    const out: number[] = [];
+    for (let x = x0; x < x1; x++) {
+      const c = Math.round(center(x));
+      for (let y = c - half; y <= c + half; y++) out.push(y * W + x);
+    }
+    return out;
+  };
+
+  it('separa dos renglones que la detección une por un puente de tinta', () => {
+    const top = band(10, 300, () => 20);
+    const bottom = band(10, 300, () => 28);
+    // Puentes entre los dos renglones (un trazo descendente y uno ascendente que se tocan)
+    const bridge: number[] = [];
+    for (const x of [80, 81, 200, 201]) for (let y = 22; y <= 26; y++) bridge.push(y * W + x);
+    const pix = Int32Array.from(new Set([...top, ...bottom, ...bridge]));
+    const pieces = splitComponentLines(pix, pix.length, W);
+    expect(pieces).toBeDefined();
+    expect(pieces?.length).toBe(2);
+    const rowsOf = (p: { pix: Int32Array }) => [...p.pix].map((i) => Math.floor(i / W));
+    const [a, b] = (pieces ?? []).map(rowsOf).sort((u, v) => Math.min(...u) - Math.min(...v));
+    expect(Math.max(...a)).toBeLessThanOrEqual(24);
+    expect(Math.min(...b)).toBeGreaterThanOrEqual(24);
+  });
+
+  it('corta en trozos rectos un renglón largo y combado; un renglón recto no se toca', () => {
+    const arc = Int32Array.from(band(0, 390, (x) => 20 + 12 * Math.sin((Math.PI * x) / 390)));
+    const pieces = splitComponentLines(arc, arc.length, W);
+    expect(pieces?.length).toBeGreaterThanOrEqual(2);
+    const straight = Int32Array.from(band(0, 390, () => 20));
+    expect(splitComponentLines(straight, straight.length, W)).toBeUndefined();
+  });
+
+  it('dbBoxes: dos renglones pegados dan dos cajas (y una sola sin separar renglones)', () => {
+    const H = 60;
+    const prob = new Float32Array(W * H);
+    for (const i of [...band(10, 300, () => 20), ...band(10, 300, () => 28)]) prob[i] = 0.9;
+    for (const x of [80, 81, 200, 201]) for (let y = 22; y <= 26; y++) prob[y * W + x] = 0.9;
+    expect(dbBoxes(prob, W, H, {}).length).toBe(2);
+    expect(dbBoxes(prob, W, H, { splitLines: false }).length).toBe(1);
   });
 });
 

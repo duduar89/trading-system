@@ -492,6 +492,7 @@ function InvoiceReviewScreen() {
           {mobileDoc && (
             <FilePreview
               file={invoice.file}
+              pages={invoice.extraPages}
               fileName={invoice.fileName}
               fileType={invoice.fileType}
               rawText={invoice.rawText}
@@ -507,6 +508,7 @@ function InvoiceReviewScreen() {
             <div className="sticky top-6">
               <FilePreview
                 file={invoice.file}
+                pages={invoice.extraPages}
                 fileName={invoice.fileName}
                 fileType={invoice.fileType}
                 rawText={invoice.rawText}

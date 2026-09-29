@@ -28,6 +28,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const GENERATOR_VERSION = 1;
 export const TUNING_SEEDS = Array.from({ length: 150 }, (_, i) => i + 1);
 export const HELDOUT_SEEDS = Array.from({ length: 100 }, (_, i) => i + 1001);
+/**
+ * Facturas de cash & carry / mayorista (artículos en dos filas con código de unidad, columnas Prec. Ud. | Cont P. |
+ * Precio | Cant. | Importe | Imp, trazabilidad GTIN/Lote, bloque del cliente con su N.I.F. y total de página). Semillas
+ * aparte para no cambiar las facturas de las semillas de siempre: ajuste 2001–2060, reservadas 3001–3040.
+ */
+export const CASH_TUNING_SEEDS = Array.from({ length: 60 }, (_, i) => i + 2001);
+export const CASH_HELDOUT_SEEDS = Array.from({ length: 40 }, (_, i) => i + 3001);
+export const isCashSeed = (seed) => (seed >= 2001 && seed <= 2999) || (seed >= 3001 && seed <= 3999);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const DEFAULT_OUT = join(ROOT, `node_modules/.cache/escandallo-random/v${GENERATOR_VERSION}`);
@@ -1391,6 +1399,172 @@ function ticketTemplate(R, ctx) {
   return htmlDoc(`Ticket ${ctx.number}`, css, `<pre>${esc(out.join('\n'))}</pre>`);
 }
 
+// ───────────────────────────── Plantilla 4: cash & carry / mayorista ─────────────────────────────
+
+/** Código de unidad de venta → unidad que debe salir (la de `normUnit` del parser). */
+const CASH_UNIT_CODES = { KG: 'kg', CJ: 'caja', BT: 'bot', MA: 'malla', MJ: 'manojo', BJ: 'bandeja', PQ: 'paquete', LA: 'lata', GF: 'garrafa', DC: 'docena', BD: 'bidon', UN: 'ud', BO: 'bote', FR: 'bote', TR: 'bote', CB: 'cubo', SC: 'saco', BL: 'bolsa', BR: 'brik' };
+const CASH_CODE_FOR = { caja: ['CJ'], bot: ['BT'], malla: ['MA'], manojo: ['MJ'], bandeja: ['BJ'], paquete: ['PQ'], lata: ['LA'], garrafa: ['GF'], docena: ['DC'], l: ['BD', 'BR', 'GF'], ud: ['UN', 'BO', 'FR', 'TR', 'CB', 'SC', 'BL'] };
+const CASH_BRANDS = ['', '', 'Chef Select', 'Horeca Plus', 'Gastro Line', 'ARO', 'Maestro Cocina'];
+
+function cashCarryInvoice(seed, opts = {}) {
+  const R = makeRng(seed);
+  const kind = SUPPLIER_KINDS.find((k) => k.id === 'cash');
+  // Un cash & carry es siempre una sociedad (nunca una persona física)
+  let supplier = makeSupplier(R, kind);
+  for (let k = 0; k < 5 && supplier.person; k++) supplier = makeSupplier(R, kind);
+  // Razón social de mayorista (S.A. con CIF de letra A la mayoría de las veces)
+  if (!supplier.person && R.chance(0.7)) {
+    supplier.name = supplier.name.replace(/\s+(?:S\.?L\.?U?\.?|S\.?A\.?U?\.?|S\. Coop\.|C\.B\.|SL|SA|SLU)$/i, '') + ', S.A.';
+    const seven = supplier.taxId.slice(1, 8);
+    supplier.taxId = `A${seven}${cifControl('A', seven)}`;
+  }
+  const customer = makeCustomer(R);
+  const date = makeDate(R);
+  const pad = (n, k) => String(n).padStart(k, '0');
+  const number = `0/0(${pad(R.int(1, 99), 3)})${pad(R.int(1, 9999), 4)}/(${date.y})${pad(R.int(1, 999999), 6)}`;
+  const brand = R.pick(CASH_BRANDS);
+  const vatCodes = R.pick([{ 4: '5', 10: '1', 21: '2' }, { 4: '1', 10: '2', 21: '3' }, { 4: '4', 10: '6', 21: '7' }]);
+  const summary = R.chance(0.45);
+  const fontSize = Number(R.float(7.4, 9.2).toFixed(2));
+  const f = (v, d) => fmtNum(v, d, { thousands: false });
+  const products = pickProducts(R, kind, R.weighted([
+    [1, R.int(3, 6)],
+    [3, R.int(7, 14)],
+    [1.5, R.int(15, 22)],
+  ]));
+  const lines = products.map((prod) => {
+    const kg = prod.unit === 'kg';
+    const code = kg ? 'KG' : R.pick(CASH_CODE_FOR[prod.unit] ?? CASH_CODE_FOR.ud);
+    let desc = applyCase(prod.d, R.pick(['upper', 'title', 'sentence', 'sentence']));
+    if (brand && R.chance(0.6)) desc = `${brand} ${desc}`;
+    const artCode = R.chance(0.1) ? `0${makeEan(R)}` : pad(R.int(1000, 999999), 6);
+    const price = rnd(R.float(prod.pmin, Math.max(prod.pmin + 0.05, prod.pmax)), 2);
+    let pu;
+    let cp;
+    let cpDec;
+    if (kg) {
+      pu = price;
+      cp = rnd(R.float(0.35, Math.max(0.8, Math.min(8, prod.qmax))), 3);
+      cpDec = 3;
+    } else if (R.chance(0.18)) {
+      // Caja de N unidades a precio por unidad: Precio = Prec. Ud. × N
+      cp = R.pick([6, 12, 24]);
+      pu = rnd(price / cp, 3) || 0.01;
+      cpDec = 0;
+    } else {
+      pu = price;
+      cp = 1;
+      cpDec = 0;
+    }
+    const pr = rnd(pu * cp, 2);
+    const cant = kg ? (R.chance(0.88) ? 1 : R.int(2, 3)) : R.weighted([
+      [6, 1],
+      [3, R.int(2, 6)],
+      [0.6, R.int(8, 24)],
+    ]);
+    const total = rnd(pr * cant, 2);
+    const trace = R.chance(0.15);
+    const oneRow = desc.length <= 36 && R.chance(0.35);
+    return { prod, kg, code, desc, artCode, pu, cp, cpDec, pr, cant, total, vat: prod.vat, trace, oneRow, lot: pad(R.int(0, 99999), R.pick([1, 5])) };
+  });
+  const subtotal = rnd(lines.reduce((a, l) => a + l.total, 0), 2);
+  const rates = [...new Set(lines.map((l) => l.vat))].sort((a, b) => a - b);
+  const breakdown = rates.map((rate) => {
+    const base = rnd(lines.filter((l) => l.vat === rate).reduce((a, l) => a + l.total, 0), 2);
+    return { rate, base, vat: rnd((base * rate) / 100, 2) };
+  });
+  const vatTotal = rnd(breakdown.reduce((a, b) => a + b.vat, 0), 2);
+  const total = rnd(subtotal + vatTotal, 2);
+
+  // Maquetación en columnas fijas (impresora de agujas / ERP)
+  const DESC_X = 15;
+  const NUM_X = 64;
+  const amounts = (l) =>
+    [l.code.padEnd(4), f(l.pu, 3).padStart(9), f(l.cp, l.cpDec).padStart(9), f(l.pr, 2).padStart(9), String(l.cant).padStart(6), f(l.total, 2).padStart(10), `     ${vatCodes[l.vat]}`].join(' ');
+  const W = NUM_X + amounts(lines[0]).length;
+  const right = (a, b) => `${a}${' '.repeat(Math.max(2, W - a.length - b.length))}${b}`;
+  const col = (a, b, c) => {
+    const left = a.padEnd(Math.max(46, a.length + 4));
+    return `${left}${b.padEnd(Math.max(b.length + 2, W - left.length - c.length - 2))}  ${c}`;
+  };
+  const hhmm = `${pad2(R.int(7, 20))}:${pad2(R.int(0, 59))}`;
+  const cif = supplier.taxId;
+  const cifPrinted = supplier.person ? supplier.taxId : R.pick([`${cif[0]}-${cif.slice(1, 3)}/${cif.slice(3)}`, `${cif[0]}-${cif.slice(1)}`, `${cif[0]}${cif.slice(1, 3)} ${cif.slice(3)}`]);
+  const out = [];
+  const branch = makeAddress(R);
+  out.push(col(supplier.name, stripAccents(branch.line2.replace(/^\d+\s*/, '')).toUpperCase(), 'Pagina:   1'));
+  out.push(col(supplier.addr.street, stripAccents(branch.street).toUpperCase(), `Fecha de venta:    ${fmtDate(date, 'dmy')} ${hhmm}`));
+  out.push(col(supplier.addr.line2, stripAccents(branch.line2).toUpperCase(), `Fecha impresion:   ${fmtDate(date, 'dmy')} ${hhmm}`));
+  out.push(`Telf.: ${supplier.phone}   Fax: ${makePhone(R)}`);
+  out.push(cifPrinted);
+  out.push(`${R.pick(['Inscrita en el Reg. Merc. de', 'Merc. de', 'R. Merc. de'])} ${R.pick(['Madrid', 'Sevilla', 'Barcelona', 'Valencia', 'Málaga', 'Bizkaia', 'Zaragoza', 'Murcia'])}, T. ${R.int(1, 9)}.${pad(R.int(0, 999), 3)} L. 0 F. ${R.int(1, 220)}, Secc. 8.ª H. ${R.pick(['M', 'SE', 'B', 'V', 'MA'])}-${R.int(1, 99)}.${pad(R.int(0, 999), 3)}`);
+  out.push(`Factura                ${number}      (${pad(R.int(1, 999), 3)}-${pad(R.int(1, 999999), 6)})`);
+  out.push('Factura de entrega');
+  out.push(col(customer.name, '', `N.cliente:  ${R.int(10, 99)} ${pad(R.int(1, 9999999), 7)} ${R.int(0, 9)}`));
+  out.push(col(customer.addr.street, '', `N.I.F.:  ${customer.taxId}`));
+  out.push(customer.addr.line2);
+  out.push('-'.repeat(W));
+  out.push(`${'MM Num. articulo'.padEnd(DESC_X + 2)}${'Descrip. articulo'.padEnd(NUM_X - DESC_X - 2)}${['Cont', ' Prec. Ud.', '  Cont P.', '   Precio', ' Cant.', '   Importe', ' Imp'].join(' ')}`);
+  out.push('-'.repeat(W));
+  const pedido = `${R.int(1, 9)}-${pad(R.int(1, 999999999), 9)}`;
+  out.push(`*** Numero de pedido ${pedido}`);
+  out.push(`Entregado a:  ${stripAccents(customer.name).toUpperCase()},  ${stripAccents(customer.addr.street).toUpperCase()},  ES *** Fecha: ${fmtDate(date, 'dmy')}`);
+  for (const l of lines) {
+    const descRow = `${l.artCode.padEnd(DESC_X)}${l.desc}`;
+    if (l.oneRow) out.push(`${descRow.padEnd(NUM_X)}${amounts(l)}`);
+    else {
+      out.push(descRow);
+      out.push(`${' '.repeat(NUM_X)}${amounts(l)}`);
+    }
+    if (l.trace) {
+      const gtin = l.artCode.length === 14 ? l.artCode : `0${makeEan(R)}`;
+      out.push(`${' '.repeat(DESC_X)}Lote: ${l.lot}`);
+      out.push(`${' '.repeat(DESC_X)}GTIN:  ${gtin}  Lote: ${l.lot}`);
+      if (R.chance(0.5)) out.push(`${' '.repeat(DESC_X)}Origen: ${R.pick(['España', 'Portugal', 'Francia', 'Marruecos', 'Perú'])}`);
+      out.push(`${' '.repeat(DESC_X)}GTIN: ${gtin.slice(1)} Qty: 1 LOT: ${l.lot}`);
+    }
+  }
+  out.push(`*** Fin de numero de pedido ${pedido}`);
+  out.push('-'.repeat(W));
+  const weight = rnd(lines.reduce((a, l) => a + (l.kg ? l.cp * l.cant : R.float(0.2, 6)), 0), 3);
+  out.push(right(`Numero de bultos: ${lines.reduce((a, l) => a + l.cant, 0)}     Peso Total: ${f(weight, 3)} KG     Envases: 0`, `Importe   ${f(subtotal, 2).padStart(10)}`));
+  out.push('');
+  if (summary) {
+    out.push(right('', `${'Tipo'.padStart(6)}  ${'Base imponible'.padStart(14)}  ${'% IVA'.padStart(6)}  ${'Cuota IVA'.padStart(10)}`));
+    for (const b of breakdown) out.push(right('', `${vatCodes[b.rate].padStart(6)}  ${f(b.base, 2).padStart(14)}  ${f(b.rate, 2).padStart(6)}  ${f(b.vat, 2).padStart(10)}`));
+    out.push('');
+    out.push(right('', `Base imponible  ${f(subtotal, 2).padStart(10)}`));
+    out.push(right('', `Total IVA  ${f(vatTotal, 2).padStart(10)}`));
+    out.push(right('', `Total factura  ${f(total, 2).padStart(10)}`));
+  } else out.push(right('', `Total pagina   ${f(subtotal, 2).padStart(10)}`));
+  const css = `body { font-family: ${R.pick(MONO)}; font-size: ${(opts.fontScale ? fontSize * opts.fontScale : fontSize).toFixed(2)}px; } pre { margin: 0; font: inherit; line-height: ${R.pick([1.25, 1.35, 1.45])}; white-space: pre; } .logo { font: 800 26px Arial, sans-serif; margin: 0 0 6px 40%; }`;
+  const logo = R.chance(0.6) ? `<div class="logo">${esc(supplier.name.split(' ')[0].toLowerCase())}</div>` : '';
+  const html = htmlDoc(`Factura ${number}`, css, `${logo}<pre>${esc(out.join('\n'))}</pre>`);
+  const page = { format: 'A4', landscape: false, margin: `${R.int(8, 12)}mm` };
+  const expected = {
+    id: `rnd-${seed}`,
+    seed,
+    generator: GENERATOR_VERSION,
+    template: 'cashcarry',
+    supplierKind: 'cash',
+    features: ['cashcarry', summary ? 'resumen-iva' : 'total-pagina', ...(lines.some((l) => l.trace) ? ['trazabilidad'] : []), ...(lines.some((l) => l.oneRow) ? ['una-fila'] : []), ...(lines.some((l) => l.cpDec === 0 && l.cp > 1) ? ['caja-n-unidades'] : [])],
+    page,
+    header: { supplierName: supplier.name, supplierTaxId: supplier.taxId, number, date: date.iso, subtotal, vatTotal: summary ? vatTotal : undefined, total: summary ? total : undefined },
+    lines: lines.map((l) => ({
+      description: l.desc,
+      code: l.artCode,
+      quantity: l.kg ? rnd(l.cp * l.cant, 3) : l.cant,
+      unit: CASH_UNIT_CODES[l.code],
+      unitShown: true,
+      unitPrice: l.kg ? l.pu : l.pr,
+      total: l.total,
+      vatPct: l.vat,
+    })),
+    extras: [],
+  };
+  return { id: expected.id, seed, template: 'cashcarry', html, page, expected };
+}
+
 // ───────────────────────────── Documento completo ─────────────────────────────
 
 /**
@@ -1398,6 +1572,7 @@ function ticketTemplate(R, ctx) {
  * página se desborda (lo decide el renderizador).
  */
 export function generateInvoice(seed, opts = {}) {
+  if (isCashSeed(seed)) return cashCarryInvoice(seed, opts);
   const R = makeRng(seed);
   const kind = R.weighted(SUPPLIER_KINDS.map((k) => [k.w, k]));
   const template = R.weighted([

@@ -27,19 +27,23 @@ src/
     analytics.ts      Ingeniería de menú, alertas de precio, KPIs, simulación de precios
   extract/            Lectura de documentos
     pdf.ts ocr.ts     pdf.js y tesseract.js (import dinámico)
-    invoiceParser.ts  Parser heurístico de facturas (validación cruzada cantidad×precio=importe)
+    invoiceParser.ts  Parser heurístico de facturas (validación cruzada cantidad×precio=importe); modo cash & carry /
+                      mayorista: artículos en dos filas con código de unidad (Prec. Ud. × Cont P. = Precio; Precio × Cant. =
+                      Importe), trazabilidad GTIN/Lote, CIF del emisor frente al N.I.F. del cliente, «Total página»
     menuParser.ts     Parser heurístico de cartas
     spreadsheet.ts    Excel/CSV de facturas o tarifas
     layout.ts         Reconstrucción de filas/columnas a partir de posiciones (pdf.js)
     imageOps.ts       Preprocesado de fotos: papel/perspectiva, iluminación, contraste, enderezado, binarización
     prep.worker.ts    Preprocesado en un Web Worker (no bloquea la interfaz)
     ocrPipeline.ts    OCR en varias pasadas (tabla / bloque / binarizado) hasta que las cuentas cuadran
-    ocrLayout.ts      Filas de tabla y columnas de carta a partir de las cajas de palabras del OCR
+    ocrLayout.ts      Filas de tabla y columnas de carta a partir de las cajas de palabras del OCR; campo de pendientes
+                      local para papel curvado (las filas se enlazan renglón a renglón)
     ocrFixes.ts       Correcciones de OCR validadas (O↔0, S↔5, «G» leída como «6», palabras pegadas…)
     menuUtils.ts      Ayudas del parser de cartas (columnas, precios, secciones, ruido de iconos)
     menuImage.ts      Cartas oscuras y pizarras: normalización de polaridad antes del OCR
     tableModel.ts     Modelo de tabla de facturas: columnas tipadas por cabecera y posición (cantidad, kilos, lote…)
-    paddleOcr.ts      Adaptador de PaddleOCR (PP-OCRv5): cajas de detección y reconocimiento → palabras/líneas
+    paddleOcr.ts      Adaptador de PaddleOCR (PP-OCRv5): cajas de detección y reconocimiento → palabras/líneas; separa los
+                      renglones que la detección une y corta en trozos rectos los curvados (fotos de página completa)
     paddleEngine.ts   Motor PaddleOCR en un worker (paddle.worker.ts) con ONNX Runtime Web; respaldo a Tesseract
     paddleModel.ts    Rutas y huellas de los modelos (public/ocr-models) y del binario de ONNX Runtime
     modelCache.ts     Descarga con verificación (tamaño/SHA-256) y caché propia de modelos para uso sin conexión
@@ -61,6 +65,10 @@ La lectura de facturas y cartas funciona 100 % en el dispositivo y sin coste:
   tabla borradas) → **PaddleOCR PP-OCRv5** (detección móvil + reconocedor latino, ONNX Runtime Web) como motor principal
   y **Tesseract** (modelo español best_int) en pasadas de respaldo, combinadas línea a línea por la validación aritmética.
 - **PDF escaneados**: render a 300 ppp → Tesseract con varias pasadas.
+- **Facturas en varias fotos**: el usuario indica que son páginas de una misma factura (`Invoice.extraPages`) y se leen
+  juntas como un documento de varias páginas.
+- **Fotos comprimidas** (WhatsApp deja el lado mayor en 1600 px): si la lectura no cuadra, la revisión explica cómo
+  conseguir una foto mejor (tamaño leído de la cabecera JPEG/PNG, sin decodificar).
 - **Validación aritmética**: cantidad × precio × (1 − dto) = importe y Σ líneas = base imponible deciden entre lecturas
   y autorizan correcciones de OCR (dígitos, decimales perdidos, «G» leída como «6»…).
 - Motores (worker y núcleo de Tesseract, binario de ONNX Runtime) y modelos se sirven desde la propia app: el plugin

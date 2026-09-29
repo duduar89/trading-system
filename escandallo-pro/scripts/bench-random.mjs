@@ -14,7 +14,7 @@
  *    validación aritmética de ocrPipeline.ts; en las fotos, primero el lector PaddleOCR (scripts/paddle-node.mjs), como
  *    la app (--engine=tesseract: sólo Tesseract). Las lecturas de ambos motores se guardan en caché.
  *
- * Uso: node scripts/bench-random.mjs [--set=tuning|heldout] [--seeds=1-40] [--ocr] [--ocr-count=30] [--no-text]
+ * Uso: node scripts/bench-random.mjs [--set=tuning|heldout|cash|cash-heldout] [--seeds=1-40] [--ocr] [--ocr-count=30] [--no-text]
  *                                    [--verbose] [--only=<plantilla|rasgo>] [--json=<archivo>] [--regen]
  *   --verbose   detalle de los fallos (sólo semillas de ajuste)
  *   --ocr       mide también la ruta OCR con las primeras --ocr-count semillas del conjunto (foto o PDF escaneado)
@@ -27,7 +27,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { dirname, join, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { HELDOUT_SEEDS, TUNING_SEEDS, makeRng, parseSeeds, renderInvoicePdf } from './gen-random-invoices.mjs';
+import { CASH_HELDOUT_SEEDS, CASH_TUNING_SEEDS, HELDOUT_SEEDS, TUNING_SEEDS, makeRng, parseSeeds, renderInvoicePdf } from './gen-random-invoices.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(join(ROOT, 'package.json'));
@@ -40,9 +40,11 @@ const args = Object.fromEntries(
 const log = (...a) => console.log(...a);
 if (!process.env.PLAYWRIGHT_BROWSERS_PATH && existsSync('/opt/pw-browsers')) process.env.PLAYWRIGHT_BROWSERS_PATH = '/opt/pw-browsers';
 
-const set = args.set === 'heldout' ? 'heldout' : 'tuning';
-const seeds = args.seeds ? parseSeeds(args.seeds) : set === 'heldout' ? HELDOUT_SEEDS : TUNING_SEEDS;
-const isHeldout = (s) => s >= 1001;
+const SETS = { tuning: TUNING_SEEDS, heldout: HELDOUT_SEEDS, cash: CASH_TUNING_SEEDS, 'cash-heldout': CASH_HELDOUT_SEEDS };
+const set = SETS[args.set] ? args.set : 'tuning';
+const seeds = args.seeds ? parseSeeds(args.seeds) : SETS[set];
+// Reservadas: 1001–1999 (facturas de siempre) y 3001+ (cash & carry); de ajuste: 1–150 y 2001–2999
+const isHeldout = (s) => (s >= 1001 && s <= 1999) || s >= 3001;
 const anyHeldout = seeds.some(isHeldout);
 const VERBOSE = !!args.verbose && !anyHeldout;
 if (args.verbose && anyHeldout) log('Aviso: las semillas reservadas sólo se informan en agregado (se ignora --verbose).');
@@ -339,9 +341,10 @@ function scoreInvoice(inv, exp) {
     supplierTaxId: inv?.supplierTaxId === h.supplierTaxId,
     number: inv?.number === h.number,
     date: inv?.date === h.date,
-    subtotal: eq(inv?.subtotal, h.subtotal, 0.005),
-    vatTotal: eq(inv?.vatTotal, h.vatTotal, 0.005),
-    total: eq(inv?.total, h.total, 0.005),
+    // Sin resumen de IVA (una página de cash & carry con su «Total página»): no debe inventarse ni el IVA ni el total
+    subtotal: h.subtotal === undefined ? inv?.subtotal === undefined : eq(inv?.subtotal, h.subtotal, 0.005),
+    vatTotal: h.vatTotal === undefined ? inv?.vatTotal === undefined : eq(inv?.vatTotal, h.vatTotal, 0.005),
+    total: h.total === undefined ? inv?.total === undefined : eq(inv?.total, h.total, 0.005),
   };
   return {
     exact,

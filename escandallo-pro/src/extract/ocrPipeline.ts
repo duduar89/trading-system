@@ -224,7 +224,16 @@ async function withDarkRegions(read: TessPage, page: PreparedPage, backend: OcrB
   };
   const blocks = (read.blocks ?? []).map((b) => ({
     ...b,
-    paragraphs: b.paragraphs.map((p) => ({ lines: p.lines.map((l) => ({ ...l, words: l.words.filter((w) => !inside(w.bbox)) })).filter((l) => l.words.length) })),
+    // Un renglón que cae sobre todo dentro de la zona es basura de la banda entera, también sus restos de los bordes
+    // (con las filas enlazadas por renglones, un resto suelto acabaría pegado a la razón social)
+    paragraphs: b.paragraphs.map((p) => ({
+      lines: p.lines
+        .map((l) => {
+          const mostly = l.words.filter((w) => inside(w.bbox)).length * 2 >= l.words.length;
+          return { ...l, words: mostly ? [] : l.words.filter((w) => !inside(w.bbox)) };
+        })
+        .filter((l) => l.words.length),
+    })),
   }));
   for (const d of page.dark) {
     const lines: TessLine[] = (d.lines ?? []).map((l) => ({

@@ -2,6 +2,7 @@ import type { AppSettings, ExtractedInvoice, ExtractedMenu, ProgressFn } from '.
 import { normalizeText } from '../core/matching';
 import { extractPdfText, pdfToImages, type PdfTextLine } from './pdf';
 import { ocrInvoiceImages, ocrMenuImages, preprocessImage, type OcrResult } from './ocr';
+import { invoiceLooksComplete } from './ocrPipeline';
 import { invoiceQuality, parseInvoiceText } from './invoiceParser';
 import { menuQuality, mergeMenuPasses, parseMenuText } from './menuParser';
 import { pdfLinesToMenuBoxes, type PositionedLine } from './menuUtils';
@@ -39,6 +40,39 @@ async function sniffKind(file: Blob): Promise<FileKind> {
   return 'unknown';
 }
 
+/**
+ * Tamaño en píxeles de una foto JPEG o PNG leído de su cabecera, sin decodificarla (undefined en otros formatos o si
+ * no se encuentra).
+ */
+export async function imagePixelSize(file: Blob): Promise<{ width: number; height: number } | undefined> {
+  try {
+    const b = new Uint8Array(await file.slice(0, 512 * 1024).arrayBuffer());
+    if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 && b.length >= 24) {
+      const dv = new DataView(b.buffer, b.byteOffset);
+      return { width: dv.getUint32(16), height: dv.getUint32(20) };
+    }
+    if (b[0] !== 0xff || b[1] !== 0xd8) return undefined;
+    // Marcadores JPEG hasta el SOF (C0–CF salvo C4 = tablas Huffman, C8 = reservado y CC = tablas aritméticas)
+    let i = 2;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xff) return undefined;
+      const marker = b[i + 1];
+      if (marker === 0xff) {
+        i++;
+        continue;
+      }
+      const len = (b[i + 2] << 8) | b[i + 3];
+      if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+        return { width: (b[i + 7] << 8) | b[i + 8], height: (b[i + 5] << 8) | b[i + 6] };
+      }
+      i += 2 + len;
+    }
+  } catch {
+    // Cabecera ilegible: sin tamaño
+  }
+  return undefined;
+}
+
 async function resolveKind(file: Blob & { name?: string }): Promise<FileKind> {
   const kind = fileKind(file);
   return kind === 'unknown' ? sniffKind(file) : kind;
@@ -73,6 +107,10 @@ function withWarnings<T extends { warnings: string[] }>(item: T, extra: string[]
 }
 
 const LOW_CONFIDENCE_WARNING = 'La imagen se lee con dificultad: revisa los datos o sube una foto más nítida, de frente y con buena luz';
+const COMPRESSED_PHOTO_WARNING =
+  'La foto ha llegado con poca resolución (pasa con las que se envían por WhatsApp): para leerla mejor, hazla desde la app con «Hacer foto» o envíala por WhatsApp como documento';
+/** Lado mayor (px) por debajo del cual una foto de una página entera pierde la letra pequeña (WhatsApp la deja en 1600). */
+const COMPRESSED_PHOTO_SIDE = 2000;
 
 // ───────────────────────────── Facturas ─────────────────────────────
 
@@ -141,12 +179,12 @@ async function aiInvoice(file: Blob, mediaType: string, settings: AppSettings, o
 }
 
 /** OCR de una factura: `photo` = foto (lector PaddleOCR primero, si el navegador puede); si no, PDF escaneado. */
-async function ocrInvoiceFrom(images: Blob[], onProgress: ProgressFn | undefined, photo = false): Promise<ExtractedInvoice[]> {
+async function ocrInvoiceFrom(images: Blob[], onProgress: ProgressFn | undefined, photo = false, oneInvoice = false): Promise<ExtractedInvoice[]> {
   const outcome = await ocrInvoiceImages(images, onProgress, { engine: photo ? 'auto' : 'tesseract' });
   const extra: string[] = [];
   if (outcome.ocr.confidence > 0 && outcome.ocr.confidence < 60) extra.push(LOW_CONFIDENCE_WARNING);
-  // Varias facturas en un mismo PDF escaneado
-  if (images.length > 1 && outcome.ocr.rows?.length) {
+  // Varias facturas en un mismo PDF escaneado (las fotos de una misma factura no se separan)
+  if (images.length > 1 && !oneInvoice && outcome.ocr.rows?.length) {
     const split = parseInvoicePages(outcome.ocr.rows, 'ocr');
     if (split.length > 1) return split.map((inv) => withWarnings(inv, extra));
   }
@@ -156,9 +194,11 @@ async function ocrInvoiceFrom(images: Blob[], onProgress: ProgressFn | undefined
 /** Extrae una o varias facturas de un archivo (un Excel puede traer muchas). */
 export async function extractInvoicesFromFile(
   file: Blob & { name?: string },
-  opts: { settings: AppSettings; onProgress?: ProgressFn; forceLocal?: boolean },
+  opts: { settings: AppSettings; onProgress?: ProgressFn; forceLocal?: boolean; pages?: Blob[] },
 ): Promise<ExtractedInvoice[]> {
   const { settings, onProgress } = opts;
+  // Factura en varias fotos: se leen juntas, como las páginas de un documento (siempre en el dispositivo)
+  const pages = opts.pages?.filter((p) => p && p.size > 0) ?? [];
   if (!file || !file.size) throw new Error('El archivo está vacío');
   const kind = await resolveKind(file);
   if (kind === 'unknown') throw new Error(UNSUPPORTED);
@@ -199,7 +239,7 @@ export async function extractInvoicesFromFile(
   }
 
   // Foto
-  if (useAi) {
+  if (useAi && !pages.length) {
     // Enderezada (EXIF) y reducida: la petición es más rápida y barata. Si no se puede abrir, el error es claro (HEIC).
     let prepared: Blob | undefined;
     try {
@@ -213,8 +253,11 @@ export async function extractInvoicesFromFile(
       if (inv) return [inv];
     }
   }
-  onProgress?.({ stage: 'Reconociendo texto…', progress: useAi ? 0.5 : 0 });
-  const ocr = await ocrInvoiceFrom([file], scoped(onProgress, useAi ? 0.5 : 0, 1), true);
+  onProgress?.({ stage: 'Reconociendo texto…', progress: useAi && !pages.length ? 0.5 : 0 });
+  const ocr = await ocrInvoiceFrom([file, ...pages], scoped(onProgress, useAi && !pages.length ? 0.5 : 0, 1), true, pages.length > 0);
+  // Foto comprimida y lectura incompleta: se explica cómo conseguir una mejor (si todo cuadra, no hace falta)
+  const size = await imagePixelSize(file);
+  if (size && Math.max(size.width, size.height) < COMPRESSED_PHOTO_SIDE && ocr.some((inv) => !invoiceLooksComplete(inv))) warnings.push(COMPRESSED_PHOTO_WARNING);
   onProgress?.({ stage: 'Factura leída', progress: 1 });
   return ocr.map((inv) => withWarnings(inv, warnings));
 }
