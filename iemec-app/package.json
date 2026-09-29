@@ -1,0 +1,38 @@
+{
+  "name": "iemec-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agenda por cabinas, repesca por WhatsApp y reseñas para IEMEC (Boadilla del Monte)",
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\" \"motor/**/*.test.js\" \"servidor/**/*.test.js\"",
+    "lint": "eslint .",
+    "migrar": "node scripts/migrar.js",
+    "semillar": "node scripts/semillar.js",
+    "preparar-bd": "node scripts/migrar.js && node scripts/semillar.js",
+    "dev": "vite",
+    "dev:servidor": "node --watch servidor/index.js",
+    "build": "vite build",
+    "start": "node servidor/index.js",
+    "cron": "node servidor/cron.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "mysql2": "^3.24.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.1",
+    "vite-plugin-pwa": "^1.3.0"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}

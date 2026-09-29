@@ -1,0 +1,61 @@
+-- 002 · Agenda: citas con lo que ocupa cada una (sala con su limpieza, profesional y aparato), el
+-- token de la página «Tu cita» y el número de versión para el .ics.
+
+CREATE TABLE IF NOT EXISTS citas (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  paciente_id INT UNSIGNED NOT NULL,
+  tratamiento_id VARCHAR(80) NOT NULL,
+  profesional_id SMALLINT UNSIGNED NULL,
+  sala_id SMALLINT UNSIGNED NULL,
+  equipo_id SMALLINT UNSIGNED NULL,
+  inicio DATETIME NOT NULL,
+  fin DATETIME NOT NULL,
+  sala_desde DATETIME NOT NULL,
+  sala_hasta DATETIME NOT NULL,
+  prof_desde DATETIME NOT NULL,
+  prof_hasta DATETIME NOT NULL,
+  estado ENUM('retenida','confirmada','llegada','en_curso','completada','no_presentada','cancelada','reprogramada') NOT NULL DEFAULT 'retenida',
+  retenida_hasta DATETIME NULL,
+  origen ENUM('ia_whatsapp','recepcion','telefono','web','treatwell','importacion','otro') NOT NULL DEFAULT 'recepcion',
+  primera_visita BOOLEAN NOT NULL DEFAULT FALSE,
+  token CHAR(43) NOT NULL,
+  secuencia_ics SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  reprograma_a_id INT UNSIGNED NULL,
+  notas VARCHAR(600) NULL,
+  motivo_cancelacion VARCHAR(255) NULL,
+  cancelada_por ENUM('paciente','clinica','sistema') NULL,
+  cancelada_en DATETIME NULL,
+  confirmada_en DATETIME NULL,
+  creada_por VARCHAR(80) NOT NULL DEFAULT 'sistema',
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY cita_token (token),
+  KEY cita_inicio (inicio),
+  KEY cita_paciente (paciente_id, inicio),
+  KEY cita_sala (sala_id, sala_desde),
+  KEY cita_prof (profesional_id, prof_desde),
+  KEY cita_equipo (equipo_id, prof_desde),
+  KEY cita_estado (estado, retenida_hasta),
+  CONSTRAINT cita_orden CHECK (inicio < fin AND sala_desde < sala_hasta AND prof_desde <= prof_hasta),
+  CONSTRAINT cita_paciente_fk FOREIGN KEY (paciente_id) REFERENCES pacientes (id),
+  CONSTRAINT cita_trat_fk FOREIGN KEY (tratamiento_id) REFERENCES tratamientos (id),
+  CONSTRAINT cita_prof_fk FOREIGN KEY (profesional_id) REFERENCES profesionales (id),
+  CONSTRAINT cita_sala_fk FOREIGN KEY (sala_id) REFERENCES salas (id),
+  CONSTRAINT cita_equipo_fk FOREIGN KEY (equipo_id) REFERENCES equipos (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Lista de espera: quien quiere un hueco antes; cuando se libera uno que encaja, se le ofrece.
+CREATE TABLE IF NOT EXISTS lista_espera (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  paciente_id INT UNSIGNED NOT NULL,
+  tratamiento_id VARCHAR(80) NOT NULL,
+  cita_actual_id INT UNSIGNED NULL,
+  desde_fecha DATE NOT NULL,
+  hasta_fecha DATE NULL,
+  franjas VARCHAR(120) NULL,
+  estado ENUM('esperando','ofrecido','aceptado','caducado','cancelado') NOT NULL DEFAULT 'esperando',
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT le_paciente FOREIGN KEY (paciente_id) REFERENCES pacientes (id) ON DELETE CASCADE,
+  CONSTRAINT le_trat FOREIGN KEY (tratamiento_id) REFERENCES tratamientos (id),
+  KEY le_estado (estado, tratamiento_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

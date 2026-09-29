@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+servidor/public/
+servidor/commit.txt
+dist/
+test-results/
+playwright-report/
+*.log
