@@ -141,12 +141,14 @@ async function aplicarDecision(con, conv, decision, { ahora, texto, datos }) {
   for (const a of decision.acciones) {
     switch (a.tipo) {
       case 'baja':
+        if (conv.lead_id) await con.query("UPDATE leads SET etapa = 'perdido', motivo_perdida = 'baja' WHERE id = ? AND etapa NOT IN ('cita','asistio','vendido')", [conv.lead_id]);
         if (pacienteId) {
           await con.query("INSERT INTO consentimientos (paciente_id, tipo, estado, fuente, prueba) VALUES (?, 'whatsapp_marketing', 'revocado', 'whatsapp', ?)", [pacienteId, texto.slice(0, 500)]);
           await con.query('UPDATE pacientes SET baja_comercial_en = ? WHERE id = ?', [ahora, pacienteId]);
         }
-        await con.query("UPDATE inscripciones SET estado = 'cancelada', motivo_fin = 'baja' WHERE estado IN ('activa','pausada') AND (paciente_id <=> ? OR lead_id <=> ?)", [pacienteId, conv.lead_id]);
-        await con.query("UPDATE seguimientos SET estado = 'cancelado', resultado = 'baja' WHERE estado = 'pendiente' AND (paciente_id <=> ? OR conversacion_id = ?)", [pacienteId, conv.id]);
+        // Ojo con los nulos: «paciente_id <=> NULL» casaría con todos los contactos sin ficha.
+        await con.query("UPDATE inscripciones SET estado = 'cancelada', motivo_fin = 'baja' WHERE estado IN ('activa','pausada') AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?))", [pacienteId, conv.lead_id]);
+        await con.query("UPDATE seguimientos SET estado = 'cancelado', resultado = 'baja' WHERE estado = 'pendiente' AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR conversacion_id = ?)", [pacienteId, conv.id]);
         Object.assign(cambios, { estado: 'cerrada', motivo_cierre: 'baja' });
         break;
       case 'pasar_a_persona':
@@ -182,6 +184,7 @@ async function aplicarDecision(con, conv, decision, { ahora, texto, datos }) {
         break;
       }
       case 'cerrar':
+        if (conv.lead_id) await con.query("UPDATE leads SET etapa = 'perdido', motivo_perdida = ? WHERE id = ? AND etapa NOT IN ('cita','asistio','vendido')", [a.motivo, conv.lead_id]);
         await con.query("UPDATE seguimientos SET estado = 'cancelado', resultado = ? WHERE estado = 'pendiente' AND conversacion_id = ?", [`cerrada: ${a.motivo}`, conv.id]);
         await con.query("UPDATE ofertas_hechas SET estado = 'rechazada' WHERE conversacion_id = ? AND estado = 'propuesta'", [conv.id]);
         Object.assign(cambios, { estado: 'cerrada', motivo_cierre: a.motivo });
@@ -231,8 +234,9 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
     const reglasPrevias = interpretar(texto);
     await guardarMensaje(con, { conversacionId: conv.id, direccion: 'entrante', autor: 'paciente', texto, waId, intencion: reglasPrevias.intencion, creadoEn: ahora });
     await con.query('UPDATE conversaciones SET ultimo_entrante_en = ?, ventana_hasta = ? WHERE id = ?', [ahora, new Date(ahora.getTime() + VENTANA_MS), conv.id]);
+    if (conv.lead_id) await con.query("UPDATE leads SET etapa = 'conversando' WHERE id = ? AND etapa IN ('nuevo','contactado')", [conv.lead_id]);
     // Lo que dice el paciente manda: se pausan sus secuencias.
-    await con.query("UPDATE inscripciones SET estado = 'pausada', motivo_fin = 'el paciente contestó' WHERE estado = 'activa' AND ((paciente_id IS NOT NULL AND paciente_id <=> ?) OR (lead_id IS NOT NULL AND lead_id <=> ?))",
+    await con.query("UPDATE inscripciones SET estado = 'pausada', motivo_fin = 'el paciente contestó' WHERE estado = 'activa' AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?))",
       [conv.paciente_id, conv.lead_id]);
     await con.commit();
   } catch (err) {
@@ -309,6 +313,9 @@ async function enviar(deps, conv, { texto = null, plantilla = null, variables = 
   const cuerpo = plantilla ? `[plantilla ${plantilla.nombre}] ${variables.join(' · ')}` : texto;
   const id = await guardarMensaje(pool, { conversacionId: conv.id, direccion: 'saliente', autor, tipo: plantilla ? 'plantilla' : 'texto', texto: cuerpo, waId: r?.waId, estado, plantillaId: plantilla?.id, creadoEn: ahora });
   await pool.query('UPDATE conversaciones SET ultimo_saliente_en = ? WHERE id = ?', [ahora, conv.id]);
+  if (conv.lead_id && estado === 'enviado') {
+    await pool.query("UPDATE leads SET etapa = 'contactado', primer_contacto_en = COALESCE(primer_contacto_en, ?) WHERE id = ? AND etapa = 'nuevo'", [ahora, conv.lead_id]);
+  }
   if (error) await pool.query('UPDATE mensajes SET error_texto = ? WHERE id = ?', [error.slice(0, 255), id]);
   return { mensajeId: id, estado, waId: r?.waId || null };
 }

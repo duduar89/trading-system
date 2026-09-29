@@ -136,6 +136,9 @@ async function reservar(pool, p) {
         inst.sala_desde, inst.sala_hasta, inst.prof_desde, inst.prof_hasta,
         p.retener ? 'retenida' : 'confirmada', retenidaHasta, p.origen || 'recepcion', Boolean(p.primeraVisita),
         token, p.actor || 'sistema', p.retener ? null : ahora]);
+    if (p.leadId) await con.query("UPDATE leads SET etapa = 'cita', cita_id = ? WHERE id = ?", [r.insertId, p.leadId]);
+    // Con cita, se acaban sus secuencias de captación y los seguimientos de repesca.
+    await con.query("UPDATE inscripciones SET estado = 'terminada', motivo_fin = 'cita' WHERE estado IN ('activa','pausada') AND secuencia IN ('lead','cancelacion','toca_repetir','dormido','vale_regalo') AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?))", [p.pacienteId, p.leadId || null]);
     await registrar(con, { tipo: p.retener ? 'cita_retenida' : 'cita_reservada', entidad: 'cita', entidadId: r.insertId, actor: p.actor, datos: { fecha: p.fecha, hora: p.hora, tratamiento: t.fila.id, profesional: hueco.profesionalId, sala: hueco.salaId } });
     await con.commit();
     return { id: r.insertId, token, estado: p.retener ? 'retenida' : 'confirmada', retenidaHasta, ...inst, profesionalId: hueco.profesionalId, salaId: hueco.salaId, equipoId: hueco.equipoId };

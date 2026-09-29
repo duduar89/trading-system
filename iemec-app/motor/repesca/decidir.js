@@ -204,6 +204,10 @@ function decidir(interp, ctx) {
         guia = 'Dile que una persona del equipo le escribe.';
       }
   }
+  // Invariante: si se queda esperando al paciente, también queda una fecha para volver a escribirle.
+  if (proximo === 'espera_respuesta' && !acciones.some((a) => a.tipo === 'programar_seguimiento')) {
+    acciones.push(seguimiento(ctx, { tipo: 'dias', n: 2 }, 'sin_respuesta_a_propuesta', frase));
+  }
   return { intencion: interp.intencion, acciones, proximoPaso: proximo, guia };
 }
 

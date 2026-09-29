@@ -1,0 +1,24 @@
+{
+  "_nota": "Datos públicos de https://iemec-clinic.com/nosotros. Horarios, salas y competencias: PENDIENTE de la clínica (confirmado = false). El personal de estética no figura en la web.",
+  "profesionales": [
+    { "codigo": "maribel-perea", "nombre": "Dra. Maribel Perea Casado", "rol": "medico", "especialidad": "Medicina estética y antienvejecimiento", "color": "#76C3C7" },
+    { "codigo": "paola-ranilla", "nombre": "Paola Ranilla", "rol": "medico", "especialidad": "Medicina estética, láser médico y tratamientos regenerativos", "color": "#C48981" },
+    { "codigo": "luisa-alenar", "nombre": "Dra. Luisa Aleñar", "rol": "medico", "especialidad": "Medicina estética y nutrigenómica", "color": "#D9BC66" },
+    { "codigo": "marcela-pedraza", "nombre": "Dra. Marcela Pedraza", "rol": "medico", "especialidad": "Armonización facial y bioestimuladores", "color": "#8FB8A8" },
+    { "codigo": "paula-vicent", "nombre": "Paula Vicent Valverde", "rol": "tricologo", "especialidad": "Medicina y cirugía capilar (TrichoTest)", "color": "#5E8C8F" },
+    { "codigo": "marco-vricella", "nombre": "Dr. Marco Vricella", "rol": "cirujano", "especialidad": "Cirugía plástica, estética y reparadora", "color": "#304E50" },
+    { "codigo": "gonzalo-orallo", "nombre": "Dr. Gonzalo Orallo", "rol": "medico", "especialidad": "Cirugía vascular (flebología)", "color": "#9A7E5F" },
+    { "codigo": "alfonso-navarro", "nombre": "Alfonso Navarro Ramírez", "rol": "medico", "especialidad": "Ginecología funcional y regenerativa", "color": "#B7A1C9" },
+    { "codigo": "estetica-1", "nombre": "Estética 1 (por confirmar)", "rol": "esteticista", "especialidad": "Tratamientos faciales y corporales", "color": "#E3C9A8" },
+    { "codigo": "estetica-2", "nombre": "Estética 2 (por confirmar)", "rol": "esteticista", "especialidad": "Tratamientos faciales, corporales y head spa", "color": "#D4F0F1" }
+  ],
+  "salas": [
+    { "codigo": "consulta-1", "nombre": "Consulta médica 1", "tipo": "consulta_medica", "color": "#123F3E", "orden": 1 },
+    { "codigo": "consulta-2", "nombre": "Consulta médica 2", "tipo": "consulta_medica", "color": "#1D5B58", "orden": 2 },
+    { "codigo": "cabina-laser", "nombre": "Cabina de aparatología", "tipo": "cabina_aparatologia", "color": "#304E50", "orden": 3 },
+    { "codigo": "cabina-facial", "nombre": "Cabina facial", "tipo": "cabina_estetica", "color": "#C48981", "orden": 4 },
+    { "codigo": "cabina-corporal", "nombre": "Cabina corporal", "tipo": "cabina_estetica", "color": "#D9BF8F", "orden": 5 },
+    { "codigo": "head-spa", "nombre": "Sala Head Spa", "tipo": "head_spa", "color": "#76C3C7", "orden": 6 },
+    { "codigo": "sala-capilar", "nombre": "Sala capilar", "tipo": "sala_capilar", "color": "#5E8C8F", "orden": 7 }
+  ]
+}

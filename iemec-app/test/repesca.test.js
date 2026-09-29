@@ -161,6 +161,21 @@ test('repesca de punta a punta', async (t) => {
       assert.equal(whatsapp.enviados.length, antes + 1);
     });
 
+    await t.test('la baja de un contacto sin ficha no toca los seguimientos de los demás', async () => {
+      const a = await nuevoLead(pool, { telefono: '+34611000008', nombre: 'Uno', tratamiento: 'limpieza-facial' });
+      const b = await nuevoLead(pool, { telefono: '+34611000009', nombre: 'Dos', tratamiento: 'limpieza-facial' });
+      for (const id of [a, b]) {
+        await R.inscribir(pool, { secuencia: 'lead', leadId: id, inicio: new Date('2026-09-29T10:00:00Z') });
+      }
+      await R.avanzarSecuencias(deps, { ahora: new Date('2026-09-29T10:00:00Z') });
+      const ra = await R.procesarEntrante(deps, { telefono: '+34611000008', texto: 'El mes que viene', ahora: new Date('2026-09-29T10:20:00Z') });
+      await R.procesarEntrante(deps, { telefono: '+34611000009', texto: 'No me escribáis más', ahora: new Date('2026-09-29T10:25:00Z') });
+      const [[s]] = await pool.query('SELECT estado FROM seguimientos WHERE conversacion_id = ?', [ra.conversacionId]);
+      assert.equal(s.estado, 'pendiente');
+      const [[ia]] = await pool.query('SELECT estado FROM inscripciones WHERE lead_id = ?', [a]);
+      assert.equal(ia.estado, 'pausada');
+    });
+
     await t.test('el mismo mensaje de WhatsApp dos veces (reintento del proveedor) se procesa una sola vez', async () => {
       const x = await R.procesarEntrante(deps, { telefono: '+34611000007', texto: 'Hola, quiero información', waId: 'wamid.X1', ahora: new Date('2026-09-29T16:00:00Z') });
       const y = await R.procesarEntrante(deps, { telefono: '+34611000007', texto: 'Hola, quiero información', waId: 'wamid.X1', ahora: new Date('2026-09-29T16:00:01Z') });

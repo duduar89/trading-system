@@ -36,6 +36,9 @@ test('toda la batería: siempre hay un próximo paso y ninguna conversación se 
     assert.ok(d.acciones.length > 0, c.frase);
     assert.ok(PROXIMOS.has(d.proximoPaso), `${c.frase} → ${d.proximoPaso}`);
     if (c.intencion === 'baja') assert.deepEqual(d.acciones, [{ tipo: 'baja' }]);
+    if (!['cerrada', 'persona'].includes(d.proximoPaso)) {
+      assert.ok(d.acciones.some((a) => a.tipo === 'programar_seguimiento'), `${c.frase}: sin fecha para volver a escribir`);
+    }
     if (c.intencion === 'salud_personal') assert.equal(d.acciones[0].tipo, 'pasar_a_persona');
     if (c.urgente) assert.equal(d.acciones[0].urgente, true);
     if (c.intencion === 'aplazar' && c.plazo !== 'vago') {

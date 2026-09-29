@@ -8,13 +8,23 @@ const { version } = require('../package.json');
 const config = require('./config');
 const db = require('./db');
 const { rutasPublicas } = require('./rutas/publicas');
+const { rutasPanel } = require('./rutas/panel');
+const { rutasSesion, requiereSesion } = require('./sesion');
+const { crearIa } = require('./integraciones/ia');
+const { crearWhatsApp } = require('./integraciones/whatsapp');
+const { crearGoogle } = require('./integraciones/google');
 
 // El despliegue deja aquí el commit que sube: así /api/version dice qué hay de verdad arriba.
 const COMMIT = (() => {
   try { return fs.readFileSync(path.join(__dirname, 'commit.txt'), 'utf8').trim(); } catch { return null; }
 })();
 
-function crearApp({ pool = db.pool } = {}) {
+function crearApp({ pool = db.pool, deps = null } = {}) {
+  const dependencias = deps || {
+    ia: crearIa(config.modos.ia),
+    whatsapp: crearWhatsApp(config.modos.whatsapp),
+    google: crearGoogle(config.modos.google),
+  };
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
@@ -36,6 +46,8 @@ function crearApp({ pool = db.pool } = {}) {
   });
 
   app.use(rutasPublicas({ pool }));
+  app.use('/api', rutasSesion({ pool }));
+  app.use('/api/panel', requiereSesion, rutasPanel({ pool, deps: { ...dependencias, pool: typeof pool === 'function' ? pool() : pool } }));
 
   app.use('/api', (_req, res) => res.status(404).json({ error: 'No existe esa ruta de la API' }));
 

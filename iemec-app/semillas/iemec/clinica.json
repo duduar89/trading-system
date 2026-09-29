@@ -1,0 +1,54 @@
+{
+  "clinica": {
+    "nombre": "Instituto Europeo de Medicina Estética y Capilar",
+    "nombre_corto": "IEMEC",
+    "razon_social": "Aneco AP Consulting S.L.",
+    "nif": "B88613492",
+    "direccion": "Av. Siglo XXI 13, local 35",
+    "cp": "28660",
+    "municipio": "Boadilla del Monte",
+    "provincia": "Madrid",
+    "telefono": "+34722833285",
+    "whatsapp": "+34722833285",
+    "web": "https://iemec-clinic.com",
+    "zona_horaria": "Europe/Madrid",
+    "google_place_id": "ChIJB6Pn5d2FQQ0ReZ4Qoqe8gtg",
+    "paso_agenda_min": 5,
+    "retencion_hueco_min": 15
+  },
+  "_fuentes": {
+    "datos": "https://iemec-clinic.com/aviso-legal",
+    "google": "https://www.google.com/maps/place/?q=place_id:ChIJB6Pn5d2FQQ0ReZ4Qoqe8gtg",
+    "horario": "Google (L-S 11:00-20:00) y fachada (L-V 11:00-20:00). Treatwell dice sábado 10:00-20:00: PENDIENTE de confirmar con la clínica"
+  },
+  "horario": [
+    { "dia_semana": 1, "abre": "11:00", "cierra": "20:00" },
+    { "dia_semana": 2, "abre": "11:00", "cierra": "20:00" },
+    { "dia_semana": 3, "abre": "11:00", "cierra": "20:00" },
+    { "dia_semana": 4, "abre": "11:00", "cierra": "20:00" },
+    { "dia_semana": 5, "abre": "11:00", "cierra": "20:00" },
+    { "dia_semana": 6, "abre": "11:00", "cierra": "20:00" }
+  ],
+  "festivos": [
+    { "fecha": "2026-01-01", "nombre": "Año Nuevo", "ambito": "nacional" },
+    { "fecha": "2026-01-06", "nombre": "Epifanía del Señor", "ambito": "nacional" },
+    { "fecha": "2026-04-02", "nombre": "Jueves Santo", "ambito": "autonomico" },
+    { "fecha": "2026-04-03", "nombre": "Viernes Santo", "ambito": "nacional" },
+    { "fecha": "2026-05-01", "nombre": "Fiesta del Trabajo", "ambito": "nacional" },
+    { "fecha": "2026-05-02", "nombre": "Fiesta de la Comunidad de Madrid", "ambito": "autonomico" },
+    { "fecha": "2026-06-01", "nombre": "San Babilés", "ambito": "local" },
+    { "fecha": "2026-08-15", "nombre": "Asunción de la Virgen", "ambito": "nacional" },
+    { "fecha": "2026-10-05", "nombre": "Virgen del Rosario", "ambito": "local" },
+    { "fecha": "2026-10-12", "nombre": "Fiesta Nacional de España", "ambito": "nacional" },
+    { "fecha": "2026-11-02", "nombre": "Todos los Santos (traslado)", "ambito": "autonomico" },
+    { "fecha": "2026-12-07", "nombre": "Día de la Constitución (traslado)", "ambito": "autonomico" },
+    { "fecha": "2026-12-08", "nombre": "Inmaculada Concepción", "ambito": "nacional" },
+    { "fecha": "2026-12-25", "nombre": "Natividad del Señor", "ambito": "nacional" },
+    { "fecha": "2027-01-01", "nombre": "Año Nuevo", "ambito": "nacional" },
+    { "fecha": "2027-01-06", "nombre": "Epifanía del Señor", "ambito": "nacional" }
+  ],
+  "_fuentes_festivos": [
+    "https://www.comunidad.madrid/noticias/2025/09/24/comunidad-madrid-aprueba-calendario-laboral-2026-12-festivos-dos-fijaran-ayuntamientos",
+    "https://www.ayuntamientoboadilladelmonte.org/boadilla-actualidad/noticias/los-festivos-locales-de-boadilla-del-monte-para-2026-seran-los-dias-1"
+  ]
+}
