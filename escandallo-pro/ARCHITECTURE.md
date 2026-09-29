@@ -77,7 +77,8 @@ La lectura de facturas y cartas funciona 100 % en el dispositivo y sin coste:
 
 Benchmarks (`npm run bench`, `npm run bench:random`, `node scripts/bench-unseen.mjs`), medidos en semillas reservadas del
 generador procedural (nunca inspeccionadas al ajustar): facturas PDF con texto 97,4 % líneas exactas (cabeceras 99,9 %),
-fotos y escaneos ~90 %, cartas en foto ~80 % limpia / ~79 % degradada; `public/samples` 100 %.
+fotos y escaneos ~90 %, cartas en foto ~80 % limpia / ~79 % degradada; `public/samples` 100 %. Facturas de mayorista
+(`--set=cash-heldout`, semillas 3001–3040): PDF con texto 100 %, fotos ~97 %, escaneos ~82 %.
 
 ## Convenciones
 - Importes en EUR **sin IVA**, salvo `Dish.menuPrice` (PVP de carta con IVA). Porcentajes 0–100.

@@ -43,6 +43,8 @@ de facturas y cartas, con variantes degradadas: foto girada, perspectiva, sombra
 | Facturas en PDF con texto | **97,4 %** (cabeceras 99,9 %) |
 | Facturas en foto o escaneadas | **~90 %** (cabeceras ~94 %) |
 | Cartas en foto limpia / degradada | **~80 % / ~79 %** |
+| Facturas de mayorista (cash & carry) en PDF con texto | **100 %** (cabeceras 100 %) |
+| Facturas de mayorista en foto / escaneadas | **~97 % / ~82 %** (cabeceras ~98 % / ~94 %) |
 | Documentos de ejemplo (`public/samples`) | **100 %** |
 
 Siempre se muestra una pantalla de revisión antes de guardar nada, con las líneas dudosas marcadas.

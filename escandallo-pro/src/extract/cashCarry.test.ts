@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PdfTextLine } from './pdf';
-import { parseInvoiceReading, parseInvoiceText, repairDocNumberParens } from './invoiceParser';
+import { ccFixDescription, parseInvoiceReading, parseInvoiceText, repairDocNumberParens } from './invoiceParser';
 
 /**
  * Facturas de cash & carry / mayorista (artículos en dos filas con código de unidad, columnas Prec. Ud. | Cont P. |
@@ -120,6 +120,45 @@ describe('cash & carry: lecturas de OCR de una foto', () => {
     ]);
   });
 
+  it('código de unidad mal leído ("sc", "cl", "EKG"), celda estropeada ("2/43") y precio de 3 decimales mal leído', () => {
+    const items = [
+      '620001        Harina de trigo saco 25 kg',
+      '                                                sc    15,670       1        15,67      1      15,67     5',
+      '620002        Guantes de nitrilo caja 100',
+      '                                                cl     6,720       1         6,72      1       6,72     2',
+      '620003        Pepino',
+      '                                                KG     1,290       1,653     2/43      1       2,13     5',
+      '620004        Patata agria',
+      '                                                EKG    1,120       2,662     2,98      1       2,98     5',
+      '620005        Calabacin',
+      '                                                KG     1,596       0,608     0,97      1       0,97     5',
+      '620006        Berenjena',
+      '                                                ES     1,220       5,832     7,42      1       7,12     5',
+    ];
+    const text = [...HEADER, ...ITEMS.slice(0, 11), ...items, 'Total pagina        116,01'].join('\n');
+    const inv = parseInvoiceReading({ text }, 'ocr', toRows(text)).invoice;
+    const got = inv.lines.slice(4).map((l) => [l.description, l.quantity, l.unit, l.unitPrice, l.total]);
+    expect(inv.lines).toHaveLength(10);
+    expect(got).toEqual([
+      ['Harina de trigo saco 25 kg', 1, 'saco', 15.67, 15.67],
+      ['Guantes de nitrilo caja 100', 1, 'ud', 6.72, 6.72],
+      ['Pepino', 1.653, 'kg', 1.29, 2.13],
+      ['Patata agria', 2.662, 'kg', 1.12, 2.98],
+      // «1,596» en un documento donde todos los precios por kilo acaban en 0: 1,590
+      ['Calabacin', 0.608, 'kg', 1.59, 0.97],
+      // «ES» por «KG» (el contenido de tres decimales delata el peso) y el precio «7,42» por 7,12
+      ['Berenjena', 5.832, 'kg', 1.22, 7.12],
+    ]);
+  });
+
+  it('erratas seguras del OCR en la descripción', () => {
+    expect(ccFixDescription('AR0 Vinagre de jerez 1l')).toBe('ARO Vinagre de jerez 1l');
+    expect(ccFixDescription('Zumo de naranja ll')).toBe('Zumo de naranja 1l');
+    expect(ccFixDescription('Queso de Burgos lkg')).toBe('Queso de Burgos 1kg');
+    expect(ccFixDescription('Garbanzo pedrosillano 1lkg')).toBe('Garbanzo pedrosillano 1kg');
+    expect(ccFixDescription('Agua mineral 1,5 L pack 6')).toBe('Agua mineral 1,5 L pack 6');
+  });
+
   it('un documento corriente con importes en columnas no entra en el modo cash & carry', () => {
     const text = [
       'FRUTAS GARCIA S.L.',
@@ -152,6 +191,27 @@ describe('cabecera de mayorista', () => {
     const inv = parseInvoiceText({ text }, 'ocr');
     expect(inv.supplierName).not.toMatch(/dto/i);
     expect(inv.supplierTaxId).toBe('A28647451');
+  });
+
+  it('escaneo: el N.I.F. del cliente (etiqueta y valor en celdas separadas) nunca es el del proveedor; el nombre, antes del título', () => {
+    const text = [
+      'Cash Costa Brava,   S.A.                          TARRAGONA                           Pagina:   1',
+      'Pza.  de  los  Olivos,  136                        C/  SAN  JUAN,  127                  Fecha de venta:   08/12/2025 18:57',
+      '14483 Cordoba                                      43291 TARRAGONA',
+      'AB2 666843',
+      'Inscrita en el  Reg.  Merc.  de Barcelona,  T.  2.496  L.  0  F.  153,  Secc.  8.*  H.  B-62.245',
+      'Factura                0/0(081)4235/(2025)088220      (919-123784)',
+      'Factura de  entrega',
+      'Hotel  El  Faro  S.L.                                             N.cliente:      52  3718672  2',
+      'Pol.  Ind.  de  la  Paz,  104                                          N.I.F.:      B25271016',
+      '30958  Murcia',
+      ...HEADER.slice(11),
+      ...ITEMS,
+    ].join('\n');
+    const inv = parseInvoiceReading({ text }, 'ocr', toRows(text)).invoice;
+    expect(inv.supplierTaxId).not.toBe('B25271016');
+    expect(inv.supplierName).toBe('Cash Costa Brava, S.A.');
+    expect(inv.lines).toHaveLength(5);
   });
 
   it('repara el paréntesis de cierre que el OCR lee como «1»', () => {

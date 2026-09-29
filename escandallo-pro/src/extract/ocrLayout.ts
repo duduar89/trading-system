@@ -267,7 +267,8 @@ export function pageSlopeField(page: TessPage): SlopeField | undefined {
 /**
  * Altura de fila de cada renglón del OCR (clave «página:renglón»), encadenando los renglones de una misma fila por sus
  * extremos: el final de un renglón y el principio del siguiente a su derecha tienen que coincidir en altura (enderezada)
- * con una tolerancia de media altura de texto. Como sólo se compara lo que hay en el hueco entre los dos, un papel
+ * con una tolerancia de un cuarto de la altura del texto en huecos cortos, que crece con el hueco hasta 0,7 alturas.
+ * Como sólo se compara lo que hay en el hueco entre los dos, un papel
  * ondulado (la fila baja, sube y vuelve a bajar) no parte la fila, y todas las palabras de un mismo renglón (una caja
  * del lector) van juntas aunque el renglón esté más inclinado que sus vecinos. Se enlazan sólo los pares que se eligen
  * mutuamente (el mejor a la derecha de uno es el mejor a la izquierda del otro) y cada cadena recibe la altura media de
@@ -317,13 +318,16 @@ export function rowAnchors(words: OcrWord[], slope: number, field?: SlopeField):
   const cost = (a: Seg, b: Seg): number => {
     if (a.page !== b.page || b.x0 < a.x1 - 0.5 * Math.min(a.h, b.h) || b.x0 - a.x1 > maxGap) return Infinity;
     // Sólo el hueco entre los dos: la altura del final de uno, llevada con la pendiente local hasta el principio del otro
-    const tol = 0.7 * Math.min(a.h, b.h);
+    const h = Math.min(a.h, b.h);
     const gap = b.x0 - a.x1;
+    // En un hueco corto la curvatura del papel no desplaza media línea: un desajuste así es otra fila (en una celda de
+    // dos líneas, el código centrado entre las dos no es de la segunda); en huecos largos se admite más
+    const tol = h * Math.min(0.7, 0.25 + 0.05 * (Math.max(0, gap) / h));
     const d = Math.abs(b.yl - a.yr - slopeAt(a.x1 + gap / 2, (a.yr + b.yl) / 2) * gap);
     if (d > tol) return Infinity;
     // Cuadra en altura y está cerca: cada 4 alturas de hueco pesan como una tolerancia entera de desajuste (cuanto más
     // lejos, más se equivoca la previsión; y no se salta a un vecino que está en medio)
-    return d / tol + Math.max(0, gap) / (4 * Math.min(a.h, b.h));
+    return d / tol + Math.max(0, gap) / (4 * h);
   };
   const right = new Array<number>(segs.length).fill(-1);
   const left = new Array<number>(segs.length).fill(-1);

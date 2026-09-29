@@ -1658,12 +1658,16 @@ interface CcRowInfo {
   start: number;
   /** Código de unidad leído ("KG", "CJ"…); undefined si el OCR no lo ha leído. */
   code?: string;
+  /** La primera palabra de la zona de importes es el código de unidad mal leído ("sc", "cl"): no es un número. */
+  slot?: boolean;
 }
 
 /** Contexto del modo cash & carry de un documento (lo que tienen en común sus filas de importes). */
 interface CcContext {
   /** Decimales habituales del precio por unidad (3 en «14,420»). */
   puDec?: number;
+  /** Los precios por unidad de tres decimales acaban en 0 («14,420»): una tercera cifra distinta es un error del OCR. */
+  puZero?: boolean;
   /** Las filas llevan un código de IVA tras el importe. */
   vat: boolean;
   /** Filas de importes (ya unidas a su descripción y a sus restos) por índice de fila. */
@@ -1687,8 +1691,14 @@ function ccNum(w: Word): boolean {
 
 function ccCode(w: Word): string | undefined {
   if (w.num) return undefined;
-  const code = w.raw.replace(/[.:,;]+$/, '');
+  // El OCR lee a veces el código en minúsculas o mezcladas ("sc", "Bo")
+  const code = w.raw.replace(/[.:,;]+$/, '').toUpperCase();
   return CC_UNIT_CODES[code] !== undefined ? code : undefined;
+}
+
+/** Celda de la zona de importes que el OCR ha estropeado ("2/43" por 2,13, "6,"): se ignora al asignar columnas. */
+function ccLost(w: Word): boolean {
+  return !w.num && /\d/.test(w.raw) && w.raw.length <= 8 && !/\p{L}{2,}/u.test(w.raw);
 }
 
 /** ¿Números de una descripción (código de artículo, formatos "5 L", "800g", "4/5"), sin importes? */
@@ -1705,7 +1715,7 @@ function ccUnitIndex(row: Row): number {
   for (let k = words.length - 1; k >= 0; k--) {
     if (!ccCode(words[k])) continue;
     const after = words.slice(k + 1);
-    if (!after.every((w) => ccNum(w) || ccJunk(w))) continue;
+    if (!after.every((w) => ccNum(w) || ccJunk(w) || ccLost(w))) continue;
     const nums = after.filter(ccNum);
     if (nums.length < 2 || !nums.some((w) => (w.num?.dec ?? 0) >= 2)) continue;
     return ccDescNumbersOk(words.slice(0, k)) ? k : -1;
@@ -1720,6 +1730,8 @@ interface CcTok {
   raw: string;
   /** Leído de otra forma (letra por cifra, punto decimal por coma). */
   fixed?: string;
+  /** Celda ilegible ("2/43"): ocupa su columna, sin valor. */
+  lost?: boolean;
 }
 
 /** Números de la zona de importes (desde `from`), con los «1» leídos como letra. */
@@ -1728,6 +1740,7 @@ function ccTokens(words: Word[], from: number): CcTok[] {
   for (let wi = from; wi < words.length; wi++) {
     const w = words[wi];
     if (ccOne(w)) out.push({ wi, value: 1, dec: 0, raw: w.raw, fixed: '1' });
+    else if (ccLost(w)) out.push({ wi, value: NaN, dec: -1, raw: w.raw, lost: true });
     else if (w.num && ccNum(w)) {
       // "4.200": precio de tres decimales con punto (en estas columnas no hay miles sin céntimos)
       if (w.num.dec === 0 && /^\d{1,3}\.\d{3}$/.test(w.raw)) out.push({ wi, value: w.num.value / 1000, dec: 3, raw: w.raw, fixed: w.raw.replace('.', ',') });
@@ -1750,17 +1763,23 @@ interface CcSol {
   fixes: string[];
   /** 1 = las cinco columnas; 2 = una corregida; 3 = importe ilegible; 4 = sin Prec. Ud. ni Cont. */
   kind: 1 | 2 | 3 | 4;
+  /** Sólo cuadra con un céntimo de diferencia (alguna cifra puede estar mal leída). */
+  approx?: boolean;
   score: number;
 }
 
-/** Prec. Ud. × Cont. = Precio (redondeado a céntimos). */
-function ccR1(pu: number, cp: number, pr: number): boolean {
-  return Math.abs(pu * cp - pr) <= 0.0101;
+/**
+ * Prec. Ud. × Cont. = Precio, redondeado a céntimos: medio céntimo de margen (con uno entero, un peso o un precio mal
+ * leído en la tercera cifra decimal también "cuadraría"). `loose`: un céntimo, sólo como último recurso.
+ */
+function ccR1(pu: number, cp: number, pr: number, loose = false): boolean {
+  return Math.abs(pu * cp - pr) <= (loose ? 0.0101 : 0.0051);
 }
 
-/** Precio × Cant. = Importe. */
-function ccR2(pr: number, ca: number, im: number): boolean {
-  return Math.abs(pr * ca - im) <= 0.0101 + 0.0005 * Math.abs(ca);
+/** Precio × Cant. = Importe (o Prec. Ud. × Cont. × Cant. redondeado de una vez, `puCp` = Prec. Ud. × Cont.). */
+function ccR2(pr: number, ca: number, im: number, puCp?: number, loose = false): boolean {
+  const tol = loose ? 0.0101 + 0.0005 * Math.abs(ca) : 0.0051;
+  return Math.abs(pr * ca - im) <= tol || (puCp !== undefined && Math.abs(puCp * ca - im) <= tol);
 }
 
 function ccTokDigits(t: CcTok): string {
@@ -1803,7 +1822,7 @@ const ccFix = (t: CcTok, value: number, dec: number): { tok: CcTok; fix: string 
  * Prec. Ud. ni Cont. (fuera de la foto). `ctx` aporta los decimales habituales del precio por unidad y si hay
  * columna de IVA, para no confundir el código de IVA con una cantidad.
  */
-function ccSolve(toks: CcTok[], ctx: Pick<CcContext, 'puDec' | 'vat'>): CcSol | undefined {
+function ccSolve(toks: CcTok[], ctx: Pick<CcContext, 'puDec' | 'vat' | 'puZero'>): CcSol | undefined {
   const n = toks.length;
   const money = (t: CcTok) => t.dec === 2;
   const vatAfter = (k: number) => {
@@ -1815,30 +1834,53 @@ function ccSolve(toks: CcTok[], ctx: Pick<CcContext, 'puDec' | 'vat'>): CcSol | 
   const consider = (s: CcSol) => {
     if (!best || s.score > best.score) best = s;
   };
-  // 1) Las cinco columnas
-  for (let a = 0; a < n; a++)
-    for (let b = a + 1; b < n; b++)
-      for (let c = b + 1; c < n; c++) {
-        if (!money(toks[c]) || !ccR1(toks[a].value, toks[b].value, toks[c].value)) continue;
-        for (let d = c + 1; d < n; d++)
-          for (let e = d + 1; e < n; e++) {
-            const [pu, cp, pr, ca, im] = [toks[a], toks[b], toks[c], toks[d], toks[e]];
-            if (!money(im) || ca.value <= 0 || !ccR2(pr.value, ca.value, im.value)) continue;
-            const gaps = a + (b - a - 1) + (c - b - 1) + (d - c - 1) + (e - d - 1);
-            const fixes = [pu, cp, ca].filter((t) => t.fixed).length;
-            const vat = vatAfter(e);
-            consider({ pu, cp, pr, ca, im, total: im.value, vat, fixes: [], kind: 1, score: 100 - gaps * 4 - fixes - puPenalty(pu) + (vat ? 2 : 0) });
-          }
-      }
+  // Precio por unidad de tres decimales que no acaba en 0 en un documento donde todos acaban en 0 ("1,596" por 1,590):
+  // el valor a céntimos que sigue cuadrando, si sólo hay uno (o el más parecido a lo leído)
+  const zeroFix = (pu: CcTok, cp: CcTok, pr: CcTok): { tok: CcTok; fix: string } | undefined => {
+    if (!ctx.puZero || pu.dec !== 3 || ccTokDigits(pu).endsWith('0')) return undefined;
+    const opts = [Math.floor(pu.value * 100 + 1e-6) / 100, Math.ceil(pu.value * 100 - 1e-6) / 100].filter((v, i, a) => v > 0 && a.indexOf(v) === i && ccR1(v, cp.value, pr.value));
+    const read = ccTokDigits(pu);
+    const pick = opts.sort((x, y) => digitDistance(read, digitsOf(x, 3)) - digitDistance(read, digitsOf(y, 3)))[0];
+    return pick === undefined ? undefined : ccFix(pu, pick, 3);
+  };
+  // 1) Las cinco columnas (con `loose`, un céntimo de margen: último recurso)
+  const five = (loose: boolean) => {
+    for (let a = 0; a < n; a++)
+      for (let b = a + 1; b < n; b++)
+        for (let c = b + 1; c < n; c++) {
+          if (!money(toks[c]) || !ccR1(toks[a].value, toks[b].value, toks[c].value, loose)) continue;
+          for (let d = c + 1; d < n; d++)
+            for (let e = d + 1; e < n; e++) {
+              const [pu0, cp, pr, ca, im] = [toks[a], toks[b], toks[c], toks[d], toks[e]];
+              if (!money(im) || ca.value <= 0 || !ccR2(pr.value, ca.value, im.value, pu0.value * cp.value, loose)) continue;
+              const gaps = a + (b - a - 1) + (c - b - 1) + (d - c - 1) + (e - d - 1);
+              const fixes = [pu0, cp, ca].filter((t) => t.fixed).length;
+              const vat = vatAfter(e);
+              const zf = loose ? undefined : zeroFix(pu0, cp, pr);
+              const pu = zf?.tok ?? pu0;
+              consider({ pu, cp, pr, ca, im, total: im.value, vat, fixes: zf ? [zf.fix] : [], kind: 1, approx: loose, score: (loose ? 40 : 100) - gaps * 4 - fixes - puPenalty(pu0) + (vat ? 2 : 0) - (zf ? 1 : 0) });
+            }
+        }
+  };
+  five(false);
   if (best) return best;
   // 2) Una cifra mal leída: la relación que se cumple determina el campo de la otra
   for (let a = 0; a + 4 < n; a++) {
     const [pu, cp, pr, ca, im] = toks.slice(a, a + 5);
     if (!money(pr) || !money(im) || ca.value <= 0 || cp.value <= 0) continue;
     const r1 = ccR1(pu.value, cp.value, pr.value);
-    const r2 = ccR2(pr.value, ca.value, im.value);
+    const r2 = ccR2(pr.value, ca.value, im.value, pu.value * cp.value);
     const vat = vatAfter(a + 4);
     const base = { pr, ca, vat, kind: 2 as const };
+    // Precio mal leído: Prec. Ud. × Cont. (a céntimos) × Cant. da el importe y el precio leído no ("7,42" por 7,12)
+    if (!r1 && !ccR2(pr.value, ca.value, im.value) && Number.isInteger(ca.value) && ca.value >= 1) {
+      const target = round(pu.value * cp.value, 2);
+      if (target > 0 && Math.abs(target * ca.value - im.value) <= 0.0051 && digitDistance(ccTokDigits(pr), digitsOf(target, 2)) <= 2) {
+        const { tok, fix } = ccFix(pr, target, 2);
+        consider({ ...base, pr: tok, pu, cp, im, total: im.value, fixes: [fix], score: 78 - a * 4 });
+        continue;
+      }
+    }
     if (r2 && !r1) {
       const decPu = Math.max(pu.dec, 2);
       const fp = ccClosest(pu, (pr.value - 0.0101) / cp.value, (pr.value + 0.0101) / cp.value, decPu, (v) => ccR1(v, cp.value, pr.value));
@@ -1859,6 +1901,17 @@ function ccSolve(toks: CcTok[], ctx: Pick<CcContext, 'puDec' | 'vat'>): CcSol | 
       }
     }
   }
+  // Precio ilegible ("2/43"): Prec. Ud. × Cont. a céntimos × Cant. = Importe, con la celda del precio en su sitio
+  for (let a = 0; a + 4 < n; a++) {
+    const [pu, cp, lost, ca, im] = toks.slice(a, a + 5);
+    if (!lost.lost || !money(im) || !(cp.value > 0) || !(pu.value > 0) || !Number.isInteger(ca.value) || ca.value < 1) continue;
+    const price = round(pu.value * cp.value, 2);
+    if (Math.abs(price * ca.value - im.value) > 0.0051) continue;
+    const pr: CcTok = { wi: lost.wi, value: price, dec: 2, raw: lost.raw, fixed: price.toFixed(2).replace('.', ',') };
+    consider({ pu, cp, pr, ca, im, total: im.value, vat: vatAfter(a + 4), fixes: [`"${lost.raw}" → ${pr.fixed}`], kind: 2, score: 70 - a * 4 });
+  }
+  if (best) return best;
+  five(true);
   if (best) return best;
   // 3) Importe ilegible: Prec. Ud. × Cont. = Precio y la cantidad entera detrás (sin otro importe después)
   for (let a = 0; a + 3 < n; a++)
@@ -1962,6 +2015,8 @@ function cashCarryPrepass(rows: Row[], headers: Map<number, TableHeader>): CcCon
   const pus: number[] = [];
   let full = 0;
   let vats = 0;
+  let pu3 = 0;
+  let pu3Zero = 0;
   for (const c of cands) {
     const merged = ccMergeWords(rows[c.i], c.k, [], ccSpillRows(rows, c.i, c.k));
     const sol = ccSolve(ccTokens(merged.words, merged.start + 1), { vat: false });
@@ -1969,28 +2024,44 @@ function cashCarryPrepass(rows: Row[], headers: Map<number, TableHeader>): CcCon
     full++;
     pus.push(sol.pu.dec);
     if (sol.vat) vats++;
+    if (sol.pu.dec === 3) {
+      pu3++;
+      if (ccTokDigits(sol.pu).endsWith('0')) pu3Zero++;
+    }
   }
   if (full < 2 && !(full >= 1 && cands.length >= 3)) return undefined;
   const counts = new Map<number, number>();
   for (const d of pus) counts.set(d, (counts.get(d) ?? 0) + 1);
   const puDec = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-  const ctx: CcContext = { puDec, vat: vats >= full * 0.5, rows: new Map() };
+  const ctx: CcContext = { puDec, vat: vats >= full * 0.5, puZero: pu3 >= 3 && pu3Zero >= pu3 * 0.8, rows: new Map() };
   const codeXs = cands.map((c) => rows[c.i].words[c.k].x0);
   const codeX = median(codeXs);
   const cw = median(cands.map((c) => rows[c.i].cw)) || 1;
   const amountRow = new Map(cands.map((c) => [c.i, c.k]));
-  // Filas de importes cuyo código de unidad no se ha leído: un código desconocido en su columna ("ER" por «FR») o
-  // directamente los números, con las dos relaciones o la primera y la cantidad
+  // Filas de importes cuyo código de unidad no se ha leído bien: una marca corta en la columna del código ("ER" por
+  // «FR», "sc" por «SC», "cl" por «CJ», "a:)") o directamente los números; delante, como mucho la descripción de la
+  // propia fila (variante en una fila). Con las dos relaciones o la primera y la cantidad.
+  const slotRows = new Set<number>();
+  const codeSlot = (w: Word) => !w.num && w.raw.length <= 4 && Math.abs(w.x0 - codeX) <= cw * 2.5;
   for (const row of rows) {
     if (amountRow.has(row.i) || headerRows.has(row.i) || !row.words.length || isMetaRow(row) || isStopRow(row)) continue;
-    const first = row.words[0];
     let start = -1;
-    if (!first.num && /^[A-Z0-9]{1,3}$/.test(first.raw) && Math.abs(first.x0 - codeX) <= cw * 2.5) start = 0;
-    else if (ccNum(first) && first.x0 > codeX - cw) start = 0;
-    if (start < 0 || row.words.some((w, k) => k > 0 && !ccNum(w) && !ccJunk(w))) continue;
-    const toks = ccTokens(row.words, ccNum(first) ? 0 : 1);
-    const sol = ccSolve(toks, ctx);
-    if (sol && (sol.kind === 1 || sol.kind === 3)) amountRow.set(row.i, ccNum(first) ? -1 : 0);
+    let slot = false;
+    for (let k = 0; k < row.words.length && start < 0; k++) {
+      const w = row.words[k];
+      if (codeSlot(w) && row.words.slice(k + 1).some(ccNum)) {
+        start = k;
+        slot = true;
+      } else if (ccNum(w) && w.x0 > codeX - cw) start = k;
+    }
+    if (start < 0) continue;
+    const before = row.words.slice(0, start);
+    if (before.length && (!before.some((w) => /\p{L}{2,}/u.test(w.raw)) || !ccDescNumbersOk(before))) continue;
+    if (row.words.slice(slot ? start + 1 : start).some((w) => !ccNum(w) && !ccJunk(w) && !ccOne(w) && !ccLost(w))) continue;
+    const sol = ccSolve(ccTokens(row.words, slot ? start + 1 : start), ctx);
+    if (!sol || (sol.kind !== 1 && sol.kind !== 3)) continue;
+    amountRow.set(row.i, start);
+    if (slot) slotRows.add(row.i);
   }
   for (const i of [...amountRow.keys()].sort((a, b) => a - b)) {
     const target = rows[i];
@@ -1999,7 +2070,8 @@ function cashCarryPrepass(rows: Row[], headers: Map<number, TableHeader>): CcCon
     const start = Math.max(0, k);
     const spills = ccSpillRows(rows, i, start);
     const own = target.words.slice(0, start);
-    const ownDesc = own.some((w) => /\p{L}{2,}/u.test(w.raw)) || !!leadingCode(own.concat(target.words[start] ?? [])).end;
+    // Con sólo el código de artículo delante de los importes, la descripción está en la fila de encima
+    const ownDesc = own.some((w) => /\p{L}{2,}/u.test(w.raw));
     const desc: Row[] = [];
     if (!ownDesc) {
       for (let j = i - 1; j >= 0; j--) {
@@ -2028,15 +2100,27 @@ function cashCarryPrepass(rows: Row[], headers: Map<number, TableHeader>): CcCon
       r.f = '';
     }
     const code = k >= 0 ? ccCode(target.words[merged.start]) : undefined;
-    ctx.rows.set(i, { start: merged.start, code });
+    ctx.rows.set(i, { start: merged.start, code, slot: slotRows.has(i) });
   }
   return ctx;
+}
+
+/**
+ * Erratas seguras del OCR en la descripción de un artículo: la «O» leída como cero dentro de una palabra en mayúsculas
+ * ("AR0" → "ARO") y el «1» leído como l/i/I delante de una unidad ("lkg" → "1kg", "ll" → "1l", "1lkg" → "1kg").
+ */
+export function ccFixDescription(text: string): string {
+  return text
+    .replace(/\b([A-ZÁÉÍÓÚÑ]{2,})0(?=[A-ZÁÉÍÓÚÑ]*\b)/g, '$1O')
+    .replace(/\b0(?=[A-ZÁÉÍÓÚÑ]{2,}\b)/g, 'O')
+    .replace(/(^|\s)[lIi|](kg|kgs|g|gr|l|cl|ml|lt)\b/g, '$11$2')
+    .replace(/(\d)[lIi|](kg|kgs|g|gr|cl|ml)\b/g, '$1$2');
 }
 
 /** Línea de una fila de importes de cash & carry; undefined si la aritmética no cuadra (se prueba como fila normal). */
 function parseCcRow(row: Row, info: CcRowInfo, ctx: CcContext): ParsedLine | undefined {
   const words = row.words;
-  const toks = ccTokens(words, info.code ? info.start + 1 : info.start);
+  const toks = ccTokens(words, info.code || info.slot ? info.start + 1 : info.start);
   const sol = ccSolve(toks, ctx);
   if (!sol) return undefined;
   const billed = info.code ? CC_UNIT_CODES[info.code] : undefined;
@@ -2044,9 +2128,14 @@ function parseCcRow(row: Row, info: CcRowInfo, ctx: CcContext): ParsedLine | und
   let confidence = sol.kind === 1 ? 1 : sol.kind === 4 ? 0.9 : 0.85;
   if (sol.fixes.length) warnings.push(`Lectura corregida por la validación aritmética: ${sol.fixes.join(', ')}`);
   if (sol.kind === 3) warnings.push('Importe ilegible: calculado como precio × cantidad');
+  if (sol.approx) {
+    confidence = 0.7;
+    warnings.push('Los importes cuadran con un céntimo de diferencia: revisa el peso o el precio');
+  }
   // Al peso (o al volumen): la cantidad son los kilos (Cont. × Cant.) al precio por kilo; sin código leído, un
   // contenido con decimales delata un artículo al peso
-  const weighed = billed === 'kg' || billed === 'l' || (!billed && !!sol.cp && sol.cp.dec === 3 && !Number.isInteger(sol.cp.value));
+  // (un contenido de tres decimales no entero es un peso aunque el código se haya leído como otro: "ES" por «KG»)
+  const weighed = billed === 'kg' || billed === 'l' || (!!sol.cp && sol.cp.dec === 3 && !Number.isInteger(sol.cp.value));
   let quantity: number;
   let unitPrice: number;
   let unit: string;
@@ -2054,7 +2143,7 @@ function parseCcRow(row: Row, info: CcRowInfo, ctx: CcContext): ParsedLine | und
   if (weighed && sol.pu && sol.cp) {
     quantity = round(sol.cp.value * sol.ca.value, 3);
     unitPrice = sol.pu.value;
-    unit = billed ?? 'kg';
+    unit = billed === 'l' ? 'l' : 'kg';
   } else {
     quantity = sol.ca.value;
     unitPrice = sol.pr.value;
@@ -2065,6 +2154,8 @@ function parseCcRow(row: Row, info: CcRowInfo, ctx: CcContext): ParsedLine | und
     } else if (sol.cp && sol.cp.dec === 0 && sol.cp.value > 1) packCount = sol.cp.value;
   }
   const descWords = words.slice(0, info.start);
+  // Resto suelto del OCR delante del código de artículo ("i 712285 Ron añejo")
+  while (descWords.length > 2 && descWords[0].raw.length === 1 && !/\d/.test(descWords[0].raw) && /^\d{5,14}$/.test(descWords[1].raw)) descWords.shift();
   const lc = leadingCode(descWords);
   let code = lc.code;
   let dw = descWords.slice(lc.end);
@@ -2073,7 +2164,13 @@ function parseCcRow(row: Row, info: CcRowInfo, ctx: CcContext): ParsedLine | und
     code = dw[0].raw;
     dw = [];
   }
-  const description = collapseSpaces(dw.map((w) => w.raw).join(' ')).replace(/[\s.·:|_-]+$/, '').replace(/^[\s.·:|_-]+/, '');
+  // Código de artículo de la fila de importes detrás de la descripción de la fila de encima
+  if (dw.length > 1 && /^\d{5,14}$/.test(dw[dw.length - 1].raw)) {
+    code ??= dw[dw.length - 1].raw;
+    dw = dw.slice(0, -1);
+  }
+  const rawDesc = collapseSpaces(dw.map((w) => w.raw).join(' ')).replace(/[\s.·:|_-]+$/, '').replace(/^[\s.·:|_-]+/, '');
+  const description = row.ocr ? ccFixDescription(rawDesc) : rawDesc;
   const vatValue = sol.vat?.value;
   return {
     row: row.i,
@@ -2319,8 +2416,8 @@ function supplierNameScore(seg: Segment, idx: number, supplierIdRow: number | un
 function cleanName(s: string): string {
   return collapseSpaces(
     s
-      // OCR: la «S» de la forma social leída como «$» ("Obrador Campos $.L.")
-      .replace(/(^|\s)\$\.?\s?(L|A|COOP)\b/gi, '$1S.$2')
+      // OCR: la «S» de la forma social leída como «$» o «5» ("Obrador Campos $.L.", "Cash Sáez 5. Coop.")
+      .replace(/(^|[\s,])[$5]\.\s?(L|A|COOP)\b/gi, '$1S.$2')
       .replace(/\b(?:C\.?I\.?F|N\.?I\.?F|DNI|NIF\/CIF|CIF\/NIF)\.?\s*[:.]?\s*(?:ES)?[A-Z0-9-]{8,11}\b.*$/i, '')
       .replace(SUPPLIER_LABEL_RE, '')
       .replace(/^[\s·•|:,.-]+|[\s·•|:,-]+$/g, ''),
@@ -2688,12 +2785,25 @@ function underCustomerNumber(rows: Row[], hit: TaxIdHit): boolean {
     .filter((sg) => sg.x0 <= hit.x + cw)
     .pop();
   if (!own) return false;
+  // La celda del identificador: su valor y la etiqueta de su izquierda ("N.I.F.:" | "B…"), si van separados
+  const ownSegs = segmentsOf(row);
+  const ownAt = ownSegs.indexOf(own);
+  const mine = [own, ownSegs[ownAt - 1]].filter((x): x is Segment => !!x && own.x0 - x.x1 <= cw * 14);
   for (let k = hit.row; k >= Math.max(0, hit.row - 3); k--) {
     const r = rows[k];
     if (r.page !== row.page) break;
-    for (const sg of segmentsOf(r)) {
+    const segs = segmentsOf(r);
+    for (let j = 0; j < segs.length; j++) {
+      const sg = segs[j];
       if (!CUSTOMER_NO_RE.test(fold(sg.text))) continue;
-      if (k === hit.row ? sg.x0 <= hit.x : Math.abs(sg.x0 - own.x0) <= Math.max(cw, r.cw) * 4) return true;
+      if (k === hit.row) {
+        if (sg.x0 <= hit.x) return true;
+        continue;
+      }
+      // Etiquetas (o valores) alineados a la izquierda o a la derecha ("N.cliente: 427…" / "   N.I.F.: B…")
+      const tol = Math.max(cw, r.cw) * 4;
+      const cell = [sg, segs[j + 1]].filter((x): x is Segment => !!x && x.x0 - sg.x1 <= r.cw * 14);
+      if (cell.some((c) => mine.some((m) => Math.abs(c.x0 - m.x0) <= tol || Math.abs(c.x1 - m.x1) <= tol))) return true;
     }
   }
   return false;
@@ -2775,6 +2885,8 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
       if (texts.some((t) => BUSINESS_RE.test(t))) score += 1;
       if (texts.some((t) => ADDRESS_RE.test(t) || /\b\d{5}\b/.test(t))) score += 2;
       if (texts.some((t) => /\btel|telf|telefono|@|www\./.test(t))) score += 1;
+      // Datos registrales (Registro Mercantil): siempre del emisor, aunque su CIF se haya leído mal
+      if (texts.some((t) => REGISTRY_RE.test(t))) score += 4;
       if (texts.some((t) => /\b(?:factura|fecha|albaran|ticket)\b/.test(t))) score -= 3;
       if (b.firstRow === top) score += 1;
       if (b.segs.length >= 2) score += 1;
@@ -2831,7 +2943,11 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
     if (/^(?:datos(?:del)?)?(?:proveedor|emisor|vendedor|expedidor|cliente|destinatario|facturara)/.test(fold(t).replace(/[^a-z]/g, ''))) return false;
     return nameCandidate(t) && !/\d/.test(t) && !COMPANY_SUFFIX_RE.test(fold(t)) && !SUPPLIER_LABEL_RE.test(fold(t)) && !CUSTOMER_LABEL_RE.test(fold(t));
   };
-  const withSuffix = (sg: Segment, b: Block): string => extendName(sg, b.segs);
+  // (con la forma jurídica suelta de su misma fila aunque haya caído en otro bloque: "Cash Costa Brava," | "S.A.")
+  const withSuffix = (sg: Segment, b: Block): string => {
+    const suffix = blocks.flatMap((o) => (o === b ? [] : o.segs)).filter((x) => x.row === sg.row && x.x0 > sg.x1 && /^(?:s\.?\s?l\.?\s?u?\.?|s\.?\s?a\.?\s?u?\.?|s\.?\s?coop\.?|c\.?\s?b\.?)$/i.test(collapseSpaces(x.text)));
+    return extendName(sg, [...b.segs, ...suffix].sort((p, q) => p.row - q.row || p.x0 - q.x0));
+  };
   // Tramo de una fila a partir de un segmento: los segmentos siguientes muy próximos ("Aragón" + "S.L.")
   const runFrom = (o: Segment, segs: Segment[]): Segment => {
     const same = segs.filter((x) => x.row === o.row && x.x0 >= o.x0).sort((a, c) => a.x0 - c.x0);
@@ -2891,7 +3007,9 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
         .sort((p, q) => q.firstRow - p.firstRow)[0];
       if (above) b = above;
     }
-    const cands = nameSegs(b);
+    // Lo que va tras el título del documento ("Factura", "Factura de entrega") ya es otra caja (la del cliente)
+    const title = b.segs.find((sg) => /^(?:factura|albaran|ticket|nota\s*de\s*entrega)\b/.test(fold(collapseSpaces(sg.text))));
+    const cands = nameSegs(b).filter((sg) => !title || sg.row < title.row || sg === b.segs[0]);
     const withCompany = cands.find((sg) => COMPANY_SUFFIX_RE.test(fold(cleanName(sg.text))));
     const pick = withCompany ?? cands[0];
     if (pick) supplierName = withSuffix(pick, b);
@@ -2916,7 +3034,7 @@ function parseDocHeader(rows: Row[], headerEnd: number, allRows: Row[], excludeR
       if (inZone && row && hit.row > 0 && idUnderCustomerLabel(allRows[hit.row - 1], row, hit.x)) score -= 12;
       if (inZone && supplierBlock && blockOfSeg(hit.row, hit.x) === supplierBlock) score += 6;
       // En la columna de la etiqueta del número de cliente ("N.cliente: 427…" / "N.I.F.: B…"): es el del cliente
-      if (row && underCustomerNumber(allRows, hit)) score -= 12;
+      if (row && underCustomerNumber(allRows, hit)) continue;
       // Junto a los datos registrales (Registro Mercantil): siempre son del emisor
       if (row && allRows.slice(Math.max(0, hit.row - 2), hit.row + 3).some((r) => r.page === row.page && REGISTRY_RE.test(r.f))) score += 4;
       if (footer.some((f) => f.id === hit.id)) score += 4;
