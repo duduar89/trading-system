@@ -1,0 +1,1 @@
+function e(e,t){return e.baseUnit??t}function t(e,t){return!e.baseUnit||!t||e.baseUnit===t.baseUnit}function n(e,t){if(!e.some(e=>e.baseUnit))return e;let n=new Map;if(t instanceof Map)for(let[e,r]of t)n.set(e,r.baseUnit);else for(let e of t)n.set(e.id,e.baseUnit);return e.filter(e=>!e.baseUnit||!n.has(e.productId)||n.get(e.productId)===e.baseUnit)}export{t as n,e as r,n as t};
