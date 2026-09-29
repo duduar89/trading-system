@@ -1,0 +1,17 @@
+{
+  "name": "mesa-trading",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fondo de agentes de IA que opera en papel (Alpaca paper o bróker simulado con 100.000 $), con parqué isométrico en el navegador.",
+  "main": "src/index.js",
+  "engines": { "node": ">=20.6" },
+  "scripts": {
+    "start": "node src/index.js",
+    "demo": "node src/index.js --modo=sintetico --velocidad=600",
+    "test": "node --test test/",
+    "probar": "node scripts/probar-todo.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.129.0"
+  }
+}
