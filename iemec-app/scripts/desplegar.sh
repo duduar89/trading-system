@@ -64,7 +64,10 @@ echo "▸ Dependencias, migraciones y reinicio"
   set -e
   source $NODE_VENV
   cd $APP_DIR
-  if ! cmp -s package.json .package-instalado.json 2>/dev/null; then npm install --omit=dev --no-audit --no-fund >/dev/null 2>&1 && cp package.json .package-instalado.json && echo '   dependencias actualizadas'; fi
+  if ! cmp -s package.json .package-instalado.json 2>/dev/null; then
+    npm install --omit=dev --no-audit --no-fund --loglevel=error || { echo '✗ npm install ha fallado en el servidor' >&2; exit 1; }
+    cp package.json .package-instalado.json && echo '   dependencias actualizadas'
+  fi
   node scripts/migrar.js
   if [ -n '${REINICIAR:-}' ]; then ${REINICIAR:-true}; else
     mkdir -p tmp && touch tmp/restart.txt
