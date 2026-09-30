@@ -17,7 +17,8 @@ export default function Hoy() {
     d.conversaciones.urgentes && { texto: `${d.conversaciones.urgentes} conversación urgente esperando a una persona`, ir: '#conversaciones', alerta: true },
     d.conversaciones.esperaPersona && { texto: `${d.conversaciones.esperaPersona} conversaciones esperan a una persona`, ir: '#conversaciones' },
     d.sinProximoPaso && { texto: `${d.sinProximoPaso} conversaciones sin próximo paso (tiene que ser cero)`, ir: '#conversaciones', alerta: true },
-    d.tareas.vencidas && { texto: `${d.tareas.vencidas} tareas vencidas (llamadas, aprobaciones)`, ir: '#conversaciones', alerta: true },
+    d.tareas.vencidas && { texto: `${d.tareas.vencidas} tareas vencidas (llamadas, aprobaciones)`, ir: '#tareas', alerta: true },
+    d.tareas.abiertas > d.tareas.vencidas && { texto: `${d.tareas.abiertas - d.tareas.vencidas} tareas abiertas (leads por llamar, conversaciones por contestar)`, ir: '#tareas' },
     d.resenasPorResponder && { texto: `${d.resenasPorResponder} reseñas de Google con respuesta preparada para aprobar`, ir: '#resenas' },
   ].filter(Boolean);
   return (

@@ -50,6 +50,45 @@ function rutasPanel({ pool, deps = null }) {
     });
   }));
 
+  // ── Tareas abiertas: qué hay que hacer, con quién y cómo contactarle ──────────────────────
+  // Un lead sin conversación (sin WhatsApp, un fijo, la baja comercial) solo se ve aquí.
+  r.get('/tareas', envolver(async (req, res) => {
+    const ahora = req.ahora || new Date();
+    const [filas] = await p().query(
+      `SELECT t.id, t.tipo, t.titulo, t.urgente, t.vence_en, t.creado_en, t.conversacion_id, COALESCE(t.lead_id, c.lead_id) AS lead_id,
+              l.nombre AS lead_nombre, l.telefono AS lead_telefono, l.email AS lead_email, l.origen, l.campana,
+              pa.nombre AS paciente_nombre, pa.apellidos, pa.telefono AS paciente_telefono, pa.email AS paciente_email, c.telefono AS conv_telefono
+         FROM tareas t
+         LEFT JOIN conversaciones c ON c.id = t.conversacion_id
+         LEFT JOIN leads l ON l.id = COALESCE(t.lead_id, c.lead_id)
+         LEFT JOIN pacientes pa ON pa.id = COALESCE(t.paciente_id, c.paciente_id)
+        WHERE t.estado = 'abierta' ORDER BY t.urgente DESC, t.vence_en, t.id LIMIT 300`);
+    // Avisos de WhatsApp o de Meta que se quedaron sin procesar después de todos los intentos.
+    const [[fallidos]] = await p().query("SELECT COUNT(*) AS n FROM cola WHERE tipo IN ('webhook_whatsapp','webhook_whatsapp_estados','webhook_meta') AND estado = 'fallido'");
+    res.json({
+      tareas: filas.map((x) => ({
+        id: x.id, tipo: x.tipo, titulo: x.titulo, urgente: Boolean(x.urgente), vence: x.vence_en, vencida: new Date(x.vence_en) < ahora,
+        creada: x.creado_en, conversacionId: x.conversacion_id,
+        quien: x.paciente_nombre ? [x.paciente_nombre, x.apellidos].filter(Boolean).join(' ') : x.lead_nombre || null,
+        telefono: x.paciente_telefono || x.lead_telefono || x.conv_telefono || null,
+        email: x.paciente_email || x.lead_email || null,
+        lead: x.lead_id ? { id: x.lead_id, origen: x.origen, campana: x.campana } : null,
+      })),
+      avisosFallidos: Number(fallidos.n),
+    });
+  }));
+
+  // Cuerpo: { estado: 'hecha' | 'cancelada', resultado }.
+  r.post('/tareas/:id', envolver(async (req, res) => {
+    const id = /^\d{1,10}$/.test(req.params.id) ? Number(req.params.id) : null;
+    const estado = req.body?.estado === 'cancelada' ? 'cancelada' : 'hecha';
+    const [hecho] = id ? await p().query("UPDATE tareas SET estado = ?, resultado = ?, hecha_en = ? WHERE id = ? AND estado = 'abierta'",
+      [estado, req.body?.resultado ? String(req.body.resultado).slice(0, 255) : null, req.ahora || new Date(), id]) : [{ affectedRows: 0 }];
+    if (!hecho.affectedRows) return res.status(404).json({ error: 'Esa tarea no existe o ya está cerrada' });
+    await registrar(p(), { tipo: `tarea_${estado}`, entidad: 'tarea', entidadId: id, actor: req.usuario?.email || 'panel' });
+    res.json({ ok: true, estado });
+  }));
+
   // ── Agenda por cabina ─────────────────────────────────────────────────────────────────────
   r.get('/agenda', envolver(async (req, res) => {
     const fecha = /^\d{4}-\d{2}-\d{2}$/.test(req.query.fecha || '') ? req.query.fecha : T.fechaMadrid(req.ahora || new Date());
