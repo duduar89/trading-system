@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const T = require('../motor/tiempo');
 const { prepararDia, huecoAInstantes, tratamientoParaMotor } = require('../motor/agenda/dia');
 const { buscarHuecos, proponer } = require('../motor/agenda/huecos');
+const E = require('../motor/agenda/estados');
 const { registrar } = require('./eventos');
 
 class ErrorAgenda extends Error {
@@ -154,23 +155,34 @@ async function reservar(pool, p) {
   }
 }
 
-async function cambiarEstado(pool, { id, token, de, a, actor = 'sistema', motivo = null, por = null, ahora = new Date() }) {
+/**
+ * Cambia el estado de una cita según la tabla de transiciones (motor/agenda/estados.js): bloquea la
+ * fila, comprueba que el cambio vale (también por la hora), guarda cuándo pasó y lo anota en eventos.
+ * @param {object} p id o token, a (estado nuevo), de? (restringe los estados de partida de la tabla),
+ *   actor, motivo, por, ahora, alCambiar? (con, cita) → lo que ese cambio mueve en el resto de la app,
+ *   en la misma transacción; lo que devuelve queda en el evento (servidor/estados-cita.js)
+ */
+async function cambiarEstado(pool, { id, token, de = null, a, actor = 'sistema', motivo = null, por = null, ahora = new Date(), alCambiar = null }) {
   const con = await pool.getConnection();
   try {
     await con.beginTransaction();
     const [[cita]] = await con.query(`SELECT * FROM citas WHERE ${id ? 'id = ?' : 'token = ?'} FOR UPDATE`, [id || token]);
     if (!cita) throw new ErrorAgenda('CITA_DESCONOCIDA', 'No existe esa cita');
-    if (!de.includes(cita.estado)) throw new ErrorAgenda('ESTADO_NO_VALIDO', `La cita está ${cita.estado}`);
-    if (cita.estado === 'retenida' && a === 'confirmada' && cita.retenida_hasta && new Date(cita.retenida_hasta) <= ahora) {
-      throw new ErrorAgenda('RETENCION_CADUCADA', 'El hueco se ha liberado: hay que elegir otro');
-    }
+    const vale = E.comprobarCambio(cita, a, ahora, { de });
+    if (!vale.ok) throw new ErrorAgenda(vale.codigo, vale.mensaje);
+    const regla = E.TRANSICIONES[a];
     const cambios = { estado: a };
-    if (a === 'confirmada') { cambios.confirmada_en = ahora; cambios.retenida_hasta = null; }
-    if (a === 'cancelada') { cambios.cancelada_en = ahora; cambios.motivo_cancelacion = motivo; cambios.cancelada_por = por; cambios.secuencia_ics = cita.secuencia_ics + 1; }
+    if (regla.columna) cambios[regla.columna] = ahora;
+    if (a === 'confirmada') cambios.retenida_hasta = null;
+    if (a === 'cancelada') Object.assign(cambios, { motivo_cancelacion: motivo, cancelada_por: por, secuencia_ics: cita.secuencia_ics + 1 });
+    // Lo que se puede deshacer guarda de dónde venía y cuándo cambió.
+    if (regla.deshacible) Object.assign(cambios, { estado_anterior: cita.estado, estado_cambiado_en: ahora });
     await con.query('UPDATE citas SET ? WHERE id = ?', [cambios, cita.id]);
-    await registrar(con, { tipo: `cita_${a}`, entidad: 'cita', entidadId: cita.id, actor, datos: { de: cita.estado, motivo } });
+    const nueva = { ...cita, ...cambios };
+    const efectos = alCambiar ? await alCambiar(con, nueva) : null;
+    await registrar(con, { tipo: `cita_${a}`, entidad: 'cita', entidadId: cita.id, actor, datos: { de: cita.estado, motivo, ...(efectos ? { efectos } : {}) } });
     await con.commit();
-    return { ...cita, ...cambios };
+    return efectos ? { ...nueva, efectos } : nueva;
   } catch (err) {
     await con.rollback().catch(() => {});
     throw err;
@@ -179,8 +191,50 @@ async function cambiarEstado(pool, { id, token, de, a, actor = 'sistema', motivo
   }
 }
 
-const confirmar = (pool, o) => cambiarEstado(pool, { ...o, de: ['retenida', 'confirmada'], a: 'confirmada' });
-const cancelar = (pool, o) => cambiarEstado(pool, { ...o, de: ['retenida', 'confirmada'], a: 'cancelada' });
+// El último cambio a `estado` que se anotó de esta cita (de dónde venía y qué movió).
+async function ultimoCambio(con, citaId, estado) {
+  const [[ev]] = await con.query("SELECT datos FROM eventos WHERE entidad = 'cita' AND entidad_id = ? AND tipo = ? ORDER BY id DESC LIMIT 1", [String(citaId), `cita_${estado}`]);
+  const datos = typeof ev?.datos === 'string' ? JSON.parse(ev.datos) : ev?.datos;
+  return datos || {};
+}
+
+/**
+ * «Deshacer»: la cita vuelve al estado anterior si su último cambio se puede deshacer y aún no ha
+ * pasado el rato (motor/agenda/estados.js). Si el estado al que vuelve también se marcó hace poco
+ * (la llegada antes de «Completada»), se podrá deshacer a su vez.
+ * @param {object} p id, actor, ahora, alDeshacer? (con, cita, { deshecho, efectos }) → anula lo que
+ *   movió ese cambio (los efectos se leen del evento que lo anotó)
+ */
+async function deshacerEstado(pool, { id, actor = 'sistema', ahora = new Date(), alDeshacer = null }) {
+  const con = await pool.getConnection();
+  try {
+    await con.beginTransaction();
+    const [[cita]] = await con.query('SELECT * FROM citas WHERE id = ? FOR UPDATE', [id]);
+    if (!cita) throw new ErrorAgenda('CITA_DESCONOCIDA', 'No existe esa cita');
+    const vale = E.comprobarDeshacer(cita, ahora);
+    if (!vale.ok) throw new ErrorAgenda(vale.codigo, vale.mensaje);
+    const deshecho = await ultimoCambio(con, cita.id, cita.estado);
+    const previa = E.TRANSICIONES[vale.a]?.deshacible ? await ultimoCambio(con, cita.id, vale.a) : {};
+    const cambios = {
+      estado: vale.a, [E.TRANSICIONES[cita.estado].columna]: null,
+      estado_anterior: previa.de || null, estado_cambiado_en: previa.de ? cita[E.TRANSICIONES[vale.a].columna] : null,
+    };
+    await con.query('UPDATE citas SET ? WHERE id = ?', [cambios, cita.id]);
+    const nueva = { ...cita, ...cambios };
+    const anulado = alDeshacer ? await alDeshacer(con, nueva, { deshecho: cita.estado, efectos: deshecho.efectos || {} }) : null;
+    await registrar(con, { tipo: 'cita_estado_deshecho', entidad: 'cita', entidadId: cita.id, actor, datos: { de: cita.estado, a: vale.a, ...(anulado ? { anulado } : {}) } });
+    await con.commit();
+    return anulado ? { ...nueva, anulado } : nueva;
+  } catch (err) {
+    await con.rollback().catch(() => {});
+    throw err;
+  } finally {
+    con.release();
+  }
+}
+
+const confirmar = (pool, o) => cambiarEstado(pool, { ...o, a: 'confirmada' });
+const cancelar = (pool, o) => cambiarEstado(pool, { ...o, a: 'cancelada' });
 
 // Libera las retenciones caducadas (lo llama el cron cada minuto).
 async function caducarRetenciones(pool, ahora = new Date()) {
@@ -190,4 +244,4 @@ async function caducarRetenciones(pool, ahora = new Date()) {
   return r.affectedRows;
 }
 
-module.exports = { huecos, proximosHuecos, reservar, confirmar, cancelar, caducarRetenciones, cargarDia, ErrorAgenda };
+module.exports = { huecos, proximosHuecos, reservar, cambiarEstado, deshacerEstado, confirmar, cancelar, caducarRetenciones, cargarDia, ErrorAgenda };
