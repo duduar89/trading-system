@@ -53,7 +53,15 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
    | `CLAVE_CIFRADO` | `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
    | `SESION_SECRETO` | otra cadena aleatoria de 32 caracteres o más |
    | `PANEL_CLAVE` | clave de acceso del personal (12+ caracteres) hasta que lleguen las passkeys |
-   | `MODO_WHATSAPP`, `MODO_IA`, `MODO_GOOGLE` | `simulado` hasta tener cuentas; luego `real` |
+   | `MODO_WHATSAPP`, `MODO_IA`, `MODO_GOOGLE`, `MODO_META` | `simulado` hasta tener cuentas; luego `real` |
+   | `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (o `WHATSAPP_WEBHOOK_CLAVE`), `WHATSAPP_NUMERO_ID` | webhook de WhatsApp: ver [`WHATSAPP-Y-LEADS.md`](WHATSAPP-Y-LEADS.md) |
+   | `META_VERIFY_TOKEN`, `META_APP_SECRET`, `META_TOKEN_PAGINA`, `META_PAGINA_ID` | leads de los formularios de Meta: ídem |
+   | `LEADS_CLAVE` | alta de leads de la web y GHL (`POST /api/leads`), 16 caracteres o más |
+
+   **Mejor todo en el `.env`:** el cron (paso 4) es otro proceso, lanzado desde la terminal, y no ve
+   las variables de «Setup Node.js App»; solo lee el `.env` (`servidor/config.js`). Es el cron el que
+   procesa lo que llega de WhatsApp y de Meta: con `MODO_META` sin poner en su `.env`, cada lead de
+   Meta acaba en una tarea para recepción en vez de entrar solo.
 
    **Guarda `CLAVE_CIFRADO` también fuera del servidor** (gestor de contraseñas): sin ella, las
    conversaciones guardadas no se pueden leer.
