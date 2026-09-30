@@ -1,0 +1,204 @@
+{
+  "_nota": "Las 8 especialidades del mapa nuevo. «nombre» es el rótulo en menús y títulos; «grupo_neutro», lo que va en el WhatsApp y en el formulario (casillas-formulario.md: lo íntimo y el peso, solo por su grupo). «sensible»: su referencia de WhatsApp no lleva el slug del tratamiento. Una especialidad sin páginas publicadas no sale en menús ni en la portada.",
+  "especialidades": [
+    {
+      "slug": "medicina-estetica-facial",
+      "orden": 1,
+      "nombre": "Medicina estética facial",
+      "grupo_neutro": "Medicina estética facial",
+      "titulo": "Medicina estética facial",
+      "titulo_seo": "Medicina estética facial en Boadilla del Monte · IEMEC",
+      "descripcion_seo": "Tratamientos faciales médicos y de cabina en IEMEC, Boadilla del Monte: arrugas, flacidez, manchas, acné y calidad de la piel, con valoración previa.",
+      "resumen": "Arrugas, flacidez, manchas, acné y luminosidad: tratamientos médicos y de cabina para tu rostro.",
+      "foto": "clinica-sala-de-procedimientos",
+      "foto_pie": "La sala de procedimientos de IEMEC.",
+      "entradilla": "Cuidamos la piel y los rasgos de tu rostro con tratamientos médicos y de cabina. Empezamos por entender qué te preocupa y te proponemos solo lo que encaja contigo.",
+      "texto": [
+        "Los tratamientos médicos, como los rellenos o la bioestimulación, los hace siempre un médico tras una valoración médica. Los de cabina, como las limpiezas, los peelings superficiales o los masajes faciales, los hace el equipo de estética, con el mismo cuidado.",
+        "En la primera cita miramos tu piel, hablamos de lo que quieres mejorar y te explicamos las opciones, el número de sesiones orientativo y el presupuesto, sin compromiso."
+      ],
+      "preguntas": [
+        { "p": "¿Por dónde empiezo si no sé qué tratamiento necesito?", "r": "Por una primera valoración. Miramos tu piel, hablamos de lo que te preocupa y te explicamos las opciones que encajan contigo, sin compromiso." },
+        { "p": "¿Quién hace los tratamientos?", "r": "Los tratamientos médicos los hace un médico, siempre tras una valoración médica. Los de cabina los hace el equipo de estética de la clínica." },
+        { "p": "¿Puedo combinar varios tratamientos?", "r": "A menudo sí. En la valoración te decimos qué combinaciones tienen sentido en tu caso y en qué orden conviene hacerlas." }
+      ]
+    },
+    {
+      "slug": "medicina-estetica-corporal",
+      "orden": 2,
+      "nombre": "Medicina estética corporal",
+      "grupo_neutro": "Medicina estética corporal",
+      "titulo": "Medicina estética corporal",
+      "titulo_seo": "Medicina estética corporal en Boadilla del Monte · IEMEC",
+      "descripcion_seo": "Grasa localizada, celulitis, flacidez, retención de líquidos y vello: tratamientos médicos, aparatología y masajes en IEMEC, Boadilla del Monte.",
+      "resumen": "Grasa localizada, celulitis, flacidez, retención de líquidos y vello: tecnología y medicina para el cuerpo.",
+      "foto": "clinica-cabina-tratamientos",
+      "foto_pie": "Una de las cabinas de tratamiento de IEMEC.",
+      "entradilla": "Tratamientos médicos, aparatología y masajes para trabajar zonas concretas del cuerpo. Te valoramos antes de empezar y te acompañamos durante todo el plan.",
+      "texto": [
+        "Cada cuerpo responde de una forma distinta, por eso empezamos con una valoración: vemos la zona, hablamos de tus hábitos y de lo que te gustaría mejorar, y te proponemos un plan realista.",
+        "Muchos tratamientos corporales se complementan entre sí. Te explicamos qué hace cada uno, cuántas sesiones suelen hacer falta y qué cuidados ayudan a mantener lo conseguido."
+      ],
+      "preguntas": [
+        { "p": "¿Estos tratamientos sirven para bajar de peso?", "r": "No. Están pensados para zonas concretas: grasa localizada, celulitis, flacidez o retención de líquidos. Si lo que te preocupa es el peso, en la valoración te orientamos." },
+        { "p": "¿Cuántas sesiones necesitaré?", "r": "Depende del tratamiento, de la zona y de cada persona. En la valoración te damos un plan orientativo antes de empezar." },
+        { "p": "¿Quién hace los tratamientos?", "r": "Los procedimientos médicos los hace un médico tras una valoración médica; la aparatología y los masajes, el equipo de estética." }
+      ]
+    },
+    {
+      "slug": "control-de-peso",
+      "orden": 3,
+      "nombre": "Control de peso",
+      "grupo_neutro": "Control de peso",
+      "sensible": true,
+      "codigo_ref": "peso",
+      "titulo": "Control de peso con supervisión médica",
+      "titulo_seo": "Control de peso con supervisión médica · IEMEC Boadilla",
+      "descripcion_seo": "Control de peso con supervisión médica en IEMEC, Boadilla del Monte: valoración, opciones que encajan contigo y seguimiento durante todo el proceso.",
+      "resumen": "Valoración médica, opciones que encajan contigo y seguimiento durante todo el proceso.",
+      "entradilla": "Si te preocupa tu peso, empezamos por una valoración médica: revisamos tu salud y tus hábitos y te explicamos las opciones que encajan contigo, con seguimiento.",
+      "texto": [
+        "No hay una única solución que sirva a todo el mundo. En la consulta, el médico revisa tu salud, tus antecedentes y tus objetivos, y te explica qué opciones tienen sentido en tu caso, con sus riesgos y sus alternativas.",
+        "Lo importante es lo que se mantiene después: por eso cada plan incluye seguimiento y un cambio de hábitos acompañado."
+      ],
+      "pendiente": "que la autorización del centro cubra el área de peso (Endocrinología, U.10, y Nutrición, U.11)",
+      "preguntas": [
+        { "p": "¿Qué pasa en la primera consulta?", "r": "El médico te pregunta por tu salud, tus hábitos y tus objetivos, y te explica las opciones que encajan contigo. Tú decides después, sin compromiso." },
+        { "p": "¿Tendré seguimiento?", "r": "Sí. Cada plan incluye revisiones para ver cómo evolucionas y ajustar lo que haga falta." }
+      ]
+    },
+    {
+      "slug": "medicina-capilar",
+      "orden": 4,
+      "nombre": "Medicina capilar",
+      "grupo_neutro": "Medicina capilar",
+      "titulo": "Medicina capilar",
+      "titulo_seo": "Medicina capilar y head spa en Boadilla del Monte · IEMEC",
+      "descripcion_seo": "Diagnóstico capilar, tratamiento médico de la caída del cabello y head spa en IEMEC, Boadilla del Monte. Primero entendemos por qué se cae el pelo.",
+      "resumen": "Diagnóstico del cuero cabelludo, tratamiento médico de la caída del cabello y head spa.",
+      "foto": "clinica-consulta",
+      "foto_pie": "La consulta de IEMEC, donde empieza el diagnóstico.",
+      "entradilla": "Si notas más caída o menos densidad, lo primero es entender por qué. Empezamos con un diagnóstico capilar y, a partir de ahí, te proponemos un plan. Y para cuidarte, el head spa.",
+      "texto": [
+        "La caída del cabello tiene causas muy distintas: hormonales, genéticas, por estrés, por carencias o por otras enfermedades. Por eso el primer paso es un diagnóstico del cuero cabelludo, que nos dice qué está pasando y qué opciones tienes.",
+        "El head spa es otra cosa: un ritual de limpieza, masaje y cuidado del cuero cabelludo para relajarte y cuidar tu pelo, que hace el equipo de estética."
+      ],
+      "pendiente": "qué cubre la unidad U.900 de la autorización en medicina capilar",
+      "preguntas": [
+        { "p": "¿Cuándo conviene consultar por la caída del cabello?", "r": "Cuando notes que se te cae más pelo de lo habitual durante semanas, que clarea alguna zona o que pierde densidad. Cuanto antes se valora, más opciones hay." },
+        { "p": "¿El head spa es un tratamiento médico?", "r": "No. Es un ritual de cuidado y bienestar del cuero cabelludo. Si te preocupa la caída, empieza por el diagnóstico capilar." }
+      ]
+    },
+    {
+      "slug": "cirugia-capilar",
+      "orden": 5,
+      "nombre": "Cirugía capilar",
+      "grupo_neutro": "Injerto capilar",
+      "titulo": "Cirugía capilar",
+      "titulo_seo": "Injerto capilar en Boadilla del Monte · IEMEC",
+      "descripcion_seo": "Injerto capilar FUE, microinjerto de cejas y de barba, línea frontal y reparación de injertos previos en IEMEC, Boadilla del Monte, con valoración previa.",
+      "resumen": "Injerto capilar FUE, cejas, barba, línea frontal y reparación de injertos previos.",
+      "foto": "clinica-consulta",
+      "foto_pie": "La consulta de IEMEC, donde empieza la valoración.",
+      "entradilla": "El injerto capilar lleva tu propio pelo desde la zona donante a las zonas con menos densidad. Empieza por una valoración para saber si es una buena opción en tu caso.",
+      "texto": [
+        "No todo el mundo es candidato a un injerto: depende de la zona donante, del tipo de caída y de tu salud. En la valoración estudiamos tu caso y, si el injerto no es lo más adecuado, te lo decimos y te orientamos hacia otras opciones.",
+        "Si sigues adelante, te explicamos la técnica, la anestesia, cómo será la recuperación, los cuidados y los riesgos antes de fijar la fecha."
+      ],
+      "preguntas": [
+        { "p": "¿Todo el mundo puede hacerse un injerto?", "r": "No. Depende de la zona donante, del tipo de caída y de tu salud. En la valoración te decimos si es una buena opción o si conviene empezar por un tratamiento médico." },
+        { "p": "¿Dónde se hace la intervención?", "r": "[PENDIENTE: confirmar si se hace en la sala de procedimientos de IEMEC, con anestesia local] Te lo explicamos con detalle en la valoración." }
+      ]
+    },
+    {
+      "slug": "estetica-intima-femenina",
+      "orden": 6,
+      "nombre": "Estética íntima femenina",
+      "grupo_neutro": "Salud íntima femenina",
+      "sensible": true,
+      "codigo_ref": "intima-f",
+      "titulo": "Estética íntima femenina",
+      "titulo_seo": "Estética íntima femenina en Boadilla del Monte · IEMEC",
+      "descripcion_seo": "Cirugía íntima y tratamientos de la zona íntima externa en IEMEC, Boadilla del Monte, con valoración médica, lenguaje claro y total discreción.",
+      "resumen": "Cirugía íntima y tratamientos de la zona íntima externa, con valoración médica y discreción.",
+      "foto": "clinica-consulta",
+      "foto_pie": "La consulta de IEMEC.",
+      "entradilla": "Una consulta confidencial para hablar de lo que te preocupa de la zona íntima. Te explicamos las opciones con un lenguaje claro y sin prisas.",
+      "texto": [
+        "Puedes contárnoslo con tranquilidad: la consulta es confidencial. El médico te escucha, te explora si hace falta y te explica las opciones, sus riesgos y lo que puedes esperar.",
+        "No hace falta que nos des detalles por WhatsApp ni en el formulario: los hablamos en consulta."
+      ],
+      "pendiente": "qué servicios de la zona íntima cubre la autorización (la ginecología, U.26, no figura)",
+      "preguntas": [
+        { "p": "¿La consulta es confidencial?", "r": "Sí. Lo que nos cuentas queda entre tú y el equipo médico, y los mensajes de la clínica nunca nombran el tratamiento." },
+        { "p": "¿Tengo que explicar mi caso al pedir cita?", "r": "No. Basta con pedir una cita de valoración; los detalles los hablamos en consulta." }
+      ]
+    },
+    {
+      "slug": "cirugia-estetica",
+      "orden": 7,
+      "nombre": "Cirugía estética",
+      "grupo_neutro": "Cirugía estética",
+      "titulo": "Cirugía estética",
+      "titulo_seo": "Cirugía estética en Boadilla del Monte · IEMEC",
+      "descripcion_seo": "Cirugía de mama, contorno corporal y cirugía facial en IEMEC, Boadilla del Monte: cada intervención empieza con una consulta con el cirujano.",
+      "resumen": "Cirugía de mama, contorno corporal y cirugía facial, siempre con consulta previa con el cirujano.",
+      "foto": "clinica-consulta",
+      "foto_pie": "La consulta de IEMEC, donde empieza cada cirugía.",
+      "entradilla": "Cada intervención empieza con una consulta con el cirujano: te explica la técnica, la anestesia, la recuperación y los riesgos, y resuelve tus dudas antes de decidir.",
+      "texto": [
+        "Una cirugía es una decisión importante. En la consulta, el cirujano valora tu caso, te explica qué se puede hacer y qué no, y te da por escrito la información y el presupuesto.",
+        "Antes de operarte firmas el consentimiento informado. Después, el seguimiento se hace en IEMEC."
+      ],
+      "preguntas": [
+        { "p": "¿Dónde se opera?", "r": "Las intervenciones de cirugía menor con anestesia local pueden hacerse en IEMEC. Las demás se hacen en un centro hospitalario autorizado: [PENDIENTE: nombre del centro]." },
+        { "p": "¿Qué incluye la consulta con el cirujano?", "r": "La valoración de tu caso, la explicación de la técnica, la anestesia, la recuperación y los riesgos, y el presupuesto por escrito." },
+        { "p": "¿Hay que firmar un consentimiento?", "r": "Sí. Antes de cualquier intervención firmas un consentimiento informado por escrito, después de que el cirujano te haya explicado la técnica, los riesgos y las alternativas." }
+      ]
+    },
+    {
+      "slug": "estetica-intima-masculina",
+      "orden": 8,
+      "nombre": "Estética íntima masculina",
+      "grupo_neutro": "Salud íntima masculina",
+      "sensible": true,
+      "codigo_ref": "intima-m",
+      "titulo": "Estética íntima masculina",
+      "titulo_seo": "Estética íntima masculina en Boadilla del Monte · IEMEC",
+      "descripcion_seo": "Tratamientos de la zona íntima masculina en IEMEC, Boadilla del Monte, con valoración médica previa, información clara y total discreción.",
+      "resumen": "Tratamientos de la zona íntima masculina con valoración médica y total discreción.",
+      "foto": "clinica-consulta",
+      "foto_pie": "La consulta de IEMEC.",
+      "entradilla": "Una consulta médica confidencial para valorar lo que te preocupa y explicarte las opciones, sus riesgos y lo que puedes esperar.",
+      "texto": [
+        "Puedes contárnoslo con tranquilidad: la consulta es confidencial. El médico valora tu caso y te explica si el tratamiento es adecuado para ti, sus riesgos y sus alternativas.",
+        "No hace falta que nos des detalles por WhatsApp ni en el formulario: los hablamos en consulta."
+      ],
+      "preguntas": [
+        { "p": "¿La consulta es confidencial?", "r": "Sí. Lo que nos cuentas queda entre tú y el equipo médico, y los mensajes de la clínica nunca nombran el tratamiento." },
+        { "p": "¿Tengo que explicar mi caso al pedir cita?", "r": "No. Basta con pedir una cita de valoración; los detalles los hablamos en consulta." }
+      ]
+    }
+  ],
+  "preocupaciones": [
+    { "slug": "arrugas", "nombre": "Arrugas" },
+    { "slug": "flacidez", "nombre": "Flacidez" },
+    { "slug": "manchas", "nombre": "Manchas" },
+    { "slug": "calidad-de-piel", "nombre": "Calidad de la piel" },
+    { "slug": "acne-y-poros", "nombre": "Acné y poros" },
+    { "slug": "volumen-y-contorno", "nombre": "Volumen y contorno" },
+    { "slug": "labios", "nombre": "Labios" },
+    { "slug": "mirada-y-ojeras", "nombre": "Mirada y ojeras" },
+    { "slug": "grasa-localizada", "nombre": "Grasa localizada" },
+    { "slug": "celulitis", "nombre": "Celulitis" },
+    { "slug": "retencion-de-liquidos", "nombre": "Retención de líquidos" },
+    { "slug": "vello", "nombre": "Vello" },
+    { "slug": "caida-del-cabello", "nombre": "Caída del cabello" },
+    { "slug": "injerto", "nombre": "Injerto capilar" },
+    { "slug": "peso", "nombre": "Control de peso" },
+    { "slug": "zona-intima", "nombre": "Zona íntima" },
+    { "slug": "varices", "nombre": "Varices" },
+    { "slug": "bienestar", "nombre": "Bienestar" },
+    { "slug": "cirugia", "nombre": "Cirugía" }
+  ]
+}

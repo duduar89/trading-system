@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 .env
 .env.*
 !.env.example
@@ -15,3 +15,11 @@ playwright-report/
 mapa*.json
 !test/fixtures/**/*.csv
 !test/fixtures/**/mapa*.json
+
+# Web pública: lo construido, las capturas y las imágenes se regeneran (npm run web, web:fotos y
+# web:revisar). De web/fotos solo va a git fotos.json.
+web/dist/
+web/dist-borradores/
+web/capturas/
+web/fotos/*
+!web/fotos/fotos.json

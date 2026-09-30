@@ -15,6 +15,8 @@ App para IEMEC (Instituto Europeo de Medicina Estética y Capilar, Boadilla del 
   Guía de accesos: [`docs/GOOGLE.md`](docs/GOOGLE.md).
 - **Panel** con la estética de la clínica (terciopelo), PWA para tablet y móvil. El personal entra con
   passkeys, cada persona con su rol (`npm run invitar` da el primer enlace de alta).
+- **Web nueva** de la clínica en `web/` (generador estático, estética terciopelo, cumple la publicidad
+  sanitaria): `npm run web` y `npm run web:ver`. Cómo se publica: [`web/README.md`](web/README.md).
 - **Importador de Flowww** (`scripts/importar-flowww.js`): pacientes y citas futuras, con ensayo y
   deshacer, para apagarlo sin perder nada. Guía en [`docs/MIGRAR-FLOWWW.md`](docs/MIGRAR-FLOWWW.md).
 

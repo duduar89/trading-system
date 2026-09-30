@@ -1,0 +1,995 @@
+{
+ "grupo": "capilar",
+ "paginas": [
+  {
+   "slug": "diagnostico-capilar",
+   "especialidad": "medicina-capilar",
+   "catalogo": [
+    "diagnostico-capilar"
+   ],
+   "orden": 10,
+   "destacado": true,
+   "nombre": "Diagnóstico capilar",
+   "titulo": "Diagnóstico capilar: estudio del cuero cabelludo y del cabello",
+   "titulo_seo": "Diagnóstico capilar en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Diagnóstico capilar en IEMEC, Boadilla del Monte: estudiamos tu cuero cabelludo y tu cabello con dermatoscopia y te proponemos un plan a tu medida.",
+   "entradilla": "Si se te cae más el pelo o lo notas más fino, el primer paso es entender por qué. Estudiamos tu cuero cabelludo y tu cabello y te explicamos con calma qué opciones tienes.",
+   "para_quien": [
+    "Se te cae más pelo de lo habitual o lo notas más fino.",
+    "Ves menos densidad, más entradas o zonas en las que se ve el cuero cabelludo.",
+    "Tienes el cuero cabelludo graso, seco, irritado o con descamación.",
+    "Te planteas un tratamiento o un injerto y quieres saber si es adecuado para ti."
+   ],
+   "texto": [
+    "El diagnóstico capilar es el primer paso de cualquier tratamiento del cabello en IEMEC. Estudiamos tu caso de forma individual: desde cuándo notas el cambio, cómo es la caída, tus antecedentes de salud y lo que te gustaría conseguir.",
+    "Después examinamos el cuero cabelludo y el cabello con dermatoscopia, también llamada tricoscopia: una lente de aumento que permite ver de cerca la piel, los folículos y el grosor del pelo. Así se detectan signos como la pérdida de densidad, la caspa, la sequedad o el exceso de grasa.",
+    "Con esa información te explicamos qué ocurre, qué objetivos son realistas y qué plan te proponemos. Puede incluir un tratamiento médico, aparatología capilar, recomendaciones de cuidado o, si tu caso lo permite, un injerto. Cualquier tratamiento médico requiere esta valoración médica previa, en la que también te explicamos sus riesgos y sus alternativas."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Una consulta",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "[PENDIENTE: profesión y titulación de quien hace el diagnóstico]"
+   },
+   "variantes": [],
+   "resultados": "Sales de la consulta con tu caso explicado y un plan a tu medida; la respuesta a cualquier tratamiento varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué se hace en el diagnóstico capilar?",
+     "r": "Hablamos de tu caso, de cuándo empezó la caída y de tus antecedentes, y examinamos el cuero cabelludo y el cabello con dermatoscopia. Con esa información te explicamos qué ocurre y te proponemos un plan personalizado, con sus opciones y el presupuesto por escrito."
+    },
+    {
+     "p": "¿La dermatoscopia molesta?",
+     "r": "No es una prueba invasiva. Consiste en observar el cuero cabelludo con una lente de aumento, apoyada sobre la piel, para ver de cerca los folículos y el cabello. No necesita agujas ni anestesia."
+    },
+    {
+     "p": "¿Qué tratamientos me pueden proponer?",
+     "r": "Depende de lo que encontremos. Puede ser un tratamiento médico de la caída, aparatología capilar como la oxigenoterapia o la fototerapia LED, recomendaciones de cuidado o, si tu caso lo permite, un injerto capilar. Te explicamos cada opción, sus riesgos y lo que puedes esperar."
+    },
+    {
+     "p": "¿Me compromete a empezar un tratamiento?",
+     "r": "No. La primera valoración es sin compromiso: te explicamos las opciones y te damos el presupuesto por escrito para que decidas con calma. Si después te surgen dudas, puedes escribirnos y te las resolvemos."
+    },
+    {
+     "p": "¿Y si ya me he hecho un injerto?",
+     "r": "También podemos valorarte. Revisamos cómo está el cabello injertado y el resto del cuero cabelludo, y te orientamos sobre los cuidados de mantenimiento o, si no estás conforme con el resultado, sobre las opciones de reparación."
+    }
+   ],
+   "preocupaciones": [
+    "caida-del-cabello"
+   ],
+   "relacionados": [
+    "caida-del-cabello",
+    "oxigenoterapia-capilar",
+    "injerto-capilar-fue"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/medicina-capilar#oxigenoterapia-capilar",
+    "https://iemec-clinic.com/medicina-capilar#trichotest-contra-la-alopecia",
+    "https://iemec-clinic.com/cita-online",
+    "https://iemec-clinic.com/nosotros"
+   ],
+   "pendiente": [
+    "La web actual lo anuncia como «diagnóstico gratuito»: esta versión no publica precios ni «gratis». Proponemos «primera valoración sin compromiso»; confirmar que se mantiene así.",
+    "Quién hace el diagnóstico: en /nosotros figura Paula Vicent Valverde («Medicina y cirugía capilar») sin titulación, y en la app el rol es «tricólogo», que no es una profesión sanitaria titulada. La página dice «equipo médico de medicina capilar»: si no lo hace un médico, cambiarlo por la titulación real y mantener la valoración médica antes de cualquier tratamiento médico.",
+    "Duración: 30 minutos es un dato del sector; confirmar.",
+    "Autorización: confirmar que la oferta asistencial del centro (CS17886: U.48 Medicina estética o U.900 Otras unidades) cubre la medicina capilar, como pide normas.md (apartado a). Si no la cubre, la página espera.",
+    "El botón genérico «Cirugía capilar» de /cita-online no tiene id en el catálogo: decidir si esa cita es este diagnóstico o una valoración de cirugía capilar aparte (hay que crearla en el catálogo).",
+    "El TrichoTest (test genético) no se anuncia (ver sin_pagina): si el médico lo indica, se explica en la consulta, con consentimiento explícito para los datos genéticos."
+   ]
+  },
+  {
+   "slug": "caida-del-cabello",
+   "especialidad": "medicina-capilar",
+   "catalogo": [
+    "mesoterapia-capilar",
+    "prp-capilar",
+    "hair-filler",
+    "recuperacion-capilar-sin-injerto"
+   ],
+   "orden": 20,
+   "destacado": true,
+   "nombre": "Caída del cabello",
+   "titulo": "Tratamiento médico de la caída del cabello",
+   "titulo_seo": "Caída del cabello: tratamiento en Boadilla · IEMEC",
+   "descripcion_seo": "Tratamiento médico de la caída del cabello en IEMEC, Boadilla del Monte: diagnóstico capilar, plan a tu medida, sesiones en consulta y revisiones.",
+   "entradilla": "Cuando el cabello se cae más de la cuenta o pierde densidad, el médico te propone un plan a tu medida tras el diagnóstico capilar, con sesiones en consulta y revisiones para ver cómo evolucionas.",
+   "para_quien": [
+    "Notas más caída de lo habitual o el cabello más fino.",
+    "Tienes entradas o menos densidad y prefieres empezar sin cirugía.",
+    "Te has hecho un injerto y quieres cuidar el resto del cabello.",
+    "Quieres un tratamiento con seguimiento médico."
+   ],
+   "texto": [
+    "La caída del cabello tiene causas distintas, y cada una se trata de una forma. Por eso el tratamiento empieza siempre con el diagnóstico capilar y una valoración médica: el médico estudia tu caso y te propone un plan, con sus riesgos, sus contraindicaciones y las alternativas.",
+    "El plan puede combinar varias técnicas. Las más habituales son las microinyecciones en el cuero cabelludo, que se hacen en consulta con agujas muy finas, y la aparatología capilar como complemento. Qué se aplica en cada caso lo decide el médico en la consulta.",
+    "Es un tratamiento de constancia: se hace por ciclos de sesiones, con revisiones para ver cómo responde el cabello y ajustar la pauta. Suele responder mejor cuando la caída está en sus primeras fases, y el resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Entre 30 y 60 minutos por sesión, según el tratamiento",
+    "sesiones": "Por ciclos, según el plan del médico",
+    "anestesia": "Crema anestésica, si hace falta",
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Mesoterapia capilar",
+     "texto": "Microinyecciones muy finas en el cuero cabelludo con los activos que el médico elige para tu caso. Como orientación, una sesión por semana durante seis a ocho semanas y, después, mantenimiento cada pocos meses.",
+     "catalogo": "mesoterapia-capilar"
+    },
+    {
+     "nombre": "Microinyecciones en zonas debilitadas",
+     "texto": "Con una aguja muy fina y crema anestésica se aplica una solución con ácido hialurónico y péptidos en las zonas donde el cabello se ha debilitado. Suele plantearse en cuatro sesiones, una por semana, con mantenimiento después.",
+     "catalogo": "hair-filler"
+    },
+    {
+     "nombre": "Plan de recuperación capilar",
+     "texto": "Un plan médico de seis meses, sin cirugía, que combina las sesiones en consulta con las pautas que te indica el médico y revisiones periódicas para ajustar el tratamiento.",
+     "catalogo": "recuperacion-capilar-sin-injerto"
+    }
+   ],
+   "resultados": "La respuesta es gradual y se valora en las revisiones de los meses siguientes; varía según cada persona y según el tipo de caída.",
+   "preguntas": [
+    {
+     "p": "¿Qué tratamiento es el adecuado para mí?",
+     "r": "Depende del tipo de caída, de cuánto tiempo lleva y de tu salud. Por eso empezamos con el diagnóstico capilar y una valoración médica. Con ellos, el médico te explica qué opciones tienes, cómo se combinan, qué riesgos tienen y qué puedes esperar en tu caso."
+    },
+    {
+     "p": "¿Molestan las microinyecciones?",
+     "r": "Se hacen con agujas muy finas y se toleran bien: durante la sesión se nota una molestia leve. Si hace falta, se aplica crema anestésica antes de empezar para que las molestias sean mínimas."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Depende del tratamiento y de cómo respondas. Como orientación, la mesoterapia capilar suele pautarse una vez por semana durante seis a ocho semanas, y otras microinyecciones, en cuatro sesiones semanales. Después se plantea un mantenimiento, que el médico ajusta en las revisiones."
+    },
+    {
+     "p": "¿Sirve para cualquier tipo de caída?",
+     "r": "No todas las caídas son iguales. Estos tratamientos se usan sobre todo en la alopecia androgenética, la más frecuente, y en el efluvio, una caída temporal más intensa de lo normal. En la valoración te decimos si son adecuados para ti."
+    },
+    {
+     "p": "¿Hace crecer pelo donde ya no hay?",
+     "r": "Solo puede actuar donde todavía quedan folículos activos. Si una zona lleva tiempo sin pelo, te lo diremos con claridad en la valoración y, si tu caso lo permite, te explicaremos otras opciones, como el injerto capilar."
+    },
+    {
+     "p": "¿Tiene efectos secundarios?",
+     "r": "Como todo tratamiento médico, puede tenerlos. Lo habitual es una molestia leve o un enrojecimiento pasajero en la zona tratada. Antes de empezar, el médico revisa tus antecedentes y te explica los riesgos y las contraindicaciones; por ejemplo, la mesoterapia no se recomienda en el embarazo."
+    }
+   ],
+   "preocupaciones": [
+    "caida-del-cabello"
+   ],
+   "relacionados": [
+    "diagnostico-capilar",
+    "microneedling-capilar",
+    "oxigenoterapia-capilar",
+    "injerto-capilar-fue"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/medicina-capilar#mesoterapia-contra-la-alopecia",
+    "https://iemec-clinic.com/medicina-capilar#prp-contra-la-alopecia",
+    "https://iemec-clinic.com/medicina-capilar#hair-filler-contra-la-alopecia",
+    "https://iemec-clinic.com/portafolio",
+    "https://iemec-clinic.com/blog/la-mesoterapia-capilar-realmente-detiene-la-caida-del-cabello",
+    "https://iemec-clinic.com/blog/hair-filler-para-la-caida-del-cabello-que-resultados-ofrece-y-como-funciona",
+    "https://iemec-clinic.com/blog/prp-capilar-funciona-el-plasma-rico-en-plaquetas-para-la-alopecia",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Medicamentos de receta y productos sanitarios: la página no nombra fármacos, principios activos, el plasma ni marcas (normas.md, apartado b y anexo B). El tratamiento con plasma del propio paciente (prp-capilar) queda cubierto por esta página sin describirse: la AEMPS prohíbe cualquier publicidad al público. El botón de WhatsApp debe mandar un texto neutro («medicina capilar»), nunca el nombre del tratamiento ni el del medicamento.",
+    "Mesoterapia capilar: según Multiestetica lleva «principios activos y fármacos» que elige la médica (por eso figura como medicamento de receta); la web habla de vitaminas, minerales y aminoácidos. La página dice «los activos que el médico elige para tu caso», sin detallar la fórmula. Confirmar.",
+    "La variante «Microinyecciones en zonas debilitadas» es el servicio que hoy se llama «Hair Filler», marca de un producto sanitario de uso profesional: no se nombra. Confirmar el producto y su composición (la web cita factores de crecimiento, péptidos y ácido hialurónico).",
+    "Plan de recuperación capilar: solo sale en /portafolio (antes y después, que no se migra) y habla de «medicación oral e inyecciones durante 6 meses». Confirmar que se ofrece, su duración y su nombre.",
+    "Autorización: confirmar que la oferta asistencial del centro (CS17886: U.48 Medicina estética o U.900 Otras unidades) cubre la medicina capilar, como pide normas.md (apartado a). Si no la cubre, la página espera.",
+    "Duración por sesión (30-60 minutos) y número de sesiones: datos del sector y del blog; confirmar.",
+    "Las entradas del blog sobre el PRP, la mesoterapia y el Hair Filler nombran medicamentos y productos (minoxidil, PRP, Hair Filler): revisarlas o retirarlas; aquí no se enlazan."
+   ]
+  },
+  {
+   "slug": "microneedling-capilar",
+   "especialidad": "medicina-capilar",
+   "catalogo": [
+    "dermapen-capilar"
+   ],
+   "orden": 30,
+   "destacado": false,
+   "nombre": "Microneedling capilar",
+   "titulo": "Microneedling capilar: microagujas para el cuero cabelludo",
+   "titulo_seo": "Microneedling capilar en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Microneedling capilar en IEMEC, Boadilla del Monte: microagujas en el cuero cabelludo, con crema anestésica, como parte de un plan capilar a tu medida.",
+   "entradilla": "Un dispositivo de microagujas hace microperforaciones controladas en el cuero cabelludo que activan su reparación natural y ayudan a que penetren los activos que se aplican. Forma parte de un plan capilar.",
+   "para_quien": [
+    "Notas el cabello más débil o con menos densidad.",
+    "Sigues un tratamiento de la caída y quieres complementarlo.",
+    "Quieres mejorar el aspecto de la piel del cuero cabelludo."
+   ],
+   "texto": [
+    "El microneedling capilar utiliza un dispositivo con microagujas muy finas que hace pequeñas perforaciones controladas en el cuero cabelludo. Esas microlesiones activan los mecanismos naturales de reparación de la piel, estimulan la producción de colágeno y mejoran la absorción de los activos que se aplican.",
+    "En IEMEC lo usamos dentro de un plan capilar, a menudo junto a otros tratamientos. Antes de empezar aplicamos crema anestésica para que las molestias sean mínimas.",
+    "Requiere una valoración médica previa: revisamos tu cuero cabelludo, si hay alguna contraindicación y qué activos convienen en tu caso, y te explicamos los riesgos y las alternativas. Después de la sesión, la zona puede quedar algo enrojecida; suele pasarse en unas 24 horas. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Entre 4 y 6, una al mes",
+    "anestesia": "Crema anestésica",
+    "recuperacion": "Enrojecimiento leve que suele pasar en unas 24 horas",
+    "profesional": "[PENDIENTE: profesión y titulación de quien lo hace]"
+   },
+   "variantes": [],
+   "resultados": "La respuesta es gradual y se valora a lo largo del ciclo de sesiones; varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Duele?",
+     "r": "Antes de empezar aplicamos crema anestésica, así que las molestias suelen ser mínimas. Durante la sesión puedes notar un leve pinchazo en el cuero cabelludo. Si tienes la piel sensible, coméntalo en la valoración."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Como orientación, entre cuatro y seis sesiones, una al mes. El número exacto depende de tu caso y de cómo respondas, y lo ajustamos en las revisiones del plan capilar."
+    },
+    {
+     "p": "¿Se inflama la zona?",
+     "r": "Es normal un enrojecimiento leve del cuero cabelludo, que suele desaparecer en unas 24 horas. Al terminar te explicamos los cuidados de las primeras horas; si algo te preocupa, escríbenos y lo revisamos."
+    },
+    {
+     "p": "¿Funciona por sí solo?",
+     "r": "Suele dar mejor resultado combinado con otros tratamientos del plan capilar que por sí solo. En la valoración te proponemos la combinación adecuada para tu caso y te explicamos qué puedes esperar."
+    },
+    {
+     "p": "¿Hace crecer pelo en zonas sin pelo?",
+     "r": "Solo puede actuar donde todavía quedan folículos activos. En zonas que llevan tiempo sin pelo no es la opción adecuada; si tu caso lo permite, te explicamos otras alternativas, como el injerto capilar."
+    }
+   ],
+   "preocupaciones": [
+    "caida-del-cabello"
+   ],
+   "relacionados": [
+    "caida-del-cabello",
+    "diagnostico-capilar",
+    "fototerapia-led-capilar"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/medicina-capilar#dermapen-contra-la-alopecia",
+    "https://iemec-clinic.com/blog/dermapen-para-alopecia-sirve-el-microneedling-para-hacer-crecer-el-cabello"
+   ],
+   "pendiente": [
+    "El servicio se llama hoy «Dermapen con Exosomas»: Dermapen es la marca del equipo y los exosomas tienen el régimen legal sin confirmar, así que la página no nombra ninguno de los dos (normas.md, apartado c). Confirmar qué producto se aplica y su régimen; si es un cosmético de uso tópico, solo podría citarse como ingrediente, sin efecto sobre la caída ni regeneración.",
+    "La web lo presenta como tratamiento de la alopecia («promoviendo el crecimiento de cabello nuevo»); aquí se describe como parte de un plan capilar. Validar con el equipo médico.",
+    "Duración: 30 minutos es un dato del sector; confirmar.",
+    "Quién lo hace: confirmar la titulación (en la app, rol «tricólogo»)."
+   ]
+  },
+  {
+   "slug": "oxigenoterapia-capilar",
+   "especialidad": "medicina-capilar",
+   "catalogo": [
+    "oxigenoterapia-capilar"
+   ],
+   "orden": 40,
+   "destacado": false,
+   "nombre": "Oxigenoterapia capilar",
+   "titulo": "Oxigenoterapia capilar para cuidar el cuero cabelludo",
+   "titulo_seo": "Oxigenoterapia capilar en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Oxigenoterapia capilar en IEMEC, Boadilla del Monte: oxígeno a presión con activos para limpiar, hidratar y revitalizar el cuero cabelludo, sin agujas.",
+   "entradilla": "Aplicamos oxígeno a presión controlada junto con activos como vitaminas y péptidos para limpiar, hidratar y revitalizar el cuero cabelludo. Es un tratamiento sin agujas que complementa tu plan capilar.",
+   "para_quien": [
+    "Quieres cuidar tu cuero cabelludo y darle al cabello un aspecto más sano.",
+    "Notas el cabello apagado o sin volumen.",
+    "Tu cuero cabelludo es graso o seco, está irritado o tiene descamación.",
+    "Te has hecho un injerto y quieres cuidar la zona durante la recuperación y después."
+   ],
+   "texto": [
+    "La oxigenoterapia capilar aplica oxígeno a presión controlada sobre el cuero cabelludo junto con activos como vitaminas y péptidos. Retira el exceso de grasa y los restos de producto e hidrata el cuero cabelludo y el cabello.",
+    "En IEMEC la sesión sigue seis pasos: estudiamos tu cuero cabelludo con dermatoscopia, hacemos una limpieza profunda, aplicamos los activos, infundimos el oxígeno, sellamos el cabello y te damos consejos para cuidarlo en casa.",
+    "Es un cuidado del cuero cabelludo, no un tratamiento de la caída: si lo que te preocupa es que se te cae el pelo, empieza por el diagnóstico capilar. También puede sumarse a los cuidados después de un injerto. Antes de empezar revisamos las contraindicaciones; en el embarazo o la lactancia, solo se hace tras valoración médica. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Entre 30 y 40 minutos",
+    "sesiones": "De 6 a 10, una o dos por semana; después, mantenimiento cada 4-6 semanas",
+    "anestesia": null,
+    "recuperacion": "Puedes seguir con tu día; espera 6-8 horas para lavarte el pelo",
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "Muchas personas notan el cabello más hidratado y con más brillo tras las primeras sesiones; varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Molesta?",
+     "r": "Es un tratamiento sin agujas y cómodo, que se tolera bien. Si tienes el cuero cabelludo sensible o irritado, coméntalo antes de empezar para que valoremos si conviene hacerlo y cómo adaptar la sesión."
+    },
+    {
+     "p": "¿Puedo lavarme el pelo después?",
+     "r": "Sí, aunque conviene esperar entre 6 y 8 horas y usar productos suaves. Al terminar la sesión te damos consejos personalizados para cuidar el cabello en casa y mantener el efecto del tratamiento."
+    },
+    {
+     "p": "¿Cuándo se notan los cambios?",
+     "r": "Muchas personas notan el cabello más hidratado y brillante tras las primeras sesiones, y la respuesta varía según cada persona. Si lo que te preocupa es la caída, empieza por el diagnóstico capilar."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Como orientación, un ciclo inicial de 6 a 10 sesiones, una o dos por semana, y después una sesión de mantenimiento cada 4 a 6 semanas. Lo ajustamos según tu cuero cabelludo y tu evolución."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Se puede sumar al plan que te propongamos tras el diagnóstico capilar y a los cuidados después de un injerto. En la valoración te indicamos cómo encaja y con qué frecuencia conviene hacerla."
+    },
+    {
+     "p": "¿Tiene contraindicaciones?",
+     "r": "Sí. No se aplica si hay una infección activa, heridas abiertas o una irritación importante en el cuero cabelludo, ni cuando alguna condición médica impide usar oxígeno a presión. En el embarazo y la lactancia, solo tras valoración médica."
+    }
+   ],
+   "preocupaciones": [],
+   "relacionados": [
+    "diagnostico-capilar",
+    "fototerapia-led-capilar",
+    "caida-del-cabello",
+    "injerto-capilar-fue"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/medicina-capilar#oxigenoterapia-capilar"
+   ],
+   "pendiente": [
+    "La web actual dice «indoloro», «desde la primera sesión notarás…», «capaz de detener el proceso» y «resultados visibles, naturales y duraderos»: aquí se reescribe sin promesas.",
+    "Confirmar que los activos que se aplican (la web cita vitaminas, factores de crecimiento y péptidos) son cosméticos de uso tópico.",
+    "El primer paso del protocolo es un estudio con dermatoscopia: confirmar quién lo hace (el catálogo da el tratamiento a una esteticista).",
+    "Revisión final (vuelta 9): Es un servicio de cabina: sin efecto sobre la caída ni sobre la microcirculación (RD 1907/1996, arts. 4.11 y 4.16); la caída, al diagnóstico capilar."
+   ]
+  },
+  {
+   "slug": "fototerapia-led-capilar",
+   "especialidad": "medicina-capilar",
+   "catalogo": [
+    "fototerapia-led-capilar"
+   ],
+   "orden": 50,
+   "destacado": false,
+   "nombre": "Fototerapia LED capilar",
+   "titulo": "Fototerapia LED capilar: luz roja e infrarroja para el cuero cabelludo",
+   "titulo_seo": "Fototerapia LED capilar en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Fototerapia LED capilar en IEMEC, Boadilla del Monte: luz roja e infrarroja de baja intensidad, sin agujas, como apoyo en el cuidado del cabello debilitado.",
+   "entradilla": "Luz LED roja e infrarroja de baja intensidad sobre el cuero cabelludo. Es un tratamiento sin agujas que se suma a tu plan capilar.",
+   "para_quien": [
+    "Notas el cabello más fino o con menos densidad.",
+    "Sigues un tratamiento de la caída y quieres complementarlo.",
+    "Buscas una opción sin agujas."
+   ],
+   "texto": [
+    "La fototerapia capilar utiliza luces LED de baja intensidad, rojas e infrarrojas, sobre el cuero cabelludo. Se usa como apoyo dentro de un plan capilar, cuando el cabello se debilita o pierde densidad.",
+    "Es un tratamiento sin agujas: durante la sesión solo tienes que relajarte mientras la luz actúa. Se puede combinar con otros tratamientos del plan capilar, como la mesoterapia.",
+    "Solo actúa donde todavía hay folículos activos, así que no está pensada para zonas que llevan tiempo sin pelo. Si la caída es intensa o avanzada, lo adecuado es una valoración médica: la luz LED es un apoyo, no un sustituto del tratamiento médico. Antes de empezar revisamos si hay alguna contraindicación en tu caso."
+   ],
+   "sesion": {
+    "duracion": "Entre 15 y 30 minutos",
+    "sesiones": "1 o 2 por semana durante 2 o 3 meses",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "La mejora es progresiva: como orientación, empieza a valorarse a partir del segundo mes y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Cuánto dura cada sesión?",
+     "r": "Entre 15 y 30 minutos. Es un tratamiento no invasivo y sin agujas: solo tienes que relajarte mientras la luz actúa sobre el cuero cabelludo. Te indicamos la frecuencia adecuada en la valoración."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Como orientación, una o dos por semana durante dos o tres meses. El plan exacto depende de tu caso y de si la combinas con otros tratamientos; lo ajustamos según tu evolución."
+    },
+    {
+     "p": "¿Cuándo se nota?",
+     "r": "La luz actúa de forma gradual. Como orientación, los cambios empiezan a valorarse a partir del segundo mes de tratamiento, y la respuesta varía según cada persona y según el tipo de caída."
+    },
+    {
+     "p": "¿Funciona en zonas sin pelo?",
+     "r": "Solo si quedan folículos activos. En zonas que llevan tiempo sin pelo no es la opción adecuada; en el diagnóstico capilar te explicamos qué alternativas tienes y si alguna encaja con tu caso."
+    },
+    {
+     "p": "¿Se combina con otros tratamientos?",
+     "r": "Sí. Es habitual sumarla a otros tratamientos del plan capilar, como la mesoterapia capilar. En la valoración te proponemos la combinación adecuada para ti y la frecuencia de las sesiones."
+    }
+   ],
+   "preocupaciones": [
+    "caida-del-cabello"
+   ],
+   "relacionados": [
+    "caida-del-cabello",
+    "oxigenoterapia-capilar",
+    "microneedling-capilar"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/medicina-capilar#fototerapia-contra-la-alopecia",
+    "https://iemec-clinic.com/blog/la-fototerapia-led-es-efectiva-contra-la-alopecia-beneficios-y-resultados-reales"
+   ],
+   "pendiente": [
+    "La web y el blog dicen que es «segura», «indolora», sin contraindicaciones y con «resultados visibles y duraderos»: aquí no se dice. Confirmar las contraindicaciones reales (por ejemplo, la fotosensibilidad) para detallarlas.",
+    "Duración: la web da 30 minutos y el blog, entre 15 y 30; confirmar.",
+    "Equipo: sin marca publicada; si se nombra, solo la tecnología (LED rojo e infrarrojo)."
+   ]
+  },
+  {
+   "slug": "head-spa-japones",
+   "especialidad": "medicina-capilar",
+   "catalogo": [
+    "head-spa-detox",
+    "head-spa-express",
+    "head-spa-synergie",
+    "head-spa-zen-premium",
+    "head-spa-japones"
+   ],
+   "orden": 60,
+   "destacado": true,
+   "nombre": "Head spa japonés",
+   "titulo": "Head spa japonés: rituales de cuidado del cuero cabelludo y relajación",
+   "titulo_seo": "Head spa japonés en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Head spa japonés en IEMEC, Boadilla del Monte: limpieza, exfoliación, mascarilla y masaje craneal en rituales de 30 a 90 minutos para desconectar.",
+   "entradilla": "Un ritual de cuidado del cabello y del cuero cabelludo que une una limpieza profunda con un masaje craneal relajante. Hay cuatro rituales, de 30 a 90 minutos, según el tiempo que quieras dedicarte.",
+   "para_quien": [
+    "Quieres cuidar tu cuero cabelludo con una limpieza profunda.",
+    "Buscas un momento de relajación y desconexión.",
+    "Te apetece un masaje craneal y cervical sin prisas."
+   ],
+   "texto": [
+    "El head spa japonés es un ritual de bienestar para el cabello y el cuero cabelludo. Combina una limpieza cuidadosa, exfoliación, vapor, mascarilla y un masaje craneal con aceites esenciales, en un ambiente tranquilo pensado para desconectar.",
+    "Todos los rituales empiezan con una revisión de tu cuero cabelludo para elegir los productos y terminan con el secado del cabello. Te recibimos con una bebida de bienvenida.",
+    "Es un servicio de estética y bienestar, no un tratamiento médico. Si te preocupa la caída del cabello, te recomendamos empezar por el diagnóstico capilar; el head spa puede sumarse después como cuidado."
+   ],
+   "sesion": {
+    "duracion": "De 30 a 90 minutos, según el ritual",
+    "sesiones": null,
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Express · 30 minutos",
+     "texto": "Una primera toma de contacto: champú aromático, mascarilla, lluvia sensorial de agua templada y masaje capilar.",
+     "catalogo": "head-spa-express"
+    },
+    {
+     "nombre": "Detox Purificante · 45 minutos",
+     "texto": "Champú personalizado, exfoliación del cuero cabelludo, vaporización, mascarilla y masaje craneal con aceites esenciales. Pone el foco en la limpieza profunda y el equilibrio del cuero cabelludo.",
+     "catalogo": "head-spa-detox"
+    },
+    {
+     "nombre": "Synergie · 60 minutos",
+     "texto": "El ritual de limpieza, exfoliación, mascarilla, vaporización y masaje, con aromaterapia, estiramientos, masaje cervical y cromoterapia para ayudarte a relajarte.",
+     "catalogo": "head-spa-synergie"
+    },
+    {
+     "nombre": "Zen Premium · 90 minutos",
+     "texto": "Una experiencia inmersiva con técnicas japonesas y ayurvédicas: limpieza, mascarilla personalizada, masaje craneal, facial y cervical, sonido envolvente, aromaterapia y respiración consciente.",
+     "catalogo": "head-spa-zen-premium"
+    }
+   ],
+   "resultados": "Sales con el cabello limpio y seco y una sensación de relajación que varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué ritual elijo?",
+     "r": "Depende del tiempo que tengas y de lo que busques. El Express es una buena primera toma de contacto; el Detox Purificante se centra en la limpieza del cuero cabelludo; el Synergie y el Zen Premium suman masaje cervical y más técnicas de relajación."
+    },
+    {
+     "p": "¿Trata la caída del cabello?",
+     "r": "No. El head spa es un cuidado estético y de bienestar: limpia el cuero cabelludo, relaja y deja el cabello suelto y ligero, pero no trata la caída. Si notas que se te cae el pelo, empieza por el diagnóstico capilar y te orientamos."
+    },
+    {
+     "p": "¿Qué incluye?",
+     "r": "Todos los rituales incluyen una revisión inicial del cuero cabelludo, el secado del cabello al terminar y una bebida de bienvenida. El resto depende del ritual: limpieza, exfoliación, vapor, mascarilla y distintos masajes."
+    },
+    {
+     "p": "¿Qué es la cromoterapia?",
+     "r": "Es el uso de luz de distintos colores durante el ritual, como parte de la experiencia sensorial que acompaña al masaje. Forma parte del ritual Synergie y busca crear un ambiente relajante."
+    }
+   ],
+   "preocupaciones": [
+    "bienestar"
+   ],
+   "relacionados": [
+    "diagnostico-capilar",
+    "oxigenoterapia-capilar"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://iemec-clinic.com/medicina-capilar#head-spa-japones",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/",
+    "https://iemec-clinic.com/blog/head-spa-japones-mucho-mas-que-un-masaje-capilar"
+   ],
+   "pendiente": [
+    "Precios (49, 69, 89 y 119 €), el suplemento de tratamiento reparador de marca (+25 €), el −10 % en pareja y la «oferta de lanzamiento» del botón de WhatsApp: no se publican en esta versión.",
+    "Express: solo sale en Treatwell; confirmar que se ofrece.",
+    "La web dice que todos los head spa «favorecen el crecimiento y la salud capilar» y que dejan el cuero cabelludo «libre de toxinas, listo para regenerarse»: son afirmaciones de salud para un servicio estético y aquí no se dicen.",
+    "Confirmar si se puede reservar para dos personas a la vez (la promoción en pareja lo daba a entender; el catálogo solo tiene un puesto de head spa).",
+    "«Detox» se mantiene como nombre del ritual (limpieza), sin prometer que elimine toxinas. La web llama «diagnóstico capilar» a la revisión inicial del ritual: aquí se dice «revisión del cuero cabelludo» para no confundirla con el diagnóstico médico.",
+    "El catálogo incluye también el id general head-spa-japones (inactivo, no se reserva): se añade al final de «catalogo» solo para que las URL y anclas antiguas del head spa lleguen a esta página."
+   ]
+  },
+  {
+   "slug": "injerto-capilar-fue",
+   "especialidad": "cirugia-capilar",
+   "catalogo": [
+    "injerto-capilar-fue"
+   ],
+   "orden": 10,
+   "destacado": true,
+   "nombre": "Injerto capilar FUE",
+   "titulo": "Injerto capilar FUE: trasplante de unidades foliculares",
+   "titulo_seo": "Injerto capilar FUE en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Injerto capilar FUE en IEMEC, Boadilla del Monte: trasplante de unidades foliculares con anestesia local, con valoración previa y seguimiento de tu evolución.",
+   "entradilla": "Una cirugía que traslada unidades foliculares, una a una, de la zona donante a las zonas con menos pelo. Se hace con anestesia local y con un diseño previo que busca un aspecto natural.",
+   "para_quien": [
+    "Tienes entradas o zonas con poco pelo en la parte superior de la cabeza.",
+    "Tu alopecia no es muy extensa y conservas una buena zona donante.",
+    "Buscas un resultado de aspecto natural y entiendes que el pelo tarda meses en crecer.",
+    "Quieres conocer los riesgos y la recuperación antes de decidir."
+   ],
+   "texto": [
+    "El injerto capilar con técnica FUE (extracción de unidades foliculares) consiste en extraer una a una las unidades foliculares de la zona donante, normalmente la parte posterior de la cabeza, e implantarlas en las zonas con menos pelo.",
+    "Antes de la intervención se hace un diseño preciso de la zona que se va a tratar, según tu cabello, para buscar un aspecto natural. Es una cirugía: la realiza un cirujano con anestesia local, en un centro sanitario autorizado, y dura entre 4 y 8 horas según las unidades que haya que implantar.",
+    "No necesitas vendaje. Los primeros días puede haber enrojecimiento o hinchazón, y las pequeñas costras suelen caer entre los 7 y los 10 días. Entre el primer y el tercer mes, el pelo implantado se cae; después vuelve a crecer.",
+    "Requiere una valoración médica previa con el cirujano, que te explica si el injerto es adecuado para ti, sus riesgos y las alternativas. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Entre 4 y 8 horas, según las unidades",
+    "sesiones": "Normalmente una intervención",
+    "anestesia": "Local",
+    "recuperacion": "Actividad ligera en pocos días; sin ejercicio intenso durante 2 semanas",
+    "profesional": "Cirujano"
+   },
+   "variantes": [],
+   "resultados": "El pelo implantado crece poco a poco: los primeros brotes se ven entre el cuarto y el sexto mes y el resultado final se valora entre los 12 y los 18 meses; varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Duele?",
+     "r": "La intervención se hace con anestesia local. Puedes notar una molestia leve con los primeros pinchazos de la anestesia; después, la zona queda anestesiada durante el procedimiento. Los días siguientes suele haber molestias leves y bien toleradas."
+    },
+    {
+     "p": "¿Cuánto dura y dónde se hace?",
+     "r": "Entre 4 y 8 horas, según el número de unidades foliculares que haya que extraer e implantar. Se hace en un centro sanitario autorizado para cirugía; en la valoración te decimos dónde será la tuya y cómo será ese día."
+    },
+    {
+     "p": "¿Cuándo puedo volver a mi rutina?",
+     "r": "Las actividades ligeras se retoman en pocos días, y el ejercicio intenso conviene evitarlo unas dos semanas. Para lavarte el pelo se suele esperar entre 3 y 5 días, siguiendo las instrucciones que te damos."
+    },
+    {
+     "p": "¿Cuándo se ve el resultado?",
+     "r": "Entre el primer y el tercer mes el pelo implantado se cae, y es normal. Los primeros brotes aparecen entre el cuarto y el sexto mes, hacia los 8-12 meses el resultado se estabiliza y el final se valora entre los 12 y los 18 meses."
+    },
+    {
+     "p": "¿Se me puede seguir cayendo el pelo?",
+     "r": "El pelo trasplantado procede de la zona donante y suele mantenerse, pero el cabello que no se ha tratado puede seguir cayendo si la alopecia avanza. Por eso, a veces, el injerto se combina con un tratamiento médico de la caída."
+    },
+    {
+     "p": "¿Qué riesgos tiene?",
+     "r": "Como toda cirugía, tiene riesgos. Lo habitual es enrojecimiento, hinchazón o pequeñas costras durante los primeros días; en casos poco frecuentes puede hacer falta una segunda intervención. El cirujano te los explica antes de que firmes el consentimiento informado."
+    }
+   ],
+   "preocupaciones": [
+    "injerto",
+    "caida-del-cabello",
+    "cirugia"
+   ],
+   "relacionados": [
+    "diagnostico-capilar",
+    "frontoplastia-capilar",
+    "reparacion-de-injertos-capilares",
+    "caida-del-cabello"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-capilar#microinjerto-capilar-fue",
+    "https://iemec-clinic.com/recuperez-vos-cheveux-a-madrid",
+    "https://iemec-clinic.com/blog/que-tener-en-cuenta-a-la-hora-de-elegir-una-clinica-para-realizarme-un-injerto-capilar"
+   ],
+   "pendiente": [
+    "Quién opera: la web habla de «cirujanos» sin nombrarlos. Para publicar hacen falta nombre, especialidad oficial y número de colegiado del cirujano (normas.md, apartado j).",
+    "Dónde se opera: confirmar si es en la sala de procedimientos de IEMEC (cirugía menor ambulatoria, U.64) o en el quirófano de otro centro autorizado, y decirlo con claridad en la página (hoy dice «en un centro sanitario autorizado»).",
+    "La web actual dice «nada dolorosa», «el pelo injertado no volverá a caerse», «podrás volver a tu rutina diaria tras la sesión» y «la técnica más recomendada»: no se trasladan.",
+    "Recuperación: la landing francesa da 1-2 días para la actividad ligera y el blog, 3-5; aquí se dice «en pocos días». Confirmar.",
+    "Edad: el blog lo recomienda a partir de los 25 años; confirmar la política de la clínica (y la edad mínima para cualquier tratamiento).",
+    "No hay en el catálogo una valoración de cirugía capilar para España (botón «Cirugía capilar» de /cita-online): crearla o usar el diagnóstico capilar como primera cita.",
+    "Las fotos de antes y después del injerto de /portafolio no se migran."
+   ]
+  },
+  {
+   "slug": "frontoplastia-capilar",
+   "especialidad": "cirugia-capilar",
+   "catalogo": [
+    "frontoplastia"
+   ],
+   "orden": 20,
+   "destacado": false,
+   "nombre": "Frontoplastia capilar",
+   "titulo": "Frontoplastia capilar: rediseño de la línea frontal con injerto",
+   "titulo_seo": "Frontoplastia capilar en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Frontoplastia capilar en IEMEC, Boadilla del Monte: rediseñamos la línea frontal del cabello con un injerto de unidades foliculares, tras valorar tu caso.",
+   "entradilla": "Una cirugía que rediseña la línea frontal del cabello trasplantando unidades foliculares, para que la frente guarde más armonía con el resto del rostro.",
+   "para_quien": [
+    "Tu línea del cabello está alta o poco definida.",
+    "Tienes entradas que te gustaría redibujar.",
+    "Buscas que tu frente guarde más armonía con el resto de la cara."
+   ],
+   "texto": [
+    "En IEMEC, la frontoplastia capilar es un injerto de unidades foliculares centrado en la línea frontal: se trasplantan folículos de la zona donante para rediseñar el nacimiento del pelo y armonizar la frente con el resto del rostro.",
+    "No es la cirugía que reduce la frente recortando piel: aquí se trabaja con tu propio cabello. El diseño de la nueva línea se adapta a cada persona para buscar un aspecto natural.",
+    "Es una cirugía y requiere una valoración médica previa con el cirujano, que te explica si es adecuada para ti, sus riesgos, cómo será la recuperación y qué puedes esperar. Como en cualquier injerto, el pelo implantado tarda meses en crecer y el resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Varias horas, según las unidades",
+    "sesiones": null,
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Cirujano"
+   },
+   "variantes": [],
+   "resultados": "El pelo implantado crece de forma gradual y el resultado final se valora pasado un año, aproximadamente; varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Es lo mismo que reducir la frente con cirugía?",
+     "r": "No. Existe otra cirugía que baja la línea del cabello recortando piel de la frente, pero la frontoplastia capilar que hacemos en IEMEC trasplanta unidades foliculares a la línea frontal, con tu propio cabello."
+    },
+    {
+     "p": "¿Cómo se diseña la nueva línea?",
+     "r": "Se diseña a medida antes de la intervención, teniendo en cuenta la forma de tu rostro y las características de tu cabello, para buscar una línea proporcionada y de aspecto natural. El cirujano te la explica en la valoración."
+    },
+    {
+     "p": "¿Cómo es la recuperación?",
+     "r": "Es parecida a la de un injerto capilar: los primeros días puede haber enrojecimiento y pequeñas costras en la zona tratada, y el pelo implantado tarda meses en crecer. El cirujano te explica los cuidados y los plazos para tu caso."
+    },
+    {
+     "p": "¿Cuándo se ve el resultado?",
+     "r": "Como en cualquier injerto capilar, el pelo implantado se cae en los primeros meses y vuelve a crecer poco a poco. El resultado final se valora pasado un año, aproximadamente, y varía según cada persona."
+    }
+   ],
+   "preocupaciones": [
+    "injerto",
+    "cirugia"
+   ],
+   "relacionados": [
+    "injerto-capilar-fue",
+    "diagnostico-capilar",
+    "reparacion-de-injertos-capilares"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-capilar#frontoplastia"
+   ],
+   "pendiente": [
+    "La web no da duración, anestesia, sesiones ni recuperación de la frontoplastia (solo «recuperación rápida»). La recuperación y los plazos se describen como los de un injerto porque aquí es un trasplante de unidades foliculares; el catálogo estima unas 8 horas (dato del sector). Confirmar y completar la ficha de la sesión.",
+    "Quién opera: la web habla de «cirujanos» sin nombrarlos. Para publicar hacen falta nombre, especialidad oficial y número de colegiado del cirujano (normas.md, apartado j).",
+    "Dónde se opera: confirmar si es en la sala de procedimientos de IEMEC (cirugía menor ambulatoria, U.64) o en el quirófano de otro centro autorizado, y decirlo con claridad en la página (hoy dice «en un centro sanitario autorizado»).",
+    "«Frontoplastia» también designa la reducción quirúrgica de la frente: la página aclara que no es esa. Confirmar que IEMEC no ofrece esa otra cirugía."
+   ]
+  },
+  {
+   "slug": "injerto-de-cejas",
+   "especialidad": "cirugia-capilar",
+   "catalogo": [
+    "microinjerto-cejas"
+   ],
+   "orden": 30,
+   "destacado": true,
+   "nombre": "Injerto de cejas",
+   "titulo": "Microinjerto de cejas: densidad y forma con tu propio pelo",
+   "titulo_seo": "Microinjerto de cejas en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Microinjerto de cejas en IEMEC, Boadilla del Monte: unidades foliculares implantadas una a una para dar densidad y forma a las cejas, con anestesia local.",
+   "entradilla": "Trasplantamos unidades foliculares, una a una, para dar densidad y forma a unas cejas escasas o irregulares. Se hace con anestesia local y el diseño se adapta a tu rostro.",
+   "para_quien": [
+    "Tienes las cejas escasas, con huecos o poco definidas.",
+    "Has perdido vello en las cejas y quieres recuperar su forma.",
+    "Quieres corregir unas cejas irregulares."
+   ],
+   "texto": [
+    "El microinjerto de cejas es un procedimiento quirúrgico que implanta unidades foliculares en la zona de las cejas. Se extraen una a una con técnica FUE de una zona donante y se colocan según un diseño hecho a tu medida.",
+    "Según la densidad que busques, se implantan en general entre 150 y 300 unidades por ceja. Se hace con anestesia local, en una sesión, y no suele requerir baja: puedes retomar tu rutina en 24 a 48 horas.",
+    "El pelo implantado mantiene las características del de la zona donante y sigue creciendo, así que necesitarás recortarlo de vez en cuando. Requiere una valoración médica previa con el cirujano, que te explica si es adecuado para ti, sus riesgos, las alternativas y qué puedes esperar; el resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unas 4 horas, orientativo",
+    "sesiones": "Una sesión",
+    "anestesia": "Local",
+    "recuperacion": "Vuelta a tu rutina en 24-48 horas",
+    "profesional": "Cirujano"
+   },
+   "variantes": [],
+   "resultados": "El pelo implantado crece de forma gradual y el resultado se valora entre los 6 y los 9 meses; varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Duele?",
+     "r": "Se hace con anestesia local, así que durante el procedimiento las molestias son mínimas; lo que más se nota son los primeros pinchazos de la anestesia. En la valoración te explicamos cómo prepararte y qué notarás los días siguientes."
+    },
+    {
+     "p": "¿Cuántas unidades se implantan?",
+     "r": "Depende de la densidad que quieras conseguir y de cómo estén tus cejas. En general se implantan entre 150 y 300 unidades foliculares por ceja; te lo concretamos en la valoración."
+    },
+    {
+     "p": "¿El pelo crece como el de la cabeza?",
+     "r": "Sí. El pelo implantado mantiene las características del de la zona donante y sigue creciendo, así que conviene recortarlo de forma periódica para mantener la forma de la ceja."
+    },
+    {
+     "p": "¿Tendré que coger la baja?",
+     "r": "No suele ser necesario: puedes retomar tu rutina en 24 a 48 horas. Al terminar te explicamos los cuidados de la zona para los primeros días y resolvemos tus dudas."
+    },
+    {
+     "p": "¿Cuándo se ve el resultado?",
+     "r": "El pelo implantado crece de forma gradual. El resultado se valora entre los 6 y los 9 meses después del procedimiento, y varía según cada persona."
+    }
+   ],
+   "preocupaciones": [
+    "injerto",
+    "mirada-y-ojeras"
+   ],
+   "relacionados": [
+    "injerto-capilar-fue",
+    "injerto-de-barba",
+    "diagnostico-capilar"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-capilar#microinjerto-de-cejas",
+    "https://iemec-clinic.com/blog/que-resultados-ofrece-el-microinjerto-de-cejas-y-es-permanente"
+   ],
+   "pendiente": [
+    "Duración: unas 4 horas es un dato del sector; confirmar.",
+    "Quién opera: la web habla de «cirujanos» sin nombrarlos. Para publicar hacen falta nombre, especialidad oficial y número de colegiado del cirujano (normas.md, apartado j).",
+    "Dónde se opera: confirmar si es en la sala de procedimientos de IEMEC (cirugía menor ambulatoria, U.64) o en el quirófano de otro centro autorizado, y decirlo con claridad en la página (hoy dice «en un centro sanitario autorizado»).",
+    "El blog lo presenta con «resultado permanente» y la web, con «resultados… duraderos» e «independientemente de la causa»: no se trasladan. Confirmar en qué casos no está indicado."
+   ]
+  },
+  {
+   "slug": "injerto-de-barba",
+   "especialidad": "cirugia-capilar",
+   "catalogo": [
+    "microinjerto-barba"
+   ],
+   "orden": 40,
+   "destacado": true,
+   "nombre": "Injerto de barba",
+   "titulo": "Microinjerto de barba: densidad y forma con tu propio pelo",
+   "titulo_seo": "Microinjerto de barba en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Microinjerto de barba en IEMEC, Boadilla del Monte: unidades foliculares implantadas para dar densidad y forma a la barba y cubrir zonas con poco vello.",
+   "entradilla": "Trasplantamos unidades foliculares a la barba para darle densidad y forma y cubrir las zonas donde el vello crece poco. Se hace con anestesia local y un diseño adaptado a tus rasgos.",
+   "para_quien": [
+    "Tu barba crece con huecos o de forma irregular.",
+    "Quieres más densidad o una forma mejor definida.",
+    "Tienes zonas sin vello por una cicatriz."
+   ],
+   "texto": [
+    "El microinjerto de barba es un procedimiento quirúrgico que extrae folículos de una zona densa, normalmente la parte posterior de la cabeza, y los implanta en las zonas de la barba donde el vello no crece o crece poco.",
+    "El diseño se adapta a tus rasgos para buscar un resultado natural. Se hace con técnica FUE y anestesia local, dura entre 3 y 5 horas según la extensión y es ambulatorio: vuelves a casa el mismo día.",
+    "Normalmente basta una sesión; si la barba es muy escasa, pueden hacer falta dos. Los cuidados se parecen a los del injerto capilar: higiene, no frotar la zona y evitar el sol. Requiere una valoración médica previa con el cirujano, que te explica si es adecuado para ti, sus riesgos y qué puedes esperar; el resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Entre 3 y 5 horas, según la extensión",
+    "sesiones": "Normalmente una; dos si la barba es muy escasa",
+    "anestesia": "Local",
+    "recuperacion": "Molestias leves; cuidados como en el injerto capilar",
+    "profesional": "Cirujano"
+   },
+   "variantes": [],
+   "resultados": "El vello implantado empieza a notarse entre los 3 y los 6 meses y el resultado se valora entre los 6 y los 12 meses; varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Duele?",
+     "r": "Se hace con anestesia local, así que durante el procedimiento las molestias deberían ser mínimas. Después, la sensación suele ser leve y, si hace falta, se controla con analgésicos."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Normalmente una. Si la barba es muy escasa o la zona que hay que cubrir es amplia, pueden hacer falta dos sesiones. Te lo explicamos en la valoración, junto con el diseño que te proponemos."
+    },
+    {
+     "p": "¿Cuánto dura el procedimiento?",
+     "r": "Entre 3 y 5 horas, según la extensión de la zona que se va a tratar. Es ambulatorio: vuelves a casa el mismo día, con las pautas de cuidado para los primeros días."
+    },
+    {
+     "p": "¿Qué cuidados necesito después?",
+     "r": "Parecidos a los de un injerto capilar: mantener una buena higiene, no frotar la zona y evitar el sol. Al terminar te explicamos los cuidados de los primeros días y resolvemos tus dudas."
+    },
+    {
+     "p": "¿Cuándo se ven los resultados?",
+     "r": "El vello implantado crece poco a poco. Empieza a notarse entre los 3 y los 6 meses, y el resultado se valora entre los 6 y los 12 meses después del injerto. Varía según cada persona."
+    }
+   ],
+   "preocupaciones": [
+    "injerto"
+   ],
+   "relacionados": [
+    "injerto-capilar-fue",
+    "injerto-de-cejas",
+    "diagnostico-capilar"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-capilar#microinjerto-de-barba",
+    "https://iemec-clinic.com/blog/que-resultados-puedo-esperar-del-microinjerto-de-barba-y-como-es-el-proceso",
+    "https://iemec-clinic.com/blog/iemec.com"
+   ],
+   "pendiente": [
+    "La web dice «apariencia más varonil y atractiva» y el blog, «resultados naturales y definitivos» y «mejora la autoestima»: no se trasladan (estereotipos y promesas).",
+    "Quién opera: la web habla de «cirujanos» sin nombrarlos. Para publicar hacen falta nombre, especialidad oficial y número de colegiado del cirujano (normas.md, apartado j).",
+    "Dónde se opera: confirmar si es en la sala de procedimientos de IEMEC (cirugía menor ambulatoria, U.64) o en el quirófano de otro centro autorizado, y decirlo con claridad en la página (hoy dice «en un centro sanitario autorizado»).",
+    "El blog da dos plazos para ver resultados (3-6 meses y 6-12 meses): se recogen como primeros cambios y resultado. Confirmar."
+   ]
+  },
+  {
+   "slug": "reparacion-de-injertos-capilares",
+   "especialidad": "cirugia-capilar",
+   "catalogo": [
+    "reparacion-trasplante-capilar"
+   ],
+   "orden": 50,
+   "destacado": false,
+   "nombre": "Reparación de injertos capilares",
+   "titulo": "Reparación de injertos capilares anteriores",
+   "titulo_seo": "Reparación de injertos capilares en Boadilla · IEMEC",
+   "descripcion_seo": "Reparación de injertos capilares en IEMEC, Boadilla del Monte: valoramos tu injerto anterior y te explicamos qué se puede corregir en tu caso.",
+   "entradilla": "Si un injerto anterior no ha dado el resultado que esperabas, valoramos tu caso y te explicamos qué se puede corregir: la línea frontal, la densidad o las marcas que haya dejado.",
+   "para_quien": [
+    "La línea frontal de tu injerto no te resulta natural.",
+    "Te falta densidad en la zona injertada o el resultado es irregular.",
+    "Te han quedado cicatrices o marcas visibles de una cirugía anterior.",
+    "Quieres una segunda opinión antes de volver a operarte."
+   ],
+   "texto": [
+    "La reparación capilar reúne varios procedimientos quirúrgicos para corregir trasplantes anteriores que no han cumplido lo que esperabas: una línea frontal poco natural, falta de densidad o cicatrices y marcas visibles.",
+    "Cada caso es distinto, así que empezamos con una valoración médica: el cirujano estudia el injerto anterior, el pelo disponible en la zona donante y lo que te gustaría mejorar. Con eso te explica qué se puede corregir, con qué técnica, sus riesgos y qué resultado es realista esperar.",
+    "La intervención la hace un cirujano, con un plan adaptado a ti. El resultado varía según cada persona y depende de lo que permita el injerto anterior."
+   ],
+   "sesion": {
+    "duracion": "Según cada caso",
+    "sesiones": "Según cada caso",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Cirujano"
+   },
+   "variantes": [],
+   "resultados": "Lo que se puede corregir depende del injerto anterior y de la zona donante; el cirujano te lo explica en la valoración y el resultado varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Se puede corregir cualquier injerto?",
+     "r": "Depende de cada caso: del resultado del injerto anterior, del estado de la zona donante y de lo que quieras mejorar. En la valoración el cirujano te explica con claridad qué es posible corregir y qué no."
+    },
+    {
+     "p": "¿Qué se puede mejorar?",
+     "r": "Según el caso, la línea frontal cuando no resulta natural, la densidad en zonas con poco pelo y las cicatrices o marcas que haya dejado la cirugía anterior. El objetivo es un aspecto más natural y armónico."
+    },
+    {
+     "p": "¿Qué necesito para la valoración?",
+     "r": "Si los tienes, trae los informes de la intervención anterior: nos ayudan a saber qué técnica se usó y cuántas unidades se implantaron. También ayuda que nos cuentes cuándo te operaste y qué te gustaría cambiar."
+    },
+    {
+     "p": "¿Dónde se hace la intervención?",
+     "r": "En un centro sanitario autorizado para cirugía [PENDIENTE: cuál]. En la valoración te explicamos dónde se hará la tuya, con qué anestesia y cómo será la recuperación."
+    }
+   ],
+   "preocupaciones": [
+    "injerto",
+    "cirugia"
+   ],
+   "relacionados": [
+    "injerto-capilar-fue",
+    "cicatrices-en-el-cuero-cabelludo",
+    "frontoplastia-capilar"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-capilar#reparacion-y-reconstruccion-de-trasplantes"
+   ],
+   "pendiente": [
+    "La web no detalla técnicas, duración, anestesia ni recuperación: se dejan para la valoración. Confirmar si se quieren publicar (el catálogo estima unas 8 horas, dato del sector).",
+    "Quién opera: la web habla de «un equipo de cirujanos especializados en la corrección de trasplantes capilares» sin nombres; hacen falta nombre, especialidad oficial y número de colegiado.",
+    "Dónde se opera: confirmar si es en la sala de procedimientos de IEMEC (cirugía menor ambulatoria, U.64) o en el quirófano de otro centro autorizado, y decirlo con claridad en la página (hoy dice «en un centro sanitario autorizado»)."
+   ]
+  },
+  {
+   "slug": "cicatrices-en-el-cuero-cabelludo",
+   "especialidad": "cirugia-capilar",
+   "catalogo": [
+    "cicatrices-capilares"
+   ],
+   "orden": 60,
+   "destacado": false,
+   "nombre": "Cicatrices en el cuero cabelludo",
+   "titulo": "Cicatrices en el cuero cabelludo: valoración y plan personalizado",
+   "titulo_seo": "Cicatrices en el cuero cabelludo en Boadilla · IEMEC",
+   "descripcion_seo": "Cicatrices en el cuero cabelludo en IEMEC, Boadilla del Monte: valoramos la cicatriz y te proponemos un plan personalizado para atenuarla.",
+   "entradilla": "Las cicatrices de una cirugía, un accidente, una quemadura o una afección de la piel pueden dejar zonas sin pelo que se notan. Valoramos la tuya y te explicamos qué opciones tienes.",
+   "para_quien": [
+    "Tienes una cicatriz en el cuero cabelludo que se nota.",
+    "Te ha quedado una marca de una cirugía anterior, también de un injerto.",
+    "Tienes una zona sin pelo por un accidente o una quemadura."
+   ],
+   "texto": [
+    "Una cicatriz en el cuero cabelludo puede tener muchos orígenes: una cirugía, un accidente, una quemadura o una afección de la piel. Además de la marca, a menudo deja una zona donde el pelo no crece y que se nota al peinarte o con el pelo corto.",
+    "No todas las cicatrices se tratan igual: influyen su tamaño, su antigüedad y el estado de la piel. Por eso empezamos con una valoración médica: estudiamos la cicatriz y la zona de alrededor y te proponemos un plan personalizado para atenuarla y mejorar su aspecto.",
+    "Te explicamos qué opciones hay en tu caso, cuántas sesiones o intervenciones harían falta, sus riesgos y qué es realista esperar: una cicatriz puede atenuarse, pero no siempre se consigue que deje de notarse. Si el plan incluye una intervención, antes firmas el consentimiento informado por escrito. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 30 minutos",
+    "sesiones": "Según el plan",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "[PENDIENTE: quién lo hace]"
+   },
+   "variantes": [],
+   "resultados": "La mejora depende del tipo de cicatriz y de la técnica que se elija; es gradual y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué cicatrices se valoran?",
+     "r": "Cicatrices del cuero cabelludo causadas por una cirugía, incluido un injerto capilar anterior, por un accidente, por una quemadura o por una afección de la piel. En la valoración te decimos si tu caso puede tratarse en IEMEC."
+    },
+    {
+     "p": "¿Puede volver a salir pelo en la cicatriz?",
+     "r": "Depende de la cicatriz y del estado de la piel. En algunos casos puede plantearse implantar unidades foliculares sobre ella; en otros, otras técnicas. Te lo explicamos en la valoración, con sus riesgos y lo que puedes esperar."
+    },
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Depende de la cicatriz y de la técnica que se elija. En la valoración te decimos cuántas sesiones o intervenciones harían falta en tu caso y te damos el presupuesto por escrito, para que decidas con calma."
+    }
+   ],
+   "preocupaciones": [
+    "injerto",
+    "cirugia"
+   ],
+   "relacionados": [
+    "reparacion-de-injertos-capilares",
+    "injerto-capilar-fue",
+    "diagnostico-capilar"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-capilar#tratamientos-para-eliminar-cicatrices"
+   ],
+   "pendiente": [
+    "La web habla de «una variedad de opciones» sin decir cuáles, y el catálogo da el régimen legal como desconocido: confirmar las técnicas (y los productos, si los hay) para detallarlas. La mención a implantar unidades foliculares sobre la cicatriz sale del blog del injerto de barba («ideal para corregir zonas con cicatrices»): confirmar.",
+    "La web lo llama «Tratamientos para eliminar cicatrices»: «eliminar» promete un resultado total; aquí se dice «atenuar».",
+    "La web habla de cicatrices «en la piel» en general, dentro de cirugía capilar: confirmar si también se tratan cicatrices fuera del cuero cabelludo.",
+    "Duración de la valoración (30 minutos): dato del sector. Quién la hace: confirmar."
+   ]
+  }
+ ],
+ "sin_pagina": [
+  {
+   "catalogo": "trichotest",
+   "motivo": "Test genético capilar (TrichoTest, de Fagron): la publicidad al público de los productos de diagnóstico genético está prohibida (RD 1662/2000, art. 25.8; normas.md, apartado c) y los datos genéticos necesitan consentimiento explícito (RGPD, art. 9). No se anuncia; si el médico lo indica tras el diagnóstico capilar, se explica en consulta. La web actual lo anuncia con precio y promoción: se retira.",
+   "va_en": "diagnostico-capilar"
+  },
+  {
+   "catalogo": "exosomas-capilares",
+   "motivo": "Duplicado: la web presenta los exosomas dentro del microneedling capilar (mismo bloque y mismo botón); el tratamiento aparte, con otra pauta, solo sale en el blog (oferta sin confirmar) y su régimen legal está sin confirmar. Las normas no permiten nombrarlos ni atribuirles efecto sobre la caída; si la clínica confirma que es un cosmético de uso tópico, podría citarse como ingrediente en el microneedling capilar.",
+   "va_en": "microneedling-capilar"
+  },
+  {
+   "catalogo": "laser-capilar",
+   "motivo": "Oferta sin confirmar: solo aparece en una frase de la oxigenoterapia («combinando PRP, mesoterapia y láser capilar») y en el blog, sin equipo, pauta ni descripción. Si la clínica lo confirma, podría entrar como variante de la fototerapia capilar (luz de baja intensidad).",
+   "va_en": "fototerapia-led-capilar"
+  },
+  {
+   "catalogo": "pack-injerto-francia",
+   "motivo": "Paquete para pacientes de Francia (landing en francés) con precio cerrado, «injertos ilimitados», hotel y traslados: esta versión no publica precios ni ofertas, y la landing debe revisarse también con la normativa francesa (normas.md, apartado k, n.º 14). Borrador neutro, sin precio, en contenido/pendientes/capilar.json.",
+   "va_en": "injerto-capilar-desde-francia"
+  },
+  {
+   "catalogo": "valoracion-injerto-francia",
+   "motivo": "Es la valoración del mismo injerto para el mercado francés (duplicado); la web nueva no tiene versión en francés, hoy se anuncia como «consultation GRATUITE» y sus formularios van a cliniquecapillaire-iemec.es. Va con el borrador para pacientes de Francia.",
+   "va_en": "injerto-capilar-desde-francia"
+  }
+ ]
+}

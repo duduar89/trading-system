@@ -1,0 +1,553 @@
+{
+  "_leeme": "Normas legales para el contenido de la web nueva de IEMEC. Patrones de expresión regular válidos en JavaScript (flag i, sin u) y en Python (re.I). Se usan sin distinguir mayúsculas. Explicación de cada regla, fuentes y alternativas: normas.md. Generado el 30-09-2026; revisión jurídica pendiente (abogado sanitario y DPD). Ampliado en la revisión final de la vuelta 9 (nota de Google, EvoSculpt y «4D», «hiperbárica» y enfermedades de la piel).",
+  "_version": "2026-09-30",
+  "prohibidas": [
+    {
+      "patron": "botul[ií]n|\\bb[oó]t[oó]x|\\btoxina\\b|neuromodulador|bloqueador(es)?\\s+neuromuscular|relajantes?\\s+muscular(es)?\\s+(para|en|contra)\\s+(las\\s+)?arrugas",
+      "motivo": "Toxina botulínica (medicamento de receta), dicha directa o indirectamente. No se anuncia al público (RDLeg 1/2015, art. 80.1; infracción muy grave, art. 111.2.c.16.ª); tampoco la referencia indirecta (RD 1416/1994, art. 1.2 y 1.4.d).",
+      "alternativa": "Habla de la zona y de la valoración: «Arrugas de expresión (frente, entrecejo, patas de gallo): valoración médica y plan personalizado»; para el sudor, «Sudoración excesiva: valoración médica»."
+    },
+    {
+      "patron": "vistabel|azzalure|bocouture|dysport|xeomin|letybo|alluzience|relfydess|nuceiva|daxxify|jeuveau|botulax|neuronox|nabota|meditoxin|innotox|hutox|coretox",
+      "motivo": "Marca de toxina botulínica (medicamento de receta). No se anuncia al público (RDLeg 1/2015, art. 80.1; infracción muy grave, art. 111.2.c.16.ª).",
+      "alternativa": "«Arrugas de expresión: valoración médica». Nunca la marca, ni en el texto, ni en fotos, ni en el nombre de un archivo."
+    },
+    {
+      "patron": "semaglut|tirzepat|liraglut|dulaglut|exenat|lixisenat|orforglipron|retatrut|cagrilint|cagrisema|survodut|mazdut",
+      "motivo": "Principio activo de un medicamento de receta para el peso (GLP-1 y similares). No se anuncia al público (RDLeg 1/2015, art. 80.1; infracción muy grave, art. 111.2.c.16.ª).",
+      "alternativa": "«Control de peso con supervisión médica: valoración, plan y seguimiento» (sin nombrar el fármaco ni prometer kilos)."
+    },
+    {
+      "patron": "ozempic|wegovy|rybelsus|mounjaro|zepbound|saxenda|victoza|trulicity|byetta|bydureon|lyxumia|xultophy|suliqua|mysimba|xenical|orlistat",
+      "motivo": "Marca de medicamento para el peso o la diabetes. No se anuncia al público (RDLeg 1/2015, art. 80.1; infracción muy grave, art. 111.2.c.16.ª).",
+      "alternativa": "«Control de peso con supervisión médica». Si el paciente pregunta por un fármaco, se le responde en consulta, no en la web."
+    },
+    {
+      "patron": "\\bglp-?1\\b|agonistas?\\s+(del\\s+receptor\\s+)?(de\\s+)?(la\\s+)?glp|an[aá]logos?\\s+de\\s+(la\\s+)?glp|incretin",
+      "motivo": "Referencia indirecta a medicamentos de receta para el peso (GLP-1). RD 1416/1994, art. 1.2 y 1.4.d; No se anuncia al público (RDLeg 1/2015, art. 80.1; infracción muy grave, art. 111.2.c.16.ª).",
+      "alternativa": "«Tratamiento médico del peso pautado tras la valoración» (sin familia de fármacos)."
+    },
+    {
+      "patron": "(plumas?|inyecci[oó]n(es)?|inyectables?|pinchazos?|f[aá]rmacos?|medicamentos?|medicaci[oó]n|pastillas?)\\s+(semanal(es)?\\s+)?(para|de|contra)\\s+(adelgazar|perder\\s+peso|bajar\\s+de\\s+peso|la\\s+obesidad|el\\s+apetito)",
+      "motivo": "Anuncio indirecto de un medicamento para adelgazar. RD 1416/1994, art. 1.2; RDLeg 1/2015, art. 80.1; RD 1907/1996, art. 4.2.",
+      "alternativa": "«Consulta médica de control de peso»."
+    },
+    {
+      "patron": "finasterid|dutasterid|minoxidil|espironolact|bicalutamid|propecia|proscar|avodart|loniten|regaine|lacovin|alopexy|finjuve|baricitinib|olumiant|ritlecitinib|litfulo|deuruxolitinib|leqselvi",
+      "motivo": "Medicamento para la caída del cabello (de receta o en fórmula magistral). No se anuncia al público (RDLeg 1/2015, art. 80.1; infracción muy grave, art. 111.2.c.16.ª); RD 1907/1996, art. 3.2.",
+      "alternativa": "«Tratamiento médico de la caída del cabello, pautado tras el diagnóstico capilar»."
+    },
+    {
+      "patron": "\\bprp\\b|plasma\\s+rico\\s+en\\s+plaquetas|plasma\\s+aut[oó]logo|\\bprgf\\b|\\bi-?prf\\b|\\bprf\\b|factores\\s+de\\s+crecimiento\\s+(plaquetarios|de\\s+tu\\s+(propia\\s+)?sangre|aut[oó]logos)|vampir[oe]",
+      "motivo": "El plasma rico en plaquetas es un medicamento de prescripción: prohibida cualquier publicidad al público (AEMPS, Resolución de 23-05-2013, apdo. 3). La Comunidad de Madrid ha requerido a decenas de clínicas retirar anuncios de toxina y PRP.",
+      "alternativa": "«Rejuvenecimiento facial médico», «Tratamiento médico de la caída del cabello», «Rejuvenecimiento íntimo»: el objetivo y la valoración, no el producto."
+    },
+    {
+      "patron": "hialuronidas|hyalase|polidocanol|etoxisclerol|aethoxysklerol|espuma\\s+esclerosante|\\besclerosantes?\\b|desoxic[oó]lic|belkyra|kybella|fosfatidilcolin|lipostabil|isotretino|roacutan|tretino[ií]n|[aá]cido\\s+retinoico|hidroquinon|amchafibrin|reducomplex",
+      "motivo": "Principio activo o marca de un medicamento de receta usado en estética (hialuronidasa, esclerosantes, lipolíticos inyectables, retinoides orales o de receta, hidroquinona, fármacos para adelgazar). No se anuncia al público (RDLeg 1/2015, art. 80.1; infracción muy grave, art. 111.2.c.16.ª).",
+      "alternativa": "Nombra el objetivo: «Corrección de un relleno previo», «Varices y arañas vasculares: valoración», «Grasa localizada: valoración médica», «Manchas: valoración»."
+    },
+    {
+      "patron": "f[oó]rmulas?\\s+magistral|formulaci[oó]n\\s+magistral|preparados?\\s+oficinal",
+      "motivo": "Prohibida la publicidad de fórmulas magistrales y preparados oficinales (RD 1907/1996, art. 3.2; RDLeg 1/2015, art. 111.2.a.5.ª).",
+      "alternativa": "«Tratamiento pautado por el médico tras la valoración»."
+    },
+    {
+      "patron": "juv[eé]derm|\\bvoluma\\b|volbella|volift|\\bvolux\\b|\\bvolite\\b|skinvive|restylane|\\bkysse\\b|\\bdefyne\\b|\\brefyne\\b|\\bvolyme\\b|radiesse|sc?ulptra|saculptra|profhilo|harmonyca|ellans[eé]|belotero|teosyal|teoxane|redensity|stylage|vivacy|desirial|saypha|croma\\s+princess|princess\\s+(filler|volume|rich|lips)|revolax|aliaxin|neauvia|hyacorp|lanluma|\\bgouri\\b|juvelook|aesthefill|yvoire|perfectha|genefill|genyal|hyafilia|hyaluxelle|hyamira|jovyal|kamilane|lumiglam|modelha|novacutan|nouvys|phillex|prodefine|qtfill|regenovue|regenyal|revofil|skinfill|volifil|xcelens|evanthia|fillzon|lenisna|algeness|apriline|aqufill|auralya|bthcross|crownlift|cytosial|dermyal|elasty|exquiller",
+      "motivo": "Marca de relleno o bioestimulador (producto sanitario de uso profesional). No se anuncia al público (RDLeg 1/2015, art. 80.7 y 80.8; RD 1591/2009, art. 38.9).",
+      "alternativa": "Nombra el procedimiento y la zona: «Aumento de labios», «Relleno de ojeras», «Bioestimulación facial». El material, solo en genérico y como información."
+    },
+    {
+      "patron": "sunekos|jalupro|karisma|viscoderm|cytocare|\\bnctf\\b|fillmed|mesohyal|mesofiller|mesoestetic|toskani|alidya|ultracol|rejuran|plinest|\\bnewest\\b|nucleofill|ameela|philart|philar\\s+hair|hair\\s+filler|dr\\.?\\s*cyj|xl\\s+hair|hair\\s+xpert|primehair|cellbooster|prostrolane|prostolane",
+      "motivo": "Marca de «skinbooster», mesoterapia inyectable, polinucleótidos o relleno capilar (producto sanitario de uso profesional). No se anuncia al público (RDLeg 1/2015, art. 80.7 y 80.8; RD 1591/2009, art. 38.9).",
+      "alternativa": "«Hidratación profunda de la piel con microinyecciones: valoración médica», «Tratamiento capilar con microinyecciones: valoración»."
+    },
+    {
+      "patron": "silhouette\\s+(soft|instalift)|happy\\s+lift|mint\\s+(lift|pdo|thread)|aptos\\s+(thread|excellence|nano|light)|allurion|orbera|spatz|obalon",
+      "motivo": "Marca de hilos tensores o de balón gástrico (producto sanitario de uso profesional). No se anuncia al público (RDLeg 1/2015, art. 80.7 y 80.8; RD 1591/2009, art. 38.9).",
+      "alternativa": "«Hilos tensores reabsorbibles: valoración médica», «Balón gástrico: valoración médica»."
+    },
+    {
+      "patron": "fotona|plexr|ultralift|innovapro|neuroline|morpheus\\s?8|emsculpt|emface|emsella|coolsculpting|thermage|ultherapy|sofwave|hydrafacial|dermapen|renovalase|incontilase|intimalase|smootheye|trichotest|fagron|ballancer",
+      "motivo": "Marca de un equipo o test de uso profesional. No se anuncia al público (RDLeg 1/2015, art. 80.7 y 80.8; RD 1591/2009, art. 38.9). Si es un test genético, además RD 1662/2000, art. 25.8 (vigente por la DT 9.ª del RD 942/2025).",
+      "alternativa": "La tecnología en genérico: «láser de erbio y neodimio», «plasma para el párpado», «ultrasonidos focalizados (HIFU)», «micropunción (microneedling)», «estudio capilar personalizado»."
+    },
+    {
+      "patron": "\\bgarantiz(a|amos|an|o)\\b|\\bde\\s+por\\s+vida\\b",
+      "motivo": "Garantía o promesa de resultado (RD 1907/1996, art. 4.4; Ley 3/1991, art. 5; CDM 2022, art. 88.2).",
+      "alternativa": "«En la valoración te explicamos qué resultado es realista en tu caso»."
+    },
+    {
+      "patron": "milagr|infalible",
+      "motivo": "Promesa exagerada (RD 1907/1996, art. 4.4 y 4.16; CDM 2022, art. 89.1).",
+      "alternativa": "Describe qué hace el tratamiento y para quién está indicado."
+    },
+    {
+      "patron": "sin\\s+dolor|no\\s+duele|no\\s+(te\\s+)?(va\\s+a\\s+)?doler|cero\\s+dolor|nada\\s+doloros[oa]",
+      "motivo": "Promesa de ausencia de dolor (igual que «indoloro»): RD 1907/1996, art. 4.4; Ley 3/1991, art. 5.1.b.",
+      "alternativa": "«Es un tratamiento bien tolerado; si hace falta, usamos crema anestésica»."
+    },
+    {
+      "patron": "sin\\s+(efectos\\s+adversos|complicaciones|secuelas|contraindicaciones)|riesgo\\s+cero|cero\\s+riesgos?",
+      "motivo": "Promesa de seguridad absoluta; hay que informar de los riesgos (MDR, art. 7.c; Ley 3/1991, arts. 5 y 7; proyecto de decreto de Madrid, art. 45.c).",
+      "alternativa": "«Como todo tratamiento médico, tiene riesgos y contraindicaciones, que te explicamos en la valoración»."
+    },
+    {
+      "patron": "(totalmente|completamente|absolutamente|100\\s*%)\\s+(segur|natural|eficaz|efectiv|garantizad|indolor)",
+      "motivo": "Afirmación absoluta de seguridad, eficacia o naturalidad (RD 1907/1996, art. 4.4 y 4.13; Ley 3/1991, art. 5).",
+      "alternativa": "«Buscamos un resultado natural, adaptado a tus facciones»."
+    },
+    {
+      "patron": "resultados?\\s+(visibles\\s+)?(desde|a\\s+partir\\s+de|tras)\\s+(la\\s+)?primera\\s+sesi[oó]n|efecto\\s+inmediato|mejora\\s+inmediata|al\\s+instante",
+      "motivo": "Promesa de resultado en un plazo (igual que «resultados inmediatos»): RD 1907/1996, art. 4.4; Ley 3/1991, art. 5.1.b.",
+      "alternativa": "«Cada piel responde a su ritmo; en la valoración te decimos qué esperar y cuándo»."
+    },
+    {
+      "patron": "(dile|di|decirle)\\s+adi[oó]s|adi[oó]s\\s+a\\s+(la|las|los|el|tu|tus)\\s",
+      "motivo": "Promesa de eliminar un problema («di adiós a...»): RD 1907/1996, art. 4.4; Ley 3/1991, art. 5.",
+      "alternativa": "«Mejora el aspecto de...», «ayuda a reducir...»."
+    },
+    {
+      "patron": "(rejuvenec|qu[ií]t|aparent|parec)[a-záéíóúñ]*\\s+(hasta\\s+)?\\d+\\s+años|\\d+\\s+años\\s+(m[aá]s\\s+joven|menos)|(m[aá]s\\s+joven|menos\\s+edad)\\s+en\\s+\\d+",
+      "motivo": "Cifra de resultado («10 años menos»): RD 1907/1996, art. 4.4; Ley 3/1991, art. 5; CDM 2022, art. 88.2.",
+      "alternativa": "«Un aspecto más descansado y natural»."
+    },
+    {
+      "patron": "\\d+([.,]\\d+)?\\s*%\\s+(de\\s+)?(los\\s+|las\\s+|nuestr[oa]s\\s+)?(pacientes|casos|personas|mujeres|hombres|usuari[oa]s|clientes)|(eficacia|efectividad|[eé]xito|satisfacci[oó]n)\\s+(del|de\\s+un|de\\s+hasta\\s+un|superior\\s+al)\\s+\\d+",
+      "motivo": "Estadística de eficacia o satisfacción usada como reclamo (RD 1907/1996, art. 4.4 y 4.16; Ley 3/1991, art. 5; CDM 2022, art. 89.1).",
+      "alternativa": "Sin cifras de éxito: explica cómo es el tratamiento y qué factores influyen en el resultado."
+    },
+    {
+      "patron": "(reduc[ea][a-z]*|reducci[oó]n|reducir|pierd[a-z]*|perd[a-z]*|p[eé]rdida|elimin[a-z]*|mejor[a-z]*|disminu[a-z]*|quem[a-z]*|aument[a-z]*|gan[a-z]*)\\s+(de\\s+)?(hasta\\s+|entre\\s+|un\\s+|el\\s+|m[aá]s\\s+de\\s+)?\\d+([.,]\\d+)?\\s*(%|cm\\b|mm\\b|cent[ií]metros|kg\\b|kilos?\\b|tallas?\\b)|\\d+\\s*(tallas?|cm|cent[ií]metros)\\s+(menos|de\\s+menos)",
+      "motivo": "Cifra de resultado (kilos, centímetros, tallas, porcentajes): RD 1907/1996, art. 4.2 y 4.4; Ley 3/1991, art. 5.",
+      "alternativa": "Describe el objetivo sin cifras: «ayuda a mejorar el contorno»; lo que puedes esperar, en la valoración."
+    },
+    {
+      "patron": "testimonio|opiniones\\s+de\\s+(nuestr[oa]s\\s+)?(pacientes|clientes)|lo\\s+que\\s+(dicen|opinan)\\s+(nuestr[oa]s\\s+)?(pacientes|clientes)|(pacientes|clientes)\\s+(satisfech|felices|content|encantad)|rese[ñn]as?\\s+(de|en)\\s+google|\\d([.,]\\d)?\\s*estrellas|valoraci[oó]n\\s+(media\\s+)?de\\s+\\d([.,]\\d)?\\s*(sobre|/|de)\\s*5",
+      "motivo": "Testimonios o reseñas de pacientes como reclamo (RD 1907/1996, art. 4.7; CDM 2022, art. 89.3; RDLeg 1/2015, art. 80.2.d).",
+      "alternativa": "Sin testimonios en las páginas de tratamiento. Como mucho, un enlace neutro a la ficha de Google, sin citar opiniones."
+    },
+    {
+      "patron": "fotos?\\s+(de\\s+)?(antes|resultados)|im[aá]gen(es)?\\s+de\\s+(antes|resultados)|resultados\\s+reales|casos\\s+reales|galer[ií]a\\s+de\\s+(resultados|casos)",
+      "motivo": "Fotos de resultados de pacientes reales usadas como reclamo (CDM 2022, arts. 28.5, 29.2 y 89.3; RD 1907/1996, art. 4.7; son datos de salud: RGPD, art. 9).",
+      "alternativa": "Ilustraciones o fotos de ambiente, sin prometer resultado. Los casos se enseñan en consulta."
+    },
+    {
+      "patron": "\\bl[ií]der(es)?\\b|n[uú]mero\\s+(1|uno)\\b|\\bn\\.?\\s?[º°]\\s*1\\b|#1\\b|\\bpioner[oa]s?\\b|(^|[^a-záéíóúñ])[uú]nic[oa]s?\\s+en\\s+(espa[ñn]a|madrid|europa|el\\s+mundo)|\\b(el|la|los|las)\\s+m[aá]s\\s+(avanzad|efectiv|eficaz|segur|complet|potente|innovador|modern|eficiente|recomendad|demandad|prestigios)|m[aá]s\\s+(efectiv[oa]s?|eficaz|eficaces|segur[oa]s?|r[aá]pid[oa]s?|barat[oa]s?)\\s+que\\b|\\bmejor(es)?\\s+que\\s+(otr[oa]s?|cualquier|la\\s+competencia|en\\s+otr)",
+      "motivo": "Superlativo o comparación con otros tratamientos o centros (Ley 3/1991, art. 5; proyecto de decreto de Madrid, art. 45.g; CDM 2022, art. 88.2).",
+      "alternativa": "Describe lo que ofreces sin compararte: «un equipo con distintas especialidades y tecnología variada»."
+    },
+    {
+      "patron": "(mism[oa]s?|igual(es)?)\\s+(resultados?|efectos?)\\s+que\\s+(una\\s+|la\\s+)?cirug",
+      "motivo": "Equipara el tratamiento a la cirugía (Ley 3/1991, art. 5; proyecto de decreto de Madrid, art. 45.g y 12.b).",
+      "alternativa": "«Tratamiento no quirúrgico; en la valoración te explicamos sus límites frente a la cirugía»."
+    },
+    {
+      "patron": "(cuerpo|piel|figura|silueta|rostro|cara|labios|nariz|pechos?|senos|abdomen|vientre|gl[uú]teos|culo|vulva|vagina|zona\\s+[ií]ntima|sonrisa|mirada|cabello|melena)\\s+perfect[oa]s?\\b|\\bperfect[oa]s?\\s+(cuerpo|piel|figura|silueta|rostro|cara|labios|nariz|pechos?|senos|abdomen|vientre|gl[uú]teos)|luc(e|es|ir)\\s+(un[oa]?\\s+)?[a-záéíóúñ]*\\s*perfect|acomplejad|tus\\s+complejos|sin\\s+complejos|complejos?\\s+(f[ií]sicos?|est[eé]ticos?)|defectos?\\s+(f[ií]sicos?|est[eé]ticos?)|cuerpo\\s+(de\\s+)?(verano|playa|bikini)|operaci[oó]n\\s+bikini",
+      "motivo": "Estereotipos estéticos o explotación de complejos (Ley 34/1988, art. 3.a; CDM 2022, art. 89.1: no promover falsas necesidades).",
+      "alternativa": "«Te ayudamos a sentirte a gusto con tu imagen, con un resultado natural»."
+    },
+    {
+      "patron": "rendimiento\\s+sexual|potencia\\s+sexual|placer\\s+sexual|m[aá]s\\s+placer|orgasmo|satisfacci[oó]n\\s+sexual|vida\\s+sexual\\s+(plena|normal|de\\s+nuevo)|mejor[a-z]*\\s+(tu\\s+|la\\s+|su\\s+)?(vida|experiencia|respuesta|funci[oó]n|salud)\\s+sexual|(alarg|agrand)[a-z]*\\s+(del\\s+|el\\s+|tu\\s+|de\\s+)?pene|pene\\s+m[aá]s\\s+(grande|grueso|largo)",
+      "motivo": "Prohibido sugerir que un método potencia el rendimiento o el placer sexual (RD 1907/1996, art. 4.12).",
+      "alternativa": "Lenguaje clínico y neutro: «Engrosamiento del pene con relleno: valoración médica»; «molestias íntimas: valoración»."
+    },
+    {
+      "patron": "elimin[a-z]*\\s+(de\\s+)?(las\\s+)?toxinas|depurativ|desintoxic|depura\\s+(el|tu)\\s+organismo",
+      "motivo": "Afirmaciones «detox» sin respaldo científico (RD 1907/1996, art. 4.16).",
+      "alternativa": "«Limpieza profunda del cuero cabelludo», «ritual de relajación»."
+    },
+    {
+      "patron": "\\bobesidad\\b|\\bantiobesidad\\b|adelgazantes?\\b|quemagrasas?|quema\\s+grasa|quemar\\s+grasa|fulmin[a-z]*\\s+(la\\s+)?grasa|derrit[a-z]*\\s+(la\\s+)?grasa|condilomas?|verrugas?\\s+genital|virus\\s+del\\s+papiloma|\\bvph\\b|\\bhpv\\b|\\binsomnio\\b",
+      "motivo": "Publicidad de métodos contra la obesidad, adelgazantes, o para enfermedades transmisibles o el insomnio: prohibida (RD 1907/1996, art. 4.1 y 4.2). Además, la autorización del centro (CS17886) no incluye Ginecología (U.26) ni Endocrinología o Nutrición (U.10 y U.11).",
+      "alternativa": "«Control de peso con supervisión médica» (si se confirma que la autorización lo cubre). Las enfermedades de transmisión sexual no se anuncian."
+    },
+    {
+      "patron": "\\bfda\\b|aprobad[oa]s?\\s+por\\s+(la\\s+)?(fda|aemps|ema|sanidad|el\\s+ministerio|la\\s+uni[oó]n\\s+europea|la\\s+ue)|avalad[oa]s?\\s+por|respaldad[oa]s?\\s+por|certificad[oa]s?\\s+por\\s+(la\\s+)?(fda|aemps|ema|sanidad|el\\s+ministerio)|marcado\\s+ce\\b|homologad[oa]s?\\s+por|autorizad[oa]s?\\s+por\\s+(la\\s+)?(fda|aemps|ema)",
+      "motivo": "Usar aprobaciones, certificados o avales como respaldo publicitario (RD 1907/1996, art. 4.5; RD 1591/2009, art. 38.8; RDLeg 1/2015, art. 80.2.e; Ley 3/1991, art. 21).",
+      "alternativa": "No se menciona. El número de registro sanitario del centro sí va en el pie, como dato obligatorio, no como reclamo."
+    },
+    {
+      "patron": "\\bremisi[oó]n\\b|(elimin[a-z]*|acab[a-z]*\\s+con|erradic[a-z]*|borr[a-z]*|desaparec[a-z]*)\\s+(por\\s+completo|totalmente|definitivamente|para\\s+siempre|de\\s+ra[ií]z)",
+      "motivo": "Promesa de curación o eliminación total (RD 1907/1996, art. 4.4; Ley 3/1991, art. 23.3).",
+      "alternativa": "«Puede mejorar los síntomas; en la valoración te decimos si eres candidata y qué esperar»."
+    },
+    {
+      "patron": "descuentos?|\\bdto\\b|\\brebaj(a|as|ado|ada|ados|adas)\\b|\\d+\\s*%\\s*(de\\s+)?(dto|descuento|menos)|\\b2\\s*x\\s*1\\b|\\b3\\s*x\\s*2\\b|precio\\s+(especial|promocional|de\\s+lanzamiento|reducido|rebajado)",
+      "motivo": "Descuentos o rebajas: en esta versión no se publican precios; ligados a un medicamento o producto sanitario son infracción muy grave (RDLeg 1/2015, art. 80.5-80.6 y 111.2.c.18.ª); CDM 2022, art. 93.",
+      "alternativa": "«Te damos el presupuesto en la valoración»."
+    },
+    {
+      "patron": "\\bofertas?\\b(?!\\s+(asistencial|de\\s+(servicios|tratamientos)))|\\bpromo(ci[oó]n|ciones|cional(es)?|s)?\\b(?!\\s+de\\s+la\\s+salud)",
+      "motivo": "Ofertas y promociones: fuera de esta versión de la web; con medicamentos o productos sanitarios, prohibidas (RDLeg 1/2015, art. 80.5-80.6 y 111.2.c.18.ª); CDM 2022, art. 89.2 y 93.",
+      "alternativa": "«Pide tu valoración»."
+    },
+    {
+      "patron": "(?<!aparcamiento\\s)(?<!parking\\s)(?<!wifi\\s)(\\bgratis\\b|\\bgratuit[oa]s?\\b)|sin\\s+coste|coste\\s+cero|(de|como)\\s+regalo\\b|\\bte\\s+regalamos\\b|\\bregalamos\\b",
+      "motivo": "Gratis o de regalo es un precio y un obsequio: con medicamentos o productos sanitarios está prohibido (RDLeg 1/2015, art. 80.5-80.6 y 111.2.c.18.ª); si no es realmente gratis, es engañoso (Ley 3/1991, art. 22.5); CDM 2022, art. 93.",
+      "alternativa": "«Primera valoración: te explicamos las opciones y el presupuesto, sin compromiso»."
+    },
+    {
+      "patron": "\\bsorteos?\\b|\\bconcursos?\\b|\\bpremios?\\b|\\bbonos?\\s+(de\\s+)?\\d+|\\bbonos?\\s+(ahorro|descuento|promocional)",
+      "motivo": "Sorteos, concursos, premios o bonos con rebaja ligados a actos médicos (RDLeg 1/2015, art. 80.5-80.6 y 111.2.c.18.ª; CDM 2022, art. 89.2).",
+      "alternativa": "Sin sorteos ni bonos en la web. El número de sesiones se decide en la valoración."
+    },
+    {
+      "patron": "solo\\s+(por\\s+)?hoy\\b|[uú]ltimas\\s+(plazas|unidades)|[uú]ltim[oa]s\\s+(d[ií]as|horas)\\s+(de\\s+(la\\s+)?(oferta|promo)|para\\s+(reservar|aprovechar))|plazas\\s+limitadas|hasta\\s+agotar|por\\s+tiempo\\s+limitado|no\\s+te\\s+lo\\s+pierdas|black\\s+friday|cyber\\s+monday",
+      "motivo": "Urgencia comercial (Ley 3/1991, art. 23.4); impropia de la publicidad sanitaria (CDM 2022, art. 87.1).",
+      "alternativa": "«Reserva tu valoración cuando te venga bien»."
+    },
+    {
+      "patron": "especialistas?\\s+en\\s+(medicina\\s+)?(est[eé]tica|antienvejecimiento|anti-?aging|capilar|tricolog[ií]a|nutrigen[oó]mica|armonizaci[oó]n|regenerativa|l[aá]ser|rellenos|inyectables)",
+      "motivo": "La medicina estética (ni la capilar, la antienvejecimiento, etc.) no es una especialidad oficial: solo quien tiene el título de especialista puede usar esa denominación (Ley 44/2003, art. 16.3; CDM 2022, art. 90).",
+      "alternativa": "«Médica con máster en Medicina Estética», «médico dedicado a la medicina capilar desde hace X años»."
+    },
+    {
+      "patron": "@gmail\\.com|microbladingzhanet",
+      "motivo": "Datos del aviso legal actual que no son de IEMEC (cita otra web y un Gmail): no identifican al titular (LSSI, art. 10.1.a).",
+      "alternativa": "Correo propio del dominio de la clínica [PENDIENTE] y la URL de la web nueva."
+    },
+    {
+      "patron": "nota\\s+(media\\s+)?en\\s+google|valoraci[oó]n\\s+(media\\s+)?en\\s+google|\\b\\d[,.]\\d\\s*(\\/\\s*5\\s*)?(estrellas?|opiniones|rese[nñ]as)|\\b\\d+\\s+(opiniones|rese[nñ]as|valoraciones)\\s+(en|de)\\s+google",
+      "motivo": "La nota o las opiniones de Google en las páginas son reseñas usadas como reclamo (normas.md, apartado d: nada de «carruseles de opiniones de Google»; RD 1907/1996, art. 4.7; CDM 2022, art. 89.3; TRLGDCU, art. 20.4).",
+      "alternativa": "Como mucho, un enlace neutro a la ficha en la página de contacto: «Nuestra ficha en Google», sin la nota ni el número de opiniones."
+    },
+    {
+      "patron": "evosculpt|\\b4d\\b",
+      "motivo": "Nombres que remiten a la marca o al protocolo de un fabricante de equipos («EVO», «Láser Fotona 4D»): ni marcas ni rodeos (RDLeg 1/2015, art. 80.7; normas.md, apartado c). EvoSculpt vuelve cuando la clínica confirme que es un nombre propio de IEMEC y no del fabricante [PENDIENTE].",
+      "alternativa": "«Protocolo corporal completo»; en el láser, «cuatro modos de trabajo»."
+    },
+    {
+      "patron": "hiperb[aá]ric",
+      "motivo": "La medicina hiperbárica (cámara presurizada) es una actividad sanitaria que la autorización CS17886 no incluye (RD 1277/2003, art. 6.2) y que no hace un aparato de cabina: induce a error (Ley 3/1991, art. 5).",
+      "alternativa": "«Oxigenoterapia facial a presión»."
+    }
+  ],
+  "avisos": [
+    {
+      "patron": "definitivamente|\\bpermanentes?\\b",
+      "motivo": "¿Promete que el resultado dura para siempre? Entonces no (RD 1907/1996, art. 4.4). Vale como dato técnico («reducción duradera del vello»), nunca como promesa."
+    },
+    {
+      "patron": "[aá]cido\\s+hialur[oó]nico|hialuronato|hidroxiapatita|policaprolactona|polil[aá]ctic|polidioxanona|\\bpdo\\b|polinucle[oó]tidos|\\bpdrn\\b|adn\\s+de\\s+salm[oó]n",
+      "motivo": "Material de un producto sanitario (o cosmético) en genérico: solo como dato informativo en el cuerpo del texto; nunca en títulos, llamadas a la acción, precios ni ofertas (RDLeg 1/2015, art. 80.8)."
+    },
+    {
+      "patron": "exosomas?",
+      "motivo": "Los productos con exosomas que se venden en la UE son cosméticos de uso tópico: sin efectos terapéuticos (caída, regeneración, cicatrización) y nada inyectable (Reglamento (CE) 1223/2009, art. 2; AEMPS COS 1/2020; RD 1907/1996, art. 4.11)."
+    },
+    {
+      "patron": "\\bdetox\\b|toxinas",
+      "motivo": "«Detox»: vale como nombre de un ritual cosmético de limpieza, nunca como eliminación de toxinas del organismo (RD 1907/1996, art. 4.16)."
+    },
+    {
+      "patron": "(tratamiento|remedio|m[eé]todo|terapia|soluci[oó]n)(es|s)?\\s+natural(es)?",
+      "motivo": "«Natural» unido a efectos terapéuticos está prohibido (RD 1907/1996, art. 4.13). «Resultado natural» (aspecto) sí vale."
+    },
+    {
+      "patron": "cl[ií]nicamente\\s+(probad|demostrad|testad)|cient[ií]ficamente\\s+(probad|demostrad)|estudios\\s+(cl[ií]nicos\\s+)?(demuestran|confirman|avalan|indican)|eficacia\\s+(probada|demostrada)|evidencia\\s+cient[ií]fica",
+      "motivo": "Solo con estudios acreditados que se puedan citar (RD 1907/1996, art. 4.16; proyecto de decreto de Madrid, art. 45.b e i)."
+    },
+    {
+      "patron": "incontinencia|atrofia\\s+(vaginal|vulvovaginal|genital)|s[ií]ndrome\\s+genitourinario|liquen|sequedad\\s+vaginal|dispareunia|prolapso|disfunci[oó]n\\s+er[eé]ctil|eyaculaci[oó]n\\s+precoz|alopecia\\s+areata|v[aá]rices|insuficiencia\\s+venosa|hiperhidrosis|lipedema|linfedema|menopausia|diabetes|c[aá]ncer|tumor|ansiedad|depresi[oó]n",
+      "motivo": "Enfermedad o síntoma: comprobar que la autorización del centro (CS17886: U.46, U.47, U.48, U.64, U.84, U.900) cubre su tratamiento y no prometer curación (RD 1277/2003, art. 6.2; RD 1907/1996, arts. 4.3, 4.4 y 6)."
+    },
+    {
+      "patron": "\\bcur(a|ar|an|amos|aci[oó]n|ativ[oa]s?)\\b",
+      "motivo": "Si promete curar, está prohibido (Ley 3/1991, art. 23.3; RD 1907/1996, art. 4.4). Si son las curas de una herida, vale."
+    },
+    {
+      "patron": "(elimin[a-z]*|acab[a-z]*\\s+con)\\s+(de\\s+)?(la\\s+|las\\s+|los\\s+|el\\s+|tu\\s+|tus\\s+)?(grasa|arrugas?|celulitis|flacidez|manchas?|v[aá]rices|estr[ií]as|papada|ojeras|cicatrices|michelines|piel\\s+de\\s+naranja|calvicie|alopecia|incontinencia|vello|acn[eé])",
+      "motivo": "«Eliminar» promete un resultado total: mejor «reducir», «mejorar», «atenuar» (RD 1907/1996, art. 4.4). «Eliminación de lunares» o «depilación» valen como nombre del procedimiento."
+    },
+    {
+      "patron": "(en|con)\\s+(una|1)\\s+sola\\s+sesi[oó]n",
+      "motivo": "¿Dato técnico o promesa? «Se hace en una sesión» vale; «resultado en una sola sesión», no (RD 1907/1996, art. 4.4)."
+    },
+    {
+      "patron": "(lifting|blefaroplastia|rinoplastia|rinomodelaci[oó]n\\s+sin|liposucci[oó]n|lipoescultura|abdominoplastia|bichectom[ií]a|mastopexia)\\s+(sin\\s+cirug[ií]a|no\\s+quir[uú]rgic[oa]|sin\\s+bistur[ií]|m[eé]dic[oa]|con\\s+l[aá]ser|l[aá]ser)|efecto\\s+lifting|alternativa\\s+a\\s+la\\s+cirug[ií]a",
+      "motivo": "Nombre de una cirugía para un tratamiento que no lo es («blefaroplastia sin cirugía», «lifting láser»): puede confundir sobre la naturaleza del servicio y sugerir el mismo resultado (Ley 3/1991, art. 5.1.a; proyecto de decreto de Madrid, art. 45.a y 45.g). Mejor el nombre descriptivo: «tratamiento de párpados con plasma», «tensado facial con láser»."
+    },
+    {
+      "patron": "[uú]ltima\\s+generaci[oó]n|revolucionari|tecnolog[ií]a\\s+(exclusiva|puntera|pionera)|\\bexclusiv[oa]s?\\b|referente|vanguardia|\\binnovador",
+      "motivo": "Reclamo de superioridad difícil de probar (Ley 3/1991, art. 5; proyecto de decreto de Madrid, art. 45.b)."
+    },
+    {
+      "patron": "\\bexpert[oa]s?\\b|especialistas?\\b",
+      "motivo": "«Especialista» solo con el título oficial de especialista (Ley 44/2003, art. 16.3; CDM 2022, art. 90); «experto», solo si hay formación acreditable."
+    },
+    {
+      "patron": "\\btric[oó]log[oa]s?\\b|tricolog[ií]a",
+      "motivo": "La tricología no es una profesión sanitaria titulada: identifica a cada profesional por su titulación (Ley 44/2003, arts. 6 y 7; CDM 2022, art. 90)."
+    },
+    {
+      "patron": "dermat[oó]log",
+      "motivo": "La autorización del centro (CS17886) no incluye Dermatología (U.8): no la anuncies salvo que haya dermatólogo y se amplíe la autorización (RD 1277/2003, art. 6.2)."
+    },
+    {
+      "patron": "ginec[oó]log[oa]s?\\b|ginecolog[ií]a\\s+(funcional|regenerativa)",
+      "motivo": "La autorización del centro no incluye Ginecología (U.26): el tratamiento de patología ginecológica está pendiente de confirmar (RD 1277/2003, art. 6.2; RD 1907/1996, art. 6)."
+    },
+    {
+      "patron": "nutricionista|diet[eé]tica\\s+y\\s+nutrici[oó]n|nutrici[oó]n\\s+y\\s+diet[eé]tica|endocrin",
+      "motivo": "La autorización del centro no incluye Endocrinología (U.10) ni Nutrición y dietética (U.11): pendiente de confirmar (RD 1277/2003, art. 6.2 y anexo II)."
+    },
+    {
+      "patron": "flebolog|angiolog|cirug[ií]a\\s+vascular|cirujan[oa]s?\\s+vascular",
+      "motivo": "La autorización del centro no incluye Angiología y cirugía vascular (U.39): pendiente de confirmar (RD 1277/2003, art. 6.2)."
+    },
+    {
+      "patron": "quir[oó]fano|anestesia\\s+general|sedaci[oó]n|\\bingreso\\b|hospital|concertad[oa]",
+      "motivo": "Di con claridad dónde se opera: IEMEC tiene autorizada cirugía menor ambulatoria (U.64); las intervenciones mayores se hacen en otro centro autorizado [PENDIENTE: cuál] (RD 1277/2003, art. 6.2; Ley 3/1991, art. 5.1.a)."
+    },
+    {
+      "patron": "adelgaz[a-z]*|pierdes?\\s+(peso|kilos|grasa|volumen)|perder[aá]s?\\s+(peso|kilos)|reductor[a-z]*|reductiv[a-z]*|anticelul[ií]tic|moldea[a-z]*|modelad[a-z]*",
+      "motivo": "Propiedades adelgazantes o reductoras: prohibidas para métodos y productos (RD 1907/1996, art. 4.2). Describe la técnica y su objetivo estético sin prometer pérdida de peso ni de volumen."
+    },
+    {
+      "patron": "financiaci[oó]n|\\bfinancia(mos|r)?\\b|sin\\s+intereses|a\\s+plazos|\\bcuotas?\\b|pago\\s+aplazado|paga\\s+en\\s+\\d+",
+      "motivo": "Formas de pago: se explican en la valoración, no como reclamo (proyecto de decreto de Madrid, art. 45.h); ligadas a medicamentos o productos sanitarios, cuidado con el art. 80.5-80.6 del RDLeg 1/2015."
+    },
+    {
+      "patron": "\\bregal(o|os)\\b|tarjetas?\\s+regalo|\\bbonos?\\b",
+      "motivo": "Tarjetas regalo y bonos: nunca ligados a medicamentos o productos sanitarios ni presentados como descuento (RDLeg 1/2015, art. 80.5-80.6 y 111.2.c.18.ª)."
+    },
+    {
+      "patron": "\\bni[ñn]os\\b|\\bni[ñn]as\\b|adolescentes?|menores\\s+de\\s+(edad|18)|(desde|a\\s+partir\\s+de)\\s+los\\s+1[0-7]\\s+años",
+      "motivo": "La publicidad no puede dirigirse a menores (Ley 34/1988, art. 3.b; proyecto de decreto de Madrid). Edad mínima para tratamientos estéticos: [PENDIENTE: política de la clínica]."
+    },
+    {
+      "patron": "lidoca[ií]na|mepivaca[ií]na|artica[ií]na|prilocai?na|\\bemla\\b",
+      "motivo": "Nombre de un anestésico (medicamento): di «crema anestésica» o «anestesia local» (RDLeg 1/2015, art. 80.1)."
+    },
+    {
+      "patron": "[aá]cido\\s+tranex[aá]mic",
+      "motivo": "Por vía oral es un medicamento de receta; en cosmética tópica puede nombrarse sin atribuirle efectos terapéuticos."
+    },
+    {
+      "patron": "vida\\s+sexual|relaciones\\s+sexuales|sexualidad",
+      "motivo": "Tono y límites en lo íntimo: sin prometer mejoras sexuales (RD 1907/1996, art. 4.12); lenguaje clínico y respetuoso (CDM 2022, art. 87.1)."
+    },
+    {
+      "patron": "rejuvenecimiento\\s+vaginal|blanqueamiento\\s+(vaginal|genital|anal|[ií]ntimo)|vagina\\s+(estrecha|joven)|estrechamiento\\s+vaginal",
+      "motivo": "Términos imprecisos o que refuerzan estereotipos (Ley 34/1988, art. 3.a): «tratamiento de la laxitud vaginal: valoración», «aclarado de la piel de la zona íntima externa»; revisar que la autorización lo cubra."
+    },
+    {
+      "patron": "garant[ií]as?\\b",
+      "motivo": "«Con todas las garantías» es vago y no puede sonar a garantía de resultado (RD 1907/1996, art. 4.4)."
+    },
+    {
+      "patron": "segur[oa]s?\\s+y\\s+(eficaz|efectiv)|tratamientos?\\s+segur",
+      "motivo": "«Seguro» solo con matices y con los riesgos explicados en la misma página (MDR, art. 7.c; proyecto de decreto de Madrid, art. 45.c)."
+    },
+    {
+      "patron": "sin\\s+(tiempo\\s+de\\s+)?recuperaci[oó]n|sin\\s+baja|sin\\s+cicatri",
+      "motivo": "Recuperación: vale si es cierto; mejor «vuelta a tu rutina en X días, según tu caso» (Ley 3/1991, art. 5)."
+    },
+    {
+      "patron": "(resultado|efecto)s?\\s+(que\\s+)?(dura|duran|puede\\s+durar|suele\\s+durar)|dura(n)?\\s+(hasta|entre)\\s+\\d+\\s+(meses|años)|duraci[oó]n\\s+de\\s+(hasta\\s+)?\\d+\\s+(meses|años)|resultados?\\s+(duraderos?|de\\s+larga\\s+duraci[oó]n)",
+      "motivo": "Duración del resultado: como orientación («suele durar entre X e Y meses, según la persona»), nunca como promesa (RD 1907/1996, art. 4.4)."
+    },
+    {
+      "patron": "(m[aá]s\\s+de|\\+)\\s*[\\d.]+\\s*(pacientes|clientes|casos|tratamientos|intervenciones|operaciones|injertos)",
+      "motivo": "Cifras de actividad: solo si son ciertas y comprobables, y nunca como prueba de resultados (Ley 3/1991, art. 5; CDM 2022, art. 89.3)."
+    },
+    {
+      "patron": "verg[uü]enza|inseguridad(es)?|autoestima|confianza\\s+en\\s+ti",
+      "motivo": "No explotes inseguridades ni prometas autoestima (Ley 34/1988, art. 3.a; CDM 2022, art. 89.1). Vale un tono de acogida: «puedes contárnoslo con tranquilidad»."
+    },
+    {
+      "patron": "terap[eé]utic",
+      "motivo": "Solo lo sanitario es terapéutico: en los servicios de estética y bienestar (masajes, head spa) habla de cuidado o relajación (RD 1907/1996, arts. 4.11 y 4.16)."
+    },
+    {
+      "patron": "\\bprecios?\\b|\\bcuesta\\b|\\bcoste\\b",
+      "motivo": "En esta versión no se publican precios. Si algún día se publican: precio final con impuestos (LSSI, art. 10.1.f; TRLGDCU, art. 20.1), nunca de medicamentos ni productos sanitarios, y ojo con el art. 93 del CDM 2022."
+    },
+    {
+      "patron": "tecnolog[ií]a\\s+evo\\b",
+      "motivo": "¿«EVO» es la marca del equipo? Si lo es, no se anuncia (RDLeg 1/2015, art. 80.7): «remodelación corporal con aparatología». «EvoSculpt» queda prohibida hasta que la clínica confirme que no es marca de terceros; OxyGlow y otros nombres propios, igual [PENDIENTE: confirmar]."
+    },
+    {
+      "patron": "ros[aá]cea|cuperosis|acn[eé]\\s+(activo|inflamatorio|severo|grave|qu[ií]stico)|brotes\\s+de\\s+acn[eé]|dermatitis|psoriasis",
+      "motivo": "Enfermedades de la piel: son dermatología (U.8, no autorizada) y no se usan como reclamo (normas.md, regla 11; RD 1907/1996, art. 4). En la estética de cabina, «rojeces», «marcas de acné» o «piel con tendencia acneica», y lo médico, a la valoración médica."
+    }
+  ],
+  "obligatorias": [
+    {
+      "donde": "todas",
+      "texto_o_patron": "CS\\s?-?17886",
+      "motivo": "Número de registro sanitario del centro en toda su publicidad (RD 1277/2003, art. 6.2; Decreto 51/2006 de la Comunidad de Madrid, art. 21.b). Cada página de la web es publicidad: va en el pie de todas."
+    },
+    {
+      "donde": "todas",
+      "texto_o_patron": "IEMEC|Aneco\\s+AP\\s+Consulting",
+      "motivo": "La comunicación comercial identifica a quien la hace (LSSI, art. 20.1)."
+    },
+    {
+      "donde": "pie",
+      "texto_o_patron": "Centro\\s+sanitario\\s+autorizado|Consejer[ií]a\\s+de\\s+Sanidad",
+      "motivo": "Texto recomendado junto al número: «Centro sanitario autorizado por la Consejería de Sanidad de la Comunidad de Madrid · N.º de registro CS17886» (RD 1277/2003, art. 6.2; LSSI, art. 10.1.c)."
+    },
+    {
+      "donde": "pie",
+      "texto_o_patron": "Aviso\\s+legal",
+      "motivo": "Acceso permanente, fácil, directo y gratuito a los datos del titular (LSSI, art. 10.1 y 10.2)."
+    },
+    {
+      "donde": "pie",
+      "texto_o_patron": "Privacidad",
+      "motivo": "Información completa de protección de datos a un clic (RGPD, art. 13; LOPDGDD, art. 11.1)."
+    },
+    {
+      "donde": "pie",
+      "texto_o_patron": "Cookies",
+      "motivo": "Aunque solo haya almacenamiento técnico, la AEPD recomienda informar de forma genérica (LSSI, art. 22.2; Guía de cookies de la AEPD, mayo de 2024)."
+    },
+    {
+      "donde": "pie",
+      "texto_o_patron": "Accesibilidad",
+      "motivo": "Declaración de accesibilidad y canal para avisar de barreras (WCAG 2.2 AA; buena práctica aunque la microempresa esté exenta de la Ley 11/2023, art. 3.3)."
+    },
+    {
+      "donde": "pie",
+      "texto_o_patron": "Cofinanciado\\s+por\\s+la\\s+Uni[oó]n\\s+Europea",
+      "motivo": "Mientras dure la obligación de publicidad de la ayuda del FSE+ que recibió la clínica: emblema de la UE y descripción breve de la operación (Reglamento (UE) 2021/1060, art. 50) [PENDIENTE: fecha fin y texto exacto de la convocatoria]."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "Aneco\\s+AP\\s+Consulting,?\\s+S\\.?\\s?L\\.?",
+      "motivo": "Denominación social del titular (LSSI, art. 10.1.a). La política de privacidad actual dice «ACECO»: error."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "B-?88613492",
+      "motivo": "NIF (LSSI, art. 10.1.e)."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "Siglo\\s+XXI[\\s\\S]{0,60}28660",
+      "motivo": "Domicilio (LSSI, art. 10.1.a)."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}",
+      "motivo": "Correo electrónico de contacto propio de la clínica, no un Gmail (LSSI, art. 10.1.a) [PENDIENTE: dirección]."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "722\\s?83\\s?32\\s?85",
+      "motivo": "Otro dato de comunicación directa y efectiva (LSSI, art. 10.1.a)."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "Registro\\s+Mercantil",
+      "motivo": "Datos de inscripción en el Registro Mercantil (LSSI, art. 10.1.b) [PENDIENTE: tomo, folio, hoja]."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "CS\\s?-?17886",
+      "motivo": "Datos de la autorización administrativa previa (LSSI, art. 10.1.c; RD 1277/2003, art. 6.2)."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "Consejer[ií]a\\s+de\\s+Sanidad",
+      "motivo": "Órgano competente que supervisa la autorización (LSSI, art. 10.1.c)."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "colegiad[oa]",
+      "motivo": "Profesión regulada: colegio y número de colegiado de cada médico (LSSI, art. 10.1.d.1; CDM 2022, art. 90) [PENDIENTE]."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "Colegio\\s+(Oficial\\s+)?de\\s+M[eé]dicos",
+      "motivo": "Colegio profesional al que pertenece cada médico (LSSI, art. 10.1.d.1)."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "t[ií]tulo",
+      "motivo": "Título académico oficial de cada profesional (LSSI, art. 10.1.d.2)."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "Estado\\s+(miembro\\s+)?de\\s+expedici[oó]n|expedid[oa]\\s+en|homologaci[oó]n|reconocimiento",
+      "motivo": "Estado de la UE o del EEE que expidió el título y, en su caso, su homologación o reconocimiento (LSSI, art. 10.1.d.3)."
+    },
+    {
+      "donde": "aviso_legal",
+      "texto_o_patron": "C[oó]digo\\s+de\\s+Deontolog[ií]a\\s+M[eé]dica",
+      "motivo": "Normas profesionales aplicables y dónde consultarlas (LSSI, art. 10.1.d.4)."
+    },
+    {
+      "donde": "formulario",
+      "texto_o_patron": "Responsable",
+      "motivo": "Primera capa: identidad del responsable (LOPDGDD, art. 11.2.a)."
+    },
+    {
+      "donde": "formulario",
+      "texto_o_patron": "Finalidad",
+      "motivo": "Primera capa: finalidad (LOPDGDD, art. 11.2.b)."
+    },
+    {
+      "donde": "formulario",
+      "texto_o_patron": "Legitimaci[oó]n",
+      "motivo": "Primera capa: base jurídica (RGPD, art. 13.1.c; modelo por capas de la AEPD)."
+    },
+    {
+      "donde": "formulario",
+      "texto_o_patron": "Destinatarios",
+      "motivo": "Primera capa: quién más trata los datos (proveedor de la app, WhatsApp de Meta) (RGPD, art. 13.1.e)."
+    },
+    {
+      "donde": "formulario",
+      "texto_o_patron": "Derechos",
+      "motivo": "Primera capa: posibilidad de ejercer los derechos de los arts. 15 a 22 del RGPD (LOPDGDD, art. 11.2.c)."
+    },
+    {
+      "donde": "formulario",
+      "texto_o_patron": "Pol[ií]tica\\s+de\\s+privacidad",
+      "motivo": "Enlace a la segunda capa (LOPDGDD, art. 11.1)."
+    },
+    {
+      "donde": "formulario",
+      "texto_o_patron": "[Cc]onsiento\\s+que\\s+IEMEC\\s+trate",
+      "motivo": "Casilla obligatoria, sin marcar, con consentimiento explícito para el dato de salud que pueda revelar el tratamiento de interés (RGPD, arts. 7 y 9.2.a; LOPDGDD, art. 6)."
+    },
+    {
+      "donde": "formulario",
+      "texto_o_patron": "Quiero\\s+recibir",
+      "motivo": "Casilla aparte, opcional y SIN MARCAR para comunicaciones comerciales; el envío no depende de ella (LSSI, art. 21.1; RGPD, art. 7; LOPDGDD, art. 6.3). La prueba comprueba además que no lleva el atributo checked."
+    },
+    {
+      "donde": "formulario",
+      "texto_o_patron": "112|urgencias",
+      "motivo": "El formulario no es un canal de urgencias (seguridad del paciente)."
+    },
+    {
+      "donde": "formulario",
+      "texto_o_patron": "[Nn]o\\s+(incluyas|escribas|nos\\s+cuentes)",
+      "motivo": "Minimización: que no se escriban datos clínicos en el mensaje (RGPD, art. 5.1.c)."
+    },
+    {
+      "donde": "tratamiento_medico",
+      "texto_o_patron": "valoraci[oó]n\\s+m[eé]dica",
+      "motivo": "El tratamiento se indica tras una valoración médica; la web no sustituye a la consulta (RD 1907/1996, art. 4.15; CDM 2022, art. 87.2)."
+    },
+    {
+      "donde": "tratamiento_medico",
+      "texto_o_patron": "riesgos?|efectos\\s+(adversos|secundarios)|complicaciones|contraindicaci",
+      "motivo": "Mencionar que tiene riesgos y contraindicaciones (MDR, art. 7.c; RD 1591/2009, art. 38.7; Ley 3/1991, art. 7; proyecto de decreto de Madrid, art. 45.c)."
+    },
+    {
+      "donde": "tratamiento_medico",
+      "texto_o_patron": "resultados?\\s+(puede[n]?\\s+)?var[ií]a|var[ií]a(n)?\\s+(de\\s+una\\s+persona|seg[uú]n|en\\s+cada)|depende(n)?\\s+de\\s+(cada\\s+persona|cada\\s+paciente|tu\\s+caso)",
+      "motivo": "Aclarar que el resultado depende de cada persona (RD 1907/1996, art. 4.4; CDM 2022, art. 88.2)."
+    },
+    {
+      "donde": "tratamiento_medico",
+      "texto_o_patron": "m[eé]dic[oa]s?|cirujan[oa]s?|enfermer[oa]s?",
+      "motivo": "Quién lo hace (médico, cirujano, enfermería), con transparencia (RD 1907/1996, art. 7.1; proyecto de decreto de Madrid, art. 45.j)."
+    }
+  ]
+}

@@ -1,0 +1,1520 @@
+{
+ "grupo": "facial-aparatologia",
+ "paginas": [
+  {
+   "slug": "hifu-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "hifu-facial"
+   ],
+   "orden": 10,
+   "destacado": true,
+   "nombre": "HIFU facial",
+   "titulo": "HIFU facial: ultrasonido focalizado para la flacidez del rostro",
+   "titulo_seo": "HIFU facial en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "HIFU facial en IEMEC, Boadilla del Monte: ultrasonido focalizado para trabajar la flacidez del óvalo, la mandíbula y las cejas, sin agujas ni cirugía.",
+   "entradilla": "El HIFU concentra ultrasonido en las capas profundas de la piel para estimular el colágeno y reafirmar el rostro, sin agujas ni cirugía. La mejora llega poco a poco, en los meses siguientes.",
+   "para_quien": [
+    "Notas el óvalo facial menos definido o la línea de la mandíbula desdibujada.",
+    "Notas las cejas o las mejillas más caídas.",
+    "Buscas un tratamiento sin agujas que te permita seguir con tu día.",
+    "Prefieres una mejora progresiva y de aspecto natural."
+   ],
+   "texto": [
+    "HIFU son las siglas en inglés de ultrasonido focalizado de alta intensidad. El equipo concentra la energía en puntos concretos bajo la piel y llega hasta el SMAS, la capa de tejido que envuelve los músculos de la cara y sostiene la piel. Allí genera un calor controlado que estimula la producción natural de colágeno y elastina.",
+    "Ayuda a reafirmar la piel, a redefinir el óvalo facial y la mandíbula y a elevar ligeramente cejas y mejillas. No usa agujas y, en general, puedes seguir con tu día al salir.",
+    "Antes de tratarte valoramos tu piel y el grado de flacidez. Te explicamos qué puedes esperar, si hay alguna contraindicación en tu caso y si conviene combinarlo con otras técnicas, como la radiofrecuencia.",
+    "Durante la sesión se nota calor o pequeños pinchazos en profundidad. Después puede haber enrojecimiento, inflamación o molestias durante unos días y, rara vez, quemaduras o alteraciones pasajeras de la sensibilidad. No se aplica, entre otros casos, en el embarazo, sobre heridas o infecciones de la piel ni con implantes metálicos en la zona: en la valoración revisamos las contraindicaciones en tu caso."
+   ],
+   "sesion": {
+    "duracion": "Unos 50 minutos",
+    "sesiones": "Normalmente una; se confirma en la valoración",
+    "anestesia": null,
+    "recuperacion": "Puedes seguir con tu día; la zona puede quedar enrojecida o algo inflamada",
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "La mejora se nota de forma progresiva durante los meses posteriores a la sesión y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Suele bastar una sesión, pero depende del grado de flacidez y de la zona que quieras tratar. En la valoración te decimos cuántas sesiones te recomendamos y si más adelante conviene hacer un mantenimiento."
+    },
+    {
+     "p": "¿Cuándo se notan los cambios?",
+     "r": "No es un efecto de un día para otro. El ultrasonido estimula la producción de colágeno y la piel responde poco a poco, así que la mejora aparece de forma progresiva durante los meses siguientes. La evolución varía según cada persona."
+    },
+    {
+     "p": "¿Necesito recuperación?",
+     "r": "No suele hacer falta: puedes volver a tus actividades al salir de la clínica, aunque la zona puede quedar enrojecida o algo inflamada unos días. Si tienes un evento importante, coméntalo en la valoración para elegir bien la fecha."
+    },
+    {
+     "p": "¿Es el único tratamiento para la flacidez?",
+     "r": "No hay un tratamiento único para todo el mundo. Según el grado de flacidez y el tipo de piel, en IEMEC combinamos a menudo el HIFU con la radiofrecuencia o con tratamientos médicos como la bioestimulación. En la valoración te proponemos el plan adecuado para ti."
+    },
+    {
+     "p": "¿Hace falta una valoración antes?",
+     "r": "Sí. Antes del tratamiento valoramos tu piel y el grado de flacidez. Te explicamos qué necesitas realmente, cuántas sesiones son recomendables y qué resultados puedes esperar en tu caso. La primera valoración es sin compromiso."
+    }
+   ],
+   "preocupaciones": [
+    "flacidez",
+    "arrugas"
+   ],
+   "relacionados": [
+    "radiofrecuencia-facial",
+    "tensado-facial-con-laser",
+    "oxigenoterapia-facial"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#hifu-rejuvenecimiento-facial",
+    "https://iemec-clinic.com/blog/hifu-facial-el-lifting-sin-cirugia",
+    "https://iemec-clinic.com/blog/cual-es-el-mejor-tratamiento-para-la-flacidez-facial"
+   ],
+   "pendiente": [
+    "Duración: el catálogo da unos 50 minutos como dato del sector; confirmar.",
+    "La web actual anuncia la valoración de HIFU como gratuita: las normas no permiten «gratis» como reclamo y esta versión no publica precios; decidir cómo se comunica (por ejemplo, «primera valoración sin compromiso»).",
+    "La web actual nombra el equipo (HIFU V10 Ultralift de InnovaPro): las normas no permiten anunciar marcas de equipos de uso profesional, así que aquí no se nombra.",
+    "La valoración de HIFU (id valoracion-hifu) está en el grupo facial-medica: enlazarla desde aquí si tiene página propia.",
+    "Revisión final (vuelta 9): Se añaden los riesgos y las contraindicaciones del aparato (MDR, art. 7; normas.md, apartado c) y se quita «no requiere tiempo de recuperación»."
+   ]
+  },
+  {
+   "slug": "tensado-facial-con-laser",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "fotona-4d-facial"
+   ],
+   "orden": 20,
+   "destacado": false,
+   "nombre": "Tensado facial con láser",
+   "titulo": "Tensado facial con láser, sin cirugía ni inyectables",
+   "titulo_seo": "Tensado facial con láser en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Tensado facial con láser en IEMEC, Boadilla del Monte: cuatro modos de láser que ayudan a tensar la piel y a mejorar arrugas, textura y tono, sin inyectables.",
+   "entradilla": "Un protocolo de láser en cuatro modos que trabaja la piel desde el interior de la boca y desde fuera. Ayuda a tensarla, suaviza las arrugas y unifica el tono, sin cirugía ni inyectables.",
+   "para_quien": [
+    "Notas signos iniciales o moderados de flacidez y arrugas.",
+    "Quieres mejorar pómulos, surcos nasogenianos, mentón o cuello.",
+    "Buscas un tratamiento sin agujas ni inyectables.",
+    "Tienes más de 30 años y quieres prevenir o tratar los primeros signos de la edad."
+   ],
+   "texto": [
+    "Es un protocolo de láser que combina en la misma sesión cuatro modos de trabajo: intraoral (desde el interior de la mejilla), fraccional, subdérmico (más profundo) y superficial. El calor del láser estimula el colágeno y la elastina y ayuda a tensar los tejidos desde dentro hacia fuera.",
+    "Trabaja zonas como pómulos, labios, mentón, surcos nasogenianos y cuello, y ayuda a corregir imperfecciones y a unificar el tono de la piel.",
+    "En IEMEC lo realiza el equipo médico, después de una valoración médica en la que te explicamos sus riesgos y sus alternativas. No hacen falta agujas ni anestesia: se nota un calor tolerable y puedes seguir con tu rutina al terminar."
+   ],
+   "sesion": {
+    "duracion": "Unos 45 minutos",
+    "sesiones": "3 o 4, separadas alrededor de un mes",
+    "anestesia": "No es necesaria",
+    "recuperacion": "No requiere recuperación ni baja",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "El efecto tensor se va notando de forma progresiva a lo largo del ciclo; cada piel responde a su ritmo y el resultado varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué son los cuatro modos de trabajo?",
+     "r": "Son cuatro formas de aplicar el láser en la misma sesión: intraoral, fraccional, subdérmico y superficial. Así se trabaja la piel desde el interior de la boca y desde fuera, en distintas capas, para abordar la flacidez, las arrugas y la textura a la vez."
+    },
+    {
+     "p": "¿Duele?",
+     "r": "Se nota un calor tolerable en la piel y no hace falta anestesia. Al terminar puedes volver a tu rutina: no requiere baja ni tiempo de recuperación. Si tienes la piel sensible, coméntalo en la valoración."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Lo habitual es un ciclo de 3 o 4 sesiones, separadas alrededor de un mes. Pasado un tiempo se valora una sesión de mantenimiento para conservar el efecto, según tu piel y tu edad."
+    },
+    {
+     "p": "¿Se puede hacer en verano?",
+     "r": "Sí, se puede hacer todo el año, siempre con una protección solar adecuada en los días siguientes. Si vas a exponerte mucho al sol, dínoslo para planificar las sesiones."
+    },
+    {
+     "p": "¿Desde qué edad se recomienda?",
+     "r": "Suele plantearse a partir de los 30 años, como prevención o para tratar signos iniciales o moderados de envejecimiento. En la valoración vemos si es lo que necesitas o si encaja más otra opción."
+    }
+   ],
+   "preocupaciones": [
+    "flacidez",
+    "arrugas",
+    "calidad-de-piel"
+   ],
+   "relacionados": [
+    "hifu-facial",
+    "radiofrecuencia-facial",
+    "oxigenoterapia-facial"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#lifting-facial-sin-cirugia-con-laser-fotona-4d",
+    "https://iemec-clinic.com/blog/en-que-consiste-el-lifting-4d-sin-cirugia-con-laser-fotona",
+    "https://iemec-clinic.com/blog/que-resultados-puedo-esperar-con-el-laser-fotona-para-rejuvenecimiento-facial"
+   ],
+   "pendiente": [
+    "El servicio se anuncia hoy como «Lifting facial sin cirugía ni inyectables con Láser Fotona 4D»: las normas no permiten la marca del equipo ni «lifting» para un tratamiento no quirúrgico, así que va como «Tensado facial con láser», el nombre que proponen las normas. «4D» se explica como los cuatro modos del láser: confirmar que se mantiene. Si se quiere dar la tecnología en genérico, «láser de erbio y neodimio» (confirmar).",
+    "Duración (unos 45 minutos) e intervalo de un mes entre sesiones son datos del sector: confirmar.",
+    "El blog cita también el láser en cuello, escote y cuerpo (ids fotona-cuello-escote y fotona-tensado-cutaneo, ofertas sin confirmar, en «sin_pagina»): si la clínica lo confirma, se añaden como variantes.",
+    "Revisión final (vuelta 9): Fuera «4D» (remite al protocolo del fabricante, «Láser Fotona 4D»): basta «cuatro modos de trabajo»."
+   ]
+  },
+  {
+   "slug": "luz-pulsada-intensa-ipl",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "ipl-facial"
+   ],
+   "orden": 30,
+   "destacado": false,
+   "nombre": "Luz pulsada intensa (IPL)",
+   "titulo": "Luz pulsada intensa (IPL) para manchas y rojeces",
+   "titulo_seo": "IPL facial para manchas en Boadilla · IEMEC",
+   "descripcion_seo": "Luz pulsada intensa (IPL) en IEMEC, Boadilla del Monte: para manchas solares, rojeces y pequeños vasos del rostro, con valoración médica previa.",
+   "entradilla": "La luz pulsada intensa actúa sobre el pigmento de las manchas y sobre los pequeños vasos dilatados para unificar el tono de la piel. También le aporta luminosidad y mejora su textura.",
+   "para_quien": [
+    "Tienes manchas solares o léntigos en la cara.",
+    "Te preocupan las rojeces de la cara.",
+    "Notas pequeños vasos visibles en el rostro.",
+    "Quieres una piel más uniforme y luminosa."
+   ],
+   "texto": [
+    "El IPL emite pulsos de luz de amplio espectro. La luz la absorben el pigmento de las manchas (la melanina) y la sangre de los vasos dilatados (la hemoglobina); al calentarse, esas lesiones se atenúan y el tono se unifica. Además estimula el colágeno, lo que ayuda a mejorar la textura de la piel.",
+    "Está indicado para manchas solares y otras hiperpigmentaciones, rojeces y pequeños vasos del rostro. No es adecuado para pieles muy oscuras ni para manchas muy profundas: por eso valoramos cada caso antes de empezar.",
+    "En IEMEC lo aplica personal de enfermería, tras una valoración médica en la que revisamos tu piel y te explicamos los posibles efectos y contraindicaciones. Con cada pulso de luz se nota un golpe de calor o un ligero pinchazo, y al terminar puedes seguir con tu rutina."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Entre 3 y 6, cada 3 o 4 semanas",
+    "anestesia": null,
+    "recuperacion": "Mínima: rojez o hinchazón leve que suele irse en horas",
+    "profesional": "Enfermería, con valoración médica previa [PENDIENTE: confirmar]"
+   },
+   "variantes": [],
+   "resultados": "La mejoría suele notarse tras las primeras sesiones y el resultado completo llega al terminar el ciclo; varía según cada piel.",
+   "preguntas": [
+    {
+     "p": "¿Molesta?",
+     "r": "Con cada pulso de luz se nota un golpe de calor o un ligero pinchazo. Es una molestia breve que la mayoría de las personas tolera bien, y la recuperación es mínima: puedes volver a tu rutina al terminar la sesión."
+    },
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Normalmente entre 3 y 6, separadas de 3 a 4 semanas. Depende del tipo de mancha o de rojez y de tu piel. La mejoría suele notarse tras las primeras sesiones, porque cada piel responde a su ritmo."
+    },
+    {
+     "p": "¿Tiene efectos secundarios?",
+     "r": "Lo habitual es una rojez o una hinchazón leve en la zona, parecida a una quemadura solar suave, que suele desaparecer en unas horas. En la valoración te explicamos los posibles efectos y los cuidados en tu caso."
+    },
+    {
+     "p": "¿Sirve para todo tipo de piel y de manchas?",
+     "r": "No. El IPL no está indicado para pieles muy oscuras ni para manchas muy profundas, y algunas alteraciones de la piel necesitan otro enfoque. Por eso valoramos tu piel antes de proponerte el tratamiento."
+    },
+    {
+     "p": "¿Hay que hacer mantenimiento?",
+     "r": "Conviene. Con el sol y el paso del tiempo pueden aparecer manchas nuevas, así que se recomienda una sesión de mantenimiento cada 6 meses o cada año, según el caso. Te lo indicamos al terminar el ciclo."
+    }
+   ],
+   "preocupaciones": [
+    "manchas",
+    "calidad-de-piel",
+    "acne-y-poros"
+   ],
+   "relacionados": [
+    "peeling-medico-facial",
+    "fototerapia-led-facial",
+    "piel-con-tendencia-acneica"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#luz-pulsada-intensa-ipl",
+    "https://iemec-clinic.com/promociones",
+    "https://iemec-clinic.com/blog/es-el-ipl-el-mas-efectivo-para-las-manchas-de-la-piel",
+    "https://iemec-clinic.com/blog/ipl-medico-para-manchas-rosacea-y-acne",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Quién lo realiza: el póster de la portada dice «enfermeras especializadas» y el catálogo, médico; confirmar.",
+    "Confirmar las pautas de sol antes y después del IPL para añadirlas.",
+    "La portada lo anuncia con precio de promoción: no se publica en esta versión.",
+    "Rosácea y acné son afecciones de la piel: confirmar que su tratamiento con IPL entra en la autorización del centro como mejora estética (U.48); la dermatología (U.8) no está autorizada.",
+    "Revisión final (vuelta 9): Fuera «rosácea» del título, la meta y el texto (dermatología, U.8, no autorizada; regla 11) y «especializada» (sugiere una especialidad oficial de enfermería). Quién lo aplica sigue [PENDIENTE] visible."
+   ]
+  },
+  {
+   "slug": "radiofrecuencia-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "radiofrecuencia-facial",
+    "radiofrecuencia-papada"
+   ],
+   "orden": 40,
+   "destacado": false,
+   "nombre": "Radiofrecuencia facial",
+   "titulo": "Radiofrecuencia facial para reafirmar el rostro y la papada",
+   "titulo_seo": "Radiofrecuencia facial en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Radiofrecuencia facial en IEMEC, Boadilla del Monte: calor controlado que estimula el colágeno para reafirmar el rostro y la papada y mejorar la textura.",
+   "entradilla": "La radiofrecuencia calienta de forma controlada las capas profundas de la piel para estimular el colágeno y la elastina. Ayuda a reafirmar el rostro y la papada, sin agujas.",
+   "para_quien": [
+    "Notas la piel del rostro menos firme o con arrugas finas.",
+    "Quieres trabajar la papada y el contorno de la mandíbula.",
+    "Buscas mejorar la textura y el tono de la piel.",
+    "Prefieres un tratamiento sin agujas que te permita seguir con tu día."
+   ],
+   "texto": [
+    "La radiofrecuencia aplica ondas que generan un calor controlado en la dermis, la capa interna de la piel. Ese calor estimula la producción de colágeno y elastina, las fibras que le dan firmeza, con un efecto tensor progresivo. También mejora la textura y el tono.",
+    "Podemos tratar el rostro completo o centrarnos en la papada, según lo que te preocupe. Durante la sesión notarás calor en la zona y, al terminar, puedes seguir con tu rutina: no requiere tiempo de recuperación.",
+    "En los planes para la flacidez, la radiofrecuencia se combina a menudo con el HIFU u otras técnicas. Te proponemos la combinación en la valoración, donde también revisamos si hay alguna contraindicación."
+   ],
+   "sesion": {
+    "duracion": "1 hora el rostro; unos 30 minutos la papada",
+    "sesiones": "Se decide en la valoración; en la papada, unas 6 semanales",
+    "anestesia": null,
+    "recuperacion": "No requiere tiempo de recuperación",
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Rostro",
+     "texto": "Sesión de 1 hora para la firmeza, las arrugas finas y la textura de la piel de la cara.",
+     "catalogo": "radiofrecuencia-facial"
+    },
+    {
+     "nombre": "Papada",
+     "texto": "Sesión de unos 30 minutos para reafirmar la piel de la papada y el contorno de la mandíbula. Como orientación, un ciclo de 6 sesiones, una por semana.",
+     "catalogo": "radiofrecuencia-papada"
+    }
+   ],
+   "resultados": "La firmeza y la textura mejoran de forma progresiva a lo largo de las sesiones; el resultado varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué se nota durante la sesión?",
+     "r": "Un calor progresivo en la zona tratada, que se controla en todo momento para que resulte tolerable. No se usan agujas, así que al terminar puedes volver a tus actividades con normalidad."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Depende de la zona y de tu piel. En la papada se suele plantear un ciclo de unas seis sesiones, una por semana; en el rostro lo ajustamos en la valoración. Después puede convenir un mantenimiento periódico."
+    },
+    {
+     "p": "¿Sirve para la grasa de la papada?",
+     "r": "La radiofrecuencia ayuda sobre todo a reafirmar la piel y a definir el contorno. Si lo que más te preocupa es el volumen de grasa, en la valoración te explicamos qué opciones encajan contigo."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Para la flacidez facial no hay un tratamiento único: en IEMEC la radiofrecuencia se combina a menudo con el HIFU o con tratamientos médicos como la bioestimulación. La combinación se decide en consulta, según tu caso."
+    }
+   ],
+   "preocupaciones": [
+    "flacidez",
+    "arrugas",
+    "volumen-y-contorno"
+   ],
+   "relacionados": [
+    "hifu-facial",
+    "tensado-facial-con-laser",
+    "protocolos-faciales"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#radiofrecuencia-facial-rostro",
+    "https://iemec-clinic.com/facial#radiofrecuencia-facial-para-la-papada",
+    "https://iemec-clinic.com/blog/cual-es-el-mejor-tratamiento-para-la-flacidez-facial",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Papada: duración (unos 30 minutos) y ciclo de 6 sesiones semanales son datos del sector; confirmar.",
+    "Número de sesiones en el rostro: no publicado.",
+    "Equipo: el blog cita la radiofrecuencia «Definitive Evo»; es marca de equipo y las normas no permiten anunciarla, así que no se nombra.",
+    "La web actual dice que reduce la grasa localizada del rostro: aquí se formula con prudencia; confirmar con el equipo médico."
+   ]
+  },
+  {
+   "slug": "parpados-con-plasma",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "plexr-blefaroplastia"
+   ],
+   "orden": 50,
+   "destacado": false,
+   "nombre": "Tratamiento de párpados con plasma",
+   "titulo": "Tratamiento de párpados con plasma, sin bisturí ni puntos",
+   "titulo_seo": "Tratamiento de párpados con plasma en Boadilla · IEMEC",
+   "descripcion_seo": "Tratamiento de párpados con plasma en IEMEC, Boadilla del Monte: para el exceso de piel del párpado, las bolsas y las arrugas de la mirada, sin bisturí.",
+   "entradilla": "Una técnica de plasma que retrae el exceso de piel de los párpados sin bisturí. Ayuda a abrir la mirada y a suavizar las bolsas y las arrugas de alrededor de los ojos.",
+   "para_quien": [
+    "Notas exceso de piel en el párpado y la mirada cansada.",
+    "Te preocupan las bolsas o las arrugas de alrededor de los ojos.",
+    "Prefieres una opción sin bisturí ni puntos.",
+    "Puedes reservar unos días para la recuperación."
+   ],
+   "texto": [
+    "Un equipo de plasma produce microquemaduras controladas en la superficie de la piel. Al recuperarse, el tejido se retrae de forma natural y el exceso de piel disminuye. Así mejora el aspecto de los párpados caídos, las bolsas y las arrugas perioculares.",
+    "Es un procedimiento ambulatorio que realiza el médico en la consulta, tras una valoración médica en la que te explica sus riesgos y sus alternativas. Antes se aplica una crema anestésica; durante el tratamiento puedes notar calor o pequeñas molestias tolerables. No hay bisturí ni puntos.",
+    "La recuperación suele llevar de 3 a 5 días. Durante esos días conviene evitar el sol directo en la zona."
+   ],
+   "sesion": {
+    "duracion": "Unos 15 minutos, más la crema anestésica",
+    "sesiones": "1 o 2, según el exceso de piel",
+    "anestesia": "Crema anestésica",
+    "recuperacion": "De 3 a 5 días",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "La mejora de la mirada es progresiva; cada piel responde a su ritmo y el resultado varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Duele?",
+     "r": "Antes de empezar se aplica una crema anestésica. Durante el tratamiento puedes notar calor o pequeñas molestias, pero es tolerable. Es un procedimiento breve y ambulatorio: vuelves a casa al terminar."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "En la mayoría de los casos bastan una o dos sesiones. Depende de cuánto exceso de piel haya en el párpado; lo valoramos en consulta antes de empezar y te explicamos qué puedes esperar."
+    },
+    {
+     "p": "¿Cuánto dura la recuperación?",
+     "r": "Suele llevar de 3 a 5 días y no hay puntos que retirar. Durante esos días conviene evitar el sol directo en la zona y seguir las pautas de cuidado que te damos al terminar la sesión."
+    },
+    {
+     "p": "¿Es lo mismo que una cirugía de párpados?",
+     "r": "No. La cirugía de párpados, o blefaroplastia, la hace un cirujano con bisturí en un centro autorizado. Este tratamiento actúa sobre la superficie de la piel con plasma y no sustituye a la cirugía en todos los casos: en la valoración te explicamos sus límites."
+    },
+    {
+     "p": "¿Se puede hacer en cualquier época del año?",
+     "r": "Sí, aunque hay que evitar el sol directo en la zona durante los primeros días. Si tienes vacaciones o un evento cerca, cuéntanoslo para elegir la fecha que más te convenga."
+    },
+    {
+     "p": "¿Cuánto dura el resultado?",
+     "r": "Depende de tu tipo de piel y de cómo envejece. La técnica no detiene el envejecimiento natural, así que con el tiempo puede plantearse repetir. En la valoración te explicamos qué esperar en tu caso."
+    }
+   ],
+   "preocupaciones": [
+    "mirada-y-ojeras",
+    "flacidez",
+    "arrugas"
+   ],
+   "relacionados": [
+    "peeling-medico-facial",
+    "lunares-y-lesiones-cutaneas",
+    "tensado-facial-con-laser"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#nosotrosblefaroplastia-plexr-mirada",
+    "https://iemec-clinic.com/facial#blefaroplastia-plexr-ojeras",
+    "https://iemec-clinic.com/blog/blefaroplastia.iemec",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "La web actual lo llama «Blefaroplastia Plexr» y el blog, «blefaroplastia sin cirugía»: las normas desaconsejan el nombre de una cirugía para lo que no lo es y no permiten la marca del equipo, así que va como «Tratamiento de párpados con plasma». Las URL antiguas deberían redirigir aquí.",
+    "Duración (unos 15 minutos, dato del sector) y tiempo de crema anestésica (30 minutos en el catálogo): confirmar.",
+    "Detallar los cuidados de los días de recuperación (costras, maquillaje, lentillas) si la clínica los facilita."
+   ]
+  },
+  {
+   "slug": "protocolos-faciales",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "protocolo-pure-glow-up",
+    "protocolo-glass-skin",
+    "protocolo-oxyglow",
+    "lifting-ah-topico"
+   ],
+   "orden": 60,
+   "destacado": true,
+   "nombre": "Protocolos faciales IEMEC",
+   "titulo": "Protocolos faciales IEMEC: Pure Glow Up, Glass Skin y OxyGlow",
+   "titulo_seo": "Protocolos faciales en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Protocolos faciales IEMEC en Boadilla del Monte: Pure Glow Up, Glass Skin y OxyGlow combinan varias técnicas en una sesión para hidratar e iluminar la piel.",
+   "entradilla": "Nuestros protocolos combinan varias técnicas en una misma sesión para cuidar la piel del rostro y, en varios casos, también del cuello y el escote. Son tratamientos de cabina, no invasivos, pensados para hidratar e iluminar.",
+   "para_quien": [
+    "Tienes la piel apagada, cansada o deshidratada.",
+    "Quieres lucir buena cara antes de un evento o de unas vacaciones.",
+    "Buscas un tratamiento completo que cuide también cuello y escote.",
+    "Te apetece una sesión relajante que sume varias técnicas."
+   ],
+   "texto": [
+    "Los Protocolos IEMEC unen tecnologías y tratamientos complementarios en una misma sesión de alrededor de una hora y media. Los adaptamos a tu tipo de piel y los realiza el equipo de estética.",
+    "Pure Glow Up combina limpieza profunda, masaje Kobido, luz LED y una mascarilla de colágeno. Glass Skin exfolia con ácido láctico, sigue con un masaje con vitamina C y un gel hidratante y termina con radiofrecuencia de alta frecuencia. OxyGlow une oxigenoterapia facial a presión y radiofrecuencia de alta frecuencia para una piel más firme y luminosa.",
+    "Si prefieres una sesión más corta, el facial hidratante reafirmante, con ácido hialurónico aplicado sobre la piel, hidrata y aporta un efecto tensor en una hora, sin agujas."
+   ],
+   "sesion": {
+    "duracion": "1 h 30 min; el facial hidratante, 1 hora",
+    "sesiones": "Pure Glow Up, una al mes para mantener el efecto",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Pure Glow Up",
+     "texto": "Limpieza profunda, masaje Kobido, luz LED y mascarilla de colágeno en rostro, cuello y escote. Aporta luminosidad e hidratación y no requiere recuperación. 1 h 30 min.",
+     "catalogo": "protocolo-pure-glow-up"
+    },
+    {
+     "nombre": "Glass Skin",
+     "texto": "Exfoliación con ácido láctico, masaje con vitamina C, gel hidratante y radiofrecuencia de alta frecuencia en rostro, cuello y escote, para una piel jugosa y luminosa. 1 h 30 min.",
+     "catalogo": "protocolo-glass-skin"
+    },
+    {
+     "nombre": "OxyGlow",
+     "texto": "Oxigenoterapia facial a presión y radiofrecuencia de alta frecuencia para oxigenar la piel y darle un aspecto más firme, uniforme y luminoso. 1 h 30 min.",
+     "catalogo": "protocolo-oxyglow"
+    },
+    {
+     "nombre": "Facial hidratante reafirmante",
+     "texto": "Protocolo de cabina que aplica ácido hialurónico sobre la piel, sin inyecciones: hidrata y aporta efecto tensor y luminosidad. 1 hora.",
+     "catalogo": "lifting-ah-topico"
+    }
+   ],
+   "resultados": "El efecto se aprecia de forma distinta en cada piel; en Pure Glow Up se mantiene, como orientación, entre 2 y 4 semanas, según la persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué protocolo elijo?",
+     "r": "Depende de lo que busque tu piel. Pure Glow Up combina limpieza, masaje y luz; Glass Skin se centra en la hidratación y el brillo, y OxyGlow, en la oxigenación y la firmeza. Si dudas, te aconsejamos en la clínica."
+    },
+    {
+     "p": "¿Cuánto dura el efecto?",
+     "r": "En Pure Glow Up, entre 2 y 4 semanas, según tu tipo de piel y tu estilo de vida. Para mantenerlo se recomienda repetirlo una vez al mes, como parte de tu rutina de cuidado."
+    },
+    {
+     "p": "¿Puedo hacerlo antes de un evento o si tengo la piel sensible?",
+     "r": "Sí. Son tratamientos no invasivos y bien tolerados, adecuados también antes de un evento o de unas vacaciones. Si tu piel es sensible, dínoslo para adaptar los productos."
+    },
+    {
+     "p": "¿Cuándo puedo tomar el sol?",
+     "r": "Tras Pure Glow Up, espera al menos 24 horas y evita el sol intenso los dos primeros días. Durante la semana siguiente usa protección solar alta, de factor 50, para evitar que aparezcan manchas."
+    },
+    {
+     "p": "¿Molesta o deja la piel roja?",
+     "r": "Las molestias son mínimas. Como mucho puede quedar un leve enrojecimiento que desaparece en pocas horas, así que puedes seguir con tu día al salir de la clínica."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel",
+    "bienestar"
+   ],
+   "relacionados": [
+    "oxigenoterapia-facial",
+    "masaje-facial",
+    "limpieza-facial",
+    "protocolos-con-microneedling"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://iemec-clinic.com/promociones",
+    "https://content.app-sources.com/s/911749830232676201/uploads/Promociones/3cc5ec15-3afe-4209-9052-9a8b2c2a0842-9028659.jpeg",
+    "https://content.app-sources.com/s/911749830232676201/uploads/Promociones/image1788176625865-8433460.jpg",
+    "https://content.app-sources.com/s/911749830232676201/uploads/Promociones/fb904b78ce0c5b82becb9acbdf737d17image1779129221782-9133328.jpg",
+    "https://content.app-sources.com/s/911749830232676201/uploads/Promociones/abf2b507-e4e9-465b-8d94-d95734a5cb8f-9028658.jpeg",
+    "https://iemec-clinic.com/blog/que-es-el-tratamiento-pure-glow-up-y-para-que-sirve",
+    "https://iemec-clinic.com/blog/cuanto-dura-el-efecto-del-tratamiento-pure-glow-up-en-la-piel",
+    "https://iemec-clinic.com/blog/cuanto-tiempo-debo-esperar-para-exponerme-al-sol-despues-de-un-tratamiento-facial-con-pure-glow-up",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/",
+    "https://iemec-clinic.com/"
+   ],
+   "pendiente": [
+    "Los protocolos se anuncian hoy con precio de promoción: no se publica en esta versión.",
+    "Glass Skin: hay dos pósters (cierre con radiofrecuencia o con mascarilla de alginato); se ha usado el más reciente. Confirmar la versión vigente.",
+    "Glass Skin: el póster habla de DMAE y de un gel «jeringa virtual»; aquí se describe como exfoliación con ácido láctico y gel hidratante. Confirmar.",
+    "Facial hidratante reafirmante: en Treatwell se llama «Lifting Ácido Hialurónico» (1 hora); las normas no permiten «lifting» para lo que no es cirugía ni el material en el nombre. Confirmar nombre y zonas."
+   ]
+  },
+  {
+   "slug": "oxigenoterapia-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "oxigenoterapia-facial"
+   ],
+   "orden": 70,
+   "destacado": false,
+   "nombre": "Oxigenoterapia facial",
+   "titulo": "Oxigenoterapia facial a presión para una piel luminosa e hidratada",
+   "titulo_seo": "Oxigenoterapia facial en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Oxigenoterapia facial a presión en IEMEC, Boadilla del Monte: oxígeno con activos hidratantes para una piel más luminosa e hidratada.",
+   "entradilla": "Proyectamos oxígeno puro a presión junto con activos hidratantes, vitaminas y antioxidantes para hidratar la piel y devolverle la luz. Es un tratamiento no invasivo y relajante.",
+   "para_quien": [
+    "Tienes la piel apagada, cansada o deshidratada.",
+    "Quieres suavizar arrugas finas y líneas de expresión.",
+    "Quieres preparar la piel antes de un evento.",
+    "Quieres complementar otros tratamientos, como el láser o los peelings."
+   ],
+   "texto": [
+    "Un equipo proyecta oxígeno puro a presión controlada sobre la piel junto con un cóctel de activos: ácido hialurónico, vitaminas y antioxidantes. La combinación ayuda a oxigenar e hidratar la piel en profundidad y a devolverle luminosidad y firmeza.",
+    "En IEMEC la sesión sigue cinco pasos: valoramos tu piel, hacemos una limpieza profunda, aplicamos el oxígeno con los activos, terminamos con un masaje calmante y te damos consejos para mantener el resultado en casa.",
+    "Está pensada para todo tipo de pieles y es un buen complemento del láser, la radiofrecuencia o los peelings médicos. También forma parte del protocolo OxyGlow, que la une con radiofrecuencia de alta frecuencia en una misma sesión."
+   ],
+   "sesion": {
+    "duracion": "Entre 45 y 60 minutos",
+    "sesiones": "Ciclo de 4 a 6 y mantenimiento mensual",
+    "anestesia": null,
+    "recuperacion": "No requiere tiempo de recuperación",
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "Muchas personas notan la piel más luminosa e hidratada tras las primeras sesiones, y la mejora se acumula con el ciclo; el resultado depende de cada piel.",
+   "preguntas": [
+    {
+     "p": "¿Molesta?",
+     "r": "No suele molestar: es un tratamiento no invasivo, sin agujas, y muchas personas lo viven como un momento relajante. Tampoco requiere tiempo de recuperación, así que puedes seguir con tu día al salir."
+    },
+    {
+     "p": "¿Cuándo se nota?",
+     "r": "Muchas personas notan la piel más luminosa e hidratada y las arrugas finas más suavizadas tras las primeras sesiones. Con el ciclo completo la mejora se acumula, aunque cada piel responde a su ritmo."
+    },
+    {
+     "p": "¿Cuánto dura el efecto?",
+     "r": "Como orientación, tras una sesión suelta la luminosidad se mantiene una o dos semanas. Con un ciclo de 4 a 6 sesiones el resultado se acumula y se prolonga, sobre todo si después haces un mantenimiento mensual. Depende de cada piel."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Antes de un evento puede plantearse una sesión suelta. Para un resultado más duradero se recomienda un ciclo de 4 a 6 sesiones y, después, un mantenimiento mensual que ayuda a conservar la luminosidad y la firmeza de la piel."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel",
+    "arrugas"
+   ],
+   "relacionados": [
+    "protocolos-faciales",
+    "fototerapia-led-facial",
+    "limpieza-facial"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#oxigenoterapia-hiperbarica-facial"
+   ],
+   "pendiente": [
+    "Confirmar que el ácido hialurónico y los demás activos son cosméticos de uso tópico (la web no nombra el producto).",
+    "Revisión final (vuelta 9): Fuera «hiperbárica»: es un término de la medicina hiperbárica (cámara presurizada), que la autorización no incluye y que no hace un aparato de cabina."
+   ]
+  },
+  {
+   "slug": "microneedling-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "dermapen-facial",
+    "microneedling-cuello-escote"
+   ],
+   "orden": 80,
+   "destacado": false,
+   "nombre": "Microneedling facial",
+   "titulo": "Microneedling facial para la textura, los poros y las marcas de la piel",
+   "titulo_seo": "Microneedling facial en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Microneedling facial en IEMEC, Boadilla del Monte: microagujas que estimulan el colágeno para mejorar textura, poros, manchas y cicatrices en rostro y cuello.",
+   "entradilla": "Un dispositivo de microagujas crea microperforaciones controladas que activan los mecanismos de reparación de la piel. Ayuda a mejorar la textura, los poros, las manchas y las cicatrices.",
+   "para_quien": [
+    "Tienes marcas o cicatrices de acné.",
+    "Notas los poros dilatados o la piel grasa.",
+    "Quieres mejorar el tono, las manchas o las líneas finas.",
+    "Buscas más firmeza en la piel del cuello y el escote."
+   ],
+   "texto": [
+    "El microneedling utiliza un dispositivo con microagujas muy finas que hacen pequeñas perforaciones controladas en la piel. Esas microlesiones activan sus mecanismos naturales de reparación y la producción de colágeno y elastina, y permiten que los activos que se aplican penetren mejor.",
+    "En IEMEC lo aplicamos en el rostro y también en el cuello y el escote, donde la piel es más fina. Ayuda a mejorar la textura y el tono, a afinar los poros y a atenuar manchas y cicatrices.",
+    "Después la piel puede quedar enrojecida y más sensible unos días. Durante 72 horas evita la piscina y el mar, y protege la piel del sol."
+   ],
+   "sesion": {
+    "duracion": "1 hora el rostro; unos 30 minutos cuello y escote",
+    "sesiones": "Según tu piel; en cuello y escote, de 3 a 6",
+    "anestesia": "Crema anestésica en cuello y escote",
+    "recuperacion": "Rojez unos días; sin piscina ni mar en 72 horas",
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Rostro",
+     "texto": "Para la textura, el tono, los poros, las manchas y las cicatrices de la cara. Sesión de alrededor de 1 hora.",
+     "catalogo": "dermapen-facial"
+    },
+    {
+     "nombre": "Cuello y escote",
+     "texto": "Trabaja la textura, la firmeza, los poros y las manchas de una piel más fina. Se aplica crema anestésica antes; como orientación, de 3 a 6 sesiones, una al mes.",
+     "catalogo": "microneedling-cuello-escote"
+    }
+   ],
+   "resultados": "Muchas personas notan la piel más uniforme y luminosa tras las primeras sesiones; la mejora de textura y marcas es progresiva y depende de cada piel.",
+   "preguntas": [
+    {
+     "p": "¿Duele?",
+     "r": "Las agujas son muy finas y el tratamiento se tolera bien: se nota un leve pinchazo. En cuello y escote se aplica crema anestésica antes de empezar para que las molestias sean mínimas."
+    },
+    {
+     "p": "¿Cuándo puedo ir a la piscina o a la playa?",
+     "r": "Espera al menos 72 horas. El cloro puede irritar la piel tratada, y el agua del mar y el sol directo también conviene evitarlos esos tres días. Entre sesiones, protege bien la piel."
+    },
+    {
+     "p": "¿Puedo maquillarme y tomar el sol después?",
+     "r": "Es preferible dejar respirar la piel unas horas antes de maquillarte. Puedes tomar el sol con fotoprotección alta, evitando la exposición intensa los primeros días; si tienes rojez, usa un protector para piel sensible."
+    },
+    {
+     "p": "¿Puedo hacérmelo antes de un viaje o de un evento?",
+     "r": "Sí. Lo ideal es hacerlo entre 3 y 7 días antes, para que la piel se asiente y la rojez haya pasado. Si vas a la playa, ten en cuenta las 72 horas sin mar ni piscina."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Depende de tu piel y de lo que quieras mejorar. Para cambios en textura, poros o cicatrices se plantea un ciclo de sesiones; en cuello y escote, como orientación, de 3 a 6, una al mes. Lo ajustamos en la valoración, donde también revisamos si hay alguna contraindicación."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel",
+    "acne-y-poros",
+    "manchas",
+    "arrugas"
+   ],
+   "relacionados": [
+    "piel-con-tendencia-acneica",
+    "bb-glow",
+    "peeling-medico-facial",
+    "protocolos-con-microneedling"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#dermapen",
+    "https://iemec-clinic.com/facial#microneedling",
+    "https://iemec-clinic.com/facial#microneedling-cuello",
+    "https://iemec-clinic.com/blog/cuando-puedo-ir-a-la-piscina-despues-de-un-tratamiento-facial-con-dermapen",
+    "https://iemec-clinic.com/blog/como-conseguir-una-piel-radiante-antes-del-verano-tratamientos-faciales-rapidos-y-efectivos",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "El servicio se llama hoy «Dermapen», que es la marca del equipo: las normas no permiten anunciarla, así que va como «Microneedling facial».",
+    "Confirmar si se usa crema anestésica en el rostro (el catálogo solo la indica en cuello y escote).",
+    "Número de sesiones en el rostro: no publicado. En cuello y escote, 3-6 sesiones y unos 30 minutos son datos del sector: confirmar."
+   ]
+  },
+  {
+   "slug": "peeling-medico-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "peeling-medico-facial",
+    "peeling-medico-cuello-escote",
+    "peeling-periocular",
+    "peeling-bbc"
+   ],
+   "orden": 90,
+   "destacado": false,
+   "nombre": "Peeling médico",
+   "titulo": "Peeling médico para renovar la piel: manchas, arrugas finas y marcas",
+   "titulo_seo": "Peeling médico facial en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Peeling médico en IEMEC, Boadilla del Monte: exfoliación química personalizada para manchas, arrugas finas, acné y cicatrices en rostro, cuello, escote y ojos.",
+   "entradilla": "Una exfoliación química que retira las capas más superficiales de la piel para que se renueve. Ayuda con las manchas, las arrugas finas, el acné y las cicatrices.",
+   "para_quien": [
+    "Tienes manchas, hiperpigmentación o el tono apagado.",
+    "Te preocupan las arrugas finas o la textura irregular.",
+    "Tienes marcas o cicatrices de acné.",
+    "Quieres renovar la piel del cuello, el escote o el contorno de ojos."
+   ],
+   "texto": [
+    "El peeling médico aplica agentes exfoliantes químicos que eliminan las capas superficiales de la piel. Al renovarse, la piel mejora su textura y su luminosidad y el tono se vuelve más uniforme.",
+    "Elegimos el tipo de peeling y su intensidad según tu piel y lo que quieras tratar. Se aplica en el rostro, en el cuello y el escote o en el contorno de ojos, y lo realiza el equipo médico tras una valoración médica en la que te explicamos sus riesgos y los cuidados posteriores.",
+    "En los peelings suaves no suele hacer falta descanso, pero sí protección solar alta y evitar el sol intenso los primeros días."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos; el peeling BBC, 1 hora",
+    "sesiones": "De 4 a 6, cada dos semanas, como orientación",
+    "anestesia": null,
+    "recuperacion": "Sin descanso en los peelings suaves; protección solar alta",
+    "profesional": "Equipo médico; el peeling BBC, esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Rostro",
+     "texto": "Para manchas, hiperpigmentación, arrugas finas, acné y cicatrices de la cara.",
+     "catalogo": "peeling-medico-facial"
+    },
+    {
+     "nombre": "Cuello y escote",
+     "texto": "Renueva la piel fina de estas zonas y ayuda con las manchas, las arrugas finas y las cicatrices.",
+     "catalogo": "peeling-medico-cuello-escote"
+    },
+    {
+     "nombre": "Contorno de ojos",
+     "texto": "Peeling químico suave pensado para la piel delicada que rodea los ojos: arrugas finas, líneas de expresión y pigmentación irregular.",
+     "catalogo": "peeling-periocular"
+    },
+    {
+     "nombre": "Peeling BBC",
+     "texto": "Peeling de renovación superficial que realiza el equipo de estética: retira células muertas y aporta luminosidad y un tono uniforme. Sesión de 1 hora.",
+     "catalogo": "peeling-bbc"
+    }
+   ],
+   "resultados": "Muchas personas notan la piel más luminosa tras las primeras sesiones; la mejora de manchas y textura es progresiva y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué tipo de peeling necesito?",
+     "r": "Depende de tu piel y de lo que quieras tratar: manchas, arrugas finas, acné o cicatrices. Hay peelings más suaves y otros más intensos; en la valoración elegimos el tipo y la intensidad adecuados para ti."
+    },
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Como orientación, entre 4 y 6 sesiones separadas unas dos semanas. El número exacto depende de la zona, del tipo de peeling y de cómo responda tu piel a las primeras sesiones."
+    },
+    {
+     "p": "¿Puedo tomar el sol después?",
+     "r": "Con precaución. Usa protección solar alta y evita la exposición intensa durante los primeros días, porque la piel renovada está más sensible. Si tienes vacaciones cerca, dinos la fecha para planificar las sesiones."
+    },
+    {
+     "p": "¿Puedo maquillarme después?",
+     "r": "Sí, aunque es preferible dejar respirar la piel unas horas. Te indicamos qué productos usar en casa mientras la piel se renueva, para cuidarla y prolongar el resultado."
+    },
+    {
+     "p": "¿Se puede hacer en el contorno de ojos?",
+     "r": "Sí, con un peeling específico y suave para la piel fina de alrededor de los ojos. Ayuda con las arrugas finas, las líneas de expresión y la pigmentación irregular de la zona."
+    }
+   ],
+   "preocupaciones": [
+    "manchas",
+    "arrugas",
+    "acne-y-poros",
+    "calidad-de-piel",
+    "mirada-y-ojeras"
+   ],
+   "relacionados": [
+    "luz-pulsada-intensa-ipl",
+    "microneedling-facial",
+    "piel-con-tendencia-acneica",
+    "limpieza-facial"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#peeling-medico",
+    "https://iemec-clinic.com/facial#peeling-medico-cuello",
+    "https://iemec-clinic.com/facial#peeling-periocular",
+    "https://iemec-clinic.com/blog/como-conseguir-una-piel-radiante-antes-del-verano-tratamientos-faciales-rapidos-y-efectivos",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Producto y tipos de peeling médico: no publicados; confirmar (sin marcas en la web).",
+    "Duración (unos 30 minutos) y ciclo de 4-6 sesiones cada dos semanas son datos del sector: confirmar.",
+    "«Peeling BBC» solo aparece en Treatwell: confirmar qué es y si se mantiene el nombre.",
+    "Confirmar los cuidados tras un peeling más intenso (descamación, días sin sol)."
+   ]
+  },
+  {
+   "slug": "piel-con-tendencia-acneica",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "perfect-skin-acne",
+    "peeling-acne",
+    "acne-xebor"
+   ],
+   "orden": 100,
+   "destacado": false,
+   "nombre": "Piel con tendencia acneica",
+   "titulo": "Piel con tendencia acneica y marcas de acné: microneedling, peeling y cuidado facial",
+   "titulo_seo": "Piel con tendencia acneica en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Cuidado de la piel con tendencia acneica en IEMEC, Boadilla del Monte: microneedling, peeling y cuidado facial para la textura, la grasa y las marcas.",
+   "entradilla": "La piel con tendencia acneica necesita cuidados distintos según el momento: exceso de grasa, poros obstruidos o marcas. Te proponemos un plan que combina, según tu piel, microneedling, peelings y cuidado facial.",
+   "para_quien": [
+    "Tu piel tiene tendencia acneica y quieres cuidarla.",
+    "Notas exceso de grasa y poros obstruidos.",
+    "Te han quedado marcas o cicatrices de acné.",
+    "Tienes la piel sensible y buscas productos de alta tolerancia."
+   ],
+   "texto": [
+    "Nuestros tratamientos para la piel con acné ayudan a controlar el exceso de grasa y a mejorar la textura, el tono y las marcas. Empezamos valorando tu piel para elegir lo que encaja con la fase en la que está.",
+    "El microneedling para el acné usa microagujas para favorecer la renovación de la piel y mejorar las marcas. El peeling para acné la renueva sin irritarla, y el tratamiento facial para piel con tendencia acneica trabaja el exceso de sebo, la textura y las marcas con productos de alta tolerancia.",
+    "Si tienes brotes inflamados, empieza por una valoración médica: el médico decide si la cabina es adecuada para ti en ese momento o si necesitas otro tipo de atención. El equipo de estética no trata el acné activo.",
+    "Estas opciones se pueden combinar entre sí y con otros tratamientos de la clínica, como la higiene facial con triácidos, el peeling médico o la luz LED."
+   ],
+   "sesion": {
+    "duracion": "Entre 30 minutos y 1 hora, según el tratamiento",
+    "sesiones": "Se decide en la valoración; el microneedling, de 3 a 6",
+    "anestesia": "Crema anestésica en el microneedling",
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Microneedling para el acné",
+     "texto": "Protocolo con microagujas pensado para pieles con acné: favorece la renovación de la piel y ayuda a mejorar la textura y las marcas. Se aplica crema anestésica antes; como orientación, de 3 a 6 sesiones, una al mes.",
+     "catalogo": "perfect-skin-acne"
+    },
+    {
+     "nombre": "Peeling para acné",
+     "texto": "Exfoliación pensada para pieles con tendencia acneica: mejora la textura, las marcas y el tono sin irritar. Sesión de 1 hora.",
+     "catalogo": "peeling-acne"
+    },
+    {
+     "nombre": "Tratamiento facial para piel con tendencia acneica",
+     "texto": "Trabaja el exceso de sebo, la textura y las marcas con productos de alta tolerancia. Sesión de 1 hora.",
+     "catalogo": "acne-xebor"
+    }
+   ],
+   "resultados": "La piel suele ganar uniformidad a lo largo de las sesiones; la evolución depende del tipo de acné y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué tratamiento necesito?",
+     "r": "Depende de tu tipo de piel y de lo que quieras mejorar: no es lo mismo cuidar una piel grasa que trabajar marcas o cicatrices. Lo decidimos contigo en la valoración, según lo que veamos en tu piel y si hay alguna contraindicación. Si hay brotes inflamados, empezamos por una valoración médica."
+    },
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Cada piel es distinta. El microneedling para el acné suele plantearse en ciclos de 3 a 6 sesiones, una al mes, y el peeling o el tratamiento facial se programan según cómo evolucione tu piel. Te proponemos un calendario en la valoración."
+    },
+    {
+     "p": "¿Molesta el microneedling para el acné?",
+     "r": "Antes se aplica una crema anestésica, así que las molestias suelen ser mínimas. Después la piel puede quedar enrojecida y más sensible unos días; te explicamos cómo cuidarla en casa."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. En la clínica también cuidamos la piel con tendencia acneica con la higiene facial con triácidos, el peeling médico, la luz LED o la luz pulsada, según el caso. Combinar técnicas permite atender a la vez la textura y las marcas."
+    }
+   ],
+   "preocupaciones": [
+    "acne-y-poros",
+    "calidad-de-piel"
+   ],
+   "relacionados": [
+    "limpieza-facial",
+    "peeling-medico-facial",
+    "microneedling-facial",
+    "fototerapia-led-facial"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#acne",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/"
+   ],
+   "pendiente": [
+    "Autorización: el acné se trata aquí con fines estéticos (U.48); la dermatología (U.8) no está autorizada, así que no se ofrece tratamiento médico del acné. Confirmar.",
+    "La web actual atribuye al microneedling para el acné reducir la inflamación y eliminar las bacterias: aquí se formula con prudencia; el equipo médico decide qué se puede afirmar.",
+    "«Tratamiento de acné Xebor» (Treatwell): aquí va sin marca, como «tratamiento facial del acné activo»; confirmar si se nombra la línea cosmética.",
+    "Confirmar si el acné moderado o grave lo valora el equipo médico de la clínica y cómo se indica en la web.",
+    "Microneedling para el acné (hoy «Perfect Skin»): duración (unos 30 minutos) y ciclo de 3-6 sesiones son datos del sector; confirmar.",
+    "«Perfect Skin» equivale a «piel perfecta», un reclamo que las normas piden evitar: aquí va como «Microneedling para el acné»; decidir el nombre.",
+    "El catálogo tiene «Programa de tratamiento del acné» (tratamiento-acne, inactivo, no reservable): esta página cumple ese papel y el botón usa el microneedling, como el de la web actual.",
+    "Revisión final (vuelta 9): Del «tratamiento del acné» (una enfermedad, dermatología U.8) a la «piel con tendencia acneica» y sus marcas; el acné activo va a la valoración médica (regla 11). Cambia también la URL (/medicina-estetica-facial/piel-con-tendencia-acneica/)."
+   ]
+  },
+  {
+   "slug": "limpieza-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "limpieza-facial-profunda",
+    "higiene-facial-triacidos"
+   ],
+   "orden": 110,
+   "destacado": false,
+   "nombre": "Limpieza facial",
+   "titulo": "Limpieza facial profunda e higiene facial con triácidos",
+   "titulo_seo": "Limpieza facial en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Limpieza facial profunda e higiene con triácidos en IEMEC, Boadilla del Monte: retiramos impurezas, puntos negros y células muertas con productos para tu piel.",
+   "entradilla": "Una limpieza en cabina que retira impurezas, células muertas y puntos negros con productos adaptados a tu tipo de piel. Si necesitas algo más, la higiene con triácidos exfolia en profundidad.",
+   "para_quien": [
+    "Tienes puntos negros, impurezas o poros obstruidos.",
+    "Notas la piel apagada o con exceso de grasa.",
+    "Tienes tendencia al acné y quieres prevenir brotes.",
+    "Quieres preparar la piel para otros tratamientos."
+   ],
+   "texto": [
+    "En IEMEC la hacemos en cabina, con productos elegidos según tu tipo de piel. Es un buen punto de partida para cuidar la piel y para prepararla antes de otros tratamientos faciales.",
+    "La limpieza facial profunda elimina impurezas, células muertas y puntos negros. La higiene con triácidos va un paso más allá: combina tres ácidos exfoliantes, glicólico, salicílico y láctico, que limpian el poro en profundidad, afinan la textura y favorecen la renovación de la piel.",
+    "Además, la higiene con triácidos mejora la absorción de los productos que aplicas después, y es una de las opciones de nuestro tratamiento del acné porque ayuda a prevenir nuevas lesiones."
+   ],
+   "sesion": {
+    "duracion": "1 hora",
+    "sesiones": null,
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Limpieza facial profunda",
+     "texto": "Retira impurezas, células muertas y puntos negros con productos adaptados a tu piel. Sesión de 1 hora.",
+     "catalogo": "limpieza-facial-profunda"
+    },
+    {
+     "nombre": "Higiene facial con triácidos",
+     "texto": "Exfoliación con ácido glicólico, salicílico y láctico para limpiar el poro, afinar la textura y renovar la piel. Sesión de 1 hora.",
+     "catalogo": "higiene-facial-triacidos"
+    }
+   ],
+   "resultados": "Muchas personas notan la piel más limpia y luminosa tras la limpieza; con una rutina regular en casa, el efecto se mantiene más tiempo. Depende de cada piel.",
+   "preguntas": [
+    {
+     "p": "¿Qué diferencia hay entre la limpieza profunda y la higiene con triácidos?",
+     "r": "La limpieza profunda retira impurezas, células muertas y puntos negros. La higiene con triácidos añade una exfoliación con tres ácidos que trabaja el poro en profundidad y estimula la renovación, útil si tienes la piel grasa o con tendencia al acné."
+    },
+    {
+     "p": "¿Sirve si tengo acné?",
+     "r": "Sí. La higiene con triácidos forma parte de las opciones para el acné en IEMEC, porque limpia los poros, retira células muertas y ayuda a prevenir nuevas lesiones. Si tienes brotes activos, te proponemos el plan adecuado en la valoración."
+    },
+    {
+     "p": "¿Qué ácidos lleva la higiene con triácidos?",
+     "r": "Ácido glicólico, salicílico y láctico. Juntos exfolian, limpian el poro y favorecen la renovación de la piel, y mejoran la absorción de los productos que aplicas después."
+    },
+    {
+     "p": "¿Cada cuánto conviene hacerla?",
+     "r": "Depende de tu tipo de piel y de tu rutina en casa. Al terminar la sesión te recomendamos una frecuencia adaptada a ti y los cuidados para mantener el resultado entre visitas."
+    }
+   ],
+   "preocupaciones": [
+    "acne-y-poros",
+    "calidad-de-piel"
+   ],
+   "relacionados": [
+    "piel-con-tendencia-acneica",
+    "peeling-medico-facial",
+    "protocolos-faciales",
+    "masaje-facial"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#higiene-facial-triacidos",
+    "https://iemec-clinic.com/facial#acne",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/"
+   ],
+   "pendiente": [
+    "La limpieza facial profunda solo figura en Treatwell: confirmar que se ofrece tal cual.",
+    "Frecuencia recomendada de las limpiezas: no publicada."
+   ]
+  },
+  {
+   "slug": "bb-glow",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "bb-glow"
+   ],
+   "orden": 120,
+   "destacado": false,
+   "nombre": "BB Glow",
+   "titulo": "BB Glow: microneedling con sérum pigmentado para unificar el tono",
+   "titulo_seo": "BB Glow en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "BB Glow en IEMEC, Boadilla del Monte: microneedling con un sérum con pigmento para unificar el tono, hidratar la piel y disimular pequeñas imperfecciones.",
+   "entradilla": "Combinamos microagujas con un sérum con pigmento para dar a la piel un tono más uniforme y un aspecto luminoso y natural. También la hidrata y ayuda a disimular pequeñas imperfecciones.",
+   "para_quien": [
+    "Quieres un tono de piel más uniforme.",
+    "Tienes pequeñas imperfecciones que te gustaría disimular.",
+    "Buscas una piel hidratada y luminosa, con aspecto natural."
+   ],
+   "texto": [
+    "El BB Glow combina el microagujado con un sérum que contiene pigmentos. Las microagujas abren pequeños canales en la capa superficial de la piel por los que penetra el sérum, y el resultado es un tono más uniforme y luminoso.",
+    "Además de unificar el tono, hidrata la piel en profundidad y ayuda a reducir pequeñas imperfecciones. Adaptamos el tratamiento a tu tipo de piel y lo realiza el equipo de estética de IEMEC.",
+    "Se plantea en un ciclo de 3 o 4 sesiones, separadas unas dos semanas. Como en cualquier microneedling, después la piel queda enrojecida y más sensible unos días; con poca frecuencia aparecen irritación, reacciones al producto o manchas. En la valoración revisamos las contraindicaciones."
+   ],
+   "sesion": {
+    "duracion": "Unos 60 minutos",
+    "sesiones": "3 o 4, cada dos semanas, como orientación",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "Muchas personas notan un tono más uniforme tras las primeras sesiones; el efecto se refuerza con el ciclo y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Es lo mismo que una micropigmentación?",
+     "r": "No. El BB Glow no es un tatuaje ni una micropigmentación: el sérum con pigmento se aplica de forma superficial para unificar el tono, y por eso se trabaja en ciclos de sesiones. En la valoración te explicamos cuánto se mantiene en tu caso."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Como orientación, entre 3 y 4 sesiones separadas unas dos semanas. El número depende de tu piel y del resultado que busques; lo ajustamos en la valoración, donde también revisamos si hay alguna contraindicación."
+    },
+    {
+     "p": "¿Molesta?",
+     "r": "Las microagujas son muy finas y se nota como un leve pinchazo. Es un tratamiento mínimamente invasivo y bien tolerado; si tienes la piel sensible, dínoslo antes de empezar para adaptarlo."
+    },
+    {
+     "p": "¿Qué cuidados hay que tener después?",
+     "r": "Como en cualquier microneedling, la piel queda más sensible: evita la piscina y el mar durante 72 horas, usa protección solar alta y deja respirar la piel unas horas antes de maquillarte."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel",
+    "manchas"
+   ],
+   "relacionados": [
+    "microneedling-facial",
+    "bb-lips",
+    "protocolos-faciales"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#bb-glow"
+   ],
+   "pendiente": [
+    "Confirmar el sérum que se usa (la web no lo nombra) y su régimen legal.",
+    "Duración (unos 60 minutos) y ciclo de 3-4 sesiones son datos del sector: confirmar.",
+    "Confirmar que las pautas tras el microneedling (72 horas sin piscina ni mar) valen también para el BB Glow, y cuánto se mantiene el efecto.",
+    "Revisión final (vuelta 9): «No invasivo» pasa a «mínimamente invasivo» (las microagujas atraviesan la capa superficial de la piel) y se añaden los riesgos. Confirmar el régimen del sérum con pigmento: un cosmético no se introduce en la piel (normas.md, apartado c)."
+   ]
+  },
+  {
+   "slug": "fototerapia-led-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "fototerapia-led-facial"
+   ],
+   "orden": 130,
+   "destacado": false,
+   "nombre": "Fototerapia LED facial",
+   "titulo": "Fototerapia LED facial: luz para el cuidado de la piel",
+   "titulo_seo": "Fototerapia LED facial en Boadilla · IEMEC",
+   "descripcion_seo": "Fototerapia LED facial en IEMEC, Boadilla del Monte: luz que ayuda a estimular el colágeno y la elastina y se usa como apoyo en pieles con acné o manchas.",
+   "entradilla": "Una terapia con luz LED que ayuda a estimular el colágeno y la elastina y se usa como apoyo en pieles con acné o manchas. No es invasiva y se puede sumar a otros tratamientos.",
+   "para_quien": [
+    "Tienes tendencia al acné o marcas que quieres cuidar.",
+    "Te preocupan las manchas o el tono irregular.",
+    "Quieres una piel más firme y luminosa sin tratamientos invasivos.",
+    "Buscas complementar otro tratamiento facial."
+   ],
+   "texto": [
+    "La fototerapia utiliza luz LED para mejorar la salud y el aspecto de la piel. La luz ayuda a estimular la producción de colágeno y elastina y se usa como apoyo en pieles con acné o con manchas.",
+    "Es un tratamiento no invasivo y sin agujas: durante la sesión solo tienes que relajarte en la camilla mientras la luz actúa sobre la piel. Se puede aplicar en la cara y también en otras zonas del cuerpo.",
+    "En IEMEC la usamos sola o dentro de protocolos faciales como Pure Glow Up, y como complemento de limpiezas, peelings o microneedling."
+   ],
+   "sesion": {
+    "duracion": "30 minutos",
+    "sesiones": null,
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "La mejora de la luminosidad y la textura se nota de forma progresiva con las sesiones y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Molesta?",
+     "r": "No es un tratamiento invasivo ni usa agujas. Durante la sesión solo tienes que estar en la camilla y relajarte mientras la luz actúa. Si tienes la piel sensible, coméntalo antes de empezar."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Depende de lo que quieras tratar y de tu piel. En la valoración revisamos si hay alguna contraindicación y te proponemos un número de sesiones y su frecuencia, o combinar la luz LED con otro tratamiento."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. La luz LED forma parte de protocolos faciales de IEMEC como Pure Glow Up, y se puede sumar a limpiezas, peelings o microneedling. Te indicamos la combinación adecuada para tu piel en la valoración."
+    },
+    {
+     "p": "¿Sirve también para el cuerpo?",
+     "r": "Sí. La fototerapia LED se aplica en la cara y también en otras zonas del cuerpo. En esta página te contamos el tratamiento facial; pregúntanos si te interesa tratar otra zona."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel",
+    "acne-y-poros",
+    "manchas"
+   ],
+   "relacionados": [
+    "piel-con-tendencia-acneica",
+    "protocolos-faciales",
+    "luz-pulsada-intensa-ipl"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#fototerapia",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/"
+   ],
+   "pendiente": [
+    "Número de sesiones y frecuencia recomendados: no publicados.",
+    "Si se quiere detallar, confirmar los tipos de luz del equipo (por ejemplo, roja o azul)."
+   ]
+  },
+  {
+   "slug": "masaje-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "gua-sha-lift",
+    "masaje-facial-kobido"
+   ],
+   "orden": 140,
+   "destacado": false,
+   "nombre": "Masaje facial Gua Sha y Kobido",
+   "titulo": "Masaje facial Gua Sha Lift y Kobido para una piel firme y luminosa",
+   "titulo_seo": "Masaje facial Kobido y Gua Sha en Boadilla · IEMEC",
+   "descripcion_seo": "Masaje facial en IEMEC, Boadilla del Monte: Gua Sha Lift con piedras de cuarzo y masaje japonés Kobido para activar la circulación, relajar y dar luz a la piel.",
+   "entradilla": "Dos masajes faciales que activan la circulación, relajan la musculatura de la cara y dan a la piel un aspecto más firme y descansado, sin aparatos ni agujas.",
+   "para_quien": [
+    "Notas el rostro cansado, hinchado o con tensión.",
+    "Buscas un efecto tensor sin agujas.",
+    "Quieres aprender a cuidar tu piel en casa.",
+    "Te apetece un momento de relajación."
+   ],
+   "texto": [
+    "El masaje facial estimula la circulación, ayuda a drenar los líquidos retenidos y relaja la musculatura de la cara. La piel se ve más luminosa y descansada, con un efecto tensor natural.",
+    "En el Gua Sha Lift usamos piedras de cuarzo sobre rostro, cuello y escote. Incluye una masterclass personalizada para que aprendas a aplicar la técnica en casa y prolongues sus beneficios.",
+    "El Kobido es un masaje facial de origen japonés que estimula la musculatura y la circulación para dar luminosidad y un efecto tensor. También forma parte del protocolo Pure Glow Up."
+   ],
+   "sesion": {
+    "duracion": "1 hora",
+    "sesiones": null,
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Gua Sha Lift",
+     "texto": "Maniobras con piedras de cuarzo en rostro, cuello y escote para drenar, relajar y reafirmar. Incluye una masterclass para seguir en casa. 1 hora.",
+     "catalogo": "gua-sha-lift"
+    },
+    {
+     "nombre": "Masaje Kobido",
+     "texto": "Masaje facial japonés que estimula la musculatura y la circulación para dar un efecto tensor y más luminosidad. 1 hora.",
+     "catalogo": "masaje-facial-kobido"
+    }
+   ],
+   "resultados": "Muchas personas notan la piel más descansada y luminosa tras las primeras sesiones; con sesiones periódicas el efecto se mantiene más tiempo, y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué diferencia hay entre el Gua Sha y el Kobido?",
+     "r": "El Gua Sha Lift se hace con piedras de cuarzo y pone el foco en drenar y relajar rostro, cuello y escote. El Kobido es un masaje manual de origen japonés que estimula la musculatura y la circulación. Los dos buscan una piel más firme y luminosa."
+    },
+    {
+     "p": "¿Qué es la masterclass del Gua Sha?",
+     "r": "En la sesión te enseñamos, de forma personalizada, a aplicar la técnica del Gua Sha en casa. Así puedes mantener sus beneficios entre visitas con una rutina sencilla y adaptada a tu piel."
+    },
+    {
+     "p": "¿Cuándo se nota?",
+     "r": "Muchas personas notan la piel más descansada y luminosa tras las primeras sesiones, sobre todo si tienen el rostro hinchado o cansado. Con sesiones periódicas y la rutina en casa, el efecto se mantiene durante más tiempo; depende de cada persona."
+    }
+   ],
+   "preocupaciones": [
+    "bienestar",
+    "calidad-de-piel"
+   ],
+   "relacionados": [
+    "protocolos-faciales",
+    "limpieza-facial",
+    "masaje-relajante"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://iemec-clinic.com/facial",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/"
+   ],
+   "pendiente": [
+    "El masaje Kobido suelto solo figura en Treatwell: confirmar que se ofrece."
+   ]
+  },
+  {
+   "slug": "protocolos-con-microneedling",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "protocolo-dermapeel-exosomas",
+    "protocolo-adn-salmon-glow"
+   ],
+   "orden": 150,
+   "destacado": false,
+   "nombre": "Protocolos con microneedling",
+   "titulo": "Protocolos faciales con microneedling y luz LED",
+   "titulo_seo": "Protocolos con microneedling en Boadilla · IEMEC",
+   "descripcion_seo": "Protocolos faciales con microneedling en IEMEC, Boadilla del Monte: microagujas con un activo sobre la piel, luz LED y mascarilla, con valoración previa.",
+   "entradilla": "Dos protocolos de cabina que combinan microneedling, un activo que se aplica sobre la piel, luz LED y una mascarilla. Buscan mejorar la textura y la luminosidad.",
+   "para_quien": [
+    "Notas la piel apagada o con la textura irregular.",
+    "Quieres una piel más luminosa y uniforme.",
+    "Buscas un tratamiento completo que incluya cuello y escote."
+   ],
+   "texto": [
+    "Estos protocolos reúnen varias técnicas en una sesión de alrededor de una hora y media. El eje es el microneedling: un dispositivo de microagujas hace pequeñas perforaciones controladas en la superficie de la piel, sobre la que se aplica un activo.",
+    "Uno empieza con un peeling químico personalizado y sigue con microneedling con el activo, luz LED y una mascarilla de alginato. El otro empieza con ultrasonido facial y sigue con microneedling, luz LED y una mascarilla calmante e hidratante en rostro, cuello y escote.",
+    "Antes de reservar valoramos tu piel y te explicamos qué producto se usa en cada protocolo, qué es, cómo se aplica y qué cuidados necesitarás después."
+   ],
+   "sesion": {
+    "duracion": "1 h 30 min",
+    "sesiones": null,
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista, con valoración previa"
+   },
+   "variantes": [
+    {
+     "nombre": "Con peeling y microneedling",
+     "texto": "Peeling químico personalizado, microneedling con un activo aplicado sobre la piel, luz LED y mascarilla de alginato, para mejorar la textura y la luminosidad. 1 h 30 min.",
+     "catalogo": "protocolo-dermapeel-exosomas"
+    },
+    {
+     "nombre": "Con ultrasonido y microneedling",
+     "texto": "Ultrasonido facial, microneedling con un activo aplicado sobre la piel, luz LED y mascarilla calmante en rostro, cuello y escote, para una piel más luminosa. 1 h 30 min.",
+     "catalogo": "protocolo-adn-salmon-glow"
+    }
+   ],
+   "resultados": "La luminosidad y la textura mejoran de forma progresiva y varían según cada persona; en la valoración te explicamos qué esperar.",
+   "preguntas": [
+    {
+     "p": "¿Qué activo se aplica?",
+     "r": "Depende del protocolo. En la valoración te explicamos qué producto se usa, qué es, cómo se aplica y si hay alguna contraindicación en tu caso, para que decidas con toda la información."
+    },
+    {
+     "p": "¿Molesta el microneedling?",
+     "r": "Las microagujas son muy finas y se nota como un leve pinchazo; es un tratamiento bien tolerado. Después la piel puede quedar enrojecida y más sensible durante unos días."
+    },
+    {
+     "p": "¿Qué cuidados hay que tener después?",
+     "r": "Como en cualquier microneedling, evita la piscina y el mar durante 72 horas, usa protección solar alta y deja respirar la piel unas horas antes de maquillarte. Te damos las pautas al terminar."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel"
+   ],
+   "relacionados": [
+    "microneedling-facial",
+    "protocolos-faciales",
+    "fototerapia-led-facial"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/promociones",
+    "https://content.app-sources.com/s/911749830232676201/uploads/Promociones/20960088-c817-4d25-b451-adebffd78683-9028658.jpeg",
+    "https://content.app-sources.com/s/911749830232676201/uploads/Promociones/image1788176648321-8433785.jpg",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec",
+    "https://iemec-clinic.com/"
+   ],
+   "pendiente": [
+    "Régimen legal sin confirmar de los activos (exosomas en uno; PDRN, «ADN de salmón», en el otro): confirmar producto y régimen antes de publicar. Según las normas, solo podrían citarse como ingrediente cosmético de uso tópico, sin efectos terapéuticos (regenerar, cicatrizar) y nunca inyectados.",
+    "Nombres comerciales actuales «Dermapeel con exosomas» y «ADN Salmón Glow»: nombran el producto; aquí van con nombre descriptivo. Decidir si se usan.",
+    "Precio de promoción: no se publica en esta versión.",
+    "Número de sesiones recomendado: no publicado."
+   ]
+  },
+  {
+   "slug": "bb-lips",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "bb-lips"
+   ],
+   "orden": 160,
+   "destacado": false,
+   "nombre": "BB Lips",
+   "titulo": "BB Lips: hidratación y color natural para los labios",
+   "titulo_seo": "BB Lips en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "BB Lips en IEMEC, Boadilla del Monte: un tratamiento de labios que busca hidratarlos en profundidad y realzar su color natural. Con valoración previa.",
+   "entradilla": "Un tratamiento pensado para los labios que busca hidratarlos en profundidad y realzar su color natural. Antes de hacerlo, valoramos tus labios y te explicamos el procedimiento.",
+   "para_quien": [
+    "Notas los labios secos o deshidratados.",
+    "Te gustaría realzar el color natural de tus labios.",
+    "Prefieres un cambio sutil, sin aumentar el volumen."
+   ],
+   "texto": [
+    "BB Lips es un tratamiento de labios que busca hidratarlos en profundidad y realzar su color natural, para un aspecto más definido y luminoso. Está pensado para quien nota los labios secos o apagados y prefiere un cambio sutil.",
+    "Se aplica con una técnica de microagujas, como el BB Glow facial. Antes de empezar valoramos tus labios, te explicamos cómo se realiza, qué producto se usa y qué cuidados necesitarás después, y resolvemos tus dudas.",
+    "No es un relleno: si lo que buscas es más volumen o redefinir el contorno de los labios, en consulta te explicamos otras opciones."
+   ],
+   "sesion": {
+    "duracion": null,
+    "sesiones": "Se decide en la valoración",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista, con valoración previa"
+   },
+   "variantes": [],
+   "resultados": "La hidratación y el color se notan de forma gradual y varían según cada persona; en la valoración te explicamos qué esperar.",
+   "preguntas": [
+    {
+     "p": "¿Es un relleno de labios?",
+     "r": "No. BB Lips busca hidratar y realzar el color natural de los labios, no aumentar su volumen como un relleno. Si lo que quieres es más volumen o definir el contorno, en consulta te explicamos otras opciones."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Depende del estado de tus labios y del resultado que busques. En la valoración te indicamos cuántas sesiones te recomendamos y cada cuánto tiempo, antes de empezar el tratamiento."
+    },
+    {
+     "p": "¿Hace falta valoración previa?",
+     "r": "Sí. Antes de reservar el tratamiento valoramos tus labios, te explicamos el procedimiento y el producto que se usa y comprobamos que es adecuado para ti y que no hay contraindicaciones. Así decides con toda la información."
+    }
+   ],
+   "preocupaciones": [
+    "labios"
+   ],
+   "relacionados": [
+    "bb-glow",
+    "microneedling-facial"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#bb-lips"
+   ],
+   "pendiente": [
+    "Régimen legal sin confirmar: confirmar la técnica y el producto (la web no los describe; el catálogo lo clasifica como microneedling) antes de publicar.",
+    "Duración y número de sesiones: el catálogo da 60 minutos y 3-4 sesiones como datos del sector; confirmar.",
+    "La web actual habla de un ligero aumento de volumen: aquí no se menciona; confirmar."
+   ]
+  },
+  {
+   "slug": "lunares-y-lesiones-cutaneas",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "plexr-lesiones-cutaneas"
+   ],
+   "orden": 170,
+   "destacado": false,
+   "nombre": "Lunares y lesiones cutáneas",
+   "titulo": "Eliminación de lunares y lesiones cutáneas superficiales con plasma",
+   "titulo_seo": "Eliminación de lunares en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Eliminación de lunares, verrugas y otras lesiones superficiales de la piel con plasma en IEMEC, Boadilla del Monte. Siempre con valoración médica previa.",
+   "entradilla": "Tratamos lunares, verrugas y otras lesiones superficiales de la piel con tecnología de plasma, en consulta. Antes, el médico examina cada lesión y decide si es apta para este tratamiento.",
+   "para_quien": [
+    "Tienes lunares, verrugas u otras lesiones superficiales que quieres quitar.",
+    "Te preocupan los xantelasmas, pequeñas placas amarillentas en los párpados.",
+    "Quieres que un médico valore la lesión antes de tratarla."
+   ],
+   "texto": [
+    "La tecnología de plasma actúa de forma localizada sobre la superficie de la piel, lo que permite eliminar lesiones pequeñas y superficiales sin bisturí. Es un procedimiento breve que se hace en la consulta.",
+    "La primera visita es siempre una valoración médica: el médico examina la lesión, decide si puede tratarse con esta técnica y te explica sus riesgos y sus alternativas. Si no es adecuada, te indicará los siguientes pasos.",
+    "Antes de tratar se aplica una crema anestésica para que las molestias sean mínimas. Según la lesión, puede bastar una sesión o hacer falta dos o tres, separadas unas semanas."
+   ],
+   "sesion": {
+    "duracion": "Unos 15 minutos, más la crema anestésica",
+    "sesiones": "De 1 a 3, según la lesión",
+    "anestesia": "Crema anestésica",
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "La evolución depende de tu caso, del tipo y del tamaño de cada lesión; en la valoración te explicamos qué esperar y cómo cuidar la zona.",
+   "preguntas": [
+    {
+     "p": "¿Hace falta valoración antes?",
+     "r": "Sí, siempre. El médico examina la lesión antes de tratarla y solo se tratan las que considera aptas para esta técnica. Si un lunar ha cambiado de forma, de color o de tamaño, díselo en la consulta."
+    },
+    {
+     "p": "¿Molesta?",
+     "r": "Se aplica una crema anestésica antes de empezar, así que las molestias suelen ser mínimas. Es un procedimiento ambulatorio: te vas a casa al terminar, con las pautas para cuidar la zona."
+    },
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Depende de la lesión. Puede bastar una sesión o hacer falta dos o tres, separadas unas semanas. Te lo indicamos en la valoración, junto con los cuidados de la zona."
+    },
+    {
+     "p": "¿Qué lesiones se pueden tratar?",
+     "r": "Lesiones superficiales de la piel, como algunos lunares, verrugas o xantelasmas, siempre que el médico las valore como aptas. Cada caso se estudia de forma individual antes de proponerte el tratamiento."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel"
+   ],
+   "relacionados": [
+    "parpados-con-plasma",
+    "peeling-medico-facial"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Solo figura en Multiestetica («Lunares», con Plexr y valoración médica previa): confirmar qué lesiones se tratan y qué se hace si una lesión es sospechosa (análisis, derivación).",
+    "Duración (unos 15 minutos) y número de sesiones son datos del sector o del catálogo: confirmar.",
+    "Confirmar los cuidados posteriores para publicarlos.",
+    "Autorización: confirmar que la eliminación de lesiones cutáneas entra como cirugía menor ambulatoria (U.64) o mejora estética (U.48); la dermatología (U.8) no está autorizada.",
+    "Multiestetica cita el equipo (Plexr): las normas no permiten anunciar marcas de equipos de uso profesional, así que no se nombra."
+   ]
+  },
+  {
+   "slug": "masaje-relajante",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "masaje-relajante",
+    "protocolo-masaje-facial"
+   ],
+   "orden": 300,
+   "destacado": false,
+   "nombre": "Masaje relajante",
+   "titulo": "Masaje relajante de cuerpo entero para liberar tensiones",
+   "titulo_seo": "Masaje relajante en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Masaje relajante de cuerpo entero en IEMEC, Boadilla del Monte: 30 minutos o 1 hora para liberar la tensión y desconectar. También con tratamiento facial.",
+   "entradilla": "Un masaje de cuerpo entero para liberar la tensión muscular y reducir el estrés. Puedes elegir 30 minutos o una hora, o sumarle un tratamiento facial.",
+   "para_quien": [
+    "Notas tensión muscular acumulada.",
+    "Necesitas desconectar y descansar.",
+    "Quieres sumar al masaje un tratamiento facial."
+   ],
+   "texto": [
+    "Es un masaje de cuerpo entero pensado para liberar las tensiones musculares y reducir el estrés. Puedes elegir una sesión de 30 minutos o de una hora, según el tiempo del que dispongas.",
+    "Si quieres una experiencia más completa, Masaje + Facial combina el masaje relajante con un tratamiento facial adaptado a tu piel, con limpieza, masaje y activos, y termina con un cierre sensorial. Dura alrededor de una hora y media.",
+    "Lo realiza el equipo de estética de IEMEC. Si tienes alguna lesión o molestia, dínoslo antes de empezar para adaptar el masaje."
+   ],
+   "sesion": {
+    "duracion": "30 minutos o 1 hora; con facial, 1 h 30 min",
+    "sesiones": null,
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Masaje relajante",
+     "texto": "Masaje de cuerpo entero de 30 minutos o de 1 hora para liberar tensiones y desconectar.",
+     "catalogo": "masaje-relajante"
+    },
+    {
+     "nombre": "Masaje + Facial",
+     "texto": "Masaje relajante de cuerpo entero, tratamiento facial adaptado a tu piel y cierre sensorial. Alrededor de 1 h 30 min.",
+     "catalogo": "protocolo-masaje-facial"
+    }
+   ],
+   "resultados": "La sensación de descanso suele notarse al terminar la sesión y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué duración elijo?",
+     "r": "Depende del tiempo que tengas y de cómo te encuentres. La sesión de 30 minutos es un respiro breve; la de una hora permite un masaje más pausado. Si además quieres cuidar tu piel, elige Masaje + Facial."
+    },
+    {
+     "p": "¿Qué incluye el Masaje + Facial?",
+     "r": "Un masaje relajante de cuerpo entero, un tratamiento facial adaptado a tu piel, con limpieza, masaje y activos, y un cierre sensorial. En total, alrededor de una hora y media dedicada a ti."
+    },
+    {
+     "p": "¿Se puede regalar?",
+     "r": "Sí. En IEMEC tienes tarjetas regalo que la persona puede canjear por los tratamientos que prefiera, también por masajes. Pregúntanos por las opciones disponibles y te ayudamos a elegir."
+    }
+   ],
+   "preocupaciones": [
+    "bienestar"
+   ],
+   "relacionados": [
+    "masaje-facial",
+    "protocolos-faciales"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://www.treatwell.es/establecimiento/clinica-iemec/",
+    "https://iemec-clinic.com/promociones",
+    "https://content.app-sources.com/s/911749830232676201/uploads/Promociones/68b926a5-b51c-4b6a-98ba-3c3eb18e401a-9028658.jpeg",
+    "https://iemec-clinic.com/",
+    "https://iemec-clinic.com/store"
+   ],
+   "pendiente": [
+    "El masaje relajante solo figura en Treatwell: confirmar las duraciones (30 minutos y 1 hora).",
+    "Masaje + Facial se anuncia con precio de promoción: no se publica en esta versión."
+   ]
+  }
+ ],
+ "sin_pagina": [
+  {
+   "catalogo": "fotona-cuello-escote",
+   "motivo": "Oferta sin confirmar por la clínica (solo sale en el blog): no se anuncia hasta que la confirme. Si la confirma, entra como variante «Cuello y escote» del tensado facial con láser (las normas proponen «Láser para cuello y escote»).",
+   "va_en": "tensado-facial-con-laser"
+  },
+  {
+   "catalogo": "fotona-tensado-cutaneo",
+   "motivo": "Oferta sin confirmar por la clínica (solo sale en el blog): tensado con láser en rostro y cuerpo. El rostro ya está en la página del tensado facial con láser; el cuerpo no se anuncia hasta que la clínica lo confirme.",
+   "va_en": "tensado-facial-con-laser"
+  },
+  {
+   "catalogo": "microdermoabrasion",
+   "motivo": "Oferta sin confirmar por la clínica: solo aparece en la lista de Multiestetica, sin descripción ni precio. No se anuncia hasta que la confirme.",
+   "va_en": null
+  }
+ ]
+}

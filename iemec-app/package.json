@@ -5,7 +5,7 @@
   "description": "Agenda por cabinas, repesca por WhatsApp y reseñas para IEMEC (Boadilla del Monte)",
   "license": "UNLICENSED",
   "scripts": {
-    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\" \"motor/**/*.test.js\" \"servidor/**/*.test.js\"",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\" \"motor/**/*.test.js\" \"servidor/**/*.test.js\" \"web/**/*.test.js\"",
     "lint": "eslint .",
     "migrar": "node scripts/migrar.js",
     "semillar": "node scripts/semillar.js",
@@ -15,7 +15,11 @@
     "dev:servidor": "node --watch servidor/index.js",
     "build": "vite build",
     "start": "node servidor/index.js",
-    "cron": "node servidor/cron.js"
+    "cron": "node servidor/cron.js",
+    "web": "node web/construir.js",
+    "web:ver": "node web/servir.js",
+    "web:fotos": "node web/fotos.js",
+    "web:revisar": "node web/revisar.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",

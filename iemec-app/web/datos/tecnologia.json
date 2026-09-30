@@ -1,0 +1,22 @@
+{
+  "_nota": "Aparatos del catálogo (semillas/iemec/tratamientos.json, «aparatos») con su nombre genérico: normas.json prohíbe la marca de los equipos en toda la web (RDLeg 1/2015, art. 80.7-80.8). En /clinica/ solo salen los que publica la clínica y que usa algún tratamiento con página publicada.",
+  "aparatos": [
+    { "codigo": "laser-fotona", "nombre": "Láser de erbio y neodimio", "para": "Tensado facial, lipoláser y otros tratamientos con láser médico." },
+    { "codigo": "hifu-v10", "nombre": "Ultrasonidos focalizados (HIFU)", "para": "Flacidez del rostro, el cuello y el cuerpo." },
+    { "codigo": "ipl", "nombre": "Luz pulsada intensa (IPL)", "para": "Manchas, rojeces y tono irregular de la piel." },
+    { "codigo": "laser-diodo", "nombre": "Láser de diodo de cuatro longitudes de onda", "para": "Depilación láser, con sistema de frío." },
+    { "codigo": "evo-dfinitive", "nombre": "Plataforma corporal de radiofrecuencia, vacío y calor", "para": "Remodelación corporal, celulitis y flacidez." },
+    { "codigo": "rf-alta-frecuencia", "nombre": "Radiofrecuencia facial", "para": "Firmeza y calidad de la piel del rostro." },
+    { "codigo": "preso-ballancer", "nombre": "Presoterapia", "para": "Retención de líquidos y sensación de piernas cansadas." },
+    { "codigo": "oxigeno-presion", "nombre": "Oxigenoterapia a presión", "para": "Protocolos faciales y capilares de hidratación y luminosidad." },
+    { "codigo": "dermapen", "nombre": "Microneedling", "para": "Textura de la piel, poros, marcas y estrías, en rostro, cuerpo y cuero cabelludo." },
+    { "codigo": "led", "nombre": "Fototerapia LED", "para": "Complemento de los protocolos faciales." },
+    { "codigo": "led-capilar", "nombre": "LED capilar de luz roja e infrarroja", "para": "Cuidado del cuero cabelludo." },
+    { "codigo": "plexr", "nombre": "Dispositivo de plasma", "para": "Tratamiento de párpados y de pequeñas lesiones cutáneas." },
+    { "codigo": "escaner-facial", "nombre": "Escáner facial de diagnóstico", "para": "Análisis de la piel en el diagnóstico facial." },
+    { "codigo": "dermatoscopio", "nombre": "Tricoscopio", "para": "Estudio del cuero cabelludo en el diagnóstico capilar." },
+    { "codigo": "neuroline-t6", "nombre": "Neuroestimulación percutánea", "para": "Control del apetito dentro de un plan médico." },
+    { "codigo": "ultrasonido-facial", "nombre": "Ultrasonido facial", "para": "Limpieza y preparación de la piel en los protocolos faciales." },
+    { "codigo": "ecodoppler", "nombre": "Ecógrafo con eco-Doppler", "para": "Estudio de las venas de las piernas." }
+  ]
+}

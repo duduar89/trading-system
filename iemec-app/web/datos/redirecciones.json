@@ -1,0 +1,2037 @@
+{
+ "_nota": "URL de la web actual (SITE123) y adónde van en la web nueva. Copiado del inventario del 30-09-2026 (177 páginas; la portada no necesita redirección). El generador afina cada destino con catalogo_ids: si alguno de esos tratamientos tiene página publicada, la redirección va a ella; si la especialidad de destino no tiene páginas publicadas, va a /tratamientos/. Las reglas no distinguen mayúsculas y aceptan la barra final. Las anclas (#…) no llegan al servidor: las resuelve web/js/web.js en la página de destino.",
+ "fuente": "inventario.json (carpeta compartida web/), 30-09-2026",
+ "redirecciones": [
+  {
+   "desde": "/inicio",
+   "hacia": "/",
+   "nota": "Hoy ya redirige a /; corregir también el canonical y el enlace «Inicio»."
+  },
+  {
+   "desde": "/nosotros",
+   "hacia": "/clinica/",
+   "nota": "El equipo (#equipo) pasa a /equipo/."
+  },
+  {
+   "desde": "/facial",
+   "hacia": "/medicina-estetica-facial/"
+  },
+  {
+   "desde": "/corporal",
+   "hacia": "/medicina-estetica-corporal/"
+  },
+  {
+   "desde": "/perdida-de-peso",
+   "hacia": "/control-de-peso/"
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa",
+   "hacia": "/estetica-intima-femenina/"
+  },
+  {
+   "desde": "/ginecoestetica",
+   "hacia": "/estetica-intima-femenina/",
+   "nota": "Hoy redirige a /ginecologia-estetica-y-regenerativa: apuntarla directamente."
+  },
+  {
+   "desde": "/sexualidad-masculina",
+   "hacia": "/estetica-intima-masculina/"
+  },
+  {
+   "desde": "/cirugia-corporal",
+   "hacia": "/cirugia-estetica/"
+  },
+  {
+   "desde": "/cirugia-facial",
+   "hacia": "/cirugia-estetica/",
+   "nota": "Hoy da 404 pero está enlazada."
+  },
+  {
+   "desde": "/medicina-capilar",
+   "hacia": "/medicina-capilar/"
+  },
+  {
+   "desde": "/cirugia-capilar",
+   "hacia": "/cirugia-capilar/"
+  },
+  {
+   "desde": "/categorias-en-medicina-estetica",
+   "hacia": "/tratamientos/"
+  },
+  {
+   "desde": "/categorias-en-cirugia-estetica",
+   "hacia": "/cirugia-estetica/"
+  },
+  {
+   "desde": "/promociones",
+   "hacia": "/tarjetas-regalo/",
+   "nota": "La web nueva no tiene página de promociones; si se crea, cambiar el destino.",
+   "cambio": "La web nueva no tiene promociones con precio: va a las tarjetas regalo (encargo de la vuelta 9)."
+  },
+  {
+   "desde": "/marcas",
+   "hacia": "/tratamientos/",
+   "nota": "No se migra (publicidad de productos sanitarios por su marca)."
+  },
+  {
+   "desde": "/portafolio",
+   "hacia": "/tratamientos/",
+   "nota": "No se migra: fotos de pacientes de antes y después."
+  },
+  {
+   "desde": "/store",
+   "hacia": "/tarjetas-regalo/"
+  },
+  {
+   "desde": "/store/category/vales-de-regalo",
+   "hacia": "/tarjetas-regalo/"
+  },
+  {
+   "desde": "/store/cart",
+   "hacia": "/tarjetas-regalo/"
+  },
+  {
+   "desde": "/store/checkout",
+   "hacia": "/tarjetas-regalo/"
+  },
+  {
+   "desde": "/store/tarjeta-de-regalo45",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ]
+  },
+  {
+   "desde": "/generar-tarjeta-regalo-45",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ]
+  },
+  {
+   "desde": "/tarjeta-regalo-45",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ],
+   "nota": "Las tarjetas ya regaladas se enviaron como enlace a esta página: al redirigir dejan de verse. /tarjetas-regalo/ debe explicar cómo canjear una tarjeta antigua (valen 6 meses)."
+  },
+  {
+   "desde": "/store/tarjeta-de-regalo70",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ]
+  },
+  {
+   "desde": "/generar-tarjeta-regalo-70",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ]
+  },
+  {
+   "desde": "/tarjeta-regalo-70",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ],
+   "nota": "Las tarjetas ya regaladas se enviaron como enlace a esta página: al redirigir dejan de verse. /tarjetas-regalo/ debe explicar cómo canjear una tarjeta antigua (valen 6 meses)."
+  },
+  {
+   "desde": "/store/tarjeta-de-regalo140",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ]
+  },
+  {
+   "desde": "/generar-tarjeta-regalo-140",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ]
+  },
+  {
+   "desde": "/tarjeta-regalo-140",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ],
+   "nota": "Las tarjetas ya regaladas se enviaron como enlace a esta página: al redirigir dejan de verse. /tarjetas-regalo/ debe explicar cómo canjear una tarjeta antigua (valen 6 meses)."
+  },
+  {
+   "desde": "/store/tarjeta-de-regalo250",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ]
+  },
+  {
+   "desde": "/generar-tarjeta-regalo-250",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ]
+  },
+  {
+   "desde": "/tarjeta-regalo-250",
+   "hacia": "/tarjetas-regalo/",
+   "catalogo_ids": [
+    "tarjeta-regalo-online"
+   ],
+   "nota": "Las tarjetas ya regaladas se enviaron como enlace a esta página: al redirigir dejan de verse. /tarjetas-regalo/ debe explicar cómo canjear una tarjeta antigua (valen 6 meses)."
+  },
+  {
+   "desde": "/cita-online",
+   "hacia": "/pedir-cita/"
+  },
+  {
+   "desde": "/gracias",
+   "hacia": "/gracias/",
+   "nota": "Era el agradecimiento de la reserva de lipoláser."
+  },
+  {
+   "desde": "/cuestionario",
+   "hacia": "/",
+   "nota": "La web nueva no tiene encuesta: si la clínica sigue mandando este enlace, mantenerla hasta que la sustituya la app y cumplir el vale de 20 € prometido."
+  },
+  {
+   "desde": "/gracias-cuestionario",
+   "hacia": "/",
+   "nota": "Página de la encuesta, que no se migra: a la portada, como /cuestionario (/gracias/ diría «hemos recibido tu solicitud» a quien no ha enviado nada)."
+  },
+  {
+   "desde": "/lo-sentimos",
+   "hacia": "/",
+   "nota": "Página de la encuesta, que no se migra: a la portada, como /cuestionario (/gracias/ diría «hemos recibido tu solicitud» a quien no ha enviado nada)."
+  },
+  {
+   "desde": "/aprende",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "lipolaser",
+    "diagnostico-lipolaser"
+   ],
+   "nota": "Landing de anuncios de lipoláser: si hay campañas activas, cambiar antes el destino de los anuncios."
+  },
+  {
+   "desde": "/lipolaser-agenda-tu-cita",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "lipolaser",
+    "diagnostico-lipolaser"
+   ],
+   "nota": "Landing de anuncios de lipoláser: si hay campañas activas, cambiar antes el destino de los anuncios."
+  },
+  {
+   "desde": "/recuperez-vos-cheveux-a-madrid",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "pack-injerto-francia",
+    "valoracion-injerto-francia"
+   ],
+   "nota": "Público francés: la web nueva no tiene francés. Alternativa: redirigir a cliniquecapillaire-iemec.es si la clínica lo prefiere."
+  },
+  {
+   "desde": "/aviso-legal",
+   "hacia": "/aviso-legal/"
+  },
+  {
+   "desde": "/politicas-de-privacidad",
+   "hacia": "/privacidad/"
+  },
+  {
+   "desde": "/politica-de-privacidad",
+   "hacia": "/privacidad/"
+  },
+  {
+   "desde": "/politica-de-cookies",
+   "hacia": "/cookies/"
+  },
+  {
+   "desde": "/blog",
+   "hacia": "/tratamientos/",
+   "nota": "No hay blog en la web nueva."
+  },
+  {
+   "desde": "/blog/page/2",
+   "hacia": "/tratamientos/"
+  },
+  {
+   "desde": "/blog/page/3",
+   "hacia": "/tratamientos/"
+  },
+  {
+   "desde": "/microinjerto-de-cejas/",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "microinjerto-cejas"
+   ],
+   "nota": "URL antigua (404) que aún sale en buscadores."
+  },
+  {
+   "desde": "/neuroline-t6-pierde-10-kilos-en-dos-meses/",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "neuroline-t6"
+   ],
+   "nota": "URL antigua (404) que aún sale en buscadores."
+  },
+  {
+   "desde": "/blog/descubre-los-beneficios-de-la-maderoterapia-bienestar-natural-a-traves-de-la-madera",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "maderoterapia"
+   ]
+  },
+  {
+   "desde": "/blog/es-el-ipl-el-mas-efectivo-para-las-manchas-de-la-piel",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "ipl-facial"
+   ]
+  },
+  {
+   "desde": "/blog/que-tener-en-cuenta-a-la-hora-de-elegir-una-clinica-para-realizarme-un-injerto-capilar",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "injerto-capilar-fue"
+   ]
+  },
+  {
+   "desde": "/blog/exosomas.iemec",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "exosomas-faciales"
+   ]
+  },
+  {
+   "desde": "/blog/blefaroplastia.iemec",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "plexr-blefaroplastia"
+   ]
+  },
+  {
+   "desde": "/blog/rellenodeojeras.iemec",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "relleno-ojeras-ah",
+    "exosomas-faciales"
+   ]
+  },
+  {
+   "desde": "/blog/en-que-consiste-el-rejuvenecimiento-intimo-con-prp-y-por-que-cada-vez-mas-mujeres-lo-eligen",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "prp-intimo"
+   ]
+  },
+  {
+   "desde": "/blog/como-ayuda-el-laser-ginecologico-a-tratar-la-incontinencia-urinaria-sin-cirugia",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "laser-incontinencia-urinaria"
+   ]
+  },
+  {
+   "desde": "/blog/iemec.com",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "microinjerto-barba",
+    "injerto-capilar-fue"
+   ]
+  },
+  {
+   "desde": "/blog/que-son-los-inductores-de-colageno-y-como-mejoran-la-firmeza-de-tu-piel",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "inductor-colageno"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-neuroline-t6-y-como-ayuda-a-controlar-el-apetito-y-perder-peso",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "neuroline-t6",
+    "balon-gastrico"
+   ]
+  },
+  {
+   "desde": "/blog/como-funciona-el-balon-gastrico-allurion-y-cuanto-peso-puedes-perder",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "balon-gastrico",
+    "dietetica-nutricion"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-la-semaglutida-y-por-que-es-uno-de-los-tratamientos-mas-efectivos-para-perder-peso",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "semaglutida",
+    "tirzepatida-mounjaro",
+    "liraglutida-saxenda"
+   ]
+  },
+  {
+   "desde": "/blog/en-que-consiste-la-elevacion-de-pecho-mastopexia-y-cuando-se-recomienda",
+   "hacia": "/cirugia-estetica/",
+   "catalogo_ids": [
+    "mastopexia"
+   ]
+  },
+  {
+   "desde": "/blog/en-que-casos-se-recomienda-una-reduccion-de-pecho-mamoplastia-reductora",
+   "hacia": "/cirugia-estetica/",
+   "catalogo_ids": [
+    "reduccion-pecho"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-la-labioplastia-y-cuando-es-recomendable-esta-cirugia-intima-femenina",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "labioplastia"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-el-rejuvenecimiento-vaginal-y-que-tipos-existen",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "rejuvenecimiento-vaginal",
+    "radiofrecuencia-intima",
+    "prp-intimo"
+   ]
+  },
+  {
+   "desde": "/blog/como-funciona-el-blanqueamiento-genital-y-es-seguro-hacerlo",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "blanqueamiento-intimo"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-la-cirugia-de-suelo-pelvico-y-como-trata-los-prolapsos-genitales",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "cirugia-suelo-pelvico"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-la-perineoplastia-de-apertura-y-para-quien-esta-indicada",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "perineoplastia-apertura"
+   ]
+  },
+  {
+   "desde": "/blog/puedo-ponerme-botox-si-estoy-tomando-antibioticos-incompatibilidades-que-debes-conocer",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "toxina-botulinica-facial",
+    "valoracion-medica"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-el-trichotest-y-como-ayuda-a-frenar-la-caida-del-cabello",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "trichotest"
+   ]
+  },
+  {
+   "desde": "/blog/prp-capilar-funciona-el-plasma-rico-en-plaquetas-para-la-alopecia",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "prp-capilar",
+    "hair-filler"
+   ]
+  },
+  {
+   "desde": "/blog/la-mesoterapia-capilar-realmente-detiene-la-caida-del-cabello",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "mesoterapia-capilar",
+    "hair-filler"
+   ]
+  },
+  {
+   "desde": "/blog/dermapen-para-alopecia-sirve-el-microneedling-para-hacer-crecer-el-cabello",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "dermapen-capilar",
+    "prp-capilar"
+   ]
+  },
+  {
+   "desde": "/blog/hair-filler-para-la-caida-del-cabello-que-resultados-ofrece-y-como-funciona",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "hair-filler",
+    "prp-capilar"
+   ]
+  },
+  {
+   "desde": "/blog/la-fototerapia-led-es-efectiva-contra-la-alopecia-beneficios-y-resultados-reales",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "fototerapia-led-capilar",
+    "prp-capilar",
+    "mesoterapia-capilar"
+   ]
+  },
+  {
+   "desde": "/blog/a-partir-de-cuanto-tiempo-puedo-hacer-ejercicio-despues-de-aplicarme-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "acido-hialuronico"
+   ]
+  },
+  {
+   "desde": "/blog/puedo-tomar-el-sol-despues-de-un-tratamiento-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "acido-hialuronico",
+    "rinomodelacion-ah"
+   ]
+  },
+  {
+   "desde": "/blog/puedo-maquillarme-despues-de-una-sesion-de-toxina-botulinica-o-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "toxina-botulinica-facial"
+   ]
+  },
+  {
+   "desde": "/blog/puedo-beber-alcohol-despues-de-inyectarme-acido-hialuronico-o-toxina-botulinica",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "toxina-botulinica-facial"
+   ]
+  },
+  {
+   "desde": "/blog/puedo-dormir-boca-abajo-despues-de-ponerme-acido-hialuronico-o-toxina-botulinica",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "toxina-botulinica-facial"
+   ]
+  },
+  {
+   "desde": "/blog/por-que-es-importante-hacer-drenaje-linfatico-despues-de-una-sesion-de-lipolisis",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "drenaje-linfatico-manual",
+    "presoterapia"
+   ]
+  },
+  {
+   "desde": "/blog/la-lipolisis-duele-todo-lo-que-debes-saber-sobre-el-tratamiento-para-grasa-localizada",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "intralipoterapia"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-la-lipolisis-y-cuanto-tarda-en-hacer-efecto",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "intralipoterapia"
+   ]
+  },
+  {
+   "desde": "/blog/que-cuidados-debo-tener-despues-de-la-lipolisis",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "intralipoterapia"
+   ]
+  },
+  {
+   "desde": "/blog/es-seguro-el-aumento-de-gluteos-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "aumento-gluteos-ah"
+   ]
+  },
+  {
+   "desde": "/blog/cuanto-tiempo-debo-esperar-para-hacer-ejercicio-despues-del-aumento-de-gluteos-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "aumento-gluteos-ah"
+   ]
+  },
+  {
+   "desde": "/blog/puedo-ponerme-toxina-botulinica-antes-del-verano-lo-que-debes-saber-para-hacerlo-con-seguridad",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "toxina-botulinica-facial"
+   ]
+  },
+  {
+   "desde": "/blog/como-conseguir-una-piel-radiante-antes-del-verano-tratamientos-faciales-rapidos-y-efectivos",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "mesoterapia-facial",
+    "dermapen-facial",
+    "peeling-medico-facial"
+   ]
+  },
+  {
+   "desde": "/blog/como-eliminar-la-retencion-de-liquidos-antes-del-verano-tratamientos-recomendados",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "presoterapia",
+    "drenaje-linfatico-manual",
+    "mesoterapia-corporal",
+    "intralipoterapia"
+   ]
+  },
+  {
+   "desde": "/blog/es-posible-aumentar-gluteos-sin-cirugia-antes-del-verano-tratamiento-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "aumento-gluteos-ah"
+   ]
+  },
+  {
+   "desde": "/blog/por-que-el-acido-hialuronico-es-uno-de-los-tratamientos-mas-recomendados-para-rejuvenecer-tu-rostro-antes-del-verano",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "acido-hialuronico",
+    "aumento-labios-ah",
+    "perfilado-labios-ah",
+    "relleno-menton-ah",
+    "marcacion-mandibular-ah",
+    "surcos-nasogenianos-ah",
+    "peeling-medico-facial"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-la-mesoterapia-facial-y-por-que-es-ideal-para-preparar-tu-piel-antes-del-verano",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "mesoterapia-facial",
+    "radiofrecuencia-facial",
+    "peeling-medico-facial"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-el-tratamiento-efecto-gloss-y-como-puede-realzar-tus-labios-este-verano",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "hidratacion-labios-ah"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-la-radiofrecuencia-corporal-y-como-ayuda-a-combatir-la-flacidez-antes-del-verano",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "radiofrecuencia-corporal",
+    "mesoterapia-corporal"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-la-presoterapia-y-como-puede-ayudarte-a-reducir-la-retencion-de-liquidos-en-verano",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "presoterapia",
+    "mesoterapia-corporal",
+    "criolipolisis"
+   ]
+  },
+  {
+   "desde": "/blog/como-se-eliminan-las-arrugas-del-labio-superior-codigo-de-barras",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "codigo-barras-ah"
+   ]
+  },
+  {
+   "desde": "/blog/como-ayudan-los-exosomas-a-frenar-la-caida-del-cabello",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "exosomas-capilares",
+    "diagnostico-capilar",
+    "trichotest",
+    "prp-capilar",
+    "mesoterapia-capilar",
+    "dermapen-capilar",
+    "laser-capilar",
+    "injerto-capilar-fue"
+   ]
+  },
+  {
+   "desde": "/blog/que-tratamiento-es-mejor-para-eliminar-el-codigo-de-barras-sin-cirugia",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "codigo-barras-ah",
+    "dermapen-facial"
+   ]
+  },
+  {
+   "desde": "/blog/que-beneficios-tiene-el-relleno-de-pomulos-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "relleno-pomulos-ah",
+    "hialuronidasa"
+   ]
+  },
+  {
+   "desde": "/blog/que-esperar-despues-de-un-relleno-de-pomulos-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "relleno-pomulos-ah"
+   ]
+  },
+  {
+   "desde": "/blog/que-cuidados-debo-tener-antes-y-despues-del-relleno-de-pomulos-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "relleno-pomulos-ah"
+   ]
+  },
+  {
+   "desde": "/blog/cuales-son-los-riesgos-o-efectos-secundarios-del-relleno-de-pomulos-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "relleno-pomulos-ah"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-el-tratamiento-pure-glow-up-y-para-que-sirve",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "protocolo-pure-glow-up"
+   ]
+  },
+  {
+   "desde": "/blog/que-es-easy-diet-y-como-funciona-para-perder-peso",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "easy-diet"
+   ]
+  },
+  {
+   "desde": "/blog/como-se-realiza-el-engrosamiento-de-pene-y-cuales-son-sus-resultados",
+   "hacia": "/estetica-intima-masculina/",
+   "catalogo_ids": [
+    "engrosamiento-pene-ah"
+   ]
+  },
+  {
+   "desde": "/blog/en-que-consiste-el-blanqueamiento-vaginal-y-es-seguro",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "blanqueamiento-intimo"
+   ]
+  },
+  {
+   "desde": "/blog/que-resultados-ofrece-el-microinjerto-de-cejas-y-es-permanente",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "microinjerto-cejas"
+   ]
+  },
+  {
+   "desde": "/blog/que-resultados-puedo-esperar-del-microinjerto-de-barba-y-como-es-el-proceso",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "microinjerto-barba"
+   ]
+  },
+  {
+   "desde": "/blog/cuanto-dura-el-efecto-del-tratamiento-pure-glow-up-en-la-piel",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "protocolo-pure-glow-up"
+   ]
+  },
+  {
+   "desde": "/blog/easy-diet-es-solo-para-perder-peso-o-tambien-mejora-la-salud-metabolica",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "easy-diet"
+   ]
+  },
+  {
+   "desde": "/blog/que-debo-saber-antes-de-hacerme-un-engrosamiento-de-pene",
+   "hacia": "/estetica-intima-masculina/",
+   "catalogo_ids": [
+    "engrosamiento-pene-ah"
+   ]
+  },
+  {
+   "desde": "/blog/el-blanqueamiento-vaginal-es-permanente-o-requiere-mantenimiento",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "blanqueamiento-intimo"
+   ]
+  },
+  {
+   "desde": "/blog/cuanto-tiempo-debo-esperar-para-tomar-el-sol-despues-de-un-tratamiento-con-neuromoduladores-toxina-botulinica",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "toxina-botulinica-facial"
+   ]
+  },
+  {
+   "desde": "/blog/cuando-puedo-ir-a-la-piscina-despues-de-un-tratamiento-facial-con-dermapen",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "dermapen-facial"
+   ]
+  },
+  {
+   "desde": "/blog/despues-de-un-relleno-de-pomulos-con-acido-hialuronico-cuando-puedo-ir-a-la-playa",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "relleno-pomulos-ah"
+   ]
+  },
+  {
+   "desde": "/blog/cuando-puedo-hacer-ejercicio-despues-de-un-tratamiento-facial-con-mesoterapia",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "mesoterapia-facial"
+   ]
+  },
+  {
+   "desde": "/blog/cuanto-tiempo-debo-esperar-para-exponerme-al-sol-despues-de-un-tratamiento-facial-con-pure-glow-up",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "protocolo-pure-glow-up",
+    "prp-facial"
+   ]
+  },
+  {
+   "desde": "/blog/que-resultados-puedo-esperar-con-el-laser-fotona-para-rejuvenecimiento-facial",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "fotona-4d-facial"
+   ]
+  },
+  {
+   "desde": "/blog/en-que-consiste-el-lifting-4d-sin-cirugia-con-laser-fotona",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "fotona-4d-facial"
+   ]
+  },
+  {
+   "desde": "/blog/como-mejora-el-laser-fotona-la-firmeza-de-la-piel-sin-cirugia",
+   "hacia": "/medicina-estetica-facial/tensado-facial-con-laser/",
+   "catalogo_ids": [
+    "fotona-tensado-cutaneo",
+    "inductor-colageno",
+    "hilos-tensores"
+   ],
+   "nota": "Su tratamiento principal (el láser de tensado) no tiene página propia y va en «Tensado facial con láser»."
+  },
+  {
+   "desde": "/blog/que-tratamientos-ginecologicos-se-pueden-realizar-con-laser-fotona",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "laser-atrofia-vaginal",
+    "rejuvenecimiento-vaginal",
+    "laser-hiperlaxitud-vaginal"
+   ]
+  },
+  {
+   "desde": "/blog/como-actua-el-laser-fotona-en-la-flacidez-del-cuello-y-escote",
+   "hacia": "/medicina-estetica-facial/tensado-facial-con-laser/",
+   "catalogo_ids": [
+    "fotona-cuello-escote",
+    "hilos-tensores",
+    "radiofrecuencia-facial"
+   ],
+   "nota": "Su tratamiento principal (el láser de tensado) no tiene página propia y va en «Tensado facial con láser»."
+  },
+  {
+   "desde": "/blog/evosculpt-que-es-como-funciona-y-cuando-se-notan-los-resultados",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "protocolo-evosculpt",
+    "tecnologia-evo-corporal"
+   ]
+  },
+  {
+   "desde": "/blog/hifu-facial-el-lifting-sin-cirugia",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "hifu-facial"
+   ]
+  },
+  {
+   "desde": "/blog/ipl-medico-para-manchas-rosacea-y-acne",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "ipl-facial"
+   ]
+  },
+  {
+   "desde": "/blog/cual-es-el-mejor-tratamiento-para-la-flacidez-facial",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "hifu-facial",
+    "inductor-colageno",
+    "radiofrecuencia-facial"
+   ]
+  },
+  {
+   "desde": "/blog/exosomas-capilares-la-nueva-generacion-contra-la-caida-del-cabello",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "exosomas-capilares",
+    "diagnostico-capilar",
+    "mesoterapia-capilar"
+   ]
+  },
+  {
+   "desde": "/blog/mesoterapia-capilar-o-prp-que-tratamiento-elegir",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "mesoterapia-capilar"
+   ]
+  },
+  {
+   "desde": "/blog/head-spa-japones-mucho-mas-que-un-masaje-capilar",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "head-spa-japones",
+    "diagnostico-capilar"
+   ]
+  },
+  {
+   "desde": "/blog/como-eliminar-la-retencion-de-liquidos-en-piernas",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "presoterapia",
+    "protocolo-evosculpt",
+    "drenaje-linfatico-manual"
+   ]
+  },
+  {
+   "desde": "/blog/radiofrecuencia-corporal-beneficios-y-resultados",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "radiofrecuencia-corporal"
+   ]
+  },
+  {
+   "desde": "/blog/tratamientos-corporales-para-preparar-el-verano",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "protocolo-evosculpt",
+    "hifu-corporal",
+    "presoterapia"
+   ]
+  },
+  {
+   "desde": "/blog/mounjaro-la-guia-definitiva-sobre-la-tirzepatida-para-perder-peso-2026",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "tirzepatida-mounjaro",
+    "hifu-corporal"
+   ]
+  },
+  {
+   "desde": "/blog/mounjaro-vs-ozempic-vs-wegovy-cual-es-la-diferencia",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "tirzepatida-mounjaro",
+    "semaglutida"
+   ]
+  },
+  {
+   "desde": "/blog/author/IEMEC",
+   "hacia": "/tratamientos/"
+  },
+  {
+   "desde": "/blog/author/Iemec marketing",
+   "hacia": "/tratamientos/"
+  },
+  {
+   "desde": "/blog/category/Estetica-Facial",
+   "hacia": "/medicina-estetica-facial/"
+  },
+  {
+   "desde": "/blog/category/IEMEC",
+   "hacia": "/tratamientos/"
+  },
+  {
+   "desde": "/blog/category/Medicina-Capilar",
+   "hacia": "/medicina-capilar/"
+  },
+  {
+   "desde": "/blog/category/Tratamientos-corporales",
+   "hacia": "/medicina-estetica-corporal/"
+  },
+  {
+   "desde": "/blog/category/emec",
+   "hacia": "/tratamientos/"
+  },
+  {
+   "desde": "/blog/category/iemec",
+   "hacia": "/tratamientos/"
+  },
+  {
+   "desde": "/blog/category/informacion",
+   "hacia": "/tratamientos/"
+  },
+  {
+   "desde": "/blog/tag/EvoSculpt",
+   "hacia": "/medicina-estetica-corporal/"
+  },
+  {
+   "desde": "/blog/tag/HIFU",
+   "hacia": "/medicina-estetica-facial/"
+  },
+  {
+   "desde": "/blog/tag/IEMEC",
+   "hacia": "/tratamientos/"
+  },
+  {
+   "desde": "/blog/tag/IPL-para-manchas,-rosacea-y-acne",
+   "hacia": "/medicina-estetica-facial/"
+  },
+  {
+   "desde": "/blog/tag/Mesoterapia-capilar",
+   "hacia": "/medicina-capilar/"
+  },
+  {
+   "desde": "/blog/tag/PRP",
+   "hacia": "/medicina-capilar/"
+  },
+  {
+   "desde": "/blog/tag/Radiofrecuencia-Definitive-Evo",
+   "hacia": "/medicina-estetica-facial/"
+  },
+  {
+   "desde": "/blog/tag/adelgazar",
+   "hacia": "/control-de-peso/"
+  },
+  {
+   "desde": "/blog/tag/caida-del-cabello",
+   "hacia": "/medicina-capilar/"
+  },
+  {
+   "desde": "/blog/tag/diferencias",
+   "hacia": "/control-de-peso/"
+  },
+  {
+   "desde": "/blog/tag/exosomas-capilares",
+   "hacia": "/medicina-capilar/"
+  },
+  {
+   "desde": "/blog/tag/flacidez-facial",
+   "hacia": "/medicina-estetica-facial/"
+  },
+  {
+   "desde": "/blog/tag/head-spa",
+   "hacia": "/medicina-capilar/"
+  },
+  {
+   "desde": "/blog/tag/head-spa-japones",
+   "hacia": "/medicina-capilar/"
+  },
+  {
+   "desde": "/blog/tag/iemec",
+   "hacia": "/tratamientos/"
+  },
+  {
+   "desde": "/blog/tag/lifting-sin-cirujia",
+   "hacia": "/medicina-estetica-facial/"
+  },
+  {
+   "desde": "/blog/tag/liquidos-en-piernas",
+   "hacia": "/medicina-estetica-corporal/"
+  },
+  {
+   "desde": "/blog/tag/masaje-capilar",
+   "hacia": "/medicina-capilar/"
+  },
+  {
+   "desde": "/blog/tag/monjauro",
+   "hacia": "/control-de-peso/"
+  },
+  {
+   "desde": "/blog/tag/mounjaro",
+   "hacia": "/control-de-peso/"
+  },
+  {
+   "desde": "/blog/tag/ozempic",
+   "hacia": "/control-de-peso/"
+  },
+  {
+   "desde": "/blog/tag/perdida-de-peso",
+   "hacia": "/control-de-peso/"
+  },
+  {
+   "desde": "/blog/tag/piernas-pesadas",
+   "hacia": "/medicina-estetica-corporal/"
+  },
+  {
+   "desde": "/blog/tag/presoterapia-Pro-Ballacer",
+   "hacia": "/medicina-estetica-corporal/"
+  },
+  {
+   "desde": "/blog/tag/radiofrecuencia-corporal",
+   "hacia": "/medicina-estetica-corporal/"
+  },
+  {
+   "desde": "/blog/tag/tratamiento-capilar",
+   "hacia": "/medicina-capilar/"
+  },
+  {
+   "desde": "/blog/tag/tratamiento-corporal",
+   "hacia": "/medicina-estetica-corporal/"
+  },
+  {
+   "desde": "/blog/tag/tratamiento-facial",
+   "hacia": "/medicina-estetica-facial/"
+  },
+  {
+   "desde": "/blog/tag/tratamineto-capilar",
+   "hacia": "/medicina-capilar/"
+  },
+  {
+   "desde": "/blog/tag/verano",
+   "hacia": "/medicina-estetica-corporal/"
+  },
+  {
+   "desde": "/blog/tag/wegovy",
+   "hacia": "/control-de-peso/"
+  }
+ ],
+ "anclas": [
+  {
+   "desde": "/facial#tratamientos-con-exosomas",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "exosomas-faciales"
+   ]
+  },
+  {
+   "desde": "/facial#higiene-facial-triacidos",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "higiene-facial-triacidos"
+   ]
+  },
+  {
+   "desde": "/facial#masculinizacion-facial",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "masculinizacion-facial"
+   ]
+  },
+  {
+   "desde": "/facial#relleno-de-ojeras-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "relleno-ojeras-ah"
+   ]
+  },
+  {
+   "desde": "/facial#blefaroplastia-plexr-ojeras",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "plexr-blefaroplastia"
+   ]
+  },
+  {
+   "desde": "/facial#aumento-de-labios-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "aumento-labios-ah"
+   ]
+  },
+  {
+   "desde": "/facial#perfilado-de-labios-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "perfilado-labios-ah"
+   ]
+  },
+  {
+   "desde": "/facial#hidratacion-de-labios-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "hidratacion-labios-ah"
+   ]
+  },
+  {
+   "desde": "/facial#tratamiento-de-codigo-de-barras-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "codigo-barras-ah"
+   ]
+  },
+  {
+   "desde": "/facial#bb-lips",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "bb-lips"
+   ]
+  },
+  {
+   "desde": "/facial#diagnostico-facial",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "diagnostico-facial"
+   ]
+  },
+  {
+   "desde": "/facial#luz-pulsada-intensa-ipl",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "ipl-facial"
+   ]
+  },
+  {
+   "desde": "/facial#acne",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "tratamiento-acne",
+    "perfect-skin-acne"
+   ]
+  },
+  {
+   "desde": "/facial#relleno-de-pomulos-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "relleno-pomulos-ah"
+   ]
+  },
+  {
+   "desde": "/facial#nosotrosblefaroplastia-plexr-mirada",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "plexr-blefaroplastia"
+   ]
+  },
+  {
+   "desde": "/facial#peeling-periocular",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "peeling-periocular"
+   ]
+  },
+  {
+   "desde": "/facial#hifu-rejuvenecimiento-facial",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "hifu-facial",
+    "valoracion-hifu",
+    "hifu-corporal"
+   ]
+  },
+  {
+   "desde": "/facial#lifting-facial-sin-cirugia-con-laser-fotona-4d",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "fotona-4d-facial"
+   ]
+  },
+  {
+   "desde": "/facial#inductor-de-colageno",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "inductor-colageno"
+   ]
+  },
+  {
+   "desde": "/facial#plasma-rico-en-plaquetas-prp",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "prp-facial"
+   ]
+  },
+  {
+   "desde": "/facial#mesoterapia",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "mesoterapia-facial"
+   ]
+  },
+  {
+   "desde": "/facial#peeling-medico",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "peeling-medico-facial"
+   ]
+  },
+  {
+   "desde": "/facial#dermapen",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "dermapen-facial"
+   ]
+  },
+  {
+   "desde": "/facial#bb-glow",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "bb-glow"
+   ]
+  },
+  {
+   "desde": "/facial#natulift",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "natulift"
+   ]
+  },
+  {
+   "desde": "/facial#skinbooster",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "skinbooster-facial"
+   ]
+  },
+  {
+   "desde": "/facial#microneedling",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "dermapen-facial"
+   ]
+  },
+  {
+   "desde": "/facial#fototerapia",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "fototerapia-led-facial"
+   ]
+  },
+  {
+   "desde": "/facial#redensificacion",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "redensificacion-facial"
+   ]
+  },
+  {
+   "desde": "/facial#radiofrecuencia-facial-rostro",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "radiofrecuencia-facial",
+    "gua-sha-lift"
+   ]
+  },
+  {
+   "desde": "/facial#tratamiento-inyectable-bloqueador-neuromuscular",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "toxina-botulinica-facial"
+   ]
+  },
+  {
+   "desde": "/facial#oxigenoterapia-hiperbarica-facial",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "oxigenoterapia-facial"
+   ]
+  },
+  {
+   "desde": "/facial#radiofrecuencia-facial-para-la-papada",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "radiofrecuencia-papada"
+   ]
+  },
+  {
+   "desde": "/facial#mesoterapia-papada",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "mesoterapia-papada"
+   ]
+  },
+  {
+   "desde": "/facial#tratamiento-inyectable-bloqueador-neuromuscular-cuello",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "toxina-botulinica-cuello"
+   ]
+  },
+  {
+   "desde": "/facial#plasma-rico-en-plaquetas-prp-cuello",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "prp-cuello-escote"
+   ]
+  },
+  {
+   "desde": "/facial#microneedling-cuello",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "microneedling-cuello-escote"
+   ]
+  },
+  {
+   "desde": "/facial#peeling-medico-cuello",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "peeling-medico-cuello-escote"
+   ]
+  },
+  {
+   "desde": "/facial#skinbooster-cuello",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "skinbooster-cuello-escote"
+   ]
+  },
+  {
+   "desde": "/corporal#varices",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "varices-ecoesclerosis",
+    "laser-vascular-piernas"
+   ]
+  },
+  {
+   "desde": "/corporal#mesoterapia-con-alidya-contra-la-celulitis",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "mesoterapia-alidya"
+   ]
+  },
+  {
+   "desde": "/corporal#microneedling-para-la-flacidez-retencion-liquidos-y-celulitis",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "microneedling-celulitis"
+   ]
+  },
+  {
+   "desde": "/corporal#radiofrecuencia-corporal",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "radiofrecuencia-corporal"
+   ]
+  },
+  {
+   "desde": "/corporal#presoterapia-celulitis",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "presoterapia"
+   ]
+  },
+  {
+   "desde": "/corporal#tecnologia-evo",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "tecnologia-evo-corporal"
+   ]
+  },
+  {
+   "desde": "/corporal#subcision",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "subcision-celulitis"
+   ]
+  },
+  {
+   "desde": "/corporal#maderoterapia",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "maderoterapia"
+   ]
+  },
+  {
+   "desde": "/corporal#peeling-medico-para-cicatrices-y-estrias",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "peeling-medico-cicatrices-estrias"
+   ]
+  },
+  {
+   "desde": "/corporal#microneedling-corporal-para-estrias-y-cicatrices",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "microneedling-corporal-estrias"
+   ]
+  },
+  {
+   "desde": "/corporal#subcision-para-estrias-y-cicatrices",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "subcision-cicatrices-estrias"
+   ]
+  },
+  {
+   "desde": "/corporal#intralipoterapia",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "intralipoterapia"
+   ]
+  },
+  {
+   "desde": "/corporal#lipolisis",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "lipolaser"
+   ]
+  },
+  {
+   "desde": "/corporal#dietetica-y-nutricion",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "dietetica-nutricion"
+   ]
+  },
+  {
+   "desde": "/corporal#mesoterapia-corporal",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "mesoterapia-corporal"
+   ]
+  },
+  {
+   "desde": "/corporal#maderoterapia-para-reducir-grasa-acumulada",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "maderoterapia"
+   ]
+  },
+  {
+   "desde": "/corporal#tecnologia-evo-para-grasa-localizada",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "tecnologia-evo-corporal"
+   ]
+  },
+  {
+   "desde": "/corporal#aumento-de-gluteos-con-acido-hialuronico",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "aumento-gluteos-ah"
+   ]
+  },
+  {
+   "desde": "/corporal#toxina-botulinica-contra-el-sudor",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "toxina-hiperhidrosis"
+   ]
+  },
+  {
+   "desde": "/perdida-de-peso#neuroline-t6",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "neuroline-t6"
+   ]
+  },
+  {
+   "desde": "/perdida-de-peso#balon-gastrico-allurion",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "balon-gastrico"
+   ]
+  },
+  {
+   "desde": "/perdida-de-peso#semaglutida",
+   "hacia": "/control-de-peso/",
+   "catalogo_ids": [
+    "semaglutida"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#labioplastia",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "labioplastia"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#rejuvenecimiento-vaginal",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "rejuvenecimiento-vaginal"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#blanqueamiento-vaginal",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "blanqueamiento-intimo"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#cirugia-de-suelo-pelvico-prolapsos-o-distopias.",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "cirugia-suelo-pelvico"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#cirugia-para-la-apertura-de-introito-vaginal-perineoplastia-de-apertura-.",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "perineoplastia-apertura"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#tratamientos-con-plasma-rico-en-plaquetas-prp-.",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "prp-intimo"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#tratamiento-laser-de-la-incontinencia-urinaria-de-esfuerzo-iue.",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "laser-incontinencia-urinaria"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#tratamiento-laser-de-la-atrofia-vaginal.",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "laser-atrofia-vaginal"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#tratamiento-laser-de-la-hiperlaxitud-y-prolapso-lev.",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "laser-hiperlaxitud-vaginal"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#tratamiento-laser-de-los-condilomas.",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "laser-condilomas"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#tratamiento-laser-del-liquen-esclero-atrofico.-enfermedad-.",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "laser-liquen-escleroatrofico"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#cirugia-del-capuchon-de-clitoris.",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "cirugia-capuchon-clitoris"
+   ]
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#cirugia-para-reparar-el-desgarro-perineal.-perineoplastia-de-cierre-.",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "perineoplastia-cierre"
+   ]
+  },
+  {
+   "desde": "/cirugia-corporal#aumento-de-pecho",
+   "hacia": "/cirugia-estetica/",
+   "catalogo_ids": [
+    "aumento-pecho"
+   ]
+  },
+  {
+   "desde": "/cirugia-corporal#elevacion-de-pecho-mastopexia",
+   "hacia": "/cirugia-estetica/",
+   "catalogo_ids": [
+    "mastopexia"
+   ]
+  },
+  {
+   "desde": "/cirugia-corporal#reduccion-de-pecho-o-mamoplastia",
+   "hacia": "/cirugia-estetica/",
+   "catalogo_ids": [
+    "reduccion-pecho"
+   ]
+  },
+  {
+   "desde": "/cirugia-corporal#liposuccion",
+   "hacia": "/cirugia-estetica/",
+   "catalogo_ids": [
+    "liposuccion"
+   ]
+  },
+  {
+   "desde": "/cirugia-corporal#abdominoplastia",
+   "hacia": "/cirugia-estetica/",
+   "catalogo_ids": [
+    "abdominoplastia"
+   ]
+  },
+  {
+   "desde": "/cirugia-corporal#lipofilling-para-aumento-de-gluteos",
+   "hacia": "/cirugia-estetica/",
+   "catalogo_ids": [
+    "lipofilling-gluteos"
+   ]
+  },
+  {
+   "desde": "/cirugia-corporal#otoplastia",
+   "hacia": "/cirugia-estetica/",
+   "catalogo_ids": [
+    "otoplastia"
+   ]
+  },
+  {
+   "desde": "/medicina-capilar#trichotest-contra-la-alopecia",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "trichotest"
+   ]
+  },
+  {
+   "desde": "/medicina-capilar#prp-contra-la-alopecia",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "prp-capilar"
+   ]
+  },
+  {
+   "desde": "/medicina-capilar#mesoterapia-contra-la-alopecia",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "mesoterapia-capilar"
+   ]
+  },
+  {
+   "desde": "/medicina-capilar#dermapen-contra-la-alopecia",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "dermapen-capilar",
+    "exosomas-capilares"
+   ]
+  },
+  {
+   "desde": "/medicina-capilar#hair-filler-contra-la-alopecia",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "hair-filler"
+   ]
+  },
+  {
+   "desde": "/medicina-capilar#fototerapia-contra-la-alopecia",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "fototerapia-led-capilar"
+   ]
+  },
+  {
+   "desde": "/medicina-capilar#oxigenoterapia-capilar",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "oxigenoterapia-capilar",
+    "diagnostico-capilar",
+    "laser-capilar"
+   ]
+  },
+  {
+   "desde": "/medicina-capilar#head-spa-japones",
+   "hacia": "/medicina-capilar/",
+   "catalogo_ids": [
+    "head-spa-japones",
+    "head-spa-detox",
+    "head-spa-synergie",
+    "head-spa-zen-premium",
+    "suplemento-olaplex"
+   ]
+  },
+  {
+   "desde": "/cirugia-capilar#microinjerto-capilar-fue",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "injerto-capilar-fue"
+   ]
+  },
+  {
+   "desde": "/cirugia-capilar#microinjerto-de-cejas",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "microinjerto-cejas"
+   ]
+  },
+  {
+   "desde": "/cirugia-capilar#microinjerto-de-barba",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "microinjerto-barba"
+   ]
+  },
+  {
+   "desde": "/cirugia-capilar#frontoplastia",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "frontoplastia"
+   ]
+  },
+  {
+   "desde": "/cirugia-capilar#tratamientos-para-eliminar-cicatrices",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "cicatrices-capilares"
+   ]
+  },
+  {
+   "desde": "/cirugia-capilar#reparacion-y-reconstruccion-de-trasplantes",
+   "hacia": "/cirugia-capilar/",
+   "catalogo_ids": [
+    "reparacion-trasplante-capilar"
+   ]
+  },
+  {
+   "desde": "/nosotros#equipo",
+   "hacia": "/equipo/",
+   "cambio": "El equipo tiene página propia."
+  },
+  {
+   "desde": "/lipolaser-agenda-tu-cita#agendadiagnosticogratis",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "diagnostico-lipolaser"
+   ]
+  },
+  {
+   "desde": "/marcas#profhilo",
+   "hacia": "/medicina-estetica-facial/",
+   "catalogo_ids": [
+    "profhilo"
+   ]
+  },
+  {
+   "desde": "/facial#facial",
+   "hacia": "/medicina-estetica-facial/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/facial#ojeras",
+   "hacia": "/tratamientos/?p=mirada-y-ojeras",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
+  },
+  {
+   "desde": "/facial#labios",
+   "hacia": "/tratamientos/?p=labios",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
+  },
+  {
+   "desde": "/facial#piel",
+   "hacia": "/tratamientos/?p=calidad-de-piel",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
+  },
+  {
+   "desde": "/facial#pomulos",
+   "hacia": "/medicina-estetica-facial/",
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "relleno-pomulos-ah"
+   ]
+  },
+  {
+   "desde": "/facial#servicios-de-mirada",
+   "hacia": "/tratamientos/?p=mirada-y-ojeras",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
+  },
+  {
+   "desde": "/facial#rejuvenecimiento-facial",
+   "hacia": "/medicina-estetica-facial/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/facial#papada",
+   "hacia": "/medicina-estetica-facial/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/facial#cuello-y-escote",
+   "hacia": "/medicina-estetica-facial/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/corporal#celulitis",
+   "hacia": "/tratamientos/?p=celulitis",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
+  },
+  {
+   "desde": "/corporal#estrias-y-cicatrices",
+   "hacia": "/medicina-estetica-corporal/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/corporal#grasa-acumulada",
+   "hacia": "/tratamientos/?p=grasa-localizada",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
+  },
+  {
+   "desde": "/corporal#gluteos",
+   "hacia": "/medicina-estetica-corporal/",
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "aumento-gluteos-ah"
+   ]
+  },
+  {
+   "desde": "/corporal#sudor",
+   "hacia": "/medicina-estetica-corporal/",
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "toxina-hiperhidrosis"
+   ]
+  },
+  {
+   "desde": "/cirugia-corporal#pecho",
+   "hacia": "/cirugia-estetica/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/cirugia-corporal#grasa-localizada",
+   "hacia": "/cirugia-estetica/",
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "liposuccion"
+   ]
+  },
+  {
+   "desde": "/cirugia-corporal#abdomen",
+   "hacia": "/cirugia-estetica/",
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "abdominoplastia"
+   ]
+  },
+  {
+   "desde": "/cirugia-corporal#gluteos",
+   "hacia": "/cirugia-estetica/",
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "lipofilling-gluteos"
+   ]
+  },
+  {
+   "desde": "/cirugia-corporal#orejas",
+   "hacia": "/cirugia-estetica/",
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "otoplastia"
+   ]
+  },
+  {
+   "desde": "/cirugia-capilar#microinjerto-capilar",
+   "hacia": "/cirugia-capilar/",
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "injerto-capilar-fue"
+   ]
+  },
+  {
+   "desde": "/cirugia-capilar#frente",
+   "hacia": "/cirugia-capilar/",
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "frontoplastia"
+   ]
+  },
+  {
+   "desde": "/cirugia-capilar#cicatrices",
+   "hacia": "/cirugia-capilar/",
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "cicatrices-capilares"
+   ]
+  },
+  {
+   "desde": "/cirugia-capilar#reparacion-de-cirugias-previas",
+   "hacia": "/cirugia-capilar/",
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "reparacion-trasplante-capilar"
+   ]
+  },
+  {
+   "desde": "/marcas#viscoderm",
+   "hacia": "/tratamientos/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/marcas#karisma",
+   "hacia": "/tratamientos/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/marcas#radiesse",
+   "hacia": "/tratamientos/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/marcas#juvederm",
+   "hacia": "/tratamientos/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/marcas#teoxane",
+   "hacia": "/tratamientos/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/marcas#alidya",
+   "hacia": "/tratamientos/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/marcas#toskani",
+   "hacia": "/tratamientos/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/marcas#mesoestetic",
+   "hacia": "/tratamientos/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/marcas#ultracol",
+   "hacia": "/tratamientos/",
+   "nota": "Ancla de sección."
+  },
+  {
+   "desde": "/nosotros#contactanos",
+   "hacia": "/pedir-cita/",
+   "cambio": "El contacto está en Pedir cita."
+  },
+  {
+   "desde": "/promociones#black-friday-en-iemec-perfect-duo-skin",
+   "hacia": "/tarjetas-regalo/",
+   "cambio": "Sin promociones: va con /promociones a las tarjetas regalo."
+  },
+  {
+   "desde": "/cita-online#regala-belleza",
+   "hacia": "/tarjetas-regalo/",
+   "cambio": "Era el botón de las tarjetas regalo."
+  },
+  {
+   "desde": "/corporal#mesoterapia-con-alidya",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "mesoterapia-alidya"
+   ],
+   "nota": "Ancla de sección con su página en la web nueva."
+  },
+  {
+   "desde": "/corporal#microneedling",
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "microneedling-corporal-estrias"
+   ],
+   "nota": "Ancla de sección con su página en la web nueva."
+  },
+  {
+   "desde": "/ginecologia-estetica-y-regenerativa#labioplastia-o-cirugia-de-labios-menores.",
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "labioplastia"
+   ],
+   "nota": "Ancla de sección con su página en la web nueva."
+  }
+ ]
+}

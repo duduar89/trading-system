@@ -63,6 +63,10 @@ function tareaRecepcion(con, { motivo, leadId, pacienteId, conv, d, telefono, em
     telefono_fijo: ['llamar', `Llamar a ${quien} al ${tel}: ha dejado un teléfono fijo, sin WhatsApp ${deDonde(d)}`],
     baja_comercial: ['otro', `${quien}, ${tel}, pide información${interes}, pero tiene la baja de mensajes comerciales: contactar solo si procede ${deDonde(d)}`],
     conversacion: ['atender_conversacion', `${quien} ha pedido información${interes}: contestarle en su conversación ${deDonde(d)}`],
+    // Formulario de la web: quien pide que le llamen o que le contesten por correo no entra en la
+    // secuencia de WhatsApp; le contesta una persona por el medio que ha elegido.
+    web_llamada: ['llamar', `Llamar a ${quien} al ${tel}: lo ha pedido en la web${interes} ${deDonde(d)}`],
+    web_correo: ['otro', `Escribir a ${quien} a ${email || 'su correo'}: pide información${interes} y quiere la respuesta por correo ${deDonde(d)}`],
   }[motivo];
   return nuevaTarea(con, { tipo, titulo, leadId, pacienteId: pacienteId || conv?.paciente_id || null, conversacionId: conv?.id || null, ahora });
 }
@@ -177,9 +181,25 @@ async function alta(con, d, { trat, tratNombre }, { inscribir, ahora }) {
       await R.inscribir(con, { secuencia: 'lead', leadId, inicio, desdePaso: hablando ? 1 : 0 });
       inscrito = true;
     }
+  } else if (d.tareaWeb) {
+    motivo = d.tareaWeb === 'web_llamada' && !telefono ? 'sin_telefono' : d.tareaWeb;
+    tareaId = await tareaRecepcion(con, { motivo, leadId, pacienteId: paciente?.id, conv, d, telefono, email, tratNombre, ahora });
   }
   await registrar(con, { tipo: 'lead_alta', entidad: 'lead', entidadId: leadId, datos: { origen: d.origen, tratamiento: tratamientoId, via: trat?.via || null, inscrito, motivo, conversacion: conv?.id || null } });
   return { leadId, nuevo: true, inscrito, motivo, tareaId, telefono, tratamientoId };
+}
+
+// La prueba de los consentimientos de un envío del formulario de la web (RGPD, art. 7.1): cada
+// casilla por separado, con la fecha y la versión de los textos. Sin clave ajena: la prueba se
+// conserva aunque se borre el lead (bloqueada, LSSI art. 45). Un reintento del mismo envío no se
+// duplica (huella única).
+async function guardarSolicitudWeb(con, { leadId, tratamientoId }, s, ahora) {
+  await con.query(
+    `INSERT IGNORE INTO solicitudes_web (lead_id, telefono, pagina, ref, tratamiento_id, interes, preferencia, consentimiento_datos,
+                                          consentimiento_comercial, version_textos, huella_envio, enviado_en)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [leadId, s.telefono || null, cortar(s.pagina, 200), cortar(s.ref, 40), tratamientoId || null, cortar(s.interes, 80), s.preferencia,
+      Boolean(s.datos), Boolean(s.comercial), cortar(s.version, 20), s.huella, ahora]);
 }
 
 /**
@@ -187,11 +207,13 @@ async function alta(con, d, { trat, tratNombre }, { inscribir, ahora }) {
  * @param {object} d { origen, telefono (tal cual llega), nombre, email, campana, conjunto, anuncio, anuncioId,
  *                     ctwaClid, codigoWeb, utm, idExterno (el envío), idContacto, idOportunidad (GHL),
  *                     respuestas: [{ pregunta, valor }],
- *                     tratamiento: { id, respuesta, claves, textos } (ver motor/entrada/leads.js) }
- * @param {object} o { inscribir: false para quien ya está escribiendo por WhatsApp, ahora }
+ *                     tratamiento: { id, respuesta, claves, textos } (ver motor/entrada/leads.js),
+ *                     tareaWeb: 'web_llamada' | 'web_correo' (sin secuencia: le contesta una persona) }
+ * @param {object} o { inscribir: false para quien ya está escribiendo por WhatsApp (o pide llamada o
+ *                     correo en la web), ahora, solicitud: la prueba del formulario de la web }
  * @returns {{ leadId, nuevo, inscrito, motivo, tareaId, telefono, tratamientoId }}
  */
-async function altaLead(pool, d, { inscribir = true, ahora = new Date() } = {}) {
+async function altaLead(pool, d, { inscribir = true, ahora = new Date(), solicitud = null } = {}) {
   const cat = await catalogo(pool);
   const trat = E.resolverTratamiento({ ...cat, ...(d.tratamiento || {}) });
   const nombreTrat = trat ? cat.tratamientos.find((t) => t.id === trat.id)?.nombre : null;
@@ -203,6 +225,7 @@ async function altaLead(pool, d, { inscribir = true, ahora = new Date() } = {}) 
     try {
       await con.beginTransaction();
       const r = await alta(con, d, { trat, tratNombre }, { inscribir, ahora });
+      if (solicitud) await guardarSolicitudWeb(con, r, solicitud, ahora);
       await con.commit();
       return r;
     } catch (err) {

@@ -3,9 +3,10 @@
 **Estado:** todas las fases con su núcleo hecho y probado en demostración; entran de verdad
 WhatsApp y los leads; el personal entra con passkeys; la cita llega al paciente sin decir el
 tratamiento; reseñas con las normas de Google y adaptadores reales de Google y DataForSEO; el importador
-de Flowww espera su primera exportación. En marcha, la web nueva. Falta conectar las cuentas reales (envío de WhatsApp, Google, IA)
+de Flowww espera su primera exportación. **La web nueva está hecha y revisada** (95 páginas, con el
+formulario conectado a la app): se publica cuando la clínica complete lo pendiente (⛔ 12). Falta conectar las cuentas reales (envío de WhatsApp, Google, IA)
 y los datos de la clínica, que esperan las puertas ⛔.
-**Última actualización:** 30-sep-2026 · **895 pruebas en verde** · ESLint limpio
+**Última actualización:** 30-sep-2026 · **932 pruebas en verde** · ESLint limpio
 
 El encargo completo está en [`docs/ENCARGO.md`](docs/ENCARGO.md). Este fichero dice dónde estamos:
 se lee al empezar cada vuelta del loop y se actualiza al terminarla.
@@ -21,11 +22,11 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
 | F4 · Reseñas + Google | hecha | Petición a todos tras **completar** la cita (sin filtrar por queja), enlace corto, un recordatorio, temas, respuestas con aprobación, **texto y autor borrados a los 29 días**, **alerta clínica para dirección médica**, historial poco a poco, ideas de publicación; **adaptadores reales** de Business Profile (reseñas, respuestas, métricas, avisos por Pub/Sub), Places y **posiciones en Maps con DataForSEO** (malla y tope de gasto) | Accesos de Google y cuenta de DataForSEO (⛔ 6, pasos en docs/GOOGLE.md) |
 | F5 · Panel | hecha | Hoy, agenda con detalle de cita y estados, bandeja con estado de entrega, seguimientos, repesca, plantillas, reseñas, tareas, lista de espera, salas × tratamientos; PWA; fuentes propias; **entrada con passkeys**, roles y permisos por ruta, pantalla «Equipo»; **pruebas de flujo con Playwright** (15 flujos; contraste AA, foco y 390 px en cada pantalla) | Enlazar cada persona con su profesional («mis citas»); marcar en la agenda las citas importadas para revisar |
 | F6 · Despliegue | hecha | Workflows comprobar y desplegar, copia previa, recuperación de `node_modules`, comprobación del commit, copias cifradas | Workflow en la rama por defecto; secretos reales; primera alta de dirección con `npm run invitar` y quitar PANEL_CLAVE cuando todos tengan passkey |
-| F7 · Web nueva | en marcha | Vuelta 9: inventario de iemec-clinic.com, normas de publicidad sanitaria, textos de los 157 tratamientos, diseño terciopelo y generador estático | Integrar, revisar (legal y móvil) y el formulario conectado a la app |
+| F7 · Web nueva | hecha | `web/`: generador estático con la estética terciopelo, 95 páginas (7 especialidades, 76 tratamientos que cubren 116 del catálogo; 41 sin página con su motivo, 10 borradores pendientes de autorización), buscador por preocupación, WhatsApp con referencia opaca en lo íntimo, formulario «Te llamamos» → `POST /web/contacto` de la app (migración 015), el primer WhatsApp de la web da de alta el lead, 177 URLs viejas con 301, sin cookies ni terceros, normas de publicidad sanitaria comprobadas en todo lo visible; entrega a Eduardo (zip, capturas y PDF de recorrido) | Lo que confirme la clínica (⛔ 12); revisión de seguridad del formulario (vuelta 9b) |
 
 ## Pruebas
 
-`npm test` con MariaDB local (10.11): **895 pruebas en verde**. Lo más importante:
+`npm test` con MariaDB local (10.11): **932 pruebas en verde**. Lo más importante:
 
 - **Agenda:** hora de Madrid, limpiezas, crema anestésica, comidas, aparatos, festivos, diez reservas
   a la vez → una; horas redondas.
@@ -52,6 +53,10 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
   el historial por turnos y lo que hace Google al rechazar una respuesta.
 - **Google y DataForSEO:** los adaptadores con respuestas grabadas (sin red): OAuth, reseñas, avisos
   firmados de Pub/Sub, Places, malla de posiciones y el tope de gasto.
+- **Web:** el generador (determinista), las normas de publicidad sanitaria en todo lo que se ve (texto,
+  alt, URL, WhatsApp, datos estructurados), enlaces, redirecciones y anclas viejas, y 95 páginas × 8
+  anchos sin desbordes (`node web/revisar.mjs`). El formulario: 303 y JSON, validación, trampa, límites
+  y CORS.
 - **Panel en un navegador:** 15 flujos con la demo a una hora fija; en cada pantalla, contraste AA en
   claro y oscuro, nombres accesibles, foco visible y nada que desborde a 390 px.
 
@@ -84,6 +89,13 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
 10. **Facturación:** fuera de la app; decidir cómo pasa la cita a la facturación.
 11. **Lista de espera:** los valores son recomendaciones (retención 30 min, antelación 2 h, envíos de
     9:00 a 21:00, dos ofertas sin contestar y sale de la lista).
+12. **Web nueva (antes de publicarla):** los datos marcados [PENDIENTE] (horario del sábado, correo del
+    dominio, Registro Mercantil, titulación y n.º de colegiado de cada profesional, quién opera y
+    dónde, emblema FSE+, logotipo vectorial, fotos nuevas); **qué cubre la autorización CS17886** (peso
+    y nutrición, ginecología funcional, varices e hiperhidrosis quedan en borrador; capilar, U.900);
+    revisión médica de 63 páginas y del abogado sanitario y el DPD; pago online de las tarjetas regalo;
+    y el cambio de iemec-clinic.com de SITE123 al hosting propio (acceso al DNS, a través de Uebea).
+    `node web/construir.js --publicar` no deja publicar mientras quede algo pendiente a la vista.
 
 ## Registro de vueltas
 
@@ -130,3 +142,10 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
   - **Repesca**: intenciones nuevas, tratamiento de interés, recuperar la cita cancelada por WhatsApp
     y privacidad en todo lo que se manda.
   - La prueba del foco de la e2e ya no se equivoca con la máquina cargada.
+- **30-sep · vuelta 9 · la web nueva.** Inventario de iemec-clinic.com (154 servicios, 177 URLs, fotos
+  propias), normas de publicidad sanitaria con fuentes oficiales (la autorización CS17886 no cubre
+  ginecología, varices, endocrinología y nutrición ni dermatología: eso queda en borrador), textos de
+  los 157 tratamientos por cinco redactores, diseño y generador estático, revisión legal y de móvil (48
+  hallazgos, todos arreglados) y la app que recibe el formulario y el primer WhatsApp de la web. Entregado
+  a Eduardo: zip listo para subir, capturas y un PDF de recorrido para la clínica. Los agentes se
+  cortaron por el límite de uso y un reinicio del contenedor a mitad y siguieron desde donde estaban.

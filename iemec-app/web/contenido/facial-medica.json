@@ -1,0 +1,1318 @@
+{
+ "grupo": "facial-medica",
+ "paginas": [
+  {
+   "slug": "valoracion-medica",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "valoracion-medica"
+   ],
+   "orden": 1,
+   "destacado": false,
+   "nombre": "Valoración médica",
+   "titulo": "Valoración médica: el primer paso en medicina estética",
+   "titulo_seo": "Valoración de medicina estética en Boadilla · IEMEC",
+   "descripcion_seo": "Valoración médica en IEMEC, Boadilla del Monte: el médico estudia tu caso, resuelve tus dudas y te propone un plan personalizado, con riesgos y alternativas.",
+   "entradilla": "Antes de cualquier tratamiento médico estético, una consulta con el médico para conocerte, estudiar tu caso y decidir contigo qué te conviene.",
+   "para_quien": [
+    "Quieres mejorar algo de tu rostro y no sabes qué tratamiento es el adecuado.",
+    "Te interesa un tratamiento médico, como los inyectables, y necesitas la valoración previa.",
+    "Buscas un plan personalizado que combine varias técnicas, como una armonización facial.",
+    "Quieres resolver tus dudas sobre riesgos, cuidados y resultados antes de decidir."
+   ],
+   "texto": [
+    "La valoración médica es la primera visita para cualquier tratamiento de medicina estética en IEMEC. Es una consulta con el médico en la que hablamos de lo que te preocupa y de lo que te gustaría conseguir.",
+    "El médico te pregunta por tu salud, tus alergias, la medicación que tomas y los tratamientos que te hayas hecho antes. Después estudia tu rostro y tu piel y te explica qué opciones tienen sentido en tu caso, cómo son, qué riesgos y contraindicaciones tienen, qué alternativas existen y qué resultado es realista esperar, porque varía según cada persona.",
+    "Si buscas un cambio más global, como una armonización facial, en esta consulta se diseña un plan personalizado que puede combinar varias técnicas y repartirse en el tiempo. Sales con la información y el presupuesto para decidir con calma y sin compromiso."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Una primera visita",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "Sales de la consulta con un plan claro; lo que se consiga con cada tratamiento varía según cada persona y el médico te explica qué esperar en tu caso.",
+   "preguntas": [
+    {
+     "p": "¿Por qué hace falta una valoración antes del tratamiento?",
+     "r": "Porque los tratamientos médicos estéticos tienen indicaciones, riesgos y contraindicaciones. Tu salud, tu medicación o un tratamiento anterior pueden cambiar lo que conviene hacer. La valoración permite adaptar el plan a ti y decidir con toda la información."
+    },
+    {
+     "p": "¿Qué tengo que contar o traer?",
+     "r": "Cuéntale al médico qué medicación tomas, si tienes alergias y qué tratamientos estéticos te has hecho, con la zona y la fecha aproximada. Si tienes informes o datos de un relleno anterior, tráelos: ayudan a decidir."
+    },
+    {
+     "p": "¿La valoración me compromete a hacerme algo?",
+     "r": "No. La primera valoración es sin compromiso: sirve para que tengas información clara y decidas con calma. Si el médico cree que un tratamiento no es adecuado para ti, te lo dirá y te explicará qué alternativas hay."
+    },
+    {
+     "p": "¿Puedo pedir un plan para varias zonas?",
+     "r": "Sí. Si quieres mejorar varias cosas, como la calidad de la piel, el contorno o las arrugas, el médico puede proponerte un plan personalizado por fases, con el orden y los tiempos más adecuados para ti."
+    },
+    {
+     "p": "¿Quién me atiende?",
+     "r": "Te atiende un médico del equipo de medicina estética de IEMEC. Es quien estudia tu caso, te explica las opciones con sus riesgos y alternativas y, si decides seguir adelante, te indica los siguientes pasos."
+    }
+   ],
+   "preocupaciones": [
+    "arrugas",
+    "volumen-y-contorno",
+    "flacidez",
+    "calidad-de-piel"
+   ],
+   "relacionados": [
+    "diagnostico-facial",
+    "arrugas-de-expresion",
+    "aumento-de-labios",
+    "bioestimulacion-facial"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cita-online",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec",
+    "https://iemec-clinic.com/blog/puedo-ponerme-botox-si-estoy-tomando-antibioticos-incompatibilidades-que-debes-conocer"
+   ],
+   "pendiente": [
+    "La web actual (botón genérico «Medicina estética» de /cita-online) y Multiestetica la presentan como «gratuita»: las normas no permiten «gratis» como reclamo y esta versión no publica precios; aquí va como «primera valoración sin compromiso». Confirmar cómo se comunica.",
+    "Duración: el catálogo da 30 minutos como dato del sector; confirmar.",
+    "Multiestetica dice que hay videoconsulta: confirmar si se ofrece antes de mencionarla.",
+    "La «armonización facial» no tiene ficha propia (id armonizacion-facial, inactivo) y empieza por esta valoración: confirmar que se quiere presentar así.",
+    "Si se quiere nombrar a los médicos, hacerlo con su titulación real y su número de colegiado (normas.md, apartado f)."
+   ]
+  },
+  {
+   "slug": "diagnostico-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "diagnostico-facial"
+   ],
+   "orden": 2,
+   "destacado": false,
+   "nombre": "Diagnóstico facial",
+   "titulo": "Diagnóstico facial: el punto de partida para cuidar tu piel",
+   "titulo_seo": "Diagnóstico facial en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Diagnóstico facial en IEMEC, Boadilla del Monte: analizamos tu piel con un escáner facial y te proponemos un plan de tratamiento personalizado, con seguimiento.",
+   "entradilla": "Una primera cita para conocer tu piel: la analizamos con un escáner facial, hablamos de lo que te preocupa y te proponemos un plan de cuidado con seguimiento.",
+   "para_quien": [
+    "Quieres cuidar tu piel y no sabes por dónde empezar.",
+    "Notas la piel apagada, deshidratada, con manchas o con los poros más visibles.",
+    "Prefieres un plan ordenado a tratamientos sueltos.",
+    "Quieres saber qué tratamientos encajan con tu piel y con tu rutina."
+   ],
+   "texto": [
+    "El diagnóstico facial es una evaluación de tu piel para detectar lo que necesita y diseñar un plan de tratamiento personalizado. Es la primera cita recomendada si quieres empezar a cuidar tu rostro en IEMEC.",
+    "Con ayuda de un escáner facial analizamos el estado de tu piel y lo comentamos contigo, junto con tu rutina, tus hábitos y lo que te gustaría mejorar. Con esa información te proponemos un plan: qué tratamientos, en qué orden y con qué seguimiento.",
+    "Lo realiza el equipo de estética. Si el plan incluye algún tratamiento médico, como los inyectables, antes lo valora un médico en una consulta de valoración médica, donde te explica sus riesgos y contraindicaciones."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Una cita, con seguimiento según tu plan",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "Sales con un plan de cuidado adaptado a tu piel; lo que consiga cada tratamiento varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿En qué se diferencia de la valoración médica?",
+     "r": "El diagnóstico facial lo hace el equipo de estética y se centra en el estado de tu piel y en los cuidados y tratamientos de cabina. La valoración médica la hace un médico y es necesaria antes de cualquier tratamiento médico, como los inyectables."
+    },
+    {
+     "p": "¿Para qué sirve el escáner facial?",
+     "r": "Nos ayuda a ver el estado de tu piel con más detalle que a simple vista. Es una herramienta de apoyo: el plan se decide contigo, teniendo en cuenta también tu rutina, tus hábitos y lo que te gustaría mejorar."
+    },
+    {
+     "p": "¿Qué pasa después del diagnóstico?",
+     "r": "Te explicamos lo que hemos visto y te proponemos un plan con los tratamientos, su orden y el seguimiento. Tú decides si empezar y cuándo. Si más adelante tu piel cambia, revisamos el plan contigo."
+    },
+    {
+     "p": "¿Cuánto dura la cita?",
+     "r": "Como orientación, una media hora, aunque depende de cada caso y de las dudas que quieras resolver. Es una cita tranquila, pensada para conocerte y explicarte bien las opciones."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel",
+    "manchas",
+    "acne-y-poros"
+   ],
+   "relacionados": [
+    "valoracion-medica",
+    "hidratacion-profunda",
+    "mesoterapia-facial"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#diagnostico-facial",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Duración: el catálogo la estima en 30 minutos; confirmar.",
+    "La web actual dice que lo hacen «expertos» y «especialistas»; el catálogo indica esteticista. Confirmar quién lo realiza.",
+    "Confirmar qué analiza el escáner facial, si se quiere detallar."
+   ]
+  },
+  {
+   "slug": "arrugas-de-expresion",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "toxina-botulinica-facial",
+    "toxina-botulinica-cuello"
+   ],
+   "orden": 200,
+   "destacado": true,
+   "nombre": "Arrugas de expresión",
+   "titulo": "Arrugas de expresión: valoración médica",
+   "titulo_seo": "Arrugas de expresión en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Arrugas de expresión en IEMEC, Boadilla del Monte: valoración médica de la frente, el entrecejo, las patas de gallo y el cuello, con un plan adaptado a ti.",
+   "entradilla": "Las líneas de la frente, del entrecejo o de las patas de gallo se marcan con los gestos. En la valoración médica estudiamos tu caso y te explicamos qué opciones tienes.",
+   "para_quien": [
+    "Te preocupan las líneas de la frente, del entrecejo o de las patas de gallo.",
+    "Notas que las arrugas se quedan marcadas aunque no gesticules.",
+    "Te molestan las líneas o las bandas del cuello.",
+    "Quieres conocer tus opciones médicas antes de decidir."
+   ],
+   "texto": [
+    "Las arrugas de expresión aparecen por la repetición de los gestos: fruncir el ceño, sonreír o levantar las cejas. Al principio solo se ven al gesticular; con los años, y a medida que la piel pierde firmeza, pueden quedarse marcadas también en reposo.",
+    "En la valoración médica, el médico observa tu expresión y tu piel, te pregunta por tu salud y por la medicación que tomas y te explica qué opciones tienes, cómo son, sus riesgos, sus contraindicaciones y sus alternativas. Si hay un tratamiento indicado, se hace en la propia consulta.",
+    "Según el tipo de arruga, el plan puede completarse con otras técnicas de la clínica, como el relleno de las arrugas más marcadas, la bioestimulación o los tratamientos para la calidad de la piel. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": null,
+    "sesiones": "Según la valoración",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Frente, entrecejo y patas de gallo",
+     "texto": "Las zonas donde más se marcan los gestos. El médico valora tu expresión y la profundidad de las líneas antes de proponerte un plan.",
+     "catalogo": "toxina-botulinica-facial"
+    },
+    {
+     "nombre": "Cuello",
+     "texto": "Líneas horizontales y bandas verticales que se marcan en el cuello con el gesto y con los años. También requieren una valoración médica previa.",
+     "catalogo": "toxina-botulinica-cuello"
+    }
+   ],
+   "resultados": "El resultado, y cuánto se mantiene, varían según cada persona y según el tratamiento que se indique; el médico te lo explica en la valoración.",
+   "preguntas": [
+    {
+     "p": "¿Por qué se marcan las arrugas de expresión?",
+     "r": "Por la repetición de los mismos gestos durante años. Con la edad, la piel pierde firmeza y elasticidad, y las líneas que antes solo se veían al gesticular se quedan marcadas. El sol y el tabaco también influyen."
+    },
+    {
+     "p": "¿Todas las arrugas se tratan igual?",
+     "r": "No. Algunas se deben sobre todo al gesto y otras a la pérdida de firmeza o de volumen de la piel, y cada caso se aborda de forma distinta. Por eso el médico estudia tu expresión y tu piel antes de proponerte un plan, con sus riesgos y sus alternativas."
+    },
+    {
+     "p": "Si tomo medicación, ¿tengo que dejarla?",
+     "r": "Nunca dejes un medicamento por tu cuenta. Cuéntale al médico todo lo que tomas, también antibióticos o suplementos: con esa información decide si el tratamiento es adecuado ahora o si conviene esperar."
+    },
+    {
+     "p": "¿Puedo hacerlo antes de un evento o de las vacaciones?",
+     "r": "Coméntalo en la valoración para elegir bien la fecha. Algunos tratamientos necesitan unos días para asentarse y, después, conviene proteger la piel del sol y del calor intenso durante un tiempo."
+    },
+    {
+     "p": "¿Se pueden prevenir?",
+     "r": "No del todo, porque forman parte de tu expresión, pero sí se puede cuidar la piel: protección solar a diario, no fumar y una buena hidratación ayudan a retrasar que se marquen. En la valoración te damos pautas para tu caso."
+    }
+   ],
+   "preocupaciones": [
+    "arrugas"
+   ],
+   "relacionados": [
+    "valoracion-medica",
+    "codigo-de-barras",
+    "bioestimulacion-facial"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#tratamiento-inyectable-bloqueador-neuromuscular",
+    "https://iemec-clinic.com/facial#tratamiento-inyectable-bloqueador-neuromuscular-cuello",
+    "https://iemec-clinic.com/blog/puedo-ponerme-botox-si-estoy-tomando-antibioticos-incompatibilidades-que-debes-conocer",
+    "https://iemec-clinic.com/blog/cuanto-tiempo-debo-esperar-para-tomar-el-sol-despues-de-un-tratamiento-con-neuromoduladores-toxina-botulinica",
+    "https://iemec-clinic.com/blog/puedo-ponerme-toxina-botulinica-antes-del-verano-lo-que-debes-saber-para-hacerlo-con-seguridad",
+    "https://iemec-clinic.com/blog/que-tratamiento-es-mejor-para-eliminar-el-codigo-de-barras-sin-cirugia"
+   ],
+   "pendiente": [
+    "Medicamento de receta (ids toxina-botulinica-facial y toxina-botulinica-cuello): la página no lo nombra ni describe su mecanismo, su pauta ni cuánto dura su efecto, porque serían referencias indirectas (normas.md, apartado b y anexo B).",
+    "Los ids del catálogo nombran el medicamento: la referencia del botón de WhatsApp no puede llevarlos tal cual; usar un código neutro (por ejemplo, el de la página). Los mensajes actuales («toxina botulinica», «toxina botulinica cuello y escote») tampoco valen.",
+    "La web actual lo llama «Tratamiento inyectable bloqueador neuromuscular», un rodeo que las normas también prohíben: las anclas antiguas deben redirigir aquí sin repetir ese nombre.",
+    "El blog tiene entradas sobre este medicamento (sol, verano, maquillaje, alcohol, antibióticos): retirarlas o reescribirlas sin nombrarlo. Las fotos de /portafolio («NEUROMODULADORES») no se migran.",
+    "Confirmar la duración de la consulta."
+   ]
+  },
+  {
+   "slug": "aumento-de-labios",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "aumento-labios-ah",
+    "perfilado-labios-ah",
+    "hidratacion-labios-ah"
+   ],
+   "orden": 210,
+   "destacado": true,
+   "nombre": "Aumento de labios",
+   "titulo": "Aumento, perfilado e hidratación de labios",
+   "titulo_seo": "Aumento de labios en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Aumento, perfilado e hidratación de labios en IEMEC, Boadilla del Monte: tratamiento médico con valoración previa, pensado para un resultado armónico.",
+   "entradilla": "Tres formas de tratar los labios según lo que busques: más volumen, un contorno más definido o más hidratación. Lo hace un médico, tras una valoración.",
+   "para_quien": [
+    "Quieres un poco más de volumen en los labios, proporcionado con tu rostro.",
+    "Te gustaría definir el contorno o corregir una pequeña asimetría.",
+    "Notas los labios secos o con líneas finas y quieres hidratarlos.",
+    "Prefieres un cambio sutil, que se vea natural."
+   ],
+   "texto": [
+    "El tratamiento consiste en inyectar en los labios pequeñas cantidades de un gel de ácido hialurónico que el cuerpo reabsorbe poco a poco. Según lo que busques, el médico lo aplica para aportar volumen, para definir el contorno o para hidratar el labio sin cambiar apenas su forma.",
+    "Antes, en la valoración médica, estudiamos la forma y la proporción de tus labios y hablamos del resultado que te gustaría. El día del tratamiento se aplica una crema anestésica para que las molestias sean mínimas, y la sesión es breve.",
+    "Es normal notar los labios hinchados, sensibles o con algún pequeño hematoma durante unos días. Como todo tratamiento médico, tiene riesgos y contraindicaciones que el médico te explica antes de empezar. El resultado varía según cada persona y, como el producto se reabsorbe, se puede repetir si lo deseas."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos, más la crema anestésica",
+    "sesiones": "Normalmente una",
+    "anestesia": "Crema anestésica",
+    "recuperacion": "Puedes seguir con tu rutina; hinchazón leve unos días",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Aumento de labios",
+     "texto": "Aporta volumen y definición a los labios, con un resultado proporcionado con tu rostro.",
+     "catalogo": "aumento-labios-ah"
+    },
+    {
+     "nombre": "Perfilado de labios",
+     "texto": "Define el contorno y puede corregir pequeñas asimetrías, con un aumento de volumen sutil.",
+     "catalogo": "perfilado-labios-ah"
+    },
+    {
+     "nombre": "Hidratación de labios",
+     "texto": "Mejora la hidratación, la suavidad y la textura del labio sin buscar más volumen. En la clínica también se conoce como efecto gloss.",
+     "catalogo": "hidratacion-labios-ah"
+    }
+   ],
+   "resultados": "El resultado se aprecia cuando baja la hinchazón de los primeros días y varía según cada persona; como orientación, se mantiene entre 6 y 12 meses, según el tratamiento.",
+   "preguntas": [
+    {
+     "p": "¿Molesta?",
+     "r": "Antes de empezar se aplica una crema anestésica y se usan agujas muy finas, así que las molestias suelen ser mínimas. Después puedes notar los labios sensibles, algo hinchados o con algún pequeño hematoma durante unos días."
+    },
+    {
+     "p": "¿Qué diferencia hay entre aumento, perfilado e hidratación?",
+     "r": "El aumento busca más volumen; el perfilado se centra en el contorno y en pequeñas asimetrías, con un volumen sutil, y la hidratación mejora la suavidad y la textura del labio sin buscar más volumen. En la valoración decidimos contigo qué encaja con lo que buscas."
+    },
+    {
+     "p": "¿Cuánto dura el efecto?",
+     "r": "Como orientación, la hidratación se mantiene entre 6 y 9 meses, y el aumento o el perfilado, entre 9 y 12 meses. Depende del producto, de tu metabolismo y de tu estilo de vida. Cuando se reabsorbe, el tratamiento se puede repetir."
+    },
+    {
+     "p": "¿Qué cuidados tengo que tener después?",
+     "r": "Durante 24 a 48 horas evita el ejercicio intenso, el calor intenso, como la sauna o el sol directo, y presionar la zona. Espera al menos 12 horas para pintarte los labios y no bebas alcohol el primer día. Te damos las pautas al terminar."
+    },
+    {
+     "p": "¿Se puede corregir si no me gusta?",
+     "r": "Si el resultado no es el esperado, hay opciones para corregirlo. El médico te las explica en la valoración y, si hiciera falta, estudia tu caso en una consulta de corrección de rellenos."
+    },
+    {
+     "p": "¿Puedo hacérmelo antes de un evento?",
+     "r": "Mejor con unos días de margen, para que pase la hinchazón y el resultado se asiente. Si tienes una fecha importante, dínoslo en la valoración y buscamos juntos el momento más adecuado."
+    }
+   ],
+   "preocupaciones": [
+    "labios"
+   ],
+   "relacionados": [
+    "codigo-de-barras",
+    "correccion-de-rellenos",
+    "relleno-de-ojeras"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#aumento-de-labios-con-acido-hialuronico",
+    "https://iemec-clinic.com/facial#perfilado-de-labios-con-acido-hialuronico",
+    "https://iemec-clinic.com/facial#hidratacion-de-labios-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/que-es-el-tratamiento-efecto-gloss-y-como-puede-realzar-tus-labios-este-verano",
+    "https://iemec-clinic.com/blog/por-que-el-acido-hialuronico-es-uno-de-los-tratamientos-mas-recomendados-para-rejuvenecer-tu-rostro-antes-del-verano",
+    "https://iemec-clinic.com/blog/puedo-tomar-el-sol-despues-de-un-tratamiento-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/a-partir-de-cuanto-tiempo-puedo-hacer-ejercicio-despues-de-aplicarme-acido-hialuronico",
+    "https://iemec-clinic.com/blog/puedo-maquillarme-despues-de-una-sesion-de-toxina-botulinica-o-acido-hialuronico",
+    "https://iemec-clinic.com/blog/puedo-beber-alcohol-despues-de-inyectarme-acido-hialuronico-o-toxina-botulinica",
+    "https://iemec-clinic.com/blog/que-tratamiento-es-mejor-para-eliminar-el-codigo-de-barras-sin-cirugia",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Producto sanitario de uso profesional: sin marcas y sin el material en títulos, entradilla ni descripción SEO; el material solo aparece como dato en el cuerpo del texto. Confirmar los productos que se usan.",
+    "Duración (30 minutos, dato del sector) y tiempo de crema anestésica (30 minutos en el catálogo): confirmar.",
+    "Hidratación de labios: la web habla de un «aumento sutil de volumen» y el blog, de no aumentarlo; aquí se dice que no busca volumen. Confirmar, y si se mantiene el nombre «efecto gloss».",
+    "Duración del efecto (6-9 meses la hidratación y 9-12 el aumento, según el blog y el catálogo): confirmar que se puede publicar.",
+    "La web promete «sin dolor» y «prácticamente indoloro», y /portafolio enseña fotos de resultados («AUMENTO DE LABIOS»): nada de eso se migra."
+   ]
+  },
+  {
+   "slug": "codigo-de-barras",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "codigo-barras-ah"
+   ],
+   "orden": 220,
+   "destacado": false,
+   "nombre": "Código de barras",
+   "titulo": "Código de barras: arrugas del labio superior",
+   "titulo_seo": "Código de barras labial en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Código de barras en IEMEC, Boadilla del Monte: microinyecciones para suavizar las arrugas finas del labio superior, tras una valoración médica.",
+   "entradilla": "Las arrugas verticales que aparecen sobre el labio superior se pueden suavizar con microinyecciones que aplica el médico, buscando un resultado discreto.",
+   "para_quien": [
+    "Te han aparecido líneas verticales sobre el labio superior.",
+    "Quieres suavizarlas sin cambiar el volumen de los labios.",
+    "Prefieres tratarlas pronto, cuando aún son finas."
+   ],
+   "texto": [
+    "Se llama código de barras a las arrugas verticales que se forman sobre el labio superior. En su aparición influyen el gesto de los labios, la pérdida de firmeza de la piel y hábitos como el tabaco o el sol.",
+    "En IEMEC las tratamos con microinyecciones de ácido hialurónico, con una técnica que busca suavizar las líneas sin aumentar en exceso el volumen del labio. Se aplica una crema anestésica y, en la mayoría de los casos, basta una pequeña cantidad de producto.",
+    "Antes, en la valoración médica, el médico estudia la profundidad de las arrugas, te explica los riesgos y las contraindicaciones y te dice si conviene combinarlo con otras técnicas, como el láser o el microneedling. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unos 20 minutos",
+    "sesiones": "Normalmente una",
+    "anestesia": "Crema anestésica",
+    "recuperacion": "Puedes volver al trabajo el mismo día",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "Las líneas se ven más suaves cuando baja la inflamación de los primeros días; como orientación, el resultado se mantiene entre 8 y 12 meses y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Me cambiará la forma del labio?",
+     "r": "La técnica busca suavizar las líneas sin aumentar en exceso el volumen del labio, para que el cambio sea discreto. En la valoración decidimos contigo la cantidad de producto, que suele ser pequeña."
+    },
+    {
+     "p": "¿Molesta?",
+     "r": "Se aplica una crema anestésica y el tratamiento se tolera bien. Después puede haber algo de inflamación, enrojecimiento o algún pequeño hematoma durante unos días; el médico te explica cómo cuidar la zona."
+    },
+    {
+     "p": "¿Puedo volver al trabajo?",
+     "r": "Sí. Ese mismo día evita el calor intenso, el maquillaje y presionar la zona, y espera al menos 12 horas para pintarte los labios. Al terminar te damos todas las pautas."
+    },
+    {
+     "p": "¿Cuándo conviene empezar?",
+     "r": "Cuando aparecen las primeras líneas finas, para que no se hagan más profundas. Si ya están marcadas, también se pueden tratar: el médico valora su profundidad y te propone la opción más adecuada para ti."
+    },
+    {
+     "p": "¿Cada cuánto se repite?",
+     "r": "Como orientación, una vez al año, aunque depende de tu piel y de cómo envejece. Protegerte del sol, no fumar y cuidar la hidratación ayuda a que las líneas tarden más en volver a marcarse."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Según la profundidad de las líneas, el médico puede proponerte combinarlo con técnicas que trabajan la superficie de la piel, como el láser o el microneedling. Lo decidimos juntos en la valoración."
+    }
+   ],
+   "preocupaciones": [
+    "arrugas",
+    "labios"
+   ],
+   "relacionados": [
+    "aumento-de-labios",
+    "arrugas-de-expresion",
+    "hidratacion-profunda"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#tratamiento-de-codigo-de-barras-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/como-se-eliminan-las-arrugas-del-labio-superior-codigo-de-barras",
+    "https://iemec-clinic.com/blog/que-tratamiento-es-mejor-para-eliminar-el-codigo-de-barras-sin-cirugia"
+   ],
+   "pendiente": [
+    "La ficha actual de /facial repite por error el texto de la hidratación de labios: aquí se ha redactado con el catálogo y las dos entradas del blog.",
+    "Duración (20 minutos, dato del sector) y crema anestésica (el catálogo no la marca; el blog habla de anestesia tópica): confirmar.",
+    "Producto sanitario de uso profesional: sin marcas y sin el material en títulos, entradilla ni descripción SEO; el material solo aparece como dato en el cuerpo del texto.",
+    "El blog compara la eficacia del láser y del relleno: aquí no se compara."
+   ]
+  },
+  {
+   "slug": "relleno-de-ojeras",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "relleno-ojeras-ah"
+   ],
+   "orden": 230,
+   "destacado": false,
+   "nombre": "Relleno de ojeras",
+   "titulo": "Relleno de ojeras para una mirada más descansada",
+   "titulo_seo": "Relleno de ojeras en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Relleno de ojeras en IEMEC, Boadilla del Monte: tratamiento médico del hundimiento bajo el ojo que ayuda a suavizar la sombra de la ojera, tras una valoración.",
+   "entradilla": "Cuando la ojera se debe a un hundimiento bajo el ojo, el relleno que aplica el médico ayuda a suavizar la sombra y a que la mirada se vea más descansada.",
+   "para_quien": [
+    "Tienes ojeras hundidas que te dan un aspecto cansado.",
+    "Notas un surco marcado entre el párpado inferior y la mejilla.",
+    "Quieres saber si tu tipo de ojera se puede tratar.",
+    "Buscas un cambio discreto, sin cirugía."
+   ],
+   "texto": [
+    "No todas las ojeras son iguales. Algunas se deben al color de la piel y otras a un hundimiento bajo el ojo, el surco lagrimal, que crea sombra. Por eso, lo primero es una valoración médica para saber cuál es la causa de la tuya y si este tratamiento es adecuado.",
+    "El relleno consiste en aplicar en ese surco, en la consulta médica, un ácido hialurónico específico para la zona de alrededor de los ojos. Así se suaviza el hundimiento, la zona refleja mejor la luz y la mirada se ve más descansada.",
+    "Es un procedimiento breve y ambulatorio. Los primeros días puede aparecer una pequeña hinchazón o algún hematoma, que es pasajero. El médico te explica antes sus riesgos y contraindicaciones. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Entre 15 y 30 minutos",
+    "sesiones": "Se decide en la valoración",
+    "anestesia": null,
+    "recuperacion": "Puede haber hinchazón leve o algún hematoma los primeros días",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "La mirada se ve más descansada cuando baja la hinchazón de los primeros días; como orientación, el resultado se mantiene entre 9 y 12 meses y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Sirve para todo tipo de ojeras?",
+     "r": "No. Está indicado sobre todo cuando la ojera se debe a un hundimiento bajo el ojo. Si la causa es otra, como el color de la piel, puede haber otras opciones. Por eso el médico estudia la causa en la valoración antes de proponerte nada."
+    },
+    {
+     "p": "¿Deja hematomas o marcas?",
+     "r": "Los primeros días puede aparecer un pequeño hematoma o una leve hinchazón, que es pasajero. Evitar el calor intenso, el alcohol y el ejercicio intenso durante las primeras 24 a 48 horas ayuda a que la zona se recupere."
+    },
+    {
+     "p": "¿Cuánto dura el efecto?",
+     "r": "Como orientación, entre 9 y 12 meses, según tu metabolismo y tu estilo de vida. Cuando el producto se reabsorbe, el tratamiento se puede repetir si lo deseas, después de valorarlo de nuevo con el médico."
+    },
+    {
+     "p": "¿Cuánto tarda la sesión?",
+     "r": "Entre 15 y 30 minutos. Es un procedimiento ambulatorio: al terminar puedes volver a tus actividades, siguiendo las pautas de cuidado que te damos para los días siguientes."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Según tu caso, el médico puede proponerte combinarlo con otros tratamientos para la zona de los ojos, como el láser o técnicas para mejorar la calidad de la piel. Lo decidimos juntos en la valoración."
+    }
+   ],
+   "preocupaciones": [
+    "mirada-y-ojeras"
+   ],
+   "relacionados": [
+    "relleno-de-pomulos",
+    "arrugas-de-expresion",
+    "correccion-de-rellenos"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#relleno-de-ojeras-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/rellenodeojeras.iemec",
+    "https://iemec-clinic.com/blog/puedo-beber-alcohol-despues-de-inyectarme-acido-hialuronico-o-toxina-botulinica",
+    "https://iemec-clinic.com/blog/a-partir-de-cuanto-tiempo-puedo-hacer-ejercicio-despues-de-aplicarme-acido-hialuronico",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "La ficha sale dos veces en /facial (secciones Ojeras y Mirada) con textos y mensajes de WhatsApp distintos («relleno de ojeras» y «relleno ojera»): las dos deben redirigir aquí.",
+    "Número de sesiones y uso de crema anestésica: no publicados; confirmar.",
+    "Multiestetica lo llama «Eliminación ojeras» y la web promete resultados «inmediatos»: aquí no se usa ninguna de las dos cosas.",
+    "Producto sanitario de uso profesional: sin marcas y sin el material en títulos, entradilla ni descripción SEO; el material solo aparece como dato en el cuerpo del texto."
+   ]
+  },
+  {
+   "slug": "relleno-de-pomulos",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "relleno-pomulos-ah",
+    "relleno-menton-ah",
+    "marcacion-mandibular-ah"
+   ],
+   "orden": 240,
+   "destacado": false,
+   "nombre": "Relleno de pómulos",
+   "titulo": "Relleno de pómulos, mentón y mandíbula",
+   "titulo_seo": "Relleno de pómulos en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Relleno de pómulos, mentón y mandíbula en IEMEC, Boadilla del Monte: tratamiento médico para reponer volumen y definir el contorno, con valoración previa.",
+   "entradilla": "Con los años el rostro va perdiendo volumen y el contorno se desdibuja. El relleno que aplica el médico ayuda a devolver soporte a los pómulos y a definir el mentón y la mandíbula.",
+   "para_quien": [
+    "Notas los pómulos más planos o menos volumen en la zona media de la cara.",
+    "Te gustaría definir el óvalo facial o la línea de la mandíbula.",
+    "Quieres mejorar la proyección del mentón para equilibrar el perfil.",
+    "Buscas un resultado armónico, más sutil o más marcado según lo que quieras."
+   ],
+   "texto": [
+    "Con el paso del tiempo, el rostro va perdiendo volumen, sobre todo en la zona media, y los contornos se ven menos definidos. El relleno de pómulos repone ese volumen y aporta soporte, lo que también ayuda a definir el óvalo facial.",
+    "Se hace en la consulta médica, con inyecciones de ácido hialurónico, normalmente en una sesión. En la valoración médica, el médico estudia tus proporciones y adapta la cantidad y los puntos a tus rasgos, para que el cambio sea sutil o más marcado según lo que busques. La misma técnica permite trabajar el mentón y la línea de la mandíbula.",
+    "Durante 24 a 72 horas es normal notar inflamación leve, tirantez o algún hematoma pequeño. Las complicaciones son poco frecuentes, pero existen, como una reacción alérgica, la aparición de nódulos o la obstrucción de un vaso sanguíneo, y el médico te las explica junto con las contraindicaciones. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unos 40 minutos",
+    "sesiones": "Normalmente una",
+    "anestesia": null,
+    "recuperacion": "Inflamación leve de 24 a 72 horas; puedes seguir con tu rutina",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Pómulos",
+     "texto": "Repone el volumen de la zona media de la cara y aporta soporte, lo que ayuda a definir el óvalo facial.",
+     "catalogo": "relleno-pomulos-ah"
+    },
+    {
+     "nombre": "Mentón",
+     "texto": "Mejora la proyección y la definición del mentón para equilibrar las proporciones del perfil.",
+     "catalogo": "relleno-menton-ah"
+    },
+    {
+     "nombre": "Línea de la mandíbula",
+     "texto": "Define y realza el contorno de la mandíbula. En la valoración, el médico decide si esta técnica es la adecuada para ti o si conviene otra.",
+     "catalogo": "marcacion-mandibular-ah"
+    }
+   ],
+   "resultados": "El resultado se valora cuando baja la inflamación de los primeros días; como orientación, en los pómulos se mantiene entre 12 y 18 meses, según el producto y cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Cambia mucho la cara?",
+     "r": "Depende de lo que busques: el cambio puede ser sutil o más marcado. En la valoración, el médico estudia tus proporciones y te propone una cantidad y unos puntos acordes con tus rasgos, buscando siempre un resultado armónico."
+    },
+    {
+     "p": "¿Molesta?",
+     "r": "Se usan agujas muy finas y, si hace falta, anestesia tópica, así que las molestias suelen ser mínimas. Después es normal notar la zona sensible, algo inflamada o con tirantez entre 24 y 72 horas."
+    },
+    {
+     "p": "¿Qué efectos secundarios son normales?",
+     "r": "Los primeros días es habitual notar inflamación leve, pequeños hematomas o rojez, tirantez y alguna asimetría leve que se ajusta sola. También es normal notar la zona firme hasta que el producto se integra. Si algo persiste, consulta al médico."
+    },
+    {
+     "p": "¿Qué cuidados tengo que tener?",
+     "r": "Antes, evita los antiinflamatorios durante 48 horas, salvo que te los haya indicado tu médico, y el alcohol el día anterior. Después, no masajees la zona ni hagas ejercicio intenso en 24 a 48 horas, evita el calor intenso y duerme boca arriba la primera noche."
+    },
+    {
+     "p": "¿Cuánto dura?",
+     "r": "Como orientación, entre 12 y 18 meses en los pómulos, según el producto y tu metabolismo. El producto se reabsorbe poco a poco; los mantenimientos permiten conservar el resultado sin cambios bruscos, siempre tras valorarlo con el médico."
+    },
+    {
+     "p": "¿Se puede corregir si no me gusta?",
+     "r": "Sí, un relleno de este tipo se puede corregir si el resultado no es el esperado. El médico te explica las opciones y, si hiciera falta, estudia tu caso en una consulta de corrección de rellenos."
+    }
+   ],
+   "preocupaciones": [
+    "volumen-y-contorno",
+    "flacidez"
+   ],
+   "relacionados": [
+    "masculinizacion-facial",
+    "bioestimulacion-facial",
+    "relleno-de-ojeras"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#relleno-de-pomulos-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/cuales-son-los-riesgos-o-efectos-secundarios-del-relleno-de-pomulos-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/despues-de-un-relleno-de-pomulos-con-acido-hialuronico-cuando-puedo-ir-a-la-playa",
+    "https://iemec-clinic.com/blog/que-beneficios-tiene-el-relleno-de-pomulos-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/que-cuidados-debo-tener-antes-y-despues-del-relleno-de-pomulos-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/que-esperar-despues-de-un-relleno-de-pomulos-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/por-que-el-acido-hialuronico-es-uno-de-los-tratamientos-mas-recomendados-para-rejuvenecer-tu-rostro-antes-del-verano",
+    "https://iemec-clinic.com/blog/puedo-dormir-boca-abajo-despues-de-ponerme-acido-hialuronico-o-toxina-botulinica",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Mentón y mandíbula no tienen ficha en la web actual: salen como zonas en el blog y con ficha propia en Multiestetica («Aumento mentón», «Marcación mandibular»). Confirmar que se ofrecen.",
+    "Duración (40 minutos pómulos y mandíbula, 30 el mentón, datos del sector) y si se usa crema anestésica (el blog habla de anestesia tópica; el catálogo no la marca): confirmar.",
+    "Duración del efecto en mentón y mandíbula: el catálogo propone repetir a los 9 meses (dato del blog); confirmar antes de publicarla.",
+    "Surcos nasogenianos: si la clínica confirma que lo ofrece, puede entrar aquí como variante (ver sin_pagina).",
+    "La web promete resultados «inmediatos» y el blog, un «efecto lifting»: aquí no se usa.",
+    "Producto sanitario de uso profesional: sin marcas y sin el material en títulos, entradilla ni descripción SEO; el material solo aparece como dato en el cuerpo del texto."
+   ]
+  },
+  {
+   "slug": "masculinizacion-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "masculinizacion-facial"
+   ],
+   "orden": 250,
+   "destacado": false,
+   "nombre": "Masculinización facial",
+   "titulo": "Masculinización facial: mandíbula, mentón y pómulos más definidos",
+   "titulo_seo": "Masculinización facial en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Masculinización facial en IEMEC, Boadilla del Monte: tratamiento médico para definir la mandíbula, el mentón y los pómulos con un resultado armónico.",
+   "entradilla": "Un diseño facial personalizado para marcar la mandíbula, proyectar el mentón y estructurar los pómulos, respetando tu anatomía y tu identidad.",
+   "para_quien": [
+    "Quieres rasgos faciales más masculinos sin pasar por cirugía.",
+    "Buscas definir la mandíbula y el mentón.",
+    "Quieres armonizar tu rostro sin perder tu esencia.",
+    "Eres hombre, persona trans o cualquier persona que busque una apariencia facial más masculina."
+   ],
+   "texto": [
+    "La masculinización facial combina técnicas de medicina estética mínimamente invasivas para reforzar la mandíbula, proyectar el mentón, definir la parte inferior del rostro y equilibrar los pómulos. El objetivo es una proporción más masculina, con un aspecto natural.",
+    "Se trabaja con ácido hialurónico, tras una valoración médica completa. La clave está en estudiar la estructura ósea, el ángulo de la mandíbula, la posición del mentón y la relación entre las distintas partes de la cara: por eso cada diseño es distinto.",
+    "Lo hace un médico en la consulta, normalmente en una sesión. Es habitual notar inflamación o algún hematoma los primeros días. Antes, el médico te explica los riesgos, las contraindicaciones y qué resultado es realista en tu caso, porque varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unos 40 minutos",
+    "sesiones": "Normalmente una",
+    "anestesia": null,
+    "recuperacion": "Inflamación o algún hematoma los primeros días",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "El resultado se valora cuando el producto se asienta, en las semanas siguientes; como orientación, se mantiene entre 12 y 18 meses, según la zona y cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Para quién está indicado?",
+     "r": "Para hombres, personas trans o cualquier persona que quiera rasgos faciales más masculinos sin cirugía, sobre todo en la mandíbula, el mentón y los pómulos. En la valoración vemos si es adecuado en tu caso y qué puedes esperar."
+    },
+    {
+     "p": "¿Queda natural?",
+     "r": "El diseño parte de tu anatomía: la estructura ósea, el ángulo de la mandíbula y la proporción entre las partes de la cara. Así se buscan rasgos más definidos sin perder armonía ni tu expresión. El grado de cambio lo decidimos contigo."
+    },
+    {
+     "p": "¿Cuánto duran los resultados?",
+     "r": "Como orientación, entre 12 y 18 meses, según la zona tratada y cada persona. El producto se reabsorbe poco a poco, así que se puede hacer un mantenimiento para conservar el resultado, siempre tras valorarlo con el médico."
+    },
+    {
+     "p": "¿Qué cuidados tengo que tener después?",
+     "r": "Durante 24 a 48 horas evita el ejercicio intenso, el calor intenso y masajear o presionar la zona, y duerme boca arriba la primera noche. Al terminar te explicamos todas las pautas para tu caso."
+    }
+   ],
+   "preocupaciones": [
+    "volumen-y-contorno"
+   ],
+   "relacionados": [
+    "relleno-de-pomulos",
+    "valoracion-medica",
+    "bioestimulacion-facial"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#masculinizacion-facial",
+    "https://iemec-clinic.com/blog/a-partir-de-cuanto-tiempo-puedo-hacer-ejercicio-despues-de-aplicarme-acido-hialuronico",
+    "https://iemec-clinic.com/blog/puedo-dormir-boca-abajo-despues-de-ponerme-acido-hialuronico-o-toxina-botulinica"
+   ],
+   "pendiente": [
+    "Duración (40 minutos, dato del sector): confirmar.",
+    "La web actual dice «resultados inmediatos», «clínica referente» y «estás en las mejores manos»: se ha quitado.",
+    "La web habla de «diferentes técnicas»: confirmar si, además del relleno, se usa alguna otra.",
+    "Producto sanitario de uso profesional: sin marcas y sin el material en títulos, entradilla ni descripción SEO; el material solo aparece como dato en el cuerpo del texto."
+   ]
+  },
+  {
+   "slug": "correccion-de-rellenos",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "hialuronidasa"
+   ],
+   "orden": 260,
+   "destacado": false,
+   "nombre": "Corrección de rellenos previos",
+   "titulo": "Corrección de rellenos previos: valoración médica",
+   "titulo_seo": "Corrección de rellenos en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Corrección de rellenos previos en IEMEC, Boadilla del Monte: valoración médica si un relleno anterior te dejó asimetrías, exceso de volumen o irregularidades.",
+   "entradilla": "Si un relleno anterior no te dejó el resultado que esperabas, el médico estudia tu caso y te explica qué opciones hay para corregirlo.",
+   "para_quien": [
+    "Te hiciste un relleno y notas asimetrías o demasiado volumen.",
+    "Notas bultos o irregularidades en una zona tratada.",
+    "Quieres revisar un relleno antiguo antes de hacerte otro tratamiento."
+   ],
+   "texto": [
+    "A veces un relleno no queda como se esperaba: puede haber asimetrías, exceso de volumen, irregularidades u otros problemas derivados de un tratamiento anterior. Existen opciones para corregirlos, que dependen de cada caso.",
+    "En la valoración médica, el médico examina la zona, te pregunta qué producto te pusieron, cuándo y dónde, y te explica qué opciones hay en tu caso, sus riesgos y contraindicaciones y qué puedes esperar. Si tienes informes o datos del tratamiento anterior, tráelos: ayudan a decidir.",
+    "Si está indicado, el tratamiento se hace en la propia consulta. A veces basta una sesión y a veces hace falta alguna más. Una vez corregida la zona, el médico y tú podéis valorar si tiene sentido volver a tratarla más adelante. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": null,
+    "sesiones": "Una o dos, según el caso",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "Lo que se puede corregir, y en cuánto tiempo, varía según cada persona y según el relleno anterior; el médico te lo explica en la valoración.",
+   "preguntas": [
+    {
+     "p": "¿Podéis valorar un relleno hecho en otro centro?",
+     "r": "Sí. Trae toda la información que tengas: qué producto te pusieron, cuándo y en qué zona. Con esos datos y la exploración, el médico te explica si se puede corregir y cómo, con sus riesgos y alternativas."
+    },
+    {
+     "p": "¿Todos los rellenos se corrigen igual?",
+     "r": "No. Depende del tipo de producto, del tiempo que haya pasado y de la zona. Por eso es importante saber qué te pusieron. En la valoración, el médico te explica las opciones que tiene sentido plantear en tu caso."
+    },
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "A veces basta una y a veces hace falta alguna más, separadas unos días. Depende de lo que haya que corregir y de cómo responda la zona. El médico te lo concreta después de la valoración."
+    },
+    {
+     "p": "¿Y si noto algo raro justo después de un relleno?",
+     "r": "Si tras un relleno reciente notas dolor intenso, la piel pálida, amoratada o con manchas, o cualquier cambio en la vista, no esperes a una cita: acude a urgencias o llama al 112. Es poco frecuente, pero hay que actuar rápido."
+    }
+   ],
+   "preocupaciones": [
+    "volumen-y-contorno",
+    "labios"
+   ],
+   "relacionados": [
+    "aumento-de-labios",
+    "relleno-de-pomulos",
+    "valoracion-medica"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec",
+    "https://iemec-clinic.com/blog/que-beneficios-tiene-el-relleno-de-pomulos-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/cuales-son-los-riesgos-o-efectos-secundarios-del-relleno-de-pomulos-con-acido-hialuronico"
+   ],
+   "pendiente": [
+    "Medicamento de receta (id hialuronidasa): no se nombra ni se describe cómo actúa (normas.md, anexo B: «Corrección de rellenos previos»). El id del catálogo lo nombra: la referencia del botón de WhatsApp debe usar un código neutro.",
+    "Multiestetica lo anuncia hoy con el nombre del medicamento y con precio, y las entradas del blog sobre pómulos lo nombran: retirarlo o reescribirlo.",
+    "No tiene ficha en la web actual (solo blog y Multiestetica): confirmar que se ofrece, también para rellenos hechos en otros centros, y la duración de la consulta.",
+    "Revisión médica de la respuesta sobre síntomas de alarma y de cómo contactar con la clínica si hay una complicación."
+   ]
+  },
+  {
+   "slug": "bioestimulacion-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "inductor-colageno",
+    "redensificacion-facial"
+   ],
+   "orden": 270,
+   "destacado": false,
+   "nombre": "Bioestimulación facial",
+   "titulo": "Bioestimulación facial para la firmeza de la piel",
+   "titulo_seo": "Bioestimulación facial en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Bioestimulación facial en IEMEC, Boadilla del Monte: inyecciones que activan el colágeno de tu piel para mejorar su firmeza y su textura, poco a poco.",
+   "entradilla": "Tratamientos médicos inyectables que activan la producción de colágeno de tu piel. La mejora de la firmeza y la textura llega poco a poco, en las semanas y los meses siguientes.",
+   "para_quien": [
+    "Notas la piel del rostro menos firme o con algo de flacidez.",
+    "Quieres mejorar la textura y la elasticidad de la piel.",
+    "Prefieres una mejora gradual, sin cambios bruscos.",
+    "Quieres cuidar la calidad de tu piel a medio plazo."
+   ],
+   "texto": [
+    "La bioestimulación consiste en aplicar en la piel, con inyecciones, sustancias que activan los fibroblastos, las células que fabrican el colágeno. Con los años producimos menos colágeno y la piel pierde firmeza; estimularlo ayuda a mejorar la firmeza, la elasticidad y la textura.",
+    "Hay distintos bioestimuladores. En la valoración médica, el médico estudia tu piel y el grado de flacidez, elige el producto y la técnica adecuados para ti y te explica qué es, sus riesgos y sus contraindicaciones. Se usa anestesia local o crema anestésica para que las molestias sean mínimas.",
+    "La mejora no es de un día para otro: el colágeno se forma poco a poco. Suelen hacer falta dos o tres sesiones, con un mantenimiento anual. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Alrededor de una hora",
+    "sesiones": "Dos o tres, con un mantenimiento anual",
+    "anestesia": "Anestesia local o crema anestésica",
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Bioestimulación del rostro",
+     "texto": "Inyecciones de un bioestimulador para mejorar la firmeza y la calidad de la piel. Como orientación, dos o tres sesiones separadas unas semanas.",
+     "catalogo": "inductor-colageno"
+    },
+    {
+     "nombre": "Redensificación",
+     "texto": "Protocolo pensado para devolver densidad, firmeza y elasticidad a la piel. Como orientación, tres sesiones separadas unas semanas. En la valoración te explicamos qué producto se usa.",
+     "catalogo": "redensificacion-facial"
+    }
+   ],
+   "resultados": "Los cambios empiezan a notarse a las pocas semanas y siguen mejorando durante los meses siguientes; varían según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Molesta?",
+     "r": "Se tolera bien. Puede haber una pequeña molestia durante las inyecciones; por eso se usa anestesia local o crema anestésica. El médico te explica antes qué puedes notar en los días siguientes y cómo cuidar la zona."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Depende del producto y de tu piel, pero lo habitual son dos o tres sesiones, con un mantenimiento una vez al año. En la valoración, el médico te propone la pauta adecuada para ti."
+    },
+    {
+     "p": "¿Cuándo se notan los resultados?",
+     "r": "A las pocas semanas, cuando la piel empieza a formar colágeno nuevo, y la mejora continúa durante los meses siguientes. Es un proceso gradual y cada piel responde a su ritmo."
+    },
+    {
+     "p": "¿En qué se diferencia de un relleno?",
+     "r": "El relleno aporta volumen en una zona concreta. La bioestimulación busca que la propia piel produzca más colágeno, para mejorar su firmeza y su calidad de forma progresiva. A veces se combinan: el médico te dice qué conviene en tu caso."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Según tu caso, puede combinarse con rellenos, con la hidratación con microinyecciones o con aparatología para la flacidez, como el láser o la radiofrecuencia. El médico te propone el orden y los tiempos."
+    }
+   ],
+   "preocupaciones": [
+    "flacidez",
+    "calidad-de-piel",
+    "arrugas"
+   ],
+   "relacionados": [
+    "hidratacion-profunda",
+    "hilos-tensores",
+    "relleno-de-pomulos"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#inductor-de-colageno",
+    "https://iemec-clinic.com/facial#redensificacion",
+    "https://iemec-clinic.com/blog/que-son-los-inductores-de-colageno-y-como-mejoran-la-firmeza-de-tu-piel",
+    "https://iemec-clinic.com/blog/como-mejora-el-laser-fotona-la-firmeza-de-la-piel-sin-cirugia",
+    "https://iemec-clinic.com/blog/que-esperar-despues-de-un-relleno-de-pomulos-con-acido-hialuronico"
+   ],
+   "pendiente": [
+    "Producto sanitario de uso profesional: sin marcas y sin el material en títulos, entradilla ni descripción SEO; el material solo aparece como dato en el cuerpo del texto. La web actual enseña marcas en /marcas y en el texto alternativo de la foto («Karisma y Radiesse»), y /portafolio («RADIESSE + ÁCIDO HIALURÓNICO»): nada de eso se migra.",
+    "Redensificación: régimen legal sin confirmar; confirmar qué producto se usa. Si no fuera un bioestimulador, necesitaría su propia página.",
+    "Duración (60 minutos, dato del sector; la redensificación, 45 minutos estimados) e intervalos entre sesiones (unas 6 y 3 semanas en el catálogo): confirmar.",
+    "El blog nombra los materiales (hidroxiapatita cálcica, policaprolactona): aquí no se nombran; si se quiere, solo como dato en el cuerpo del texto.",
+    "El WhatsApp actual dice «inductor colageno pomulos»: confirmar si el servicio se centra en los pómulos."
+   ]
+  },
+  {
+   "slug": "hidratacion-profunda",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "skinbooster-facial",
+    "skinbooster-cuello-escote",
+    "profhilo"
+   ],
+   "orden": 280,
+   "destacado": false,
+   "nombre": "Hidratación con microinyecciones",
+   "titulo": "Hidratación profunda con microinyecciones",
+   "titulo_seo": "Hidratación con microinyecciones en Boadilla · IEMEC",
+   "descripcion_seo": "Hidratación profunda con microinyecciones en IEMEC, Boadilla: mejora la hidratación, la elasticidad y la luminosidad del rostro, el cuello y el escote.",
+   "entradilla": "Pequeñas inyecciones que hidratan la piel en profundidad para mejorar su textura, su elasticidad y su luminosidad, en el rostro, el cuello y el escote. Las aplica el médico, tras una valoración.",
+   "para_quien": [
+    "Notas la piel deshidratada, apagada o con poca elasticidad.",
+    "Te preocupan las líneas finas que se marcan con la sequedad.",
+    "Quieres cuidar también la piel del cuello y el escote.",
+    "Buscas mejorar la calidad de la piel sin cambiar tus rasgos."
+   ],
+   "texto": [
+    "Consiste en pequeñas inyecciones de ácido hialurónico repartidas por la zona. A diferencia de un relleno, no busca dar volumen, sino hidratar la piel en profundidad y mejorar su textura, su elasticidad y su luminosidad.",
+    "Se puede aplicar en el rostro y en el cuello y el escote, donde la piel es más fina. Antes, en la valoración médica, el médico estudia tu piel, te explica sus riesgos y contraindicaciones y te propone la pauta: lo habitual son dos o tres sesiones, separadas unas semanas.",
+    "Después, la zona puede quedar algo enrojecida o con algún pequeño hematoma durante unos días. La mejora es progresiva, varía según cada persona y se mantiene con sesiones de mantenimiento."
+   ],
+   "sesion": {
+    "duracion": "Unos 45 minutos",
+    "sesiones": "Dos o tres, separadas unas semanas",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Rostro",
+     "texto": "Para una piel deshidratada, apagada o con líneas finas. Busca mejorar su hidratación, su textura y su luminosidad.",
+     "catalogo": "skinbooster-facial"
+    },
+    {
+     "nombre": "Cuello y escote",
+     "texto": "La piel de esta zona es más fina. Busca mejorar su hidratación, su elasticidad y su luminosidad.",
+     "catalogo": "skinbooster-cuello-escote"
+    }
+   ],
+   "resultados": "La piel se nota más hidratada y luminosa de forma progresiva, a lo largo de las sesiones; el resultado varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿En qué se diferencia de un relleno?",
+     "r": "Un relleno aporta volumen o define una zona concreta. Aquí el producto se reparte en pequeñas cantidades por toda la zona para hidratar la piel y mejorar su calidad, sin cambiar tus rasgos."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Lo habitual son dos o tres sesiones, separadas unas semanas, y después un mantenimiento. El médico ajusta la pauta a tu piel y a la zona que se trate durante la valoración."
+    },
+    {
+     "p": "¿Molesta?",
+     "r": "Son inyecciones muy pequeñas y se toleran bien. Si hace falta, el médico puede aplicar antes una crema anestésica. Después la zona puede quedar algo enrojecida durante unos días."
+    },
+    {
+     "p": "¿Qué cuidados hay que tener después?",
+     "r": "Las primeras 24 horas evita el maquillaje, el ejercicio intenso, el calor intenso y el sol directo, y los días siguientes usa protección solar alta. Al terminar te explicamos las pautas para tu caso."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Suele combinarse con otros tratamientos para la calidad de la piel o para la flacidez, como la bioestimulación o la aparatología. El médico te propone el orden más adecuado en la valoración."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel",
+    "arrugas"
+   ],
+   "relacionados": [
+    "mesoterapia-facial",
+    "bioestimulacion-facial",
+    "rejuvenecimiento-facial-medico"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#skinbooster",
+    "https://iemec-clinic.com/facial#skinbooster-cuello",
+    "https://iemec-clinic.com/marcas#profhilo",
+    "https://iemec-clinic.com/blog/puedo-maquillarme-despues-de-una-sesion-de-toxina-botulinica-o-acido-hialuronico",
+    "https://iemec-clinic.com/blog/a-partir-de-cuanto-tiempo-puedo-hacer-ejercicio-despues-de-aplicarme-acido-hialuronico",
+    "https://iemec-clinic.com/blog/puedo-tomar-el-sol-despues-de-un-tratamiento-con-acido-hialuronico",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "El servicio se llama hoy «Skinbooster», que es el nombre del tipo de producto; siguiendo las normas (anexo B) va como «Hidratación profunda con microinyecciones». Decidir si se menciona el término como dato.",
+    "El id profhilo (marca de un producto) solo aparece hoy en /marcas: aquí queda cubierto sin marca. Confirmar si se ofrece como protocolo propio (el catálogo da dos sesiones separadas un mes; /marcas cita también las manos).",
+    "Duración (45 minutos, estimada), número de sesiones e intervalo (datos del sector) y si se usa crema anestésica: confirmar.",
+    "La web actual promete resultados «inmediatos y duraderos»: aquí no.",
+    "Producto sanitario de uso profesional: sin marcas y sin el material en títulos, entradilla ni descripción SEO; el material solo aparece como dato en el cuerpo del texto."
+   ]
+  },
+  {
+   "slug": "mesoterapia-facial",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "mesoterapia-facial",
+    "mesoterapia-papada"
+   ],
+   "orden": 290,
+   "destacado": false,
+   "nombre": "Mesoterapia facial",
+   "titulo": "Mesoterapia facial para la hidratación y la luminosidad",
+   "titulo_seo": "Mesoterapia facial en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Mesoterapia facial en IEMEC, Boadilla del Monte: microinyecciones de vitaminas y minerales para hidratar la piel y mejorar su luminosidad, también en la papada.",
+   "entradilla": "Microinyecciones de una combinación de vitaminas, minerales y otros activos que hidratan la piel y mejoran su luminosidad. Se hace en varias sesiones y también en la papada.",
+   "para_quien": [
+    "Notas la piel apagada, deshidratada o cansada.",
+    "Quieres preparar la piel antes del verano o de una fecha señalada.",
+    "Te preocupa la calidad de la piel de la papada.",
+    "Buscas un tratamiento médico de mantenimiento para tu piel."
+   ],
+   "texto": [
+    "La mesoterapia facial consiste en aplicar en la piel, con microinyecciones, una combinación de vitaminas, minerales, ácido hialurónico y otros nutrientes adaptada a lo que necesita tu piel. Ayuda a hidratarla, a mejorar su textura y su luminosidad y a estimular el colágeno y la elastina.",
+    "La hace el médico, tras una valoración médica en la que estudia tu piel y te explica sus riesgos y contraindicaciones. Se aplica una crema anestésica para que las molestias sean mínimas. Lo habitual es un ciclo de 3 a 5 sesiones, una cada dos semanas, y después un mantenimiento.",
+    "Después evita el sol directo durante 24 horas, y el ejercicio intenso y la sauna durante 48. Los cambios son progresivos y el resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unos 20 minutos; en la papada, unos 30",
+    "sesiones": "De 3 a 5, una cada dos semanas",
+    "anestesia": "Crema anestésica",
+    "recuperacion": "Sin ejercicio intenso ni sauna durante 48 horas",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Rostro",
+     "texto": "Para hidratar la piel del rostro y mejorar su textura y su luminosidad. Como orientación, de 3 a 5 sesiones, una cada dos semanas.",
+     "catalogo": "mesoterapia-facial"
+    },
+    {
+     "nombre": "Papada",
+     "texto": "La misma combinación de activos, aplicada para hidratar y mejorar la calidad de la piel de la papada. Como orientación, cuatro sesiones, una por semana.",
+     "catalogo": "mesoterapia-papada"
+    }
+   ],
+   "resultados": "La piel se ve más hidratada y luminosa de forma progresiva a lo largo del ciclo de sesiones; el resultado varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Lo habitual son entre 3 y 5 sesiones, una cada dos semanas, y después un mantenimiento. En la papada, como orientación, cuatro sesiones semanales. El médico ajusta la pauta a tu piel en la valoración."
+    },
+    {
+     "p": "¿Molesta?",
+     "r": "Las microinyecciones pueden causar una ligera molestia, por eso se aplica una crema anestésica antes de empezar. Es un tratamiento breve y bien tolerado, y al terminar puedes seguir con tu día."
+    },
+    {
+     "p": "¿Cuándo puedo hacer ejercicio?",
+     "r": "Espera 24 horas para la actividad ligera y 48 horas para el ejercicio intenso, porque el sudor puede alterar los activos e irritar la piel. Evita también la sauna y los baños calientes durante 48 horas."
+    },
+    {
+     "p": "¿Puedo lavarme la cara y tomar el sol?",
+     "r": "Puedes lavarte la cara con agua tibia y sin frotar. Evita el sol directo durante las 24 horas siguientes y usa protección solar alta los días posteriores, para cuidar la piel tratada."
+    },
+    {
+     "p": "¿Cuándo se notan los resultados?",
+     "r": "La mejora es progresiva: la piel se va viendo más hidratada y luminosa a lo largo de las sesiones. Cada piel responde a su ritmo, así que el resultado varía según cada persona."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Puede combinarse, por ejemplo, con peelings suaves o con radiofrecuencia para completar el cuidado de la piel. El médico te indica el orden y el tiempo entre tratamientos en la valoración."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel"
+   ],
+   "relacionados": [
+    "hidratacion-profunda",
+    "diagnostico-facial",
+    "bioestimulacion-facial"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#mesoterapia",
+    "https://iemec-clinic.com/facial#mesoterapia-papada",
+    "https://iemec-clinic.com/blog/cuando-puedo-hacer-ejercicio-despues-de-un-tratamiento-facial-con-mesoterapia",
+    "https://iemec-clinic.com/blog/que-es-la-mesoterapia-facial-y-por-que-es-ideal-para-preparar-tu-piel-antes-del-verano",
+    "https://iemec-clinic.com/blog/como-conseguir-una-piel-radiante-antes-del-verano-tratamientos-faciales-rapidos-y-efectivos"
+   ],
+   "pendiente": [
+    "Composición del cóctel (en la papada la web no la publica): confirmar. Si llevara algún medicamento o fórmula magistral, como un lipolítico, no podría anunciarse (normas.md, apartado b).",
+    "La mesoterapia de papada se presenta aquí como tratamiento de la calidad de la piel, no para reducir grasa: confirmar.",
+    "Duración (20 y 30 minutos, datos del sector) y pauta de la papada (4 sesiones semanales en el catálogo): confirmar.",
+    "La web dice que también se aplica en el cuerpo: la mesoterapia corporal está en otro grupo.",
+    "La web actual promete «sin dolor» y el blog, resultados «desde la primera sesión»: aquí no.",
+    "Producto sanitario de uso profesional: sin marcas y sin el material en títulos, entradilla ni descripción SEO; el material solo aparece como dato en el cuerpo del texto."
+   ]
+  },
+  {
+   "slug": "rejuvenecimiento-facial-medico",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "prp-facial",
+    "prp-cuello-escote"
+   ],
+   "orden": 300,
+   "destacado": false,
+   "nombre": "Rejuvenecimiento facial médico",
+   "titulo": "Rejuvenecimiento facial médico: rostro, cuello y escote",
+   "titulo_seo": "Rejuvenecimiento facial médico en Boadilla · IEMEC",
+   "descripcion_seo": "Rejuvenecimiento facial médico en IEMEC, Boadilla: tratamiento en consulta para la calidad de la piel del rostro, el cuello y el escote, con valoración previa.",
+   "entradilla": "Un tratamiento médico en consulta para la piel que ha perdido calidad: textura, elasticidad, pequeñas manchas o marcas. En la valoración, el médico te explica si es adecuado para ti.",
+   "para_quien": [
+    "Notas la piel del rostro menos elástica o con peor textura.",
+    "Te preocupan las pequeñas manchas o las marcas de acné.",
+    "Quieres cuidar también la piel del cuello y el escote.",
+    "Prefieres un plan médico con varias sesiones y seguimiento."
+   ],
+   "texto": [
+    "Con los años, el sol y el ritmo de vida, la piel pierde calidad: se vuelve menos elástica, cambia su textura y se notan más las pequeñas manchas o las marcas. En IEMEC hacemos un tratamiento médico de rejuvenecimiento para el rostro y para el cuello y el escote.",
+    "Antes, en la valoración médica, el médico estudia tu piel y tu historia de salud y te explica en qué consiste el tratamiento, sus riesgos y contraindicaciones y qué alternativas tienes. Si es adecuado para ti, se hace en la propia consulta, con crema anestésica.",
+    "Suele plantearse como un ciclo de varias sesiones, separadas unas semanas, y después un mantenimiento. La mejora es progresiva y el resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": null,
+    "sesiones": "Un ciclo de varias sesiones; lo concreta el médico",
+    "anestesia": "Crema anestésica",
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Rostro",
+     "texto": "Para la textura, la elasticidad y el aspecto de la piel del rostro, incluidas las pequeñas manchas o las marcas.",
+     "catalogo": "prp-facial"
+    },
+    {
+     "nombre": "Cuello y escote",
+     "texto": "Para la piel del cuello y el escote, más fina y expuesta al sol, que también pierde elasticidad con los años.",
+     "catalogo": "prp-cuello-escote"
+    }
+   ],
+   "resultados": "La mejora se aprecia de forma progresiva a lo largo de las sesiones y varía según cada persona; el médico te explica qué esperar en tu caso.",
+   "preguntas": [
+    {
+     "p": "¿En qué consiste el tratamiento?",
+     "r": "El médico te lo explica con detalle en la valoración: cómo se hace, cuántas sesiones necesitas, qué riesgos y contraindicaciones tiene y qué alternativas hay para tu piel. Así decides con toda la información."
+    },
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Suele plantearse un ciclo de varias sesiones, separadas unas semanas, y después un mantenimiento. El número exacto depende de tu piel y de lo que quieras mejorar; te lo concreta el médico."
+    },
+    {
+     "p": "¿Molesta?",
+     "r": "Antes de empezar se aplica una crema anestésica para que las molestias sean mínimas. Después la piel puede quedar enrojecida o algo inflamada durante un tiempo; el médico te explica qué es normal y qué cuidados seguir."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Según tu piel, el médico puede proponerte combinarlo con otros tratamientos para la calidad de la piel, como la hidratación con microinyecciones o el microneedling, dentro de un plan personalizado."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel",
+    "manchas",
+    "acne-y-poros"
+   ],
+   "relacionados": [
+    "hidratacion-profunda",
+    "mesoterapia-facial",
+    "bioestimulacion-facial"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#plasma-rico-en-plaquetas-prp",
+    "https://iemec-clinic.com/facial#plasma-rico-en-plaquetas-prp-cuello"
+   ],
+   "pendiente": [
+    "Medicamento de receta (ids prp-facial y prp-cuello-escote): la página no lo nombra ni describe cómo se obtiene o se prepara, porque sería una referencia indirecta (normas.md, apartado b y anexo B; resolución de la AEMPS de 2013). Los ids y los mensajes de WhatsApp actuales («PRP pomulos», «PRP cuello y escote») lo nombran: el botón debe llevar un código neutro.",
+    "Confirmar que la clínica ha comunicado a la Comunidad de Madrid el uso de este tratamiento, como exige la normativa (normas.md, apartado b).",
+    "Número de sesiones, intervalo y duración (datos del sector: 3 sesiones, una al mes, y unos 75 minutos): confirmar si se quieren concretar.",
+    "El blog lo cita como combinable con Pure Glow Up: reescribir esas entradas sin nombrarlo."
+   ]
+  },
+  {
+   "slug": "hilos-tensores",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "hilos-tensores"
+   ],
+   "orden": 310,
+   "destacado": false,
+   "nombre": "Hilos tensores",
+   "titulo": "Hilos tensores reabsorbibles para la flacidez facial",
+   "titulo_seo": "Hilos tensores en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Hilos tensores en IEMEC, Boadilla del Monte: hilos reabsorbibles que sostienen zonas del rostro con flacidez y estimulan el colágeno, tras valoración médica.",
+   "entradilla": "Hilos reabsorbibles que el médico coloca bajo la piel para dar soporte a zonas concretas del rostro con flacidez. Antes, una valoración decide si es la técnica adecuada para ti.",
+   "para_quien": [
+    "Notas flacidez en zonas concretas del rostro.",
+    "Quieres redefinir algunas zonas del rostro sin cirugía.",
+    "Buscas un resultado natural que respete tu expresión."
+   ],
+   "texto": [
+    "Los hilos tensores son un tratamiento de medicina estética para la flacidez facial. El médico coloca bajo la piel unos hilos reabsorbibles que dan soporte a determinadas zonas del rostro y ayudan a redefinirlas. Además, estimulan la producción de colágeno.",
+    "Cada tratamiento empieza con una valoración médica: el médico estudia el grado de flacidez y lo que te gustaría conseguir, decide si los hilos son la técnica adecuada o si te conviene otra y te explica sus riesgos y contraindicaciones.",
+    "Se hace en la consulta, normalmente en una sesión. Los hilos se reabsorben con el tiempo y el tratamiento puede repetirse. También pueden combinarse con otras técnicas, como el láser o la radiofrecuencia. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Alrededor de una hora",
+    "sesiones": "Normalmente una",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "La mejora del soporte y de la firmeza es progresiva y varía según cada persona; el médico te explica qué esperar en tu caso.",
+   "preguntas": [
+    {
+     "p": "¿Qué pasa con los hilos con el tiempo?",
+     "r": "Son reabsorbibles: el cuerpo los va asimilando poco a poco. Por eso el efecto se mantiene un tiempo y después el tratamiento puede repetirse si lo deseas, tras valorarlo de nuevo con el médico."
+    },
+    {
+     "p": "¿Son adecuados para cualquier persona?",
+     "r": "No en todos los casos. El médico valora el grado de flacidez, la zona y tus objetivos, y si otra técnica te conviene más, te lo dice. La idea es conseguir un resultado natural y armónico, que respete tu expresión."
+    },
+    {
+     "p": "¿Se pueden combinar con otros tratamientos?",
+     "r": "Sí. Pueden combinarse con aparatología para la firmeza de la piel, como el láser o la radiofrecuencia, o con la bioestimulación. El médico te propone el orden y los tiempos en la valoración."
+    },
+    {
+     "p": "¿Cuánto dura la sesión?",
+     "r": "Como orientación, alrededor de una hora, según las zonas que se traten. Se hace en la consulta y después vuelves a casa; el médico te explica los cuidados de los días siguientes."
+    }
+   ],
+   "preocupaciones": [
+    "flacidez",
+    "volumen-y-contorno"
+   ],
+   "relacionados": [
+    "bioestimulacion-facial",
+    "relleno-de-pomulos",
+    "valoracion-medica"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec",
+    "https://iemec-clinic.com/blog/como-mejora-el-laser-fotona-la-firmeza-de-la-piel-sin-cirugia",
+    "https://iemec-clinic.com/blog/como-actua-el-laser-fotona-en-la-flacidez-del-cuello-y-escote"
+   ],
+   "pendiente": [
+    "La web actual no tiene ficha de hilos: salen en el blog (como combinables con el láser), en las fichas del equipo y en Multiestetica, con valoración médica previa. Confirmar que se ofrecen y en qué zonas.",
+    "Duración (60 minutos, dato del sector), anestesia, recuperación y cuánto se mantiene el efecto: no publicados; confirmar.",
+    "Producto sanitario de uso profesional: sin marcas ni material de los hilos."
+   ]
+  },
+  {
+   "slug": "tratamiento-reafirmante-no-invasivo",
+   "especialidad": "medicina-estetica-facial",
+   "catalogo": [
+    "natulift"
+   ],
+   "orden": 320,
+   "destacado": false,
+   "nombre": "Tratamiento reafirmante no invasivo",
+   "titulo": "Tratamiento reafirmante no invasivo con efecto tensor suave",
+   "titulo_seo": "Tratamiento reafirmante en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Tratamiento reafirmante no invasivo en IEMEC, Boadilla del Monte: busca mejorar la firmeza y la elasticidad de la piel con un efecto tensor suave.",
+   "entradilla": "Un tratamiento no invasivo que busca un efecto tensor suave y mejorar la firmeza y la elasticidad de la piel. Antes de hacerlo, valoramos tu piel y te explicamos en qué consiste.",
+   "para_quien": [
+    "Notas la piel algo menos firme y elástica.",
+    "Prefieres un tratamiento no invasivo que te permita seguir con tu día.",
+    "Buscas un cambio suave y progresivo."
+   ],
+   "texto": [
+    "Es un tratamiento no invasivo pensado para mejorar la firmeza y la elasticidad de la piel y aportar un efecto tensor suave. Busca estimular la producción de colágeno y elastina y mejorar también la textura y la luminosidad, y puede aplicarse en distintas zonas.",
+    "Lo realiza el equipo de estética de IEMEC. Antes de reservarlo valoramos tu piel y te explicamos en qué consiste, qué técnica y qué productos se usan, cuántas sesiones te recomendamos y si hay alguna contraindicación en tu caso.",
+    "No requiere tiempo de recuperación, así que puedes seguir con tu día al salir de la clínica. El resultado es progresivo y varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Alrededor de una hora",
+    "sesiones": "Se decide en la valoración",
+    "anestesia": null,
+    "recuperacion": "No requiere tiempo de recuperación",
+    "profesional": "Esteticista, con valoración previa"
+   },
+   "variantes": [],
+   "resultados": "La mejora es suave y progresiva y varía según cada persona; en la valoración te explicamos qué esperar.",
+   "preguntas": [
+    {
+     "p": "¿En qué consiste?",
+     "r": "Es un tratamiento no invasivo de cabina. En la valoración te explicamos la técnica y los productos que se usan, cómo es la sesión y qué cuidados necesitas, para que decidas con toda la información."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Depende de tu piel y de lo que quieras mejorar. En la valoración te indicamos cuántas sesiones te recomendamos y cada cuánto tiempo, antes de empezar el tratamiento."
+    },
+    {
+     "p": "¿Necesito recuperación?",
+     "r": "No. Es un tratamiento no invasivo que no requiere tiempo de recuperación, así que puedes seguir con tu día al salir de la clínica. Si tienes la piel sensible, cuéntanoslo en la valoración."
+    },
+    {
+     "p": "¿Qué otras opciones hay para la firmeza?",
+     "r": "Hay varias, desde la aparatología hasta los tratamientos médicos inyectables, como la bioestimulación. Según tu piel y el grado de flacidez, te recomendamos la opción que tenga más sentido para ti o una combinación."
+    }
+   ],
+   "preocupaciones": [
+    "flacidez",
+    "calidad-de-piel"
+   ],
+   "relacionados": [
+    "bioestimulacion-facial",
+    "hilos-tensores",
+    "diagnostico-facial"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#natulift"
+   ],
+   "pendiente": [
+    "El servicio se llama hoy «Natulift» y puede ser un nombre comercial (no consta como marca en una búsqueda rápida): aquí va con un nombre descriptivo. Decidir el nombre.",
+    "La web no explica la técnica, el aparato ni el producto, y el régimen legal está sin confirmar: explicar qué es antes de publicar. Si fuera un tratamiento médico o usara un producto sanitario, cambiarían el profesional y los textos.",
+    "Duración (60 minutos, estimada), número de sesiones y zonas: confirmar. El catálogo indica esteticista.",
+    "El mensaje de WhatsApp actual dice «naturlift» (errata)."
+   ]
+  }
+ ],
+ "sin_pagina": [
+  {
+   "catalogo": "valoracion-hifu",
+   "motivo": "Duplicado: la valoración previa de HIFU forma parte de la página «HIFU facial» (grupo facial-aparatologia), que ya la explica. En la web actual está dentro del bloque de HIFU, anunciada como «gratuita», y su botón de WhatsApp manda el mismo texto que el HIFU. Si la clínica quiere reservarla aparte, el botón de esa página puede llevar esta referencia.",
+   "va_en": "hifu-facial"
+  },
+  {
+   "catalogo": "surcos-nasogenianos-ah",
+   "motivo": "Oferta sin confirmar: solo sale como zona en una entrada del blog y en la ficha general de ácido hialurónico de Multiestetica, y el catálogo pide no ofrecerlo hasta que la clínica lo confirme. Si lo confirma, entra como variante «Surcos nasogenianos» de la página de relleno de pómulos.",
+   "va_en": "relleno-de-pomulos"
+  },
+  {
+   "catalogo": "rinomodelacion-ah",
+   "motivo": "Oferta sin confirmar: solo sale en una entrada del blog y en la lista de Multiestetica, sin ficha ni precio, y el catálogo pide no ofrecerlo hasta que la clínica lo confirme. Si lo confirma, necesitaría su propia página, con sus riesgos específicos.",
+   "va_en": null
+  },
+  {
+   "catalogo": "exosomas-faciales",
+   "motivo": "Protocolo parecido a otro que ya tiene página: es microneedling con un producto de exosomas aplicado sobre la piel, como el protocolo con peeling y microneedling de «protocolos-con-microneedling» (grupo facial-aparatologia). Las normas no permiten usar los exosomas como reclamo ni en el título, ni atribuirles efectos regenerativos, así que una página propia duplicaría aquella. Régimen legal sin confirmar (qué producto y si es cosmético). Propuesta: añadirlo allí como variante «Microneedling con un activo tópico» (unos 60 minutos según Treatwell, de 3 a 5 sesiones según el blog, esteticista).",
+   "va_en": "protocolos-con-microneedling"
+  },
+  {
+   "catalogo": "micropigmentacion",
+   "motivo": "Oferta sin confirmar: solo figura en la lista de tratamientos de Multiestetica (y en una foto etiquetada «Microblading»), sin descripción ni precio, y no sale en la web actual. El catálogo pide no anunciarlo hasta que la clínica lo confirme.",
+   "va_en": null
+  }
+ ]
+}

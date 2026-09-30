@@ -1,0 +1,72 @@
+{
+  "_nota": "Datos de la clínica para la web nueva. Fuentes: semillas/iemec/clinica.json, el inventario de iemec-clinic.com (30-09-2026) y normas.md. Lo que falta confirmar va en «pendiente» y sale resaltado en la web como [PENDIENTE: …] hasta que la clínica lo resuelva.",
+  "dominio": "https://iemec-clinic.com",
+  "con_www": false,
+  "idioma": "es-ES",
+  "actualizado": "2026-09-30",
+  "nombre": "Instituto Europeo de Medicina Estética y Capilar",
+  "nombre_corto": "IEMEC",
+  "frase": "IEMEC es un centro sanitario de medicina estética, cirugía estética y medicina capilar en Boadilla del Monte: te valoramos antes de proponerte nada y te acompañamos en cada paso.",
+  "titular": {
+    "razon_social": "Aneco AP Consulting, S.L.",
+    "nif": "B88613492"
+  },
+  "registro_sanitario": {
+    "numero": "CS17886",
+    "texto_pie": "Centro sanitario autorizado por la Consejería de Sanidad de la Comunidad de Madrid · N.º de registro CS17886",
+    "texto_corto": "Centro sanitario autorizado · CS17886"
+  },
+  "direccion": {
+    "calle": "Av. Siglo XXI 13, local 35",
+    "cp": "28660",
+    "municipio": "Boadilla del Monte",
+    "provincia": "Madrid",
+    "pais": "ES",
+    "pendiente": "confirmar si es «local 35» o «locales 35-36», como figura en el Registro de centros sanitarios"
+  },
+  "coordenadas": { "lat": 40.4066059, "lng": -3.9001441 },
+  "como_llegar": {
+    "google": "https://www.google.com/maps/dir/?api=1&destination=IEMEC%2C%20Av.%20Siglo%20XXI%2013%2C%2028660%20Boadilla%20del%20Monte&destination_place_id=ChIJB6Pn5d2FQQ0ReZ4Qoqe8gtg",
+    "apple": "https://maps.apple.com/?daddr=Av.%20Siglo%20XXI%2013%2C%2028660%20Boadilla%20del%20Monte&ll=40.4066059%2C-3.9001441",
+    "pendiente": "aparcamiento y transporte público más cercanos (la web actual no lo explica)",
+    "_pendiente": "Mientras falte, la sección «Aparcamiento y transporte» de /clinica/ no sale (está en la lista de pendientes)."
+  },
+  "google": {
+    "ficha": "https://www.google.com/maps/place/?q=place_id:ChIJB6Pn5d2FQQ0ReZ4Qoqe8gtg",
+    "_nota": "Solo un enlace neutro a la ficha («Nuestra ficha en Google»), en /pedir-cita/. Ni la nota ni el número de opiniones: normas.md (apartado d) no permite reseñas como reclamo en la web de un centro sanitario (RD 1907/1996, art. 4.7; CDM 2022, art. 89.3), y normas.json lo prueba."
+  },
+  "telefono": { "e164": "+34722833285", "visible": "722 83 32 85", "internacional": "+34 722 83 32 85" },
+  "telefono_fijo": null,
+  "whatsapp": {
+    "numero": "34722833285",
+    "plantilla": "Hola, vengo de la web y me interesa: {tratamiento}. (ref. {ref})"
+  },
+  "correo": null,
+  "correo_pendiente": "correo del dominio de la clínica; hoy solo hay un Gmail",
+  "horario": [
+    { "dias": "Lunes a viernes", "abre": "11:00", "cierra": "20:00", "schema": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] },
+    { "dias": "Sábado", "pendiente": "horario del sábado", "_detalle": "Google dice de 11:00 a 20:00 y Treatwell, de 10:00 a 20:00" }
+  ],
+  "redes": [
+    { "red": "Instagram", "url": "https://www.instagram.com/iemec_clinic/", "icono": "instagram" },
+    { "red": "Facebook", "url": "https://www.facebook.com/IEMECClinic", "icono": "facebook" },
+    { "red": "TikTok", "url": "https://www.tiktok.com/@iemec_clinic", "icono": "tiktok" },
+    { "red": "LinkedIn", "url": "https://www.linkedin.com/company/iemecclinicmadrid", "icono": "linkedin" }
+  ],
+  "api": {
+    "base": "https://agenda.iemec-clinic.com",
+    "contacto": "/web/contacto"
+  },
+  "formulario": {
+    "version_textos": "2026-09-30",
+    "mensaje_max": 500,
+    "pendiente_version": "versión de la cláusula del formulario que fije el DPD"
+  },
+  "fse": {
+    "titulo": "FSE+ · Fondo Social Europeo Plus · «Cofinanciado por la Unión Europea».",
+    "texto": "De acuerdo con las obligaciones de publicidad de la subvención recibida, informamos de que Aneco AP Consulting, S.L. ha sido beneficiaria de una ayuda destinada a la contratación de una joven trabajadora, para fomentar el empleo juvenil y mejorar sus oportunidades de inserción laboral.",
+    "emblema": null,
+    "pendiente": "emblema oficial «Cofinanciado por la Unión Europea» (el de la web actual está dañado) y fecha hasta la que hay que mantener el aviso"
+  },
+  "asistente_virtual_pendiente": "si responde el asistente virtual de la app, decir aquí que es una IA que se presenta como tal y te pasa con una persona (Reglamento (UE) 2024/1689, art. 50.1)"
+}

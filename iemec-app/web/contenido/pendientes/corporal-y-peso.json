@@ -1,0 +1,471 @@
+{
+ "grupo": "corporal-y-peso",
+ "nota": "Borradores fuera de la web: normas.md deja estos servicios sin página hasta que la clínica confirme que la autorización del centro (CS17886) los cubre (U.39 varices; la hiperhidrosis, un problema de salud; U.10/U.11 todo el área de peso: supervisión médica, balón gástrico, neuroestimulación y nutrición). Cuando se confirme, se pasan a contenido/corporal-y-peso.json y sus ids salen de sin_pagina.",
+ "paginas": [
+  {
+   "slug": "varices-y-aranas-vasculares",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "varices-ecoesclerosis",
+    "laser-vascular-piernas"
+   ],
+   "orden": 40,
+   "destacado": true,
+   "nombre": "Varices y arañas vasculares",
+   "titulo": "Varices y arañas vasculares: valoración y tratamiento sin cirugía",
+   "titulo_seo": "Varices y arañas vasculares en Boadilla · IEMEC",
+   "descripcion_seo": "Varices y arañas vasculares en IEMEC Boadilla: estudio con eco-Doppler por el cirujano vascular, ecoesclerosis sin cirugía y láser vascular.",
+   "entradilla": "Nuestro servicio de flebología estudia tus piernas con eco-Doppler y trata varices y arañas vasculares sin cirugía, para mejorar su aspecto y aliviar la pesadez y el dolor.",
+   "para_quien": [
+    "Tienes varices, arañas vasculares o venas visibles en las piernas.",
+    "Notas pesadez, hinchazón, dolor o sensación de acorchamiento en las piernas.",
+    "Quieres un estudio vascular antes de decidir un tratamiento.",
+    "Te han hablado de cirugía y quieres conocer otras opciones."
+   ],
+   "texto": [
+    "Las varices son venas dilatadas cuyas válvulas no funcionan bien, de modo que la sangre se acumula. Además de su aspecto, pueden causar pesadez, hinchazón o dolor y, en fases avanzadas, complicaciones como úlceras o flebitis.",
+    "Todo empieza con una valoración médica. El cirujano vascular de nuestro servicio de Flebología y Linfología estudia tus piernas con eco-Doppler, una ecografía que muestra cómo circula la sangre por las venas, y te propone el tratamiento adecuado, con sus riesgos y alternativas.",
+    "La ecoesclerosis, o escleroterapia ecoguiada, permite tratar sin cirugía varices profundas y de mayor calibre, como las de la safena y las perforantes. El médico localiza la vena enferma con la ecografía y la trata guiándose por la imagen. No se usa anestesia, no necesita puntos y puedes volver a tu actividad habitual después del procedimiento.",
+    "Para arañas vasculares y venas azules, o si tienes contraindicada la cirugía o la escleroterapia, contamos también con tratamiento con láser vascular."
+   ],
+   "sesion": {
+    "duracion": "Alrededor de 1 hora",
+    "sesiones": "Según cada caso; a veces basta una sesión",
+    "anestesia": "No se utiliza",
+    "recuperacion": "Puedes volver a tu actividad habitual después del procedimiento",
+    "profesional": "Cirujano vascular"
+   },
+   "variantes": [
+    {
+     "nombre": "Ecoesclerosis (escleroterapia ecoguiada)",
+     "texto": "Para varices profundas y de mayor calibre, como la safena y las perforantes. Se hace guiada por ecografía, sin cirugía, sin anestesia y sin puntos.",
+     "catalogo": "varices-ecoesclerosis"
+    },
+    {
+     "nombre": "Láser vascular de piernas",
+     "texto": "Para arañas vasculares y venas azules, y como alternativa cuando están contraindicadas la cirugía o la escleroterapia.",
+     "catalogo": "laser-vascular-piernas"
+    }
+   ],
+   "resultados": "La mejora del aspecto y de los síntomas es progresiva y varía según cada persona; el cirujano vascular sigue tu evolución en las revisiones.",
+   "preguntas": [
+    {
+     "p": "¿Qué es la ecoesclerosis?",
+     "r": "Es una escleroterapia guiada por ecografía: el médico ve la vena en un monitor y la trata guiándose por la imagen. Así puede tratar sin cirugía varices profundas, como las de la safena o las perforantes, que no se ven a simple vista."
+    },
+    {
+     "p": "¿En qué se diferencia de la escleroterapia clásica?",
+     "r": "La escleroterapia clásica trata venas visibles y superficiales. La ecoesclerosis llega también a venas más profundas y gruesas, que muchas veces son el origen de las varices y arañas vasculares que se ven en la piel."
+    },
+    {
+     "p": "¿Se usa anestesia? ¿Deja cicatriz?",
+     "r": "No se utiliza anestesia. Tampoco necesita puntos ni deja cicatriz, porque se trata de una aplicación con aguja guiada por ecografía. Después del procedimiento puedes volver a tus tareas habituales."
+    },
+    {
+     "p": "¿Qué problemas venosos se valoran?",
+     "r": "Arañas vasculares y derrames, insuficiencia venosa crónica, flebitis, trombosis, fleboedema, síndrome postrombótico, úlceras venosas y complicaciones de las piernas por diabetes, entre otros. El cirujano vascular estudia cada caso con eco-Doppler antes de proponer un tratamiento."
+    },
+    {
+     "p": "¿Se pueden prevenir las varices?",
+     "r": "No hay ninguna medida que las evite del todo, pero ayudan el ejercicio, evitar el sobrepeso y el sedentarismo, no pasar mucho tiempo de pie, elevar las piernas y usar calzado cómodo. Las del embarazo suelen desaparecer unas semanas después del parto."
+    },
+    {
+     "p": "¿Y si no puedo hacerme cirugía ni escleroterapia?",
+     "r": "Existe el tratamiento con láser vascular, que trata a la vez arañas vasculares y venas azules. Es una alternativa cuando la cirugía o la escleroterapia están contraindicadas; el cirujano vascular te dirá si es adecuada para ti."
+    }
+   ],
+   "preocupaciones": [
+    "varices"
+   ],
+   "relacionados": [
+    "presoterapia",
+    "drenaje-linfatico"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#varices",
+    "https://iemec-clinic.com/nosotros",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "La espuma esclerosante es un medicamento de receta: no se nombra el producto en los textos ni en el mensaje de WhatsApp.",
+    "Láser vascular: confirmar el equipo, el número de sesiones y que se ofrece (la web actual solo lo cita en una pregunta, con el texto cortado).",
+    "La web actual promete eliminar «todo tipo de varices» «en una sola sesión indolora»: no se traslada.",
+    "Confirmar cómo presentar la titulación del cirujano vascular (el título de especialista debe estar reconocido en España).",
+    "Normas: la autorización del centro (CS17886) no incluye Angiología y cirugía vascular (U.39); confirmar que cubre este servicio antes de publicarlo."
+   ]
+  },
+  {
+   "slug": "supervision-medica",
+   "especialidad": "control-de-peso",
+   "catalogo": [
+    "semaglutida",
+    "tirzepatida-mounjaro",
+    "liraglutida-saxenda",
+    "reducomplex"
+   ],
+   "orden": 10,
+   "destacado": true,
+   "nombre": "Control de peso con supervisión médica",
+   "titulo": "Control de peso con supervisión médica: valoración, plan y seguimiento",
+   "titulo_seo": "Control de peso con supervisión médica en Boadilla · IEMEC",
+   "descripcion_seo": "Control de peso con supervisión médica en IEMEC Boadilla: valoración, plan personalizado, pautas de alimentación y seguimiento médico periódico.",
+   "entradilla": "Un acompañamiento médico para cuidar tu peso y tu salud: valoración completa, un plan personalizado, orientación sobre alimentación y revisiones periódicas.",
+   "para_quien": [
+    "Tienes sobrepeso y te resulta difícil controlarlo solo con dieta y ejercicio.",
+    "Quieres hacerlo con control médico y un plan personalizado.",
+    "Te preocupa cómo afecta el peso a tu salud.",
+    "Te han hablado de tratamientos médicos para el peso y quieres saber si son adecuados para ti."
+   ],
+   "texto": [
+    "Controlar el peso no siempre depende solo de la fuerza de voluntad. En la consulta, el médico estudia tu historia de salud, tus hábitos, tu medicación y tus objetivos para valorar qué opciones son adecuadas en tu caso.",
+    "Si está indicado, tras la valoración te pautamos un tratamiento médico del peso y te explicamos cómo funciona, sus posibles efectos secundarios y las alternativas. No es un tratamiento estético ni sirve para todo el mundo: depende de tu índice de masa corporal, de otras enfermedades y de una valoración individual.",
+    "El plan se acompaña siempre de cambios en la alimentación y en la actividad física, cuidando la masa muscular. En las revisiones se ajusta la pauta y se vigila cómo la toleras. Si con el cambio de peso aparece flacidez, te orientamos sobre cómo tratarla."
+   ],
+   "sesion": {
+    "duracion": "Primera consulta de unos 60 minutos; revisiones de unos 30",
+    "sesiones": "Revisiones periódicas, según tu plan",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "La evolución es progresiva y varía según cada persona: depende del plan, de la constancia y de los hábitos, y se revisa en cada visita.",
+   "preguntas": [
+    {
+     "p": "¿Es para todo el mundo?",
+     "r": "No. La indicación depende de tu índice de masa corporal, de si tienes otras enfermedades y de una valoración médica individual. El médico revisa tus antecedentes, tu medicación y las posibles contraindicaciones antes de proponerte nada."
+    },
+    {
+     "p": "¿Qué incluye el seguimiento?",
+     "r": "Revisiones periódicas con el médico para ver tu evolución, ajustar la pauta y vigilar cómo la toleras, junto con orientación sobre alimentación y actividad física para cuidar también la masa muscular."
+    },
+    {
+     "p": "¿Tiene efectos secundarios?",
+     "r": "Todo tratamiento médico puede tenerlos. Antes de empezar, el médico te explica los posibles efectos secundarios y las contraindicaciones de lo que te proponga, y el seguimiento sirve para ajustar la pauta si hace falta."
+    },
+    {
+     "p": "¿Se recupera el peso al dejarlo?",
+     "r": "Puede ocurrir si no se mantienen hábitos saludables. Por eso el plan incluye alimentación, actividad física y revisiones, para ayudarte a mantener los cambios cuando termine el tratamiento."
+    },
+    {
+     "p": "¿Puedo combinarlo con tratamientos estéticos?",
+     "r": "En muchos casos sí, siempre tras una valoración médica. Si con el cambio de peso aparece flacidez, pueden plantearse la radiofrecuencia, el HIFU, los inductores de colágeno o, en algunos casos, la cirugía."
+    }
+   ],
+   "preocupaciones": [
+    "peso"
+   ],
+   "relacionados": [
+    "dietetica-y-nutricion",
+    "neuroestimulacion-control-del-apetito",
+    "balon-gastrico"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/perdida-de-peso",
+    "https://iemec-clinic.com/portafolio"
+   ],
+   "pendiente": [
+    "Medicamentos de receta: la página no nombra fármacos, principios activos, familias ni marcas; el botón de WhatsApp tampoco debe hacerlo (el mensaje actual nombra el principio activo, igual que el id principal del catálogo).",
+    "Normas: se evitan «obesidad», «adelgazar» y cualquier promesa de pérdida de peso (RD 1907/1996, art. 4.1 y 4.2), y se usa su alternativa «Control de peso con supervisión médica». La autorización del centro (CS17886) no incluye Endocrinología (U.10) ni Nutrición y dietética (U.11): confirmar que cubre este servicio antes de publicarlo.",
+    "La web actual publica cifras de kilos («hasta 5 kilos al mes»; «3-6 kg al mes» en /portafolio) y antes y después: no se trasladan.",
+    "Confirmar qué pautas se ofrecen de verdad (dos de los fármacos del catálogo solo salen en el blog) y qué es «Reducomplex».",
+    "Los posts del blog que nombran medicamentos conviene revisarlos o retirarlos; aquí no se enlazan."
+   ]
+  },
+  {
+   "slug": "dietetica-y-nutricion",
+   "especialidad": "control-de-peso",
+   "catalogo": [
+    "dietetica-nutricion",
+    "easy-diet"
+   ],
+   "orden": 40,
+   "destacado": true,
+   "nombre": "Dietética y nutrición",
+   "titulo": "Dietética y nutrición: tu plan de alimentación personalizado",
+   "titulo_seo": "Nutrición y dietética en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Consulta de dietética y nutrición en IEMEC Boadilla: plan de alimentación personalizado para cuidar tu peso y tu salud, con seguimiento.",
+   "entradilla": "Un plan de alimentación hecho para ti, con seguimiento, para alcanzar un peso saludable, cuidar tu salud y acompañar tus tratamientos.",
+   "para_quien": [
+    "Quieres alcanzar un peso saludable o mantenerlo.",
+    "Tienes resistencia a la insulina, hipotiroidismo u otra condición que influye en tu alimentación.",
+    "Buscas mejorar tu rendimiento físico y mental o tu bienestar general.",
+    "Sigues un plan de control de peso y necesitas apoyo nutricional."
+   ],
+   "texto": [
+    "En IEMEC entendemos que la belleza y la salud van de la mano. En la consulta de dietética y nutrición analizamos tus hábitos, tu salud y tus objetivos para diseñar un plan de alimentación adaptado a ti y a tu ritmo de vida.",
+    "El plan puede orientarse a alcanzar un peso saludable, prevenir enfermedades, mejorar tu rendimiento físico y mental o acompañar otros tratamientos, como el balón gástrico o el control de peso con supervisión médica. Se adapta a situaciones como la resistencia a la insulina o los desequilibrios hormonales.",
+    "La consulta la lleva una médica con formación en nutrigenómica. Empieza con una valoración médica que tiene en cuenta tu salud, tu medicación y las posibles contraindicaciones, y en las revisiones periódicas ajustamos el plan según tu evolución."
+   ],
+   "sesion": {
+    "duracion": "Primera consulta de unos 60 minutos; revisiones de unos 30",
+    "sesiones": "Revisiones periódicas según tu plan",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Médica con formación en nutrigenómica"
+   },
+   "variantes": [
+    {
+     "nombre": "Plan médico-nutricional con seguimiento semanal",
+     "texto": "Programa de control de peso supervisado por el médico: evaluación médica y nutricional, dieta adaptada y revisiones semanales, desde 4 semanas.",
+     "catalogo": "easy-diet"
+    }
+   ],
+   "resultados": "Los cambios llegan de forma progresiva, a medida que incorporas los nuevos hábitos, y varían según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿En qué consiste la primera consulta?",
+     "r": "Revisamos tu historia de salud, tus hábitos, tu alimentación y tus objetivos. Con esa información diseñamos un plan adaptado a ti y a tu ritmo de vida, y acordamos cómo será el seguimiento."
+    },
+    {
+     "p": "¿Puedo seguir el plan si tengo hipotiroidismo o resistencia a la insulina?",
+     "r": "Sí. El plan se adapta a condiciones hormonales y metabólicas, como el hipotiroidismo, la resistencia a la insulina o el hígado graso, y se revisa con supervisión médica en cada visita."
+    },
+    {
+     "p": "¿Puedo seguir entrenando?",
+     "r": "Sí. Se recomienda actividad física moderada y el plan se ajusta a tu ritmo y a tu entrenamiento. Si haces deporte con regularidad, lo tenemos en cuenta para cubrir lo que necesitas."
+    },
+    {
+     "p": "¿Incluye suplementos o medicación?",
+     "r": "No necesariamente. Los suplementos o un tratamiento médico solo se valoran si hacen falta en tu caso, y siempre bajo control médico. La base del plan es la alimentación y los hábitos que construyes."
+    }
+   ],
+   "preocupaciones": [
+    "peso",
+    "bienestar"
+   ],
+   "relacionados": [
+    "supervision-medica",
+    "neuroestimulacion-control-del-apetito",
+    "balon-gastrico"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#dietetica-y-nutricion",
+    "https://iemec-clinic.com/nosotros",
+    "https://iemec-clinic.com/blog/que-es-easy-diet-y-como-funciona-para-perder-peso",
+    "https://iemec-clinic.com/blog/easy-diet-es-solo-para-perder-peso-o-tambien-mejora-la-salud-metabolica"
+   ],
+   "pendiente": [
+    "«Easy Diet» solo aparece en el blog (con cifras de kilos que no se trasladan): confirmar si se ofrece y si se quiere usar ese nombre; aquí va como «Plan médico-nutricional». El blog cita también control de la ansiedad y apoyo psicológico: confirmar si se ofrecen y quién los da.",
+    "Normas: la autorización del centro (CS17886) no incluye Nutrición y dietética (U.11) ni Endocrinología (U.10); confirmar que cubre esta consulta antes de publicarla.",
+    "Confirmar quién pasa la consulta (en /nosotros, la Dra. Luisa Aleñar ofrece coaching nutricional) y la duración de la primera visita y de las revisiones."
+   ]
+  },
+  {
+   "slug": "balon-gastrico",
+   "especialidad": "control-de-peso",
+   "catalogo": [
+    "balon-gastrico"
+   ],
+   "orden": 10,
+   "destacado": true,
+   "nombre": "Balón gástrico",
+   "titulo": "Balón gástrico: valoración y seguimiento médico",
+   "titulo_seo": "Balón gástrico en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Balón gástrico en IEMEC Boadilla: valoración médica, colocación en un centro hospitalario autorizado y seguimiento médico durante el proceso.",
+   "entradilla": "Una opción sin cirugía para el control del peso: un balón ocupa parte del estómago durante un tiempo y ayuda a sentir saciedad antes, con seguimiento médico.",
+   "para_quien": [
+    "Te preocupa tu peso y otras medidas no te han funcionado.",
+    "Buscas una opción sin cirugía, con acompañamiento médico.",
+    "Quieres cambiar tus hábitos con seguimiento médico durante el proceso."
+   ],
+   "texto": [
+    "El balón gástrico es un dispositivo que se coloca en el estómago y ocupa parte de su espacio. Así se come menos cantidad y la sensación de saciedad llega antes. Es una opción no quirúrgica y reversible.",
+    "En IEMEC empieza con una valoración médica: revisamos tu salud, tus antecedentes y tus objetivos, y te explicamos la idoneidad, los riesgos y las alternativas. La colocación se hace fuera de la clínica, en un centro hospitalario autorizado: [PENDIENTE: quién coloca el balón (profesional y especialidad) y en qué centro].",
+    "El balón se mantiene un tiempo limitado, de unos meses según el tipo, y después se retira o el propio cuerpo lo expulsa. Durante el proceso tienes seguimiento médico para cambiar hábitos y mantenerlos después."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una colocación, con seguimiento durante varios meses",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico (valoración) y [PENDIENTE: profesional que coloca el balón] (colocación)"
+   },
+   "variantes": [],
+   "resultados": "La evolución varía según cada persona y depende sobre todo de los hábitos que se consolidan durante el seguimiento.",
+   "preguntas": [
+    {
+     "p": "¿Cómo se coloca?",
+     "r": "Depende del tipo de balón indicado en tu caso. La colocación se hace en un centro hospitalario autorizado [PENDIENTE: profesional y centro]; en la valoración te explicamos paso a paso cómo será el procedimiento."
+    },
+    {
+     "p": "¿Cuánto tiempo se lleva?",
+     "r": "Un tiempo limitado, de unos meses según el tipo de balón. Después se retira o el propio cuerpo lo expulsa, y el seguimiento médico continúa para ayudarte a mantener los nuevos hábitos."
+    },
+    {
+     "p": "¿Qué incluye el seguimiento?",
+     "r": "Revisiones médicas durante el proceso para ver cómo lo toleras, resolver tus dudas y acompañarte en el cambio de hábitos que te ayude a mantener los cambios."
+    },
+    {
+     "p": "¿Es para mí?",
+     "r": "La indicación la decide el médico tras valorar tu salud, tu peso y tus antecedentes. Si no es adecuado para ti, te lo decimos y te orientamos hacia otras opciones."
+    }
+   ],
+   "preocupaciones": [
+    "peso"
+   ],
+   "relacionados": [
+    "supervision-medica",
+    "neuroestimulacion-control-del-apetito"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/perdida-de-peso",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Producto sanitario de uso profesional: no se nombra la marca del balón (la web actual pone «Allurion» en el título y en el mensaje de WhatsApp).",
+    "Confirmar el tipo de balón, el centro autorizado donde se coloca (normas: decir cuál) y quién lo hace: Multiestetica habla de colocación y retirada por un cirujano de aparato digestivo en hospital, y el blog, de una cápsula que se traga.",
+    "Normas: sin «obesidad» ni cifras o promesas de pérdida de peso (la web actual da porcentajes).",
+    "Área de peso: confirmar que la autorización del centro (CS17886) cubre la valoración y el seguimiento; normas.md deja pendiente de autorización (U.10/U.11) el control de peso.",
+    "Revisión legal (vuelta 9): vuelve a borrador hasta que se confirme la autorización del área de peso; sin «seguimiento nutricional» (Nutrición, U.11, no autorizada) y sin dar por hecho quién coloca el balón."
+   ],
+   "tipo": "medico"
+  },
+  {
+   "slug": "neuroestimulacion-control-del-apetito",
+   "especialidad": "control-de-peso",
+   "catalogo": [
+    "neuroline-t6"
+   ],
+   "orden": 20,
+   "destacado": true,
+   "nombre": "Neuroestimulación para el apetito",
+   "titulo": "Neuroestimulación para el control del apetito",
+   "titulo_seo": "Neuroestimulación para el apetito en Boadilla · IEMEC",
+   "descripcion_seo": "Neuroestimulación para el control del apetito en IEMEC Boadilla: una técnica médica dentro de un plan con supervisión médica, tras una valoración.",
+   "entradilla": "Una técnica médica que aplica un estímulo eléctrico mínimo en un punto del abdomen, como ayuda para controlar el apetito dentro de un plan médico.",
+   "para_quien": [
+    "Te cuesta controlar el apetito y quieres hacerlo con supervisión médica.",
+    "Mantener unos hábitos de alimentación en el día a día se te complica.",
+    "Buscas una ayuda sin fármacos ni cirugía, supervisada por un médico."
+   ],
+   "texto": [
+    "La neuroestimulación es una técnica médica que se usa como ayuda para controlar el apetito. Se aplica en un punto concreto de la piel del abdomen, relacionado con nervios que intervienen en funciones digestivas.",
+    "Con una aguja muy fina se aplica en ese punto una corriente eléctrica mínima. Se combina siempre con cambios en la alimentación y en los hábitos, que son los que se mantienen después.",
+    "La indica y la supervisa un médico, tras una valoración médica y dentro de un plan integral con cambios de hábitos. Puede combinarse con otros tratamientos que indique el médico."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Un ciclo de sesiones semanales que marca el médico",
+    "anestesia": null,
+    "recuperacion": "Ambulatorio: sigues con tu día al salir",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "El efecto sobre el apetito varía según cada persona y depende de que lo acompañes de cambios en la alimentación.",
+   "preguntas": [
+    {
+     "p": "¿Cómo funciona?",
+     "r": "Con una aguja fina se aplica una estimulación eléctrica de baja intensidad en un punto del abdomen. Se usa como ayuda para controlar el apetito, dentro de un plan médico con cambios de hábitos."
+    },
+    {
+     "p": "¿Para quién está indicada?",
+     "r": "La indicación la decide el médico tras la valoración, según tu salud, tus antecedentes y tus objetivos. También puede combinarse con otros tratamientos, si el médico lo ve adecuado."
+    },
+    {
+     "p": "¿Tiene efectos secundarios?",
+     "r": "Como cualquier técnica médica, puede producir molestias o efectos no deseados y tiene contraindicaciones, que el médico te explica en la valoración antes de empezar. La sesión es ambulatoria y puedes seguir con tu día al salir."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Se plantea como un ciclo de sesiones semanales. El número lo decide el médico según tu caso y tu evolución, y se revisa durante el seguimiento junto con tu plan de alimentación."
+    }
+   ],
+   "preocupaciones": [
+    "peso"
+   ],
+   "relacionados": [
+    "supervision-medica",
+    "balon-gastrico"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/perdida-de-peso#neuroline-t6",
+    "https://iemec-clinic.com/blog/que-es-neuroline-t6-y-como-ayuda-a-controlar-el-apetito-y-perder-peso"
+   ],
+   "pendiente": [
+    "La web actual promete «10 kg en 10 semanas» y «sin efectos secundarios»: no se traslada.",
+    "Confirmar el número de sesiones (el catálogo dice 10, semanales) y la duración.",
+    "Neuroline T6 es la marca del equipo: las normas no permiten anunciarla, así que aquí no se nombra (tampoco «T6» en el título, como propone el anexo B).",
+    "Normas (apartado d): pendiente también de que se confirme la autorización del área de peso (U.10/U.11).",
+    "Revisión legal (vuelta 9): vuelve a borrador hasta que se confirme la autorización del área de peso; fuera «dermatoma T6» (también de la meta description: recuerda a la marca del equipo), la grelina (efecto sin pruebas, RD 1907/1996, art. 4.16) y el sobrepeso como reclamo (art. 4.2)."
+   ]
+  },
+  {
+   "slug": "sudoracion-excesiva",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "toxina-hiperhidrosis"
+   ],
+   "orden": 180,
+   "destacado": false,
+   "nombre": "Sudoración excesiva",
+   "titulo": "Sudoración excesiva: valoración médica",
+   "titulo_seo": "Sudoración excesiva en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Sudoración excesiva en IEMEC Boadilla: valoración médica para estudiar tu caso y proponerte un plan personalizado, con sus riesgos y alternativas.",
+   "entradilla": "Si sudas mucho más de lo que tu cuerpo necesita, en la consulta médica estudiamos tu caso y te explicamos qué opciones tienes.",
+   "para_quien": [
+    "Sudas en exceso aunque no haga calor ni estés haciendo ejercicio.",
+    "El sudor te condiciona en el trabajo o en tu vida social.",
+    "Quieres saber qué opciones médicas tienes."
+   ],
+   "texto": [
+    "Sudar más de lo que el cuerpo necesita para regular su temperatura puede hacer incómodas situaciones cotidianas, en el trabajo o en la vida social.",
+    "En la valoración médica, el médico te pregunta por tus síntomas, las zonas afectadas, tu salud y tu medicación, y te explica qué opciones de tratamiento hay en tu caso, cómo son, sus riesgos y sus alternativas.",
+    "Si está indicado, el tratamiento se hace en la propia consulta y el médico te dice cada cuánto conviene revisarlo. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": null,
+    "sesiones": "Según la valoración",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "El resultado y cuánto se mantiene varían según cada persona; el médico te lo explica en la valoración.",
+   "preguntas": [
+    {
+     "p": "¿Qué es la hiperhidrosis?",
+     "r": "Es una sudoración mayor de la que el cuerpo necesita para regular su temperatura. Puede aparecer aunque no haga calor ni estés haciendo ejercicio, y a menudo condiciona el trabajo o la vida social."
+    },
+    {
+     "p": "¿Qué pasa en la valoración?",
+     "r": "El médico te pregunta por tus síntomas, las zonas afectadas, tu salud y tu medicación, y te explica qué opciones tienes, sus riesgos, sus alternativas y qué puedes esperar en tu caso."
+    },
+    {
+     "p": "¿Cuánto dura el efecto?",
+     "r": "Depende del tratamiento que se indique y de cada persona. En la valoración, el médico te explica qué puedes esperar y cada cuánto conviene revisarlo para mantener el resultado."
+    }
+   ],
+   "preocupaciones": [
+    "bienestar"
+   ],
+   "relacionados": [
+    "depilacion-laser",
+    "drenaje-linfatico"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#sudor",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Medicamento de receta: no se nombra, ni se describe su mecanismo ni la duración de su efecto, porque sería una referencia indirecta (normas.md, apartado b); tampoco en el mensaje de WhatsApp (el actual lo nombra, igual que el id principal del catálogo).",
+    "Normas: comprobar que la autorización del centro (CS17886) cubre el tratamiento de la hiperhidrosis, que es un problema de salud.",
+    "Confirmar las zonas que se tratan y la duración de la consulta.",
+    "Revisión final (vuelta 9): vuelve a borrador hasta que la clínica confirme que la autorización del centro (CS17886) cubre el tratamiento de la hiperhidrosis, que es un problema de salud y no una mejora estética (normas.md, anexo B y regla 11). Sin «no es solo una cuestión estética» ni «confirma el diagnóstico»."
+   ]
+  }
+ ],
+ "sin_pagina": []
+}

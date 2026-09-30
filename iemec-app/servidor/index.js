@@ -10,6 +10,7 @@ const db = require('./db');
 const { rutasPublicas } = require('./rutas/publicas');
 const { rutasPanel } = require('./rutas/panel');
 const { rutasWebhooks } = require('./rutas/webhooks');
+const { rutasWeb } = require('./rutas/web');
 const { rutasAcceso } = require('./rutas/acceso');
 const { rutasEquipo } = require('./rutas/equipo');
 const { rutasSesion, exigirSesion } = require('./sesion');
@@ -38,6 +39,8 @@ function crearApp({ pool = db.pool, deps = null, reloj, publico = path.join(__di
   // Webhooks de WhatsApp y Meta y alta de leads: antes del lector de JSON, porque la firma se
   // comprueba sobre el cuerpo tal cual llega.
   app.use(rutasWebhooks({ pool, reloj }));
+  // El formulario «Te llamamos» de la web pública (otro dominio): lee su propio cuerpo.
+  app.use(rutasWeb({ pool, reloj }));
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/api/version', (_req, res) => {
