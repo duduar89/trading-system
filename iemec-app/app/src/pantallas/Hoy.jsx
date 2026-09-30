@@ -9,6 +9,16 @@ function saludo(ahora = new Date()) {
   return 'Buenas noches';
 }
 
+// Qué ha pasado con las citas de hoy (los «no vino», a la vista).
+function detalleCitas(c) {
+  return [
+    `${c.confirmadas} confirmadas`,
+    c.llegadas > 0 && `${c.llegadas} en la clínica`,
+    c.completadas > 0 && `${c.completadas} ${c.completadas === 1 ? 'completada' : 'completadas'}`,
+    c.noPresentadas > 0 && `${c.noPresentadas} ${c.noPresentadas === 1 ? 'no vino' : 'no vinieron'}`,
+  ].filter(Boolean).join(' · ');
+}
+
 export default function Hoy() {
   const { datos: d, error } = useDatos('/panel/hoy', { cadaMs: 30000 });
   if (error) return <Error texto={error} />;
@@ -24,7 +34,7 @@ export default function Hoy() {
     <>
       <Cabecera antetitulo={diaLargo(d.fecha)} titulo={`${saludo()}, IEMEC`} />
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Cifra etiqueta="Citas hoy" valor={d.citas.total} detalle={`${d.citas.confirmadas} confirmadas`} />
+        <Cifra etiqueta="Citas hoy" valor={d.citas.total} detalle={detalleCitas(d.citas)} />
         <Cifra etiqueta="La IA atiende" valor={d.conversaciones.conIa} detalle="conversaciones abiertas" />
         <Cifra etiqueta="Seguimientos hoy" valor={d.seguimientosHoy} detalle="con la fecha que pidió cada paciente" />
         <Cifra etiqueta="Recuperado este mes" valor={euros(d.recuperadoMes.euros)} detalle={`${d.recuperadoMes.citas} citas cerradas por WhatsApp`} tono="oro" />

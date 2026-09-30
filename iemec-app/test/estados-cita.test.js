@@ -344,7 +344,10 @@ test('ruta del panel: sin sesión no entra; con sesión marca, explica lo que no
         assert.equal(d1.conversacionId, conv.insertId);
         assert.deepEqual(d1.acciones, ['llegada', 'completada', 'no_presentada']);
         assert.equal(d1.deshacer, null);
-        assert.deepEqual((await get(`/citas/${c2.id}`)).acciones, ['llegada'], 'la de las 12:30 aún no ha empezado');
+        assert.equal(d1.espera, null);
+        const d2 = await get(`/citas/${c2.id}`);
+        assert.deepEqual(d2.acciones, ['llegada'], 'la de las 12:30 aún no ha empezado');
+        assert.equal(d2.espera, 'Aún no ha empezado: se puede marcar como completada desde las 12:30');
         assert.equal((await fetch(`${base}/api/panel/citas/999999`)).status, 404);
 
         const r1 = await post(c1.id, { estado: 'llegada' });
