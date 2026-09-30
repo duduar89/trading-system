@@ -105,9 +105,11 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
    límite. En los dos casos, hay que ajustarlo (con LucusHost) antes de publicar la web. Después,
    `DELETE FROM limites_acceso WHERE clave LIKE 'web%';`.
 6. **Plantilla de confirmación de la web:** `iemec_solicitud_web` (utilidad, sin variables, botones «Sí,
-   fui yo» y «No fui yo») tiene que estar aprobada en Meta antes de publicar el formulario: es lo
-   primero que recibe quien pide WhatsApp (ver [`WHATSAPP-Y-LEADS.md`](WHATSAPP-Y-LEADS.md)).
-   Mientras no lo esté, cada solicitud con WhatsApp sale como tarea «llamar y preguntar si la pidió».
+   fui yo» y «No fui yo») tiene que estar aprobada en Meta, y el envío real conectado, antes de que el
+   formulario ofrezca WhatsApp (`web/datos/sitio.json` → `formulario.whatsapp: true`): es lo primero
+   que recibe quien lo pide (ver [`WHATSAPP-Y-LEADS.md`](WHATSAPP-Y-LEADS.md)). Mientras no lo esté,
+   la web sale sin esa opción (llamada o correo) y no promete ese WhatsApp; si aun así llega una
+   solicitud con WhatsApp, sale como tarea «llamar y preguntar si la pidió».
 7. **Secretos para desplegar:** desde tu terminal, `bash scripts/secretos-despliegue.sh`. Crea una
    clave SSH solo para esto, te dice cómo autorizarla en cPanel y guarda los secretos en GitHub
    (`IEMEC_SSH_KEY`, `IEMEC_SSH_HOST`, `IEMEC_SSH_USER`, `IEMEC_KNOWN_HOSTS`, `IEMEC_DOMINIO`).

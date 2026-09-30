@@ -434,7 +434,9 @@ vez (`repetido`), **400** faltan datos, **401** clave mala, **503** sin `LEADS_C
 - Envío real (`servidor/integraciones/whatsapp.js` en modo `real`): hoy solo entra.
 - Sacar a alguien de la lista de bajas si vuelve a dar su consentimiento (hoy, a mano en la base; si
   lo marca en la web después de su baja, una tarea lo dice).
-- Aprobar en Meta la plantilla `iemec_solicitud_web` antes de publicar el formulario de la web.
+- Aprobar en Meta la plantilla `iemec_solicitud_web` y conectar el envío real antes de ofrecer WhatsApp en
+  el formulario de la web (`web/datos/sitio.json` → `formulario.whatsapp: true`). Hasta entonces la web
+  sale sin esa opción (llamada o correo) y no promete el WhatsApp de confirmación.
 - Estados de las plantillas (`message_template_status_update`, calidad) y, con coexistencia, los
   mensajes que manda el equipo desde el móvil (`smb_message_echoes`): se guardan, pero aún no se
   procesan.
