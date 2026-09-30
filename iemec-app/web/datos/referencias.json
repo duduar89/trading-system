@@ -237,11 +237,6 @@
     "frontoplastia"
    ]
   },
-  "web-ginecologia-estetica": {
-   "catalogo": null,
-   "pagina": "/ginecologia-estetica/",
-   "especialidad": "ginecologia-estetica"
-  },
   "web-gracias": {
    "catalogo": null,
    "pagina": "/gracias/",
@@ -322,10 +317,15 @@
     "microinjerto-cejas"
    ]
   },
+  "web-intima-f-1l61s42": {
+   "catalogo": null,
+   "pagina": "/estetica-intima-femenina/",
+   "especialidad": "estetica-intima-femenina"
+  },
   "web-intima-f-6mlx46": {
    "catalogo": "labioplastia",
-   "pagina": "/ginecologia-estetica/labioplastia/",
-   "especialidad": "ginecologia-estetica",
+   "pagina": "/estetica-intima-femenina/labioplastia/",
+   "especialidad": "estetica-intima-femenina",
    "ids": [
     "labioplastia",
     "cirugia-capuchon-clitoris"
@@ -333,24 +333,29 @@
   },
   "web-intima-f-uugwi2": {
    "catalogo": "remodelacion-intima-ah",
-   "pagina": "/ginecologia-estetica/remodelacion-intima/",
-   "especialidad": "ginecologia-estetica",
+   "pagina": "/estetica-intima-femenina/remodelacion-intima/",
+   "especialidad": "estetica-intima-femenina",
    "ids": [
     "remodelacion-intima-ah"
    ]
   },
   "web-intima-f-zqz54s": {
    "catalogo": "blanqueamiento-intimo",
-   "pagina": "/ginecologia-estetica/aclarado-de-la-zona-intima/",
-   "especialidad": "ginecologia-estetica",
+   "pagina": "/estetica-intima-femenina/aclarado-de-la-zona-intima/",
+   "especialidad": "estetica-intima-femenina",
    "ids": [
     "blanqueamiento-intimo"
    ]
   },
+  "web-intima-m-1xa9qse": {
+   "catalogo": null,
+   "pagina": "/estetica-intima-masculina/",
+   "especialidad": "estetica-intima-masculina"
+  },
   "web-intima-m-jo0m9h": {
    "catalogo": "engrosamiento-pene-ah",
-   "pagina": "/salud-sexual-masculina/engrosamiento-del-pene/",
-   "especialidad": "salud-sexual-masculina",
+   "pagina": "/estetica-intima-masculina/engrosamiento-del-pene/",
+   "especialidad": "estetica-intima-masculina",
    "ids": [
     "engrosamiento-pene-ah"
    ]
@@ -580,25 +585,14 @@
     "peeling-bbc"
    ]
   },
-  "web-perdida-de-peso": {
-   "catalogo": null,
-   "pagina": "/perdida-de-peso/",
-   "especialidad": "perdida-de-peso"
-  },
-  "web-peso-14ctfn8": {
-   "catalogo": "balon-gastrico",
-   "pagina": "/perdida-de-peso/balon-gastrico/",
-   "especialidad": "perdida-de-peso",
+  "web-piel-con-tendencia-acneica": {
+   "catalogo": "perfect-skin-acne",
+   "pagina": "/medicina-estetica-facial/piel-con-tendencia-acneica/",
+   "especialidad": "medicina-estetica-facial",
    "ids": [
-    "balon-gastrico"
-   ]
-  },
-  "web-peso-8qkgyo": {
-   "catalogo": "neuroline-t6",
-   "pagina": "/perdida-de-peso/neuroestimulacion-control-del-apetito/",
-   "especialidad": "perdida-de-peso",
-   "ids": [
-    "neuroline-t6"
+    "perfect-skin-acne",
+    "peeling-acne",
+    "acne-xebor"
    ]
   },
   "web-presoterapia": {
@@ -703,11 +697,6 @@
     "reparacion-trasplante-capilar"
    ]
   },
-  "web-salud-sexual-masculina": {
-   "catalogo": null,
-   "pagina": "/salud-sexual-masculina/",
-   "especialidad": "salud-sexual-masculina"
-  },
   "web-subcision": {
    "catalogo": "subcision-celulitis",
    "pagina": "/medicina-estetica-corporal/subcision/",
@@ -715,14 +704,6 @@
    "ids": [
     "subcision-celulitis",
     "subcision-cicatrices-estrias"
-   ]
-  },
-  "web-sudoracion-excesiva": {
-   "catalogo": "toxina-hiperhidrosis",
-   "pagina": "/medicina-estetica-corporal/sudoracion-excesiva/",
-   "especialidad": "medicina-estetica-corporal",
-   "ids": [
-    "toxina-hiperhidrosis"
    ]
   },
   "web-tarjeta-140": {
@@ -766,16 +747,6 @@
    "especialidad": "medicina-estetica-facial",
    "ids": [
     "fotona-4d-facial"
-   ]
-  },
-  "web-tratamiento-del-acne": {
-   "catalogo": "perfect-skin-acne",
-   "pagina": "/medicina-estetica-facial/tratamiento-del-acne/",
-   "especialidad": "medicina-estetica-facial",
-   "ids": [
-    "perfect-skin-acne",
-    "peeling-acne",
-    "acne-xebor"
    ]
   },
   "web-tratamiento-reafirmante-no-invasivo": {

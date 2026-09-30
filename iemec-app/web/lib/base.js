@@ -153,12 +153,15 @@ ${marca(ctx, { diferida: true })}
 }
 
 // ── Formulario «Te llamamos» (textos de casillas-formulario.md) ────────────────────────────────
+// Los valores son grupos (el slug de la especialidad…) o la referencia de la página («web-lipolaser»),
+// nunca un id del catálogo: la app los traduce con semillas/iemec/referencias-web.json. En lo íntimo
+// y el peso se preselecciona el grupo neutro (sin opción repetida) y el tratamiento va en «ref».
 function opcionesInteres(ctx, seleccion) {
   const grupos = ctx.especialidades.map((e) => ({ valor: e.slug, texto: e.grupo_neutro }));
   grupos.push({ valor: 'estetica-y-bienestar', texto: 'Estética y bienestar (faciales, masajes, head spa)' });
   grupos.push({ valor: 'tarjeta-regalo', texto: 'Tarjeta regalo' });
   grupos.push({ valor: 'otra', texto: 'Otra cosa / prefiero contarlo por teléfono' });
-  const extra = seleccion && !grupos.some((g) => g.valor === seleccion.valor) ? [seleccion] : [];
+  const extra = seleccion && seleccion.texto && !grupos.some((g) => g.valor === seleccion.valor) ? [seleccion] : [];
   return [...extra, ...grupos].map((g) => html`<option value="${g.valor}"${seleccion && g.valor === seleccion.valor ? crudo(' selected') : ''}>${g.texto}</option>`);
 }
 
@@ -168,7 +171,9 @@ function formulario(ctx, { id = 'f', pagina, ref, seleccion = null, titulo = nul
   const campo = (n) => `${id}-${n}`;
   const err = (n) => html`<p class="error" id="${campo(n)}-error" data-error-de="${n}" hidden></p>`;
   const correo = s.correo || null;
-  return html`<form class="formulario" action="${accion}" method="post" novalidate data-formulario>
+  // Sin «novalidate» en el HTML: sin JavaScript valida el navegador; con él, web.js lo desactiva y
+  // pinta sus propios mensajes.
+  return html`<form class="formulario" action="${accion}" method="post" data-formulario>
 ${titulo ? html`<h3>${titulo}</h3>` : ''}
 <div class="campos-dos">
 <div class="campo"><label for="${campo('nombre')}">Nombre</label><input id="${campo('nombre')}" name="nombre" autocomplete="given-name" required maxlength="80" aria-describedby="${campo('nombre')}-error">${err('nombre')}</div>
@@ -178,12 +183,13 @@ ${titulo ? html`<h3>${titulo}</h3>` : ''}
 <div class="campo"><label for="${campo('email')}">Correo electrónico (opcional)</label><input id="${campo('email')}" name="email" type="email" autocomplete="email" maxlength="120" aria-describedby="${campo('email')}-error">${err('email')}</div>
 <div class="campo"><label for="${campo('tratamiento')}">¿Qué te interesa?</label><select id="${campo('tratamiento')}" name="tratamiento" required aria-describedby="${campo('tratamiento')}-ayuda ${campo('tratamiento')}-error"><option value="">Elige una opción</option>${opcionesInteres(ctx, seleccion)}</select><p class="ayuda" id="${campo('tratamiento')}-ayuda">Si vienes de la página de un tratamiento, ya está elegido.</p>${err('tratamiento')}</div>
 </div>
-<fieldset class="campo"><legend>¿Cómo prefieres que te contactemos?</legend>
+<fieldset class="campo" aria-describedby="${campo('preferencia')}-error"><legend>¿Cómo prefieres que te contactemos?</legend>
 <div class="opciones">
-<label class="opcion"><input type="radio" name="preferencia" value="whatsapp" checked> WhatsApp</label>
+<label class="opcion"><input type="radio" name="preferencia" value="whatsapp" required> WhatsApp</label>
 <label class="opcion"><input type="radio" name="preferencia" value="llamada"> Llamada</label>
+<label class="opcion"><input type="radio" name="preferencia" value="correo"> Correo electrónico</label>
 </div>${err('preferencia')}</fieldset>
-<div class="campo"><label for="${campo('mensaje')}">Mensaje (opcional)</label><textarea id="${campo('mensaje')}" name="mensaje" rows="4" maxlength="${s.formulario.mensaje_max}" aria-describedby="${campo('mensaje')}-ayuda"></textarea><p class="ayuda" id="${campo('mensaje')}-ayuda">Cuéntanos lo básico: qué te interesa y cuándo te viene bien. <strong>No incluyas datos médicos</strong> (enfermedades, medicación, fotos): los hablaremos en consulta.</p></div>
+<div class="campo"><label for="${campo('mensaje')}">Mensaje (opcional)</label><textarea id="${campo('mensaje')}" name="mensaje" rows="4" maxlength="${s.formulario.mensaje_max}" aria-describedby="${campo('mensaje')}-ayuda ${campo('mensaje')}-error"></textarea><p class="ayuda" id="${campo('mensaje')}-ayuda">Cuéntanos lo básico: qué te interesa y cuándo te viene bien. <strong>No incluyas datos médicos</strong> (enfermedades, medicación, fotos): los hablaremos en consulta.</p>${err('mensaje')}</div>
 <div class="capa-privacidad">
 <h3>Información básica sobre protección de datos</h3>
 <table><tbody>
@@ -199,13 +205,13 @@ ${titulo ? html`<h3>${titulo}</h3>` : ''}
 <div class="casilla"><input type="checkbox" id="${campo('comercial')}" name="comercial" value="si"><label for="${campo('comercial')}">Quiero recibir comunicaciones comerciales de IEMEC (novedades y propuestas sobre los tratamientos que me interesan) por WhatsApp o correo electrónico. Puedo darme de baja cuando quiera respondiendo «BAJA». <em>(Opcional)</em></label></div>
 <input type="hidden" name="pagina" value="${pagina}">
 <input type="hidden" name="ref" value="${ref}">
-${['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid'].map((n) => html`<input type="hidden" name="${n}" value="">`)}
+${['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].map((n) => html`<input type="hidden" name="${n}" value="">`)}
 <input type="hidden" name="t" value="">
 <input type="hidden" name="version_textos" value="${s.formulario.version_textos}">
 <div class="trampa" aria-hidden="true"><label for="${campo('web')}">No rellenes este campo</label><input id="${campo('web')}" name="web" tabindex="-1" autocomplete="off"></div>
 <button class="boton boton-oscuro" type="submit">Enviar solicitud</button>
 <p class="nota-form">Te contestamos en horario de la clínica. <strong>Este formulario no es para urgencias: si es urgente, llama al 112.</strong></p>
-<div class="form-estado" role="status" aria-live="polite"></div>
+<div class="form-estado" role="status" aria-live="polite" tabindex="-1"></div>
 </form>`;
 }
 

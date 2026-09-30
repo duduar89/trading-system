@@ -33,8 +33,12 @@ cuando quieras.
 
 - **Formulario de la web:** nombre, teléfono, correo electrónico (opcional, obligatorio si eliges
   que te contestemos por correo), el tratamiento que te interesa, tu mensaje (opcional), cómo
-  prefieres que te contactemos, la página desde la que escribes, la fecha y la hora, y lo que
-  marcas en las casillas.
+  prefieres que te contactemos (WhatsApp, llamada o correo: no hay ninguna opción marcada de
+  antemano), la página desde la que escribes, la fecha y la hora, y lo que marcas en las casillas.
+- **Campaña de la que llegas:** si entras en la web desde un anuncio o un enlace con código de
+  campaña, ese código (el nombre de la campaña y su origen, como «facebook» o «google»). Nos llega
+  con el formulario y, si nos escribes por WhatsApp, tu mensaje lleva una clave corta de la campaña,
+  no su nombre. No usamos identificadores de clic de Google ni de Meta.
 - **Conversaciones:** lo que nos escribes por WhatsApp o nos cuentas por teléfono, y los datos de
   tus citas (tratamiento, fecha, hora, profesional, recordatorios, confirmaciones y cambios).
 - **Si llegas a ser paciente:** tu historia clínica, que se rige por su propia cláusula.
@@ -56,7 +60,8 @@ hablaremos en consulta.
 | **Atenderte como paciente** (historia clínica, consentimientos, facturación). | Asistencia sanitaria (RGPD, art. 9.2.h), obligaciones legales (RGPD, art. 6.1.c; Ley 41/2002) y contrato. | Según la cláusula para pacientes y los plazos legales de documentación clínica, mercantil y fiscal. |
 | **Pedirte tu opinión** sobre la atención después de la cita, con un enlace a nuestra ficha de Google. | Interés legítimo en conocer la calidad de nuestra atención (RGPD, art. 6.1.f). Puedes oponerte en cualquier momento y no volveremos a pedírtela. `[PENDIENTE: validar la base con el DPD]` | Lo que dure la gestión de tu cita. Si publicas tu opinión en Google, lo haces tú, con las condiciones de Google. |
 | **Enviarte comunicaciones comerciales** (novedades y propuestas) por WhatsApp o correo, adaptadas a los tratamientos que te interesan. | Solo si marcas la casilla: tu consentimiento (RGPD, arts. 6.1.a y 9.2.a; LSSI, art. 21). Nunca enviamos publicidad de medicamentos de receta. | Hasta que te des de baja. La prueba de tu consentimiento y de tu baja se guarda bloqueada hasta 3 años (plazo de prescripción de la LSSI, art. 45). |
-| **Seguridad de la web** y prevención del abuso de los formularios. | Interés legítimo (RGPD, art. 6.1.f). | `[PENDIENTE: p. ej. 90 días para los registros del servidor]` |
+| **Saber de qué campaña llega cada solicitud**, para medir nuestros anuncios sin seguirte por otras webs. | Interés legítimo (RGPD, art. 6.1.f): es un dato de la campaña, no del tratamiento, y no se cede a nadie. `[PENDIENTE: validar la base con el DPD]` | Lo mismo que la solicitud. |
+| **Seguridad de la web** y prevención del abuso de los formularios (límite de envíos por dirección IP y por teléfono). | Interés legítimo (RGPD, art. 6.1.f). | `[PENDIENTE: p. ej. 90 días para los registros del servidor]`; el contador de envíos, unas horas. |
 | **Cumplir obligaciones legales** y defendernos de reclamaciones. | Obligación legal (RGPD, art. 6.1.c) e interés legítimo (RGPD, art. 6.1.f). | Bloqueados durante los plazos de prescripción (LOPDGDD, art. 32). |
 
 `[PENDIENTE: solo si se mantiene la venta online de tarjetas regalo: finalidad «gestionar tu

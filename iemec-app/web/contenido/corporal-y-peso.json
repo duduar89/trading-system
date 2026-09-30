@@ -107,7 +107,7 @@
     },
     {
      "p": "¿Es lo mismo que una liposucción?",
-     "r": "No. La liposucción es una cirugía que hace un cirujano plástico en un centro autorizado. El lipoláser es un procedimiento médico mínimamente invasivo que se hace en la clínica. En la valoración te explicamos qué opción encaja con tu caso."
+     "r": "No. La liposucción es una cirugía que hace un cirujano en un centro autorizado. El lipoláser es un procedimiento médico mínimamente invasivo que se hace en la clínica. En la valoración te explicamos qué opción encaja con tu caso."
     },
     {
      "p": "¿Sirve para perder peso?",
@@ -150,11 +150,11 @@
    ],
    "orden": 30,
    "destacado": true,
-   "nombre": "Remodelación corporal y EvoSculpt",
-   "titulo": "Remodelación corporal con aparatología y protocolo EvoSculpt",
-   "titulo_seo": "Remodelación corporal y EvoSculpt en Boadilla · IEMEC",
-   "descripcion_seo": "Remodelación corporal y protocolo EvoSculpt en IEMEC Boadilla: radiofrecuencia y vacuum para la grasa localizada, la flacidez y la celulitis.",
-   "entradilla": "Aparatología corporal no invasiva que combina radiofrecuencia y vacuum para trabajar la grasa localizada, la flacidez y la celulitis, sola o dentro del protocolo EvoSculpt.",
+   "nombre": "Remodelación corporal",
+   "titulo": "Remodelación corporal con aparatología y protocolo corporal completo",
+   "titulo_seo": "Remodelación corporal en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Remodelación corporal en IEMEC Boadilla: radiofrecuencia y vacío para la grasa localizada, la flacidez y la celulitis, sola o en un protocolo completo.",
+   "entradilla": "Aparatología corporal no invasiva que combina radiofrecuencia y vacío para trabajar la grasa localizada, la flacidez y la celulitis, sola o dentro de un protocolo corporal completo.",
    "para_quien": [
     "Quieres mejorar el contorno de abdomen, piernas, glúteos o brazos.",
     "Te preocupan la celulitis, la flacidez o la grasa localizada.",
@@ -162,12 +162,13 @@
     "Buscas un tratamiento no invasivo."
    ],
    "texto": [
-    "Usamos un equipo de remodelación corporal que reúne varias técnicas de estética avanzada. Entre ellas, la radiofrecuencia, que calienta de forma controlada las capas profundas de la piel, y el vacuum, una succión suave que moviliza el tejido. Así trabaja a la vez la grasa localizada, la flacidez y la celulitis.",
+    "Usamos un equipo de remodelación corporal que reúne varias técnicas de estética avanzada. Entre ellas, la radiofrecuencia, que calienta de forma controlada las capas profundas de la piel, y el vacío, una succión suave que moviliza el tejido. Así trabaja a la vez la grasa localizada, la flacidez y la celulitis.",
     "Antes de empezar hacemos un diagnóstico corporal para adaptar el tratamiento a tu cuerpo y a tus objetivos. Cada sesión puede centrarse en una zona o en dos.",
-    "EvoSculpt es el protocolo corporal completo de IEMEC. En una misma cita une el diagnóstico corporal, una sesión de aparatología, un masaje drenante manual y presoterapia, con asesoramiento personalizado para acompañarte durante el proceso."
+    "El protocolo corporal completo de IEMEC une en una misma cita el diagnóstico corporal, una sesión de aparatología, un masaje drenante manual y presoterapia, con asesoramiento personalizado para acompañarte durante el proceso.",
+    "Durante la sesión se nota calor y una succión suave. Después la piel puede quedar enrojecida y caliente unas horas y, con poca frecuencia, aparecen molestias, pequeños hematomas por la succión o quemaduras. No se aplica, entre otros casos, en el embarazo, con marcapasos o con implantes metálicos en la zona, ni sobre piel irritada o con heridas: en el diagnóstico revisamos las contraindicaciones en tu caso."
    ],
    "sesion": {
-    "duracion": "1 hora por zona; EvoSculpt, 1 hora y 45 minutos",
+    "duracion": "1 hora por zona; el protocolo completo, 1 hora y 45 minutos",
     "sesiones": "Varias, según el diagnóstico",
     "anestesia": null,
     "recuperacion": null,
@@ -180,7 +181,7 @@
      "catalogo": "tecnologia-evo-corporal"
     },
     {
-     "nombre": "Protocolo EvoSculpt",
+     "nombre": "Protocolo corporal completo",
      "texto": "Diagnóstico corporal, aparatología de remodelación, masaje drenante manual y presoterapia en una cita de 1 hora y 45 minutos, con asesoramiento personalizado.",
      "catalogo": "protocolo-evosculpt"
     }
@@ -188,8 +189,8 @@
    "resultados": "Muchas personas notan sensación de ligereza desde las primeras sesiones; los cambios en el contorno y en la piel se aprecian tras varias sesiones y varían según cada persona.",
    "preguntas": [
     {
-     "p": "¿Qué diferencia hay entre una sesión de aparatología y EvoSculpt?",
-     "r": "La sesión de aparatología trabaja una o dos zonas con el equipo. EvoSculpt es un protocolo más completo: añade diagnóstico corporal, masaje drenante manual, presoterapia y asesoramiento personalizado en una misma cita de 1 hora y 45 minutos."
+     "p": "¿Qué diferencia hay entre una sesión de aparatología y el protocolo completo?",
+     "r": "La sesión de aparatología trabaja una o dos zonas con el equipo. El protocolo completo añade diagnóstico corporal, masaje drenante manual, presoterapia y asesoramiento personalizado en una misma cita de 1 hora y 45 minutos."
     },
     {
      "p": "¿Cuándo se notan los resultados?",
@@ -230,7 +231,8 @@
     "EVO es la marca del equipo (plataforma D-finitive EVO) y las normas no permiten anunciarla: aquí se habla de aparatología. EvoSculpt, como nombre de protocolo de IEMEC, vale si no es marca de terceros: confirmar.",
     "Confirmar las tecnologías del equipo: Treatwell dice radiofrecuencia, vacuum y electroestimulación; la ficha del equipo, endotermia.",
     "EvoSculpt se vende como promoción: en esta versión no se publican precios ni descuentos.",
-    "La sección «Tecnología EVO» de /corporal tiene por error el texto de la subcisión; aquí se ha corregido."
+    "La sección «Tecnología EVO» de /corporal tiene por error el texto de la subcisión; aquí se ha corregido.",
+    "Revisión final (vuelta 9): «EvoSculpt» pasa a «protocolo corporal completo» hasta que la clínica confirme que es un nombre propio de IEMEC y no del fabricante del equipo (normas.json lo prohíbe mientras tanto). «Vacuum» pasa a «vacío», como en /clinica/. Se añaden los riesgos y las contraindicaciones del aparato (MDR, art. 7)."
    ]
   },
   {
@@ -254,9 +256,10 @@
     "Buscas un tratamiento adaptado a tu tipo de piel y de vello."
    ],
    "texto": [
-    "La depilación láser actúa sobre la raíz del vello para reducirlo de forma progresiva. En IEMEC usamos un láser de diodo cuatriondas, que combina cuatro longitudes de onda para adaptarse a distintos tipos de piel y de vello.",
+    "La depilación láser actúa sobre la raíz del vello para reducirlo de forma progresiva. En IEMEC usamos un láser de diodo de cuatro longitudes de onda, que se adapta a distintos tipos de piel y de vello.",
     "El equipo incorpora un sistema de enfriamiento que hace la sesión más cómoda. Puedes tratar zonas concretas o el cuerpo completo, tanto si eres mujer como si eres hombre.",
-    "Como el vello crece por ciclos, hacen falta varias sesiones, normalmente entre 5 y 8, separadas unas semanas. Con el tiempo puede ser necesaria alguna sesión de mantenimiento."
+    "Como el vello crece por ciclos, hacen falta varias sesiones, normalmente entre 5 y 8, separadas unas semanas. Con el tiempo puede ser necesaria alguna sesión de mantenimiento.",
+    "Después de la sesión la piel puede quedar enrojecida o algo inflamada unas horas; con poca frecuencia aparecen ampollas, quemaduras o cambios en el color de la piel. No se aplica sobre piel bronceada, en el embarazo ni si tomas medicamentos que sensibilizan a la luz, entre otros casos: en la primera cita revisamos las contraindicaciones."
    ],
    "sesion": {
     "duracion": "Según la zona; el cuerpo completo, alrededor de una hora",
@@ -290,7 +293,7 @@
     },
     {
      "p": "¿Sirve para mi tipo de piel?",
-     "r": "El láser de diodo cuatriondas está pensado para adaptarse a distintos tipos de piel y de vello. En la primera cita revisamos tu piel y tu vello para ajustar el tratamiento a tu caso."
+     "r": "El láser de diodo de cuatro longitudes de onda está pensado para adaptarse a distintos tipos de piel y de vello. En la primera cita revisamos tu piel y tu vello para ajustar el tratamiento a tu caso."
     },
     {
      "p": "¿Es molesta?",
@@ -306,8 +309,7 @@
    ],
    "relacionados": [
     "remodelacion-corporal",
-    "presoterapia",
-    "sudoracion-excesiva"
+    "presoterapia"
    ],
    "restringida": false,
    "revision_medica": false,
@@ -319,7 +321,8 @@
    "pendiente": [
     "La web actual la llama «depilación definitiva», dice que es «prácticamente indoloro» y que «garantiza» eficacia: aquí se evita.",
     "La web actual vende bonos de cuerpo completo con precio por sesión: las normas no permiten bonos ni precios en la web, así que aquí se habla de «cuerpo completo». Confirmar sesiones y condiciones.",
-    "Confirmar las zonas que se ofrecen por separado y la duración de cada una."
+    "Confirmar las zonas que se ofrecen por separado y la duración de cada una.",
+    "Revisión final (vuelta 9): «Cuatriondas» pasa a «de cuatro longitudes de onda», como en /clinica/. Se añaden los riesgos y las contraindicaciones del láser (MDR, art. 7 y anexo XVI)."
    ]
   },
   {
@@ -349,7 +352,7 @@
     "duracion": "Unos 45 minutos",
     "sesiones": "Entre 6 y 10, una por semana",
     "anestesia": "No necesita",
-    "recuperacion": "No necesita; puedes seguir con tu rutina",
+    "recuperacion": "Puedes seguir con tu rutina",
     "profesional": "Esteticista"
    },
    "variantes": [],
@@ -365,7 +368,7 @@
     },
     {
      "p": "¿Es molesta? ¿Tiene recuperación?",
-     "r": "Es un tratamiento cómodo: durante la sesión notas calor en la zona tratada. No necesita tiempo de recuperación, así que puedes volver a tus actividades al salir, y es apto para todos los tipos de piel."
+     "r": "Es un tratamiento cómodo: durante la sesión notas calor en la zona tratada y al salir puedes volver a tus actividades. La piel puede quedar enrojecida y caliente un rato y, con poca frecuencia, aparecen molestias o quemaduras. No se aplica, entre otros casos, en el embarazo, con marcapasos o sobre implantes metálicos en la zona: revisamos las contraindicaciones antes de empezar."
     },
     {
      "p": "¿Se puede combinar con otros tratamientos?",
@@ -390,7 +393,8 @@
     "https://iemec-clinic.com/blog/radiofrecuencia-corporal-beneficios-y-resultados"
    ],
    "pendiente": [
-    "Confirmar el equipo (el catálogo lo asigna a la plataforma EVO) y la duración real de la sesión."
+    "Confirmar el equipo (el catálogo lo asigna a la plataforma EVO) y la duración real de la sesión.",
+    "Revisión final (vuelta 9): Se añaden los riesgos y las contraindicaciones del aparato (MDR, art. 7) y se quita «apto para todos los tipos de piel»."
    ]
   },
   {
@@ -409,18 +413,19 @@
    "para_quien": [
     "Notas la piel del cuerpo menos firme y quieres mejorarla sin cirugía.",
     "Has perdido peso y te preocupa la flacidez de la piel.",
-    "Buscas un tratamiento sin agujas ni tiempo de recuperación."
+    "Buscas un tratamiento sin agujas."
    ],
    "texto": [
     "El HIFU, siglas en inglés de ultrasonido focalizado de alta intensidad, concentra la energía en puntos concretos bajo la piel. Ese calor controlado estimula la producción de colágeno y elastina, que dan firmeza al tejido.",
-    "En IEMEC usamos para el cuerpo el mismo equipo de HIFU que para el rostro, adaptado a la flacidez corporal. No usa agujas y no necesita tiempo de recuperación.",
-    "Antes de tratarte hacemos una valoración para ver si es adecuado en tu caso, qué zonas conviene trabajar, cuántas sesiones son recomendables y qué puedes esperar."
+    "En IEMEC usamos para el cuerpo el mismo equipo de HIFU que para el rostro, adaptado a la flacidez corporal. No usa agujas y, en general, puedes seguir con tu rutina al salir.",
+    "Antes de tratarte hacemos una valoración para ver si es adecuado en tu caso, qué zonas conviene trabajar, cuántas sesiones son recomendables y qué puedes esperar.",
+    "Durante la sesión se nota calor o pequeños pinchazos en profundidad. Después puede haber enrojecimiento, inflamación o molestias durante unos días y, rara vez, quemaduras o alteraciones pasajeras de la sensibilidad. No se aplica, entre otros casos, en el embarazo, sobre heridas o infecciones de la piel ni con implantes metálicos en la zona: en la valoración revisamos las contraindicaciones en tu caso."
    ],
    "sesion": {
     "duracion": "Unos 60 minutos",
     "sesiones": "Entre 2 y 3, según la valoración",
     "anestesia": null,
-    "recuperacion": "No necesita",
+    "recuperacion": "Puedes seguir con tu rutina; la zona puede quedar enrojecida o sensible unos días",
     "profesional": "Esteticista"
    },
    "variantes": [],
@@ -440,7 +445,7 @@
     },
     {
      "p": "¿Tiene recuperación?",
-     "r": "No usa agujas ni necesita tiempo de recuperación, así que puedes seguir con tu rutina al salir. Si tienes cualquier duda después de la sesión, puedes escribirnos."
+     "r": "No suele hacer falta: puedes seguir con tu rutina al salir, aunque la zona puede quedar enrojecida o sensible unos días. Si tienes cualquier duda después de la sesión, puedes escribirnos."
     }
    ],
    "preocupaciones": [
@@ -461,7 +466,8 @@
    ],
    "pendiente": [
     "En la web actual el HIFU corporal no tiene sección propia (solo una línea en el HIFU facial): confirmar zonas, duración y número de sesiones.",
-    "La valoración de HIFU se anuncia como gratuita en la web actual: decidir cómo comunicarlo (sin precios en esta versión)."
+    "La valoración de HIFU se anuncia como gratuita en la web actual: decidir cómo comunicarlo (sin precios en esta versión).",
+    "Revisión final (vuelta 9): Se añaden los riesgos y las contraindicaciones del aparato (MDR, art. 7)."
    ]
   },
   {
@@ -671,7 +677,7 @@
     },
     {
      "p": "¿Se puede combinar con otros tratamientos?",
-     "r": "Sí. Se combina con la mesoterapia, la radiofrecuencia o el drenaje linfático manual, y forma parte del protocolo EvoSculpt. También es compatible con hacer ejercicio con regularidad."
+     "r": "Sí. Se combina con la mesoterapia, la radiofrecuencia o el drenaje linfático manual, y forma parte del protocolo corporal completo. También es compatible con hacer ejercicio con regularidad."
     }
    ],
    "preocupaciones": [
@@ -1027,8 +1033,9 @@
    ],
    "texto": [
     "El microneedling hace microperforaciones controladas en la piel con un dispositivo de microagujas. Esas pequeñas lesiones activan los mecanismos de reparación de la piel y la producción de colágeno y elastina, que mejoran su textura y su firmeza.",
-    "En el cuerpo lo usamos para estrías y cicatrices, y también para la flacidez, la celulitis y la retención de líquidos. Se puede aplicar en distintas zonas.",
-    "Antes de la sesión aplicamos crema anestésica para que las molestias sean mínimas. Suelen hacerse entre 3 y 6 sesiones, con unas cuatro semanas entre una y otra."
+    "En el cuerpo lo usamos para estrías y cicatrices, y también para la flacidez y la celulitis. Se puede aplicar en distintas zonas.",
+    "Antes de la sesión aplicamos crema anestésica para que las molestias sean mínimas. Suelen hacerse entre 3 y 6 sesiones, con unas cuatro semanas entre una y otra.",
+    "Después la piel queda enrojecida y sensible unos días, y puede haber hinchazón o pequeños puntos de sangrado; con poca frecuencia, infección, manchas o marcas. No se hace sobre piel con heridas, infecciones o brotes, ni en el embarazo: en la primera cita revisamos las contraindicaciones."
    ],
    "sesion": {
     "duracion": "Unos 30 minutos, más el tiempo de la crema anestésica",
@@ -1081,7 +1088,8 @@
     "https://iemec-clinic.com/corporal#microneedling-para-la-flacidez-retencion-liquidos-y-celulitis"
    ],
    "pendiente": [
-    "Confirmar quién lo realiza (el catálogo indica esteticista), la duración real y los cuidados posteriores."
+    "Confirmar quién lo realiza (el catálogo indica esteticista), la duración real y los cuidados posteriores.",
+    "Revisión final (vuelta 9): Fuera «la retención de líquidos» (efecto sin pruebas, RD 1907/1996, art. 4.16). Se añaden los riesgos y las contraindicaciones (MDR, art. 7)."
    ]
   },
   {
@@ -1291,234 +1299,27 @@
     "Producto sanitario de uso profesional: no se nombra la marca; confirmar el producto y que pueden publicarse la duración del efecto (12-18 meses) y los plazos de recuperación.",
     "Normas: el material (ácido hialurónico) solo aparece como dato informativo en el cuerpo del texto, no en el título, la entradilla ni la descripción SEO."
    ]
-  },
-  {
-   "slug": "sudoracion-excesiva",
-   "especialidad": "medicina-estetica-corporal",
-   "catalogo": [
-    "toxina-hiperhidrosis"
-   ],
-   "orden": 180,
-   "destacado": false,
-   "nombre": "Sudoración excesiva",
-   "titulo": "Sudoración excesiva: valoración médica",
-   "titulo_seo": "Sudoración excesiva en Boadilla del Monte · IEMEC",
-   "descripcion_seo": "Sudoración excesiva en IEMEC Boadilla: valoración médica para estudiar tu caso y proponerte un plan personalizado, con sus riesgos y alternativas.",
-   "entradilla": "Si sudas mucho más de lo que tu cuerpo necesita, en la consulta médica estudiamos tu caso y te explicamos qué opciones tienes.",
-   "para_quien": [
-    "Sudas en exceso aunque no haga calor ni estés haciendo ejercicio.",
-    "El sudor te condiciona en el trabajo o en tu vida social.",
-    "Quieres saber qué opciones médicas tienes."
-   ],
-   "texto": [
-    "La hiperhidrosis es una sudoración mayor de la que el cuerpo necesita para regular su temperatura. No es solo una cuestión estética: puede afectar a la calidad de vida y hacer incómodas situaciones cotidianas.",
-    "En la valoración médica, el médico te pregunta por tus síntomas, las zonas afectadas, tu salud y tu medicación, y te explica qué opciones de tratamiento hay en tu caso, cómo son, sus riesgos y sus alternativas.",
-    "Si está indicado, el tratamiento se hace en la propia consulta y el médico te dice cada cuánto conviene revisarlo. El resultado varía según cada persona."
-   ],
-   "sesion": {
-    "duracion": null,
-    "sesiones": "Según la valoración",
-    "anestesia": null,
-    "recuperacion": null,
-    "profesional": "Equipo médico"
-   },
-   "variantes": [],
-   "resultados": "El resultado y cuánto se mantiene varían según cada persona; el médico te lo explica en la valoración.",
-   "preguntas": [
-    {
-     "p": "¿Qué es la hiperhidrosis?",
-     "r": "Es una sudoración mayor de la que el cuerpo necesita para regular su temperatura. Puede aparecer aunque no haga calor ni estés haciendo ejercicio, y a menudo condiciona el trabajo o la vida social."
-    },
-    {
-     "p": "¿Qué pasa en la valoración?",
-     "r": "El médico te pregunta por tus síntomas, las zonas afectadas, tu salud y tu medicación, confirma el diagnóstico y te explica qué opciones tienes, sus riesgos, sus alternativas y qué puedes esperar en tu caso."
-    },
-    {
-     "p": "¿Cuánto dura el efecto?",
-     "r": "Depende del tratamiento que se indique y de cada persona. En la valoración, el médico te explica qué puedes esperar y cada cuánto conviene revisarlo para mantener el resultado."
-    }
-   ],
-   "preocupaciones": [
-    "bienestar"
-   ],
-   "relacionados": [
-    "depilacion-laser",
-    "drenaje-linfatico"
-   ],
-   "restringida": true,
-   "revision_medica": true,
-   "fuentes": [
-    "https://iemec-clinic.com/corporal#sudor",
-    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
-   ],
-   "pendiente": [
-    "Medicamento de receta: no se nombra, ni se describe su mecanismo ni la duración de su efecto, porque sería una referencia indirecta (normas.md, apartado b); tampoco en el mensaje de WhatsApp (el actual lo nombra, igual que el id principal del catálogo).",
-    "Normas: comprobar que la autorización del centro (CS17886) cubre el tratamiento de la hiperhidrosis, que es un problema de salud.",
-    "Confirmar las zonas que se tratan y la duración de la consulta."
-   ]
-  },
-  {
-   "slug": "balon-gastrico",
-   "especialidad": "perdida-de-peso",
-   "catalogo": [
-    "balon-gastrico"
-   ],
-   "orden": 10,
-   "destacado": true,
-   "nombre": "Balón gástrico",
-   "titulo": "Balón gástrico: valoración y seguimiento médico",
-   "titulo_seo": "Balón gástrico en Boadilla del Monte · IEMEC",
-   "descripcion_seo": "Balón gástrico en IEMEC Boadilla: valoración médica, colocación por un cirujano de aparato digestivo y seguimiento médico y nutricional.",
-   "entradilla": "Una opción sin cirugía para el control del peso: un balón ocupa parte del estómago durante un tiempo y ayuda a sentir saciedad antes, con seguimiento médico y nutricional.",
-   "para_quien": [
-    "Tienes exceso de peso y otras medidas no te han funcionado.",
-    "Buscas una opción sin cirugía, con acompañamiento médico.",
-    "Quieres cambiar tus hábitos con apoyo nutricional durante el proceso."
-   ],
-   "texto": [
-    "El balón gástrico es un dispositivo que se coloca en el estómago y ocupa parte de su espacio. Así se come menos cantidad y la sensación de saciedad llega antes. Es una opción no quirúrgica y reversible.",
-    "En IEMEC empieza con una valoración médica: revisamos tu salud, tus antecedentes y tus objetivos, y te explicamos la idoneidad, los riesgos y las alternativas. La colocación la hace un cirujano de aparato digestivo en un centro hospitalario autorizado, fuera de la clínica.",
-    "El balón se mantiene un tiempo limitado, de unos meses según el tipo, y después se retira o el propio cuerpo lo expulsa. Durante el proceso tienes seguimiento médico y nutricional para cambiar hábitos y mantenerlos después."
-   ],
-   "sesion": {
-    "duracion": "Valoración de unos 45 minutos",
-    "sesiones": "Una colocación, con seguimiento durante varios meses",
-    "anestesia": null,
-    "recuperacion": null,
-    "profesional": "Equipo médico (valoración) y cirujano de aparato digestivo (colocación)"
-   },
-   "variantes": [],
-   "resultados": "La evolución varía según cada persona y depende sobre todo de los hábitos que se consolidan durante el seguimiento.",
-   "preguntas": [
-    {
-     "p": "¿Cómo se coloca?",
-     "r": "Depende del tipo de balón indicado en tu caso. La colocación la hace un cirujano de aparato digestivo en un centro hospitalario autorizado; en la valoración te explicamos paso a paso cómo será el procedimiento."
-    },
-    {
-     "p": "¿Cuánto tiempo se lleva?",
-     "r": "Un tiempo limitado, de unos meses según el tipo de balón. Después se retira o el propio cuerpo lo expulsa, y el seguimiento médico y nutricional continúa para ayudarte a mantener los nuevos hábitos."
-    },
-    {
-     "p": "¿Qué incluye el seguimiento?",
-     "r": "Revisiones médicas y asesoramiento nutricional personalizado durante el proceso, para que aprendas a comer de otra forma y adquieras hábitos saludables que te ayuden a mantener los cambios a largo plazo."
-    },
-    {
-     "p": "¿Es para mí?",
-     "r": "Está pensado para personas con exceso de peso que buscan una opción menos invasiva que la cirugía. La indicación la decide el médico tras valorar tu salud, tu peso y tus antecedentes."
-    }
-   ],
-   "preocupaciones": [
-    "peso"
-   ],
-   "relacionados": [
-    "neuroestimulacion-control-del-apetito",
-    "radiofrecuencia-corporal",
-    "hifu-corporal"
-   ],
-   "restringida": true,
-   "revision_medica": true,
-   "fuentes": [
-    "https://iemec-clinic.com/perdida-de-peso",
-    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
-   ],
-   "pendiente": [
-    "Producto sanitario de uso profesional: no se nombra la marca del balón (la web actual pone «Allurion» en el título y en el mensaje de WhatsApp).",
-    "Confirmar el tipo de balón, el centro autorizado donde se coloca (normas: decir cuál) y quién lo hace: Multiestetica habla de colocación y retirada por un cirujano de aparato digestivo en hospital, y el blog, de una cápsula que se traga.",
-    "Normas: sin «obesidad» ni cifras o promesas de pérdida de peso (la web actual da porcentajes).",
-    "Área de peso: confirmar que la autorización del centro (CS17886) cubre la valoración y el seguimiento; normas.md deja pendiente de autorización (U.10/U.11) el control de peso."
-   ]
-  },
-  {
-   "slug": "neuroestimulacion-control-del-apetito",
-   "especialidad": "perdida-de-peso",
-   "catalogo": [
-    "neuroline-t6"
-   ],
-   "orden": 20,
-   "destacado": true,
-   "nombre": "Neuroestimulación para el apetito",
-   "titulo": "Neuroestimulación para el control del apetito",
-   "titulo_seo": "Neuroestimulación para el apetito en Boadilla · IEMEC",
-   "descripcion_seo": "Neuroestimulación del dermatoma T6 en IEMEC Boadilla: técnica médica que ayuda a controlar el apetito, dentro de un plan con supervisión médica.",
-   "entradilla": "Una técnica médica que aplica un estímulo eléctrico mínimo en un punto del abdomen para ayudar a reducir el apetito y a seguir tu plan de alimentación.",
-   "para_quien": [
-    "Tienes sobrepeso y te resulta difícil controlar el apetito.",
-    "Mantener una dieta en el día a día se te complica.",
-    "Buscas una ayuda sin fármacos ni cirugía, supervisada por un médico."
-   ],
-   "texto": [
-    "La neuroestimulación del dermatoma T6 es una técnica médica que actúa sobre el apetito. Un dermatoma es la zona de piel que corresponde a un nervio concreto; el T6 está en el abdomen y se relaciona con funciones digestivas.",
-    "Con una aguja muy fina se aplica en ese punto una corriente eléctrica mínima. El objetivo es disminuir la grelina, la hormona que provoca la sensación de hambre, para que te resulte más fácil seguir una alimentación equilibrada.",
-    "La indica y la supervisa un médico, tras una valoración médica y dentro de un plan integral con cambios de hábitos. Es compatible con cualquier tipo de dieta y puede combinarse con el balón gástrico u otros tratamientos que indique el médico."
-   ],
-   "sesion": {
-    "duracion": "Unos 30 minutos",
-    "sesiones": "Un ciclo de sesiones semanales que marca el médico",
-    "anestesia": null,
-    "recuperacion": "Ambulatorio: sigues con tu día al salir",
-    "profesional": "Equipo médico"
-   },
-   "variantes": [],
-   "resultados": "El efecto sobre el apetito varía según cada persona y depende de que lo acompañes de cambios en la alimentación.",
-   "preguntas": [
-    {
-     "p": "¿Cómo funciona?",
-     "r": "Con una aguja fina se aplica una estimulación eléctrica de baja intensidad en un punto del abdomen relacionado con el dermatoma T6. Busca reducir la grelina, la hormona del hambre, para ayudarte a controlar el apetito."
-    },
-    {
-     "p": "¿Para quién está indicada?",
-     "r": "Para personas con sobrepeso a las que les resulta difícil seguir una dieta, o que prefieren evitar fármacos o cirugía. También puede combinarse con el balón gástrico u otros tratamientos, si el médico lo ve adecuado."
-    },
-    {
-     "p": "¿Tiene efectos secundarios?",
-     "r": "Como cualquier técnica médica, puede producir molestias o efectos no deseados y tiene contraindicaciones, que el médico te explica en la valoración antes de empezar. La sesión es ambulatoria y puedes seguir con tu día al salir."
-    },
-    {
-     "p": "¿Cuántas sesiones necesito?",
-     "r": "Se plantea como un ciclo de sesiones semanales. El número lo decide el médico según tu caso y tu evolución, y se revisa durante el seguimiento junto con tu plan de alimentación."
-    }
-   ],
-   "preocupaciones": [
-    "peso"
-   ],
-   "relacionados": [
-    "balon-gastrico",
-    "radiofrecuencia-corporal",
-    "hifu-corporal"
-   ],
-   "restringida": false,
-   "revision_medica": true,
-   "fuentes": [
-    "https://iemec-clinic.com/perdida-de-peso#neuroline-t6",
-    "https://iemec-clinic.com/blog/que-es-neuroline-t6-y-como-ayuda-a-controlar-el-apetito-y-perder-peso"
-   ],
-   "pendiente": [
-    "La web actual promete «10 kg en 10 semanas» y «sin efectos secundarios»: no se traslada.",
-    "Confirmar el número de sesiones (el catálogo dice 10, semanales) y la duración.",
-    "Neuroline T6 es la marca del equipo: las normas no permiten anunciarla, así que aquí no se nombra (tampoco «T6» en el título, como propone el anexo B).",
-    "Normas (apartado d): pendiente también de que se confirme la autorización del área de peso (U.10/U.11)."
-   ]
   }
  ],
  "sin_pagina": [
   {
    "catalogo": "semaglutida",
-   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte.",
+   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso/supervision-medica), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte.",
    "va_en": null
   },
   {
    "catalogo": "tirzepatida-mounjaro",
-   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte. Además, oferta sin confirmar: solo sale en el blog.",
+   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso/supervision-medica), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte. Además, oferta sin confirmar: solo sale en el blog.",
    "va_en": null
   },
   {
    "catalogo": "liraglutida-saxenda",
-   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte. Además, oferta sin confirmar: solo sale en el blog.",
+   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso/supervision-medica), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte. Además, oferta sin confirmar: solo sale en el blog.",
    "va_en": null
   },
   {
    "catalogo": "reducomplex",
-   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte. Además, nombre y pauta sin confirmar: en la web actual solo sale en /portafolio, con cifras de kilos y antes y después.",
+   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso/supervision-medica), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte. Además, nombre y pauta sin confirmar: en la web actual solo sale en /portafolio, con cifras de kilos y antes y después.",
    "va_en": null
   },
   {
@@ -1550,6 +1351,18 @@
    "catalogo": "cirugia-bariatrica",
    "motivo": "No se hace en IEMEC (normas.md, anexo B) y solo figura en la lista de Multiestetica, sin descripción: oferta sin confirmar.",
    "va_en": null
+  },
+  {
+   "catalogo": "balon-gastrico",
+   "motivo": "Área de peso: vuelve a borrador (contenido/pendientes/corporal-y-peso.json) hasta que la clínica confirme que la autorización del centro (CS17886) cubre Endocrinología (U.10) y Nutrición (U.11) (normas.md, regla 10 y anexo B). Borrador: balon-gastrico."
+  },
+  {
+   "catalogo": "neuroline-t6",
+   "motivo": "Área de peso: vuelve a borrador (contenido/pendientes/corporal-y-peso.json) hasta que la clínica confirme que la autorización del centro (CS17886) cubre Endocrinología (U.10) y Nutrición (U.11) (normas.md, regla 10 y anexo B). Borrador: neuroestimulacion-control-del-apetito."
+  },
+  {
+   "catalogo": "toxina-hiperhidrosis",
+   "motivo": "Sudoración excesiva: vuelve a borrador (contenido/pendientes/corporal-y-peso.json) hasta que la clínica confirme que la autorización del centro (CS17886) cubre el tratamiento de la hiperhidrosis, un problema de salud (normas.md, anexo B y regla 11). Además es un medicamento de receta: no se nombra."
   }
  ]
 }

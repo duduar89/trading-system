@@ -26,7 +26,7 @@ consentimiento.** Solo guarda lo imprescindible para funcionar o lo que tú elig
 
 | Nombre | Tipo | Para qué | Duración |
 |---|---|---|---|
-| `iemec-campana` | Almacenamiento de sesión, propio | Si llegas desde un enlace con código de campaña (por ejemplo, un anuncio), recuerda ese código mientras navegas para que tu mensaje de WhatsApp o el formulario nos digan de dónde vienes. No se comparte con nadie ni sirve para seguirte en otras webs. | Hasta cerrar la pestaña |
+| `iemec-campana` | Almacenamiento de sesión, propio | Si llegas desde un enlace con código de campaña (por ejemplo, un anuncio), recuerda ese código mientras navegas: el formulario nos lo envía y, si nos escribes por WhatsApp, tu mensaje lleva una clave corta de la campaña (no su nombre). No guarda identificadores de clic de Google ni de Meta, esta web no lo envía a nadie más y no sirve para seguirte en otras webs. | Hasta cerrar la pestaña |
 
 No hay nada más: ni cookies propias ni de terceros. Esta técnica es propia, dura solo la visita y
 sirve para atender la solicitud que nos haces (LSSI, art. 22.2). `[PENDIENTE: que el DPD confirme
@@ -41,7 +41,7 @@ política. Hasta que no pulsas, esos servicios no reciben nada desde nuestra web
 ### 4. Cómo borrarlas
 
 Puedes borrar lo que guarda esta web desde la configuración de tu navegador (apartado de
-privacidad o datos de sitios). La web seguirá funcionando; solo perderás tus preferencias.
+privacidad o datos de sitios). La web seguirá funcionando igual.
 
 ### 5. Cambios
 

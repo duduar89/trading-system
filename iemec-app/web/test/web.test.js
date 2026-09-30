@@ -92,7 +92,7 @@ test('lo que la autorización no cubre, lo que no se confirma y lo pendiente no 
   const idsPublicados = new Set(Object.values(INFORME.referencias).flatMap((r) => r.ids || []));
   for (const id of noPublicar) assert.ok(!idsPublicados.has(id), `${id} no debería tener página`);
   // Los borradores de contenido/pendientes no salen sin --borradores.
-  for (const ruta of ['/perdida-de-peso/control-de-peso/', '/medicina-estetica-corporal/varices-y-aranas-vasculares/']) {
+  for (const ruta of ['/control-de-peso/supervision-medica/', '/control-de-peso/balon-gastrico/', '/control-de-peso/neuroestimulacion-control-del-apetito/', '/medicina-estetica-corporal/varices-y-aranas-vasculares/']) {
     assert.ok(!PAGINAS.has(ruta), `${ruta} no debería publicarse`);
     for (const [r, h] of PAGINAS) assert.ok(!h.includes(`href="${ruta}"`), `${r} enlaza a ${ruta}`);
   }
@@ -158,6 +158,85 @@ test('el validador JS dice lo mismo que el de Python también con tildes (límit
   ];
   for (const [frase, prohibida] of casos) assert.equal(prohibidasEn(frase, normas).length > 0, prohibida, frase);
   assert.equal(prohibidasEn('Tarjeta regalo de 45 €', normas, ['precio']).length, 0);
+  // Reglas de la revisión final: la nota de Google, las marcas por rodeo y la «oxigenoterapia hiperbárica».
+  const nuevas = [
+    ['4,9 · Nota en Google, con 533 opiniones', true], ['4,8 estrellas', true], ['533 opiniones en Google', true], ['Nuestra ficha en Google', false],
+    ['Protocolo EvoSculpt', true], ['láser «4D»', true], ['la versión 4 del protocolo', false],
+    ['Oxigenoterapia hiperbárica facial', true], ['Oxigenoterapia facial a presión', false],
+  ];
+  for (const [frase, prohibida] of nuevas) assert.equal(prohibidasEn(frase, normas).length > 0, prohibida, frase);
+});
+
+test('revisión legal final: peso en borrador, sin nota de Google, avisos que cuadran con la página y URL neutras', () => {
+  const visible = (r) => R.textoVisible(PAGINAS.get(r));
+  // 1 · El área de peso no se publica (ni la especialidad, ni sus páginas, ni en menús o formularios).
+  assert.ok(!INFORME.especialidades.some((e) => e.slug === 'control-de-peso'));
+  for (const [ruta, h] of PAGINAS) assert.ok(!/\/(control-de-peso|perdida-de-peso)\//.test(h) && !/>Control de peso</.test(h), `${ruta} enlaza o nombra el área de peso`);
+  for (const id of ['balon-gastrico', 'neuroline-t6', 'toxina-hiperhidrosis']) assert.ok(INFORME.sin_pagina.some((s) => s.catalogo === id), `${id} sin su motivo`);
+  // 2 · Ni la nota ni las opiniones de Google; el enlace neutro, en /pedir-cita/.
+  assert.ok(!/Nota en Google|opiniones/i.test(visible('/')));
+  assert.match(PAGINAS.get('/pedir-cita/'), /Nuestra ficha en Google/);
+  // 7 · Cirugías: recuadro de cirugía (también la labioplastia), consentimiento por escrito y los huecos
+  // de quién opera, dónde y la edad.
+  for (const r of ['/estetica-intima-femenina/labioplastia/', '/cirugia-estetica/otoplastia/', '/cirugia-capilar/injerto-capilar-fue/']) {
+    const t = visible(r);
+    assert.match(t, /Cirugía: requiere una consulta previa/, r);
+    assert.match(t, /consentimiento informado por escrito/, r);
+    assert.match(t, /\[PENDIENTE: nombre, especialidad oficial y n\.º de colegiado\]/, r);
+    assert.match(t, /Dónde: .*\[PENDIENTE/, r);
+    assert.match(t, /Solo para mayores de edad \[PENDIENTE/, r);
+  }
+  assert.ok(!/cirujano plástico/i.test(visible('/cirugia-estetica/otoplastia/')));
+  // 8 · El aviso no contradice la página: sin «el médico» donde lo hace estética con el régimen sin
+  // confirmar, y sin aviso en la propia consulta de valoración.
+  const bb = visible('/medicina-estetica-facial/bb-lips/');
+  assert.match(bb, /Requiere valoración previa/);
+  assert.ok(!/Tratamiento médico: requiere|el médico estudia tu caso/.test(bb));
+  for (const r of ['/medicina-estetica-facial/valoracion-medica/', '/cirugia-estetica/consulta-de-cirugia-plastica/', '/medicina-estetica-corporal/diagnostico-de-lipolaser/']) {
+    assert.ok(!/class="aviso-medico/.test(PAGINAS.get(r)), `${r}: aviso en la propia valoración`);
+  }
+  // 9, 10, 11 · Sin rodeos de marca, sin «hiperbárica», sin la rosácea ni el acné activo como reclamo.
+  const ipl = PAGINAS.get('/medicina-estetica-facial/luz-pulsada-intensa-ipl/');
+  assert.ok(!/rosácea/i.test(R.titulo(ipl) + R.meta(ipl, 'description') + visible('/medicina-estetica-facial/luz-pulsada-intensa-ipl/')));
+  assert.ok(PAGINAS.has('/medicina-estetica-facial/piel-con-tendencia-acneica/') && !PAGINAS.has('/medicina-estetica-facial/tratamiento-del-acne/'));
+  assert.ok(!/acné activo o granos/.test(visible('/medicina-estetica-facial/piel-con-tendencia-acneica/')));
+  // 12 · URL sin «ginecología» ni «salud sexual».
+  for (const ruta of PAGINAS.keys()) assert.ok(!/ginecolog|salud-sexual|perdida-de-peso/.test(ruta), ruta);
+  // 14 · Sin la especialidad oficial mientras no esté reconocida.
+  assert.ok(!/con la especialidad de Cirugía Plástica/.test(visible('/equipo/')));
+  // 15 · Las páginas de aparatos dicen sus riesgos.
+  for (const r of ['/medicina-estetica-facial/hifu-facial/', '/medicina-estetica-corporal/hifu-corporal/', '/medicina-estetica-corporal/depilacion-laser/', '/medicina-estetica-corporal/radiofrecuencia-corporal/', '/medicina-estetica-corporal/remodelacion-corporal/', '/medicina-estetica-corporal/microneedling-corporal/', '/medicina-estetica-facial/bb-glow/']) {
+    const t = visible(r).split('También te puede interesar')[0]; // sin las tarjetas de otros tratamientos
+    assert.match(t, /contraindicaci/, `${r}: sin contraindicaciones`);
+    assert.match(t, /quemadura|infecci|irritaci|manchas/, `${r}: sin riesgos`);
+    assert.ok(!/No necesita tiempo de recuperación|no requiere tiempo de recuperación/.test(t), r);
+  }
+  assert.ok(!/retención de líquidos/.test(visible('/medicina-estetica-corporal/microneedling-corporal/').split('También te puede interesar')[0]));
+  // 20 · En el aviso legal, solo quien sale en la web.
+  assert.ok(!/Orallo/.test(visible('/aviso-legal/')));
+  if (INFORME.fotos.length) {
+    const publicadas = fs.readdirSync(path.join(SALIDA, 'fotos'));
+    assert.ok(!publicadas.some((f) => /orallo/.test(f)), 'se copian retratos que no usa ninguna página');
+  }
+  // 21, 24, 25, 26 · Frases que no deben estar.
+  assert.ok(!/al momento/.test(visible('/pedir-cita/')));
+  assert.ok(!/caída leve o reciente|efecto sobre la caída/.test(visible('/medicina-capilar/oxigenoterapia-capilar/')));
+  assert.ok(!/relaciones sexuales/.test(visible('/estetica-intima-femenina/labioplastia/').split('Preguntas frecuentes')[0]));
+  assert.ok(!/vacuum|cuatriondas/i.test([...PAGINAS.values()].map(R.textoVisible).join(' ')));
+  assert.ok(!/perderás tus preferencias/.test(visible('/cookies/')));
+  assert.ok(!/Accesibilidad\. Queremos/.test(visible('/accesibilidad/')));
+  assert.ok(![...PAGINAS.values()].some((h) => /\[PENDIENTE[^\]]*normas\.md/.test(R.textoVisible(h))), 'un [PENDIENTE] cita un archivo interno');
+});
+
+test('--publicar: cualquier [PENDIENTE] a la vista o dato obligatorio sin rellenar es un error', () => {
+  const c = temporal('publicar');
+  const inf = construir({ salida: c, referencias: null, publicar: true });
+  assert.ok(inf.errores.some((e) => e.tipo === 'pendiente_visible'));
+  assert.ok(inf.errores.some((e) => e.tipo === 'obligatoria' && /@/.test(e.patron)), 'el correo del aviso legal');
+  assert.ok(inf.pendientes_textos.length > 5 && inf.pendientes_textos.every((p) => p.paginas >= 1 && p.ejemplo));
+  // Sin --publicar, la vista previa para la clínica se construye igual.
+  assert.deepEqual(INFORME.errores, []);
+  fs.rmSync(c, { recursive: true, force: true });
 });
 
 test('cada WhatsApp lleva «(ref. web-…)», un texto limpio y una referencia que la app sabe traducir', () => {
@@ -182,14 +261,21 @@ test('cada WhatsApp lleva «(ref. web-…)», un texto limpio y una referencia q
   // (y su grupo neutro en el texto), no el nombre del tratamiento.
   const lipo = R.whatsapps(PAGINAS.get('/medicina-estetica-corporal/lipolaser/'));
   assert.ok(lipo.some((w) => w.texto.endsWith('me interesa: Lipoláser. (ref. web-lipolaser)')));
+  // También en la página de la especialidad (antes llevaba «web-salud-sexual-masculina» en claro).
+  let sensibles = 0;
   for (const [ref, r] of Object.entries(refs)) {
-    if (!r.pagina || !/^\/(ginecologia-estetica|salud-sexual-masculina|perdida-de-peso)\/[^/]+\/$/.test(r.pagina)) continue;
+    if (!r.pagina || !/^\/(estetica-intima-femenina|estetica-intima-masculina|control-de-peso)\/([^/]+\/)?$/.test(r.pagina)) continue;
+    sensibles++;
     assert.match(ref, /^web-(intima-f|intima-m|peso)-[0-9a-z]+$/, `${r.pagina} → ${ref}`);
+    const slug = r.pagina.split('/').filter(Boolean).pop();
     for (const w of R.whatsapps(PAGINAS.get(r.pagina))) {
-      assert.ok(!w.texto.includes(r.pagina.split('/')[2]), `${r.pagina}: el WhatsApp nombra el tratamiento`);
+      assert.ok(!w.texto.includes(slug), `${r.pagina}: el WhatsApp nombra el tratamiento`);
+      assert.ok(!/(ginecolog|sexual|labioplast|pene|peso-)/i.test(w.texto.split('(ref.')[1] || ''), `${r.pagina}: referencia en claro`);
       assert.match(w.texto, /me interesa: (Salud íntima femenina|Salud íntima masculina|Control de peso|una primera valoración)\./);
     }
   }
+  assert.ok(sensibles >= 6, `solo ${sensibles} páginas sensibles comprobadas`);
+  for (const [ruta, h] of PAGINAS) for (const w of R.whatsapps(h)) assert.ok(!/web-(ginecologia|salud-sexual|perdida-de-peso|control-de-peso|estetica-intima)/.test(w.texto), `${ruta}: ${w.texto}`);
   assert.equal(refs['web-inicio'].pagina, '/');
   assert.equal(refs['web-medicina-estetica-facial'].especialidad, 'medicina-estetica-facial');
   for (const i of [45, 70, 140, 250]) assert.equal(refs[`web-tarjeta-${i}`].importe, i);
@@ -247,8 +333,35 @@ test('las anclas de la web anterior se resuelven en la página que las recibe', 
   assert.equal(facial[huellaCorta('aumento-de-labios-con-acido-hialuronico')], paginaDe('aumento-labios-ah'));
   assert.equal(mapa('/cirugia-estetica/')[huellaCorta('aumento-de-pecho')], paginaDe('aumento-pecho'));
   assert.equal(mapa('/clinica/')[huellaCorta('equipo')], '/equipo/');
+  // Las anclas de sección que tienen página (o filtro) equivalente ya no se quedan en la especialidad.
+  assert.equal(mapa('/cirugia-capilar/')[huellaCorta('frente')], paginaDe('frontoplastia'));
+  assert.equal(mapa('/cirugia-capilar/')[huellaCorta('microinjerto-capilar')], paginaDe('injerto-capilar-fue'));
+  assert.equal(mapa('/medicina-estetica-corporal/')[huellaCorta('microneedling')], paginaDe('microneedling-corporal-estrias'));
+  assert.equal(mapa('/cirugia-estetica/')[huellaCorta('orejas')], paginaDe('otoplastia'));
+  assert.equal(mapa('/estetica-intima-femenina/')[huellaCorta('labioplastia-o-cirugia-de-labios-menores.')], paginaDe('labioplastia'));
+  assert.equal(mapa('/medicina-estetica-facial/')[huellaCorta('labios')], '/tratamientos/?p=labios');
+  // Todo destino de un ancla existe.
+  for (const ruta of PAGINAS.keys()) for (const destino of Object.values(mapa(ruta))) assert.ok(PAGINAS.has(destino.split('?')[0]), `${ruta}: ancla hacia ${destino}`);
   // El mapa no lleva el texto de las anclas viejas (algunas nombran medicamentos).
   for (const [ruta, h] of PAGINAS) assert.ok(!/semaglutida|plasma-rico/i.test(h), ruta);
+});
+
+test('redirecciones: solo manda el tratamiento principal; si no tiene página, el destino del inventario', () => {
+  const regla = (desde) => INFORME.redirecciones.find((r) => r.desde === desde).hacia;
+  assert.equal(regla('/blog/mounjaro-la-guia-definitiva-sobre-la-tirzepatida-para-perder-peso-2026'), '/tratamientos/');
+  assert.equal(regla('/blog/como-mejora-el-laser-fotona-la-firmeza-de-la-piel-sin-cirugia'), '/medicina-estetica-facial/tensado-facial-con-laser/');
+  assert.equal(regla('/blog/como-actua-el-laser-fotona-en-la-flacidez-del-cuello-y-escote'), '/medicina-estetica-facial/tensado-facial-con-laser/');
+  // La encuesta no se migra: nadie llega a «Gracias, hemos recibido tu solicitud» sin haberla enviado.
+  for (const d of ['/lo-sentimos', '/gracias-cuestionario', '/cuestionario']) assert.equal(regla(d), '/');
+  // El área de peso está en borrador: sus URL viejas van a /tratamientos/.
+  assert.equal(regla('/perdida-de-peso'), '/tratamientos/');
+  // Ninguna regla manda a la página de un tratamiento que su página vieja solo mencionaba.
+  for (const r of REDIRECCIONES.redirecciones) {
+    const ids = r.catalogo_ids || [];
+    const hacia = regla(r.desde);
+    const pagina = Object.values(INFORME.referencias).find((x) => x.pagina === hacia && x.ids);
+    if (pagina && ids.length) assert.ok(pagina.ids.includes(ids[0]) || hacia === r.hacia, `${r.desde} → ${hacia}`);
+  }
 });
 
 test('sitemap y robots: todas las páginas públicas, ninguna de las que no se indexan', () => {
@@ -301,26 +414,43 @@ test('formularios: campos, casillas sin marcar, trampa, versión y envío a la A
   const h = PAGINAS.get('/pedir-cita/');
   const form = /<form class="formulario"[\s\S]*?<\/form>/.exec(h)[0];
   assert.match(form, /action="https:\/\/agenda\.iemec-clinic\.com\/web\/contacto" method="post"/);
-  for (const n of ['nombre', 'telefono', 'email', 'tratamiento', 'mensaje', 'preferencia', 'privacidad', 'comercial', 'pagina', 'ref', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid', 'web', 't', 'version_textos']) {
+  for (const n of ['nombre', 'telefono', 'email', 'tratamiento', 'mensaje', 'preferencia', 'privacidad', 'comercial', 'pagina', 'ref', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'web', 't', 'version_textos']) {
     assert.match(form, new RegExp(`name="${n}"`), `falta ${n}`);
   }
+  // Sin identificadores de clic de Google ni de Meta, en ninguna página ni en web.js.
+  for (const [ruta, html] of PAGINAS) assert.ok(!/gclid|fbclid/.test(html), ruta);
+  const js = fs.readFileSync(path.join(SALIDA, INFORME.recursos.js), 'utf8');
+  assert.ok(!/gclid|fbclid/.test(js));
+  // Sin novalidate en el HTML: sin JavaScript valida el navegador (web.js lo quita al cargar).
+  assert.ok(!/novalidate/.test(form));
+  assert.match(js, /noValidate = true/);
+  // Preferencia: WhatsApp, llamada o correo, ninguna marcada de antemano (RGPD, art. 25.2).
+  assert.match(form, /value="whatsapp" required>/);
+  assert.match(form, /value="correo">/);
+  assert.ok(!/name="preferencia"[^>]*checked/.test(form), 'preferencia marcada de antemano');
   assert.match(form, /<input type="checkbox" id="cita-privacidad" name="privacidad" value="si" required/);
   assert.match(form, /<input type="checkbox" id="cita-comercial" name="comercial" value="si">/);
   assert.ok(!/checked[^>]*name="(privacidad|comercial)"|name="(privacidad|comercial)"[^>]*checked/.test(form), 'casillas marcadas');
-  assert.match(form, /value="whatsapp"/);
   assert.match(form, /value="llamada"/);
   assert.match(form, /maxlength="500"/);
   assert.match(form, /class="trampa" aria-hidden="true"/);
   assert.match(form, /name="pagina" value="\/pedir-cita\/"/);
-  // En cada tratamiento, plegado y con su página y su referencia; el id del catálogo solo si no nombra un medicamento.
+  // En cada tratamiento, desplegado sin JavaScript (web.js lo pliega) y con su propio título; la
+  // página va con su referencia, nunca con el id del catálogo.
   const t = PAGINAS.get('/medicina-estetica-facial/arrugas-de-expresion/');
-  if (t) {
-    assert.match(t, /<details class="plegable">/);
-    assert.match(t, /name="ref" value="web-arrugas-de-expresion"/);
-    assert.ok(!/value="toxina/.test(t));
-  }
+  assert.match(t, /<h2 id="t-llamamos"[^>]*>Te llamamos<\/h2>/);
+  assert.match(t, /<details class="plegable" open data-plegable>/);
+  assert.match(t, /name="ref" value="web-arrugas-de-expresion"/);
+  assert.ok(!/value="toxina/.test(t));
   const lipo = PAGINAS.get('/medicina-estetica-corporal/lipolaser/');
-  assert.match(lipo, /<option value="lipolaser" selected>Lipoláser<\/option>/);
+  assert.match(lipo, /<option value="web-lipolaser" selected>Lipoláser<\/option>/);
+  // Ningún valor de una opción es un id del catálogo (algunos nombran marcas o lo íntimo).
+  const ids = new Set(CATALOGO.tratamientos.map((x) => x.id));
+  for (const [ruta, html] of PAGINAS) for (const m of html.matchAll(/<option value="([^"]+)"/g)) assert.ok(!ids.has(m[1]), `${ruta}: opción con el id ${m[1]}`);
+  // En lo íntimo, el grupo neutro preseleccionado, una sola vez.
+  const labio = PAGINAS.get('/estetica-intima-femenina/labioplastia/');
+  assert.match(labio, /<option value="estetica-intima-femenina" selected>Salud íntima femenina<\/option>/);
+  assert.equal((labio.match(/>Salud íntima femenina<\/option>/g) || []).length, 1);
   // Cada etiqueta con su campo.
   for (const [, html] of PAGINAS) for (const m of html.matchAll(/<label for="([^"]+)"/g)) assert.match(html, new RegExp(`id="${m[1]}"`));
 });
@@ -401,15 +531,15 @@ test('una especialidad sin páginas publicadas no sale en menús ni en la portad
   const inf = construir({
     salida: c, referencias: null,
     ajustarDatos: (datos) => {
-      for (const f of datos.contenidos) f.paginas = f.paginas.filter((p) => p.especialidad !== 'salud-sexual-masculina');
-      datos.provisionales.paginas = datos.provisionales.paginas.filter((p) => p.especialidad !== 'salud-sexual-masculina');
+      for (const f of datos.contenidos) f.paginas = f.paginas.filter((p) => p.especialidad !== 'estetica-intima-masculina');
+      datos.provisionales.paginas = datos.provisionales.paginas.filter((p) => p.especialidad !== 'estetica-intima-masculina');
       datos.provisionales.sin_pagina.push({ catalogo: 'engrosamiento-pene-ah', motivo: 'Prueba: sin página.' });
     },
   });
-  assert.ok(inf.especialidades_sin_paginas.includes('salud-sexual-masculina'));
+  assert.ok(inf.especialidades_sin_paginas.includes('estetica-intima-masculina'));
   const inicio = fs.readFileSync(path.join(c, 'index.html'), 'utf8');
-  assert.ok(!inicio.includes('/salud-sexual-masculina/'));
-  assert.ok(!fs.existsSync(path.join(c, 'salud-sexual-masculina')));
+  assert.ok(!inicio.includes('/estetica-intima-masculina/'));
+  assert.ok(!fs.existsSync(path.join(c, 'estetica-intima-masculina')));
   assert.equal(inf.redirecciones.find((r) => r.desde === '/sexualidad-masculina').hacia, '/tratamientos/');
   fs.rmSync(c, { recursive: true, force: true });
 });

@@ -22,20 +22,20 @@
   },
   {
    "desde": "/perdida-de-peso",
-   "hacia": "/perdida-de-peso/"
+   "hacia": "/control-de-peso/"
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa",
-   "hacia": "/ginecologia-estetica/"
+   "hacia": "/estetica-intima-femenina/"
   },
   {
    "desde": "/ginecoestetica",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "nota": "Hoy redirige a /ginecologia-estetica-y-regenerativa: apuntarla directamente."
   },
   {
    "desde": "/sexualidad-masculina",
-   "hacia": "/salud-sexual-masculina/"
+   "hacia": "/estetica-intima-masculina/"
   },
   {
    "desde": "/cirugia-corporal",
@@ -198,11 +198,13 @@
   },
   {
    "desde": "/gracias-cuestionario",
-   "hacia": "/gracias/"
+   "hacia": "/",
+   "nota": "Página de la encuesta, que no se migra: a la portada, como /cuestionario (/gracias/ diría «hemos recibido tu solicitud» a quien no ha enviado nada)."
   },
   {
    "desde": "/lo-sentimos",
-   "hacia": "/gracias/"
+   "hacia": "/",
+   "nota": "Página de la encuesta, que no se migra: a la portada, como /cuestionario (/gracias/ diría «hemos recibido tu solicitud» a quien no ha enviado nada)."
   },
   {
    "desde": "/aprende",
@@ -270,7 +272,7 @@
   },
   {
    "desde": "/neuroline-t6-pierde-10-kilos-en-dos-meses/",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "neuroline-t6"
    ],
@@ -321,14 +323,14 @@
   },
   {
    "desde": "/blog/en-que-consiste-el-rejuvenecimiento-intimo-con-prp-y-por-que-cada-vez-mas-mujeres-lo-eligen",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "prp-intimo"
    ]
   },
   {
    "desde": "/blog/como-ayuda-el-laser-ginecologico-a-tratar-la-incontinencia-urinaria-sin-cirugia",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "laser-incontinencia-urinaria"
    ]
@@ -350,7 +352,7 @@
   },
   {
    "desde": "/blog/que-es-neuroline-t6-y-como-ayuda-a-controlar-el-apetito-y-perder-peso",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "neuroline-t6",
     "balon-gastrico"
@@ -358,7 +360,7 @@
   },
   {
    "desde": "/blog/como-funciona-el-balon-gastrico-allurion-y-cuanto-peso-puedes-perder",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "balon-gastrico",
     "dietetica-nutricion"
@@ -366,7 +368,7 @@
   },
   {
    "desde": "/blog/que-es-la-semaglutida-y-por-que-es-uno-de-los-tratamientos-mas-efectivos-para-perder-peso",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "semaglutida",
     "tirzepatida-mounjaro",
@@ -389,14 +391,14 @@
   },
   {
    "desde": "/blog/que-es-la-labioplastia-y-cuando-es-recomendable-esta-cirugia-intima-femenina",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "labioplastia"
    ]
   },
   {
    "desde": "/blog/que-es-el-rejuvenecimiento-vaginal-y-que-tipos-existen",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "rejuvenecimiento-vaginal",
     "radiofrecuencia-intima",
@@ -405,21 +407,21 @@
   },
   {
    "desde": "/blog/como-funciona-el-blanqueamiento-genital-y-es-seguro-hacerlo",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "blanqueamiento-intimo"
    ]
   },
   {
    "desde": "/blog/que-es-la-cirugia-de-suelo-pelvico-y-como-trata-los-prolapsos-genitales",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "cirugia-suelo-pelvico"
    ]
   },
   {
    "desde": "/blog/que-es-la-perineoplastia-de-apertura-y-para-quien-esta-indicada",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "perineoplastia-apertura"
    ]
@@ -705,21 +707,21 @@
   },
   {
    "desde": "/blog/que-es-easy-diet-y-como-funciona-para-perder-peso",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "easy-diet"
    ]
   },
   {
    "desde": "/blog/como-se-realiza-el-engrosamiento-de-pene-y-cuales-son-sus-resultados",
-   "hacia": "/salud-sexual-masculina/",
+   "hacia": "/estetica-intima-masculina/",
    "catalogo_ids": [
     "engrosamiento-pene-ah"
    ]
   },
   {
    "desde": "/blog/en-que-consiste-el-blanqueamiento-vaginal-y-es-seguro",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "blanqueamiento-intimo"
    ]
@@ -747,21 +749,21 @@
   },
   {
    "desde": "/blog/easy-diet-es-solo-para-perder-peso-o-tambien-mejora-la-salud-metabolica",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "easy-diet"
    ]
   },
   {
    "desde": "/blog/que-debo-saber-antes-de-hacerme-un-engrosamiento-de-pene",
-   "hacia": "/salud-sexual-masculina/",
+   "hacia": "/estetica-intima-masculina/",
    "catalogo_ids": [
     "engrosamiento-pene-ah"
    ]
   },
   {
    "desde": "/blog/el-blanqueamiento-vaginal-es-permanente-o-requiere-mantenimiento",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "blanqueamiento-intimo"
    ]
@@ -818,16 +820,17 @@
   },
   {
    "desde": "/blog/como-mejora-el-laser-fotona-la-firmeza-de-la-piel-sin-cirugia",
-   "hacia": "/medicina-estetica-facial/",
+   "hacia": "/medicina-estetica-facial/tensado-facial-con-laser/",
    "catalogo_ids": [
     "fotona-tensado-cutaneo",
     "inductor-colageno",
     "hilos-tensores"
-   ]
+   ],
+   "nota": "Su tratamiento principal (el láser de tensado) no tiene página propia y va en «Tensado facial con láser»."
   },
   {
    "desde": "/blog/que-tratamientos-ginecologicos-se-pueden-realizar-con-laser-fotona",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "laser-atrofia-vaginal",
     "rejuvenecimiento-vaginal",
@@ -836,12 +839,13 @@
   },
   {
    "desde": "/blog/como-actua-el-laser-fotona-en-la-flacidez-del-cuello-y-escote",
-   "hacia": "/medicina-estetica-facial/",
+   "hacia": "/medicina-estetica-facial/tensado-facial-con-laser/",
    "catalogo_ids": [
     "fotona-cuello-escote",
     "hilos-tensores",
     "radiofrecuencia-facial"
-   ]
+   ],
+   "nota": "Su tratamiento principal (el láser de tensado) no tiene página propia y va en «Tensado facial con láser»."
   },
   {
    "desde": "/blog/evosculpt-que-es-como-funciona-y-cuando-se-notan-los-resultados",
@@ -925,7 +929,7 @@
   },
   {
    "desde": "/blog/mounjaro-la-guia-definitiva-sobre-la-tirzepatida-para-perder-peso-2026",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "tirzepatida-mounjaro",
     "hifu-corporal"
@@ -933,7 +937,7 @@
   },
   {
    "desde": "/blog/mounjaro-vs-ozempic-vs-wegovy-cual-es-la-diferencia",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "tirzepatida-mounjaro",
     "semaglutida"
@@ -1005,7 +1009,7 @@
   },
   {
    "desde": "/blog/tag/adelgazar",
-   "hacia": "/perdida-de-peso/"
+   "hacia": "/control-de-peso/"
   },
   {
    "desde": "/blog/tag/caida-del-cabello",
@@ -1013,7 +1017,7 @@
   },
   {
    "desde": "/blog/tag/diferencias",
-   "hacia": "/perdida-de-peso/"
+   "hacia": "/control-de-peso/"
   },
   {
    "desde": "/blog/tag/exosomas-capilares",
@@ -1049,19 +1053,19 @@
   },
   {
    "desde": "/blog/tag/monjauro",
-   "hacia": "/perdida-de-peso/"
+   "hacia": "/control-de-peso/"
   },
   {
    "desde": "/blog/tag/mounjaro",
-   "hacia": "/perdida-de-peso/"
+   "hacia": "/control-de-peso/"
   },
   {
    "desde": "/blog/tag/ozempic",
-   "hacia": "/perdida-de-peso/"
+   "hacia": "/control-de-peso/"
   },
   {
    "desde": "/blog/tag/perdida-de-peso",
-   "hacia": "/perdida-de-peso/"
+   "hacia": "/control-de-peso/"
   },
   {
    "desde": "/blog/tag/piernas-pesadas",
@@ -1097,7 +1101,7 @@
   },
   {
    "desde": "/blog/tag/wegovy",
-   "hacia": "/perdida-de-peso/"
+   "hacia": "/control-de-peso/"
   }
  ],
  "anclas": [
@@ -1472,7 +1476,7 @@
   },
   {
    "desde": "/corporal#dietetica-y-nutricion",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "dietetica-nutricion"
    ]
@@ -1514,112 +1518,112 @@
   },
   {
    "desde": "/perdida-de-peso#neuroline-t6",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "neuroline-t6"
    ]
   },
   {
    "desde": "/perdida-de-peso#balon-gastrico-allurion",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "balon-gastrico"
    ]
   },
   {
    "desde": "/perdida-de-peso#semaglutida",
-   "hacia": "/perdida-de-peso/",
+   "hacia": "/control-de-peso/",
    "catalogo_ids": [
     "semaglutida"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#labioplastia",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "labioplastia"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#rejuvenecimiento-vaginal",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "rejuvenecimiento-vaginal"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#blanqueamiento-vaginal",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "blanqueamiento-intimo"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#cirugia-de-suelo-pelvico-prolapsos-o-distopias.",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "cirugia-suelo-pelvico"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#cirugia-para-la-apertura-de-introito-vaginal-perineoplastia-de-apertura-.",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "perineoplastia-apertura"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#tratamientos-con-plasma-rico-en-plaquetas-prp-.",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "prp-intimo"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#tratamiento-laser-de-la-incontinencia-urinaria-de-esfuerzo-iue.",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "laser-incontinencia-urinaria"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#tratamiento-laser-de-la-atrofia-vaginal.",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "laser-atrofia-vaginal"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#tratamiento-laser-de-la-hiperlaxitud-y-prolapso-lev.",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "laser-hiperlaxitud-vaginal"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#tratamiento-laser-de-los-condilomas.",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "laser-condilomas"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#tratamiento-laser-del-liquen-esclero-atrofico.-enfermedad-.",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "laser-liquen-escleroatrofico"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#cirugia-del-capuchon-de-clitoris.",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "cirugia-capuchon-clitoris"
    ]
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#cirugia-para-reparar-el-desgarro-perineal.-perineoplastia-de-cierre-.",
-   "hacia": "/ginecologia-estetica/",
+   "hacia": "/estetica-intima-femenina/",
    "catalogo_ids": [
     "perineoplastia-cierre"
    ]
@@ -1804,28 +1808,31 @@
   },
   {
    "desde": "/facial#ojeras",
-   "hacia": "/medicina-estetica-facial/",
-   "nota": "Ancla de sección."
+   "hacia": "/tratamientos/?p=mirada-y-ojeras",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
   },
   {
    "desde": "/facial#labios",
-   "hacia": "/medicina-estetica-facial/",
-   "nota": "Ancla de sección."
+   "hacia": "/tratamientos/?p=labios",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
   },
   {
    "desde": "/facial#piel",
-   "hacia": "/medicina-estetica-facial/",
-   "nota": "Ancla de sección."
+   "hacia": "/tratamientos/?p=calidad-de-piel",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
   },
   {
    "desde": "/facial#pomulos",
    "hacia": "/medicina-estetica-facial/",
-   "nota": "Ancla de sección."
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "relleno-pomulos-ah"
+   ]
   },
   {
    "desde": "/facial#servicios-de-mirada",
-   "hacia": "/medicina-estetica-facial/",
-   "nota": "Ancla de sección."
+   "hacia": "/tratamientos/?p=mirada-y-ojeras",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
   },
   {
    "desde": "/facial#rejuvenecimiento-facial",
@@ -1844,8 +1851,8 @@
   },
   {
    "desde": "/corporal#celulitis",
-   "hacia": "/medicina-estetica-corporal/",
-   "nota": "Ancla de sección."
+   "hacia": "/tratamientos/?p=celulitis",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
   },
   {
    "desde": "/corporal#estrias-y-cicatrices",
@@ -1854,18 +1861,24 @@
   },
   {
    "desde": "/corporal#grasa-acumulada",
-   "hacia": "/medicina-estetica-corporal/",
-   "nota": "Ancla de sección."
+   "hacia": "/tratamientos/?p=grasa-localizada",
+   "nota": "Ancla de sección: va a los tratamientos de esa preocupación."
   },
   {
    "desde": "/corporal#gluteos",
    "hacia": "/medicina-estetica-corporal/",
-   "nota": "Ancla de sección."
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "aumento-gluteos-ah"
+   ]
   },
   {
    "desde": "/corporal#sudor",
    "hacia": "/medicina-estetica-corporal/",
-   "nota": "Ancla de sección."
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "toxina-hiperhidrosis"
+   ]
   },
   {
    "desde": "/cirugia-corporal#pecho",
@@ -1875,42 +1888,66 @@
   {
    "desde": "/cirugia-corporal#grasa-localizada",
    "hacia": "/cirugia-estetica/",
-   "nota": "Ancla de sección."
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "liposuccion"
+   ]
   },
   {
    "desde": "/cirugia-corporal#abdomen",
    "hacia": "/cirugia-estetica/",
-   "nota": "Ancla de sección."
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "abdominoplastia"
+   ]
   },
   {
    "desde": "/cirugia-corporal#gluteos",
    "hacia": "/cirugia-estetica/",
-   "nota": "Ancla de sección."
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "lipofilling-gluteos"
+   ]
   },
   {
    "desde": "/cirugia-corporal#orejas",
    "hacia": "/cirugia-estetica/",
-   "nota": "Ancla de sección."
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "otoplastia"
+   ]
   },
   {
    "desde": "/cirugia-capilar#microinjerto-capilar",
    "hacia": "/cirugia-capilar/",
-   "nota": "Ancla de sección."
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "injerto-capilar-fue"
+   ]
   },
   {
    "desde": "/cirugia-capilar#frente",
    "hacia": "/cirugia-capilar/",
-   "nota": "Ancla de sección."
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "frontoplastia"
+   ]
   },
   {
    "desde": "/cirugia-capilar#cicatrices",
    "hacia": "/cirugia-capilar/",
-   "nota": "Ancla de sección."
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "cicatrices-capilares"
+   ]
   },
   {
    "desde": "/cirugia-capilar#reparacion-de-cirugias-previas",
    "hacia": "/cirugia-capilar/",
-   "nota": "Ancla de sección."
+   "nota": "Ancla de sección con su página en la web nueva.",
+   "catalogo_ids": [
+    "reparacion-trasplante-capilar"
+   ]
   },
   {
    "desde": "/marcas#viscoderm",
@@ -1974,15 +2011,27 @@
   },
   {
    "desde": "/corporal#mesoterapia-con-alidya",
-   "hacia": "/medicina-estetica-corporal/"
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "mesoterapia-alidya"
+   ],
+   "nota": "Ancla de sección con su página en la web nueva."
   },
   {
    "desde": "/corporal#microneedling",
-   "hacia": "/medicina-estetica-corporal/"
+   "hacia": "/medicina-estetica-corporal/",
+   "catalogo_ids": [
+    "microneedling-corporal-estrias"
+   ],
+   "nota": "Ancla de sección con su página en la web nueva."
   },
   {
    "desde": "/ginecologia-estetica-y-regenerativa#labioplastia-o-cirugia-de-labios-menores.",
-   "hacia": "/ginecologia-estetica/"
+   "hacia": "/estetica-intima-femenina/",
+   "catalogo_ids": [
+    "labioplastia"
+   ],
+   "nota": "Ancla de sección con su página en la web nueva."
   }
  ]
 }

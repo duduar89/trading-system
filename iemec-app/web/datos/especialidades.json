@@ -42,7 +42,7 @@
       ]
     },
     {
-      "slug": "perdida-de-peso",
+      "slug": "control-de-peso",
       "orden": 3,
       "nombre": "Control de peso",
       "grupo_neutro": "Control de peso",
@@ -57,7 +57,7 @@
         "No hay una única solución que sirva a todo el mundo. En la consulta, el médico revisa tu salud, tus antecedentes y tus objetivos, y te explica qué opciones tienen sentido en tu caso, con sus riesgos y sus alternativas.",
         "Lo importante es lo que se mantiene después: por eso cada plan incluye seguimiento y un cambio de hábitos acompañado."
       ],
-      "pendiente": "confirmar que la autorización CS17886 cubre el área de peso (normas.md: Endocrinología U.10 y Nutrición U.11)",
+      "pendiente": "que la autorización del centro cubra el área de peso (Endocrinología, U.10, y Nutrición, U.11)",
       "preguntas": [
         { "p": "¿Qué pasa en la primera consulta?", "r": "El médico te pregunta por tu salud, tus hábitos y tus objetivos, y te explica las opciones que encajan contigo. Tú decides después, sin compromiso." },
         { "p": "¿Tendré seguimiento?", "r": "Sí. Cada plan incluye revisiones para ver cómo evolucionas y ajustar lo que haga falta." }
@@ -77,7 +77,7 @@
         "La caída del cabello tiene causas muy distintas: hormonales, genéticas, por estrés, por carencias o por otras enfermedades. Por eso el primer paso es un diagnóstico del cuero cabelludo, que nos dice qué está pasando y qué opciones tienes.",
         "El head spa es otra cosa: un ritual de limpieza, masaje y cuidado del cuero cabelludo para relajarte y cuidar tu pelo, que hace el equipo de estética."
       ],
-      "pendiente": "confirmar qué cubre la unidad U.900 de la autorización CS17886 en medicina capilar",
+      "pendiente": "qué cubre la unidad U.900 de la autorización en medicina capilar",
       "preguntas": [
         { "p": "¿Cuándo conviene consultar por la caída del cabello?", "r": "Cuando notes que se te cae más pelo de lo habitual durante semanas, que clarea alguna zona o que pierde densidad. Cuanto antes se valora, más opciones hay." },
         { "p": "¿El head spa es un tratamiento médico?", "r": "No. Es un ritual de cuidado y bienestar del cuero cabelludo. Si te preocupa la caída, empieza por el diagnóstico capilar." }
@@ -103,7 +103,7 @@
       ]
     },
     {
-      "slug": "ginecologia-estetica",
+      "slug": "estetica-intima-femenina",
       "orden": 6,
       "nombre": "Estética íntima femenina",
       "grupo_neutro": "Salud íntima femenina",
@@ -118,7 +118,7 @@
         "Puedes contárnoslo con tranquilidad: la consulta es confidencial. El médico te escucha, te explora si hace falta y te explica las opciones, sus riesgos y lo que puedes esperar.",
         "No hace falta que nos des detalles por WhatsApp ni en el formulario: los hablamos en consulta."
       ],
-      "pendiente": "confirmar qué servicios de la zona íntima cubre la autorización CS17886 (normas.md: la ginecología, U.26, no figura)",
+      "pendiente": "qué servicios de la zona íntima cubre la autorización (la ginecología, U.26, no figura)",
       "preguntas": [
         { "p": "¿La consulta es confidencial?", "r": "Sí. Lo que nos cuentas queda entre tú y el equipo médico, y los mensajes de la clínica nunca nombran el tratamiento." },
         { "p": "¿Tengo que explicar mi caso al pedir cita?", "r": "No. Basta con pedir una cita de valoración; los detalles los hablamos en consulta." }
@@ -145,7 +145,7 @@
       ]
     },
     {
-      "slug": "salud-sexual-masculina",
+      "slug": "estetica-intima-masculina",
       "orden": 8,
       "nombre": "Estética íntima masculina",
       "grupo_neutro": "Salud íntima masculina",

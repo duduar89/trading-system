@@ -25,13 +25,16 @@ function html(partes, ...vals) {
 }
 
 // Texto de contenido: se escapa y los huecos «[PENDIENTE: …]» salen resaltados para la clínica.
+// Las fechas (20-07-2025) no se parten por el guion al final de una línea estrecha.
 const PENDIENTE = /\[PENDIENTE[^\]]*\]/g;
+const FECHA = /\b\d{1,2}-\d{1,2}-\d{4}\b/g;
+const sinCorte = (s) => s.replace(FECHA, (m) => `<span class="sin-corte">${m}</span>`);
 function texto(s) {
-  return crudo(escapar(s).replace(PENDIENTE, (m) => `<mark class="pendiente">${m}</mark>`));
+  return crudo(sinCorte(escapar(s)).replace(PENDIENTE, (m) => `<mark class="pendiente">${m}</mark>`));
 }
 const pendiente = (s) => texto(`[PENDIENTE: ${s}]`);
 
 // Atributos opcionales: attr('href', x) → ` href="x"` o nada.
 const attr = (nombre, v) => (v === null || v === undefined || v === false ? '' : crudo(v === true ? ` ${nombre}` : ` ${nombre}="${escapar(v)}"`));
 
-module.exports = { html, crudo, escapar, texto, pendiente, attr, Crudo, PENDIENTE };
+module.exports = { html, crudo, escapar, texto, pendiente, attr, Crudo, PENDIENTE, sinCorte };

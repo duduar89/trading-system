@@ -227,35 +227,35 @@
       "preocupaciones": ["injerto"]
     },
     {
-      "slug": "labioplastia", "especialidad": "ginecologia-estetica", "catalogo": ["labioplastia"], "tipo": "cirugia", "orden": 10, "destacado": true, "profesional": "Médico",
+      "slug": "labioplastia", "especialidad": "estetica-intima-femenina", "catalogo": ["labioplastia"], "tipo": "cirugia", "orden": 10, "destacado": true, "profesional": "Médico",
       "nombre": "Labioplastia", "titulo": "Labioplastia: cirugía de los labios menores",
       "entradilla": "Cirugía de los labios menores, por motivos funcionales o estéticos, siempre tras una valoración médica.",
       "problema": "Algunas mujeres sienten molestias con la ropa, el deporte o la higiene por el tamaño o la forma de los labios menores; otras quieren cambiar su aspecto. La labioplastia los reduce o los remodela.",
       "preocupaciones": ["zona-intima"]
     },
     {
-      "slug": "cirugia-del-capuchon-del-clitoris", "especialidad": "ginecologia-estetica", "catalogo": ["cirugia-capuchon-clitoris"], "tipo": "cirugia", "orden": 20, "profesional": "Médico",
+      "slug": "cirugia-del-capuchon-del-clitoris", "especialidad": "estetica-intima-femenina", "catalogo": ["cirugia-capuchon-clitoris"], "tipo": "cirugia", "orden": 20, "profesional": "Médico",
       "nombre": "Cirugía del capuchón del clítoris", "titulo": "Cirugía del capuchón del clítoris",
       "entradilla": "Cirugía ambulatoria del capuchón cuando su tamaño causa molestias o por motivos estéticos, tras una valoración médica.",
       "problema": "Un capuchón grande puede causar molestias o no gustar por su aspecto. En la consulta el médico valora tu caso y te explica la intervención.",
       "preocupaciones": ["zona-intima"]
     },
     {
-      "slug": "aclarado-de-la-zona-intima", "especialidad": "ginecologia-estetica", "catalogo": ["blanqueamiento-intimo"], "tipo": "medico", "orden": 30,
+      "slug": "aclarado-de-la-zona-intima", "especialidad": "estetica-intima-femenina", "catalogo": ["blanqueamiento-intimo"], "tipo": "medico", "orden": 30,
       "nombre": "Aclarado de la zona íntima", "titulo": "Aclarado de la piel de la zona íntima externa",
       "entradilla": "Tratamiento para unificar el tono de la piel de la zona íntima externa, con valoración médica.",
       "problema": "Es habitual que la piel de la zona íntima externa sea más oscura que la del resto del cuerpo. Si te preocupa, en la valoración te explicamos las opciones y sus cuidados.",
       "preocupaciones": ["zona-intima", "manchas"]
     },
     {
-      "slug": "remodelacion-intima", "especialidad": "ginecologia-estetica", "catalogo": ["remodelacion-intima-ah"], "tipo": "medico", "orden": 40,
+      "slug": "remodelacion-intima", "especialidad": "estetica-intima-femenina", "catalogo": ["remodelacion-intima-ah"], "tipo": "medico", "orden": 40,
       "nombre": "Remodelación íntima", "titulo": "Remodelación íntima: valoración médica",
       "entradilla": "Tratamiento médico de la zona íntima externa para devolver volumen o mejorar su aspecto, tras una valoración.",
       "problema": "Con el tiempo, los cambios hormonales o los partos, la zona íntima externa puede perder volumen. Si te preocupa, el médico valora tu caso y te explica las opciones.",
       "preocupaciones": ["zona-intima"]
     },
     {
-      "slug": "engrosamiento-del-pene", "especialidad": "salud-sexual-masculina", "catalogo": ["engrosamiento-pene-ah"], "tipo": "medico", "orden": 10, "destacado": true,
+      "slug": "engrosamiento-del-pene", "especialidad": "estetica-intima-masculina", "catalogo": ["engrosamiento-pene-ah"], "tipo": "medico", "orden": 10, "destacado": true,
       "nombre": "Engrosamiento del pene", "titulo": "Engrosamiento del pene con relleno: valoración médica",
       "entradilla": "Un procedimiento médico de la zona íntima masculina, con valoración previa, información clara y total discreción.",
       "problema": "Es una consulta más habitual de lo que parece. El médico valora tu caso y te explica si el tratamiento es adecuado para ti, sus riesgos y sus alternativas.",
@@ -263,7 +263,7 @@
     },
     {
       "slug": "consulta-con-el-cirujano", "especialidad": "cirugia-estetica", "catalogo": ["valoracion-cirugia-plastica"], "tipo": "cirugia", "orden": 1, "destacado": true,
-      "nombre": "Consulta con el cirujano", "titulo": "Consulta de valoración con el cirujano plástico",
+      "nombre": "Consulta con el cirujano", "titulo": "Consulta de valoración con el cirujano",
       "entradilla": "El primer paso antes de cualquier cirugía: el cirujano valora tu caso, te explica las opciones y resuelve tus dudas.",
       "descripcion": "Es la primera consulta para cualquier intervención. El cirujano escucha lo que te gustaría cambiar, te explora y te explica qué se puede hacer, cómo y con qué riesgos.",
       "preocupaciones": ["cirugia"]

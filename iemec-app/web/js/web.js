@@ -29,8 +29,8 @@
     } catch (e) { /* mapa roto: se queda en la página */ }
   })();
 
-  // ── Campaña: utm_* y los identificadores de clic de la visita ───────────────────────────────
-  var CAMPOS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid'];
+  // ── Campaña: los utm_* de la visita (sin identificadores de clic de Google ni de Meta) ──────
+  var CAMPOS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
   var campana = {};
   (function () {
     var guardada = leer('iemec-campana');
@@ -43,17 +43,21 @@
     });
     if (nueva) guardar('iemec-campana', JSON.stringify(campana));
   })();
-  var codigoCampana = (campana.utm_campaign || '').replace(/[^\w.\-áéíóúñü ]/gi, '').trim().slice(0, 40);
+  var codigoCampana = String(campana.utm_campaign || '').trim().toLowerCase().slice(0, 120);
 
-  // WhatsApp: «(ref. web-…)» pasa a «(ref. web-… · campaña)».
+  // WhatsApp: «(ref. web-…)» pasa a «(ref. web-… · c-…)». Va una clave corta de la campaña (su huella),
+  // nunca su nombre: el mensaje pasa por Meta y queda en el móvil, y una campaña puede nombrar un
+  // tratamiento íntimo. La app la reconoce calculando la misma huella de sus campañas. El texto se
+  // codifica como el del generador (%20, no «+»), que es lo que espera wa.me.
   if (codigoCampana) {
+    var clave = 'c-' + huella(codigoCampana);
     Array.prototype.forEach.call(d.querySelectorAll('a[href^="https://wa.me/"]'), function (a) {
       try {
         var u = new URL(a.href);
         var t = u.searchParams.get('text') || '';
-        if (t.indexOf('(ref. web-') === -1 || t.indexOf(' · ' + codigoCampana + ')') !== -1) return;
-        u.searchParams.set('text', t.replace(/\(ref\. (web-[^)\s]+)\)/, '(ref. $1 · ' + codigoCampana + ')'));
-        a.href = u.toString();
+        if (t.indexOf('(ref. web-') === -1 || t.indexOf(' · ' + clave + ')') !== -1) return;
+        var nuevo = t.replace(/\(ref\. (web-[^)\s]+)\)/, '(ref. $1 · ' + clave + ')');
+        a.href = 'https://wa.me' + u.pathname + '?text=' + encodeURIComponent(nuevo);
       } catch (e) { /* URL rara: se deja */ }
     });
   }
@@ -83,6 +87,10 @@
         desplegable.open = false;
         desplegable.querySelector('summary').focus();
       }
+    });
+    // Si el foco sale con Tab, se cierra (si no, el panel tapa lo que viene detrás).
+    desplegable.addEventListener('focusout', function (e) {
+      if (desplegable.open && e.relatedTarget && !desplegable.contains(e.relatedTarget)) desplegable.open = false;
     });
   }
 
@@ -136,13 +144,39 @@
     window.addEventListener('resize', function () { if (window.innerWidth >= 1024) cerrarMenu(false); });
   }
 
+  // ── «Te llamamos» de las fichas: plegado, salvo si se llega a él ────────────────────────────
+  // Sin JavaScript el formulario sale desplegado; con él se pliega al cargar y se despliega (con el
+  // foco en el nombre) desde cualquier enlace «Te llamamos» o si la dirección lleva #te-llamamos.
+  var plegable = d.querySelector('[data-plegable]');
+  if (plegable) {
+    var seccionLlamamos = d.getElementById('te-llamamos');
+    var abrirLlamamos = function (enfocar) {
+      plegable.open = true;
+      if (!enfocar) return;
+      if (seccionLlamamos) seccionLlamamos.scrollIntoView();
+      var nombre = plegable.querySelector('input[name="nombre"]');
+      if (nombre) nombre.focus({ preventScroll: true });
+    };
+    if (location.hash === '#te-llamamos') abrirLlamamos(false); else plegable.open = false;
+    d.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href="#te-llamamos"]');
+      if (!a) return;
+      e.preventDefault();
+      if (window.history.replaceState) window.history.replaceState(null, '', '#te-llamamos');
+      abrirLlamamos(true);
+    });
+  }
+
   // ── Formularios «Te llamamos» ───────────────────────────────────────────────────────────────
+  var WHATSAPP = '722 83 32 85';
   var MENSAJES = {
     nombre: 'Escribe tu nombre.',
     telefono: 'Revisa el teléfono: 9 cifras, o con prefijo si es de fuera de España.',
     email: 'Revisa el correo electrónico (falta la @ o el dominio).',
+    emailRequerido: 'Has elegido que te contestemos por correo: escribe tu correo electrónico.',
     tratamiento: 'Elige qué te interesa (o «Otra cosa»).',
     preferencia: 'Elige cómo prefieres que te contactemos.',
+    mensaje: 'El mensaje es demasiado largo.',
     privacidad: 'Para contestarte necesitamos tu consentimiento en la primera casilla.'
   };
   function validar(form) {
@@ -151,14 +185,30 @@
     if (!v('nombre')) errores.nombre = MENSAJES.nombre;
     var tel = v('telefono').replace(/[\s.\-()]/g, '');
     if (!/^(\+|00)?\d{9,15}$/.test(tel)) errores.telefono = MENSAJES.telefono;
+    var pref = form.querySelector('input[name="preferencia"]:checked');
     var correo = v('email');
     if (correo && !/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(correo)) errores.email = MENSAJES.email;
+    else if (!correo && pref && pref.value === 'correo') errores.email = MENSAJES.emailRequerido;
     if (!v('tratamiento')) errores.tratamiento = MENSAJES.tratamiento;
-    var pref = form.querySelector('input[name="preferencia"]:checked');
     if (!pref) errores.preferencia = MENSAJES.preferencia;
+    var men = form.elements.mensaje;
+    if (men && men.maxLength > 0 && men.value.length > men.maxLength) errores.mensaje = MENSAJES.mensaje;
     var priv = form.elements.privacidad;
     if (priv && !priv.checked) errores.privacidad = MENSAJES.privacidad;
     return errores;
+  }
+  // El aviso de estado, con un enlace a WhatsApp si hace falta (el de la propia página).
+  function avisar(estado, clase, texto, conWhatsapp) {
+    estado.className = 'form-estado' + (clase ? ' ' + clase : '');
+    estado.textContent = texto;
+    if (!conWhatsapp) return;
+    var wa = d.querySelector('a[href^="https://wa.me/"]');
+    var enlace = d.createElement(wa ? 'a' : 'span');
+    if (wa) enlace.href = wa.href;
+    enlace.textContent = 'escríbenos por WhatsApp al ' + WHATSAPP;
+    estado.appendChild(d.createTextNode(' '));
+    estado.appendChild(enlace);
+    estado.appendChild(d.createTextNode('.'));
   }
   function pintarErrores(form, errores) {
     var primero = null;
@@ -176,38 +226,54 @@
     return primero;
   }
   Array.prototype.forEach.call(d.querySelectorAll('form[data-formulario]'), function (form) {
+    // Con JavaScript, los mensajes los pinta esta página; sin él, valida el navegador.
+    form.noValidate = true;
     var estado = form.querySelector('.form-estado');
+    var cargada = Date.now();
+    var enviando = false;
     var set = function (n, v) { var el = form.elements[n]; if (el && !el.value) el.value = v; };
-    set('t', String(Date.now()));
     CAMPOS.forEach(function (c) { if (campana[c]) set(c, campana[c]); });
     form.addEventListener('submit', function (e) {
+      if (enviando) { e.preventDefault(); return; }
+      // t: cuánto se ha tardado en rellenarlo (ms). Vacío = sin JavaScript: la app no lo descarta.
+      if (form.elements.t) form.elements.t.value = String(Date.now() - cargada);
       if (form.elements.web && form.elements.web.value) return; // trampa: que lo decida el servidor
       var errores = validar(form);
       var primero = pintarErrores(form, errores);
       if (primero) {
         e.preventDefault();
-        estado.className = 'form-estado mal';
-        estado.textContent = 'Revisa los campos marcados: ' + Object.keys(errores).length + (Object.keys(errores).length === 1 ? ' error.' : ' errores.');
+        var n = Object.keys(errores).length;
+        avisar(estado, 'mal', 'Revisa los campos marcados: ' + n + (n === 1 ? ' error.' : ' errores.'));
         primero.focus();
         return;
       }
       if (!window.fetch || !window.URLSearchParams) return; // envío normal
       e.preventDefault();
       var enviar = form.querySelector('[type="submit"]');
-      enviar.disabled = true;
-      estado.className = 'form-estado';
-      estado.textContent = 'Enviando…';
+      // Sin «disabled»: el foco se queda en el botón (con disabled caería al principio de la página).
+      enviando = true;
+      enviar.setAttribute('aria-disabled', 'true');
+      avisar(estado, '', 'Enviando…');
       var cuerpo = new URLSearchParams(new FormData(form));
+      var fallo = function (texto) {
+        enviando = false;
+        enviar.removeAttribute('aria-disabled');
+        avisar(estado, 'mal', texto, true);
+        estado.focus();
+      };
       window.fetch(form.action, {
-        method: 'POST', body: cuerpo, credentials: 'omit',
+        method: 'POST', body: cuerpo, credentials: 'omit', redirect: 'manual',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }
       }).then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, datos: j }; });
+        // Una redirección (303 a /gracias/) también es «recibido»: no se sigue, para no reintentar
+        // algo que ya se ha guardado.
+        if (r.type === 'opaqueredirect' || (r.status >= 300 && r.status < 400)) return { ok: true, estado: r.status, datos: { ok: true } };
+        return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, estado: r.status, datos: j }; });
       }).then(function (res) {
         if (res.ok && res.datos && res.datos.ok !== false) {
           var nombre = String(form.elements.nombre.value || '').trim().split(/\s+/)[0];
           var pref = form.querySelector('input[name="preferencia"]:checked');
-          var medio = pref && pref.value === 'llamada' ? 'teléfono' : 'WhatsApp';
+          var medio = pref && pref.value === 'llamada' ? 'teléfono' : pref && pref.value === 'correo' ? 'correo electrónico' : 'WhatsApp';
           var gracias = d.createElement('div');
           gracias.className = 'form-estado ok';
           gracias.setAttribute('role', 'status');
@@ -220,16 +286,25 @@
           gracias.focus();
           return;
         }
+        if (res.estado === 429) {
+          fallo('Has enviado varias solicitudes seguidas. Espera unos minutos antes de volver a enviarla o');
+          return;
+        }
         var errs = (res.datos && res.datos.errores) || {};
+        var claves = Object.keys(errs);
+        if (!claves.length) {
+          fallo('No hemos podido enviar tu solicitud. Vuelve a intentarlo en un momento o');
+          return;
+        }
+        // Los errores con hueco junto a su campo; los demás, en el aviso.
         var foco = pintarErrores(form, errs);
-        estado.className = 'form-estado mal';
-        estado.textContent = Object.keys(errs).length ? 'Revisa los campos marcados.' : 'No hemos podido enviar tu solicitud. Vuelve a intentarlo o escríbenos por WhatsApp al 722 83 32 85.';
-        enviar.disabled = false;
-        if (foco) foco.focus();
+        var sueltos = claves.filter(function (k) { return !form.querySelector('[data-error-de="' + k + '"]'); }).map(function (k) { return String(errs[k]); });
+        enviando = false;
+        enviar.removeAttribute('aria-disabled');
+        avisar(estado, 'mal', 'Revisa los campos marcados.' + (sueltos.length ? ' ' + sueltos.join(' ') : ''));
+        (foco || estado).focus();
       }).catch(function () {
-        estado.className = 'form-estado mal';
-        estado.textContent = 'No hemos podido enviar tu solicitud. Vuelve a intentarlo o escríbenos por WhatsApp al 722 83 32 85.';
-        enviar.disabled = false;
+        fallo('No hemos podido enviar tu solicitud. Vuelve a intentarlo en un momento o');
       });
     });
   });
@@ -297,6 +372,12 @@
         obs.observe(el);
       }
     });
+    // El brillo del filete dorado solo corre (dos pasadas) cuando su sección está a la vista: así la
+    // página queda en reposo y no repinta sin parar.
+    var brillo = new IntersectionObserver(function (entradas) {
+      entradas.forEach(function (en) { en.target.classList.toggle('brilla', en.isIntersecting); });
+    });
+    Array.prototype.forEach.call(d.querySelectorAll('.filete'), function (f) { brillo.observe(f); });
   }
   raiz.classList.add('con-js');
 })();

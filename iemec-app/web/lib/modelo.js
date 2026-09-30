@@ -3,7 +3,7 @@
 // activo acaba en una página (propia o provisional) o en un «sin_pagina» con su motivo.
 const fs = require('fs');
 const path = require('path');
-const { cargarNormas, prohibidasEn, avisosEn, comoTexto } = require('./normas');
+const { cargarNormas, prohibidasEn, avisosEn } = require('./normas');
 
 const WEB = path.join(__dirname, '..');
 const RAIZ = path.join(WEB, '..');
@@ -16,7 +16,7 @@ function huellaCorta(s) {
   return h.toString(36);
 }
 
-const ROL_PROFESIONAL = { cirujano: 'Cirujano plástico', medico: 'Médico', tricologo: 'Equipo de medicina capilar', esteticista: 'Equipo de estética' };
+const ROL_PROFESIONAL = { cirujano: 'Cirujano', medico: 'Médico', tricologo: 'Equipo de medicina capilar', esteticista: 'Equipo de estética' };
 const REGIMEN_MEDICO = new Set(['medicamento_receta', 'producto_sanitario', 'cirugia']);
 
 function cargarDatos({ borradores = false } = {}) {
@@ -155,15 +155,14 @@ function construirModelo(datos) {
     p.ruta = `/${p.especialidad}/${p.slug}/`;
     p.principal = p.catalogo[0] || p.ids[0];
     const cats = p.ids.map((id) => porId.get(id)).filter(Boolean);
-    p.medico = !!(p.restringida || p.tipo === 'medico' || p.tipo === 'cirugia'
-      || cats.some((t) => t.rol_profesional === 'medico' || t.rol_profesional === 'cirujano' || REGIMEN_MEDICO.has(t.regimen_legal)));
+    p.clase = claseDe(p, cats);
+    p.cirugia = p.clase === 'cirugia';
+    p.medico = p.clase === 'cirugia' || p.clase === 'medico'
+      || (p.clase === 'valoracion' && cats.some((t) => t.rol_profesional === 'medico' || t.rol_profesional === 'cirujano'));
     p.profesional = p.sesion?.profesional || p.profesional || profesionalDe(cats, p);
     p.sensible = !!esp.sensible;
     p.ref = esp.sensible ? `web-${esp.codigo_ref}-${huellaCorta(p.slug)}` : `web-${p.slug}`;
     p.interes = esp.sensible ? esp.grupo_neutro : p.nombre;
-    // El id que va en el formulario: si nombra un medicamento o una marca, la especialidad (la app
-    // traduce la referencia con web/datos/referencias.json).
-    p.idFormulario = prohibidasEn(comoTexto(p.principal), normas).length ? p.especialidad : p.principal;
     p.orden = p.orden ?? 500;
   }
   // Referencias únicas.
@@ -177,7 +176,10 @@ function construirModelo(datos) {
   const publicadas = especialidades.map((e) => {
     const suyas = paginas.filter((p) => p.especialidad === e.slug)
       .sort((a, b) => (Number(!!b.destacado) - Number(!!a.destacado)) || (a.orden - b.orden) || a.nombre.localeCompare(b.nombre, 'es'));
-    return { ...e, ruta: `/${e.slug}/`, paginas: suyas, ref: `web-${e.slug}` };
+    // Lo íntimo y el peso tampoco se nombran en la referencia de su especialidad: un código.
+    let ref = e.sensible ? `web-${e.codigo_ref}-${huellaCorta(e.slug)}` : `web-${e.slug}`;
+    if (refs.has(ref)) ref = `${ref}-${huellaCorta(`/${e.slug}/`).slice(0, 3)}`;
+    return { ...e, ruta: `/${e.slug}/`, paginas: suyas, ref };
   }).filter((e) => e.paginas.length);
 
   // Relacionados: los que pide el contenido (si existen) o, en las provisionales, los de su especialidad
@@ -210,6 +212,25 @@ function construirModelo(datos) {
   };
 }
 
+// Qué clase de página es, según el catálogo (no según las palabras del texto):
+//   cirugia     · el tipo lo dice o algún tratamiento es de régimen «cirugía» (la labioplastia también);
+//   valoracion  · la propia consulta de valoración o de diagnóstico (servicio): sin recuadro de aviso;
+//   medico      · un médico, un cirujano o un medicamento o producto sanitario; o restringida con equipo
+//                 capilar (su texto ya pide valoración médica);
+//   previa      · restringida, pero la hace el equipo de estética y el régimen del producto está sin
+//                 confirmar: «requiere valoración previa», sin decir «médico» (no consta que lo sea);
+//   null        · estética de cabina.
+function claseDe(p, cats) {
+  const roles = new Set(cats.map((t) => t.rol_profesional));
+  const regimenes = new Set(cats.map((t) => t.regimen_legal));
+  if (p.tipo === 'cirugia' || regimenes.has('cirugia')) return 'cirugia';
+  if (cats.length && [...regimenes].every((r) => r === 'servicio') && /^(valoracion|diagnostico|consulta)\b/.test(p.slug)) return 'valoracion';
+  const medico = p.tipo === 'medico' || roles.has('medico') || roles.has('cirujano') || [...regimenes].some((r) => REGIMEN_MEDICO.has(r));
+  if (medico) return 'medico';
+  if (p.restringida) return [...roles].every((r) => r === 'esteticista') ? 'previa' : 'medico';
+  return null;
+}
+
 function profesionalDe(cats, p) {
   const roles = new Set(cats.map((t) => t.rol_profesional));
   const cirugia = cats.some((t) => t.regimen_legal === 'cirugia');
@@ -223,8 +244,8 @@ function profesionalDe(cats, p) {
 
 const FAMILIA_A_ESPECIALIDAD = {
   facial: 'medicina-estetica-facial', corporal: 'medicina-estetica-corporal', estetica_avanzada: 'medicina-estetica-corporal',
-  perdida_peso: 'perdida-de-peso', nutricion: 'perdida-de-peso', medicina_capilar: 'medicina-capilar', head_spa: 'medicina-capilar',
-  cirugia_capilar: 'cirugia-capilar', ginecoestetica: 'ginecologia-estetica', sexualidad_masculina: 'salud-sexual-masculina',
+  perdida_peso: 'control-de-peso', nutricion: 'control-de-peso', medicina_capilar: 'medicina-capilar', head_spa: 'medicina-capilar',
+  cirugia_capilar: 'cirugia-capilar', ginecoestetica: 'estetica-intima-femenina', sexualidad_masculina: 'estetica-intima-masculina',
   cirugia_estetica: 'cirugia-estetica', otro: 'medicina-estetica-facial',
 };
 const especialidadDeFamilia = (t) => FAMILIA_A_ESPECIALIDAD[t.familia] || null;
@@ -333,14 +354,17 @@ function resolverRedirecciones(datos, modelo, rutas) {
     if (rutas.has(d)) return d;
     return '/tratamientos/';
   };
+  // Destino de un ancla: una página, o un filtro de /tratamientos/ («/tratamientos/?p=labios»).
+  const anclaValida = (d) => !!d && rutas.has(d.split('?')[0]);
   const reglas = [];
   for (const r of redirecciones) {
+    // Solo decide el tratamiento principal (el primero): los demás solo se mencionaban en la página
+    // vieja. Si no tiene página, vale el destino del inventario (o /tratamientos/).
     let hacia = null;
     let motivo = 'inventario';
-    for (const id of r.catalogo_ids || []) {
-      const p = modelo.paginaDeId.get(id);
-      if (p) { hacia = p.ruta; motivo = `catalogo:${id}`; break; }
-    }
+    const principal = (r.catalogo_ids || [])[0];
+    const p = principal ? modelo.paginaDeId.get(principal) : null;
+    if (p) { hacia = p.ruta; motivo = `catalogo:${principal}`; }
     if (!hacia) hacia = destinoValido(r.hacia);
     if (hacia !== r.hacia && motivo === 'inventario') motivo = 'sin página publicada';
     reglas.push({ desde: r.desde, hacia, original: r.hacia, motivo, igual: norm(r.desde) === norm(hacia) });
@@ -358,7 +382,7 @@ function resolverRedirecciones(datos, modelo, rutas) {
       const p = modelo.paginaDeId.get(id);
       if (p) { destino = p.ruta; break; }
     }
-    if (!destino && a.hacia && rutas.has(a.hacia)) destino = a.hacia;
+    if (!destino && anclaValida(a.hacia)) destino = a.hacia;
     if (!destino || destino === recibe) continue;
     if (!mapas.has(recibe)) mapas.set(recibe, {});
     mapas.get(recibe)[huellaCorta(frag)] = destino;

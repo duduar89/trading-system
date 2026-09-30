@@ -68,9 +68,9 @@ const ICONOS = {
 
 // Cada especialidad y cada preocupación, con su icono.
 const ALIAS = {
-  'medicina-estetica-facial': 'facial', 'medicina-estetica-corporal': 'corporal', 'perdida-de-peso': 'peso',
-  'medicina-capilar': 'capilar', 'cirugia-capilar': 'injerto', 'ginecologia-estetica': 'intima', 'cirugia-estetica': 'cirugia',
-  'salud-sexual-masculina': 'masculina',
+  'medicina-estetica-facial': 'facial', 'medicina-estetica-corporal': 'corporal', 'control-de-peso': 'peso',
+  'medicina-capilar': 'capilar', 'cirugia-capilar': 'injerto', 'estetica-intima-femenina': 'intima', 'cirugia-estetica': 'cirugia',
+  'estetica-intima-masculina': 'masculina',
   arrugas: 'arrugas', 'volumen-y-contorno': 'volumen', flacidez: 'flacidez', manchas: 'manchas', 'acne-y-poros': 'acne',
   'calidad-de-piel': 'piel', 'mirada-y-ojeras': 'mirada', labios: 'labios', 'caida-del-cabello': 'caida', injerto: 'injerto',
   'grasa-localizada': 'grasa', celulitis: 'celulitis', 'retencion-de-liquidos': 'liquidos', peso: 'peso', 'zona-intima': 'intima',

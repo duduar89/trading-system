@@ -28,15 +28,12 @@
   "como_llegar": {
     "google": "https://www.google.com/maps/dir/?api=1&destination=IEMEC%2C%20Av.%20Siglo%20XXI%2013%2C%2028660%20Boadilla%20del%20Monte&destination_place_id=ChIJB6Pn5d2FQQ0ReZ4Qoqe8gtg",
     "apple": "https://maps.apple.com/?daddr=Av.%20Siglo%20XXI%2013%2C%2028660%20Boadilla%20del%20Monte&ll=40.4066059%2C-3.9001441",
-    "pendiente": "aparcamiento y transporte público más cercanos (la web actual no lo explica)"
+    "pendiente": "aparcamiento y transporte público más cercanos (la web actual no lo explica)",
+    "_pendiente": "Mientras falte, la sección «Aparcamiento y transporte» de /clinica/ no sale (está en la lista de pendientes)."
   },
   "google": {
     "ficha": "https://www.google.com/maps/place/?q=place_id:ChIJB6Pn5d2FQQ0ReZ4Qoqe8gtg",
-    "nota": 4.9,
-    "opiniones": 533,
-    "fecha": "2026-09-29",
-    "mostrar_nota": true,
-    "_mostrar_nota": "El encargo pide la nota con el número de opiniones y la fecha del dato. normas.md (apartado d) recomienda no citarla: si el abogado lo pide, false y en su lugar queda solo el enlace a la ficha."
+    "_nota": "Solo un enlace neutro a la ficha («Nuestra ficha en Google»), en /pedir-cita/. Ni la nota ni el número de opiniones: normas.md (apartado d) no permite reseñas como reclamo en la web de un centro sanitario (RD 1907/1996, art. 4.7; CDM 2022, art. 89.3), y normas.json lo prueba."
   },
   "telefono": { "e164": "+34722833285", "visible": "722 83 32 85", "internacional": "+34 722 83 32 85" },
   "telefono_fijo": null,
@@ -48,7 +45,7 @@
   "correo_pendiente": "correo del dominio de la clínica; hoy solo hay un Gmail",
   "horario": [
     { "dias": "Lunes a viernes", "abre": "11:00", "cierra": "20:00", "schema": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] },
-    { "dias": "Sábado", "pendiente": "horario del sábado: Google dice de 11:00 a 20:00 y Treatwell, de 10:00 a 20:00" }
+    { "dias": "Sábado", "pendiente": "horario del sábado", "_detalle": "Google dice de 11:00 a 20:00 y Treatwell, de 10:00 a 20:00" }
   ],
   "redes": [
     { "red": "Instagram", "url": "https://www.instagram.com/iemec_clinic/", "icono": "instagram" },

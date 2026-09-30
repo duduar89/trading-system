@@ -1,6 +1,6 @@
 {
   "_nota": "Equipo publicado hoy en iemec-clinic.com/nosotros, con las biografías reescritas sin medicamentos, marcas ni superlativos (normas.md). «especialista» solo con título oficial. «foto»: clave de web/fotos/fotos.json (si no hay foto, sale un monograma). «requiere_especialidad» o «requiere_catalogo»: la persona solo sale si esa especialidad o esos tratamientos tienen página publicada (lo que la autorización CS17886 no cubre todavía no se anuncia).",
-  "responsable_pendiente": "responsable asistencial (dirección médica): nombre, titulación, colegio y número de colegiado",
+  "responsable_pendiente": "nombre, titulación y n.º de colegiado",
   "personas": [
     {
       "codigo": "maribel-perea",
@@ -36,12 +36,12 @@
       "bio": "Más de quince años de experiencia en medicina estética facial y corporal. Trabaja la armonización facial, la bioestimulación y otros procedimientos mínimamente invasivos, con planes personalizados.",
       "areas": ["medicina-estetica-facial"],
       "foto": null,
-      "pendiente": "titulación, n.º de colegiada y retrato (la foto de la web actual lleva el nombre de otra persona)"
+      "pendiente": "titulación, n.º de colegiada y retrato"
     },
     {
       "codigo": "paula-vicent",
       "nombre": "Paula Vicent Valverde",
-      "cargo": "Medicina y cirugía capilar",
+      "cargo": "Área capilar",
       "bio": "Estudia cada caso de forma individual, explica con detalle el diagnóstico, los objetivos y lo que se puede esperar, y adapta el tratamiento a cada persona.",
       "areas": ["medicina-capilar", "cirugia-capilar"],
       "foto": "equipo-paula-vicent",
@@ -50,19 +50,19 @@
     {
       "codigo": "marco-vricella",
       "nombre": "Dr. Marco Vricella",
-      "cargo": "Cirugía plástica, reparadora y estética",
-      "bio": "Médico con la especialidad de Cirugía Plástica, Reparadora y Estética por la Universidad Católica del Sagrado Corazón de Roma (1992), con más de treinta años de experiencia.",
+      "cargo": "Cirugía estética",
+      "bio": "Médico. Formación en cirugía plástica en la Universidad Católica del Sagrado Corazón de Roma (1992), con más de treinta años de experiencia.",
       "areas": ["cirugia-estetica"],
       "foto": "equipo-marco-vricella-480",
-      "pendiente": "reconocimiento del título de especialista en España, n.º de colegiado y retrato en alta resolución"
+      "pendiente": "reconocimiento en España del título de especialista (hasta entonces no se nombra la especialidad), n.º de colegiado y retrato en alta resolución"
     },
     {
       "codigo": "alfonso-navarro",
       "nombre": "Alfonso Navarro Ramírez",
       "cargo": "Estética íntima femenina",
       "bio": "Atiende la consulta de estética íntima femenina: cirugía íntima y tratamientos de la zona íntima externa.",
-      "areas": ["ginecologia-estetica"],
-      "requiere_especialidad": "ginecologia-estetica",
+      "areas": ["estetica-intima-femenina"],
+      "requiere_especialidad": "estetica-intima-femenina",
       "foto": "equipo-alfonso-navarro",
       "pendiente": "profesión, especialidad oficial («Dr.») y n.º de colegiado"
     },

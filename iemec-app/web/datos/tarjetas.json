@@ -16,10 +16,13 @@
     "Validez de 6 meses desde la fecha en que se emite.",
     "Se canjean en IEMEC, en Boadilla del Monte, y la cita depende de la disponibilidad de la agenda.",
     "No se cambian por dinero.",
-    "No se usan para tratamientos con medicamentos o productos sanitarios como obsequio ni con ventajas de precio."
+    "Con tratamientos que usan medicamentos o productos sanitarios solo sirven como pago a cuenta, por su importe exacto y sin ninguna ventaja de precio."
   ],
-  "condiciones_pendiente": "condiciones de compra (forma de pago, desistimiento de 14 días y confirmación del pedido) que revise el abogado; hoy la tienda de SITE123 dice que no se devuelve el saldo que no se use",
+  "condiciones_pendiente": "condiciones de compra (pago, desistimiento y confirmación del pedido)",
+  "_condiciones_pendiente": "Que las revise el abogado: forma de pago, desistimiento de 14 días y confirmación del pedido. Hoy la tienda de SITE123 dice que no se devuelve el saldo que no se use.",
   "antiguas": "¿Te regalaron una tarjeta en la web anterior? Sigue valiendo durante sus 6 meses. Escríbenos por WhatsApp con el nombre de quien te la regaló y la fecha, y te damos cita.",
-  "antiguas_pendiente": "cómo se comprueban las tarjetas ya vendidas, que no llevan código único",
-  "pago_pendiente": "pago online de las tarjetas (hoy lo cobra la tienda de SITE123, que desaparece con la web nueva)"
+  "antiguas_pendiente": "cómo se comprueban las tarjetas ya vendidas",
+  "_antiguas_pendiente": "Las tarjetas de la web anterior no llevan código único.",
+  "pago_pendiente": "pago online de las tarjetas",
+  "_pago_pendiente": "Hoy lo cobra la tienda de SITE123, que desaparece con la web nueva."
 }

@@ -30,6 +30,8 @@ function enLinea(txt) {
     const externo = /^https?:/.test(u);
     return guardar(`<a href="${escapar(u)}"${externo ? ' rel="noopener"' : ''}>${t}</a>`);
   });
+  // Las fechas (20-07-2025) no se parten por el guion en pantallas estrechas.
+  s = s.replace(/\b\d{1,2}-\d{1,2}-\d{4}\b/g, (m) => guardar(`<span class="sin-corte">${m}</span>`));
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/(^|[^*\w])\*([^*\s][^*]*)\*(?!\*)/g, '$1<em>$2</em>');
   // eslint-disable-next-line no-control-regex

@@ -1,5 +1,5 @@
 {
-  "_leeme": "Normas legales para el contenido de la web nueva de IEMEC. Patrones de expresión regular válidos en JavaScript (flag i, sin u) y en Python (re.I). Se usan sin distinguir mayúsculas. Explicación de cada regla, fuentes y alternativas: normas.md. Generado el 30-09-2026; revisión jurídica pendiente (abogado sanitario y DPD).",
+  "_leeme": "Normas legales para el contenido de la web nueva de IEMEC. Patrones de expresión regular válidos en JavaScript (flag i, sin u) y en Python (re.I). Se usan sin distinguir mayúsculas. Explicación de cada regla, fuentes y alternativas: normas.md. Generado el 30-09-2026; revisión jurídica pendiente (abogado sanitario y DPD). Ampliado en la revisión final de la vuelta 9 (nota de Google, EvoSculpt y «4D», «hiperbárica» y enfermedades de la piel).",
   "_version": "2026-09-30",
   "prohibidas": [
     {
@@ -206,6 +206,21 @@
       "patron": "@gmail\\.com|microbladingzhanet",
       "motivo": "Datos del aviso legal actual que no son de IEMEC (cita otra web y un Gmail): no identifican al titular (LSSI, art. 10.1.a).",
       "alternativa": "Correo propio del dominio de la clínica [PENDIENTE] y la URL de la web nueva."
+    },
+    {
+      "patron": "nota\\s+(media\\s+)?en\\s+google|valoraci[oó]n\\s+(media\\s+)?en\\s+google|\\b\\d[,.]\\d\\s*(\\/\\s*5\\s*)?(estrellas?|opiniones|rese[nñ]as)|\\b\\d+\\s+(opiniones|rese[nñ]as|valoraciones)\\s+(en|de)\\s+google",
+      "motivo": "La nota o las opiniones de Google en las páginas son reseñas usadas como reclamo (normas.md, apartado d: nada de «carruseles de opiniones de Google»; RD 1907/1996, art. 4.7; CDM 2022, art. 89.3; TRLGDCU, art. 20.4).",
+      "alternativa": "Como mucho, un enlace neutro a la ficha en la página de contacto: «Nuestra ficha en Google», sin la nota ni el número de opiniones."
+    },
+    {
+      "patron": "evosculpt|\\b4d\\b",
+      "motivo": "Nombres que remiten a la marca o al protocolo de un fabricante de equipos («EVO», «Láser Fotona 4D»): ni marcas ni rodeos (RDLeg 1/2015, art. 80.7; normas.md, apartado c). EvoSculpt vuelve cuando la clínica confirme que es un nombre propio de IEMEC y no del fabricante [PENDIENTE].",
+      "alternativa": "«Protocolo corporal completo»; en el láser, «cuatro modos de trabajo»."
+    },
+    {
+      "patron": "hiperb[aá]ric",
+      "motivo": "La medicina hiperbárica (cámara presurizada) es una actividad sanitaria que la autorización CS17886 no incluye (RD 1277/2003, art. 6.2) y que no hace un aparato de cabina: induce a error (Ley 3/1991, art. 5).",
+      "alternativa": "«Oxigenoterapia facial a presión»."
     }
   ],
   "avisos": [
@@ -351,7 +366,11 @@
     },
     {
       "patron": "tecnolog[ií]a\\s+evo\\b",
-      "motivo": "¿«EVO» es la marca del equipo? Si lo es, no se anuncia (RDLeg 1/2015, art. 80.7): «remodelación corporal con aparatología». Los nombres propios de los protocolos de IEMEC (EvoSculpt, OxyGlow...) valen si no son marcas de terceros [PENDIENTE: confirmar]."
+      "motivo": "¿«EVO» es la marca del equipo? Si lo es, no se anuncia (RDLeg 1/2015, art. 80.7): «remodelación corporal con aparatología». «EvoSculpt» queda prohibida hasta que la clínica confirme que no es marca de terceros; OxyGlow y otros nombres propios, igual [PENDIENTE: confirmar]."
+    },
+    {
+      "patron": "ros[aá]cea|cuperosis|acn[eé]\\s+(activo|inflamatorio|severo|grave|qu[ií]stico)|brotes\\s+de\\s+acn[eé]|dermatitis|psoriasis",
+      "motivo": "Enfermedades de la piel: son dermatología (U.8, no autorizada) y no se usan como reclamo (normas.md, regla 11; RD 1907/1996, art. 4). En la estética de cabina, «rojeces», «marcas de acné» o «piel con tendencia acneica», y lo médico, a la valoración médica."
     }
   ],
   "obligatorias": [

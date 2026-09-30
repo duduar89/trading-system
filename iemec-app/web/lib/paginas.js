@@ -11,8 +11,6 @@ const recortar = (s, n) => {
   const corte = t.slice(0, n - 1);
   return `${corte.slice(0, Math.max(corte.lastIndexOf(' '), n - 20)).replace(/[,;:.\s]+$/, '')}…`;
 };
-const fechaES = (iso) => { const [a, m, d] = iso.split('-'); return `${d}-${m}-${a}`; };
-const numeroES = (n) => String(n).replace('.', ',');
 const minusculaInicial = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 
 // Título ≤ 65 caracteres y descripción entre 70 y 160.
@@ -60,14 +58,14 @@ function llamadaFinal(ctx, { whatsapp, titulo = crudo('¿Empezamos por una <em>v
 }
 
 // ── Tarjetas ────────────────────────────────────────────────────────────────────────────────
-function tarjetaEspecialidad(e, { destacados = true } = {}) {
+// Compactas y de la misma altura: sin lista de destacados (las sensibles no la llevaban y quedaban
+// huecos junto a las demás).
+function tarjetaEspecialidad(e) {
   const n = e.paginas.length;
-  const lista = destacados && !e.sensible ? e.paginas.slice(0, 3) : [];
   return html`<article class="tarjeta tarjeta-especialidad">
 <span class="tarjeta-icono">${icono(e.slug)}</span>
 <h3><a href="${e.ruta}">${e.nombre}</a></h3>
 <p>${e.resumen}</p>
-${lista.length ? html`<ul class="destacados">${lista.map((p) => html`<li><a href="${p.ruta}">${p.nombre}</a></li>`)}</ul>` : ''}
 <span class="mas">${n === 1 ? 'Ver el tratamiento' : `Ver los ${n} tratamientos`} ${icono('flecha')}</span>
 </article>`;
 }
@@ -76,6 +74,7 @@ function tarjetaTratamiento(p, nivel = 3, { agrupada = false } = {}) {
   const mini = [];
   if (p.sesion?.duracion) mini.push(html`<li>${icono('reloj')}${p.sesion.duracion}</li>`);
   if (p.medico && !agrupada) mini.push(html`<li>${icono('medico')}Con valoración médica</li>`);
+  else if (p.clase === 'previa' && !agrupada) mini.push(html`<li>${icono('valoracion')}Con valoración previa</li>`);
   return html`<article class="tarjeta tarjeta-tratamiento">
 ${crudo(`<h${nivel}>`)}<a href="${p.ruta}">${p.nombre}</a>${crudo(`</h${nivel}>`)}
 <p>${texto(recortar(p.entradilla, 150))}</p>
@@ -87,13 +86,11 @@ ${mini.length ? html`<ul class="ficha-mini">${mini}</ul>` : ''}
 // ── Inicio ──────────────────────────────────────────────────────────────────────────────────
 function inicio(ctx) {
   const s = ctx.sitio;
-  const g = s.google;
   const wa = B.urlWhatsapp(ctx, B.INTERES_GENERAL, 'web-inicio');
   const recepcion = ctx.foto('clinica-recepcion');
   const equipo = ctx.equipoVisible.filter((p) => p.foto && ctx.foto(p.foto)).slice(0, 4);
-  const nota = g.mostrar_nota
-    ? html`<li><b>${numeroES(g.nota)}</b><span>Nota en Google, con ${g.opiniones} opiniones</span><small>Dato del ${fechaES(g.fecha)}. Son opiniones de Google: IEMEC no las elige ni las modera.</small><a href="${g.ficha}" rel="noopener">Ver la ficha en Google</a></li>`
-    : html`<li><b>Google</b><span>Nuestra ficha en Google</span><a href="${g.ficha}" rel="noopener">Ver la ficha en Google</a></li>`;
+  // Sin la nota de Google: las reseñas no se usan como reclamo (normas.md, apartado d). El enlace
+  // neutro a la ficha va en /pedir-cita/.
   const cuerpo = html`<section class="portada terciopelo" aria-labelledby="titulo-portada">
 <div class="capitone-velo" aria-hidden="true"></div><span class="filete" aria-hidden="true"></span>
 <div class="contenedor">
@@ -108,8 +105,8 @@ function inicio(ctx) {
 ${recepcion ? html`<figure class="portada-foto"><div class="marco-dorado">${B.imagen(ctx, 'clinica-recepcion', { tamanos: '(min-width: 960px) 440px, (min-width: 400px) 360px, 90vw', prioridad: true })}</div><figcaption>La recepción de IEMEC, en la avenida Siglo XXI.</figcaption></figure>` : ''}
 </div>
 <ul class="confianza">
-${nota}
 <li><b>Médicos</b><span>Valoración médica antes de cada tratamiento médico</span></li>
+<li><b>Tu plan</b><span>Opciones, riesgos y presupuesto por escrito, sin compromiso</span><a href="/pedir-cita/">Pedir cita</a></li>
 <li><b>Boadilla</b><span>${s.direccion.calle}, en Boadilla del Monte</span></li>
 <li><b>Tecnología</b><span>Láser médico, HIFU, radiofrecuencia y luz pulsada</span><a href="/clinica/#tecnologia">Ver la tecnología</a></li>
 </ul>
@@ -155,8 +152,8 @@ ${equipo.length ? html`<section class="seccion" aria-labelledby="t-equipo" data-
 <div class="contenedor">
 <div class="titulo-seccion centrado">
 <p class="etiqueta">El equipo</p>
-<h2 id="t-equipo">Médicos, cirujano <em>y equipo de estética</em></h2>
-<p class="entrada">Cada tratamiento lo hace el profesional que le corresponde.</p>
+<h2 id="t-equipo">Las personas <em>que te atienden</em></h2>
+<p class="entrada">Cada tratamiento lo hace el profesional que le corresponde, siempre con una valoración previa.</p>
 </div>
 <ul class="equipo-portada">${equipo.map((p) => html`<li><div class="retrato">${B.imagen(ctx, p.foto, { tamanos: '116px', alt: '' })}</div><b>${p.nombre}</b><span>${p.cargo}</span></li>`)}</ul>
 <p class="titulo-seccion centrado"><a class="enlace-flecha" href="/equipo/">Conoce al equipo ${icono('flecha')}</a></p>
@@ -172,7 +169,7 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
   };
 }
 
-function ubicacion(ctx, { titulo = true } = {}) {
+function ubicacion(ctx, { titulo = true, ficha = false } = {}) {
   const s = ctx.sitio;
   return html`<section class="seccion seccion-blanca" aria-labelledby="t-donde" data-aparece>
 <div class="contenedor ubicacion">
@@ -185,6 +182,8 @@ ${titulo ? html`<h2 id="t-donde">Te esperamos en <em>Boadilla del Monte</em></h2
 <li>${icono('reloj')}${B.horario(ctx)}</li>
 </ul>
 <div class="acciones"><a class="boton boton-oscuro" href="${s.como_llegar.google}" rel="noopener">${icono('pin')}Cómo llegar con Google Maps</a><a class="boton boton-linea" href="${s.como_llegar.apple}" rel="noopener">Abrir en Apple Maps</a></div>
+${ficha ? html`<p class="ficha-google"><a class="enlace-flecha" href="${s.google.ficha}" rel="noopener">Nuestra ficha en Google ${icono('flecha')}</a></p>` : ''}
+${titulo ? '' : html`<p class="nota-mapa">No cargamos ningún mapa al abrir la página: los enlaces abren Google Maps o Apple Maps solo si los pulsas.</p>`}
 </div>
 ${ctx.foto('clinica-fachada') ? html`<figure class="foto-marco"><div class="marco-dorado">${B.imagen(ctx, 'clinica-fachada', { tamanos: '(min-width: 900px) 560px, 92vw' })}</div><figcaption>La entrada de IEMEC, en la avenida Siglo XXI 13.</figcaption></figure>` : ''}
 </div>
@@ -199,11 +198,12 @@ function especialidad(ctx, e) {
   const medicas = e.paginas.filter((p) => p.medico);
   const cabina = e.paginas.filter((p) => !p.medico);
   const separar = e.paginas.length > 8 && medicas.length && cabina.length;
-  const rejilla = (lista, nivel) => html`<div class="rejilla rejilla-3 rejilla-tratamientos">${lista.map((p) => tarjetaTratamiento(p, nivel, { agrupada: nivel === 4 }))}</div>`;
+  const columnas = (n) => (n === 1 ? 'rejilla-1' : n === 2 || n === 4 ? 'rejilla-2' : 'rejilla-3');
+  const rejilla = (lista, nivel) => html`<div class="rejilla ${columnas(lista.length)} rejilla-tratamientos">${lista.map((p) => tarjetaTratamiento(p, nivel, { agrupada: nivel === 4 }))}</div>`;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: 'Especialidad', titulo: e.titulo, entradilla: e.entradilla, adorno: e.slug,
     extra: e.pendiente ? html`<p class="entrada">${pendiente(e.pendiente)}</p>` : '',
-    acciones: html`${botonWhatsapp(wa)}<a class="boton boton-claro" href="#tratamientos">Ver los tratamientos</a>`,
+    acciones: html`${botonWhatsapp(wa)}<a class="boton boton-claro" href="#tratamientos">${e.paginas.length === 1 ? 'Ver el tratamiento' : 'Ver los tratamientos'}</a>`,
   })}
 <section class="seccion" id="tratamientos" aria-labelledby="t-lista">
 <div class="contenedor">
@@ -237,14 +237,39 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
 }
 
 // ── Tratamiento ─────────────────────────────────────────────────────────────────────────────
-function avisoMedico(p) {
-  const cirugia = p.tipo === 'cirugia' || /cirujan/i.test(p.profesional || '');
+// Quién la opera: hasta que la clínica dé nombre, especialidad oficial y número de colegiado
+// (normas.md, apartado j), se ve el hueco.
+const PENDIENTE_CIRUJANO = 'nombre, especialidad oficial y n.º de colegiado';
+const quienOpera = (p) => (/\[PENDIENTE|colegiad/i.test(p.profesional || '') ? p.profesional : `${p.profesional || 'Cirujano'} [PENDIENTE: ${PENDIENTE_CIRUJANO}]`);
+const dondeOpera = (p) => p.sesion?.donde || '[PENDIENTE: centro donde se opera]';
+
+// El recuadro del principio según la clase de la página (web/lib/modelo.js): la cirugía, lo médico y
+// lo que requiere una valoración previa sin que conste quién la hace. En la propia consulta de
+// valoración no sale (sería «antes de la valoración, una valoración»).
+function aviso(p) {
   // «Lo realiza: equipo médico.»: en minúscula tras los dos puntos, salvo un nombre propio («Dr. …»).
-  const quien = p.profesional && !/^(Dr|Dra)\b/.test(p.profesional) ? p.profesional.charAt(0).toLowerCase() + p.profesional.slice(1) : p.profesional;
-  return html`<div class="aviso-medico" role="note">
-<p class="aviso-titulo">${icono('medico')}Tratamiento médico: requiere valoración previa</p>
-<p>Antes de ${cirugia ? 'operarte' : 'hacerlo'} tienes una valoración médica: ${cirugia ? 'el cirujano' : 'el médico'} estudia tu caso y te explica los riesgos y las contraindicaciones. El resultado varía según cada persona.${quien ? ` Lo realiza: ${quien}.` : ''}</p>
+  const minuscula = (s) => (s && !/^(Dr|Dra)\b/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+  if (p.clase === 'cirugia') {
+    const quien = /cirujan/i.test(p.profesional || 'cirujano') ? 'el cirujano' : 'el médico';
+    return html`<div class="aviso-medico" role="note">
+<p class="aviso-titulo">${icono('medico')}Cirugía: requiere una consulta previa</p>
+<p>Antes de operarte tienes una consulta de valoración: ${quien} estudia tu caso y te explica la técnica, la anestesia, la recuperación, los riesgos y las alternativas. Antes de la intervención firmas el consentimiento informado por escrito. El resultado varía según cada persona.</p>
+<p>${texto(`Lo realiza: ${minuscula(quienOpera(p))}. Dónde: ${minuscula(dondeOpera(p))}. Solo para mayores de edad [PENDIENTE: política con menores].`)}</p>
 </div>`;
+  }
+  if (p.clase === 'medico') {
+    return html`<div class="aviso-medico" role="note">
+<p class="aviso-titulo">${icono('medico')}Tratamiento médico: requiere valoración previa</p>
+<p>${texto(`Antes de hacerlo tienes una valoración médica: el médico estudia tu caso y te explica los riesgos y las contraindicaciones. El resultado varía según cada persona.${p.profesional ? ` Lo realiza: ${minuscula(p.profesional)}.` : ''}`)}</p>
+</div>`;
+  }
+  if (p.clase === 'previa') {
+    return html`<div class="aviso-medico aviso-previa" role="note">
+<p class="aviso-titulo">${icono('valoracion')}Requiere valoración previa</p>
+<p>${texto(`Antes de hacerlo valoramos tu caso y te explicamos la técnica, el producto que se usa, los cuidados, los riesgos y las contraindicaciones. El resultado varía según cada persona.${p.profesional ? ` Lo realiza: ${minuscula(p.profesional)}.` : ''} La valoración la hace [PENDIENTE: médico o equipo de estética, según el producto].`)}</p>
+</div>`;
+  }
+  return '';
 }
 
 function tratamiento(ctx, p) {
@@ -255,25 +280,21 @@ function tratamiento(ctx, p) {
   const ficha = [
     ['reloj', 'Duración', s.duracion], ['calendario', 'Sesiones', s.sesiones], ['tratamiento', 'Anestesia', s.anestesia],
     ['seguimiento', 'Recuperación', s.recuperacion], ['medico', 'Lo realiza', p.profesional],
+    ['pin', 'Dónde', p.cirugia ? dondeOpera(p) : s.donde],
   ].filter(([, , v]) => v);
   const rapidos = [];
   if (s.duracion) rapidos.push(html`<li>${icono('reloj')}${s.duracion}</li>`);
   if (s.sesiones) rapidos.push(html`<li>${icono('calendario')}${s.sesiones}</li>`);
+  // Primero el aviso (y, en el móvil, la ficha justo después: van antes que el texto en el HTML y,
+  // en escritorio, la ficha pasa a la columna de la derecha).
+  const avisos = `${p.origen === 'provisional' ? html`<div class="aviso-provisional" role="note"><p>${pendiente('página provisional hecha desde el catálogo; la sustituye el texto final de su grupo cuando llegue')}</p></div>` : ''}${aviso(p)}`;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: e.nombre, titulo: p.titulo, entradilla: p.entradilla, adorno: (p.preocupaciones || [])[0] || e.slug,
     extra: rapidos.length ? html`<ul class="datos-rapidos">${rapidos}</ul>` : '',
     acciones: html`${botonWhatsapp(wa)}<a class="boton boton-claro" href="#te-llamamos">${icono('telefono')}Te llamamos</a>`,
   })}
 <div class="contenedor tratamiento-rejilla">
-<div class="tratamiento-principal">
-${p.origen === 'provisional' ? html`<div class="aviso-provisional" role="note"><p>${pendiente('página provisional hecha desde el catálogo; la sustituye el texto final de su grupo cuando llegue')}</p></div>` : ''}
-${p.medico ? avisoMedico(p) : ''}
-${p.para_quien && p.para_quien.length ? html`<section class="bloque" aria-labelledby="t-para"><h2 id="t-para">¿Para quién es?</h2><ul class="lista-rombo">${p.para_quien.map((x) => html`<li>${texto(x)}</li>`)}</ul></section>` : ''}
-<section class="bloque" aria-labelledby="t-consiste"><h2 id="t-consiste">En qué consiste</h2>${p.texto.map((x) => html`<p>${texto(x)}</p>`)}</section>
-${p.variantes && p.variantes.length ? html`<section class="bloque" aria-labelledby="t-opciones"><h2 id="t-opciones">Opciones</h2><div class="variantes">${p.variantes.map((v) => html`<div class="variante"><h3>${texto(v.nombre)}</h3><p>${texto(v.texto)}</p></div>`)}</div></section>` : ''}
-${p.resultados ? html`<section class="bloque" aria-labelledby="t-esperar"><h2 id="t-esperar">Qué puedes esperar</h2><p class="resultado">${texto(p.resultados)}</p></section>` : ''}
-${p.preguntas && p.preguntas.length ? html`<section class="bloque" aria-labelledby="t-preguntas"><h2 id="t-preguntas">Preguntas frecuentes</h2>${B.preguntas(p.preguntas)}</section>` : ''}
-</div>
+${avisos ? html`<div class="tratamiento-aviso">${crudo(avisos)}</div>` : ''}
 <aside class="tratamiento-lateral" aria-labelledby="t-ficha">
 <div class="ficha">
 <h2 id="t-ficha">Ficha práctica</h2>
@@ -283,6 +304,13 @@ ${botonWhatsapp(wa, 'Pedir cita por WhatsApp', 'boton-oscuro')}
 <p class="nota-wa">WhatsApp es un servicio de Meta. Más información en la <a href="/privacidad/">política de privacidad</a>.</p>
 </div>
 </aside>
+<div class="tratamiento-principal">
+${p.para_quien && p.para_quien.length ? html`<section class="bloque" aria-labelledby="t-para"><h2 id="t-para">¿Para quién es?</h2><ul class="lista-rombo">${p.para_quien.map((x) => html`<li>${texto(x)}</li>`)}</ul></section>` : ''}
+<section class="bloque" aria-labelledby="t-consiste"><h2 id="t-consiste">En qué consiste</h2>${p.texto.map((x) => html`<p>${texto(x)}</p>`)}</section>
+${p.variantes && p.variantes.length ? html`<section class="bloque" aria-labelledby="t-opciones"><h2 id="t-opciones">Opciones</h2><div class="variantes">${p.variantes.map((v) => html`<div class="variante"><h3>${texto(v.nombre)}</h3><p>${texto(v.texto)}</p></div>`)}</div></section>` : ''}
+${p.resultados ? html`<section class="bloque" aria-labelledby="t-esperar"><h2 id="t-esperar">Qué puedes esperar</h2><p class="resultado">${texto(p.resultados)}</p></section>` : ''}
+${p.preguntas && p.preguntas.length ? html`<section class="bloque" aria-labelledby="t-preguntas"><h2 id="t-preguntas">Preguntas frecuentes</h2>${B.preguntas(p.preguntas)}</section>` : ''}
+</div>
 </div>
 ${p.relacionadas.length ? html`<section class="seccion seccion-blanca" aria-labelledby="t-rel" data-aparece>
 <div class="contenedor">
@@ -292,9 +320,11 @@ ${p.relacionadas.length ? html`<section class="seccion seccion-blanca" aria-labe
 </section>` : ''}
 <section class="seccion" id="te-llamamos" aria-labelledby="t-llamamos">
 <div class="contenedor estrecho">
-<details class="plegable">
-<summary>${icono('telefono')}<span><span class="titulo-plegable" id="t-llamamos">Te llamamos</span><span class="sub">Déjanos tu teléfono y te contactamos en horario de la clínica.</span></span>${icono('bajar', 'bajar')}</summary>
-${B.formulario(ctx, { id: 'f', pagina: p.ruta, ref: p.ref, seleccion: { valor: p.idFormulario, texto: p.sensible ? e.grupo_neutro : p.nombre } })}
+<h2 id="t-llamamos" class="titulo-llamamos">Te llamamos</h2>
+<p class="entrada">Déjanos tu teléfono y te contactamos en horario de la clínica.</p>
+<details class="plegable" open data-plegable>
+<summary>${icono('telefono')}<span><span class="titulo-plegable">Rellenar el formulario</span><span class="sub">Nombre, teléfono y cómo prefieres que te contactemos.</span></span>${icono('bajar', 'bajar')}</summary>
+${B.formulario(ctx, { id: 'f', pagina: p.ruta, ref: p.ref, seleccion: p.sensible ? { valor: e.slug } : { valor: p.ref, texto: p.nombre } })}
 </details>
 </div>
 </section>`;
@@ -353,8 +383,7 @@ function equipoPagina(ctx) {
   const est = ctx.datos.equipo.estetica;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: 'El equipo', titulo: html`Las personas <em>de IEMEC</em>`, adorno: 'medico',
-    entradilla: 'Médicos, cirujano y equipo de estética. Cada tratamiento lo hace el profesional que le corresponde, siempre con una valoración previa.',
-    extra: html`<p class="entrada">Responsable asistencial: ${pendiente(ctx.datos.equipo.responsable_pendiente)}</p>`,
+    entradilla: 'Cada tratamiento lo hace el profesional que le corresponde, siempre con una valoración previa.',
   })}
 <section class="seccion" aria-labelledby="t-personas">
 <div class="contenedor">
@@ -375,13 +404,14 @@ ${ctx.equipoVisible.map((p) => html`<li class="tarjeta persona">
 <p class="colegiado">${pendiente(est.pendiente)}</p>
 </li>
 </ul>
+<p class="nota-equipo">Responsable asistencial (dirección médica): ${pendiente(ctx.datos.equipo.responsable_pendiente)}</p>
 </div>
 </section>
 ${llamadaFinal(ctx, { whatsapp: wa })}`;
   return {
     ruta: '/equipo/', tipo: 'equipo', whatsapp: wa, ref: 'web-equipo', migas: pasos,
     titulo: 'Equipo médico y de estética · IEMEC Boadilla del Monte',
-    descripcion: 'Conoce al equipo de IEMEC en Boadilla del Monte: médicas de medicina estética, cirujano, medicina capilar y equipo de estética.',
+    descripcion: 'Conoce al equipo de IEMEC en Boadilla del Monte: medicina estética, cirugía estética, área capilar y equipo de estética, con sus datos.',
     cuerpo,
   };
 }
@@ -391,9 +421,10 @@ function clinica(ctx) {
   const s = ctx.sitio;
   const wa = B.urlWhatsapp(ctx, B.INTERES_GENERAL, 'web-clinica');
   const pasos = [{ nombre: 'Inicio', ruta: '/' }, { nombre: 'La clínica', ruta: '/clinica/' }];
+  // La foto ancha, la de más resolución (la sala, 1600 px); la recepción (810 px) va en la fila.
   const galeria = [
-    ['clinica-recepcion', 'Recepción y sala de espera.'],
     ['clinica-sala-de-procedimientos', 'Sala de procedimientos.'],
+    ['clinica-recepcion', 'Recepción y sala de espera.'],
     ['clinica-cabina-tratamientos', 'Una de las cabinas de tratamiento.'],
     ['clinica-consulta', 'Consulta.'],
   ].filter(([k]) => ctx.foto(k));
@@ -405,7 +436,7 @@ function clinica(ctx) {
 ${galeria.length ? html`<section class="seccion" aria-labelledby="t-espacio">
 <div class="contenedor">
 <div class="titulo-seccion"><p class="etiqueta">El espacio</p><h2 id="t-espacio">Así es IEMEC por dentro</h2></div>
-<div class="galeria">${galeria.map(([k, pie], i) => html`<figure>${B.imagen(ctx, k, { tamanos: i === 0 ? '(min-width: 1180px) 1116px, 94vw' : '(min-width: 720px) 46vw, 94vw' })}<figcaption>${pie}</figcaption></figure>`)}</div>
+<div class="galeria">${galeria.map(([k, pie], i) => html`<figure>${B.imagen(ctx, k, { tamanos: i === 0 ? '(min-width: 1180px) 1116px, 94vw' : '(min-width: 1180px) 363px, (min-width: 720px) 30vw, 94vw' })}<figcaption>${pie}</figcaption></figure>`)}</div>
 </div>
 </section>` : ''}
 <section class="seccion seccion-blanca" id="tecnologia" aria-labelledby="t-tecnologia" data-aparece>
@@ -422,13 +453,12 @@ ${galeria.length ? html`<section class="seccion" aria-labelledby="t-espacio">
 </div>
 </section>
 <div id="como-llegar">${ubicacion(ctx, { titulo: false })}</div>
-<section class="seccion" aria-labelledby="t-llegar-mas">
+${s.como_llegar.aparcamiento ? html`<section class="seccion" aria-labelledby="t-llegar-mas">
 <div class="contenedor estrecho">
 <h2 id="t-llegar-mas">Aparcamiento y transporte</h2>
-<p>${pendiente(s.como_llegar.pendiente)}</p>
-<p>No cargamos ningún mapa al abrir la página: los enlaces «Cómo llegar» abren Google Maps o Apple Maps solo si los pulsas.</p>
+${s.como_llegar.aparcamiento.map((t) => html`<p>${texto(t)}</p>`)}
 </div>
-</section>
+</section>` : ''}
 ${llamadaFinal(ctx, { whatsapp: wa })}`;
   return {
     ruta: '/clinica/', tipo: 'clinica', whatsapp: wa, ref: 'web-clinica', migas: pasos,
@@ -504,7 +534,7 @@ function pedirCita(ctx) {
 <article class="tarjeta">
 <span class="tarjeta-icono">${icono('whatsapp')}</span>
 <h3>Por WhatsApp</h3>
-<p>Te contesta al momento y reserva tu cita en la misma agenda de la clínica. ${pendiente(s.asistente_virtual_pendiente)}</p>
+<p>Te contestamos en horario de la clínica y te damos cita en la misma agenda de la clínica.</p>
 ${botonWhatsapp(wa, 'Escribir por WhatsApp', 'boton-oscuro')}
 </article>
 <article class="tarjeta">
@@ -542,7 +572,7 @@ ${B.formulario(ctx, { id: 'cita', pagina: '/pedir-cita/', ref: 'web-pedir-cita' 
 </ol>
 </div>
 </section>
-${ubicacion(ctx)}`;
+${ubicacion(ctx, { ficha: true })}`;
   return {
     ruta: '/pedir-cita/', tipo: 'cita', whatsapp: wa, ref: 'web-pedir-cita', migas: pasos, formulario: true,
     titulo: 'Pedir cita · IEMEC Boadilla del Monte',
@@ -556,7 +586,7 @@ function legal(ctx, { ruta, titulo, tituloSeo: tSeo, descripcion, contenido, eti
   const pasos = [{ nombre: 'Inicio', ruta: '/' }, { nombre: titulo, ruta }];
   const cuerpo = html`${cabeceraPagina({ pasos, etiqueta, titulo, adorno: 'escudo' })}
 <div class="contenedor prosa">
-<div class="aviso-borrador-legal" role="note"><p>${pendiente('revisión del abogado sanitario y del delegado de protección de datos antes de publicar')}</p></div>
+<div class="aviso-borrador-legal" role="note"><p>${pendiente('revisión del abogado sanitario y del DPD')}</p></div>
 ${contenido}
 </div>`;
   return { ruta, tipo: 'legal', migas: pasos, titulo: tSeo, descripcion, cuerpo, ref: `web-${ruta.replace(/\//g, '')}` };

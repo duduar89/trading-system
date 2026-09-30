@@ -1,10 +1,10 @@
 {
  "grupo": "intima-y-cirugia",
- "nota": "Borradores fuera de la web: la autorización del centro (CS17886: U.46, U.47, U.48, U.64, U.84 y U.900) no incluye Ginecología (U.26), y normas.md deja la ginecología funcional (incontinencia, atrofia, laxitud, liquen, suelo pélvico, perineoplastias y el tratamiento médico que no se nombra) sin página hasta que la clínica confirme que la cubre o amplíe la autorización. Cuando se confirme, se pasan a contenido/intima-y-cirugia.json (especialidad ginecologia-estetica, orden 40 a 90) y sus ids salen de sin_pagina. El láser para condilomas no tiene borrador: su publicidad está prohibida (RD 1907/1996, art. 4.1).",
+ "nota": "Borradores fuera de la web: la autorización del centro (CS17886: U.46, U.47, U.48, U.64, U.84 y U.900) no incluye Ginecología (U.26), y normas.md deja la ginecología funcional (incontinencia, atrofia, laxitud, liquen, suelo pélvico, perineoplastias y el tratamiento médico que no se nombra) sin página hasta que la clínica confirme que la cubre o amplíe la autorización. Cuando se confirme, se pasan a contenido/intima-y-cirugia.json (especialidad estetica-intima-femenina, orden 40 a 90) y sus ids salen de sin_pagina. El láser para condilomas no tiene borrador: su publicidad está prohibida (RD 1907/1996, art. 4.1).",
  "paginas": [
   {
    "slug": "incontinencia-urinaria-de-esfuerzo",
-   "especialidad": "ginecologia-estetica",
+   "especialidad": "estetica-intima-femenina",
    "catalogo": [
     "laser-incontinencia-urinaria"
    ],
@@ -83,7 +83,7 @@
   },
   {
    "slug": "sequedad-y-atrofia-vaginal",
-   "especialidad": "ginecologia-estetica",
+   "especialidad": "estetica-intima-femenina",
    "catalogo": [
     "laser-atrofia-vaginal"
    ],
@@ -158,7 +158,7 @@
   },
   {
    "slug": "laxitud-vaginal",
-   "especialidad": "ginecologia-estetica",
+   "especialidad": "estetica-intima-femenina",
    "catalogo": [
     "laser-hiperlaxitud-vaginal",
     "radiofrecuencia-intima"
@@ -247,7 +247,7 @@
   },
   {
    "slug": "liquen-escleroso-vulvar",
-   "especialidad": "ginecologia-estetica",
+   "especialidad": "estetica-intima-femenina",
    "catalogo": [
     "laser-liquen-escleroatrofico",
     "prp-intimo"
@@ -324,7 +324,7 @@
   },
   {
    "slug": "perineoplastia",
-   "especialidad": "ginecologia-estetica",
+   "especialidad": "estetica-intima-femenina",
    "catalogo": [
     "perineoplastia-apertura",
     "perineoplastia-cierre"
@@ -413,7 +413,7 @@
   },
   {
    "slug": "cirugia-del-suelo-pelvico",
-   "especialidad": "ginecologia-estetica",
+   "especialidad": "estetica-intima-femenina",
    "catalogo": [
     "cirugia-suelo-pelvico"
    ],

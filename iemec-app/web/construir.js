@@ -6,6 +6,8 @@
 //   node web/construir.js --borradores    → web/dist-borradores: además, los borradores de
 //                                           web/contenido/pendientes con la franja «Borrador»
 //   node web/construir.js --salida <dir>  → otra carpeta (las pruebas construyen en una temporal)
+//   node web/construir.js --publicar      → además, error si queda algún «[PENDIENTE…]» a la vista o
+//                                           algún dato obligatorio sin rellenar: así no se sube a medias
 //
 // Lee web/datos/*.json, web/contenido/*.json, los textos legales y el catálogo de la app, y escribe
 // páginas con URL limpias, recursos con huella, .htaccess, sitemap.xml, robots.txt e informe.json.
@@ -28,7 +30,6 @@ const FUENTES = [
   ['montserrat-latin-500-normal.woff2', 'Montserrat', 'normal', 500],
   ['montserrat-latin-600-normal.woff2', 'Montserrat', 'normal', 600],
   ['playfair-display-latin-500-normal.woff2', 'Playfair Display', 'normal', 500],
-  ['playfair-display-latin-400-italic.woff2', 'Playfair Display', 'italic', 400],
   ['playfair-display-latin-500-italic.woff2', 'Playfair Display', 'italic', 500, true],
 ];
 
@@ -44,8 +45,15 @@ function minificarCss(css) {
   return s.replace(/__URL(\d+)__/g, (_, i) => guardados[Number(i)]);
 }
 
+// web.js se escribe con comentarios de sobra (es ES5, sin plantillas de texto): fuera las líneas que
+// son solo un comentario, el bloque del principio y la sangría. Nada que cambie lo que hace.
+function minificarJs(js) {
+  return js.replace(/^\/\*[\s\S]*?\*\/\n/, '')
+    .split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('//')).join('\n') + '\n';
+}
+
 function argumentos(argv) {
-  const o = { borradores: argv.includes('--borradores'), silencio: argv.includes('--silencio') };
+  const o = { borradores: argv.includes('--borradores'), silencio: argv.includes('--silencio'), publicar: argv.includes('--publicar') };
   const i = argv.indexOf('--salida');
   if (i !== -1) o.salida = path.resolve(argv[i + 1]);
   const j = argv.indexOf('--referencias');
@@ -84,11 +92,14 @@ function construir(opciones = {}) {
     fs.writeFileSync(destino, contenido);
     escritos.push(rel);
   };
-  const conHuella = (dir, nombre, buf) => {
+  const conHuellaSinEscribir = (dir, nombre, buf) => {
     const ext = path.extname(nombre);
-    const final = `${nombre.slice(0, -ext.length)}.${huella(buf)}${ext}`;
-    escribir(`${dir}/${final}`, buf);
-    return `/${dir}/${final}`;
+    return `/${dir}/${nombre.slice(0, -ext.length)}.${huella(buf)}${ext}`;
+  };
+  const conHuella = (dir, nombre, buf) => {
+    const url = conHuellaSinEscribir(dir, nombre, buf);
+    escribir(url.slice(1), buf);
+    return url;
   };
 
   // Fuentes propias (OFL) y su licencia.
@@ -98,15 +109,23 @@ function construir(opciones = {}) {
   // Los woff2 ya son solo el subconjunto latino (español incluido): sin unicode-range.
   const caras = fuentes.map((f) => `@font-face{font-family:'${f.familia}';font-style:${f.estilo};font-weight:${f.peso};font-display:swap;src:url('${f.url}') format('woff2')}`).join('');
   const css = caras + minificarCss(fs.readFileSync(path.join(WEB, 'css', 'estilos.css'), 'utf8'));
-  const js = fs.readFileSync(path.join(WEB, 'js', 'web.js'));
+  const js = Buffer.from(minificarJs(fs.readFileSync(path.join(WEB, 'js', 'web.js'), 'utf8')));
 
-  // Fotos: solo las convertidas con web/fotos.js (si faltan, la web sale igual, sin ellas).
+  // Fotos: solo las convertidas con web/fotos.js (si faltan, la web sale igual, sin ellas). Se copian
+  // a la salida solo las que usa alguna página (un retrato de quien no sale en la web, no).
   const fotos = new Map();
+  const fotosUsadas = new Set();
   for (const [clave, f] of Object.entries(datos.fotos.fotos)) {
     if (!f.usar || !f.salidas || !f.salidas.length) continue;
     const archivos = f.salidas.map((s) => ({ ...s, ruta: path.join(WEB, 'fotos', s.archivo) }));
     if (!archivos.every((a) => fs.existsSync(a.ruta))) continue;
-    fotos.set(clave, { alt: f.alt, salidas: archivos.map((a) => ({ ancho: a.ancho, alto: a.alto, url: conHuella('fotos', a.archivo, fs.readFileSync(a.ruta)) })) });
+    fotos.set(clave, {
+      alt: f.alt,
+      salidas: archivos.map((a) => {
+        const buf = fs.readFileSync(a.ruta);
+        return { ancho: a.ancho, alto: a.alto, url: conHuellaSinEscribir('fotos', a.archivo, buf), buf };
+      }),
+    });
   }
   const og = datos.fotos.og && fs.existsSync(path.join(WEB, 'fotos', datos.fotos.og.archivo))
     ? { url: `${sitio.dominio}${conHuella('fotos', datos.fotos.og.archivo, fs.readFileSync(path.join(WEB, 'fotos', datos.fotos.og.archivo)))}`, ancho: datos.fotos.og.ancho, alto: datos.fotos.og.alto }
@@ -130,7 +149,11 @@ function construir(opciones = {}) {
     equipoVisible, tecnologia, og,
     recursos: { css: conHuella('recursos', 'estilos.css', Buffer.from(css)), js: conHuella('recursos', 'web.js', js), favicon: conHuella('recursos', 'icono.svg', Buffer.from(FAVICON)), apple },
     fuentes: { precarga: fuentes.filter((f) => f.precarga).map((f) => f.url) },
-    foto: (clave) => fotos.get(clave) || null,
+    foto: (clave) => {
+      const f = fotos.get(clave);
+      if (f) fotosUsadas.add(clave);
+      return f || null;
+    },
   };
 
   // Rutas que existen y redirecciones (con las anclas que resuelve cada página).
@@ -142,11 +165,14 @@ function construir(opciones = {}) {
   const leerLegal = (n) => fs.readFileSync(path.join(WEB, 'contenido', 'legal', n), 'utf8');
   const avisoMd = leerLegal('aviso-legal.md');
   const anexoAcc = secciones(avisoMd).find((s) => s.titulo && /Accesibilidad/.test(s.titulo));
+  // En la tabla de profesionales del aviso legal, solo quien sale en la web (como en «Equipo»).
+  const ocultos = datos.equipo.personas.filter((p) => !equipoVisible.includes(p)).map((p) => p.nombre);
+  const sinOcultos = (md) => md.split('\n').filter((l) => !ocultos.some((n) => l.startsWith(`| ${n} |`))).join('\n');
   const legales = [
-    { ruta: '/aviso-legal/', titulo: 'Aviso legal', tituloSeo: 'Aviso legal · IEMEC', descripcion: 'Aviso legal de IEMEC: titular, datos de contacto, autorización sanitaria CS17886, profesiones sanitarias, uso de la web y ayudas públicas.', md: textoLegal(avisoMd, { quitar: [/^Anexo/] }) },
+    { ruta: '/aviso-legal/', titulo: 'Aviso legal', tituloSeo: 'Aviso legal · IEMEC', descripcion: 'Aviso legal de IEMEC: titular, datos de contacto, autorización sanitaria CS17886, profesiones sanitarias, uso de la web y ayudas públicas.', md: sinOcultos(textoLegal(avisoMd, { quitar: [/^Anexo/] })) },
     { ruta: '/privacidad/', titulo: 'Política de privacidad', tituloSeo: 'Política de privacidad · IEMEC', descripcion: 'Cómo trata IEMEC tus datos: responsable, finalidades, bases legales, plazos, destinatarios, transferencias y cómo ejercer tus derechos.', md: textoLegal(leerLegal('privacidad.md'), { quitar: [/no se publican/i] }) },
     { ruta: '/cookies/', titulo: 'Política de cookies', tituloSeo: 'Política de cookies · IEMEC', descripcion: 'Esta web no usa cookies de analítica, de publicidad ni de redes sociales, y no necesita tu consentimiento. Qué guarda y cómo borrarlo.', md: textoLegal(leerLegal('cookies.md'), { quitar: [/^Variante B/i], desenvolver: /^Variante A/i }) },
-    { ruta: '/accesibilidad/', titulo: 'Accesibilidad', tituloSeo: 'Accesibilidad · IEMEC', descripcion: 'Cómo hemos hecho accesible la web de IEMEC (pautas WCAG 2.2, nivel AA) y cómo avisarnos si encuentras alguna barrera.', md: anexoAcc ? anexoAcc.md.replace(/^##\s+.*\n/, '') : '' },
+    { ruta: '/accesibilidad/', titulo: 'Accesibilidad', tituloSeo: 'Accesibilidad · IEMEC', descripcion: 'Cómo hemos hecho accesible la web de IEMEC (pautas WCAG 2.2, nivel AA) y cómo avisarnos si encuentras alguna barrera.', md: anexoAcc ? anexoAcc.md.replace(/^##\s+.*\n/, '').replace(/^\s*\*\*Accesibilidad\.\*\*\s*/, '') : '' },
   ];
 
   // Páginas.
@@ -200,11 +226,21 @@ function construir(opciones = {}) {
     const av = avisosEn(visible, normas).map((a) => a.coincidencia);
     if (av.length) avisos.push({ ruta: p.ruta, avisos: [...new Set(av)] });
   }
+  // Lo que falta por confirmar y se ve en la web. Con --publicar, cada hueco es un error.
+  const marcas = paginas.map((p) => ({ ruta: p.ruta, lista: R.textoVisible(p.html).match(/\[PENDIENTE[^\]]*\]/g) || [] })).filter((x) => x.lista.length);
+  const porTexto = new Map();
+  for (const x of marcas) for (const m of x.lista) { if (!porTexto.has(m)) porTexto.set(m, new Set()); porTexto.get(m).add(x.ruta); }
+  if (opciones.publicar) {
+    for (const x of marcas) errores.push({ tipo: 'pendiente_visible', ruta: x.ruta, n: x.lista.length, primero: x.lista[0] });
+    for (const o of pendientesObligatorios) errores.push({ tipo: 'obligatoria', ...o });
+    if (borradores) errores.push({ tipo: 'borradores', nota: 'La vista previa con borradores no se publica nunca.' });
+  }
   if (Buffer.byteLength(css) > 45 * 1024) errores.push({ tipo: 'tamaño', ruta: ctx.recursos.css, bytes: Buffer.byteLength(css), limite: 45 * 1024 });
   if (Buffer.byteLength(js) > 20 * 1024) errores.push({ tipo: 'tamaño', ruta: ctx.recursos.js, bytes: Buffer.byteLength(js), limite: 20 * 1024 });
 
-  // Escribir páginas.
+  // Escribir páginas y las fotos que usan.
   for (const p of paginas) escribir(p.ruta === '/404.html' ? '404.html' : `${p.ruta.replace(/^\//, '')}index.html`, p.html);
+  for (const clave of [...fotosUsadas].sort()) for (const s of fotos.get(clave).salidas) escribir(s.url.slice(1), s.buf);
 
   // .htaccess, sitemap y robots.
   escribir('.htaccess', htaccess(sitio, red.reglas));
@@ -245,7 +281,8 @@ function construir(opciones = {}) {
     unidos: modelo.paginas.filter((p) => p.unidos).map((p) => ({ ruta: p.ruta, ids: p.unidos })),
     contenido_pendiente: modelo.paginas.filter((p) => p.origen !== 'provisional' && p.pendiente && p.pendiente.length).map((p) => ({ ruta: p.ruta, pendiente: p.pendiente })),
     revision_medica: modelo.paginas.filter((p) => p.revision_medica).map((p) => p.ruta),
-    pendientes_visibles: paginas.map((p) => ({ ruta: p.ruta, n: (R.textoVisible(p.html).match(/\[PENDIENTE/g) || []).length })).filter((x) => x.n),
+    pendientes_visibles: marcas.map((x) => ({ ruta: x.ruta, n: x.lista.length })),
+    pendientes_textos: [...porTexto].map(([texto, rutas]) => ({ texto, paginas: rutas.size, ejemplo: [...rutas][0] })).sort((a, b) => b.paginas - a.paginas || a.texto.localeCompare(b.texto, 'es')),
     redirecciones: red.reglas.map((r) => ({ desde: r.desde, hacia: r.hacia, motivo: r.motivo })),
     anclas: red.anclas,
     errores,
@@ -257,7 +294,7 @@ function construir(opciones = {}) {
       css: Buffer.byteLength(css),
       js: Buffer.byteLength(js),
     },
-    fotos: [...fotos.keys()],
+    fotos: [...fotosUsadas].sort(),
     recursos: ctx.recursos,
   };
   escribir('informe.json', `${JSON.stringify(informe, null, 1)}\n`);
@@ -281,4 +318,4 @@ if (require.main === module) {
   process.exitCode = inf.errores.length ? 1 : 0;
 }
 
-module.exports = { construir, minificarCss, textoLegal };
+module.exports = { construir, minificarCss, minificarJs, textoLegal };

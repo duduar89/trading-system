@@ -30,7 +30,7 @@
     "sesiones": "Una consulta",
     "anestesia": null,
     "recuperacion": null,
-    "profesional": "Equipo médico de medicina capilar"
+    "profesional": "[PENDIENTE: profesión y titulación de quien hace el diagnóstico]"
    },
    "variantes": [],
    "resultados": "Sales de la consulta con tu caso explicado y un plan a tu medida; la respuesta a cualquier tratamiento varía según cada persona.",
@@ -274,20 +274,20 @@
    "orden": 40,
    "destacado": false,
    "nombre": "Oxigenoterapia capilar",
-   "titulo": "Oxigenoterapia capilar para el cuero cabelludo y el cabello debilitado",
+   "titulo": "Oxigenoterapia capilar para cuidar el cuero cabelludo",
    "titulo_seo": "Oxigenoterapia capilar en Boadilla del Monte · IEMEC",
    "descripcion_seo": "Oxigenoterapia capilar en IEMEC, Boadilla del Monte: oxígeno a presión con activos para limpiar, hidratar y revitalizar el cuero cabelludo, sin agujas.",
    "entradilla": "Aplicamos oxígeno a presión controlada junto con activos como vitaminas y péptidos para limpiar, hidratar y revitalizar el cuero cabelludo. Es un tratamiento sin agujas que complementa tu plan capilar.",
    "para_quien": [
-    "Notas una caída leve o reciente y quieres cuidar el cabello.",
-    "Tienes el cabello debilitado, sin volumen o apagado.",
+    "Quieres cuidar tu cuero cabelludo y darle al cabello un aspecto más sano.",
+    "Notas el cabello apagado o sin volumen.",
     "Tu cuero cabelludo es graso o seco, está irritado o tiene descamación.",
     "Te has hecho un injerto y quieres cuidar la zona durante la recuperación y después."
    ],
    "texto": [
-    "La oxigenoterapia capilar aplica oxígeno a presión controlada sobre el cuero cabelludo junto con activos como vitaminas y péptidos. Ayuda a mejorar la microcirculación, retira el exceso de grasa y los restos de producto e hidrata el cabello en profundidad.",
+    "La oxigenoterapia capilar aplica oxígeno a presión controlada sobre el cuero cabelludo junto con activos como vitaminas y péptidos. Retira el exceso de grasa y los restos de producto e hidrata el cuero cabelludo y el cabello.",
     "En IEMEC la sesión sigue seis pasos: estudiamos tu cuero cabelludo con dermatoscopia, hacemos una limpieza profunda, aplicamos los activos, infundimos el oxígeno, sellamos el cabello y te damos consejos para cuidarlo en casa.",
-    "Es un complemento: cuando la caída está avanzada no sustituye al tratamiento médico, pero puede sumarse a él y al cuidado después de un injerto. Antes de empezar revisamos las contraindicaciones; en el embarazo o la lactancia, solo se hace tras valoración médica. El resultado varía según cada persona."
+    "Es un cuidado del cuero cabelludo, no un tratamiento de la caída: si lo que te preocupa es que se te cae el pelo, empieza por el diagnóstico capilar. También puede sumarse a los cuidados después de un injerto. Antes de empezar revisamos las contraindicaciones; en el embarazo o la lactancia, solo se hace tras valoración médica. El resultado varía según cada persona."
    ],
    "sesion": {
     "duracion": "Entre 30 y 40 minutos",
@@ -297,7 +297,7 @@
     "profesional": "Esteticista"
    },
    "variantes": [],
-   "resultados": "Muchas personas notan el cabello más hidratado y con más brillo tras las primeras sesiones; el efecto sobre la caída es gradual y varía según cada persona.",
+   "resultados": "Muchas personas notan el cabello más hidratado y con más brillo tras las primeras sesiones; varía según cada persona.",
    "preguntas": [
     {
      "p": "¿Molesta?",
@@ -309,7 +309,7 @@
     },
     {
      "p": "¿Cuándo se notan los cambios?",
-     "r": "Muchas personas notan el cabello más hidratado y brillante tras las primeras sesiones. Si hay caída, su mejora se valora después de varias sesiones y es gradual. La respuesta varía según cada persona."
+     "r": "Muchas personas notan el cabello más hidratado y brillante tras las primeras sesiones, y la respuesta varía según cada persona. Si lo que te preocupa es la caída, empieza por el diagnóstico capilar."
     },
     {
      "p": "¿Cuántas sesiones necesito?",
@@ -317,16 +317,14 @@
     },
     {
      "p": "¿Se puede combinar con otros tratamientos?",
-     "r": "Sí. Es un buen complemento del tratamiento médico de la caída y del cuidado después de un injerto capilar. En la valoración te indicamos cómo encaja en tu plan y con qué frecuencia conviene hacerla."
+     "r": "Sí. Se puede sumar al plan que te propongamos tras el diagnóstico capilar y a los cuidados después de un injerto. En la valoración te indicamos cómo encaja y con qué frecuencia conviene hacerla."
     },
     {
      "p": "¿Tiene contraindicaciones?",
      "r": "Sí. No se aplica si hay una infección activa, heridas abiertas o una irritación importante en el cuero cabelludo, ni cuando alguna condición médica impide usar oxígeno a presión. En el embarazo y la lactancia, solo tras valoración médica."
     }
    ],
-   "preocupaciones": [
-    "caida-del-cabello"
-   ],
+   "preocupaciones": [],
    "relacionados": [
     "diagnostico-capilar",
     "fototerapia-led-capilar",
@@ -341,7 +339,8 @@
    "pendiente": [
     "La web actual dice «indoloro», «desde la primera sesión notarás…», «capaz de detener el proceso» y «resultados visibles, naturales y duraderos»: aquí se reescribe sin promesas.",
     "Confirmar que los activos que se aplican (la web cita vitaminas, factores de crecimiento y péptidos) son cosméticos de uso tópico.",
-    "El primer paso del protocolo es un estudio con dermatoscopia: confirmar quién lo hace (el catálogo da el tratamiento a una esteticista)."
+    "El primer paso del protocolo es un estudio con dermatoscopia: confirmar quién lo hace (el catálogo da el tratamiento a una esteticista).",
+    "Revisión final (vuelta 9): Es un servicio de cabina: sin efecto sobre la caída ni sobre la microcirculación (RD 1907/1996, arts. 4.11 y 4.16); la caída, al diagnóstico capilar."
    ]
   },
   {
@@ -356,14 +355,14 @@
    "titulo": "Fototerapia LED capilar: luz roja e infrarroja para el cuero cabelludo",
    "titulo_seo": "Fototerapia LED capilar en Boadilla del Monte · IEMEC",
    "descripcion_seo": "Fototerapia LED capilar en IEMEC, Boadilla del Monte: luz roja e infrarroja de baja intensidad, sin agujas, como apoyo en el cuidado del cabello debilitado.",
-   "entradilla": "Luz LED roja e infrarroja de baja intensidad que ayuda a activar la microcirculación del cuero cabelludo. Es un tratamiento sin agujas que se suma a tu plan capilar.",
+   "entradilla": "Luz LED roja e infrarroja de baja intensidad sobre el cuero cabelludo. Es un tratamiento sin agujas que se suma a tu plan capilar.",
    "para_quien": [
     "Notas el cabello más fino o con menos densidad.",
     "Sigues un tratamiento de la caída y quieres complementarlo.",
     "Buscas una opción sin agujas."
    ],
    "texto": [
-    "La fototerapia capilar utiliza luces LED de baja intensidad, rojas e infrarrojas, sobre el cuero cabelludo. Esa luz ayuda a aumentar la microcirculación y a activar los folículos, y se usa como apoyo cuando el cabello se debilita o pierde densidad.",
+    "La fototerapia capilar utiliza luces LED de baja intensidad, rojas e infrarrojas, sobre el cuero cabelludo. Se usa como apoyo dentro de un plan capilar, cuando el cabello se debilita o pierde densidad.",
     "Es un tratamiento sin agujas: durante la sesión solo tienes que relajarte mientras la luz actúa. Se puede combinar con otros tratamientos del plan capilar, como la mesoterapia.",
     "Solo actúa donde todavía hay folículos activos, así que no está pensada para zonas que llevan tiempo sin pelo. Si la caída es intensa o avanzada, lo adecuado es una valoración médica: la luz LED es un apoyo, no un sustituto del tratamiento médico. Antes de empezar revisamos si hay alguna contraindicación en tu caso."
    ],
@@ -849,14 +848,14 @@
    "texto": [
     "La reparación capilar reúne varios procedimientos quirúrgicos para corregir trasplantes anteriores que no han cumplido lo que esperabas: una línea frontal poco natural, falta de densidad o cicatrices y marcas visibles.",
     "Cada caso es distinto, así que empezamos con una valoración médica: el cirujano estudia el injerto anterior, el pelo disponible en la zona donante y lo que te gustaría mejorar. Con eso te explica qué se puede corregir, con qué técnica, sus riesgos y qué resultado es realista esperar.",
-    "La intervención la hacen los cirujanos del equipo de cirugía capilar, con un plan adaptado a ti. El resultado varía según cada persona y depende de lo que permita el injerto anterior."
+    "La intervención la hace un cirujano, con un plan adaptado a ti. El resultado varía según cada persona y depende de lo que permita el injerto anterior."
    ],
    "sesion": {
     "duracion": "Según cada caso",
     "sesiones": "Según cada caso",
     "anestesia": null,
     "recuperacion": null,
-    "profesional": "Equipo de cirujanos"
+    "profesional": "Cirujano"
    },
    "variantes": [],
    "resultados": "Lo que se puede corregir depende del injerto anterior y de la zona donante; el cirujano te lo explica en la valoración y el resultado varía según cada persona.",
@@ -875,7 +874,7 @@
     },
     {
      "p": "¿Dónde se hace la intervención?",
-     "r": "En un centro sanitario autorizado para cirugía, con los cirujanos del equipo de cirugía capilar. En la valoración te explicamos dónde se hará la tuya, con qué anestesia y cómo será la recuperación."
+     "r": "En un centro sanitario autorizado para cirugía [PENDIENTE: cuál]. En la valoración te explicamos dónde se hará la tuya, con qué anestesia y cómo será la recuperación."
     }
    ],
    "preocupaciones": [

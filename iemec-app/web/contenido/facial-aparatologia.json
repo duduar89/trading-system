@@ -22,14 +22,15 @@
    ],
    "texto": [
     "HIFU son las siglas en inglés de ultrasonido focalizado de alta intensidad. El equipo concentra la energía en puntos concretos bajo la piel y llega hasta el SMAS, la capa de tejido que envuelve los músculos de la cara y sostiene la piel. Allí genera un calor controlado que estimula la producción natural de colágeno y elastina.",
-    "Ayuda a reafirmar la piel, a redefinir el óvalo facial y la mandíbula y a elevar ligeramente cejas y mejillas. No usa agujas ni requiere tiempo de recuperación.",
-    "Antes de tratarte valoramos tu piel y el grado de flacidez. Te explicamos qué puedes esperar, si hay alguna contraindicación en tu caso y si conviene combinarlo con otras técnicas, como la radiofrecuencia."
+    "Ayuda a reafirmar la piel, a redefinir el óvalo facial y la mandíbula y a elevar ligeramente cejas y mejillas. No usa agujas y, en general, puedes seguir con tu día al salir.",
+    "Antes de tratarte valoramos tu piel y el grado de flacidez. Te explicamos qué puedes esperar, si hay alguna contraindicación en tu caso y si conviene combinarlo con otras técnicas, como la radiofrecuencia.",
+    "Durante la sesión se nota calor o pequeños pinchazos en profundidad. Después puede haber enrojecimiento, inflamación o molestias durante unos días y, rara vez, quemaduras o alteraciones pasajeras de la sensibilidad. No se aplica, entre otros casos, en el embarazo, sobre heridas o infecciones de la piel ni con implantes metálicos en la zona: en la valoración revisamos las contraindicaciones en tu caso."
    ],
    "sesion": {
     "duracion": "Unos 50 minutos",
     "sesiones": "Normalmente una; se confirma en la valoración",
     "anestesia": null,
-    "recuperacion": "No requiere tiempo de recuperación",
+    "recuperacion": "Puedes seguir con tu día; la zona puede quedar enrojecida o algo inflamada",
     "profesional": "Esteticista"
    },
    "variantes": [],
@@ -45,7 +46,7 @@
     },
     {
      "p": "¿Necesito recuperación?",
-     "r": "No. El HIFU no usa agujas ni requiere tiempo de recuperación, así que puedes volver a tus actividades al salir de la clínica. Si tienes un evento importante, coméntalo en la valoración para elegir bien la fecha."
+     "r": "No suele hacer falta: puedes volver a tus actividades al salir de la clínica, aunque la zona puede quedar enrojecida o algo inflamada unos días. Si tienes un evento importante, coméntalo en la valoración para elegir bien la fecha."
     },
     {
      "p": "¿Es el único tratamiento para la flacidez?",
@@ -76,7 +77,8 @@
     "Duración: el catálogo da unos 50 minutos como dato del sector; confirmar.",
     "La web actual anuncia la valoración de HIFU como gratuita: las normas no permiten «gratis» como reclamo y esta versión no publica precios; decidir cómo se comunica (por ejemplo, «primera valoración sin compromiso»).",
     "La web actual nombra el equipo (HIFU V10 Ultralift de InnovaPro): las normas no permiten anunciar marcas de equipos de uso profesional, así que aquí no se nombra.",
-    "La valoración de HIFU (id valoracion-hifu) está en el grupo facial-medica: enlazarla desde aquí si tiene página propia."
+    "La valoración de HIFU (id valoracion-hifu) está en el grupo facial-medica: enlazarla desde aquí si tiene página propia.",
+    "Revisión final (vuelta 9): Se añaden los riesgos y las contraindicaciones del aparato (MDR, art. 7; normas.md, apartado c) y se quita «no requiere tiempo de recuperación»."
    ]
   },
   {
@@ -99,7 +101,7 @@
     "Tienes más de 30 años y quieres prevenir o tratar los primeros signos de la edad."
    ],
    "texto": [
-    "Es un protocolo de láser que combina en la misma sesión cuatro modos de trabajo: intraoral (desde el interior de la mejilla), fraccional, subdérmico (más profundo) y superficial. Por eso se conoce como láser «4D». El calor del láser estimula el colágeno y la elastina y ayuda a tensar los tejidos desde dentro hacia fuera.",
+    "Es un protocolo de láser que combina en la misma sesión cuatro modos de trabajo: intraoral (desde el interior de la mejilla), fraccional, subdérmico (más profundo) y superficial. El calor del láser estimula el colágeno y la elastina y ayuda a tensar los tejidos desde dentro hacia fuera.",
     "Trabaja zonas como pómulos, labios, mentón, surcos nasogenianos y cuello, y ayuda a corregir imperfecciones y a unificar el tono de la piel.",
     "En IEMEC lo realiza el equipo médico, después de una valoración médica en la que te explicamos sus riesgos y sus alternativas. No hacen falta agujas ni anestesia: se nota un calor tolerable y puedes seguir con tu rutina al terminar."
    ],
@@ -114,8 +116,8 @@
    "resultados": "El efecto tensor se va notando de forma progresiva a lo largo del ciclo; cada piel responde a su ritmo y el resultado varía según cada persona.",
    "preguntas": [
     {
-     "p": "¿Por qué se llama 4D?",
-     "r": "Porque combina cuatro modos de láser en la misma sesión: intraoral, fraccional, subdérmico y superficial. Así se trabaja la piel desde el interior de la boca y desde fuera, en distintas capas, para abordar la flacidez, las arrugas y la textura a la vez."
+     "p": "¿Qué son los cuatro modos de trabajo?",
+     "r": "Son cuatro formas de aplicar el láser en la misma sesión: intraoral, fraccional, subdérmico y superficial. Así se trabaja la piel desde el interior de la boca y desde fuera, en distintas capas, para abordar la flacidez, las arrugas y la textura a la vez."
     },
     {
      "p": "¿Duele?",
@@ -154,7 +156,8 @@
    "pendiente": [
     "El servicio se anuncia hoy como «Lifting facial sin cirugía ni inyectables con Láser Fotona 4D»: las normas no permiten la marca del equipo ni «lifting» para un tratamiento no quirúrgico, así que va como «Tensado facial con láser», el nombre que proponen las normas. «4D» se explica como los cuatro modos del láser: confirmar que se mantiene. Si se quiere dar la tecnología en genérico, «láser de erbio y neodimio» (confirmar).",
     "Duración (unos 45 minutos) e intervalo de un mes entre sesiones son datos del sector: confirmar.",
-    "El blog cita también el láser en cuello, escote y cuerpo (ids fotona-cuello-escote y fotona-tensado-cutaneo, ofertas sin confirmar, en «sin_pagina»): si la clínica lo confirma, se añaden como variantes."
+    "El blog cita también el láser en cuello, escote y cuerpo (ids fotona-cuello-escote y fotona-tensado-cutaneo, ofertas sin confirmar, en «sin_pagina»): si la clínica lo confirma, se añaden como variantes.",
+    "Revisión final (vuelta 9): Fuera «4D» (remite al protocolo del fabricante, «Láser Fotona 4D»): basta «cuatro modos de trabajo»."
    ]
   },
   {
@@ -166,27 +169,27 @@
    "orden": 30,
    "destacado": false,
    "nombre": "Luz pulsada intensa (IPL)",
-   "titulo": "Luz pulsada intensa (IPL) para manchas, rojeces y rosácea",
+   "titulo": "Luz pulsada intensa (IPL) para manchas y rojeces",
    "titulo_seo": "IPL facial para manchas en Boadilla · IEMEC",
-   "descripcion_seo": "Luz pulsada intensa (IPL) en IEMEC, Boadilla del Monte: para manchas solares, rojeces, rosácea y pequeños vasos del rostro, con valoración previa.",
+   "descripcion_seo": "Luz pulsada intensa (IPL) en IEMEC, Boadilla del Monte: para manchas solares, rojeces y pequeños vasos del rostro, con valoración médica previa.",
    "entradilla": "La luz pulsada intensa actúa sobre el pigmento de las manchas y sobre los pequeños vasos dilatados para unificar el tono de la piel. También le aporta luminosidad y mejora su textura.",
    "para_quien": [
     "Tienes manchas solares o léntigos en la cara.",
-    "Te preocupan las rojeces, la rosácea o la cuperosis.",
+    "Te preocupan las rojeces de la cara.",
     "Notas pequeños vasos visibles en el rostro.",
     "Quieres una piel más uniforme y luminosa."
    ],
    "texto": [
     "El IPL emite pulsos de luz de amplio espectro. La luz la absorben el pigmento de las manchas (la melanina) y la sangre de los vasos dilatados (la hemoglobina); al calentarse, esas lesiones se atenúan y el tono se unifica. Además estimula el colágeno, lo que ayuda a mejorar la textura de la piel.",
-    "Está indicado para manchas solares y otras hiperpigmentaciones, rojeces, rosácea y lesiones vasculares del rostro, y puede apoyar el tratamiento del acné. No es adecuado para pieles muy oscuras ni para manchas muy profundas: por eso valoramos cada caso antes de empezar.",
-    "En IEMEC lo aplica personal de enfermería especializado, tras una valoración médica en la que revisamos tu piel y te explicamos los posibles efectos y contraindicaciones. Con cada pulso de luz se nota un golpe de calor o un ligero pinchazo, y al terminar puedes seguir con tu rutina."
+    "Está indicado para manchas solares y otras hiperpigmentaciones, rojeces y pequeños vasos del rostro. No es adecuado para pieles muy oscuras ni para manchas muy profundas: por eso valoramos cada caso antes de empezar.",
+    "En IEMEC lo aplica personal de enfermería, tras una valoración médica en la que revisamos tu piel y te explicamos los posibles efectos y contraindicaciones. Con cada pulso de luz se nota un golpe de calor o un ligero pinchazo, y al terminar puedes seguir con tu rutina."
    ],
    "sesion": {
     "duracion": "Unos 30 minutos",
     "sesiones": "Entre 3 y 6, cada 3 o 4 semanas",
     "anestesia": null,
     "recuperacion": "Mínima: rojez o hinchazón leve que suele irse en horas",
-    "profesional": "Enfermería especializada, con valoración médica previa"
+    "profesional": "Enfermería, con valoración médica previa [PENDIENTE: confirmar]"
    },
    "variantes": [],
    "resultados": "La mejoría suele notarse tras las primeras sesiones y el resultado completo llega al terminar el ciclo; varía según cada piel.",
@@ -220,7 +223,7 @@
    "relacionados": [
     "peeling-medico-facial",
     "fototerapia-led-facial",
-    "tratamiento-del-acne"
+    "piel-con-tendencia-acneica"
    ],
    "restringida": false,
    "revision_medica": true,
@@ -236,7 +239,8 @@
     "Quién lo realiza: el póster de la portada dice «enfermeras especializadas» y el catálogo, médico; confirmar.",
     "Confirmar las pautas de sol antes y después del IPL para añadirlas.",
     "La portada lo anuncia con precio de promoción: no se publica en esta versión.",
-    "Rosácea y acné son afecciones de la piel: confirmar que su tratamiento con IPL entra en la autorización del centro como mejora estética (U.48); la dermatología (U.8) no está autorizada."
+    "Rosácea y acné son afecciones de la piel: confirmar que su tratamiento con IPL entra en la autorización del centro como mejora estética (U.48); la dermatología (U.8) no está autorizada.",
+    "Revisión final (vuelta 9): Fuera «rosácea» del título, la meta y el texto (dermatología, U.8, no autorizada; regla 11) y «especializada» (sugiere una especialidad oficial de enfermería). Quién lo aplica sigue [PENDIENTE] visible."
    ]
   },
   {
@@ -376,7 +380,7 @@
     },
     {
      "p": "¿Es lo mismo que una cirugía de párpados?",
-     "r": "No. La cirugía de párpados, o blefaroplastia, la hace un cirujano plástico con bisturí en un centro autorizado. Este tratamiento actúa sobre la superficie de la piel con plasma y no sustituye a la cirugía en todos los casos: en la valoración te explicamos sus límites."
+     "r": "No. La cirugía de párpados, o blefaroplastia, la hace un cirujano con bisturí en un centro autorizado. Este tratamiento actúa sobre la superficie de la piel con plasma y no sustituye a la cirugía en todos los casos: en la valoración te explicamos sus límites."
     },
     {
      "p": "¿Se puede hacer en cualquier época del año?",
@@ -435,7 +439,7 @@
    ],
    "texto": [
     "Los Protocolos IEMEC unen tecnologías y tratamientos complementarios en una misma sesión de alrededor de una hora y media. Los adaptamos a tu tipo de piel y los realiza el equipo de estética.",
-    "Pure Glow Up combina limpieza profunda, masaje Kobido, luz LED y una mascarilla de colágeno. Glass Skin exfolia con ácido láctico, sigue con un masaje con vitamina C y un gel hidratante y termina con radiofrecuencia de alta frecuencia. OxyGlow une oxigenoterapia hiperbárica y radiofrecuencia de alta frecuencia para una piel más firme y luminosa.",
+    "Pure Glow Up combina limpieza profunda, masaje Kobido, luz LED y una mascarilla de colágeno. Glass Skin exfolia con ácido láctico, sigue con un masaje con vitamina C y un gel hidratante y termina con radiofrecuencia de alta frecuencia. OxyGlow une oxigenoterapia facial a presión y radiofrecuencia de alta frecuencia para una piel más firme y luminosa.",
     "Si prefieres una sesión más corta, el facial hidratante reafirmante, con ácido hialurónico aplicado sobre la piel, hidrata y aporta un efecto tensor en una hora, sin agujas."
    ],
    "sesion": {
@@ -458,7 +462,7 @@
     },
     {
      "nombre": "OxyGlow",
-     "texto": "Oxigenoterapia hiperbárica y radiofrecuencia de alta frecuencia para oxigenar la piel y darle un aspecto más firme, uniforme y luminoso. 1 h 30 min.",
+     "texto": "Oxigenoterapia facial a presión y radiofrecuencia de alta frecuencia para oxigenar la piel y darle un aspecto más firme, uniforme y luminoso. 1 h 30 min.",
      "catalogo": "protocolo-oxyglow"
     },
     {
@@ -530,9 +534,9 @@
    "orden": 70,
    "destacado": false,
    "nombre": "Oxigenoterapia facial",
-   "titulo": "Oxigenoterapia hiperbárica facial para una piel luminosa e hidratada",
+   "titulo": "Oxigenoterapia facial a presión para una piel luminosa e hidratada",
    "titulo_seo": "Oxigenoterapia facial en Boadilla del Monte · IEMEC",
-   "descripcion_seo": "Oxigenoterapia hiperbárica facial en IEMEC, Boadilla del Monte: oxígeno a presión con activos hidratantes para una piel más luminosa, firme e hidratada.",
+   "descripcion_seo": "Oxigenoterapia facial a presión en IEMEC, Boadilla del Monte: oxígeno con activos hidratantes para una piel más luminosa e hidratada.",
    "entradilla": "Proyectamos oxígeno puro a presión junto con activos hidratantes, vitaminas y antioxidantes para hidratar la piel y devolverle la luz. Es un tratamiento no invasivo y relajante.",
    "para_quien": [
     "Tienes la piel apagada, cansada o deshidratada.",
@@ -587,7 +591,8 @@
     "https://iemec-clinic.com/facial#oxigenoterapia-hiperbarica-facial"
    ],
    "pendiente": [
-    "Confirmar que el ácido hialurónico y los demás activos son cosméticos de uso tópico (la web no nombra el producto)."
+    "Confirmar que el ácido hialurónico y los demás activos son cosméticos de uso tópico (la web no nombra el producto).",
+    "Revisión final (vuelta 9): Fuera «hiperbárica»: es un término de la medicina hiperbárica (cámara presurizada), que la autorización no incluye y que no hace un aparato de cabina."
    ]
   },
   {
@@ -664,7 +669,7 @@
     "arrugas"
    ],
    "relacionados": [
-    "tratamiento-del-acne",
+    "piel-con-tendencia-acneica",
     "bb-glow",
     "peeling-medico-facial",
     "protocolos-con-microneedling"
@@ -775,7 +780,7 @@
    "relacionados": [
     "luz-pulsada-intensa-ipl",
     "microneedling-facial",
-    "tratamiento-del-acne",
+    "piel-con-tendencia-acneica",
     "limpieza-facial"
    ],
    "restringida": false,
@@ -796,7 +801,7 @@
    ]
   },
   {
-   "slug": "tratamiento-del-acne",
+   "slug": "piel-con-tendencia-acneica",
    "especialidad": "medicina-estetica-facial",
    "catalogo": [
     "perfect-skin-acne",
@@ -805,20 +810,21 @@
    ],
    "orden": 100,
    "destacado": false,
-   "nombre": "Tratamiento del acné",
-   "titulo": "Tratamiento del acné: microneedling, peeling y cuidado facial por fases",
-   "titulo_seo": "Tratamiento del acné en Boadilla del Monte · IEMEC",
-   "descripcion_seo": "Tratamiento del acné en IEMEC, Boadilla del Monte: microneedling, peeling y cuidado facial adaptados a cada fase, del brote activo a las marcas.",
-   "entradilla": "El acné cambia con cada fase: brotes, exceso de grasa, marcas. Por eso lo tratamos con un plan personalizado que combina, según tu piel, microneedling, peelings y cuidado facial.",
+   "nombre": "Piel con tendencia acneica",
+   "titulo": "Piel con tendencia acneica y marcas de acné: microneedling, peeling y cuidado facial",
+   "titulo_seo": "Piel con tendencia acneica en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Cuidado de la piel con tendencia acneica en IEMEC, Boadilla del Monte: microneedling, peeling y cuidado facial para la textura, la grasa y las marcas.",
+   "entradilla": "La piel con tendencia acneica necesita cuidados distintos según el momento: exceso de grasa, poros obstruidos o marcas. Te proponemos un plan que combina, según tu piel, microneedling, peelings y cuidado facial.",
    "para_quien": [
-    "Tienes brotes de acné activo o granos inflamados.",
+    "Tu piel tiene tendencia acneica y quieres cuidarla.",
     "Notas exceso de grasa y poros obstruidos.",
     "Te han quedado marcas o cicatrices de acné.",
     "Tienes la piel sensible y buscas productos de alta tolerancia."
    ],
    "texto": [
     "Nuestros tratamientos para la piel con acné ayudan a controlar el exceso de grasa y a mejorar la textura, el tono y las marcas. Empezamos valorando tu piel para elegir lo que encaja con la fase en la que está.",
-    "El microneedling para el acné usa microagujas para favorecer la renovación de la piel y mejorar las marcas. El peeling para acné la renueva sin irritarla, y el tratamiento facial del acné activo trabaja la inflamación, el exceso de sebo y las marcas con productos de alta tolerancia.",
+    "El microneedling para el acné usa microagujas para favorecer la renovación de la piel y mejorar las marcas. El peeling para acné la renueva sin irritarla, y el tratamiento facial para piel con tendencia acneica trabaja el exceso de sebo, la textura y las marcas con productos de alta tolerancia.",
+    "Si tienes brotes inflamados, empieza por una valoración médica: el médico decide si la cabina es adecuada para ti en ese momento o si necesitas otro tipo de atención. El equipo de estética no trata el acné activo.",
     "Estas opciones se pueden combinar entre sí y con otros tratamientos de la clínica, como la higiene facial con triácidos, el peeling médico o la luz LED."
    ],
    "sesion": {
@@ -840,8 +846,8 @@
      "catalogo": "peeling-acne"
     },
     {
-     "nombre": "Tratamiento facial del acné activo",
-     "texto": "Trabaja las distintas fases del acné, de la inflamación y el exceso de sebo a las marcas, con productos de alta tolerancia. Sesión de 1 hora.",
+     "nombre": "Tratamiento facial para piel con tendencia acneica",
+     "texto": "Trabaja el exceso de sebo, la textura y las marcas con productos de alta tolerancia. Sesión de 1 hora.",
      "catalogo": "acne-xebor"
     }
    ],
@@ -849,7 +855,7 @@
    "preguntas": [
     {
      "p": "¿Qué tratamiento necesito?",
-     "r": "Depende de la fase de tu acné y de tu tipo de piel: no es lo mismo tratar brotes activos que marcas o cicatrices. Lo decidimos contigo en la valoración, según lo que veamos en tu piel y si hay alguna contraindicación, y podemos combinar varias opciones."
+     "r": "Depende de tu tipo de piel y de lo que quieras mejorar: no es lo mismo cuidar una piel grasa que trabajar marcas o cicatrices. Lo decidimos contigo en la valoración, según lo que veamos en tu piel y si hay alguna contraindicación. Si hay brotes inflamados, empezamos por una valoración médica."
     },
     {
      "p": "¿Cuántas sesiones hacen falta?",
@@ -861,7 +867,7 @@
     },
     {
      "p": "¿Se puede combinar con otros tratamientos?",
-     "r": "Sí. En la clínica también trabajamos el acné con la higiene facial con triácidos, el peeling médico, la luz LED o la luz pulsada, según el caso. Combinar técnicas permite atender a la vez los brotes y las marcas."
+     "r": "Sí. En la clínica también cuidamos la piel con tendencia acneica con la higiene facial con triácidos, el peeling médico, la luz LED o la luz pulsada, según el caso. Combinar técnicas permite atender a la vez la textura y las marcas."
     }
    ],
    "preocupaciones": [
@@ -887,7 +893,8 @@
     "Confirmar si el acné moderado o grave lo valora el equipo médico de la clínica y cómo se indica en la web.",
     "Microneedling para el acné (hoy «Perfect Skin»): duración (unos 30 minutos) y ciclo de 3-6 sesiones son datos del sector; confirmar.",
     "«Perfect Skin» equivale a «piel perfecta», un reclamo que las normas piden evitar: aquí va como «Microneedling para el acné»; decidir el nombre.",
-    "El catálogo tiene «Programa de tratamiento del acné» (tratamiento-acne, inactivo, no reservable): esta página cumple ese papel y el botón usa el microneedling, como el de la web actual."
+    "El catálogo tiene «Programa de tratamiento del acné» (tratamiento-acne, inactivo, no reservable): esta página cumple ese papel y el botón usa el microneedling, como el de la web actual.",
+    "Revisión final (vuelta 9): Del «tratamiento del acné» (una enfermedad, dermatología U.8) a la «piel con tendencia acneica» y sus marcas; el acné activo va a la valoración médica (regla 11). Cambia también la URL (/medicina-estetica-facial/piel-con-tendencia-acneica/)."
    ]
   },
   {
@@ -958,7 +965,7 @@
     "calidad-de-piel"
    ],
    "relacionados": [
-    "tratamiento-del-acne",
+    "piel-con-tendencia-acneica",
     "peeling-medico-facial",
     "protocolos-faciales",
     "masaje-facial"
@@ -996,7 +1003,7 @@
    "texto": [
     "El BB Glow combina el microagujado con un sérum que contiene pigmentos. Las microagujas abren pequeños canales en la capa superficial de la piel por los que penetra el sérum, y el resultado es un tono más uniforme y luminoso.",
     "Además de unificar el tono, hidrata la piel en profundidad y ayuda a reducir pequeñas imperfecciones. Adaptamos el tratamiento a tu tipo de piel y lo realiza el equipo de estética de IEMEC.",
-    "Se plantea en un ciclo de 3 o 4 sesiones, separadas unas dos semanas. Como en cualquier microneedling, después conviene cuidar la piel unos días."
+    "Se plantea en un ciclo de 3 o 4 sesiones, separadas unas dos semanas. Como en cualquier microneedling, después la piel queda enrojecida y más sensible unos días; con poca frecuencia aparecen irritación, reacciones al producto o manchas. En la valoración revisamos las contraindicaciones."
    ],
    "sesion": {
     "duracion": "Unos 60 minutos",
@@ -1018,7 +1025,7 @@
     },
     {
      "p": "¿Molesta?",
-     "r": "Las microagujas son muy finas y se nota como un leve pinchazo. Es un tratamiento no invasivo y bien tolerado; si tienes la piel sensible, dínoslo antes de empezar para adaptarlo."
+     "r": "Las microagujas son muy finas y se nota como un leve pinchazo. Es un tratamiento mínimamente invasivo y bien tolerado; si tienes la piel sensible, dínoslo antes de empezar para adaptarlo."
     },
     {
      "p": "¿Qué cuidados hay que tener después?",
@@ -1042,7 +1049,8 @@
    "pendiente": [
     "Confirmar el sérum que se usa (la web no lo nombra) y su régimen legal.",
     "Duración (unos 60 minutos) y ciclo de 3-4 sesiones son datos del sector: confirmar.",
-    "Confirmar que las pautas tras el microneedling (72 horas sin piscina ni mar) valen también para el BB Glow, y cuánto se mantiene el efecto."
+    "Confirmar que las pautas tras el microneedling (72 horas sin piscina ni mar) valen también para el BB Glow, y cuánto se mantiene el efecto.",
+    "Revisión final (vuelta 9): «No invasivo» pasa a «mínimamente invasivo» (las microagujas atraviesan la capa superficial de la piel) y se añaden los riesgos. Confirmar el régimen del sérum con pigmento: un cosmético no se introduce en la piel (normas.md, apartado c)."
    ]
   },
   {
@@ -1102,7 +1110,7 @@
     "manchas"
    ],
    "relacionados": [
-    "tratamiento-del-acne",
+    "piel-con-tendencia-acneica",
     "protocolos-faciales",
     "luz-pulsada-intensa-ipl"
    ],
