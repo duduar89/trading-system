@@ -181,9 +181,23 @@ Enseña el SQL (cinco `CREATE TABLE IF NOT EXISTS mesa_…`) y pide que se escri
 y no borra ni altera nada. Sin terminal interactiva: `--si`, después de haber
 enseñado el SQL a Eduardo.
 
-### 6. El usuario del panel — (Eduardo, cPanel → Terminal)
+### 6. El usuario del panel — (Eduardo, con un enlace de un solo uso)
 
-cPanel → **Terminal**:
+**Lo normal: el enlace de alta.** Claude lanza en el servidor
+`node scripts/crear-alta.js` y le pasa a Eduardo el enlace que sale
+(`https://mesa.brainstormersagency.es/alta#…`). Eduardo lo abre, elige usuario
+y contraseña (12 caracteres o más, dos veces) y queda dentro. El enlace vale
+**una vez** y caduca en **24 h**; crear otro anula el anterior. Si el usuario ya
+existe, le cambia la contraseña y cierra sus sesiones: sirve también para
+«olvidé la contraseña».
+
+- En el servidor solo queda la huella del enlace (`data/alta.json`, permisos
+  600), nunca el enlace.
+- La parte de detrás de `#` no viaja al servidor al abrir la página: no queda
+  en el registro de accesos. Por el camino de GitHub Actions, el enlace sale
+  cifrado con una clave que solo tiene la sesión de Claude.
+
+**A mano, sin enlace:** cPanel → **Terminal**:
 
 ```bash
 cd ~/mesa-trading && source ~/nodevenv/mesa-trading/22/bin/activate

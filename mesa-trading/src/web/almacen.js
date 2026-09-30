@@ -41,6 +41,14 @@ function almacenBD(entorno = process.env) {
     frenado: d => sesiones.frenado(pool(), d),
     reservarIntento: d => sesiones.reservarIntento(pool(), d),
     resolverIntento: d => sesiones.resolverIntento(pool(), d),
+    // Alta por enlace de un solo uso: crea el usuario o, si ya existe, le
+    // cambia la contraseña (y cierra sus sesiones).
+    async darDeAlta({ usuario, clave }) {
+      try { return { ...(await usuarios.crearUsuario(pool(), { usuario, clave })), nuevo: true }; } catch (e) {
+        if (e.code !== 'EXISTE') throw e;
+        return { ...(await usuarios.cambiarClave(pool(), { usuario, clave })), nuevo: false };
+      }
+    },
   };
 }
 
@@ -82,6 +90,20 @@ function almacenMemoria({ ahora = () => Date.now() } = {}) {
       const id = siguienteId++;
       usuarios.set(usuario, { id, hash: await hashDe(clave) });
       return { usuarioId: id };
+    },
+    async darDeAlta({ usuario, clave }) {
+      const { validarUsuario, validarClave } = require('../bd/usuarios');
+      const u = validarUsuario(usuario);
+      const c = validarClave(clave);
+      const existente = usuarios.get(u);
+      if (existente) {
+        existente.hash = await hashDe(c);
+        for (const [k, v] of sesiones) if (v.usuarioId === existente.id) sesiones.delete(k);
+        return { usuarioId: existente.id, nuevo: false };
+      }
+      const id = siguienteId++;
+      usuarios.set(u, { id, hash: await hashDe(c) });
+      return { usuarioId: id, nuevo: true };
     },
     async comprobarClave({ usuario, clave }) {
       const u = usuarios.get(String(usuario || ''));

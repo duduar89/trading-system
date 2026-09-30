@@ -30,6 +30,7 @@ const { crearCabeceras } = require('./cabeceras');
 const { ipDe, textoEspera } = require('./freno');
 const { LectorMesa, diferencias } = require('./lector');
 const ses = require('./sesiones');
+const alta = require('./alta');
 const log = require('../util/log').crear('web');
 
 const PING_MS = 15_000;
@@ -49,7 +50,7 @@ const COMANDOS = new Set(['comite', 'megafono', 'megafono-aplicar', 'prueba', 'p
 // Lo que se ve sin sesión (rutas ya sin el prefijo /web).
 const PUBLICOS = new Set([
   '/login.html', '/css/login.css', '/js/login.js', '/js/pwa.js',
-  '/manifest.webmanifest', '/sin-conexion.html', '/favicon.ico',
+  '/manifest.webmanifest', '/sin-conexion.html', '/favicon.ico', '/js/alta.js',
 ]);
 const esPublico = r => PUBLICOS.has(r) || /^\/iconos\/[a-z0-9-]+\.png$/.test(r);
 
@@ -401,6 +402,41 @@ function crearServidorWeb({
     }
   }
 
+  // Alta con el enlace de un solo uso (src/web/alta.js). Sin freno por
+  // contraseña: el token tiene 256 bits y no se adivina; sí un turno por IP.
+  async function darDeAlta(req, res) {
+    if (req.method !== 'POST') { req.resume(); return enviarJSON(res, 405, { ok: false, mensaje: 'El alta va por POST.' }); }
+    let d;
+    try { d = await leerObjetoJSON(req, MAX_CUERPO_LOGIN); } catch (e) { return enviarJSON(res, e.status || 400, { ok: false, mensaje: e.message }); }
+    const token = typeof d.token === 'string' ? d.token.trim() : '';
+    const usuario = typeof d.usuario === 'string' ? d.usuario.trim().slice(0, 64) : '';
+    const clave = typeof d.clave === 'string' ? d.clave.slice(0, 1024) : '';
+    if (!almacen || typeof almacen.darDeAlta !== 'function') return enviarJSON(res, 503, { ok: false, mensaje: 'La base de datos no está configurada.' });
+    const ip = ipDe(req);
+    if (!tomarTurnoLogin(ip)) return enviarJSON(res, 429, { ok: false, esperaSeg: 2, mensaje: 'Ya hay un alta en marcha desde aquí. Espera un momento.' }, { 'Retry-After': '2' });
+    try {
+      if (!alta.altaValida(carpeta, token)) return enviarJSON(res, 410, { ok: false, mensaje: 'Este enlace ya no vale: se usó, caducó o se creó otro. Pide uno nuevo.' });
+      if (!usuario || !clave) return enviarJSON(res, 400, { ok: false, mensaje: 'Escribe el usuario y la contraseña.' });
+      const reserva = alta.consumirAlta(carpeta, token);
+      if (!reserva) return enviarJSON(res, 410, { ok: false, mensaje: 'Este enlace ya no vale: se usó, caducó o se creó otro. Pide uno nuevo.' });
+      let r;
+      try { r = await almacen.darDeAlta({ usuario, clave }); } catch (e) {
+        reserva.devolver();
+        if (/usuario|contraseña/i.test(e.message)) return enviarJSON(res, 400, { ok: false, mensaje: e.message });
+        throw e;
+      }
+      reserva.confirmar();
+      log.info(`alta por enlace: ${r.nuevo ? 'usuario nuevo' : 'contraseña cambiada'} «${usuario}»`);
+      const s = await almacen.crearSesion({ usuarioId: r.usuarioId, ip, agente: String(req.headers['user-agent'] || '').slice(0, 255) });
+      return enviarJSON(res, 200, { ok: true, mensaje: r.nuevo ? 'Usuario creado.' : 'Contraseña cambiada.', usuario }, { 'Set-Cookie': ses.cookieSesion(s.token) });
+    } catch (e) {
+      log.error(`alta: ${e.message}`);
+      return enviarJSON(res, 503, { ok: false, mensaje: 'La base de datos no responde: vuelve a intentarlo en un momento (el enlace sigue valiendo).' });
+    } finally {
+      soltarTurnoLogin(ip);
+    }
+  }
+
   async function logout(req, res) {
     req.resume();
     if (req.method !== 'POST') return enviarJSON(res, 405, { ok: false, mensaje: 'Cerrar sesión va por POST.' });
@@ -505,6 +541,7 @@ function crearServidorWeb({
       if (crudo === '/api/salud') { req.resume(); return salud(res); }
       if (crudo === '/api/login') return login(req, res);
       if (crudo === '/api/logout') return logout(req, res);
+      if (crudo === '/api/alta') return darDeAlta(req, res);
     }
 
     if (ruta === '/sw.js') return servirSW(req, res);
@@ -513,6 +550,7 @@ function crearServidorWeb({
       try { if (await ses.sesionDe(req, almacen)) return redirigir(res, '/'); } catch (_) { /* base caída: se enseña el login */ }
       return servirFichero(req, res, path.join(web, 'login.html'));
     }
+    if (ruta === '/alta' || ruta === '/alta.html') return servirFichero(req, res, path.join(web, 'alta.html'), { 'Cache-Control': 'no-store' });
     if (esPublico(ruta)) {
       const { rutaEstatica } = require('../servidor');
       const destino = rutaEstatica(web, ruta);
