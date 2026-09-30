@@ -93,16 +93,45 @@ function barraMovil(ctx, whatsapp) {
 }
 
 // ── Horario y dirección ─────────────────────────────────────────────────────────────────────
+// Un día sin horario confirmado sale como hueco en la vista previa; al publicar, solo lo confirmado y
+// «Otros horarios, consúltanos» (lanzamiento.json → sabado).
+const OTROS_HORARIOS = 'Otros horarios, consúltanos.';
 function horario(ctx) {
-  return html`<table class="horario"><tbody>${ctx.sitio.horario.map((h) => html`<tr><th scope="row">${h.dias}</th><td>${h.abre ? `${h.abre} a ${h.cierra}` : pendiente(h.pendiente)}</td></tr>`)}</tbody></table>`;
+  const dias = ctx.publicar ? ctx.sitio.horario.filter((h) => h.abre) : ctx.sitio.horario;
+  const otros = dias.length < ctx.sitio.horario.length;
+  return html`<table class="horario"><tbody>${dias.map((h) => html`<tr><th scope="row">${h.dias}</th><td>${h.abre ? `${h.abre} a ${h.cierra}` : pendiente(h.pendiente)}</td></tr>`)}${otros ? html`<tr><td colspan="2">${OTROS_HORARIOS}</td></tr>` : ''}</tbody></table>`;
 }
 function horarioCorto(ctx) {
-  return ctx.sitio.horario.map((h) => (h.abre ? html`${h.dias}, de ${h.abre} a ${h.cierra}.` : html` ${h.dias}: ${pendiente('horario del sábado')}`));
+  const confirmados = ctx.sitio.horario.filter((h) => h.abre).map((h) => html`${h.dias}, de ${h.abre} a ${h.cierra}.`);
+  if (ctx.publicar) return confirmados.length < ctx.sitio.horario.length ? [...confirmados, ` ${OTROS_HORARIOS}`] : confirmados;
+  return ctx.sitio.horario.map((h) => (h.abre ? html`${h.dias}, de ${h.abre} a ${h.cierra}.` : html` ${h.dias}: ${pendiente(h.pendiente)}`));
 }
 function direccion(ctx, { pendienteLocal = false } = {}) {
   const d = ctx.sitio.direccion;
   return html`${d.calle}, ${d.cp} ${d.municipio} (${d.provincia})${pendienteLocal ? html` ${pendiente(d.pendiente)}` : ''}`;
 }
+
+// ── Lo que hace IEMEC ───────────────────────────────────────────────────────────────────────
+// Según las especialidades publicadas: si la clínica decide lanzar sin las cirugías
+// (lanzamiento.json → alternativas), la web no las nombra ni en la portada ni en el pie.
+// «medicina estética, medicina y cirugía capilar y cirugía estética».
+function lista(partes) {
+  return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : partes.join('');
+}
+function areas(ctx, { detalle = false } = {}) {
+  const hay = (slug) => ctx.especialidades.some((e) => e.slug === slug);
+  const partes = [];
+  const facial = hay('medicina-estetica-facial');
+  const corporal = hay('medicina-estetica-corporal');
+  if (facial || corporal) partes.push(detalle && facial && corporal ? 'medicina estética facial y corporal' : 'medicina estética');
+  if (hay('medicina-capilar') && hay('cirugia-capilar')) partes.push('medicina y cirugía capilar');
+  else if (hay('medicina-capilar')) partes.push('medicina capilar');
+  else if (hay('cirugia-capilar')) partes.push('cirugía capilar');
+  if (hay('cirugia-estetica')) partes.push('cirugía estética');
+  return lista(partes);
+}
+// La frase de sitio.json, con «{areas}» según lo publicado.
+const frase = (ctx) => ctx.sitio.frase.split('{areas}').join(areas(ctx));
 
 // ── Pie ─────────────────────────────────────────────────────────────────────────────────────
 function pie(ctx) {
@@ -112,7 +141,7 @@ function pie(ctx) {
 <div class="pie-rejilla">
 <div class="pie-marca">
 ${marca(ctx, { diferida: true })}
-<p>${s.frase}</p>
+<p>${frase(ctx)}</p>
 <ul class="redes">${s.redes.map((r) => html`<li><a href="${r.url}" rel="noopener" aria-label="${r.red} de IEMEC">${icono(r.icono)}</a></li>`)}</ul>
 </div>
 <nav id="menu-pie" aria-label="Especialidades y páginas">
@@ -144,7 +173,7 @@ ${marca(ctx, { diferida: true })}
 <li><a href="/accesibilidad/">Accesibilidad</a></li>
 </ul>
 <div class="fse">
-<div class="fse-emblema">${s.fse.emblema ? '' : pendiente('emblema oficial de la UE')}</div>
+<div class="fse-emblema">${ctx.recursos.emblema ? html`<img src="${ctx.recursos.emblema}" width="${s.fse.emblema.ancho}" height="${s.fse.emblema.alto}" alt="${s.fse.emblema.alt}" loading="lazy" decoding="async">` : pendiente('emblema oficial de la UE')}</div>
 <p><strong>${s.fse.titulo}</strong> ${s.fse.texto}</p>
 </div>
 <p class="copy">© 2026 ${s.titular.razon_social} · IEMEC, ${s.nombre}</p>
@@ -192,6 +221,13 @@ function textosFormulario(ctx) {
 }
 const versionTextos = (ctx) => `${ctx.sitio.formulario.version_textos}.${crypto.createHash('sha256').update(JSON.stringify(textosFormulario(ctx))).digest('hex').slice(0, 8)}`;
 
+// ¿Ofrece el formulario WhatsApp? Solo con sitio.json → formulario.whatsapp: quien lo elige recibe antes
+// un WhatsApp de confirmación de la app (plantilla iemec_solicitud_web), y eso solo es verdad con el 722
+// conectado a la app y la plantilla aprobada en Meta. Hasta entonces, llamada o correo, y nada en la web
+// promete esa confirmación (lanzamiento.json → whatsapp-formulario).
+const conWhatsapp = (ctx) => !!(ctx.sitio.formulario && ctx.sitio.formulario.whatsapp === true);
+const CONFIRMACION_WHATSAPP = `Te escribiremos por WhatsApp desde el +34 722 83 32 85 para confirmar que la solicitud es tuya: contesta «Sí, fui yo» y seguimos por ahí.`;
+
 function formulario(ctx, { id = 'f', pagina, ref, seleccion = null, titulo = null }) {
   const s = ctx.sitio;
   const accion = `${s.api.base}${s.api.contacto}`;
@@ -203,11 +239,13 @@ function formulario(ctx, { id = 'f', pagina, ref, seleccion = null, titulo = nul
   const [textoComercial, opcional] = t.comercial.split(' (Opcional)');
   // Sin «novalidate» en el HTML: sin JavaScript valida el navegador; con él, web.js lo desactiva y
   // pinta sus propios mensajes.
-  return html`<form class="formulario" action="${accion}" method="post" data-formulario>
+  // Con WhatsApp, el aviso de confirmación que pinta web.js al enviar va en el propio formulario: el
+  // JavaScript no lleva ninguna promesa que la web no haga.
+  return html`<form class="formulario" action="${accion}" method="post" data-formulario${conWhatsapp(ctx) ? html` data-confirmacion="${CONFIRMACION_WHATSAPP}"` : ''}>
 ${titulo ? html`<h3>${titulo}</h3>` : ''}
 <div class="campos-dos">
 <div class="campo"><label for="${campo('nombre')}">Nombre</label><input id="${campo('nombre')}" name="nombre" autocomplete="given-name" required maxlength="80" aria-describedby="${campo('nombre')}-error">${err('nombre')}</div>
-<div class="campo"><label for="${campo('telefono')}">Teléfono</label><input id="${campo('telefono')}" name="telefono" type="tel" inputmode="tel" autocomplete="tel" required maxlength="20" aria-describedby="${campo('telefono')}-ayuda ${campo('telefono')}-error"><p class="ayuda" id="${campo('telefono')}-ayuda">Te llamaremos o escribiremos a este número.</p>${err('telefono')}</div>
+<div class="campo"><label for="${campo('telefono')}">Teléfono</label><input id="${campo('telefono')}" name="telefono" type="tel" inputmode="tel" autocomplete="tel" required maxlength="20" aria-describedby="${campo('telefono')}-ayuda ${campo('telefono')}-error"><p class="ayuda" id="${campo('telefono')}-ayuda">${conWhatsapp(ctx) ? 'Te llamaremos o escribiremos a este número.' : 'Lo necesitamos para contactarte.'}</p>${err('telefono')}</div>
 </div>
 <div class="campos-dos">
 <div class="campo"><label for="${campo('email')}">Correo electrónico (opcional)</label><input id="${campo('email')}" name="email" type="email" autocomplete="email" maxlength="120" aria-describedby="${campo('email')}-error">${err('email')}</div>
@@ -215,8 +253,8 @@ ${titulo ? html`<h3>${titulo}</h3>` : ''}
 </div>
 <fieldset class="campo" aria-describedby="${campo('preferencia')}-error"><legend>¿Cómo prefieres que te contactemos?</legend>
 <div class="opciones">
-<label class="opcion"><input type="radio" name="preferencia" value="whatsapp" required> WhatsApp</label>
-<label class="opcion"><input type="radio" name="preferencia" value="llamada"> Llamada</label>
+${conWhatsapp(ctx) ? html`<label class="opcion"><input type="radio" name="preferencia" value="whatsapp" required> WhatsApp</label>
+` : ''}<label class="opcion"><input type="radio" name="preferencia" value="llamada" required> Llamada</label>
 <label class="opcion"><input type="radio" name="preferencia" value="correo"> Correo electrónico</label>
 </div>${err('preferencia')}</fieldset>
 <div class="campo"><label for="${campo('mensaje')}">Mensaje (opcional)</label><textarea id="${campo('mensaje')}" name="mensaje" rows="4" maxlength="${s.formulario.mensaje_max}" aria-describedby="${campo('mensaje')}-ayuda ${campo('mensaje')}-error"></textarea><p class="ayuda" id="${campo('mensaje')}-ayuda">Cuéntanos lo básico: qué te interesa y cuándo te viene bien. <strong>No incluyas datos médicos</strong> (enfermedades, medicación, fotos): los hablaremos en consulta.</p>${err('mensaje')}</div>
@@ -340,5 +378,6 @@ ${cuerpo}
 
 module.exports = {
   documento, urlWhatsapp, textoWhatsapp, telHref, imagen, marca, formulario, preguntas, migas, horario, horarioCorto, direccion,
-  clinicaLd, INTERES_GENERAL, empezarPagina, gruposInteres, textosFormulario, versionTextos,
+  clinicaLd, INTERES_GENERAL, empezarPagina, gruposInteres, textosFormulario, versionTextos, conWhatsapp, CONFIRMACION_WHATSAPP,
+  areas, frase,
 };

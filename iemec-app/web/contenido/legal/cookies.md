@@ -4,9 +4,13 @@
 > terceros que necesiten consentimiento** (fuentes alojadas en el propio servidor, sin Google
 > Analytics, sin píxel de Meta, sin mapas ni vídeos incrustados, sin reCAPTCHA). Así no hace falta
 > banner (LSSI, art. 22.2; [Guía sobre el uso de las cookies de la AEPD, mayo de 2024](https://www.aepd.es/guias/guia-cookies.pdf)).
-> Antes de publicar, el desarrollo confirma la tabla del apartado 2 con el inventario real del
-> navegador `[PENDIENTE]`. Si algún día se añade analítica, mapas o vídeos, se usa la variante B
-> del final.
+> El apartado 2 lo comprueba `node web/revisar.mjs` en un Chromium de verdad: después de recorrer
+> todas las páginas, también llegando con un código de campaña, no queda ninguna cookie ni nada en
+> el almacenamiento local ni en el de sesión. El código de campaña ya no se guarda en el navegador
+> (antes iba en `iemec-campana`, en el de sesión): medir los anuncios no es un servicio que pida quien
+> visita la web y no estaría exento de consentimiento (LSSI, art. 22.2; guía de cookies de la AEPD).
+> Ahora solo lo usan el formulario y los botones de WhatsApp de la página a la que se llega. Si algún
+> día se añade analítica, mapas o vídeos, se usa la variante B del final.
 > Hoy iemec-clinic.com carga dos propiedades de Google Analytics, dos píxeles de Meta, Google
 > Fonts y reCAPTCHA, con un banner de SITE123: nada de eso pasa a la web nueva.
 
@@ -21,16 +25,13 @@ Las cookies son pequeños archivos que una web guarda en tu navegador. Hay otras
 
 ### 2. Qué usa esta web
 
-**Esta web no usa cookies de analítica, de publicidad ni de redes sociales, y no necesita tu
-consentimiento.** Solo guarda lo imprescindible para funcionar o lo que tú eliges:
+**Esta web no usa cookies y no guarda nada en tu dispositivo**: ni cookies propias ni de terceros,
+ni almacenamiento local o de sesión. Por eso no te pide consentimiento.
 
-| Nombre | Tipo | Para qué | Duración |
-|---|---|---|---|
-| `iemec-campana` | Almacenamiento de sesión, propio | Si llegas desde un enlace con código de campaña (por ejemplo, un anuncio), recuerda ese código mientras navegas: el formulario nos lo envía y, si nos escribes por WhatsApp, tu mensaje lleva una clave corta de la campaña (no su nombre). No guarda identificadores de clic de Google ni de Meta, esta web no lo envía a nadie más y no sirve para seguirte en otras webs. | Hasta cerrar la pestaña |
-
-No hay nada más: ni cookies propias ni de terceros. Esta técnica es propia, dura solo la visita y
-sirve para atender la solicitud que nos haces (LSSI, art. 22.2). `[PENDIENTE: que el DPD confirme
-que el código de campaña está exento de consentimiento]`
+Si llegas desde un anuncio o un enlace con código de campaña, ese código va en la dirección de la
+página (por ejemplo, `?utm_campaign=…`). Esa página lo pone en su formulario y en sus botones de
+WhatsApp para saber de qué campaña llega tu solicitud, pero no lo guarda: si pasas a otra página, se
+pierde. Qué hacemos con él lo explica la [Política de privacidad](./privacidad.md).
 
 ### 3. Enlaces a otros servicios
 
@@ -40,15 +41,15 @@ política. Hasta que no pulsas, esos servicios no reciben nada desde nuestra web
 
 ### 4. Cómo borrarlas
 
-Puedes borrar lo que guarda esta web desde la configuración de tu navegador (apartado de
-privacidad o datos de sitios). La web seguirá funcionando igual.
+Esta web no guarda nada en tu dispositivo. Si quieres borrar lo que guardan otras webs o servicios,
+puedes hacerlo desde la configuración de tu navegador (apartado de privacidad o datos de sitios).
 
 ### 5. Cambios
 
 Si algún día usamos cookies que necesiten tu consentimiento, te lo pediremos antes con un aviso
 claro y podrás rechazarlas con la misma facilidad que aceptarlas.
 
-Última actualización: `[PENDIENTE: fecha de publicación]`
+Última actualización: {{fecha_textos}}
 
 ---
 

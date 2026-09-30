@@ -180,11 +180,22 @@
     "https://iemec-clinic.com/blog/prp-capilar-funciona-el-plasma-rico-en-plaquetas-para-la-alopecia",
     "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis el «Plan de recuperación capilar» de seis meses, con ese nombre y esa duración? Solo sale en /portafolio, como «medicación oral e inyecciones durante 6 meses»."
+    },
+    {
+     "tipo": "producto",
+     "que": "Mesoterapia capilar: ¿qué lleva? Multiestetica habla de «principios activos y fármacos» que elige la médica y la web actual, de vitaminas, minerales y aminoácidos. Si lleva un medicamento de receta, no se puede anunciar."
+    },
+    {
+     "tipo": "producto",
+     "que": "Microinyecciones en las zonas debilitadas (hoy «Hair Filler», marca de un producto sanitario de uso profesional): ¿qué producto es y qué lleva? La web actual cita factores de crecimiento, péptidos y ácido hialurónico."
+    }
+   ],
    "pendiente": [
     "Medicamentos de receta y productos sanitarios: la página no nombra fármacos, principios activos, el plasma ni marcas (normas.md, apartado b y anexo B). El tratamiento con plasma del propio paciente (prp-capilar) queda cubierto por esta página sin describirse: la AEMPS prohíbe cualquier publicidad al público. El botón de WhatsApp debe mandar un texto neutro («medicina capilar»), nunca el nombre del tratamiento ni el del medicamento.",
-    "Mesoterapia capilar: según Multiestetica lleva «principios activos y fármacos» que elige la médica (por eso figura como medicamento de receta); la web habla de vitaminas, minerales y aminoácidos. La página dice «los activos que el médico elige para tu caso», sin detallar la fórmula. Confirmar.",
-    "La variante «Microinyecciones en zonas debilitadas» es el servicio que hoy se llama «Hair Filler», marca de un producto sanitario de uso profesional: no se nombra. Confirmar el producto y su composición (la web cita factores de crecimiento, péptidos y ácido hialurónico).",
-    "Plan de recuperación capilar: solo sale en /portafolio (antes y después, que no se migra) y habla de «medicación oral e inyecciones durante 6 meses». Confirmar que se ofrece, su duración y su nombre.",
     "Autorización: confirmar que la oferta asistencial del centro (CS17886: U.48 Medicina estética o U.900 Otras unidades) cubre la medicina capilar, como pide normas.md (apartado a). Si no la cubre, la página espera.",
     "Duración por sesión (30-60 minutos) y número de sesiones: datos del sector y del blog; confirmar.",
     "Las entradas del blog sobre el PRP, la mesoterapia y el Hair Filler nombran medicamentos y productos (minoxidil, PRP, Hair Filler): revisarlas o retirarlas; aquí no se enlazan."
@@ -258,11 +269,15 @@
     "https://iemec-clinic.com/medicina-capilar#dermapen-contra-la-alopecia",
     "https://iemec-clinic.com/blog/dermapen-para-alopecia-sirve-el-microneedling-para-hacer-crecer-el-cabello"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿Qué producto se aplica (hoy se anuncia «con exosomas») y cuál es su régimen legal? ¿Quién lo aplica (profesión y título)? Si es un cosmético de uso tópico, solo puede citarse como ingrediente, sin efecto sobre la caída."
+    }
+   ],
    "pendiente": [
-    "El servicio se llama hoy «Dermapen con Exosomas»: Dermapen es la marca del equipo y los exosomas tienen el régimen legal sin confirmar, así que la página no nombra ninguno de los dos (normas.md, apartado c). Confirmar qué producto se aplica y su régimen; si es un cosmético de uso tópico, solo podría citarse como ingrediente, sin efecto sobre la caída ni regeneración.",
     "La web lo presenta como tratamiento de la alopecia («promoviendo el crecimiento de cabello nuevo»); aquí se describe como parte de un plan capilar. Validar con el equipo médico.",
-    "Duración: 30 minutos es un dato del sector; confirmar.",
-    "Quién lo hace: confirmar la titulación (en la app, rol «tricólogo»)."
+    "Duración: 30 minutos es un dato del sector; confirmar."
    ]
   },
   {
@@ -336,9 +351,14 @@
    "fuentes": [
     "https://iemec-clinic.com/medicina-capilar#oxigenoterapia-capilar"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿Los activos que se aplican (la web actual cita vitaminas, factores de crecimiento y péptidos) son cosméticos de uso tópico?"
+    }
+   ],
    "pendiente": [
     "La web actual dice «indoloro», «desde la primera sesión notarás…», «capaz de detener el proceso» y «resultados visibles, naturales y duraderos»: aquí se reescribe sin promesas.",
-    "Confirmar que los activos que se aplican (la web cita vitaminas, factores de crecimiento y péptidos) son cosméticos de uso tópico.",
     "El primer paso del protocolo es un estudio con dermatoscopia: confirmar quién lo hace (el catálogo da el tratamiento a una esteticista).",
     "Revisión final (vuelta 9): Es un servicio de cabina: sin efecto sobre la caída ni sobre la microcirculación (RD 1907/1996, arts. 4.11 y 4.16); la caída, al diagnóstico capilar."
    ]
@@ -506,9 +526,14 @@
     "https://www.treatwell.es/establecimiento/clinica-iemec/",
     "https://iemec-clinic.com/blog/head-spa-japones-mucho-mas-que-un-masaje-capilar"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis el head spa Express, de 30 minutos? Solo sale en Treatwell."
+    }
+   ],
    "pendiente": [
     "Precios (49, 69, 89 y 119 €), el suplemento de tratamiento reparador de marca (+25 €), el −10 % en pareja y la «oferta de lanzamiento» del botón de WhatsApp: no se publican en esta versión.",
-    "Express: solo sale en Treatwell; confirmar que se ofrece.",
     "La web dice que todos los head spa «favorecen el crecimiento y la salud capilar» y que dejan el cuero cabelludo «libre de toxinas, listo para regenerarse»: son afirmaciones de salud para un servicio estético y aquí no se dicen.",
     "Confirmar si se puede reservar para dos personas a la vez (la promoción en pareja lo daba a entender; el catálogo solo tiene un puesto de head spa).",
     "«Detox» se mantiene como nombre del ritual (limpieza), sin prometer que elimine toxinas. La web llama «diagnóstico capilar» a la revisión inicial del ritual: aquí se dice «revisión del cuero cabelludo» para no confundirla con el diagnóstico médico.",
@@ -874,7 +899,7 @@
     },
     {
      "p": "¿Dónde se hace la intervención?",
-     "r": "En un centro sanitario autorizado para cirugía [PENDIENTE: cuál]. En la valoración te explicamos dónde se hará la tuya, con qué anestesia y cómo será la recuperación."
+     "r": "{donde_cirugia}. En la valoración te explicamos con qué anestesia y cómo será la recuperación."
     }
    ],
    "preocupaciones": [
@@ -905,6 +930,7 @@
    ],
    "orden": 60,
    "destacado": false,
+   "tipo": "cirugia",
    "nombre": "Cicatrices en el cuero cabelludo",
    "titulo": "Cicatrices en el cuero cabelludo: valoración y plan personalizado",
    "titulo_seo": "Cicatrices en el cuero cabelludo en Boadilla · IEMEC",
@@ -925,7 +951,7 @@
     "sesiones": "Según el plan",
     "anestesia": null,
     "recuperacion": null,
-    "profesional": "[PENDIENTE: quién lo hace]"
+    "profesional": "Cirujano"
    },
    "variantes": [],
    "resultados": "La mejora depende del tipo de cicatriz y de la técnica que se elija; es gradual y varía según cada persona.",
@@ -957,11 +983,15 @@
    "fuentes": [
     "https://iemec-clinic.com/cirugia-capilar#tratamientos-para-eliminar-cicatrices"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿Qué técnicas (y productos, si los hay) usáis para las cicatrices del cuero cabelludo? ¿Implantáis unidades foliculares sobre la cicatriz, como dice la página (sale del blog del injerto de barba)? ¿Tratáis también cicatrices fuera del cuero cabelludo? El catálogo da su régimen legal como desconocido."
+    }
+   ],
    "pendiente": [
-    "La web habla de «una variedad de opciones» sin decir cuáles, y el catálogo da el régimen legal como desconocido: confirmar las técnicas (y los productos, si los hay) para detallarlas. La mención a implantar unidades foliculares sobre la cicatriz sale del blog del injerto de barba («ideal para corregir zonas con cicatrices»): confirmar.",
     "La web lo llama «Tratamientos para eliminar cicatrices»: «eliminar» promete un resultado total; aquí se dice «atenuar».",
-    "La web habla de cicatrices «en la piel» en general, dentro de cirugía capilar: confirmar si también se tratan cicatrices fuera del cuero cabelludo.",
-    "Duración de la valoración (30 minutos): dato del sector. Quién la hace: confirmar."
+    "Duración de la valoración (30 minutos): dato del sector. Se trata como cirugía porque el plan puede incluir una intervención (implantar unidades foliculares): quién opera y dónde, como en el resto de la cirugía capilar."
    ]
   }
  ],

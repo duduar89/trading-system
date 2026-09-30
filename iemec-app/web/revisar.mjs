@@ -4,10 +4,12 @@
 // Mira todas las páginas del sitemap (y la 404) de 320 a 1440 px: que ninguna caja se salga por los
 // lados (por su rectángulo: con overflow-x: clip no hay barra horizontal que avise), que no
 // haya errores de consola ni imágenes rotas y que las zonas de toque midan al menos 44 px. Prueba el
-// menú del móvil (abre, atrapa el foco, se cierra con Escape) y guarda capturas a página completa de
-// las cinco páginas clave en móvil (390 × 844) y escritorio (1440 × 900).
+// menú del móvil (abre, atrapa el foco, se cierra con Escape), comprueba lo que dice la política de
+// cookies (ni cookies ni nada en el almacenamiento local o de sesión, tampoco al llegar con un código de
+// campaña, que solo usan el formulario y los WhatsApp de esa página) y guarda capturas a página
+// completa de las cinco páginas clave en móvil (390 × 844) y escritorio (1440 × 900).
 // Si no hay nada escuchando en el puerto, arranca web/servir.js y lo para al acabar (por su PID).
-/* global document, getComputedStyle -- lo de pagina.evaluate corre en el navegador */
+/* global document, getComputedStyle, window -- lo de pagina.evaluate corre en el navegador */
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -129,6 +131,34 @@ async function probarMenu(navegador, problemas) {
   return { abierto, cerrado };
 }
 
+// Lo que dice /cookies/: después de recorrer las páginas no hay cookies ni nada en el almacenamiento
+// local o de sesión, tampoco al llegar con ?utm_campaign=…: el código lo usan el formulario y los
+// WhatsApp de esa página, y en la siguiente ya no está.
+async function probarAlmacenamiento(navegador, rutas, problemas) {
+  const ctx = await navegador.newContext({ viewport: { width: 390, height: 844 } });
+  const p = await ctx.newPage();
+  const guardado = () => p.evaluate(() => ({ local: Object.keys(window.localStorage), sesion: Object.keys(window.sessionStorage) }));
+  const campanaEnPagina = () => p.evaluate(() => ({
+    formulario: (document.querySelector('form[data-formulario] input[name="utm_campaign"]') || {}).value || '',
+    whatsapp: [...document.querySelectorAll('a[href^="https://wa.me/"]')].some((a) => /%C2%B7%20c-/.test(a.href)),
+  }));
+  for (const ruta of rutas.slice(0, 12)) await p.goto(`${BASE}${ruta}`, { waitUntil: 'load' });
+  const sin = await guardado();
+  await p.goto(`${BASE}/medicina-estetica-corporal/lipolaser/?utm_source=prueba&utm_campaign=revision`, { waitUntil: 'load' });
+  const enLaLlegada = await campanaEnPagina();
+  await p.goto(`${BASE}/pedir-cita/`, { waitUntil: 'load' });
+  const con = await guardado();
+  const despues = await campanaEnPagina();
+  const cookies = await ctx.cookies();
+  if (cookies.length) problemas.push({ pagina: '*', ancho: 390, problema: `cookies: ${cookies.map((c) => c.name).join(', ')}` });
+  if (sin.local.length || sin.sesion.length) problemas.push({ pagina: '*', ancho: 390, problema: `guarda sin campaña: ${JSON.stringify(sin)}` });
+  if (con.local.length || con.sesion.length) problemas.push({ pagina: '*', ancho: 390, problema: `con campaña guarda ${JSON.stringify(con)} (la política de cookies dice que no se guarda nada)` });
+  if (enLaLlegada.formulario !== 'revision' || !enLaLlegada.whatsapp) problemas.push({ pagina: '/medicina-estetica-corporal/lipolaser/', ancho: 390, problema: `la página de llegada no usa el código de campaña: ${JSON.stringify(enLaLlegada)}` });
+  if (despues.formulario || despues.whatsapp) problemas.push({ pagina: '/pedir-cita/', ancho: 390, problema: `el código de campaña pasa a otra página sin guardarse: ${JSON.stringify(despues)}` });
+  await ctx.close();
+  return { cookies: cookies.length, sin_campana: sin, con_campana: con, en_la_llegada: enLaLlegada, en_la_siguiente: despues };
+}
+
 async function main() {
   const servidor = await asegurarServidor();
   const navegador = await lanzar();
@@ -160,6 +190,7 @@ async function main() {
       await ctx.close();
     }
     const menu = await probarMenu(navegador, problemas);
+    const almacenamiento = await probarAlmacenamiento(navegador, rutas, problemas);
     // Capturas a página completa.
     fs.mkdirSync(CAPTURAS, { recursive: true });
     const hechas = [];
@@ -175,7 +206,7 @@ async function main() {
       }
       await ctx.close();
     }
-    const resumen = { fecha_revision: 'local', paginas: rutas.length, anchos: ANCHOS, cargas, menu, problemas, capturas: hechas.map((h) => path.basename(h)) };
+    const resumen = { fecha_revision: 'local', paginas: rutas.length, anchos: ANCHOS, cargas, menu, almacenamiento, problemas, capturas: hechas.map((h) => path.basename(h)) };
     fs.writeFileSync(path.join(CAPTURAS, 'revisar.json'), `${JSON.stringify(resumen, null, 1)}\n`);
     console.log(`${rutas.length} páginas × ${ANCHOS.length} anchos (${cargas} cargas) · problemas: ${problemas.length} · capturas en ${CAPTURAS}`);
     for (const p of problemas.slice(0, 60)) console.log(`  ${p.pagina} @${p.ancho}: ${p.problema}`);

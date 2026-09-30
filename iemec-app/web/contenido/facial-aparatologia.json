@@ -182,14 +182,14 @@
    "texto": [
     "El IPL emite pulsos de luz de amplio espectro. La luz la absorben el pigmento de las manchas (la melanina) y la sangre de los vasos dilatados (la hemoglobina); al calentarse, esas lesiones se atenúan y el tono se unifica. Además estimula el colágeno, lo que ayuda a mejorar la textura de la piel.",
     "Está indicado para manchas solares y otras hiperpigmentaciones, rojeces y pequeños vasos del rostro. No es adecuado para pieles muy oscuras ni para manchas muy profundas: por eso valoramos cada caso antes de empezar.",
-    "En IEMEC lo aplica personal de enfermería, tras una valoración médica en la que revisamos tu piel y te explicamos los posibles efectos y contraindicaciones. Con cada pulso de luz se nota un golpe de calor o un ligero pinchazo, y al terminar puedes seguir con tu rutina."
+    "En IEMEC lo aplica personal de enfermería [PENDIENTE: confirmar quién lo hace], tras una valoración médica en la que revisamos tu piel y te explicamos los posibles efectos y contraindicaciones. Con cada pulso de luz se nota un golpe de calor o un ligero pinchazo, y al terminar puedes seguir con tu rutina."
    ],
    "sesion": {
     "duracion": "Unos 30 minutos",
     "sesiones": "Entre 3 y 6, cada 3 o 4 semanas",
     "anestesia": null,
     "recuperacion": "Mínima: rojez o hinchazón leve que suele irse en horas",
-    "profesional": "Enfermería, con valoración médica previa [PENDIENTE: confirmar]"
+    "profesional": "Enfermería, con valoración médica previa [PENDIENTE: confirmar quién lo hace]"
    },
    "variantes": [],
    "resultados": "La mejoría suele notarse tras las primeras sesiones y el resultado completo llega al terminar el ciclo; varía según cada piel.",
@@ -235,11 +235,16 @@
     "https://www.treatwell.es/establecimiento/clinica-iemec/",
     "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
    ],
+   "confirmar": [
+    {
+     "tipo": "abogado",
+     "que": "Las rojeces y los pequeños vasos del rostro con luz pulsada: ¿entran en la autorización como medicina estética (U.48)? La dermatología (U.8) no está autorizada."
+    }
+   ],
    "pendiente": [
     "Quién lo realiza: el póster de la portada dice «enfermeras especializadas» y el catálogo, médico; confirmar.",
     "Confirmar las pautas de sol antes y después del IPL para añadirlas.",
     "La portada lo anuncia con precio de promoción: no se publica en esta versión.",
-    "Rosácea y acné son afecciones de la piel: confirmar que su tratamiento con IPL entra en la autorización del centro como mejora estética (U.48); la dermatología (U.8) no está autorizada.",
     "Revisión final (vuelta 9): Fuera «rosácea» del título, la meta y el texto (dermatología, U.8, no autorizada; regla 11) y «especializada» (sugiere una especialidad oficial de enfermería). Quién lo aplica sigue [PENDIENTE] visible."
    ]
   },
@@ -590,8 +595,13 @@
    "fuentes": [
     "https://iemec-clinic.com/facial#oxigenoterapia-hiperbarica-facial"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿El ácido hialurónico y los demás activos que se aplican son cosméticos de uso tópico?"
+    }
+   ],
    "pendiente": [
-    "Confirmar que el ácido hialurónico y los demás activos son cosméticos de uso tópico (la web no nombra el producto).",
     "Revisión final (vuelta 9): Fuera «hiperbárica»: es un término de la medicina hiperbárica (cámara presurizada), que la autorización no incluye y que no hace un aparato de cabina."
    ]
   },
@@ -793,10 +803,15 @@
     "https://www.treatwell.es/establecimiento/clinica-iemec/",
     "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Qué es el «Peeling BBC» (qué producto lleva y quién lo hace) y lo ofrecéis con ese nombre? Solo sale en Treatwell."
+    }
+   ],
    "pendiente": [
     "Producto y tipos de peeling médico: no publicados; confirmar (sin marcas en la web).",
     "Duración (unos 30 minutos) y ciclo de 4-6 sesiones cada dos semanas son datos del sector: confirmar.",
-    "«Peeling BBC» solo aparece en Treatwell: confirmar qué es y si se mantiene el nombre.",
     "Confirmar los cuidados tras un peeling más intenso (descamación, días sin sol)."
    ]
   },
@@ -886,8 +901,13 @@
     "https://iemec-clinic.com/facial#acne",
     "https://www.treatwell.es/establecimiento/clinica-iemec/"
    ],
+   "confirmar": [
+    {
+     "tipo": "abogado",
+     "que": "La piel con tendencia acneica y sus marcas se presentan como medicina estética (U.48), sin tratar el acné como enfermedad, y el acné activo va a la valoración médica: ¿vale así? La dermatología (U.8) no está autorizada."
+    }
+   ],
    "pendiente": [
-    "Autorización: el acné se trata aquí con fines estéticos (U.48); la dermatología (U.8) no está autorizada, así que no se ofrece tratamiento médico del acné. Confirmar.",
     "La web actual atribuye al microneedling para el acné reducir la inflamación y eliminar las bacterias: aquí se formula con prudencia; el equipo médico decide qué se puede afirmar.",
     "«Tratamiento de acné Xebor» (Treatwell): aquí va sin marca, como «tratamiento facial del acné activo»; confirmar si se nombra la línea cosmética.",
     "Confirmar si el acné moderado o grave lo valora el equipo médico de la clínica y cómo se indica en la web.",
@@ -977,8 +997,13 @@
     "https://iemec-clinic.com/facial#acne",
     "https://www.treatwell.es/establecimiento/clinica-iemec/"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis la limpieza facial profunda tal como se describe? Solo sale en Treatwell."
+    }
+   ],
    "pendiente": [
-    "La limpieza facial profunda solo figura en Treatwell: confirmar que se ofrece tal cual.",
     "Frecuencia recomendada de las limpiezas: no publicada."
    ]
   },
@@ -1046,8 +1071,13 @@
    "fuentes": [
     "https://iemec-clinic.com/facial#bb-glow"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿Qué sérum se usa (el que lleva pigmento) y cuál es su régimen legal? Un cosmético no se introduce en la piel con microagujas."
+    }
+   ],
    "pendiente": [
-    "Confirmar el sérum que se usa (la web no lo nombra) y su régimen legal.",
     "Duración (unos 60 minutos) y ciclo de 3-4 sesiones son datos del sector: confirmar.",
     "Confirmar que las pautas tras el microneedling (72 horas sin piscina ni mar) valen también para el BB Glow, y cuánto se mantiene el efecto.",
     "Revisión final (vuelta 9): «No invasivo» pasa a «mínimamente invasivo» (las microagujas atraviesan la capa superficial de la piel) y se añaden los riesgos. Confirmar el régimen del sérum con pigmento: un cosmético no se introduce en la piel (normas.md, apartado c)."
@@ -1199,9 +1229,13 @@
     "https://iemec-clinic.com/facial",
     "https://www.treatwell.es/establecimiento/clinica-iemec/"
    ],
-   "pendiente": [
-    "El masaje Kobido suelto solo figura en Treatwell: confirmar que se ofrece."
-   ]
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis el masaje Kobido suelto? Solo sale en Treatwell."
+    }
+   ],
+   "pendiente": []
   },
   {
    "slug": "protocolos-con-microneedling",
@@ -1279,8 +1313,13 @@
     "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec",
     "https://iemec-clinic.com/"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿Qué productos llevan los dos protocolos (exosomas en uno; PDRN, «ADN de salmón», en el otro) y cuál es su régimen legal? Solo podrían citarse como ingrediente cosmético de uso tópico, sin efectos terapéuticos y nunca inyectados."
+    }
+   ],
    "pendiente": [
-    "Régimen legal sin confirmar de los activos (exosomas en uno; PDRN, «ADN de salmón», en el otro): confirmar producto y régimen antes de publicar. Según las normas, solo podrían citarse como ingrediente cosmético de uso tópico, sin efectos terapéuticos (regenerar, cicatrizar) y nunca inyectados.",
     "Nombres comerciales actuales «Dermapeel con exosomas» y «ADN Salmón Glow»: nombran el producto; aquí van con nombre descriptivo. Decidir si se usan.",
     "Precio de promoción: no se publica en esta versión.",
     "Número de sesiones recomendado: no publicado."
@@ -1344,8 +1383,13 @@
    "fuentes": [
     "https://iemec-clinic.com/facial#bb-lips"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿Qué técnica y qué producto se usan en BB Lips, y cuál es su régimen legal? La web actual no los describe; el catálogo lo clasifica como microneedling."
+    }
+   ],
    "pendiente": [
-    "Régimen legal sin confirmar: confirmar la técnica y el producto (la web no los describe; el catálogo lo clasifica como microneedling) antes de publicar.",
     "Duración y número de sesiones: el catálogo da 60 minutos y 3-4 sesiones como datos del sector; confirmar.",
     "La web actual habla de un ligero aumento de volumen: aquí no se menciona; confirmar."
    ]
@@ -1412,11 +1456,19 @@
    "fuentes": [
     "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis la eliminación de lunares y lesiones con plasma? ¿Qué lesiones tratáis y qué hacéis con una que parezca sospechosa (análisis, derivación)? Solo sale en Multiestetica."
+    },
+    {
+     "tipo": "abogado",
+     "que": "¿Se puede anunciar? Lunares y verrugas son lesiones de la piel (la dermatología, U.8, no está autorizada: ¿entra como cirugía menor ambulatoria, U.64, o medicina estética, U.48?), y el RD 1907/1996 (art. 4.1) prohíbe la publicidad de tratamientos de enfermedades transmisibles y tumorales."
+    }
+   ],
    "pendiente": [
-    "Solo figura en Multiestetica («Lunares», con Plexr y valoración médica previa): confirmar qué lesiones se tratan y qué se hace si una lesión es sospechosa (análisis, derivación).",
     "Duración (unos 15 minutos) y número de sesiones son datos del sector o del catálogo: confirmar.",
     "Confirmar los cuidados posteriores para publicarlos.",
-    "Autorización: confirmar que la eliminación de lesiones cutáneas entra como cirugía menor ambulatoria (U.64) o mejora estética (U.48); la dermatología (U.8) no está autorizada.",
     "Multiestetica cita el equipo (Plexr): las normas no permiten anunciar marcas de equipos de uso profesional, así que no se nombra."
    ]
   },

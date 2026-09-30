@@ -12,8 +12,10 @@ function decodificar(s) {
   });
 }
 
+// Sin las notas para la revisión (<aside class="nota-interna">): solo salen en la vista previa, para el
+// médico y el abogado, y no son la web (con --publicar no llegan nunca: lanzamiento.js · textosDeTrabajo).
 function textoVisible(html) {
-  const cuerpo = html.replace(/<head>[\s\S]*?<\/head>/i, ' ');
+  const cuerpo = html.replace(/<head>[\s\S]*?<\/head>/i, ' ').replace(/<aside class="nota-interna[^"]*"[\s\S]*?<\/aside>/gi, ' ');
   return decodificar(cuerpo
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')

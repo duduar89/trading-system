@@ -4,6 +4,8 @@
 const { html, crudo, texto, pendiente } = require('./html');
 const { icono } = require('./iconos');
 const B = require('./base');
+const L = require('./legal');
+const { TIPOS_CONFIRMAR } = require('./lanzamiento');
 
 const recortar = (s, n) => {
   const t = String(s || '').trim();
@@ -12,6 +14,7 @@ const recortar = (s, n) => {
   return `${corte.slice(0, Math.max(corte.lastIndexOf(' '), n - 20)).replace(/[,;:.\s]+$/, '')}…`;
 };
 const minusculaInicial = (s) => s.charAt(0).toLowerCase() + s.slice(1);
+const mayusculaInicial = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // Título ≤ 65 caracteres y descripción entre 70 y 160.
 function tituloSeo(base, extra = ' · IEMEC Boadilla del Monte') {
@@ -98,7 +101,7 @@ function inicio(ctx) {
 <div>
 <p class="etiqueta">Boadilla del Monte · Madrid</p>
 <h1 id="titulo-portada">Medicina estética y capilar <em>en Boadilla del Monte</em></h1>
-<p class="lema">${s.frase}</p>
+<p class="lema">${B.frase(ctx)}</p>
 <div class="acciones">${botonWhatsapp(wa)}<a class="boton boton-claro" href="/tratamientos/">Ver tratamientos</a></div>
 <p class="sello">${icono('escudo')}${s.registro_sanitario.texto_corto}</p>
 </div>
@@ -127,7 +130,7 @@ ${recepcion ? html`<figure class="portada-foto"><div class="marco-dorado">${B.im
 <div class="titulo-seccion">
 <p class="etiqueta">Especialidades</p>
 <h2 id="t-especialidades">Todo lo que hacemos, <em>en un mismo lugar</em></h2>
-<p class="entrada">Medicina estética, medicina y cirugía capilar y cirugía estética, cada una con su equipo.</p>
+<p class="entrada">${mayusculaInicial(B.areas(ctx))}, cada una con su equipo.</p>
 </div>
 <div class="rejilla rejilla-4">${ctx.especialidades.map((e) => tarjetaEspecialidad(e))}
 <article class="tarjeta tarjeta-especialidad tarjeta-todas">
@@ -169,7 +172,7 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
   return {
     ruta: '/', tipo: 'inicio', whatsapp: wa, ref: 'web-inicio',
     titulo: 'IEMEC · Medicina estética y capilar en Boadilla del Monte',
-    descripcion: 'Instituto Europeo de Medicina Estética y Capilar en Boadilla del Monte: medicina estética facial y corporal, medicina y cirugía capilar y cirugía estética.',
+    descripcion: descripcionSeo(`Instituto Europeo de Medicina Estética y Capilar en Boadilla del Monte: ${B.areas(ctx, { detalle: true })}.`),
     cuerpo,
   };
 }
@@ -213,7 +216,9 @@ function especialidad(ctx, e) {
   const preguntasEsp = html`<div class="preguntas-especialidad"><h2 class="solo-lector">Preguntas frecuentes</h2>${B.preguntas(e.preguntas)}</div>`;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: 'Especialidad', titulo: e.titulo, entradilla: e.entradilla, adorno: e.slug,
-    extra: e.pendiente ? html`<p class="entrada">${pendiente(e.pendiente)}</p>` : '',
+    // La nota de la especialidad: en la vista previa y, si es de un dato imprescindible (qué cubre la
+    // autorización), también al publicar, para que --publicar no deje publicar sin ella.
+    extra: e.pendiente && (!ctx.publicar || ctx.imprescindible(e.pendiente)) ? html`<p class="entrada">${pendiente(e.pendiente)}</p>` : '',
     acciones: html`${botonWhatsapp(wa)}<a class="boton boton-claro" href="#tratamientos">${e.paginas.length === 1 ? 'Ver el tratamiento' : 'Ver los tratamientos'}</a>`,
   })}
 <section class="seccion" id="tratamientos" aria-labelledby="t-lista">
@@ -246,16 +251,28 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
 }
 
 // ── Tratamiento ─────────────────────────────────────────────────────────────────────────────
-// Quién la opera: hasta que la clínica dé nombre, especialidad oficial y número de colegiado
-// (normas.md, apartado j), se ve el hueco.
+// Quién la opera: quien diga operarla en web/datos/equipo.json («opera») con su número de colegiado
+// (normas.md, apartado j). Hasta entonces se ve el hueco, que es imprescindible para publicar
+// (lanzamiento.json → cirugias).
 const PENDIENTE_CIRUJANO = 'nombre, especialidad oficial y n.º de colegiado';
-const quienOpera = (p) => (/\[PENDIENTE|colegiad/i.test(p.profesional || '') ? p.profesional : `${p.profesional || 'Cirujano'} [PENDIENTE: ${PENDIENTE_CIRUJANO}]`);
-const dondeOpera = (p) => p.sesion?.donde || '[PENDIENTE: centro donde se opera]';
+function quienOpera(p) {
+  const conDatos = (p.operan || []).filter((x) => L.tiene(x.colegiado));
+  if (conDatos.length) return conDatos.map(L.quienEs).join(' o ');
+  return /\[PENDIENTE|colegiad/i.test(p.profesional || '') ? p.profesional : `${p.profesional || 'Cirujano'} [PENDIENTE: ${PENDIENTE_CIRUJANO}]`;
+}
+const dondeOpera = (p, e) => p.sesion?.donde || e?.donde_cirugia || '[PENDIENTE: dónde se opera]';
+
+// La política con menores (sitio.json → politica_menores): hasta tenerla, en la vista previa sale el
+// hueco y al publicar no se dice nada de la edad (lanzamiento.json → menores).
+function edad(ctx) {
+  if (ctx.sitio.politica_menores) return ` ${ctx.sitio.politica_menores}`;
+  return ctx.publicar ? '' : ' Solo para mayores de edad [PENDIENTE: política con menores].';
+}
 
 // El recuadro del principio según la clase de la página (web/lib/modelo.js): la cirugía, lo médico y
 // lo que requiere una valoración previa sin que conste quién la hace. En la propia consulta de
 // valoración no sale (sería «antes de la valoración, una valoración»).
-function aviso(p) {
+function aviso(ctx, p, e) {
   // «Lo realiza: equipo médico.»: en minúscula tras los dos puntos, salvo un nombre propio («Dr. …»).
   const minuscula = (s) => (s && !/^(Dr|Dra)\b/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
   if (p.clase === 'cirugia') {
@@ -263,7 +280,7 @@ function aviso(p) {
     return html`<div class="aviso-medico" role="note">
 <p class="aviso-titulo">${icono('medico')}Cirugía: requiere una consulta previa</p>
 <p>Antes de operarte tienes una consulta de valoración: ${quien} estudia tu caso y te explica la técnica, la anestesia, la recuperación, los riesgos y las alternativas. Antes de la intervención firmas el consentimiento informado por escrito. El resultado varía según cada persona.</p>
-<p>${texto(`Lo realiza: ${minuscula(quienOpera(p))}. Dónde: ${minuscula(dondeOpera(p))}. Solo para mayores de edad [PENDIENTE: política con menores].`)}</p>
+<p>${texto(`Lo realiza: ${minuscula(quienOpera(p))}. Dónde: ${minuscula(dondeOpera(p, e))}.${edad(ctx)}`)}</p>
 </div>`;
   }
   if (p.clase === 'medico') {
@@ -273,12 +290,28 @@ function aviso(p) {
 </div>`;
   }
   if (p.clase === 'previa') {
+    // Quién valora depende del producto (lanzamiento.json → valoracion-previa): sesion.valoracion.
+    const valora = p.sesion?.valoracion ? ` La valoración la hace ${p.sesion.valoracion}.` : ctx.publicar ? '' : ' La valoración la hace [PENDIENTE: médico o equipo de estética, según el producto].';
     return html`<div class="aviso-medico aviso-previa" role="note">
 <p class="aviso-titulo">${icono('valoracion')}Requiere valoración previa</p>
-<p>${texto(`Antes de hacerlo valoramos tu caso y te explicamos la técnica, el producto que se usa, los cuidados, los riesgos y las contraindicaciones. El resultado varía según cada persona.${p.profesional ? ` Lo realiza: ${minuscula(p.profesional)}.` : ''} La valoración la hace [PENDIENTE: médico o equipo de estética, según el producto].`)}</p>
+<p>${texto(`Antes de hacerlo valoramos tu caso y te explicamos la técnica, el producto que se usa, los cuidados, los riesgos y las contraindicaciones. El resultado varía según cada persona.${p.profesional ? ` Lo realiza: ${minuscula(p.profesional)}.` : ''}${valora}`)}</p>
 </div>`;
   }
   return '';
+}
+
+// En la vista previa, lo que falta de cada página, para quien la revisa (el médico, el abogado y la
+// clínica): lo que hay que confirmar antes de publicarla (web/contenido/*.json → «confirmar»:
+// imprescindible, lanzamiento.json → paginas-por-confirmar) y las notas de redacción («pendiente»). No
+// se publica nunca y no cuenta como texto de la página (web/lib/revision.js · textoVisible).
+function notasRevision(p) {
+  const confirmar = p.confirmar || [];
+  const notas = p.origen === 'provisional' ? [] : p.pendiente || [];
+  if (!confirmar.length && !notas.length) return '';
+  return html`<aside class="nota-interna nota-pagina"><p class="etiqueta">Nota para la revisión · no se publicará</p>
+${confirmar.length ? html`<p><strong>Antes de publicarla, la clínica tiene que confirmar:</strong></p><ul>${confirmar.map((c) => html`<li><strong>${TIPOS_CONFIRMAR[c.tipo] || c.tipo}.</strong> ${c.que}</li>`)}</ul>` : ''}
+${notas.length ? html`<p><strong>Notas de redacción, para el visto bueno médico:</strong></p><ul>${notas.map((n) => html`<li>${n}</li>`)}</ul>` : ''}
+</aside>`;
 }
 
 function tratamiento(ctx, p) {
@@ -294,14 +327,14 @@ function tratamiento(ctx, p) {
     ['reloj', 'Duración', s.duracion], ['calendario', 'Sesiones', s.sesiones], ['tratamiento', 'Anestesia', s.anestesia],
     // En la cirugía y en la consulta con el cirujano, «Lo realiza» lleva el hueco del cirujano.
     ['seguimiento', 'Recuperación', s.recuperacion], ['medico', 'Lo realiza', p.cirugia || /cirujan/i.test(p.profesional || '') ? quienOpera(p) : p.profesional],
-    ['pin', 'Dónde', p.cirugia ? dondeOpera(p) : s.donde],
+    ['pin', 'Dónde', p.cirugia ? dondeOpera(p, e) : s.donde],
   ].filter(([, , v]) => v);
   const rapidos = [];
   if (s.duracion) rapidos.push(html`<li>${icono('reloj')}${s.duracion}</li>`);
   if (s.sesiones) rapidos.push(html`<li>${icono('calendario')}${s.sesiones}</li>`);
   // Primero el aviso (y, en el móvil, la ficha justo después: van antes que el texto en el HTML y,
   // en escritorio, la ficha pasa a la columna de la derecha).
-  const avisos = `${p.origen === 'provisional' ? html`<div class="aviso-provisional" role="note"><p>${pendiente('página provisional hecha desde el catálogo; la sustituye el texto final de su grupo cuando llegue')}</p></div>` : ''}${aviso(p)}`;
+  const avisos = `${ctx.publicar ? '' : notasRevision(p)}${p.origen === 'provisional' ? html`<div class="aviso-provisional" role="note"><p>${pendiente('página provisional hecha desde el catálogo; la sustituye el texto final de su grupo cuando llegue')}</p></div>` : ''}${aviso(ctx, p, e)}`;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: e.nombre, titulo: p.titulo, entradilla: p.entradilla, adorno: (p.preocupaciones || [])[0] || e.slug,
     extra: rapidos.length ? html`<ul class="datos-rapidos">${rapidos}</ul>` : '',
@@ -382,7 +415,7 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
   return {
     ruta: '/tratamientos/', tipo: 'tratamientos', whatsapp: wa, ref: 'web-tratamientos', migas: pasos,
     titulo: 'Todos los tratamientos · IEMEC Boadilla del Monte',
-    descripcion: `Los ${total} tratamientos de IEMEC en Boadilla del Monte: medicina estética facial y corporal, medicina y cirugía capilar y cirugía estética.`,
+    descripcion: descripcionSeo(`Los ${total} tratamientos de IEMEC en Boadilla del Monte: ${B.areas(ctx, { detalle: true })}.`),
     cuerpo,
   };
 }
@@ -391,10 +424,23 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
 function iniciales(nombre) {
   return nombre.replace(/^(Dra?\.)\s+/, '').split(/\s+/).slice(0, 2).map((x) => x[0]).join('');
 }
+// Titulación y colegiación de cada persona (web/datos/equipo.json): lo que consta; lo que falta, como
+// hueco en la vista previa y sin decir nada al publicar (lanzamiento.json → equipo).
+function colegiado(ctx, p) {
+  const datos = L.datosProfesionales(p);
+  const falta = !ctx.publicar && p.pendiente ? pendiente(p.pendiente) : '';
+  if (!datos && !falta) return '';
+  return html`<p class="colegiado">${datos}${datos && falta ? ' ' : ''}${falta}</p>`;
+}
+
 function equipoPagina(ctx) {
   const wa = B.urlWhatsapp(ctx, B.INTERES_GENERAL, 'web-equipo');
   const pasos = [{ nombre: 'Inicio', ruta: '/' }, { nombre: 'Equipo', ruta: '/equipo/' }];
   const est = ctx.datos.equipo.estetica;
+  const resp = L.responsable(ctx.datos);
+  const responsableEquipo = resp
+    ? html`<p class="nota-equipo">Responsable asistencial (dirección médica): ${L.quienEs(resp)}</p>`
+    : ctx.publicar ? '' : html`<p class="nota-equipo">Responsable asistencial (dirección médica): ${pendiente(ctx.datos.equipo.responsable_pendiente)}</p>`;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: 'El equipo', titulo: html`Las personas <em>de IEMEC</em>`, adorno: 'medico',
     entradilla: 'Cada tratamiento lo hace el profesional que le corresponde, siempre con una valoración previa.',
@@ -408,24 +454,24 @@ ${ctx.equipoVisible.map((p) => html`<li class="tarjeta persona">
 <h3>${p.nombre}</h3>
 <p class="cargo">${p.cargo}</p>
 <p class="bio">${texto(p.bio)}</p>
-<p class="colegiado">${pendiente(p.pendiente)}</p>
+${colegiado(ctx, p)}
 </li>`)}
 <li class="tarjeta persona">
 <div class="retrato"><span class="monograma" aria-hidden="true">${icono('tratamiento')}</span></div>
 <h3>${est.nombre}</h3>
 <p class="cargo">Cabina y head spa</p>
 <p class="bio">${est.texto}</p>
-<p class="colegiado">${pendiente(est.pendiente)}</p>
+${ctx.publicar || !est.pendiente ? '' : html`<p class="colegiado">${pendiente(est.pendiente)}</p>`}
 </li>
 </ul>
-<p class="nota-equipo">Responsable asistencial (dirección médica): ${pendiente(ctx.datos.equipo.responsable_pendiente)}</p>
+${responsableEquipo}
 </div>
 </section>
 ${llamadaFinal(ctx, { whatsapp: wa })}`;
   return {
     ruta: '/equipo/', tipo: 'equipo', whatsapp: wa, ref: 'web-equipo', migas: pasos,
     titulo: 'Equipo médico y de estética · IEMEC Boadilla del Monte',
-    descripcion: 'Conoce al equipo de IEMEC en Boadilla del Monte: medicina estética, cirugía estética, área capilar y equipo de estética, con sus datos.',
+    descripcion: descripcionSeo(`Conoce al equipo de IEMEC en Boadilla del Monte: los profesionales de ${B.areas(ctx)} y el equipo de estética.`),
     cuerpo,
   };
 }
@@ -494,7 +540,7 @@ function tarjetasRegalo(ctx) {
   })}
 <section class="seccion" aria-labelledby="t-importes">
 <div class="contenedor">
-<div class="titulo-seccion"><p class="etiqueta">Importes</p><h2 id="t-importes">Elige el importe</h2><p class="entrada">Pídela por WhatsApp con el importe ya escrito y te explicamos cómo recibirla. ${pendiente(t.pago_pendiente)}</p></div>
+<div class="titulo-seccion"><p class="etiqueta">Importes</p><h2 id="t-importes">Elige el importe</h2><p class="entrada">Pídela por WhatsApp con el importe ya escrito y te explicamos cómo recibirla. ${t.precio}${ctx.publicar ? '' : html` ${pendiente(t.pago_pendiente)}`}</p></div>
 <ul class="importes">${t.importes.map((i) => html`<li class="tarjeta importe">
 <div class="tarjeta-regalo-visual terciopelo" aria-hidden="true"><span class="marca-mini">IEMEC</span><span class="cifra-mini">${i} €</span></div>
 <h3>${i} €</h3>
@@ -510,7 +556,7 @@ function tarjetasRegalo(ctx) {
 <p>${t.estuche.texto}</p>
 <h3>Condiciones</h3>
 <ul class="lista-rombo lista-condiciones">${t.condiciones.map((c) => html`<li>${c}</li>`)}</ul>
-<p>${pendiente(t.condiciones_pendiente)}</p>
+${ctx.publicar ? '' : html`<p>${pendiente(t.condiciones_pendiente)}</p>`}
 </div>
 ${ctx.foto(t.estuche.foto) ? html`<figure class="foto-marco"><div class="marco-dorado">${B.imagen(ctx, t.estuche.foto, { tamanos: '(min-width: 900px) 560px, 92vw' })}</div><figcaption>Los estuches de las tarjetas regalo.</figcaption></figure>` : ''}
 </div>
@@ -520,7 +566,7 @@ ${ctx.foto(t.estuche.foto) ? html`<figure class="foto-marco"><div class="marco-d
 <p class="etiqueta">Tarjetas de la web anterior</p>
 <h2 id="t-antiguas">¿Ya tienes una tarjeta?</h2>
 <p>${t.antiguas}</p>
-<p>${pendiente(t.antiguas_pendiente)}</p>
+${ctx.publicar ? '' : html`<p>${pendiente(t.antiguas_pendiente)}</p>`}
 <div class="acciones">${botonWhatsapp(B.urlWhatsapp(ctx, 'canjear una tarjeta regalo', 'web-tarjeta-canje'), 'Canjear mi tarjeta', 'boton-oscuro')}</div>
 </div>
 </section>`;
@@ -560,7 +606,7 @@ ${botonWhatsapp(wa, 'Escribir por WhatsApp', 'boton-oscuro')}
 <article class="tarjeta">
 <span class="tarjeta-icono">${icono('calendario')}</span>
 <h3>Te llamamos</h3>
-<p>Déjanos tu nombre y tu teléfono y te contactamos nosotros como prefieras: por WhatsApp, por teléfono o por correo.</p>
+<p>Déjanos tu nombre y tu teléfono y te contactamos nosotros como prefieras: ${B.conWhatsapp(ctx) ? 'por WhatsApp, por teléfono o por correo' : 'por teléfono o por correo'}.</p>
 <a class="boton boton-linea" href="#formulario">Rellenar el formulario</a>
 </article>
 </div>
@@ -600,21 +646,24 @@ function legal(ctx, { ruta, titulo, tituloSeo: tSeo, descripcion, contenido, eti
   const pasos = [{ nombre: 'Inicio', ruta: '/' }, { nombre: titulo, ruta }];
   const cuerpo = html`${cabeceraPagina({ pasos, etiqueta, titulo, adorno: 'escudo' })}
 <div class="contenedor prosa">
-<div class="aviso-borrador-legal" role="note"><p>${pendiente('revisión del abogado sanitario y del DPD')}</p></div>
+${ctx.publicar ? '' : html`<div class="aviso-borrador-legal" role="note"><p>${pendiente('revisión del abogado sanitario y del DPD')}</p></div>`}
 ${contenido}
 </div>`;
   return { ruta, tipo: 'legal', migas: pasos, titulo: tSeo, descripcion, cuerpo, ref: `web-${ruta.replace(/\//g, '')}` };
 }
 
 // ── Gracias y 404 ───────────────────────────────────────────────────────────────────────────
-// Quien pide WhatsApp recibe antes uno de confirmación (el formulario es anónimo: la app no escribe con
-// lo que puso nadie hasta que el dueño del teléfono dice que fue él); si prefiere no esperar, puede
-// escribirnos él.
+// Si el formulario ofrece WhatsApp, quien lo pide recibe antes uno de confirmación (el formulario es
+// anónimo: la app no escribe con lo que puso nadie hasta que el dueño del teléfono dice que fue él); si
+// prefiere no esperar, puede escribirnos él. Sin WhatsApp en el formulario, llamada o correo.
 function gracias(ctx) {
   const wa = B.urlWhatsapp(ctx, B.INTERES_GENERAL, 'web-gracias');
   const cuerpo = html`${cabeceraPagina({
     titulo: html`Gracias. <em>Hemos recibido tu solicitud.</em>`,
-    entradilla: 'Si has elegido WhatsApp, te escribiremos desde el +34 722 83 32 85 para confirmar que la solicitud es tuya: contesta «Sí, fui yo» y seguimos por ahí. Si has elegido llamada o correo, te contactaremos en horario de la clínica.',
+    // La confirmación por WhatsApp, solo si el formulario lo ofrece (sitio.json → formulario.whatsapp).
+    entradilla: B.conWhatsapp(ctx)
+      ? 'Si has elegido WhatsApp, te escribiremos desde el +34 722 83 32 85 para confirmar que la solicitud es tuya: contesta «Sí, fui yo» y seguimos por ahí. Si has elegido llamada o correo, te contactaremos en horario de la clínica.'
+      : 'Te contactaremos por el medio que has elegido en horario de la clínica. Si prefieres no esperar, escríbenos por WhatsApp: verás nuestro número, +34 722 83 32 85.',
     acciones: html`${botonWhatsapp(wa, 'Escríbenos ya por WhatsApp')}<a class="boton boton-claro" href="/">Volver al inicio</a>`,
   })}`;
   return { ruta: '/gracias/', tipo: 'gracias', whatsapp: wa, ref: 'web-gracias', indexable: false, titulo: 'Gracias · IEMEC', descripcion: 'Hemos recibido tu solicitud en IEMEC, Boadilla del Monte. Te contactaremos por el medio que has elegido en horario de la clínica.', cuerpo };

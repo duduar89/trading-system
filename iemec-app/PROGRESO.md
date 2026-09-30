@@ -6,7 +6,7 @@ tratamiento; reseñas con las normas de Google y adaptadores reales de Google y 
 de Flowww espera su primera exportación. **La web nueva está hecha y revisada** (95 páginas, con el
 formulario conectado a la app): se publica cuando la clínica complete lo pendiente (⛔ 12). Falta conectar las cuentas reales (envío de WhatsApp, Google, IA)
 y los datos de la clínica, que esperan las puertas ⛔.
-**Última actualización:** 30-sep-2026 · **959 pruebas en verde** · ESLint limpio
+**Última actualización:** 30-sep-2026 · **965 pruebas en verde** · ESLint limpio
 
 El encargo completo está en [`docs/ENCARGO.md`](docs/ENCARGO.md). Este fichero dice dónde estamos:
 se lee al empezar cada vuelta del loop y se actualiza al terminarla.
@@ -26,7 +26,7 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
 
 ## Pruebas
 
-`npm test` con MariaDB local (10.11): **959 pruebas en verde**. Lo más importante:
+`npm test` con MariaDB local (10.11): **965 pruebas en verde**. Lo más importante:
 
 - **Agenda:** hora de Madrid, limpiezas, crema anestésica, comidas, aparatos, festivos, diez reservas
   a la vez → una; horas redondas.
@@ -92,13 +92,16 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
 10. **Facturación:** fuera de la app; decidir cómo pasa la cita a la facturación.
 11. **Lista de espera:** los valores son recomendaciones (retención 30 min, antelación 2 h, envíos de
     9:00 a 21:00, dos ofertas sin contestar y sale de la lista).
-12. **Web nueva (antes de publicarla):** los datos marcados [PENDIENTE] (horario del sábado, correo del
-    dominio, Registro Mercantil, titulación y n.º de colegiado de cada profesional, quién opera y
-    dónde, emblema FSE+, logotipo vectorial, fotos nuevas); **qué cubre la autorización CS17886** (peso
-    y nutrición, ginecología funcional, varices e hiperhidrosis quedan en borrador; capilar, U.900);
-    revisión médica de 63 páginas y del abogado sanitario y el DPD; pago online de las tarjetas regalo;
-    y el cambio de iemec-clinic.com de SITE123 al hosting propio (acceso al DNS, a través de Uebea).
-    `node web/construir.js --publicar` no deja publicar mientras quede algo pendiente a la vista.
+12. **Web nueva (antes de publicarla):** todo en [`docs/LANZAR-WEB.md`](docs/LANZAR-WEB.md), y para la
+    clínica un PDF «Lo que necesitamos». Diez imprescindibles: correo con el dominio (hoy no tiene
+    correo), delegado de protección de datos, quién opera cada cirugía y dónde, 37 preguntas en 33
+    páginas (si se ofrece y con qué producto), quién hace el diagnóstico capilar, título y n.º de
+    colegiado de quien se nombra, qué cubre la U.900, lo íntimo dentro de la autorización, y los
+    vistos buenos del médico responsable y del abogado sanitario y el DPD. De Uebea: el registro A
+    del dominio (Namecheap), el correo del dominio y el subdominio agenda. Ya resuelto con fuentes
+    oficiales: Registro Mercantil y domicilio social (BORME), la puerta 35-36 del registro de centros
+    y el emblema oficial del FSE+. `node web/construir.js --publicar` no deja publicar sin los diez;
+    se puede lanzar sin las páginas que tarden (p. ej., sin cirugía).
 
 ## Registro de vueltas
 
@@ -159,3 +162,10 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
   pide WhatsApp recibe un «¿fuiste tú?» neutro y solo con su «sí» sigue; la casilla comercial manda y
   pasa a la ficha con su prueba; lo pedido va cifrado; topes por IP, por teléfono y global; borrado en
   plazo. Se deja escrito qué hace falta para lanzar la web (docs/LANZAR-WEB.md, en marcha).
+- **30-sep · vuelta 9c · lista para lanzar.** La web no se puede subir desde aquí (no hay acceso al
+  hosting ni al DNS, que lleva Uebea) ni se publica en otro sitio: queda lista para subirla en un paso.
+  Lo pendiente se clasifica (imprescindible, se oculta con una frase cierta o se completa con fuentes
+  oficiales) y `--publicar` hace la versión para subir. Una revisión legal encontró 13 fallos (entre
+  ellos, que las dudas de los redactores no las controlaba nada), todos arreglados. Entregado: docs/
+  LANZAR-WEB.md y el PDF para la clínica. Queda una carrera real en servidor/acceso.js (desactivar a
+  alguien mientras completa su alta), a revisar en la próxima vuelta.

@@ -541,8 +541,13 @@
     "https://iemec-clinic.com/blog/la-lipolisis-duele-todo-lo-que-debes-saber-sobre-el-tratamiento-para-grasa-localizada",
     "https://iemec-clinic.com/blog/que-cuidados-debo-tener-despues-de-la-lipolisis"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿Qué producto se infiltra y cuál es su régimen legal (producto sanitario o medicamento)?"
+    }
+   ],
    "pendiente": [
-    "Producto sanitario de uso profesional: no se nombra el producto; confirmar cuál se usa y su régimen legal.",
     "Confirmar la duración real de la sesión (la del catálogo es estimada).",
     "El blog llama «lipólisis» tanto a este tratamiento como al lipoláser: conviene aclararlo."
    ]
@@ -623,9 +628,14 @@
     "https://iemec-clinic.com/blog/como-eliminar-la-retencion-de-liquidos-antes-del-verano-tratamientos-recomendados",
     "https://iemec-clinic.com/blog/que-es-la-presoterapia-y-como-puede-ayudarte-a-reducir-la-retencion-de-liquidos-en-verano"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "Mesoterapia de la grasa localizada: ¿qué productos se usan y cuál es su régimen legal?"
+    }
+   ],
    "pendiente": [
     "La web actual llama a la variante de celulitis «Mesoterapia con Alidya»: es un producto sanitario de uso profesional y la marca no puede usarse como reclamo; aquí va como «Mesoterapia para la celulitis».",
-    "Confirmar qué productos se usan en la mesoterapia de grasa localizada y su régimen legal.",
     "Confirmar la duración y el número de sesiones de cada variante."
    ]
   },
@@ -926,8 +936,13 @@
    "fuentes": [
     "https://www.treatwell.es/establecimiento/clinica-iemec/"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis estos masajes (para la celulitis y de contorno) y cuántas sesiones recomendáis? Solo salen en Treatwell, no en la web actual."
+    }
+   ],
    "pendiente": [
-    "Estos masajes solo aparecen en Treatwell, no en la web actual: confirmar que se quieren publicar y el número de sesiones recomendado.",
     "Los nombres actuales («anticelulítico», «reductor») sugieren propiedades reductoras, que las normas no permiten (RD 1907/1996, art. 4.2): aquí son «masaje para la celulitis» y «masaje de contorno». Confirmar los nombres."
    ]
   },
@@ -1006,8 +1021,13 @@
     "https://iemec-clinic.com/corporal#subcision-para-estrias-y-cicatrices",
     "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿Se infiltra algún producto durante la subcisión? ¿Cuál, y con qué régimen legal?"
+    }
+   ],
    "pendiente": [
-    "Régimen legal sin confirmar: confirmar si se infiltra algún producto durante la subcisión.",
     "Confirmar duración, número de sesiones, anestesia y recuperación (la web actual dice «sin tiempo de recuperación»; conviene que lo valide el médico).",
     "La web actual usa el mismo texto, de cicatrices de acné, para las dos subcisiones; aquí se ha separado."
    ]
@@ -1218,9 +1238,17 @@
    "fuentes": [
     "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis la carboxiterapia? Solo sale en Multiestetica, no en la web actual."
+    },
+    {
+     "tipo": "producto",
+     "que": "¿Qué CO₂ se usa y con qué régimen legal? El CO₂ de uso médico es un gas medicinal."
+    }
+   ],
    "pendiente": [
-    "Solo aparece en Multiestetica, no en la web actual: confirmar que se ofrece y que se quiere publicar.",
-    "Régimen legal sin confirmar (CO₂ de uso médico): confirmarlo antes de publicar.",
     "Confirmar zonas, duración, número de sesiones y cómo se aplica."
    ]
   },

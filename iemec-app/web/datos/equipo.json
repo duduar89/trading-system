@@ -1,5 +1,6 @@
 {
-  "_nota": "Equipo publicado hoy en iemec-clinic.com/nosotros, con las biografías reescritas sin medicamentos, marcas ni superlativos (normas.md). «especialista» solo con título oficial. «foto»: clave de web/fotos/fotos.json (si no hay foto, sale un monograma). «requiere_especialidad» o «requiere_catalogo»: la persona solo sale si esa especialidad o esos tratamientos tienen página publicada (lo que la autorización CS17886 no cubre todavía no se anuncia).",
+  "_nota": "Equipo publicado hoy en iemec-clinic.com/nosotros, con las biografías reescritas sin medicamentos, marcas ni superlativos (normas.md). «especialista» solo con título oficial. «foto»: clave de web/fotos/fotos.json (si no hay foto, sale un monograma). «requiere_especialidad» o «requiere_catalogo»: la persona solo sale si esa especialidad o esos tratamientos tienen página publicada (lo que la autorización CS17886 no cubre todavía no se anuncia). Datos profesionales (LSSI, art. 10.1.d; normas.md, apartados f y j), cada uno null hasta que la clínica lo confirme: «titulo» (título académico oficial, p. ej. «Licenciada en Medicina»), «especialidad» (especialidad oficial reconocida en España, si la tiene), «colegio» (p. ej. «Colegio Oficial de Médicos de Madrid»), «colegiado» (número) y «titulo_extranjero» (si el título es de otro país: el Estado que lo expidió y su homologación o reconocimiento en España). «opera»: especialidades (slug) o páginas (slug) cuyas cirugías hace esa persona; con «colegiado», las páginas de cirugía dicen quién opera (imprescindible para publicarlas: lanzamiento.json → cirugias). «responsable»: el código de la persona que es responsable asistencial (dirección médica). En la vista previa, lo que falta sale como [PENDIENTE: …] («pendiente»); con --publicar se publica solo lo confirmado.",
+  "responsable": null,
   "responsable_pendiente": "nombre, titulación y n.º de colegiado",
   "personas": [
     {
@@ -7,8 +8,16 @@
       "nombre": "Dra. Maribel Perea Casado",
       "cargo": "Medicina estética",
       "bio": "Médica dedicada a la medicina estética facial: armonización del rostro, calidad de la piel y prevención del envejecimiento.",
-      "areas": ["medicina-estetica-facial"],
+      "areas": [
+        "medicina-estetica-facial"
+      ],
       "foto": "equipo-maribel-perea",
+      "titulo": null,
+      "especialidad": null,
+      "colegio": null,
+      "colegiado": null,
+      "titulo_extranjero": null,
+      "opera": [],
       "pendiente": "titulación, formación y n.º de colegiada"
     },
     {
@@ -16,8 +25,17 @@
       "nombre": "Paola Ranilla",
       "cargo": "Medicina estética",
       "bio": "Máster en Medicina Estética y Antienvejecimiento por la Universidad Complutense de Madrid, con más de diez años de experiencia. Trabaja la armonización facial, los tratamientos regenerativos y el láser médico en rostro y cuerpo.",
-      "areas": ["medicina-estetica-facial", "medicina-estetica-corporal"],
+      "areas": [
+        "medicina-estetica-facial",
+        "medicina-estetica-corporal"
+      ],
       "foto": "equipo-paola-ranilla",
+      "titulo": null,
+      "especialidad": null,
+      "colegio": null,
+      "colegiado": null,
+      "titulo_extranjero": null,
+      "opera": [],
       "pendiente": "profesión y título («Dra.»), y n.º de colegiada"
     },
     {
@@ -25,8 +43,17 @@
       "nombre": "Dra. Luisa Aleñar",
       "cargo": "Medicina estética",
       "bio": "Licenciada en Medicina, con máster en Medicina Estética y formación en nutrigenómica. Se ocupa de tratamientos corporales y de rejuvenecimiento.",
-      "areas": ["medicina-estetica-corporal", "medicina-estetica-facial"],
+      "areas": [
+        "medicina-estetica-corporal",
+        "medicina-estetica-facial"
+      ],
       "foto": "equipo-luisa-alenar",
+      "titulo": null,
+      "especialidad": null,
+      "colegio": null,
+      "colegiado": null,
+      "titulo_extranjero": null,
+      "opera": [],
       "pendiente": "n.º de colegiada y retrato nuevo en alta resolución"
     },
     {
@@ -34,8 +61,16 @@
       "nombre": "Dra. Marcela Pedraza",
       "cargo": "Medicina estética",
       "bio": "Más de quince años de experiencia en medicina estética facial y corporal. Trabaja la armonización facial, la bioestimulación y otros procedimientos mínimamente invasivos, con planes personalizados.",
-      "areas": ["medicina-estetica-facial"],
+      "areas": [
+        "medicina-estetica-facial"
+      ],
       "foto": null,
+      "titulo": null,
+      "especialidad": null,
+      "colegio": null,
+      "colegiado": null,
+      "titulo_extranjero": null,
+      "opera": [],
       "pendiente": "titulación, n.º de colegiada y retrato"
     },
     {
@@ -43,8 +78,17 @@
       "nombre": "Paula Vicent Valverde",
       "cargo": "Área capilar",
       "bio": "Estudia cada caso de forma individual, explica con detalle el diagnóstico, los objetivos y lo que se puede esperar, y adapta el tratamiento a cada persona.",
-      "areas": ["medicina-capilar", "cirugia-capilar"],
+      "areas": [
+        "medicina-capilar",
+        "cirugia-capilar"
+      ],
       "foto": "equipo-paula-vicent",
+      "titulo": null,
+      "especialidad": null,
+      "colegio": null,
+      "colegiado": null,
+      "titulo_extranjero": null,
+      "opera": [],
       "pendiente": "profesión, título y, si procede, n.º de colegiada"
     },
     {
@@ -52,18 +96,34 @@
       "nombre": "Dr. Marco Vricella",
       "cargo": "Cirugía estética",
       "bio": "Médico. Formación en cirugía plástica en la Universidad Católica del Sagrado Corazón de Roma (1992), con más de treinta años de experiencia.",
-      "areas": ["cirugia-estetica"],
+      "areas": [
+        "cirugia-estetica"
+      ],
       "foto": "equipo-marco-vricella-480",
+      "titulo": null,
+      "especialidad": null,
+      "colegio": null,
+      "colegiado": null,
+      "titulo_extranjero": null,
+      "opera": [],
       "pendiente": "reconocimiento en España del título de especialista (hasta entonces no se nombra la especialidad), n.º de colegiado y retrato en alta resolución"
     },
     {
       "codigo": "alfonso-navarro",
       "nombre": "Alfonso Navarro Ramírez",
       "cargo": "Estética íntima femenina",
-      "bio": "Atiende la consulta de estética íntima femenina: cirugía íntima y tratamientos de la zona íntima externa.",
-      "areas": ["estetica-intima-femenina"],
+      "bio": "Atiende la consulta de estética íntima femenina.",
+      "areas": [
+        "estetica-intima-femenina"
+      ],
       "requiere_especialidad": "estetica-intima-femenina",
       "foto": "equipo-alfonso-navarro",
+      "titulo": null,
+      "especialidad": null,
+      "colegio": null,
+      "colegiado": null,
+      "titulo_extranjero": null,
+      "opera": [],
       "pendiente": "profesión, especialidad oficial («Dr.») y n.º de colegiado"
     },
     {
@@ -71,9 +131,20 @@
       "nombre": "Dr. Gonzalo Orallo",
       "cargo": "Flebología y linfología",
       "bio": "Médico cirujano con formación en flebología y linfología. Miembro de la Sociedad Argentina de Flebología y Linfología.",
-      "areas": ["medicina-estetica-corporal"],
-      "requiere_catalogo": ["varices-ecoesclerosis", "laser-vascular-piernas"],
+      "areas": [
+        "medicina-estetica-corporal"
+      ],
+      "requiere_catalogo": [
+        "varices-ecoesclerosis",
+        "laser-vascular-piernas"
+      ],
       "foto": "equipo-gonzalo-orallo",
+      "titulo": null,
+      "especialidad": null,
+      "colegio": null,
+      "colegiado": null,
+      "titulo_extranjero": null,
+      "opera": [],
       "pendiente": "homologación o reconocimiento del título en España y n.º de colegiado"
     }
   ],

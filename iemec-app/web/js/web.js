@@ -5,10 +5,6 @@
   var d = document;
   var raiz = d.documentElement;
 
-  // ── Almacenamiento de sesión (puede fallar: modo privado, cookies bloqueadas…) ──────────────
-  function leer(clave) { try { return window.sessionStorage.getItem(clave); } catch (e) { return null; } }
-  function guardar(clave, valor) { try { window.sessionStorage.setItem(clave, valor); } catch (e) { /* sin almacenamiento */ } }
-
   // Huella FNV-1a de 32 bits en base 36: la misma que web/lib/modelo.js.
   function huella(s) {
     var h = 0x811c9dc5;
@@ -29,19 +25,17 @@
     } catch (e) { /* mapa roto: se queda en la página */ }
   })();
 
-  // ── Campaña: los utm_* de la visita (sin identificadores de clic de Google ni de Meta) ──────
+  // ── Campaña: los utm_* de la página a la que se llega (sin identificadores de clic de Google ni
+  // de Meta). Solo los de la dirección de esta página: no se guardan en el navegador (ni cookies ni
+  // almacenamiento), así que no hace falta consentimiento; si se pasa a otra página, se pierden.
   var CAMPOS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
   var campana = {};
   (function () {
-    var guardada = leer('iemec-campana');
-    if (guardada) { try { campana = JSON.parse(guardada) || {}; } catch (e) { campana = {}; } }
     var q = new URLSearchParams(location.search);
-    var nueva = false;
     CAMPOS.forEach(function (c) {
       var v = q.get(c);
-      if (v) { campana[c] = v.slice(0, 120); nueva = true; }
+      if (v) campana[c] = v.slice(0, 120);
     });
-    if (nueva) guardar('iemec-campana', JSON.stringify(campana));
   })();
   var codigoCampana = String(campana.utm_campaign || '').trim().toLowerCase().slice(0, 120);
 
@@ -286,6 +280,9 @@
           var nombre = String(form.elements.nombre.value || '').trim().split(/\s+/)[0];
           var pref = form.querySelector('input[name="preferencia"]:checked');
           var medio = pref && pref.value === 'llamada' ? 'teléfono' : pref && pref.value === 'correo' ? 'correo electrónico' : 'WhatsApp';
+          // El aviso de la confirmación por WhatsApp lo lleva el formulario (data-confirmacion) solo si
+          // ofrece WhatsApp: la app escribe antes para confirmar que el teléfono es suyo.
+          var confirmacion = form.getAttribute('data-confirmacion');
           var gracias = d.createElement('div');
           gracias.className = 'form-estado ok';
           gracias.setAttribute('role', 'status');
@@ -293,10 +290,9 @@
           var fuerte = d.createElement('strong');
           fuerte.textContent = 'Gracias' + (nombre ? ', ' + nombre : '') + '. Hemos recibido tu solicitud.';
           gracias.appendChild(fuerte);
-          if (medio === 'WhatsApp') {
-            // La app escribe antes para confirmar que el teléfono es suyo (el formulario es anónimo); si
-            // prefiere no esperar, nos escribe él desde el WhatsApp de esta página.
-            gracias.appendChild(d.createTextNode(' Te escribiremos por WhatsApp desde el +34 722 83 32 85 para confirmar que la solicitud es tuya: contesta «Sí, fui yo» y seguimos por ahí. Si lo prefieres, '));
+          if (medio === 'WhatsApp' && confirmacion) {
+            // Si prefiere no esperar, nos escribe él desde el WhatsApp de esta página.
+            gracias.appendChild(d.createTextNode(' ' + confirmacion + ' Si lo prefieres, '));
             var wa = d.querySelector('a[href^="https://wa.me/"]');
             var enlace = d.createElement(wa ? 'a' : 'span');
             if (wa) enlace.href = wa.href;

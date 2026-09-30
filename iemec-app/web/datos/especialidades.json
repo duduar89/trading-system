@@ -100,6 +100,8 @@
       "resumen": "Injerto capilar FUE, cejas, barba, línea frontal y reparación de injertos previos.",
       "foto": "clinica-consulta",
       "foto_pie": "La consulta de IEMEC, donde empieza la valoración.",
+      "donde_cirugia": null,
+      "_donde_cirugia": "Dónde se operan las cirugías capilares (p. ej. «En la sala de procedimientos de IEMEC, con anestesia local»): sale en el recuadro y la ficha de cada cirugía y en las preguntas con {donde_cirugia}. Imprescindible (lanzamiento.json → cirugias).",
       "entradilla": "El injerto capilar lleva tu propio pelo desde la zona donante a las zonas con menos densidad. Empieza por una valoración para saber si es una buena opción en tu caso.",
       "texto": [
         "No todo el mundo es candidato a un injerto: depende de la zona donante, del tipo de caída y de tu salud. En la valoración estudiamos tu caso y, si el injerto no es lo más adecuado, te lo decimos y te orientamos hacia otras opciones.",
@@ -107,7 +109,7 @@
       ],
       "preguntas": [
         { "p": "¿Todo el mundo puede hacerse un injerto?", "r": "No. Depende de la zona donante, del tipo de caída y de tu salud. En la valoración te decimos si es una buena opción o si conviene empezar por un tratamiento médico." },
-        { "p": "¿Dónde se hace la intervención?", "r": "[PENDIENTE: confirmar si se hace en la sala de procedimientos de IEMEC, con anestesia local] Te lo explicamos con detalle en la valoración." }
+        { "p": "¿Dónde se hace la intervención?", "r": "{donde_cirugia}. Te lo explicamos con detalle en la valoración." }
       ]
     },
     {
@@ -119,8 +121,8 @@
       "codigo_ref": "intima-f",
       "titulo": "Estética íntima femenina",
       "titulo_seo": "Estética íntima femenina en Boadilla del Monte · IEMEC",
-      "descripcion_seo": "Cirugía íntima y tratamientos de la zona íntima externa en IEMEC, Boadilla del Monte, con valoración médica, lenguaje claro y total discreción.",
-      "resumen": "Cirugía íntima y tratamientos de la zona íntima externa, con valoración médica y discreción.",
+      "descripcion_seo": "Tratamientos de la zona íntima externa en IEMEC, Boadilla del Monte, con valoración médica, lenguaje claro y total discreción.",
+      "resumen": "Tratamientos de la zona íntima externa, con valoración médica y total discreción.",
       "foto": "clinica-consulta",
       "foto_pie": "La consulta de IEMEC.",
       "entradilla": "Una consulta confidencial para hablar de lo que te preocupa de la zona íntima. Te explicamos las opciones con un lenguaje claro y sin prisas.",

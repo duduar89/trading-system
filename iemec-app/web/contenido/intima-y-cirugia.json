@@ -72,13 +72,18 @@
     "https://iemec-clinic.com/cirugia-corporal",
     "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Valoráis en esta consulta la blefaroplastia y la liposucción de papada? La última pregunta las enumera: si no se confirman (ver sus páginas), se quitan de la lista."
+    }
+   ],
    "pendiente": [
     "Es la cita que se reserva en IEMEC antes de cualquier cirugía (en la web actual, el botón genérico «Cirugía estética» de /cita-online).",
     "Multiestetica publica un precio «desde» y la consulta como «gratuita»: en esta versión no se publican precios ni «gratis». Proponemos «primera valoración sin compromiso».",
     "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j).",
     "Multiestetica sitúa las intervenciones en el Hospital (Universitario) Moncloa: confirmar el centro para decirlo en cada página.",
-    "Duración de la consulta: 45 minutos, dato del sector; confirmar.",
-    "La última pregunta enumera las cirugías que se valoran: incluye la blefaroplastia y la liposucción de papada, que solo salen en Multiestetica. Ajustarla si la clínica no las confirma."
+    "Duración de la consulta: 45 minutos, dato del sector; confirmar."
    ]
   },
   {
@@ -396,9 +401,14 @@
     "https://iemec-clinic.com/cirugia-corporal#liposuccion",
     "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis la liposucción de papada? ¿Dónde se hace, con qué anestesia y quién la hace? Solo sale en Multiestetica, con lipoláser o liposucción según la valoración."
+    }
+   ],
    "pendiente": [
     "Dónde, anestesia e ingreso: la página solo dice «quirófano de un centro hospitalario autorizado». Normas.md pide decir con claridad dónde se opera: confirmar el centro, el tipo de anestesia y si hay ingreso. Multiestetica dice anestesia general en el Hospital Universitario Moncloa.",
-    "Liposucción de papada: solo sale en Multiestetica (con lipoláser o liposucción quirúrgica, según la valoración) y el catálogo la asigna a la sala de procedimientos de IEMEC. Confirmar que se ofrece, dónde se hace, con qué anestesia y quién la hace. El lipoláser tiene página propia en corporal-y-peso (slug lipolaser): enlazarla.",
     "Multiestetica ofrece «hasta un 50 % de descuento» en la liposucción asociada a la abdominoplastia: no se publica (normas: sin descuentos).",
     "La galería de Multiestetica etiqueta fotos como «Lipo Vaser», técnica que la clínica no describe: no se menciona.",
     "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j)."
@@ -708,8 +718,13 @@
    "fuentes": [
     "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis la blefaroplastia (párpados superiores, inferiores o completa)? Solo sale en Multiestetica, con el Hospital Moncloa, una noche de ingreso y precio «desde»."
+    }
+   ],
    "pendiente": [
-    "Solo sale en Multiestetica (párpados superiores, inferiores o completa; Hospital Moncloa y una noche de hospitalización; precio «desde»), no en la web actual. Confirmar que se ofrece y esos datos antes de publicar.",
     "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j).",
     "Enlazar con «Tratamiento de párpados con plasma» (slug parpados-con-plasma, grupo facial-aparatologia), que es la opción sin cirugía."
    ]
@@ -819,7 +834,7 @@
     "anestesia": "Anestesia local",
     "recuperacion": "Vida diaria en 3 a 5 días, según tu caso",
     "profesional": "Médico",
-    "donde": "En IEMEC, como cirugía menor con anestesia local [PENDIENTE: confirmar]"
+    "donde": "En IEMEC, como cirugía menor con anestesia local [PENDIENTE: confirmar dónde se opera]"
    },
    "variantes": [
     {
@@ -872,8 +887,13 @@
     "https://iemec-clinic.com/blog/que-es-la-labioplastia-y-cuando-es-recomendable-esta-cirugia-intima-femenina",
     "https://iemec-clinic.com/nosotros"
    ],
+   "confirmar": [
+    {
+     "tipo": "abogado",
+     "que": "La labioplastia se publica como cirugía estética y menor ambulatoria (U.47 y U.64), no como ginecología (U.26, no autorizada): ¿vale ese encaje también para el capuchón del clítoris?"
+    }
+   ],
    "pendiente": [
-    "Autorización: se publica como cirugía estética y menor ambulatoria (U.47 y U.64, autorizadas), no como ginecología (U.26, no autorizada). Confirmar con el abogado sanitario que el encaje vale también para el capuchón del clítoris.",
     "Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo. En la web actual es quien hace la labioplastia.",
     "Confirmar que se hace en la sala de procedimientos de IEMEC como cirugía menor con anestesia local (así lo dicen el vídeo de la web, «cirugía menor», y el blog) y la duración (catálogo: 60 y 30 minutos, datos del sector).",
     "El capuchón del clítoris va como variante: en la web actual es un bloque aparte, cuyo botón manda el WhatsApp del blanqueamiento. Sus dos anclas antiguas (y la rota «labioplastia o cirugía de labios menores») deben redirigir aquí.",
@@ -959,8 +979,13 @@
     "https://iemec-clinic.com/blog/en-que-consiste-el-blanqueamiento-vaginal-y-es-seguro",
     "https://iemec-clinic.com/nosotros"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿Qué peelings, cremas y láser se usan? ¿Alguna crema es un medicamento de receta o una fórmula magistral (con hidroquinona, por ejemplo)? Entonces no se nombra ni se usa como reclamo."
+    }
+   ],
    "pendiente": [
-    "Régimen legal sin confirmar (restringido por precaución en el catálogo): qué peelings, cremas y láser se usan. Si alguna crema es un medicamento de receta o una fórmula magistral (por ejemplo, con hidroquinona), no se nombra ni se usa como reclamo.",
     "Nombre: la web actual lo llama «blanqueamiento vaginal»; normas.md pide «aclarado de la piel de la zona íntima externa» (la vagina es interna). Las URL antiguas y las tres entradas del blog deben redirigir aquí.",
     "Duración de la sesión (30 minutos, dato del sector) y equipo láser: confirmar. Un post del blog habla de 2 a 5 sesiones y otro de 3 a 5: se publica «entre 3 y 5».",
     "Autorización y profesional: se presenta como medicina estética (U.48). Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo. En /nosotros hace el «blanqueamiento de la zona íntima».",
@@ -1031,8 +1056,13 @@
    "fuentes": [
     "https://iemec-clinic.com/nosotros"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis la remodelación íntima con relleno? Solo se cita en la ficha del médico en /nosotros, sin bloque ni botón. Si no se ofrece, la página no se publica."
+    }
+   ],
    "pendiente": [
-    "Oferta sin confirmar: en la web actual solo se cita en la ficha del médico de /nosotros («remodelación íntima con ácido hialurónico»), sin bloque ni botón. Confirmar que se ofrece antes de publicar; si no, pasa a sin_pagina.",
     "Confirmar las zonas que se tratan (¿labios mayores?), la indicación, la anestesia, la duración (30 minutos, dato del sector) y el número de sesiones: la página no los concreta.",
     "Producto sanitario de uso profesional: sin marca y sin usar el producto como reclamo; el ácido hialurónico solo aparece como dato en el cuerpo del texto.",
     "Autorización y profesional: se presenta como medicina estética (U.48). Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo.",
