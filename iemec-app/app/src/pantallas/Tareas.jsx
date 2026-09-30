@@ -9,6 +9,10 @@ const TIPO = {
 const ORIGEN = {
   meta_formulario: 'formulario de Meta', meta_ctwa: 'anuncio de WhatsApp', web: 'la web', ghl: 'GHL', web_whatsapp: 'WhatsApp de la web',
 };
+// Una solicitud de la web sin verificar (el lead, o lo último que pidió en la web): la pudo enviar otra
+// persona con ese teléfono.
+const sinVerificar = (t) => Boolean(t.lead) && (t.lead.verificado === false || t.lead.solicitudesWeb?.[0]?.verificada === false);
+
 // «+34611000604» → «611 00 06 04».
 const legible = (t) => {
   const m = /^\+34(\d{3})(\d{2})(\d{2})(\d{2})$/.exec(t || '');
@@ -26,6 +30,15 @@ export default function Tareas() {
     setAviso('');
     try {
       await api(`/panel/tareas/${id}`, { metodo: 'POST', cuerpo: { estado } });
+      recargar();
+    } catch (err) { setAviso(err.message); }
+  };
+  // Una solicitud de la web sin verificar: recepción ha llamado y es quien la pidió (su casilla
+  // comercial pasa a contar y se une a su ficha).
+  const verificar = async (leadId) => {
+    setAviso('');
+    try {
+      await api(`/panel/leads/${leadId}/verificar`, { metodo: 'POST', cuerpo: {} });
       recargar();
     } catch (err) { setAviso(err.message); }
   };
@@ -56,9 +69,20 @@ export default function Tareas() {
                     {t.telefono && <>{t.quien || t.lead ? ' · ' : ''}<a className="underline underline-offset-2" href={`tel:${t.telefono}`}>{legible(t.telefono)}</a></>}
                     {t.email && <> · <a className="underline underline-offset-2" href={`mailto:${t.email}`}>{t.email}</a></>}
                   </div>
+                  {sinVerificar(t) && (
+                    <div className="mt-1 text-xs text-rosa">Solicitud de la web sin verificar: la pudo enviar otra persona con este teléfono. Compruébalo antes de hablarle de lo que pide.</div>
+                  )}
+                  {(t.lead?.solicitudesWeb?.[0]?.mensaje || t.lead?.respuestas?.length > 0) && (
+                    <div className="mt-1 text-sm break-words" style={{ color: 'var(--texto-suave)' }}>
+                      {t.lead.solicitudesWeb?.[0]?.mensaje
+                        ? `Escribió en la web: «${t.lead.solicitudesWeb[0].mensaje}»`
+                        : t.lead.respuestas.map((r) => `${r.pregunta}: ${r.valor}`).join(' · ')}
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {t.conversacionId && <a href={`#conversaciones/${t.conversacionId}`} className="rounded-full border border-[var(--borde)] px-4 py-2 text-sm hover:border-oro">Ver chat</a>}
+                  {sinVerificar(t) && <Boton onClick={() => verificar(t.lead.id)}>Confirmado: lo pidió</Boton>}
                   <Boton variante="lleno" onClick={() => cerrar(t.id, 'hecha')}>Hecha</Boton>
                   <Boton onClick={() => cerrar(t.id, 'cancelada')}>Descartar</Boton>
                 </div>

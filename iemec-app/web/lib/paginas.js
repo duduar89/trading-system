@@ -298,7 +298,11 @@ function aviso(ctx, p, e) {
 
 function tratamiento(ctx, p) {
   const e = ctx.especialidades.find((x) => x.slug === p.especialidad);
-  const wa = B.urlWhatsapp(ctx, p.interes, p.ref);
+  // En lo íntimo y el peso, el WhatsApp lleva la referencia de la especialidad, la misma en todas sus
+  // páginas: el texto se lee en la pantalla del móvil y pasa por Meta, y el código de cada página se
+  // puede buscar (la tabla de referencias está en el repositorio). Lo concreto lo pregunta la
+  // conversación. El formulario sí lleva el de su página: va directo a la app, junto a la página.
+  const wa = B.urlWhatsapp(ctx, p.interes, p.sensible ? e.ref : p.ref);
   const pasos = [{ nombre: 'Inicio', ruta: '/' }, { nombre: e.nombre, ruta: e.ruta }, { nombre: p.nombre, ruta: p.ruta }];
   const s = p.sesion || {};
   const ficha = [
@@ -584,7 +588,7 @@ ${botonWhatsapp(wa, 'Escribir por WhatsApp', 'boton-oscuro')}
 <article class="tarjeta">
 <span class="tarjeta-icono">${icono('calendario')}</span>
 <h3>Te llamamos</h3>
-<p>Déjanos tu nombre y tu teléfono y te contactamos nosotros como prefieras: por WhatsApp, por teléfono o por correo.</p>
+<p>Déjanos tu nombre y tu teléfono y te contactamos nosotros como prefieras: ${B.conWhatsapp(ctx) ? 'por WhatsApp, por teléfono o por correo' : 'por teléfono o por correo'}.</p>
 <a class="boton boton-linea" href="#formulario">Rellenar el formulario</a>
 </article>
 </div>
@@ -631,12 +635,18 @@ ${contenido}
 }
 
 // ── Gracias y 404 ───────────────────────────────────────────────────────────────────────────
+// Si el formulario ofrece WhatsApp, quien lo pide recibe antes uno de confirmación (el formulario es
+// anónimo: la app no escribe con lo que puso nadie hasta que el dueño del teléfono dice que fue él); si
+// prefiere no esperar, puede escribirnos él. Sin WhatsApp en el formulario, llamada o correo.
 function gracias(ctx) {
   const wa = B.urlWhatsapp(ctx, B.INTERES_GENERAL, 'web-gracias');
   const cuerpo = html`${cabeceraPagina({
     titulo: html`Gracias. <em>Hemos recibido tu solicitud.</em>`,
-    entradilla: 'Te contactaremos por el medio que has elegido en horario de la clínica. Si nos escribes por WhatsApp, verás nuestro número: +34 722 83 32 85.',
-    acciones: html`<a class="boton boton-oro" href="/">Volver al inicio</a><a class="boton boton-claro" href="/tratamientos/">Ver tratamientos</a>`,
+    // La confirmación por WhatsApp, solo si el formulario lo ofrece (sitio.json → formulario.whatsapp).
+    entradilla: B.conWhatsapp(ctx)
+      ? 'Si has elegido WhatsApp, te escribiremos desde el +34 722 83 32 85 para confirmar que la solicitud es tuya: contesta «Sí, fui yo» y seguimos por ahí. Si has elegido llamada o correo, te contactaremos en horario de la clínica.'
+      : 'Te contactaremos por el medio que has elegido en horario de la clínica. Si prefieres no esperar, escríbenos por WhatsApp: verás nuestro número, +34 722 83 32 85.',
+    acciones: html`${botonWhatsapp(wa, 'Escríbenos ya por WhatsApp')}<a class="boton boton-claro" href="/">Volver al inicio</a>`,
   })}`;
   return { ruta: '/gracias/', tipo: 'gracias', whatsapp: wa, ref: 'web-gracias', indexable: false, titulo: 'Gracias · IEMEC', descripcion: 'Hemos recibido tu solicitud en IEMEC, Boadilla del Monte. Te contactaremos por el medio que has elegido en horario de la clínica.', cuerpo };
 }

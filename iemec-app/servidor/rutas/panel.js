@@ -17,9 +17,43 @@ const resenasSrv = require('../resenas');
 const { registrar } = require('../eventos');
 const estados = require('../estados-cita');
 const { exige } = require('../permisos');
+const { verificarSolicitudWeb } = require('../leads');
+const { consentimientoWeb } = require('../consentimiento-web');
 
 const madrid = (d) => (d ? T.partesMadrid(new Date(d)) : null);
 const envolver = (fn) => (req, res, next) => fn(req, res).catch(next);
+const respuestasDe = (l) => (l?.respuestas_cifradas ? JSON.parse(descifrar(l.respuestas_cifradas, l.respuestas_iv, l.respuestas_tag)) : []);
+
+// Lo que pidió en el formulario de la web, cada vez (cifrado en solicitudes_web), con sus casillas y si
+// está verificado (una sin verificar la pudo enviar otra persona con su teléfono).
+async function solicitudesWeb(q, leadId) {
+  if (!leadId) return [];
+  const [filas] = await q.query(
+    `SELECT id, preferencia, consentimiento_comercial, version_textos, version_conocida, enviado_en, verificada_en, rechazada_en, datos_cifrados, datos_iv, datos_tag
+       FROM solicitudes_web WHERE lead_id = ? ORDER BY enviado_en DESC, id DESC LIMIT 10`, [leadId]);
+  return filas.map((s) => {
+    const d = s.datos_cifrados ? JSON.parse(descifrar(s.datos_cifrados, s.datos_iv, s.datos_tag)) : {};
+    return {
+      id: s.id, en: s.enviado_en, preferencia: s.preferencia, comercial: Boolean(s.consentimiento_comercial), version: s.version_textos,
+      versionConocida: Boolean(s.version_conocida), verificada: Boolean(s.verificada_en), rechazada: Boolean(s.rechazada_en),
+      nombre: d.nombre || null, email: d.email || null, interes: d.interes || null, mensaje: d.mensaje || null,
+    };
+  });
+}
+
+// ¿Quiere comunicaciones comerciales? De un paciente, lo último que consta en su ficha; si no, la casilla
+// de la web (solo cuenta verificada). → { valor: true | false | null (no consta), fuente, en, version, marcada, verificada }
+async function consentimientoComercial(q, c) {
+  if (c.paciente_id) {
+    const [[x]] = await q.query("SELECT estado, fuente, registrado_en FROM consentimientos WHERE paciente_id = ? AND tipo = 'whatsapp_marketing' ORDER BY registrado_en DESC, id DESC LIMIT 1", [c.paciente_id]);
+    if (x) return { valor: x.estado === 'otorgado', fuente: x.fuente, en: x.registrado_en };
+  }
+  const web = await consentimientoWeb(q, c.telefono);
+  if (web.otorgado) return { valor: true, fuente: 'web', en: web.solicitud.enviado_en, version: web.solicitud.version_textos, marcada: true, verificada: true };
+  const [[s]] = await q.query('SELECT consentimiento_comercial, version_textos, enviado_en, verificada_en FROM solicitudes_web WHERE telefono = ? AND rechazada_en IS NULL ORDER BY enviado_en DESC, id DESC LIMIT 1', [c.telefono]);
+  if (!s) return { valor: null };
+  return { valor: false, fuente: 'web', en: s.enviado_en, version: s.version_textos, marcada: Boolean(s.consentimiento_comercial), verificada: Boolean(s.verificada_en) };
+}
 
 // Contestar una reseña: dirección o marketing; si la reseña tiene alerta clínica (columna alerta_clinica),
 // dirección médica.
@@ -43,6 +77,7 @@ function rutasPanel({ pool, deps = null }) {
   r.post('/citas/:id/estado', exige('citas.estado'));
   r.use('/lista-espera', exige('citas.reservar'));
   r.use('/conversaciones', exige('conversaciones.atender'));
+  r.post('/leads/:id/verificar', exige('conversaciones.atender'));
   r.patch('/seguimientos/:id', exige('seguimientos.editar'));
   r.post('/resenas/:id/publicar', permisoParaContestar(p));
   r.put('/ajustes/salas-tratamientos/:tratamiento', exige('salas.editar'));
@@ -89,7 +124,8 @@ function rutasPanel({ pool, deps = null }) {
     const ahora = req.ahora || new Date();
     const [filas] = await p().query(
       `SELECT t.id, t.tipo, t.titulo, t.urgente, t.vence_en, t.creado_en, t.conversacion_id, COALESCE(t.lead_id, c.lead_id) AS lead_id,
-              l.nombre AS lead_nombre, l.telefono AS lead_telefono, l.email AS lead_email, l.origen, l.campana,
+              l.nombre AS lead_nombre, l.telefono AS lead_telefono, l.email AS lead_email, l.origen, l.campana, l.sin_verificar,
+              l.respuestas_cifradas, l.respuestas_iv, l.respuestas_tag,
               pa.nombre AS paciente_nombre, pa.apellidos, pa.telefono AS paciente_telefono, pa.email AS paciente_email, c.telefono AS conv_telefono
          FROM tareas t
          LEFT JOIN conversaciones c ON c.id = t.conversacion_id
@@ -98,6 +134,19 @@ function rutasPanel({ pool, deps = null }) {
         WHERE t.estado = 'abierta' ORDER BY t.urgente DESC, t.vence_en, t.id LIMIT 300`);
     // Avisos de WhatsApp o de Meta que se quedaron sin procesar después de todos los intentos.
     const [[fallidos]] = await p().query("SELECT COUNT(*) AS n FROM cola WHERE tipo IN ('webhook_whatsapp','webhook_whatsapp_estados','webhook_meta') AND estado = 'fallido'");
+    // Lo que pidió en la web cada vez (si ha vuelto a enviar el formulario, lo último que dijo).
+    const leadIds = [...new Set(filas.map((x) => x.lead_id).filter(Boolean))];
+    const porLead = new Map();
+    for (const id of leadIds) porLead.set(id, []);
+    if (leadIds.length) {
+      const [sols] = await p().query(
+        `SELECT lead_id, preferencia, enviado_en, verificada_en, datos_cifrados, datos_iv, datos_tag FROM solicitudes_web
+          WHERE lead_id IN (?) AND datos_cifrados IS NOT NULL ORDER BY enviado_en DESC, id DESC`, [leadIds]);
+      for (const s of sols) {
+        const d = JSON.parse(descifrar(s.datos_cifrados, s.datos_iv, s.datos_tag));
+        porLead.get(s.lead_id)?.push({ en: s.enviado_en, preferencia: s.preferencia, verificada: Boolean(s.verificada_en), interes: d.interes || null, mensaje: d.mensaje || null });
+      }
+    }
     res.json({
       tareas: filas.map((x) => ({
         id: x.id, tipo: x.tipo, titulo: x.titulo, urgente: Boolean(x.urgente), vence: x.vence_en, vencida: new Date(x.vence_en) < ahora,
@@ -105,7 +154,11 @@ function rutasPanel({ pool, deps = null }) {
         quien: x.paciente_nombre ? [x.paciente_nombre, x.apellidos].filter(Boolean).join(' ') : x.lead_nombre || null,
         telefono: x.paciente_telefono || x.lead_telefono || x.conv_telefono || null,
         email: x.paciente_email || x.lead_email || null,
-        lead: x.lead_id ? { id: x.lead_id, origen: x.origen, campana: x.campana } : null,
+        // Lo que escribió en el formulario (un lead que pide llamada o correo solo se ve aquí) y si su
+        // teléfono está verificado (una solicitud de la web sin verificar la pudo enviar otro).
+        lead: x.lead_id ? {
+          id: x.lead_id, origen: x.origen, campana: x.campana, verificado: !x.sin_verificar, respuestas: respuestasDe(x), solicitudesWeb: (porLead.get(x.lead_id) || []).slice(0, 3),
+        } : null,
       })),
       avisosFallidos: Number(fallidos.n),
     });
@@ -120,6 +173,19 @@ function rutasPanel({ pool, deps = null }) {
     if (!hecho.affectedRows) return res.status(404).json({ error: 'Esa tarea no existe o ya está cerrada' });
     await registrar(p(), { tipo: `tarea_${estado}`, entidad: 'tarea', entidadId: id, actor: req.usuario?.email || 'panel' });
     res.json({ ok: true, estado });
+  }));
+
+  // Recepción ha llamado a quien envió una solicitud de la web y ha confirmado que la pidió él: queda
+  // verificada (el lead y sus solicitudes, también una que llegó después a un lead ya verificado), como
+  // con su «Sí, fui yo» por WhatsApp: su casilla comercial cuenta, se une a su ficha y a su conversación.
+  r.post('/leads/:id/verificar', envolver(async (req, res) => {
+    const id = /^\d{1,10}$/.test(req.params.id) ? Number(req.params.id) : 0;
+    const [[l]] = await p().query('SELECT id, telefono FROM leads WHERE id = ?', [id]);
+    if (!l) return res.status(404).json({ error: 'No existe ese lead' });
+    if (!l.telefono) return res.status(409).json({ error: 'Ese lead no tiene teléfono que verificar' });
+    const [[conv]] = await p().query("SELECT id FROM conversaciones WHERE telefono = ? AND estado <> 'cerrada' ORDER BY id DESC LIMIT 1", [l.telefono]);
+    const hecho = await verificarSolicitudWeb(p(), { telefono: l.telefono, leadIds: [l.id], conversacionId: conv?.id || null, ahora: req.ahora || new Date(), por: req.usuario?.email || 'panel' });
+    res.json({ ok: true, ...hecho, yaVerificado: !hecho.leads.length && !hecho.solicitudes });
   }));
 
   // ── Agenda por cabina ─────────────────────────────────────────────────────────────────────
@@ -301,11 +367,14 @@ function rutasPanel({ pool, deps = null }) {
     const [segs] = await p().query('SELECT id, motivo, plazo_tipo, frase_cifrada, frase_iv, frase_tag, programado_para, estado, creado_por FROM seguimientos WHERE conversacion_id = ? ORDER BY programado_para', [id]);
     const [eventos] = await p().query("SELECT tipo, actor, datos, creado_en FROM eventos WHERE entidad = 'conversacion' AND entidad_id = ? ORDER BY id DESC LIMIT 20", [String(id)]);
     const [[paciente]] = c.paciente_id ? await p().query('SELECT id, nombre, apellidos, email, es_cliente, baja_comercial_en FROM pacientes WHERE id = ?', [c.paciente_id]) : [[null]];
-    const [[fila]] = c.lead_id ? await p().query('SELECT l.nombre, l.origen, l.campana, l.anuncio, l.etapa, l.respuestas_cifradas, l.respuestas_iv, l.respuestas_tag, t.nombre AS tratamiento FROM leads l LEFT JOIN tratamientos t ON t.id = l.tratamiento_interes_id WHERE l.id = ?', [c.lead_id]) : [[null]];
-    // Lo que escribió en el formulario (va cifrado, como los mensajes).
+    const [[fila]] = c.lead_id ? await p().query('SELECT l.nombre, l.origen, l.campana, l.anuncio, l.etapa, l.sin_verificar, l.utm, l.respuestas_cifradas, l.respuestas_iv, l.respuestas_tag, t.nombre AS tratamiento FROM leads l LEFT JOIN tratamientos t ON t.id = l.tratamiento_interes_id WHERE l.id = ?', [c.lead_id]) : [[null]];
+    // Lo que escribió en el formulario (va cifrado, como los mensajes) y lo que pidió en la web, cada
+    // vez, con sus casillas (las que no están verificadas, dicho).
+    // La campaña del WhatsApp de la web llega como una huella («c-1x2y3z»): si no se sabe de cuál es, se enseña esa.
+    const utm = fila && (typeof fila.utm === 'string' ? JSON.parse(fila.utm) : fila.utm);
     const lead = fila && {
       nombre: fila.nombre, origen: fila.origen, campana: fila.campana, anuncio: fila.anuncio, etapa: fila.etapa, tratamiento: fila.tratamiento,
-      respuestas: fila.respuestas_cifradas ? JSON.parse(descifrar(fila.respuestas_cifradas, fila.respuestas_iv, fila.respuestas_tag)) : [],
+      verificado: !fila.sin_verificar, respuestas: respuestasDe(fila), claveCampana: utm?.clave_campana || null, solicitudesWeb: await solicitudesWeb(p(), c.lead_id),
     };
     const [citas] = c.paciente_id ? await p().query('SELECT c.inicio, c.estado, t.nombre AS tratamiento FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id WHERE c.paciente_id = ? ORDER BY c.inicio DESC LIMIT 5', [c.paciente_id]) : [[]];
     res.json({
@@ -315,6 +384,8 @@ function rutasPanel({ pool, deps = null }) {
       // mandar algo comercial (servidor/bandeja.js).
       saludo: await bandeja.saludo(p(), c),
       comercial: await bandeja.permisoComercial(p(), c, req.ahora || new Date()),
+      // Si quiere comunicaciones comerciales (la casilla de la web, verificada, o su ficha): sí, no o no consta.
+      consentimientoComercial: await consentimientoComercial(p(), c),
       mensajes: msgs.map((m) => ({
         id: m.id, direccion: m.direccion, autor: m.autor, tipo: m.tipo, texto: descifrar(m.cuerpo_cifrado, m.iv, m.tag), estado: m.estado,
         error: m.estado === 'fallido' && (m.error_codigo || m.error_texto) ? { codigo: m.error_codigo, texto: m.error_texto } : null, intencion: m.intencion, en: m.creado_en,

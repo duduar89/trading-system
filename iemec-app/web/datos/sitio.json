@@ -105,7 +105,9 @@
   "formulario": {
     "version_textos": "2026-09-30",
     "mensaje_max": 500,
-    "pendiente_version": "versión de la cláusula del formulario que fije el DPD"
+    "pendiente_version": "versión de la cláusula del formulario que fije el DPD",
+    "whatsapp": false,
+    "_whatsapp": "Si el formulario ofrece «WhatsApp» como forma de contacto. Quien lo elige recibe antes un WhatsApp de la app para confirmar que la solicitud es suya (plantilla iemec_solicitud_web): solo es verdad con el 722 83 32 85 conectado a la app en modo real (MODO_WHATSAPP=real) y la plantilla aprobada en Meta (puerta ⛔ 5). Hasta entonces, false: el formulario ofrece llamada o correo, /gracias/ y la privacidad no prometen esa confirmación y recepción llama (lanzamiento.json → whatsapp-formulario)."
   },
   "fse": {
     "titulo": "FSE+ · Fondo Social Europeo Plus · «Cofinanciado por la Unión Europea».",

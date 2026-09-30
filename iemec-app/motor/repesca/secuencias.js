@@ -26,6 +26,16 @@ const SECUENCIAS = {
     ],
     terminaCon: ['cita'],
   },
+  // Quien pide en el formulario de la web que le contestemos por WhatsApp: el teléfono no está
+  // comprobado (se puede escribir el de otro), así que primero un WhatsApp neutro de utilidad, sin
+  // nombre ni tratamiento: «Hemos recibido una solicitud con este número. ¿Has sido tú?». Con su «Sí,
+  // fui yo», le atiende la conversación (servidor/entrada.js).
+  confirmar_web: {
+    nombre: 'Confirmar una solicitud de la web',
+    prioridad: 85,
+    pasos: [{ esperaMin: 0, accion: 'plantilla', uso: 'solicitud_web' }],
+    terminaCon: ['cita'],
+  },
   cancelacion: {
     nombre: 'Cita cancelada o «No vino» sin nueva cita',
     prioridad: 90,

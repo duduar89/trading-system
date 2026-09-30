@@ -6,6 +6,7 @@
 // En la vista previa, lo que falta sale como [PENDIENTE: …]. Con --publicar, lo que es de clase «b»
 // (web/datos/lanzamiento.json) no se publica y lo de clase «a» se queda a la vista: el generador lo
 // encuentra y no deja publicar.
+const B = require('./base');
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const esFecha = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(`${s}T12:00:00Z`));
@@ -77,14 +78,22 @@ function valores(datos, { personas = [], publicar = false } = {}) {
   const s = datos.sitio;
   const vb = (datos.lanzamiento && datos.lanzamiento.vistos_buenos) || {};
   const correo = (c) => `[${c}](mailto:${c})`;
+  // Lo que dice el formulario según ofrezca WhatsApp o no (sitio.json → formulario.whatsapp).
+  const whatsapp = B.conWhatsapp({ sitio: s });
   return {
     correo: tiene(s.correo) ? correo(s.correo) : hueco('correo'),
     dpd: s.dpd && tiene(s.dpd.correo) ? `${tiene(s.dpd.nombre) ? `${s.dpd.nombre} · ` : ''}${correo(s.dpd.correo)}` : hueco('nombre o empresa y correo del DPD'),
     profesionales: tablaProfesionales(personas, { publicar }),
     responsable_asistencial: lineaResponsable(datos, { publicar }),
     fecha_textos: vb.legal && esFecha(vb.legal.fecha) ? fechaLarga(vb.legal.fecha) : hueco('fecha de publicación'),
-    version_textos: s.formulario.version_textos,
+    // La versión entera, la que envía el formulario y guarda la app con cada consentimiento: la fecha
+    // del DPD y la huella de los textos (web/lib/base.js · versionTextos).
+    version_textos: B.versionTextos({ sitio: s }),
     fecha_accesibilidad: esFecha(s.accesibilidad_revisada) ? fechaLarga(s.accesibilidad_revisada) : hueco('fecha de la revisión'),
+    medios_formulario: whatsapp ? 'WhatsApp, llamada o correo' : 'llamada o correo',
+    confirmacion_whatsapp: whatsapp
+      ? ' Si eliges WhatsApp, antes te escribimos una vez para confirmar que la solicitud es tuya (el formulario lo puede rellenar cualquiera con un número ajeno): si nos dices que no, borramos lo que se escribió con tu número.'
+      : '',
   };
 }
 

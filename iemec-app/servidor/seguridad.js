@@ -58,6 +58,15 @@ function mismoOrigen() {
   };
 }
 
+// Detrás de qué proxy está la app (el «trust proxy» de Express): solo del que está en la misma máquina
+// (el servidor web del alojamiento o el nginx del VPS, que hablan con Node por 127.0.0.1 o por un
+// socket Unix). La IP del visitante es entonces la que ese proxy añade al final de X-Forwarded-For. Si
+// alguien llega a Node sin pasar por él, la cabecera no cuenta: manda la IP de la conexión (si no,
+// cambiándola en cada petición se saltaría el límite de intentos). Cómo comprobarlo en el alojamiento:
+// docs/DESPLIEGUE.md.
+const PROXY_LOCAL = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const confiarEnProxyLocal = (ip, salto) => salto === 0 && (!ip || PROXY_LOCAL.has(ip));
+
 // Compara dos secretos en tiempo constante, también si miden distinto.
 function igualesSeguro(a, b) {
   const h = (x) => crypto.createHash('sha256').update(String(x)).digest();
@@ -74,10 +83,16 @@ const LIMITES = {
   retos: { max: 60, ventanaMs: 15 * 60000 },
   fallos: { max: 20, ventanaMs: 15 * 60000 },
   emergencia: { max: 5, ventanaMs: 15 * 60000 },
-  // El formulario de la web pública: envíos por IP y por teléfono (que nadie use la clínica para
-  // escribir sin parar a un número ajeno).
+  // El formulario de la web pública (anónimo): envíos por IP cada 15 minutos y al día, y por teléfono al
+  // día (que nadie use la clínica para escribir sin parar a un número ajeno). El del teléfono no se le
+  // dice a quien envía: diría si otra persona ha pedido información con ese número.
   web: { max: 8, ventanaMs: 15 * 60000 },
+  webDia: { max: 20, ventanaMs: 24 * 3600000 },
   webTelefono: { max: 3, ventanaMs: 24 * 3600000 },
+  // Lo que el formulario pone en marcha solo (el WhatsApp de confirmación o una tarea para recepción),
+  // entre todos los envíos: si alguien lo usa desde muchas IP, pasado esto se guarda sin hacer nada y
+  // una sola tarea avisa (servidor/rutas/web.js).
+  webAcciones: { max: 20, ventanaMs: 3600000 },
 };
 
 const dame = (pool) => (typeof pool === 'function' ? pool() : pool);
@@ -136,5 +151,5 @@ async function purgarLimites(pool, ahora = new Date()) {
 
 module.exports = {
   origenesPermitidos, CSP_PANEL, cabeceras, mismoOrigen, igualesSeguro, huellaIp, LIMITES, contar, frenar, sumarFallo, purgarLimites,
-  sumarIntento, claveLimite,
+  sumarIntento, claveLimite, confiarEnProxyLocal,
 };

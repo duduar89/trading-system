@@ -52,6 +52,13 @@ const BIBLIOTECA = [
     cuerpo: 'Hola {{1}}, estabas en nuestra lista de espera para {{2}}: se ha liberado un hueco el {{3}} a las {{4}}. ¿Te lo guardamos?',
     ejemplos: ['Laura', 'tu valoración capilar', 'jueves 8 de octubre', '18:30'],
     botones: [{ tipo: 'respuesta_rapida', texto: 'Sí, guárdamelo' }, { tipo: 'respuesta_rapida', texto: 'No me viene bien' }] },
+  // A quien pide en el formulario de la web que le contestemos por WhatsApp, antes que nada: el
+  // teléfono no está comprobado (se puede escribir el de otra persona). Sin nombre ni tratamiento (los
+  // escribió quien lo envió) y sin nada comercial: contesta a una solicitud. Con «Sí, fui yo» sigue la
+  // conversación; con «No fui yo» se borra lo que escribió el otro.
+  { uso: 'solicitud_web', categoria: 'utilidad', nombre: 'iemec_solicitud_web',
+    cuerpo: 'Hola, hemos recibido en la web de IEMEC una solicitud de información con este número de teléfono. ¿Has sido tú? Si es así, te atendemos por aquí; si no, pulsa «No fui yo» y no volveremos a escribirte por ella.',
+    ejemplos: [], botones: [{ tipo: 'respuesta_rapida', texto: 'Sí, fui yo' }, { tipo: 'respuesta_rapida', texto: 'No fui yo' }] },
   { uso: 'lead_primer_contacto', categoria: 'marketing', nombre: 'iemec_lead_bienvenida',
     cuerpo: `Hola {{1}}, soy el asistente virtual de IEMEC. Gracias por tu interés en {{2}}. ¿Te buscamos un hueco para una primera valoración con nuestro equipo? ${BAJA}`,
     ejemplos: ['Laura', 'la mesoterapia capilar'], botones: BOTONES_REPESCA },

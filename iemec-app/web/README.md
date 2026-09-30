@@ -229,13 +229,14 @@ pero «Te llamamos» lo abre y pone el foco en el nombre (sin JavaScript sale ab
 | `email` | Opcional (máx. 120); obligatorio si elige que le contestemos por correo |
 | `tratamiento` | En un tratamiento, su referencia (`web-lipolaser`); si no, un grupo: el slug de la especialidad, `estetica-y-bienestar`, `tarjeta-regalo` u `otra`. En lo íntimo va el grupo neutro y el tratamiento sale de `ref`. Nunca un id del catálogo |
 | `mensaje` | Opcional, máx. 500 |
-| `preferencia` | `whatsapp`, `llamada` o `correo`; ninguna marcada de antemano |
+| `preferencia` | `llamada` o `correo`, y `whatsapp` solo si `sitio.json` → `formulario.whatsapp` es `true` (con el 722 conectado a la app y la plantilla `iemec_solicitud_web` aprobada en Meta; hasta entonces, `false`); ninguna marcada de antemano. La app acepta las tres |
 | `privacidad` | `si`: obligatoria, nunca marcada de antemano |
 | `comercial` | `si` si acepta comunicaciones comerciales (opcional, sin marcar) |
 | `pagina`, `ref` | La página y su referencia (`web-…`) |
 | `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content` | La campaña, si la hay |
 | `t` | Milisegundos desde que se abrió la página: un envío en menos de 2,5 s es de un robot. **Vacío = sin JavaScript: no se descarta** |
-| `version_textos` | Versión de las cláusulas aceptadas (`sitio.json` → `formulario`) |
+| `version_textos` | Versión de las cláusulas aceptadas: la fecha de los textos más una huella de su contenido exacto. `npm run web` guarda cada versión con sus textos en `semillas/iemec/textos-formulario.json` (sin borrar las anteriores) y la app marca las que no conoce |
+| `envio` | Identificador al azar de cada envío (lo pone `web.js`): la app no guarda dos veces el mismo |
 | `web` | Trampa para robots: si viene con algo, se contesta «recibido» y no se guarda nada |
 
 Respuesta de la app:
@@ -247,20 +248,39 @@ Respuesta de la app:
   `redirect: 'manual'`): `200 {"ok": true}`, `422 {"ok": false, "errores": {"telefono": "…"}}` (la
   web pinta cada error junto a su campo; los que no tienen hueco, en el aviso) o `429` (demasiados
   envíos: la web propone WhatsApp). Un `303` también cuenta como recibido.
-- CORS: solo para `WEB_DOMINIO` (por defecto `https://iemec-clinic.com`) y `WEB_ORIGENES`.
-- La app guarda el lead (origen `web`, `codigo_web` = `ref`) y, en `solicitudes_web`, la prueba de
-  los dos consentimientos por separado, con la fecha y `version_textos`. Límite de 8 envíos por IP
-  cada 15 minutos y 3 por teléfono al día. Quien pide WhatsApp entra en la secuencia «lead» (el
-  seguimiento de su solicitud); quien pide llamada o correo, tarea para recepción.
+- CORS y origen: solo `WEB_DOMINIO` (por defecto `https://iemec-clinic.com`) y `WEB_ORIGENES`. Lo que
+  llega de otra web (Origin ajeno o `Sec-Fetch-Site: cross-site`) se contesta «recibido» y no se
+  guarda nada.
+- Límites: 8 envíos por IP cada 15 minutos y 20 al día; 3 por teléfono al día (en silencio: se
+  contesta «recibido» y no se guarda); y un tope de 20 altas por hora en total, por encima del cual
+  solo sale una tarea «N solicitudes de la web en la última hora».
+- **El teléfono no está comprobado:** el lead nace «sin verificar», no se une a los datos de nadie y
+  no se le escribe con lo que puso quien lo envió. Quien pide WhatsApp recibe primero la plantilla
+  de utilidad `iemec_solicitud_web` (neutra, sin nombre ni tratamiento, botones «Sí, fui yo» y «No
+  fui yo»; hay que aprobarla en Meta: puerta ⛔ 5) y solo con su «sí» sigue la conversación. Por
+  eso la web solo ofrece WhatsApp con `formulario.whatsapp: true`: con `false` (hoy) no sale la
+  opción, `/gracias/`, `/pedir-cita/` y la privacidad no hablan de ese WhatsApp y el aviso de
+  `web.js` sale del atributo `data-confirmacion` del formulario, que solo existe con él. Quien pide
+  llamada o correo genera una tarea «sin verificar» que recepción confirma en Tareas
+  («Confirmado: lo pidió»).
+- La casilla comercial manda: sin ella, solo el seguimiento de su solicitud mientras esté en curso;
+  con ella y verificado, pasa a los consentimientos de su ficha con su prueba y su versión.
+- Lo pedido (página, referencia, tratamiento, mensaje) va cifrado en `solicitudes_web` (migraciones
+  015 y 017). Una solicitud sin confirmar caduca a los 7 días y se borra a los 30; un lead de la web
+  sin cita ni actividad, a los 12 meses (`RETENCION_LEADS_MESES`).
 
 ## Publicar
 
 Todo, con los accesos y quién hace cada cosa, en [`docs/LANZAR-WEB.md`](../docs/LANZAR-WEB.md). En
 corto:
 
-0. **Primero la app** con la migración `015-formulario-web.sql` y, si la web va en otro dominio,
-   `WEB_DOMINIO` (y `WEB_ORIGENES` para un dominio de prueba): sin ella, el formulario no tiene a
-   dónde enviar (ver `docs/DESPLIEGUE.md`).
+0. **Primero la app** con las migraciones `015-formulario-web.sql` y `017-verificar-formulario-web.sql`
+   y, si la web va en otro dominio, `WEB_DOMINIO` (y `WEB_ORIGENES` para un dominio de prueba): sin
+   ella, el formulario no tiene a dónde enviar (ver `docs/DESPLIEGUE.md`). **Cada vez que la web
+   estrene páginas o cambie los textos del formulario**, despliega antes la app con los
+   `semillas/iemec/referencias-web.json` y `semillas/iemec/textos-formulario.json` que genera
+   `node web/construir.js --publicar` (o `npm run web`): si no, la app no reconoce esas referencias
+   ni esa versión de las casillas.
 1. `npm run web:fotos -- --origen <carpeta>` si hay fotos nuevas (las WebP no están en git).
 2. `node web/construir.js --publicar --zip iemec-web-publicable.zip` sin errores y
    `npm run web:revisar` sin problemas.

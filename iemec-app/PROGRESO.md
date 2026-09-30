@@ -6,7 +6,7 @@ tratamiento; reseñas con las normas de Google y adaptadores reales de Google y 
 de Flowww espera su primera exportación. **La web nueva está hecha y revisada** (95 páginas, con el
 formulario conectado a la app): se publica cuando la clínica complete lo pendiente (⛔ 12). Falta conectar las cuentas reales (envío de WhatsApp, Google, IA)
 y los datos de la clínica, que esperan las puertas ⛔.
-**Última actualización:** 30-sep-2026 · **932 pruebas en verde** · ESLint limpio
+**Última actualización:** 30-sep-2026 · **959 pruebas en verde** · ESLint limpio
 
 El encargo completo está en [`docs/ENCARGO.md`](docs/ENCARGO.md). Este fichero dice dónde estamos:
 se lee al empezar cada vuelta del loop y se actualiza al terminarla.
@@ -22,11 +22,11 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
 | F4 · Reseñas + Google | hecha | Petición a todos tras **completar** la cita (sin filtrar por queja), enlace corto, un recordatorio, temas, respuestas con aprobación, **texto y autor borrados a los 29 días**, **alerta clínica para dirección médica**, historial poco a poco, ideas de publicación; **adaptadores reales** de Business Profile (reseñas, respuestas, métricas, avisos por Pub/Sub), Places y **posiciones en Maps con DataForSEO** (malla y tope de gasto) | Accesos de Google y cuenta de DataForSEO (⛔ 6, pasos en docs/GOOGLE.md) |
 | F5 · Panel | hecha | Hoy, agenda con detalle de cita y estados, bandeja con estado de entrega, seguimientos, repesca, plantillas, reseñas, tareas, lista de espera, salas × tratamientos; PWA; fuentes propias; **entrada con passkeys**, roles y permisos por ruta, pantalla «Equipo»; **pruebas de flujo con Playwright** (15 flujos; contraste AA, foco y 390 px en cada pantalla) | Enlazar cada persona con su profesional («mis citas»); marcar en la agenda las citas importadas para revisar |
 | F6 · Despliegue | hecha | Workflows comprobar y desplegar, copia previa, recuperación de `node_modules`, comprobación del commit, copias cifradas | Workflow en la rama por defecto; secretos reales; primera alta de dirección con `npm run invitar` y quitar PANEL_CLAVE cuando todos tengan passkey |
-| F7 · Web nueva | hecha | `web/`: generador estático con la estética terciopelo, 95 páginas (7 especialidades, 76 tratamientos que cubren 116 del catálogo; 41 sin página con su motivo, 10 borradores pendientes de autorización), buscador por preocupación, WhatsApp con referencia opaca en lo íntimo, formulario «Te llamamos» → `POST /web/contacto` de la app (migración 015), el primer WhatsApp de la web da de alta el lead, 177 URLs viejas con 301, sin cookies ni terceros, normas de publicidad sanitaria comprobadas en todo lo visible; entrega a Eduardo (zip, capturas y PDF de recorrido) | Lo que confirme la clínica (⛔ 12); revisión de seguridad del formulario (vuelta 9b) |
+| F7 · Web nueva | hecha | `web/`: generador estático con la estética terciopelo, 95 páginas (7 especialidades, 76 tratamientos que cubren 116 del catálogo; 41 sin página con su motivo, 10 borradores pendientes de autorización), buscador por preocupación, WhatsApp con referencia opaca en lo íntimo, formulario «Te llamamos» → `POST /web/contacto` de la app (migración 015), el primer WhatsApp de la web da de alta el lead, 177 URLs viejas con 301, sin cookies ni terceros, normas de publicidad sanitaria comprobadas en todo lo visible; entrega a Eduardo (zip, capturas y PDF de recorrido) | Lo que confirme la clínica (⛔ 12) y los accesos para subirla |
 
 ## Pruebas
 
-`npm test` con MariaDB local (10.11): **932 pruebas en verde**. Lo más importante:
+`npm test` con MariaDB local (10.11): **959 pruebas en verde**. Lo más importante:
 
 - **Agenda:** hora de Madrid, limpiezas, crema anestésica, comidas, aparatos, festivos, diez reservas
   a la vez → una; horas redondas.
@@ -55,8 +55,9 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
   firmados de Pub/Sub, Places, malla de posiciones y el tope de gasto.
 - **Web:** el generador (determinista), las normas de publicidad sanitaria en todo lo que se ve (texto,
   alt, URL, WhatsApp, datos estructurados), enlaces, redirecciones y anclas viejas, y 95 páginas × 8
-  anchos sin desbordes (`node web/revisar.mjs`). El formulario: 303 y JSON, validación, trampa, límites
-  y CORS.
+  anchos sin desbordes (`node web/revisar.mjs`). El formulario: 303 y JSON, validación, trampa, límites,
+  origen y CORS; nada sale sin verificar el teléfono, la casilla comercial manda y los datos se borran
+  en plazo (19 ataques y fallos de la revisión reproducidos antes de arreglarlos).
 - **Panel en un navegador:** 15 flujos con la demo a una hora fija; en cada pantalla, contraste AA en
   claro y oscuro, nombres accesibles, foco visible y nada que desborde a 390 px.
 
@@ -73,8 +74,8 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
    cabecera `X-Clave`; plantillas nuevas o cambiadas que hay que aprobar en Meta
    (`iemec_no_vino_nuevo_hueco`, `iemec_toca_repetir`, `hueco_liberado`; las de la cita con mapa y
    botones: `iemec_cita_confirmada`, `iemec_cita_cambiada`, `iemec_recordatorio_24h`,
-   `iemec_recordatorio_2h`, `iemec_cita_cancelada`; y `iemec_opinion_visita` e
-   `iemec_opinion_recordatorio`).
+   `iemec_recordatorio_2h`, `iemec_cita_cancelada`; `iemec_opinion_visita` e
+   `iemec_opinion_recordatorio`; y `iemec_solicitud_web`, la de «¿fuiste tú?» del formulario de la web).
 6. **Google:** acceso de gestor a la ficha, formulario de acceso a la API (Google contesta en unos
    14 días), OAuth en producción, Pub/Sub y clave de Places (pasos en `docs/GOOGLE.md`); cuenta de
    DataForSEO (50 $ de saldo, tope de 3 $ al mes); Search Console y Analytics a través de Uebea.
@@ -84,8 +85,10 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
    renovación y contrato de eternis.
 9. **Revisión del abogado sanitario y del delegado de protección de datos** antes de activar nada:
    excepción LSSI 21.2 para clientes (¿cuentan como clientes los pacientes que vienen de Flowww?),
-   consentimiento comercial (hoy no se recoge en ningún sitio: un
-   «no vino» sin consentimiento acaba en una tarea de llamar), textos de plantillas.
+   consentimiento comercial (el formulario de la web ya lo recoge con su prueba; un «no vino» sin
+   consentimiento acaba en una tarea de llamar), si la regla «sin la casilla, solo el seguimiento de su
+   solicitud» se extiende a los leads de Meta, GHL y recepción (hoy solo a los de la web), textos de
+   plantillas.
 10. **Facturación:** fuera de la app; decidir cómo pasa la cita a la facturación.
 11. **Lista de espera:** los valores son recomendaciones (retención 30 min, antelación 2 h, envíos de
     9:00 a 21:00, dos ofertas sin contestar y sale de la lista).
@@ -149,3 +152,10 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
   hallazgos, todos arreglados) y la app que recibe el formulario y el primer WhatsApp de la web. Entregado
   a Eduardo: zip listo para subir, capturas y un PDF de recorrido para la clínica. Los agentes se
   cortaron por el límite de uso y un reinicio del contenedor a mitad y siguieron desde donde estaban.
+- **30-sep · vuelta 9b · el formulario de la web, revisado.** Dos revisores (seguridad; privacidad,
+  LSSI e integración) encontraron 19 fallos, entre ellos que un formulario anónimo podía hacer que la
+  clínica escribiera a cualquier número con el nombre y el tratamiento que pusiera otro, o mezclar sus
+  datos con la ficha de una paciente. Ahora el lead de la web nace sin verificar (migración 017): quien
+  pide WhatsApp recibe un «¿fuiste tú?» neutro y solo con su «sí» sigue; la casilla comercial manda y
+  pasa a la ficha con su prueba; lo pedido va cifrado; topes por IP, por teléfono y global; borrado en
+  plazo. Se deja escrito qué hace falta para lanzar la web (docs/LANZAR-WEB.md, en marcha).

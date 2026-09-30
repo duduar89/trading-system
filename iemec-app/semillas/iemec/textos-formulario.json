@@ -1,0 +1,37 @@
+{
+ "_nota": "Generado por web/construir.js (no se edita a mano): cada versión de los textos del formulario «Te llamamos» (la primera capa de protección de datos y las dos casillas) con sus textos exactos. La versión es la fecha que fija el DPD y una huella de los textos. La app guarda en cada solicitud la versión que aceptó y no da por buena una que no esté aquí.",
+ "actual": "2026-09-30.ab7f30d1",
+ "versiones": {
+  "2026-09-30.ab7f30d1": {
+   "fecha": "2026-09-30",
+   "capa": [
+    [
+     "Responsable",
+     "Aneco AP Consulting, S.L. (IEMEC)."
+    ],
+    [
+     "Finalidad",
+     "Contestar a tu solicitud y darte cita por el medio que elijas. Si marcas la segunda casilla, enviarte comunicaciones comerciales."
+    ],
+    [
+     "Legitimación",
+     "Tu solicitud, y tu consentimiento explícito para el dato de salud que pueda revelar el tratamiento que te interesa. Para las comunicaciones comerciales, tu consentimiento."
+    ],
+    [
+     "Destinatarios",
+     "El proveedor de la app de gestión de la clínica, como encargado del tratamiento, y WhatsApp (Meta) si eliges que te escribamos por WhatsApp, con posible transferencia a EE. UU. amparada en el Marco de Privacidad de Datos UE-EE. UU. No se ceden a nadie más salvo obligación legal."
+    ],
+    [
+     "Derechos",
+     "Acceder, rectificar y suprimir tus datos, oponerte, limitar su uso, portarlos y retirar tu consentimiento escribiendo a [PENDIENTE: correo]. Puedes reclamar ante la AEPD."
+    ],
+    [
+     "Más información",
+     "En la Política de privacidad."
+    ]
+   ],
+   "privacidad": "He leído la información básica sobre protección de datos. Consiento que IEMEC trate mis datos, incluido el tratamiento que me interesa si revela algo de mi salud, para contestar a mi solicitud por el medio que he elegido.",
+   "comercial": "Quiero recibir comunicaciones comerciales de IEMEC (novedades y propuestas sobre los tratamientos que me interesan) por WhatsApp o correo electrónico. Puedo darme de baja cuando quiera respondiendo «BAJA». (Opcional)"
+  }
+ }
+}

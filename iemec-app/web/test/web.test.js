@@ -350,7 +350,13 @@ test('--publicar con lo imprescindible resuelto (datos inventados): sin marcas n
   assert.match(visible('/aviso-legal/'), /te los damos si nos los pides/);
   assert.match(visible('/aviso-legal/'), /Última actualización: 2 de octubre de 2026/);
   assert.ok(!/Compra de tarjetas regalo|Códigos de conducta/.test(visible('/aviso-legal/')));
-  assert.match(visible('/privacidad/'), /Versión de la cláusula del formulario: 2026-09-30/);
+  // La versión de la cláusula es la que envía el formulario (y guarda la app), entera.
+  const versionForm = /name="version_textos" value="([^"]+)"/.exec(paginas.get('/pedir-cita/'))[1];
+  assert.match(versionForm, /^2026-09-30\.[0-9a-f]{8}$/);
+  assert.ok(visible('/privacidad/').includes(`Versión de la cláusula del formulario: ${versionForm}`));
+  // Los plazos de la 9b: las solicitudes, 12 meses (lo que borra la app); el contador, un día.
+  assert.match(visible('/privacidad/'), /si no llegas a tener cita, 12 meses desde el último contacto\. Después se borran\./);
+  assert.match(visible('/privacidad/'), /Los registros del servidor, el tiempo imprescindible para la seguridad de la web; el contador de envíos, un día como mucho/);
   assert.ok(!/Asistente virtual/.test(visible('/privacidad/')));
   assert.match(visible('/accesibilidad/'), /Última revisión: 30 de septiembre de 2026/);
   assert.match(visible('/'), /Lunes a viernes, de 11:00 a 20:00\. Otros horarios, consúltanos\./);
@@ -564,8 +570,11 @@ test('formularios: campos, casillas sin marcar, trampa, versión y envío a la A
   // Sin novalidate en el HTML: sin JavaScript valida el navegador (web.js lo quita al cargar).
   assert.ok(!/novalidate/.test(form));
   assert.match(js, /noValidate = true/);
-  // Preferencia: WhatsApp, llamada o correo, ninguna marcada de antemano (RGPD, art. 25.2).
-  assert.match(form, /value="whatsapp" required>/);
+  // Preferencia: llamada o correo (WhatsApp, solo con sitio.json → formulario.whatsapp), ninguna
+  // marcada de antemano (RGPD, art. 25.2).
+  assert.equal(SITIO.formulario.whatsapp, false, 'el WhatsApp de confirmación espera a la puerta 5');
+  assert.ok(!/value="whatsapp"/.test(form));
+  assert.match(form, /value="llamada" required>/);
   assert.match(form, /value="correo">/);
   assert.ok(!/name="preferencia"[^>]*checked/.test(form), 'preferencia marcada de antemano');
   assert.match(form, /<input type="checkbox" id="cita-privacidad" name="privacidad" value="si" required/);
@@ -593,6 +602,71 @@ test('formularios: campos, casillas sin marcar, trampa, versión y envío a la A
   assert.equal((labio.match(/>Salud íntima femenina<\/option>/g) || []).length, 1);
   // Cada etiqueta con su campo.
   for (const [, html] of PAGINAS) for (const m of html.matchAll(/<label for="([^"]+)"/g)) assert.match(html, new RegExp(`id="${m[1]}"`));
+});
+
+test('formulario: la versión de los textos es la fecha del DPD y la huella de lo que se lee; la app tiene cada versión con sus textos', () => {
+  const B = require('../lib/base');
+  const form = /<form class="formulario"[\s\S]*?<\/form>/.exec(PAGINAS.get('/pedir-cita/'))[0];
+  const version = /name="version_textos" value="([^"]+)"/.exec(form)[1];
+  assert.match(version, new RegExp(`^${SITIO.formulario.version_textos}\\.[0-9a-f]{8}$`));
+  assert.equal(INFORME.textos.actual, version);
+  const t = INFORME.textos.versiones[version];
+  // Lo que se lee en el formulario es exactamente eso: la primera capa y las dos casillas.
+  const limpio = (h) => R.textoVisible(`<body>${h}</body>`).replace(/\s+([.,;:])/g, '$1');
+  assert.equal(limpio(/<div class="capa-privacidad">[\s\S]*?<\/div>/.exec(form)[0]),
+    limpio(`Información básica sobre protección de datos ${t.capa.map(([c, v]) => `${c} ${v}`).join(' ')}`));
+  const casillas = [...form.matchAll(/<div class="casilla">[\s\S]*?<label[^>]*>([\s\S]*?)<\/label>/g)].map((m) => limpio(m[1]));
+  assert.deepEqual(casillas, [t.privacidad, t.comercial]);
+  // Si cambia una coma de lo que se acepta, cambia la versión.
+  assert.equal(B.versionTextos({ sitio: SITIO }), version);
+  assert.notEqual(B.versionTextos({ sitio: { ...SITIO, titular: { ...SITIO.titular, razon_social: 'Otra Razón Social, S.L.' } } }), version);
+  assert.notEqual(B.versionTextos({ sitio: { ...SITIO, correo: 'hola@iemec-clinic.com' } }), version);
+  // Cada formulario, con su identificador de envío (lo pone web.js): un reintento no se duplica.
+  assert.match(form, /<input type="hidden" name="envio" value="">/);
+  assert.match(fs.readFileSync(path.join(SALIDA, INFORME.recursos.js), 'utf8'), /randomUUID/);
+});
+
+test('lo íntimo: el WhatsApp de cada página lleva la referencia de su especialidad (la misma en todas); el formulario, la suya', () => {
+  for (const esp of ['/estetica-intima-femenina/', '/estetica-intima-masculina/']) {
+    const refEsp = /\(ref\. (web-intima-[fm]-[0-9a-z]+)\)/.exec(R.whatsapps(PAGINAS.get(esp))[0].texto)[1];
+    const paginas = [...PAGINAS.keys()].filter((r) => r.startsWith(esp) && r !== esp);
+    assert.ok(paginas.length >= 1, esp);
+    for (const ruta of paginas) {
+      const h = PAGINAS.get(ruta);
+      for (const w of R.whatsapps(h)) assert.ok(w.texto.endsWith(`(ref. ${refEsp})`), `${ruta}: ${w.texto}`);
+      // El formulario va directo a la app (junto a la página): ahí sí, la de la página.
+      assert.notEqual(/name="ref" value="([^"]+)"/.exec(h)[1], refEsp, ruta);
+    }
+  }
+});
+
+test('WhatsApp en el formulario: sin el 722 conectado ni la plantilla aprobada, nada promete la confirmación; con ellos, el formulario la ofrece y /gracias/ y la privacidad la explican', () => {
+  // Hoy (formulario.whatsapp false): llamada o correo, y ni la web ni web.js prometen un WhatsApp.
+  const g = PAGINAS.get('/gracias/');
+  assert.match(R.textoVisible(g), /Te contactaremos por el medio que has elegido en horario de la clínica/);
+  assert.ok(R.whatsapps(g).some((w) => w.texto.endsWith('(ref. web-gracias)')), 'puede escribirnos él');
+  const js = fs.readFileSync(path.join(SALIDA, INFORME.recursos.js), 'utf8');
+  for (const [ruta, h] of [...PAGINAS, ['web.js', js]]) assert.ok(!/fui yo|para confirmar que la solicitud es tuya/i.test(h), `${ruta}: promete el WhatsApp de confirmación`);
+  assert.ok(!/data-confirmacion/.test(PAGINAS.get('/pedir-cita/')));
+  assert.match(R.textoVisible(PAGINAS.get('/pedir-cita/')), /como prefieras: por teléfono o por correo\./);
+  const privacidad = R.textoVisible(PAGINAS.get('/privacidad/'));
+  assert.match(privacidad, /cómo prefieres que te contactemos \(llamada o correo:/);
+  assert.ok(!/antes te escribimos una vez para confirmar/.test(privacidad));
+  // Con el 722 conectado y iemec_solicitud_web aprobada (formulario.whatsapp true).
+  const c = temporal('whatsapp');
+  const inf = construir({ salida: c, referencias: null, ajustarDatos: (d) => { d.sitio.formulario.whatsapp = true; } });
+  assert.deepEqual(inf.errores, []);
+  const pag = leerPaginas(c);
+  const form = /<form class="formulario"[^>]*>[\s\S]*?<\/form>/.exec(pag.get('/pedir-cita/'))[0];
+  assert.match(form, /value="whatsapp" required> WhatsApp/);
+  assert.match(form, /data-confirmacion="Te escribiremos por WhatsApp desde el \+34 722 83 32 85 para confirmar que la solicitud es tuya: contesta «Sí, fui yo» y seguimos por ahí\."/);
+  assert.match(R.textoVisible(pag.get('/gracias/')), /te escribiremos desde el \+34 722 83 32 85 para confirmar que la solicitud es tuya: contesta «Sí, fui yo»/);
+  assert.match(R.textoVisible(pag.get('/privacidad/')), /\(WhatsApp, llamada o correo:[\s\S]*Si eliges WhatsApp, antes te escribimos una vez para confirmar que la solicitud es tuya/);
+  // web.js pinta el aviso que lleva el formulario, no uno propio.
+  assert.match(js, /getAttribute\('data-confirmacion'\)/);
+  // Las casillas no cambian: la versión de sus textos, tampoco.
+  assert.equal(/name="version_textos" value="([^"]+)"/.exec(form)[1], INFORME.textos.actual);
+  fs.rmSync(c, { recursive: true, force: true });
 });
 
 test('CSP: sin scripts en línea (salvo datos) ni estilos en línea; recursos con huella y dentro de su tamaño', () => {

@@ -314,20 +314,19 @@
       "id": "privacidad-plazos",
       "clase": "b",
       "titulo": "Plazos de conservación",
-      "falta": "Cuánto se guardan las solicitudes que no acaban en cita (se recomiendan 12 meses), el plazo de la documentación clínica que fije la clínica y cuánto guarda el alojamiento sus registros.",
-      "por_que": "El RGPD (art. 13.2.a) permite dar el criterio en vez del plazo; el plazo lo fija el DPD. La app no borra hoy sola los leads: un plazo fijo sería una promesa sin cumplir.",
+      "falta": "Que el DPD confirme el plazo de las solicitudes que no acaban en cita (12 meses desde el último contacto: es lo que hace la app), el de la documentación clínica que fije la clínica y cuánto guarda el alojamiento sus registros.",
+      "por_que": "El RGPD (art. 13.2.a) pide el plazo cuando se conoce: el de las solicitudes lo cumple la app (servidor/retencion.js las borra cada día a los 12 meses del último contacto, RETENCION_LEADS_MESES) y se publica. Si el DPD fija otro, se cambian a la vez esa variable y el texto. El de la documentación clínica sale con el mínimo legal; el de los registros del servidor depende del alojamiento: mientras, el criterio.",
       "donde": ["/privacidad/ (apartado 3)"],
       "responsable": "Clínica (DPD)",
-      "marcas": ["[PENDIENTE: plazo de conservación de las solicitudes (se recomiendan 12 meses)]", "[PENDIENTE: plazo que fije la clínica]", "[PENDIENTE: plazo de los registros del servidor (p. ej. 90 días)]"],
-      "publicado": "Los criterios: «Si no llegas a tener cita, los borramos cuando ya no hacen falta para contestarte, salvo lo que la ley obligue a guardar bloqueado»; la documentación clínica, con el mínimo legal de 5 años; los registros del servidor, «el tiempo imprescindible para la seguridad de la web».",
+      "marcas": ["[PENDIENTE: que el DPD confirme el plazo (la app los borra a los 12 meses: RETENCION_LEADS_MESES)]", "[PENDIENTE: plazo que fije la clínica]", "[PENDIENTE: plazo de los registros del servidor (p. ej. 90 días)]"],
+      "publicado": "Las solicitudes que no acaban en cita, «12 meses desde el último contacto. Después se borran»; la documentación clínica, con el mínimo legal de 5 años; los registros del servidor, «el tiempo imprescindible para la seguridad de la web»; el contador de envíos, «un día como mucho», sin guardar la dirección IP ni el teléfono.",
       "en_publicacion": {
         "redacciones": [
-          { "archivo": "contenido/legal/privacidad.md", "buscar": "Mientras gestionamos tu solicitud y, si no llegas a tener cita, `[PENDIENTE: plazo de conservación de las solicitudes (se recomiendan 12 meses)]` desde el último contacto. Después se borran.", "cambiar_por": "Mientras gestionamos tu solicitud. Si no llegas a tener cita, los borramos cuando ya no hacen falta para contestarte, salvo lo que la ley obligue a guardar bloqueado." },
-          { "archivo": "contenido/legal/privacidad.md", "buscar": "`[PENDIENTE: plazo de los registros del servidor (p. ej. 90 días)]`; el contador de envíos, unas horas.", "cambiar_por": "Los registros del servidor, el tiempo imprescindible para la seguridad de la web; el contador de envíos, unas horas." }
+          { "archivo": "contenido/legal/privacidad.md", "buscar": "`[PENDIENTE: plazo de los registros del servidor (p. ej. 90 días)]`; el contador de envíos, un día como mucho", "cambiar_por": "Los registros del servidor, el tiempo imprescindible para la seguridad de la web; el contador de envíos, un día como mucho" }
         ],
-        "quitar": ["[PENDIENTE: plazo que fije la clínica]"]
+        "quitar": ["[PENDIENTE: que el DPD confirme el plazo (la app los borra a los 12 meses: RETENCION_LEADS_MESES)]", "[PENDIENTE: plazo que fije la clínica]"]
       },
-      "como_completar": "El apartado 3 de web/contenido/legal/privacidad.md."
+      "como_completar": "El apartado 3 de web/contenido/legal/privacidad.md; si el DPD cambia el de las solicitudes, también RETENCION_LEADS_MESES en el .env de la app."
     },
     {
       "id": "privacidad-bases",
@@ -393,14 +392,27 @@
       "id": "version-clausula",
       "clase": "b",
       "titulo": "Versión de la cláusula del formulario",
-      "falta": "La versión de las casillas que fije el DPD.",
+      "falta": "La fecha de la versión de las casillas que fije el DPD.",
       "donde": ["/privacidad/ (apartado 9)"],
       "responsable": "Clínica (DPD)",
       "marcas": [],
       "antes": ["[PENDIENTE: p. ej. 2026-10-01]"],
-      "publicado": "La versión que envía el formulario y guarda la app con cada consentimiento (web/datos/sitio.json → formulario.version_textos).",
-      "en_publicacion": { "codigo": "web/lib/legal.js · {{version_textos}}" },
-      "como_completar": "Si el DPD cambia las casillas, subir formulario.version_textos en web/datos/sitio.json."
+      "publicado": "La versión entera que envía el formulario y guarda la app con cada consentimiento: la fecha de web/datos/sitio.json → formulario.version_textos y la huella de los textos que se aceptan (p. ej. «2026-09-30.7d0c5ef9»; web/lib/base.js · versionTextos()).",
+      "en_publicacion": { "codigo": "web/lib/legal.js · {{version_textos}} = web/lib/base.js · versionTextos(), la misma que lleva el formulario" },
+      "como_completar": "Si el DPD cambia las casillas o fija otra fecha, formulario.version_textos en web/datos/sitio.json; la huella cambia sola con los textos. Después, construir y desplegar la app con semillas/iemec/textos-formulario.json."
+    },
+    {
+      "id": "whatsapp-formulario",
+      "clase": "b",
+      "titulo": "WhatsApp en el formulario «Te llamamos»",
+      "falta": "Que el WhatsApp del 722 83 32 85 esté conectado a la app en modo real (MODO_WHATSAPP=real, con el proveedor que se elija) y que Meta haya aprobado la plantilla de utilidad iemec_solicitud_web («¿Has sido tú?», con los botones «Sí, fui yo» y «No fui yo»).",
+      "por_que": "Quien elige WhatsApp en el formulario recibe antes un WhatsApp de la app para confirmar que la solicitud es suya: el formulario es anónimo y cualquiera puede escribir un teléfono ajeno. Sin el envío real ni la plantilla aprobada (puerta ⛔ 5), la web prometería un mensaje que no llega.",
+      "donde": ["el formulario «Te llamamos» (páginas de tratamiento y /pedir-cita/)", "/pedir-cita/ (tarjeta «Te llamamos»)", "/gracias/ y el aviso que pinta web.js al enviar", "/privacidad/ (apartados 2 y 3)"],
+      "responsable": "Eduardo (conectar el 722 a la app y pedir la plantilla a Meta) y la clínica (dónde está hoy el 722 y con qué proveedor)",
+      "marcas": [],
+      "publicado": "El formulario ofrece llamada o correo, sin WhatsApp: cada solicitud llega a recepción como tarea para llamar, «sin verificar». /gracias/ dice que te contactamos por el medio que has elegido y que, si prefieres no esperar, nos escribas por WhatsApp; la privacidad no habla del WhatsApp de confirmación. Los botones de WhatsApp de cada página siguen: ahí escribe la persona.",
+      "en_publicacion": { "codigo": "web/lib/base.js · conWhatsapp() con web/datos/sitio.json → formulario.whatsapp (false): formulario(), la ayuda del teléfono y data-confirmacion (el aviso de web.js); web/lib/paginas.js · gracias() y pedirCita(); web/lib/legal.js · {{medios_formulario}} y {{confirmacion_whatsapp}}" },
+      "como_completar": "Con el 722 conectado en modo real y iemec_solicitud_web aprobada, y probado el formulario con WhatsApp de punta a punta (docs/WHATSAPP-Y-LEADS.md): web/datos/sitio.json → formulario.whatsapp: true; construir con --publicar y subir la carpeta (las casillas no cambian, así que tampoco su versión)."
     },
     {
       "id": "fecha-accesibilidad",

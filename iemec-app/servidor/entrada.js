@@ -11,7 +11,11 @@
 //   referral (anuncio que abre WhatsApp)      → lead «meta_ctwa» ANTES de procesar el mensaje, para
 //                                               que la repesca lo trate como lead
 //   «(ref. web-…)» (botón de WhatsApp de la   → lead «web_whatsapp» con su referencia y su
-//   web pública)                                tratamiento, también antes del mensaje
+//   web pública)                                tratamiento, también antes del mensaje; se entiende
+//                                               como una petición de información de esa página
+//   «Sí, fui yo» / «No fui yo» (la respuesta  → la solicitud queda verificada (y sigue la conversación)
+//   al WhatsApp que confirma una solicitud      o se borra lo que escribió quien la envió
+//   del formulario de la web)
 //   estados (enviado, entregado, leído,        → mensajes.estado y el error, por wa_id; el 131050 (ha
 //   fallido)                                     dejado de recibir marketing) es una baja comercial; el
 //                                               aviso de un hueco que no llega pasa al siguiente de la
@@ -24,7 +28,7 @@ const cola = require('./cola');
 const config = require('./config');
 const R = require('./repesca/motor');
 const LE = require('./lista-espera');
-const { altaLead } = require('./leads');
+const { altaLead, verificarSolicitudWeb, rechazarSolicitudWeb } = require('./leads');
 const { apuntarBaja } = require('./bajas');
 const { crearMeta } = require('./integraciones/meta');
 const { combinar } = require('./integraciones/ia');
@@ -33,7 +37,7 @@ const { registrar } = require('./eventos');
 const W = require('../motor/entrada/whatsapp');
 const E = require('../motor/entrada/leads');
 const { interpretar } = require('../motor/repesca/interpretar');
-const { referenciaDeWhatsapp } = require('../motor/entrada/web');
+const { referenciaDeWhatsapp, sinReferencia, respuestaConfirmacion, huellaCampana } = require('../motor/entrada/web');
 const { cargarReferencias, entradaDe } = require('./referencias-web');
 
 // Los avisos que solo traen estados (enviado, entregado, leído) van en su propio trabajo: son muchos
@@ -210,8 +214,15 @@ async function atenderMensaje(deps, m, { ahora }) {
   if (ya) return { duplicado: true };
   const recibidoEn = horaDe(m, ahora);
   if (m.tipo === 'reaccion') return registrarReaccion(pool, m, { recibidoEn });
+  let comoEntender = null;
   if (m.referral) await leadDesdeAnuncio(pool, m, { ahora });
-  else if (m.tipo === 'texto' && referenciaDeWhatsapp(m.texto)) await leadDesdeWeb(deps, m, { ahora });
+  else if (m.tipo === 'texto' && referenciaDeWhatsapp(m.texto)) comoEntender = await leadDesdeWeb(deps, m, { ahora });
+  // ¿Contesta a la confirmación de una solicitud del formulario de la web («¿Has sido tú?»)?
+  if (!comoEntender && m.aIa) {
+    const c = await atenderConfirmacion(deps, m, { ahora, recibidoEn });
+    if (c?.hecho) return c.hecho;
+    if (c?.verificada) comoEntender = { intencion: 'informacion' };
+  }
   const nombre = await nombreParaSaludo(pool, m);
 
   // Una foto o un documento con una baja o algo de salud en la leyenda va también por la repesca: la
@@ -221,7 +232,7 @@ async function atenderMensaje(deps, m, { ahora }) {
   const aLaRepesca = m.aIa || ['baja', 'salud_personal'].includes(leyenda?.intencion);
   if (!aLaRepesca) return paraPersona(deps, m, { nombre, ahora, recibidoEn });
   try {
-    const r = await R.procesarEntrante(deps, { telefono: m.telefono, texto: m.texto, waId: m.waId, nombre, ahora, recibidoEn });
+    const r = await R.procesarEntrante(deps, { telefono: m.telefono, texto: m.texto, waId: m.waId, nombre, ahora, recibidoEn, entender: comoEntender });
     if (!r.duplicado) {
       await completarMensaje(pool, m);
       if (!m.aIa && r.conversacionId) {
@@ -283,7 +294,7 @@ async function nombreParaSaludo(pool, m) {
   if (!m.perfil) return null;
   const [[p]] = await pool.query('SELECT id FROM pacientes WHERE telefono = ?', [m.telefono]);
   if (p) return null;
-  const [[l]] = await pool.query("SELECT id FROM leads WHERE telefono = ? AND etapa NOT IN ('perdido','vendido') AND nombre IS NOT NULL LIMIT 1", [m.telefono]);
+  const [[l]] = await pool.query("SELECT id FROM leads WHERE telefono = ? AND etapa NOT IN ('perdido','vendido') AND nombre IS NOT NULL AND sin_verificar = FALSE LIMIT 1", [m.telefono]);
   if (l) return null;
   return E.nombrePila(m.perfil);
 }
@@ -304,20 +315,101 @@ async function leadDesdeAnuncio(pool, m, { ahora }) {
 
 // Botón de WhatsApp de la web pública: el primer mensaje trae «(ref. web-…)» y, si llegó por una
 // campaña, su huella («· c-…»). Lead «web_whatsapp» con la referencia (codigo_web) y el tratamiento
-// que le corresponde (semillas/iemec/referencias-web.json; en lo íntimo, la referencia es un código
-// y el texto del mensaje no nombra nada) y la conversación enlazada a él, como con los anuncios.
-// Quien ya estaba en marcha no se duplica. Una referencia que no está en el archivo (una página que
-// ya no existe) da igual el lead, sin tratamiento.
+// que le corresponde (semillas/iemec/referencias-web.json; en lo íntimo, la referencia es la de su
+// especialidad y el texto del mensaje no nombra nada) y la conversación enlazada a él, como con los
+// anuncios. Quien ya estaba en marcha no se duplica. Una referencia que no está en el archivo (una
+// página que ya no existe) da igual el lead, sin tratamiento.
+// Devuelve cómo se entiende ese mensaje: es una petición de información de lo que eligió en la web
+// (su texto, «Hola, vengo de la web y me interesa: …», no lo dicen las reglas), sin la referencia y
+// sin volver a sacar del texto lo que le interesa (la referencia es exacta). Las tarjetas regalo las
+// lleva una persona (comprarla o canjearla no es una cita).
 async function leadDesdeWeb(deps, m, { ahora }) {
   const { ref, campana } = referenciaDeWhatsapp(m.texto);
   const { referencias } = (deps.referenciasWeb || cargarReferencias)();
   const destino = entradaDe(referencias, ref);
   const { leadId } = await altaLead(deps.pool, {
     origen: 'web_whatsapp', telefono: m.telefono, nombre: m.perfil, codigoWeb: ref, utm: campana ? { clave_campana: campana } : null,
+    campana: campana ? await campanaDeClave(deps.pool, campana) : null,
     tratamiento: { id: destino?.catalogo || null, claves: [ref], textos: [] },
   }, { inscribir: false, ahora });
   await enlazarConversacion(deps.pool, m.telefono, leadId, { ahora });
-  return leadId;
+  return { texto: sinReferencia(m.texto), intencion: 'informacion', interesFijado: true, persona: tarjetaRegalo(ref, destino), leadId };
+}
+
+// De qué campaña es la huella del WhatsApp de la web («c-1x2y3z»): se busca entre las que ya conocemos
+// (las de los formularios de la web y de Meta, y las claves del mapeo de campañas). Si no está, el lead
+// se queda con la huella (utm.clave_campana) y el panel la enseña.
+async function campanaDeClave(q, clave) {
+  const [filas] = await q.query('SELECT DISTINCT campana AS nombre FROM leads WHERE campana IS NOT NULL UNION SELECT clave FROM mapeo_tratamientos');
+  return filas.find((f) => huellaCampana(f.nombre) === clave)?.nombre || null;
+}
+
+// «Quiere comprar una tarjeta regalo de 45 €…»: lo que pide un botón de /tarjetas-regalo/.
+function tarjetaRegalo(ref, destino) {
+  if (!/^web-tarjeta-/.test(ref || '')) return null;
+  if (destino?.canje || ref === 'web-tarjeta-canje') return 'Quiere canjear una tarjeta regalo (desde la web): pedirle el código y darle cita';
+  if (destino?.importe) return `Quiere comprar una tarjeta regalo de ${destino.importe} € (desde la web): contarle cómo y gestionarlo`;
+  return 'Quiere una tarjeta regalo (desde la web): contarle las opciones y gestionarlo';
+}
+
+// ── La respuesta a «¿Has sido tú?» (confirmación de una solicitud del formulario de la web) ──────
+
+// El formulario de la web es anónimo: quien pide WhatsApp recibe primero uno neutro, «Hemos recibido
+// una solicitud con este número. ¿Has sido tú?» (servidor/repesca/motor.js, secuencia confirmar_web).
+// Lo que contesta, durante una semana y mientras no le escribamos otra cosa:
+//   · «Sí, fui yo» (o «sí», «soy yo»…): su solicitud queda verificada y sigue la conversación, que le
+//     cuenta lo que pidió (una petición de información de lo que eligió);
+//   · «No fui yo»: se borra lo que escribió quien la envió, se le piden disculpas y no se le vuelve a
+//     escribir por ella;
+//   · otra cosa: se le explica una vez por qué le escribimos; una baja, algo de salud o una queja van
+//     por la repesca, como siempre.
+// → null (no es eso), { verificada: true } (sigue la repesca) o { hecho } (ya está contestado).
+async function atenderConfirmacion(deps, m, { ahora, recibidoEn }) {
+  const { pool } = deps;
+  const p = await R.confirmacionPendiente(pool, m.telefono, ahora);
+  if (!p) return null;
+  const reglas = interpretar(m.texto);
+  if (['baja', 'salud_personal', 'queja'].includes(reglas.intencion) || reglas.urgente) return null;
+  const respuesta = respuestaConfirmacion(m.texto);
+  if (respuesta === 'si') {
+    const conv = p.conversacion.estado === 'cerrada' ? null : p.conversacion;
+    await verificarSolicitudWeb(pool, { telefono: m.telefono, leadIds: p.leads, conversacionId: conv?.id || null, ahora, por: 'whatsapp' });
+    return { verificada: true };
+  }
+  if (respuesta === 'no') {
+    await rechazarSolicitudWeb(pool, { telefono: m.telefono, leadIds: p.leads, ahora });
+    const texto = 'Perdona las molestias. Alguien dejó este número en nuestra web: no volveremos a escribirte por esa solicitud.';
+    return { hecho: await contestarAConfirmacion(deps, m, p, { texto, ahora, recibidoEn, cerrar: true }) };
+  }
+  if (p.aclarada) return null;
+  const texto = 'Te escribimos porque en la web de IEMEC nos han pedido información con este número de teléfono. Si fuiste tú, responde «Sí, fui yo» y te atendemos por aquí; si no, «No fui yo» y no volveremos a escribirte por ella.';
+  return { hecho: await contestarAConfirmacion(deps, m, p, { texto, ahora, recibidoEn, cerrar: false }) };
+}
+
+// Guarda lo que ha escrito en la conversación de la confirmación y le contesta (sin la IA). Si ha dicho
+// que no fue él, la conversación se cierra (si solo era de eso); si no, la pregunta sigue en pie una vez.
+async function contestarAConfirmacion(deps, m, p, { texto, ahora, recibidoEn, cerrar }) {
+  const { pool } = deps;
+  const conv = await enTransaccion(pool, async (con) => {
+    const [[c]] = await con.query('SELECT * FROM conversaciones WHERE id = ? FOR UPDATE', [p.conversacion.id]);
+    const cf = cifrar(m.texto);
+    await con.query(
+      `INSERT INTO mensajes (conversacion_id, direccion, autor, tipo, cuerpo_cifrado, iv, tag, wa_id, estado, creado_en)
+       VALUES (?, 'entrante', 'paciente', ?, ?, ?, ?, ?, 'recibido', ?)`, [c.id, ['boton', 'interactivo'].includes(m.tipo) ? m.tipo : 'texto', cf.cifrado, cf.iv, cf.tag, m.waId, recibidoEn]);
+    await con.query("UPDATE conversaciones SET ultimo_entrante_en = ?, ventana_hasta = ?, estado = IF(estado = 'cerrada', 'esperando_paciente', estado), nombre_whatsapp = COALESCE(?, nombre_whatsapp) WHERE id = ?",
+      [recibidoEn, new Date(recibidoEn.getTime() + VENTANA_MS), E.limpiarNombre(m.perfil), c.id]);
+    return c;
+  });
+  const envio = await R.enviar(deps, conv, { texto, autor: 'ia', ahora });
+  if (cerrar) {
+    const soloEso = conv.contexto === 'general' && !conv.lead_id;
+    if (soloEso) await pool.query("UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'no_lo_pidio', proximo_paso = 'cerrada' WHERE id = ?", [conv.id]);
+    await pool.query("UPDATE seguimientos SET estado = 'cancelado', resultado = 'no pidió la solicitud' WHERE conversacion_id = ? AND estado = 'pendiente' AND motivo = 'cierre_sin_respuesta'", [conv.id]);
+  } else {
+    await R.ponerPregunta(pool, conv.id, { tipo: 'confirmar_web', leads: p.leads, aclarada: true }, ahora);
+  }
+  await registrar(pool, { tipo: 'repesca_decision', entidad: 'conversacion', entidadId: conv.id, actor: 'ia', datos: { intencion: cerrar ? 'no_lo_pidio' : 'confirmar_solicitud_web', acciones: [], proximo: cerrar ? 'cerrada' : 'espera_respuesta' } });
+  return { conversacionId: conv.id, confirmacion: cerrar ? 'no' : 'aclarada', respuesta: texto, envio };
 }
 
 // La conversación de ese teléfono queda con el lead (contexto «lead»): una abierta sin lead (o con
@@ -375,7 +467,7 @@ async function paraPersona(deps, m, { nombre, ahora, recibidoEn = ahora }) {
     }
     await con.query('UPDATE conversaciones SET ultimo_entrante_en = ?, ventana_hasta = ?, nombre_whatsapp = COALESCE(?, nombre_whatsapp) WHERE id = ?',
       [recibidoEn, new Date(recibidoEn.getTime() + VENTANA_MS), E.limpiarNombre(m.perfil), conv.id]);
-    await con.query("UPDATE leads SET etapa = 'conversando' WHERE (id = ? OR telefono = ?) AND etapa IN ('nuevo','contactado')", [conv.lead_id, m.telefono]);
+    await con.query("UPDATE leads SET etapa = 'conversando' WHERE (id = ? OR telefono = ?) AND etapa IN ('nuevo','contactado') AND sin_verificar = FALSE", [conv.lead_id, m.telefono]);
     await con.query(
       `UPDATE inscripciones SET estado = 'pausada', motivo_fin = 'el paciente contestó' WHERE estado = 'activa'
           AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?) OR lead_id IN (SELECT id FROM leads WHERE telefono = ?))`,

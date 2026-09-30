@@ -36,7 +36,8 @@ Y para poder subirla (no son datos de la web, pero sin ellos no se lanza):
 | Qué | Quién |
 |---|---|
 | **Alojamiento** con cPanel (o FTP/SFTP) y acceso a `public_html` del dominio principal, con Apache y `.htaccess` (`mod_rewrite`, `mod_headers`, `mod_deflate`). Puede ser el mismo cPanel de la app (LucusHost, `docs/DESPLIEGUE.md`) | Eduardo (con la clínica, si hay que contratarlo) |
-| **La app publicada** en `https://agenda.iemec-clinic.com` con la migración `015-formulario-web.sql` y `WEB_DOMINIO=https://iemec-clinic.com`: recibe el formulario «Te llamamos» y los WhatsApp de la web. Hoy `agenda.iemec-clinic.com` **no existe** en el DNS | Eduardo (y Uebea, el registro del subdominio) |
+| **La app publicada** en `https://agenda.iemec-clinic.com` con las migraciones `015-formulario-web.sql` y `017-verificar-formulario-web.sql`, `WEB_DOMINIO=https://iemec-clinic.com` y los `semillas/iemec/referencias-web.json` y `textos-formulario.json` que deja `--publicar`: recibe el formulario «Te llamamos» y los WhatsApp de la web. Hoy `agenda.iemec-clinic.com` **no existe** en el DNS | Eduardo (y Uebea, el registro del subdominio) |
+| **WhatsApp en el formulario** (no bloquea): el 722 83 32 85 conectado a la app en modo real y la plantilla `iemec_solicitud_web` aprobada en Meta (puerta ⛔ 5). Mientras no esté, el formulario sale sin la opción WhatsApp (`web/datos/sitio.json` → `formulario.whatsapp: false`), nada en la web promete el WhatsApp de confirmación y recepción llama a cada solicitud | Eduardo (y la clínica: dónde está hoy el 722) |
 | **Acceso al DNS** de iemec-clinic.com para cambiar los registros de la web y crear los de `agenda` y del correo | Uebea (o quien tenga la cuenta del dominio) |
 
 Si la clínica tarda en mandar el punto 3 y prefiere lanzar antes, se puede lanzar sin las
@@ -103,10 +104,13 @@ Comprobado el 30-09-2026 en fuentes públicas (RDAP de Verisign y DNS público):
 
    Si falla, dice qué falta y deja `web/dist` vacío (solo `informe.json`): nada que se pueda subir
    por error. `npm run web` vuelve a hacer la vista previa con los huecos en amarillo.
-2. **Publicar primero la app** con la migración `015-formulario-web.sql` y en su `.env`
-   `WEB_DOMINIO=https://iemec-clinic.com` (y `WEB_ORIGENES=https://prueba.iemec-clinic.com` si se
-   prueba en un subdominio): ver `docs/DESPLIEGUE.md`. Crear el subdominio `agenda` con AutoSSL y
-   comprobar `https://agenda.iemec-clinic.com/api/salud`.
+2. **Publicar primero la app** con las migraciones `015-formulario-web.sql` y
+   `017-verificar-formulario-web.sql` y en su `.env` `WEB_DOMINIO=https://iemec-clinic.com` (y
+   `WEB_ORIGENES=https://prueba.iemec-clinic.com` si se prueba en un subdominio): ver
+   `docs/DESPLIEGUE.md`. Va con los `semillas/iemec/referencias-web.json` y `textos-formulario.json`
+   que acaba de escribir `--publicar` (en git: la app no da por buena una versión de las casillas que
+   no conoce). Crear el subdominio `agenda` con AutoSSL y comprobar
+   `https://agenda.iemec-clinic.com/api/salud`.
 3. **Construir la versión para subir**, con las fotos (sus WebP no están en git):
 
    ```sh

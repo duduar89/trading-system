@@ -29,6 +29,11 @@ const config = {
     dominio: leer('WEB_DOMINIO', 'https://iemec-clinic.com'),
     origenes: leer('WEB_ORIGENES', ''),
   },
+  // Cuánto se guarda lo que llega pidiendo información y no acaba en cita (servidor/retencion.js): la
+  // política de privacidad de la web dice 12 meses desde el último contacto.
+  retencion: {
+    leadsMeses: Math.max(1, Number(leer('RETENCION_LEADS_MESES', 12)) || 12),
+  },
   // Modo de cada integración: «simulado» (por defecto, nunca sale nada a internet) o «real».
   modos: {
     whatsapp: leer('MODO_WHATSAPP', 'simulado'),

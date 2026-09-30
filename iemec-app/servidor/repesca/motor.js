@@ -30,6 +30,8 @@ const { elegirOpcion, textoOpciones } = require('../../motor/repesca/opciones');
 const { combinar, textoSimulado } = require('../integraciones/ia');
 const { cifrar, descifrar } = require('../cripto');
 const { apuntarBaja, tieneBaja } = require('../bajas');
+const { consentimientoWeb, aplicarConsentimientoWeb } = require('../consentimiento-web');
+const { sinReferencia } = require('../../motor/entrada/web');
 const {
   limpiarNombre, nombrePila, telefonoLegible, esAgrupador, esOpcion, restringido, buscarEnCatalogo, buscarEnMensaje, NOTA_AGRUPADOR, NOTA_BOTON_COMPARTIDO,
 } = require('../../motor/entrada/leads');
@@ -73,7 +75,8 @@ async function conversacionPara(con, { telefono, pacienteId = null, leadId = nul
     pacienteId = p?.id || null;
   }
   if (!leadId) {
-    const [[l]] = await con.query("SELECT id FROM leads WHERE telefono = ? AND etapa NOT IN ('perdido','vendido') ORDER BY id DESC LIMIT 1", [telefono]);
+    // Una solicitud de la web sin verificar no es de quien escribe hasta que lo confirme.
+    const [[l]] = await con.query("SELECT id FROM leads WHERE telefono = ? AND etapa NOT IN ('perdido','vendido') AND sin_verificar = FALSE ORDER BY id DESC LIMIT 1", [telefono]);
     leadId = l?.id || null;
   }
   const [r] = await con.query('INSERT INTO conversaciones (telefono, paciente_id, lead_id, contexto, contexto_id) VALUES (?, ?, ?, ?, ?)',
@@ -92,9 +95,14 @@ async function guardarMensaje(con, m) {
   return r.insertId;
 }
 
+// Lo que se ha hablado, para la IA. Del paciente, sin la «(ref. …)» que escribe la web en el primer
+// mensaje de sus botones: la puso la web, no él (en la conversación se guarda entero).
 async function historial(q, conversacionId, n = 10) {
   const [filas] = await q.query('SELECT autor, cuerpo_cifrado, iv, tag, creado_en FROM mensajes WHERE conversacion_id = ? ORDER BY id DESC LIMIT ?', [conversacionId, n]);
-  return filas.reverse().map((f) => ({ autor: f.autor, texto: descifrar(f.cuerpo_cifrado, f.iv, f.tag), en: f.creado_en }));
+  return filas.reverse().map((f) => {
+    const texto = descifrar(f.cuerpo_cifrado, f.iv, f.tag);
+    return { autor: f.autor, texto: f.autor === 'paciente' ? sinReferencia(texto) : texto, en: f.creado_en };
+  });
 }
 
 // Todo lo que la política necesita saber de este paciente y esta conversación. tratamientoId: el que
@@ -489,14 +497,26 @@ function textoDia(fecha) {
   return `el ${DIAS[T.diaSemana(fecha)]} ${Number(fecha.slice(8, 10))} de ${MESES[Number(fecha.slice(5, 7))]}`;
 }
 
+// Lo que manda siempre, se diga lo que se diga antes: una baja, algo de salud o una queja.
+const LO_QUE_MANDA = new Set(['baja', 'salud_personal', 'queja']);
+
 /**
  * Llega un mensaje del paciente por WhatsApp.
  * deps: { pool, ia, whatsapp }
  * recibidoEn: cuándo lo escribió (la marca de WhatsApp); si se procesa tarde, su hora y la ventana de
  * 24 h cuentan desde entonces, no desde que lo coge el cron.
+ * entender: cómo se entiende este mensaje cuando no es solo lo que ha escrito (servidor/entrada.js):
+ *   { texto: lo que se entiende (sin la «(ref. …)» de los botones de la web; en la conversación se
+ *     guarda entero), intencion: la que es (el primer mensaje de un botón de la web o el «Sí, fui yo»
+ *     a la confirmación de una solicitud: pide información de lo que eligió), interesFijado: el interés
+ *     ya lo puso la referencia de la web y no se vuelve a sacar del texto, persona: el motivo si lo
+ *     tiene que llevar una persona (una tarjeta regalo) }. Una baja, algo de salud o una queja mandan
+ *     igual.
  */
-async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = new Date(), nombre = null, recibidoEn = null }) {
+async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = new Date(), nombre = null, recibidoEn = null, entender = null }) {
   const { pool, ia } = deps;
+  const textoEntendido = entender?.texto ?? texto;
+  const forzar = (r) => (entender?.intencion && !LO_QUE_MANDA.has(r.intencion) && !r.urgente ? { ...r, intencion: entender.intencion } : r);
   const con = await pool.getConnection();
   let conv;
   let mensajeId;
@@ -507,13 +527,14 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
       const [[ya]] = await con.query('SELECT id FROM mensajes WHERE wa_id = ?', [waId]);
       if (ya) { await con.commit(); return { duplicado: true }; }
     }
-    const reglasPrevias = interpretar(texto);
+    const reglasPrevias = forzar(interpretar(textoEntendido));
     const recibido = recibidoEn && recibidoEn < ahora ? recibidoEn : ahora;
     mensajeId = await guardarMensaje(con, { conversacionId: conv.id, direccion: 'entrante', autor: 'paciente', texto, waId, intencion: reglasPrevias.intencion, creadoEn: recibido });
     await con.query('UPDATE conversaciones SET ultimo_entrante_en = ?, ventana_hasta = ? WHERE id = ?', [recibido, new Date(recibido.getTime() + VENTANA_MS), conv.id]);
     // Lo que dice el paciente manda: se pausan sus secuencias, las de su ficha y las de cualquier lead
-    // con su teléfono (aunque aún no sea el de esta conversación).
-    await con.query("UPDATE leads SET etapa = 'conversando' WHERE (id = ? OR telefono = ?) AND etapa IN ('nuevo','contactado')", [conv.lead_id, telefono]);
+    // con su teléfono (aunque aún no sea el de esta conversación). Una solicitud de la web sin verificar
+    // no pasa a «conversando»: aún no se sabe si es suya.
+    await con.query("UPDATE leads SET etapa = 'conversando' WHERE (id = ? OR telefono = ?) AND etapa IN ('nuevo','contactado') AND sin_verificar = FALSE", [conv.lead_id, telefono]);
     await con.query(
       `UPDATE inscripciones SET estado = 'pausada', motivo_fin = 'el paciente contestó' WHERE estado = 'activa'
           AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?) OR lead_id IN (SELECT id FROM leads WHERE telefono = ?))`,
@@ -528,7 +549,7 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
 
   // Una persona lleva la conversación: la IA no contesta (la bajas y la salud, sí se registran).
   if (['persona', 'espera_persona'].includes(conv.estado)) {
-    const r = interpretar(texto);
+    const r = interpretar(textoEntendido);
     if (r.intencion === 'baja' || r.urgente) {
       // Se aplica igual: una baja o una urgencia no esperan a nadie.
     } else {
@@ -538,11 +559,13 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
 
   let datos = await cargarContexto(pool, conv, ahora);
   const hist = await historial(pool, conv.id);
-  const reglas = interpretar(texto);
+  const reglas = forzar(interpretar(textoEntendido));
   // Si nombra lo que le interesa (no lo sabíamos, dice el nivel de un agrupador o pregunta por otro
-  // tratamiento), en esta vuelta se habla de eso, y queda en su lead.
-  if (!NO_ES_INTERES.has(reglas.intencion)) {
-    const nombrado = await tratamientoNombrado(pool, texto, datos);
+  // tratamiento), en esta vuelta se habla de eso, y queda en su lead. En el primer mensaje de un botón
+  // de la web no: lo que le interesa ya lo dijo la referencia de la página, que es exacta («Diagnóstico
+  // de lipoláser» nombra el lipoláser, pero su página es la del diagnóstico).
+  if (!entender?.interesFijado && !NO_ES_INTERES.has(reglas.intencion)) {
+    const nombrado = await tratamientoNombrado(pool, textoEntendido, datos);
     if (nombrado) {
       await fijarInteres(pool, conv, nombrado, datos.tratamiento?.id || null);
       datos = await cargarContexto(pool, conv, ahora, { tratamientoId: nombrado });
@@ -554,19 +577,22 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
 
   // «Quítame de la lista de espera»: sale de la lista, no es una baja de todo (si además pide que no
   // le escribamos, sí lo es).
-  if (reglas.intencion === 'baja' && conv.paciente_id && soloDeLaLista(texto)) {
+  if (reglas.intencion === 'baja' && conv.paciente_id && soloDeLaLista(textoEntendido)) {
     const r = await salirDeLaLista(deps, conv, { ahora, nombre: nombrePila, hola, mensajeId });
     if (r) return r;
   }
 
-  if (!['baja', 'salud_personal', 'queja'].includes(reglas.intencion)) {
-    const r = await sinRepesca(deps, conv, { texto, ahora, datos, hist, reglas, nombre: nombrePila, hola, mensajeId });
+  if (!LO_QUE_MANDA.has(reglas.intencion)) {
+    const r = await sinRepesca(deps, conv, { texto: textoEntendido, ahora, datos, hist, reglas, nombre: nombrePila, hola, mensajeId });
     if (r) return r;
   }
 
+  // Con la intención ya dicha (entender.intencion), la IA no la vuelve a interpretar: lo que manda
+  // (bajas, salud, quejas) ya lo han visto las reglas.
   let desdeIa;
   try {
-    desdeIa = ia.modo === 'real' ? await ia.interpretar({ texto, historial: hist, contexto: { tipo: conv.contexto, tratamiento: datos.tratamiento?.nombre } }) : null;
+    desdeIa = ia.modo === 'real' && reglas.intencion !== entender?.intencion
+      ? await ia.interpretar({ texto: textoEntendido, historial: hist, contexto: { tipo: conv.contexto, tratamiento: datos.tratamiento?.nombre } }) : null;
   } catch { desdeIa = null; }
   const interp = ia.modo === 'real' ? combinar(reglas, desdeIa) : reglas;
   // «Quiero más información» sin decir de qué: del tratamiento del que se está hablando, nunca del de
@@ -576,14 +602,18 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
   if (interp.intencion === 'informacion' && datos.origen === 'ultima_cita') datos = await cargarContexto(pool, conv, ahora, { sinUltimaCita: true });
   const discreto = interp.intencion === 'informacion' && datos.origen !== 'nombrado' && Boolean(datos.tratamiento)
     && (esSensible(datos.tratamiento) || restringido(datos.tratamiento));
-  const decision = decidir(interp, { ...datos.ctx, ...(discreto ? { tieneRespuestaAprobada: false, reservable: false } : {}), frase: texto });
+  // Lo que lleva una persona (una tarjeta regalo desde la web): a ella, con su motivo.
+  const aPersona = entender?.persona && !LO_QUE_MANDA.has(interp.intencion) && !interp.urgente;
+  const decision = aPersona
+    ? { intencion: interp.intencion, acciones: [{ tipo: 'pasar_a_persona', motivo: entender.persona }], proximoPaso: 'persona', guia: 'Dale las gracias y dile que una persona del equipo le atiende por aquí enseguida.' }
+    : decidir(interp, { ...datos.ctx, ...(discreto ? { tieneRespuestaAprobada: false, reservable: false } : {}), frase: textoEntendido });
 
   const con2 = await pool.getConnection();
   let aplicado;
   try {
     await con2.beginTransaction();
     const [[fresca]] = await con2.query('SELECT * FROM conversaciones WHERE id = ? FOR UPDATE', [conv.id]);
-    aplicado = await aplicarDecision(con2, fresca, decision, { ahora, texto, datos });
+    aplicado = await aplicarDecision(con2, fresca, decision, { ahora, texto: textoEntendido, datos });
     await con2.commit();
   } catch (err) {
     await con2.rollback().catch(() => {});
@@ -608,7 +638,7 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
   const datosRedaccion = {
     nombre: nombrePila, huecos, huecosTexto: textoHuecos(huecos), primerMensajeIa,
     ofertaTexto: aplicado.oferta?.textoPaciente || null,
-    respuestaAprobada: discreto ? null : (decision.intencion === 'informacion' ? respuestaParaInformacion(datos.respuestas, texto) : datos.respuestas[0])?.respuesta || null,
+    respuestaAprobada: discreto ? null : (decision.intencion === 'informacion' ? respuestaParaInformacion(datos.respuestas, textoEntendido) : datos.respuestas[0])?.respuesta || null,
     fecha: decision.acciones.find((x) => x.tipo === 'programar_seguimiento')?.texto || null,
     conTratamiento: Boolean(datos.tratamiento), esCliente: datos.ctx.esCliente,
     citaPendiente: suCita ? `${textoDia(suCita.fecha)} a las ${suCita.hora}` : null,
@@ -708,7 +738,9 @@ async function nombreDelLead(q, conv) {
   return l?.nombre ? l.nombre.trim().split(/\s+/)[0] : null;
 }
 
-// Un lead que reserva pasa a tener ficha de paciente (la cita la necesita).
+// Un lead que reserva pasa a tener ficha de paciente (la cita la necesita). Si en la web marcó que
+// quiere comunicaciones comerciales (y está verificado), eso pasa a su ficha: es lo que mira la
+// repesca para los pacientes (servidor/consentimiento-web.js).
 async function asegurarPaciente(q, conv, { nombre }) {
   if (conv.paciente_id) return conv.paciente_id;
   const [[lead]] = conv.lead_id ? await q.query('SELECT nombre, email, origen FROM leads WHERE id = ?', [conv.lead_id]) : [[null]];
@@ -718,6 +750,7 @@ async function asegurarPaciente(q, conv, { nombre }) {
     [pila.slice(0, 80), resto.join(' ').slice(0, 120) || null, conv.telefono, lead?.email || null, lead?.origen || 'whatsapp']);
   await q.query('UPDATE conversaciones SET paciente_id = ? WHERE id = ?', [r.insertId, conv.id]);
   if (conv.lead_id) await q.query('UPDATE leads SET paciente_id = ? WHERE id = ? AND paciente_id IS NULL', [r.insertId, conv.lead_id]);
+  await aplicarConsentimientoWeb(q, { pacienteId: r.insertId, telefono: conv.telefono });
   conv.paciente_id = r.insertId;
   return r.insertId;
 }
@@ -1798,10 +1831,12 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
       uso = S.usoDelPaso(paso, cita?.estado);
     }
     const p = elegirPlantilla(uso, plantillas);
+    // La confirmación de una solicitud de la web (sin verificar): a ese teléfono, sin unirla a nada suyo.
+    const confirmacion = ins.secuencia === 'confirmar_web';
     // Sin plantilla aprobada cuenta la de la biblioteca: la baja y el consentimiento se miran igual.
     const comercial = (p || BIBLIOTECA.find((b) => b.uso === uso))?.categoria === 'marketing';
     if (comercial) {
-      const permiso = await permisoComercial(pool, ins, ahora);
+      const permiso = await permisoComercial(pool, ins, ahora, { uso });
       if (!permiso.ok) {
         // No se pierde el paso: se reintenta mañana (salvo baja o sin consentimiento, que termina).
         if (/baja|consentimiento/.test(permiso.motivo)) {
@@ -1815,8 +1850,11 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
     }
     if (!p) {
       // Mientras Meta no apruebe la plantilla, le escribe o le llama una persona.
+      const titulo = confirmacion
+        ? `Solicitud de la web sin verificar (aún no hay plantilla «${uso}» aprobada): llamar al ${telefonoLegible(telefono)} y preguntar si la pidió antes de hablarle de ella`
+        : `${S.SECUENCIAS[ins.secuencia].nombre}: aún no hay plantilla aprobada («${uso}»), escribir o llamar a mano a ${await quienEs(pool, ins, telefono)}`;
       const [t] = await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, lead_id, vence_en) VALUES ('llamar', ?, ?, ?, ?)",
-        [`${S.SECUENCIAS[ins.secuencia].nombre}: aún no hay plantilla aprobada («${uso}»), escribir o llamar a mano a ${await quienEs(pool, ins, telefono)}`.slice(0, 200), ins.paciente_id, ins.lead_id, new Date(ahora.getTime() + 3600000)]);
+        [titulo.slice(0, 200), ins.paciente_id, ins.lead_id, new Date(ahora.getTime() + 3600000)]);
       // La de recuperar una cita queda en el hecho de esa cita: si reserva otra, se cierra sola (agenda).
       if (ins.secuencia === 'cancelacion' && ins.cita_id) {
         await registrar(pool, { tipo: 'cita_recuperacion', entidad: 'cita', entidadId: ins.cita_id, datos: { efectos: { recuperar: { tarea: t.insertId } } } });
@@ -1825,9 +1863,14 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
       continue;
     }
     // Si una persona lleva ya su conversación, la secuencia no se mete en medio: se para.
-    const [[conPersona]] = await pool.query("SELECT id FROM conversaciones WHERE telefono = ? AND estado IN ('persona','espera_persona') LIMIT 1", [telefono]);
+    const [[conPersona]] = await pool.query("SELECT id, paciente_id FROM conversaciones WHERE telefono = ? AND estado IN ('persona','espera_persona') LIMIT 1", [telefono]);
     if (conPersona) {
       await pool.query("UPDATE inscripciones SET estado = 'pausada', motivo_fin = 'su conversación la lleva una persona' WHERE id = ? AND estado = 'activa'", [ins.id]);
+      // Una solicitud de la web sin verificar: que se lo pregunte quien le atiende (sin unirla a su conversación).
+      if (confirmacion) {
+        await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, lead_id, conversacion_id, vence_en) VALUES ('atender_conversacion', ?, ?, ?, ?, ?)",
+          ['En la web piden información con el teléfono de esta conversación (sin verificar): preguntarle si fue él o ella antes de hablarle de ello', conPersona.paciente_id, ins.lead_id, conPersona.id, new Date(ahora.getTime() + 2 * 3600000)]);
+      }
       resultados.push({ inscripcion: ins.id, paso: ins.paso_actual, omitido: 'la lleva una persona' });
       continue;
     }
@@ -1837,7 +1880,9 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
       await con3.beginTransaction();
       // En «cancelación» y «toca repetir», contexto_id es siempre la cita (o nada): nunca un lead.
       const contextoId = ['cancelacion', 'toca_repetir'].includes(ins.secuencia) ? ins.cita_id : ins.presupuesto_id || ins.cita_id || ins.lead_id;
-      conv = await conversacionPara(con3, { telefono, pacienteId: ins.paciente_id, leadId: ins.lead_id, contexto: contextoDe(ins.secuencia), contextoId });
+      conv = confirmacion
+        ? await conversacionParaConfirmar(con3, { telefono, ahora })
+        : await conversacionPara(con3, { telefono, pacienteId: ins.paciente_id, leadId: ins.lead_id, contexto: contextoDe(ins.secuencia), contextoId });
       await con3.commit();
     } finally {
       con3.release();
@@ -1862,9 +1907,52 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
       continue;
     }
     const envio = await enviar(deps, conv, { plantilla: p, variables, ahora });
+    if (confirmacion && envio.estado === 'enviado') await confirmacionEnviada(pool, conv, ins.lead_id, { ahora, calendario });
     await avanzar({ envio: envio.estado, plantilla: p.nombre });
   }
   return resultados;
+}
+
+// ── La confirmación de una solicitud de la web ────────────────────────────────────────────────
+
+// Va a la conversación abierta de ese teléfono o a una nueva, sin el lead (aún no se sabe si es suyo)
+// y sin reabrir otra (la de su cita, por ejemplo).
+async function conversacionParaConfirmar(con, { telefono }) {
+  const [[abierta]] = await con.query("SELECT * FROM conversaciones WHERE telefono = ? AND estado <> 'cerrada' ORDER BY id DESC LIMIT 1 FOR UPDATE", [telefono]);
+  if (abierta) return abierta;
+  const [[p]] = await con.query('SELECT id FROM pacientes WHERE telefono = ?', [telefono]);
+  const [r] = await con.query("INSERT INTO conversaciones (telefono, paciente_id, contexto) VALUES (?, ?, 'general')", [telefono, p?.id || null]);
+  const [[nueva]] = await con.query('SELECT * FROM conversaciones WHERE id = ?', [r.insertId]);
+  return nueva;
+}
+
+// Lo último que le hemos preguntado es «¿Has sido tú?» (servidor/entrada.js entiende su respuesta
+// durante una semana, mientras no le escribamos otra cosa). Si no contesta, la conversación se cierra
+// a los 4 días (como la de un lead que no contesta) y la solicitud caduca sin verificar
+// (servidor/retencion.js).
+const DIAS_PREGUNTA_CONFIRMAR = 7;
+async function confirmacionEnviada(pool, conv, leadId, { ahora, calendario }) {
+  const [[fresca]] = await pool.query('SELECT pregunta_pendiente FROM conversaciones WHERE id = ?', [conv.id]);
+  const antes = parseJson(fresca?.pregunta_pendiente);
+  const leads = [...new Set([...(antes?.tipo === 'confirmar_web' ? antes.leads || [] : []), leadId])];
+  await ponerPregunta(pool, conv.id, { tipo: 'confirmar_web', leads }, ahora);
+  await pool.query("UPDATE leads SET etapa = 'contactado', primer_contacto_en = COALESCE(primer_contacto_en, ?) WHERE id = ? AND etapa = 'nuevo'", [ahora, leadId]);
+  // Si la conversación ya era de otra cosa, sigue como estaba.
+  if (conv.contexto !== 'general' || conv.lead_id) return;
+  const s = calcularSeguimiento({ tipo: 'dias', n: 4 }, { hoy: T.fechaMadrid(ahora), ahoraMin: T.minutosMadrid(ahora), calendario });
+  const cuando = T.desdeMadrid(s.fecha, s.hora);
+  await pool.query(
+    `INSERT INTO seguimientos (conversacion_id, contexto, motivo, plazo_tipo, programado_para, creado_por, creado_en)
+     VALUES (?, 'general', 'cierre_sin_respuesta', 'dias', ?, 'sistema', ?)`, [conv.id, cuando, ahora]);
+  await pool.query("UPDATE conversaciones SET proximo_paso = 'espera_respuesta', proximo_paso_en = ? WHERE id = ?", [cuando, conv.id]);
+}
+
+// La pregunta «¿Has sido tú?» que sigue en pie en la última conversación de ese teléfono (o null).
+async function confirmacionPendiente(q, telefono, ahora) {
+  const [[c]] = await q.query("SELECT * FROM conversaciones WHERE telefono = ? AND pregunta_pendiente IS NOT NULL ORDER BY id DESC LIMIT 1", [telefono]);
+  const p = parseJson(c?.pregunta_pendiente);
+  if (p?.tipo !== 'confirmar_web' || !p.en || ahora - new Date(p.en) > DIAS_PREGUNTA_CONFIRMAR * 86400000) return null;
+  return { conversacion: c, leads: (p.leads || []).map(Number).filter(Boolean), aclarada: Boolean(p.aclarada) };
 }
 
 function contextoDe(secuencia) {
@@ -1934,13 +2022,27 @@ async function leadSinRespuesta(q, ins, { ahora, calendario }) {
   await q.query("UPDATE conversaciones SET proximo_paso = 'espera_respuesta', proximo_paso_en = ? WHERE id = ?", [cuando, conv.id]);
 }
 
-async function permisoComercial(q, ins, ahora) {
+// Contestar a lo que pidió un lead de la web (el seguimiento de su propia solicitud: su bienvenida,
+// «¿te buscamos hueco?», el último intento y el «como quedamos») no necesita más consentimiento que
+// haberlo pedido, mientras su solicitud siga en curso (sin cita ni «no, gracias»). Todo lo demás es
+// publicidad (LSSI, art. 21): solo con su casilla comercial (verificada) o, si es paciente, con su
+// consentimiento o siendo cliente.
+const USOS_SEGUIMIENTO = new Set(['lead_primer_contacto', 'lead_sin_cita', 'lead_ultimo_intento', 'como_quedamos']);
+const LEAD_EN_CURSO = new Set(['nuevo', 'contactado', 'conversando']);
+
+/**
+ * ¿Se le puede mandar ahora un mensaje comercial? uso: la plantilla (su uso) que se quiere mandar; sin
+ * él, cualquier comercial. → { ok, motivo, seguimiento: los usos que sí se le pueden mandar sin su
+ * consentimiento (los del seguimiento de su solicitud, si es un lead en curso) }
+ */
+async function permisoComercial(q, ins, ahora, { uso = null } = {}) {
   const pid = ins.paciente_id;
   let baja = false;
   let consentimiento = false;
   let cliente = false;
   let seguimientoHasta = null;
   let enviados = [];
+  let seguimiento = [];
   if (pid) {
     // La baja, de su ficha o de la lista de bajas por su teléfono (la que pidió cuando aún era un lead,
     // o la que avisó Meta, no siempre está en su ficha).
@@ -1956,11 +2058,21 @@ async function permisoComercial(q, ins, ahora) {
        WHERE c.paciente_id = ? AND m.direccion = 'saliente' AND p.categoria = 'marketing' AND m.creado_en > ?`, [pid, new Date(ahora.getTime() - 30 * 86400000)]);
     enviados = m.map((x) => x.creado_en);
   } else if (ins.lead_id) {
-    // Un lead que deja sus datos pidiendo información da su consentimiento para que le contestemos,
-    // con los mismos límites que un paciente: la baja (de su ficha o de la lista de bajas), el silencio
-    // pactado y los mensajes comerciales de la semana y del mes, contados por su teléfono.
-    consentimiento = true;
-    const [[l]] = await q.query('SELECT telefono FROM leads WHERE id = ?', [ins.lead_id]);
+    // Un lead que deja sus datos pidiendo información da su consentimiento para que le contestemos a
+    // eso, con los mismos límites que un paciente: la baja (de su ficha o de la lista de bajas), el
+    // silencio pactado y los mensajes comerciales de la semana y del mes, contados por su teléfono.
+    // Los de la web (su formulario y sus botones de WhatsApp), solo para eso: el seguimiento de su
+    // solicitud mientras siga en curso; la publicidad, con su casilla comercial (verificada). Así lo
+    // dicen su formulario y su política de privacidad. Una solicitud sin verificar no tiene nada de
+    // eso. Los de Meta, GHL o recepción, como hasta ahora (lo que diga el DPD: puerta ⛔ 9).
+    const [[l]] = await q.query('SELECT telefono, etapa, origen, sin_verificar FROM leads WHERE id = ?', [ins.lead_id]);
+    if (l && ['web', 'web_whatsapp'].includes(l.origen)) {
+      const suSolicitud = !l.sin_verificar && LEAD_EN_CURSO.has(l.etapa);
+      seguimiento = suSolicitud ? [...USOS_SEGUIMIENTO] : [];
+      consentimiento = (await consentimientoWeb(q, l.telefono)).otorgado || (suSolicitud && USOS_SEGUIMIENTO.has(uso));
+    } else {
+      consentimiento = Boolean(l);
+    }
     baja = await tieneBaja(q, l?.telefono);
     const [[s]] = await q.query("SELECT MAX(programado_para) AS hasta FROM seguimientos WHERE lead_id = ? AND estado = 'pendiente' AND creado_por IN ('ia','persona')", [ins.lead_id]);
     seguimientoHasta = s?.hasta || null;
@@ -1971,7 +2083,7 @@ async function permisoComercial(q, ins, ahora) {
       enviados = m.map((x) => x.creado_en);
     }
   }
-  return S.puedeEnviarComercial({ ahora, enviados, seguimientoPendienteHasta: seguimientoHasta, baja, consentimientoMarketing: consentimiento, esClienteConServicioSimilar: cliente });
+  return { ...S.puedeEnviarComercial({ ahora, enviados, seguimientoPendienteHasta: seguimientoHasta, baja, consentimientoMarketing: consentimiento, esClienteConServicioSimilar: cliente }), seguimiento };
 }
 
 // Conversaciones abiertas sin próximo paso (la lista de cada mañana: el objetivo es que esté vacía).
@@ -1993,5 +2105,5 @@ module.exports = {
   ponerPregunta, textoCitaReservada, enlacesCita, cerrarConCita,
   textoHuecos, textoDia, procesarEntrante, procesarSeguimientos, avanzarSecuencias, inscribir, sinProximoPaso, enviar, historial,
   calendarioDesdeBd, cargarContexto, conversacionPara, datosCita, plantillasBd, enMinuscula, nombreTratamiento, permisoComercial,
-  huecosParaProponer, referenciaDe, fraseTratamiento, nombreParaSaludar, saludoSinNombre, esOpcionDe,
+  huecosParaProponer, referenciaDe, fraseTratamiento, nombreParaSaludar, saludoSinNombre, esOpcionDe, confirmacionPendiente, USOS_SEGUIMIENTO,
 };
