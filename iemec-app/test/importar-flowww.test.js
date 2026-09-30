@@ -225,8 +225,10 @@ test('importación de Flowww: ensayo, aplicar, repetir, avisos y deshacer', asyn
       assert.equal(mapeo.tratamiento_id, 'toxina-3-zonas', 'lo del mapa queda guardado para la próxima vez');
       const [secuencias] = await pool.query('SELECT estado, motivo_fin FROM inscripciones WHERE id IN (?) ORDER BY id', [[app.inscripcion, app.inscripcionMarta]]);
       assert.deepEqual(secuencias.map((s) => ({ ...s })), Array(2).fill({ estado: 'terminada', motivo_fin: 'cita' }), 'con cita, se acaban sus secuencias');
-      const [[ev]] = await pool.query("SELECT COUNT(*) AS n FROM eventos WHERE tipo = 'importacion_flowww' AND entidad_id = ?", [lote]);
-      assert.equal(ev.n, 1);
+      const [eventos] = await pool.query("SELECT datos FROM eventos WHERE tipo = 'importacion_flowww' AND entidad_id = ?", [lote]);
+      assert.equal(eventos.length, 1);
+      const datosLote = typeof eventos[0].datos === 'string' ? eventos[0].datos : JSON.stringify(eventos[0].datos);
+      assert.doesNotMatch(datosLote, /\+34|611000302|@|Ruiz|Marta/, 'el lote guarda números de la app, no datos de nadie');
     });
 
     await t.test('la segunda ejecución no duplica nada; lo guardado del mapa vale sin mapa y lo que cambió en Flowww se avisa', async () => {

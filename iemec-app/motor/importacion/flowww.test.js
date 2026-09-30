@@ -71,6 +71,11 @@ test('columnas: los nombres típicos en español, sin tildes ni mayúsculas, y l
   assert.deepEqual(m.campos.observaciones, [], 'con null, ese campo no se trae');
   assert.match(m.errores[0], /«id» está en la columna «Ficha», y el fichero no la tiene/);
 
+  const ambiguo = F.resolverColumnas(['Código', 'Nº cita', 'Cliente', 'Fecha', 'Hora', 'Servicio'], 'citas');
+  assert.deepEqual(ambiguo.campos.id, ['Nº cita'], 'un campo, una columna: la concreta antes que la genérica');
+  assert.deepEqual(ambiguo.sinUsar, ['Código'], 'la otra se ve en «No se traen»');
+  assert.deepEqual(F.resolverColumnas(['Código', 'Código cliente', 'Nombre'], 'pacientes').campos.id, ['Código cliente']);
+
   const c = F.resolverColumnas(['Inicio', 'Cliente', 'Tratamiento', 'Empleada', 'Sala'], 'citas');
   assert.deepEqual([c.campos.fecha, c.campos.hora], [['Inicio'], ['Inicio']], 'fecha y hora en la misma columna');
   assert.deepEqual(F.resolverColumnas(['Cliente', 'Fecha'], 'citas').errores, ['Falta la columna de «servicio»: dila en el mapa («citas»: { "servicio": "nombre de la columna" })']);

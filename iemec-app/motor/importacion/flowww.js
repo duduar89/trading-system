@@ -19,15 +19,17 @@ const clave = (t) => String(t ?? '').toLowerCase().normalize('NFD').replace(/[̀
   .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 // ── Columnas ────────────────────────────────────────────────────────────────────────────────
-// Los campos de cada fichero y los nombres con los que suelen venir, por orden de preferencia. En
-// «apellidos» se juntan todas las que haya (primer y segundo apellido); en el resto vale la primera
-// que traiga algo útil (el móvil antes que el fijo).
+// Los campos de cada fichero y los nombres con los que suelen venir, por orden de preferencia (los
+// concretos antes que los genéricos: «Nº cita» antes que «Código»). Cada campo sale de una sola
+// columna, salvo los de VARIAS: los apellidos y las observaciones se juntan (primer y segundo
+// apellido), y del teléfono, el email y el consentimiento vale la primera que traiga algo útil (el
+// móvil antes que el fijo).
 const TELEFONO = ['Móvil', 'Teléfono móvil', 'Tel. móvil', 'Celular', 'WhatsApp', 'Teléfono', 'Tel', 'Tlf', 'Tfno', 'Teléfono 1', 'Teléfono 2', 'Teléfono fijo'];
 const EMAIL = ['Email', 'E-mail', 'Correo', 'Correo electrónico', 'Mail'];
 const OBSERVACIONES = ['Observaciones', 'Notas', 'Comentarios', 'Nota'];
 const CAMPOS = {
   pacientes: {
-    id: ['Código', 'Código cliente', 'Cód. cliente', 'Id', 'Id cliente', 'Nº cliente', 'Número de cliente', 'Nº historia', 'Historia', 'Referencia'],
+    id: ['Código cliente', 'Cód. cliente', 'Id cliente', 'Nº cliente', 'Número de cliente', 'Nº historia', 'Historia', 'Código', 'Id', 'Referencia'],
     nombre: ['Nombre', 'Nombre cliente', 'Nombre y apellidos', 'Nombre completo', 'Cliente', 'Paciente'],
     apellidos: ['Apellidos', 'Primer apellido', 'Apellido 1', 'Apellido', 'Segundo apellido', 'Apellido 2'],
     telefono: TELEFONO,
@@ -41,7 +43,7 @@ const CAMPOS = {
     marketing_email: ['Publicidad email', 'Email publicidad', 'Marketing email', 'Newsletter'],
   },
   citas: {
-    id: ['Id', 'Id cita', 'Código', 'Código cita', 'Nº cita', 'Número de cita', 'Localizador', 'Referencia'],
+    id: ['Id cita', 'Nº cita', 'Número de cita', 'Código cita', 'Localizador', 'Id', 'Código', 'Referencia'],
     paciente_id: ['Código cliente', 'Cód. cliente', 'Id cliente', 'Nº cliente', 'Número de cliente', 'Código paciente', 'Id paciente', 'Nº historia'],
     paciente: ['Cliente', 'Paciente', 'Nombre cliente', 'Nombre paciente', 'Nombre y apellidos', 'Nombre'],
     apellidos: ['Apellidos'],
@@ -58,6 +60,7 @@ const CAMPOS = {
     observaciones: OBSERVACIONES,
   },
 };
+const VARIAS = new Set(['apellidos', 'telefono', 'email', 'observaciones', 'marketing', 'marketing_whatsapp', 'marketing_email']);
 // La hora puede venir en la misma columna que la fecha («15/10/2026 11:00»).
 const PUEDE_REPETIR = new Set(['hora']);
 // Sin estas columnas no se puede importar el fichero.
@@ -83,7 +86,8 @@ function resolverColumnas(cabeceras, tipo, mapa = {}) {
       }
       continue;
     }
-    campos[campo] = [...new Set(nombres.map((n) => porClave.get(clave(n))).filter((c) => c && (!usadas.has(c) || PUEDE_REPETIR.has(campo))))];
+    const halladas = [...new Set(nombres.map((n) => porClave.get(clave(n))).filter((c) => c && (!usadas.has(c) || PUEDE_REPETIR.has(campo))))];
+    campos[campo] = VARIAS.has(campo) ? halladas : halladas.slice(0, 1);
     for (const c of campos[campo]) usadas.add(c);
   }
   for (const grupo of OBLIGATORIAS[tipo]) {

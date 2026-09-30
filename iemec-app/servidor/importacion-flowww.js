@@ -397,7 +397,8 @@ async function escribir(con, ctx, { ahora, actor, sinRecordatorios }) {
       }
       if (e.completarTelefono) {
         const [r] = await con.query('UPDATE pacientes SET telefono = ? WHERE id = ? AND telefono IS NULL', [e.completarTelefono, e.pacienteId]);
-        if (r.affectedRows) hecho.telefonos.push({ id: e.pacienteId, telefono: e.completarTelefono });
+        // En el lote, su huella y no el número: los eventos no van cifrados.
+        if (r.affectedRows) hecho.telefonos.push({ id: e.pacienteId, huella: crypto.createHash('sha256').update(e.completarTelefono).digest('hex') });
       }
     }
   }
@@ -553,7 +554,8 @@ async function deshacer(pool, { lote = null, aplicar = false, ahora = new Date()
     if (d.consentimientos.length) r.consentimientos = await hechas('DELETE FROM consentimientos WHERE id IN (?)', [d.consentimientos]);
     if (d.bajas.length) r.bajas = await hechas('UPDATE pacientes SET baja_comercial_en = NULL WHERE id IN (?) AND baja_comercial_en = ?', [d.bajas, new Date(d.ahora)]);
     for (const v of d.vinculados) r.vinculados += await hechas('UPDATE pacientes SET flowww_id = NULL WHERE id = ? AND flowww_id = ?', [v.id, v.flowwwId]);
-    for (const v of d.telefonos) r.telefonos += await hechas('UPDATE pacientes SET telefono = NULL WHERE id = ? AND telefono = ?', [v.id, v.telefono]);
+    // El teléfono que se le puso, si sigue siendo ese.
+    for (const v of d.telefonos) r.telefonos += await hechas('UPDATE pacientes SET telefono = NULL WHERE id = ? AND SHA2(telefono, 256) = ?', [v.id, v.huella]);
     for (const id of d.pacientesNuevos) {
       let borrado = false;
       if (!(await tieneActividad(con, id))) {
