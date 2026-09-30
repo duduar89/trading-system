@@ -31,12 +31,13 @@ const { conciliar, factorEscalado } = require('../../cartera/conciliacion');
 const { valorarBenchmarks } = require('../../cartera/benchmarks');
 const { metricasMesa, sharpeRodante, alarmaDeriva } = require('../../aprendizaje/evaluador');
 const plantillas = require('../plantillas');
+const conversacion = require('../conversacion');
 const { anadirJSONL, leerJSONL } = require('../../util/almacen');
 const { redondearAbajo } = require('../../util/numeros');
 const { diaUTC, inicioVela, MIN, HORA, DIA } = require('../../util/reloj');
 const f = require('../../util/formato');
 const log = require('../../util/log').crear('operaciones');
-const { EPS, etiqueta, isoCompacto } = require('./comun');
+const { EPS, etiqueta, isoCompacto, agenteDePuesto } = require('./comun');
 
 const ESTADOS_FINALES = new Set(['ejecutada', 'cancelada', 'rechazada', 'caducada']);
 const POLVO_USD = 0.01;           // lo que queda tras cerrar y vale menos de un céntimo es redondeo
@@ -55,6 +56,42 @@ const CIERRE_TARDE = 15 * MIN;
 // Contraste de la comisión estimada de Alpaca con la real (CFEE).
 const DESVIO_COMISION = 0.05;
 const DIAS_COMISIONES = 10;
+
+// Por qué sale una orden, en llano (decisiones.jsonl): el tipo y, si la
+// decidió una estrategia, su motivo con las cifras de la vela.
+const MOTIVO_ORDEN = Object.freeze({
+  apertura: 'señal de compra de la estrategia',
+  cierre: 'señal de venta de la estrategia',
+  stop: 'saltó el stop (precio de salida de emergencia)',
+  kill: 'kill switch: se cierra todo',
+  prueba: 'orden de prueba pedida desde el panel',
+});
+
+function quienOrden(orden) {
+  if (orden.tipo === 'prueba') return 'humano';
+  if (orden.tipo === 'kill' || orden.tipo === 'stop') return 'riesgos';
+  if (orden.accion === 'despido') return 'cio';
+  return orden.mesaId && orden.simbolo ? agenteDePuesto(orden.mesaId, orden.simbolo) : 'ejecutor';
+}
+
+function decisionOrden(ctx, orden, envio) {
+  const e = etiqueta(orden.simbolo);
+  const mesa = typeof ctx.mesaPorId === 'function' ? ctx.mesaPorId(orden.mesaId) : null;
+  const porque = orden.accion === 'despido' ? 'la mesa pasa al banquillo: se cierra lo suyo' : (MOTIVO_ORDEN[orden.tipo] || orden.tipo || 'orden');
+  const motivos = [porque, ...(orden.razon ? [orden.razon] : [])];
+  const que = envio.nocional !== undefined ? `Compra de ${f.usd(envio.nocional)} de ${e}` : `Venta de ${f.cantidad(envio.cantidad, 8)} ${e}`;
+  return {
+    tipo: 'orden',
+    quien: quienOrden(orden),
+    resumen: `${que}${mesa ? ` (${mesa.nombre})` : ''}: ${motivos.join('; ')}.`,
+    datos: {
+      idCliente: envio.idCliente, puestoId: orden.puestoId || null, mesaId: orden.mesaId || null, simbolo: orden.simbolo, lado: orden.lado,
+      tipo: orden.tipo || null, nocional: envio.nocional ?? null, cantidad: envio.cantidad ?? null,
+      precioReferencia: Number.isFinite(orden.precioReferencia) ? orden.precioReferencia : null, stop: Number.isFinite(orden.stop) ? orden.stop : null,
+      motivo: orden.motivo || null, motivos,
+    },
+  };
+}
 
 class Ejecutor {
   constructor(ctx) {
@@ -129,15 +166,26 @@ class Ejecutor {
     const ahora = ctx.reloj.ahora();
     const e = etiqueta(orden.simbolo);
 
+    // Un activo de solo dato (VIXY, el termómetro de Macro) no se opera nunca.
+    if (universo.esSoloDato(orden.simbolo)) {
+      conversacion.seguir(ctx, orden.puestoId, {
+        de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
+        texto: plantillas.frase(`No envío la orden de ${e}: es solo un dato para Macro, ninguna mesa lo opera.`),
+        datos: { puestoId: orden.puestoId || null, simbolo: orden.simbolo }, importancia: 3,
+      });
+      return { ok: false, motivo: 'solo_dato' };
+    }
+
     // Acciones con la bolsa cerrada: la decisión espera a la apertura + 5 min.
     if (!universo.esCripto(orden.simbolo) && !(ctx.vivo.mercadoAbierto && ctx.vivo.mercadoAbierto.accion)) {
       // Una sola pendiente por puesto y lado: un stop saltado de noche no se encola en cada latido.
       if (ctx.estado.pendientes.some(p => p.puestoId === orden.puestoId && p.lado === orden.lado)) return { ok: false, pendiente: true, repetida: true };
       const enviarDesde = this._proximaApertura(ahora) + 5 * MIN;
       ctx.estado.pendientes.push({ ...orden, enviarDesde, encolada: ahora });
-      ctx.bus.publicar({
-        de: 'ejecutor', canal: 'ejecucion', tipo: 'nota',
-        texto: plantillas.frase(`Bolsa cerrada: la orden de ${orden.lado === 'compra' ? 'compra' : 'venta'} de ${e} espera a la apertura (${f.hora(enviarDesde)}).`),
+      const op = conversacion.operadorDe(ctx, orden.mesaId, orden.simbolo);
+      conversacion.seguir(ctx, orden.puestoId, {
+        de: 'ejecutor', para: op || 'todos', canal: 'ejecucion', tipo: 'nota',
+        texto: plantillas.frase(`${op ? `${conversacion.pilaDe(ctx, op)}, la` : 'La'} bolsa está cerrada: la ${orden.lado === 'compra' ? 'compra' : 'venta'} de ${e} espera a la apertura (${f.hora(enviarDesde)}).`),
         datos: { puestoId: orden.puestoId, simbolo: orden.simbolo, enviarDesde },
       });
       return { ok: false, pendiente: true };
@@ -146,9 +194,9 @@ class Ejecutor {
     // Serie por símbolo también entre latidos: si la anterior sigue sin estado
     // final en el bróker, no se manda otra encima (salvo el kill, que cancela antes).
     if (orden.tipo !== 'kill' && Object.values(ctx.estado.ordenesEnVuelo).some(o => o.simbolo === orden.simbolo)) {
-      ctx.bus.publicar({
+      conversacion.seguir(ctx, orden.puestoId, {
         de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
-        texto: plantillas.frase(`No envío la orden de ${e}: la anterior de ${e} sigue sin ejecutarse en el bróker.`),
+        texto: plantillas.frase(`No envío la orden de ${e}: la anterior de ${e} aún no se ha completado en el bróker.`),
         datos: { puestoId: orden.puestoId, simbolo: orden.simbolo }, importancia: 2,
       });
       return { ok: false, motivo: 'orden_en_vuelo' };
@@ -181,9 +229,9 @@ class Ejecutor {
       cantidad = redondearAbajo(Math.min(pedida, disponible), await this._incremento(orden.simbolo));
       if (cubreTodo && disponible > 0 && esPolvo(disponible - pedida)) cantidad = disponible;
       if (!(cantidad > 0)) {
-        ctx.bus.publicar({
+        conversacion.seguir(ctx, orden.puestoId, {
           de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
-          texto: plantillas.frase(`No hay ${e} disponible en el bróker para vender (libros ${f.cantidad(orden.cantidad, 9)}, bróker ${f.cantidad(disponible, 9)}).`),
+          texto: plantillas.frase(`No puedo vender ${e}: el bróker no tiene nada disponible (en nuestros libros hay ${f.cantidad(orden.cantidad, 9)}; en el bróker, ${f.cantidad(disponible, 9)}).`),
           datos: { puestoId: orden.puestoId, simbolo: orden.simbolo }, importancia: 3,
         });
         return { ok: false, motivo: 'sin_disponible' };
@@ -196,16 +244,19 @@ class Ejecutor {
       : { idCliente, simbolo: orden.simbolo, lado: orden.lado, cantidad };
     const registro = { ...orden, cantidad: envio.cantidad ?? null, nocional: envio.nocional ?? null, idCliente };
     this._registrar({ estado: 'INTENCION', ...registro });
-    ctx.bus.publicar({
-      de: 'ejecutor', canal: 'ejecucion', tipo: 'orden',
-      texto: envio.nocional !== undefined
-        ? plantillas.frase(`Orden a mercado: comprar ${f.usd(envio.nocional)} de ${e}.`)
-        : plantillas.frase(`Orden a mercado: vender ${f.cantidad(envio.cantidad, 8)} ${e}${orden.tipo === 'stop' ? ' (stop)' : orden.tipo === 'kill' ? ' (kill switch)' : ''}.`),
+    // Confirma a los dos de la conversación: el operador que la pidió y la
+    // Jefa de riesgos que la aprobó (§6.2).
+    const operador = conversacion.operadorDe(ctx, orden.mesaId, orden.simbolo);
+    const aQuien = [operador, 'riesgos'].filter(Boolean).map(id => conversacion.pilaDe(ctx, id)).filter(Boolean);
+    conversacion.seguir(ctx, orden.puestoId, {
+      de: 'ejecutor', para: operador || 'todos', canal: 'ejecucion', tipo: 'orden',
+      texto: plantillas.orden({ etiqueta: e, lado: envio.nocional !== undefined ? 'compra' : 'venta', tipo: orden.tipo, nocional: envio.nocional, cantidad: envio.cantidad, a: aQuien }),
       datos: { puestoId: orden.puestoId, idCliente, simbolo: orden.simbolo, lado: orden.lado, tipo: orden.tipo, nocional: envio.nocional ?? null, cantidad: envio.cantidad ?? null },
       importancia: 2,
     });
 
     if (orden.mesaId !== 'sombra') (ctx.registroOrdenes || (ctx.registroOrdenes = [])).push({ t: ahora, mesaId: orden.mesaId });
+    if (orden.mesaId !== 'sombra' && typeof ctx.anotarDecision === 'function') ctx.anotarDecision(decisionOrden(ctx, orden, envio));
     if (typeof ctx.anotarActividad === 'function') ctx.anotarActividad({ agente: 'ejecutor', accion: 'orden', objetivo: 'monitor', detalle: `${orden.lado} ${e}`, puestoId: orden.puestoId || null });
     let enviada;
     try {
@@ -218,9 +269,9 @@ class Ejecutor {
         // conciliación hasta saber por su idCliente si existe.
         this._registrar({ estado: 'DESCONOCIDA', idCliente, tipoError: err.tipo || 'desconocido', mensaje });
         ctx.estado.ordenesEnVuelo[idCliente] = { ...registro, enviadaT: ahora, incierta: true };
-        ctx.bus.publicar({
+        conversacion.seguir(ctx, orden.puestoId, {
           de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
-          texto: plantillas.frase(`Sin respuesta del bróker con la orden de ${e}: no sé si entró. La compruebo por su idCliente antes de mandar nada más de ${e}.`),
+          texto: plantillas.frase(`El bróker no ha contestado a la orden de ${e}: no sé si ha entrado. Lo compruebo por su identificador antes de mandar nada más de ${e}.`),
           datos: { puestoId: orden.puestoId, idCliente, tipoError: err.tipo || null }, importancia: 3,
         });
         return { ok: false, motivo: 'incierta', error: err };
@@ -231,9 +282,9 @@ class Ejecutor {
       if (/ya usado por otra orden/.test(mensaje) && typeof ctx.registrarIncidente === 'function') {
         ctx.registrarIncidente('orden_duplicada', `Orden de ${e} rechazada: ${mensaje}`, { idCliente });
       }
-      ctx.bus.publicar({
+      conversacion.seguir(ctx, orden.puestoId, {
         de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
-        texto: plantillas.frase(`El bróker rechazó la orden de ${e} (${err.tipo || 'error'}): ${String(err.message).slice(0, 80)}`),
+        texto: plantillas.frase(`El bróker ha rechazado la orden de ${e} (${err.tipo || 'error'}): ${String(err.message).slice(0, 80)}`),
         datos: { puestoId: orden.puestoId, idCliente, tipoError: err.tipo || null }, importancia: 3,
       });
       return { ok: false, motivo: 'rechazo', error: err };
@@ -277,9 +328,9 @@ class Ejecutor {
     if (aceptada && typeof ctx.registrarIncidente === 'function') {
       ctx.registrarIncidente('orden_huerfana', `Orden ${idCliente} aceptada por el bróker y luego sin rastro.`, { idCliente });
     }
-    ctx.bus.publicar({
+    conversacion.seguir(ctx, reg && reg.puestoId, {
       de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
-      texto: plantillas.frase(`Orden ${idCliente} sin rastro en el bróker: no se envió y no se repite.`),
+      texto: plantillas.frase(`La orden ${idCliente} no aparece en el bróker: no llegó a enviarse y no la repito.`),
       datos: { idCliente, puestoId: reg && reg.puestoId }, importancia: aceptada ? 3 : 2,
     });
   }
@@ -319,9 +370,9 @@ class Ejecutor {
       ...(orden.comisionEstimada ? { comisionEstimada: true } : {}),
     });
     if (!(orden.cantidadEjecutada > 0) || !(orden.precioMedio > 0)) {
-      ctx.bus.publicar({
+      conversacion.seguir(ctx, registro.puestoId, {
         de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
-        texto: plantillas.frase(`La orden de ${etiqueta(registro.simbolo)} terminó ${orden.estado} sin ejecutarse.`),
+        texto: plantillas.frase(`La orden de ${etiqueta(registro.simbolo)} ha terminado ${orden.estado} sin ejecutarse: no se ha comprado ni vendido nada.`),
         datos: { puestoId: registro.puestoId, idCliente, estado: orden.estado }, importancia: 2,
       });
       return { ok: false, motivo: orden.estado };
@@ -345,7 +396,7 @@ class Ejecutor {
       // false: ya no se puede cancelar (se llenó entretanto): basta con releerla.
       if (!(await ctx.broker.cancelarOrden(orden.id))) return (await ctx.broker.ordenPorIdCliente(idCliente)) || orden;
       registro.cancelacionPedida = true;
-      ctx.bus.publicar({
+      conversacion.seguir(ctx, registro.puestoId, {
         de: 'ejecutor', canal: 'ejecucion', tipo: 'nota',
         texto: plantillas.frase(`La orden de ${etiqueta(registro.simbolo)} lleva más de un minuto sin completarse: cancelo lo que falta. Lo ejecutado se apunta y el resto se decide de nuevo.`),
         datos: { idCliente, puestoId: registro.puestoId, cantidadEjecutada: orden.cantidadEjecutada ?? null },
@@ -418,9 +469,10 @@ class Ejecutor {
       cantidad, precio, nocional: cantidad * precio, comision, motivo: registro.motivo,
     };
     ctx.registrarEjecucion(ej);
-    ctx.bus.publicar({
-      de: 'ejecutor', canal: 'ejecucion', tipo: 'ejecucion',
-      texto: plantillas.ejecucion({ etiqueta: ej.etiqueta, lado: ej.lado, cantidad, precio, nocional: registro.lado === 'compra' ? registro.nocional : ej.nocional, comision }),
+    const operador = conversacion.operadorDe(ctx, registro.mesaId, registro.simbolo);
+    conversacion.seguir(ctx, registro.puestoId, {
+      de: 'ejecutor', para: operador || 'todos', canal: 'ejecucion', tipo: 'ejecucion',
+      texto: plantillas.ejecucion({ etiqueta: ej.etiqueta, lado: ej.lado, cantidad, precio, nocional: registro.lado === 'compra' ? registro.nocional : ej.nocional, comision, a: operador ? conversacion.pilaDe(ctx, operador) : null }),
       datos: { puestoId: registro.puestoId, idCliente: registro.idCliente, simbolo: registro.simbolo, lado: registro.lado, cantidad, precio, comision, motivo: registro.motivo },
     });
     for (const op of cerradas) ctx.registrarOperacion(op);
@@ -543,6 +595,9 @@ function conciliarCadaLatido(ctx) {
     f0.nivel = 'pausado';
     f0.motivo = `${c.gravesSeguidas} conciliaciones graves seguidas: pausa hasta que un humano revise y pulse Reabrir.`;
     ctx.bus.publicar({ de: 'controller', canal: 'riesgo', tipo: 'alerta', texto: plantillas.frase(f0.motivo), importancia: 3 });
+    if (typeof ctx.anotarDecision === 'function') {
+      ctx.anotarDecision({ tipo: 'pausa', quien: 'controller', resumen: `Pausa: ${f0.motivo}`, datos: { accion: 'pausar', nivel: 'pausado', motivo: f0.motivo, gravesSeguidas: c.gravesSeguidas } });
+    }
   }
   return r;
 }
@@ -715,7 +770,7 @@ function informeSemanal(ctx) {
     if (d.alarma) {
       ctx.bus.publicar({
         de: 'controller', canal: 'direccion', tipo: 'alerta',
-        texto: plantillas.frase(`Deriva en ${mesa.nombre}: los últimos ${d.n} días van ${f.numero(Math.abs(d.z), 2)} σ por debajo de su backtest.`),
+        texto: plantillas.frase(`Ojo con ${mesa.nombre}: en los últimos ${d.n} días rinde bastante peor que en su prueba con datos pasados (${f.numero(Math.abs(d.z), 2)} desviaciones típicas por debajo).`),
         datos: { mesaId: mesa.id, z: d.z, n: d.n }, importancia: 2,
       });
     }
@@ -750,7 +805,7 @@ async function killSwitch(ctx, motivo) {
   if (r.abiertos.length || r.errores.length || r.quedanEnBroker.length) {
     ctx.bus.publicar({
       de: 'riesgos', canal: 'riesgo', tipo: 'alerta',
-      texto: plantillas.frase(`Tras el kill quedan ${r.abiertos.length} puestos abiertos y ${r.errores.length} errores${r.quedanEnBroker.length ? `: se reintenta vender ${r.quedanEnBroker.map(etiqueta).join(', ')} cada pocos minutos` : ''}.`),
+      texto: plantillas.frase(`Tras el kill quedan ${r.abiertos.length} posiciones abiertas y ${r.errores.length} errores${r.quedanEnBroker.length ? `: vuelvo a intentar vender ${r.quedanEnBroker.map(etiqueta).join(', ')} cada pocos minutos` : ''}.`),
       datos: { abiertos: r.abiertos, errores: r.errores, quedanEnBroker: r.quedanEnBroker }, importancia: 3,
     });
   }
@@ -881,7 +936,22 @@ async function venderKill(ctx) {
   return { cerradas, errores, esperanApertura: [...esperanApertura], quedanEnBroker: quedan.filter(s => !esperanApertura.has(s)), abiertos, preciosVenta };
 }
 
+// El cierre de una operación, contado por su operador en el hilo de la
+// operación (§6.2), que queda guardado para que el Auditor le conteste.
+// Lo llama el orquestador al apuntar la operación (registrarOperacion).
+function contarCierre(ctx, op, mesa = null) {
+  const de = mesa ? agenteDePuesto(op.mesaId, op.simbolo) : 'ejecutor';
+  const texto = plantillas.cierre({ etiqueta: etiqueta(op.simbolo), pnl: op.pnl, pnlPct: op.pnlPct, motivoSalida: op.motivoSalida, barras: op.barras, rMultiple: op.rMultiple });
+  const m = conversacion.seguir(ctx, op.puestoId, {
+    de, canal: mesa ? 'parque' : 'ejecucion', tipo: 'cierre', texto,
+    datos: { puestoId: op.puestoId, operacionId: op.id, pnl: op.pnl, pnlPct: op.pnlPct, motivoSalida: op.motivoSalida, barras: op.barras },
+    importancia: 2,
+  });
+  conversacion.terminar(ctx, op.puestoId, { operacionId: op.id, mensaje: m });
+  return texto;
+}
+
 module.exports = {
-  Ejecutor, conciliarCadaLatido, cierreDiario, informeSemanal, killSwitch, reintentarKill, venderKill, quedanEnBroker, contrastarComisiones,
+  Ejecutor, conciliarCadaLatido, cierreDiario, informeSemanal, killSwitch, reintentarKill, venderKill, quedanEnBroker, contrastarComisiones, contarCierre,
   valorMesa, pnlMesaTotal, sharpes90, anotarCurva, esIncierto, GRAVES_PARA_PAUSAR, CANCELAR_TRAS, esperaReintento,
 };

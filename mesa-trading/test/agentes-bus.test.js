@@ -18,13 +18,15 @@ test('publicar: devuelve el Mensaje completo con nombre y departamento del emiso
   const bus = new Bus({ reloj: new RelojSimulado(T0), agentes: AGENTES });
   const m = bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'veto', texto: 'Veto a SOL: precio viejo.', datos: { simbolo: 'SOL/USD' }, importancia: 2 });
   assert.deepEqual(Object.keys(m).sort(),
-    ['canal', 'costeUsd', 'datos', 'de', 'deNombre', 'departamento', 'id', 'importancia', 'para', 't', 'texto', 'tipo'].sort());
+    ['canal', 'costeUsd', 'datos', 'de', 'deNombre', 'departamento', 'hilo', 'id', 'importancia', 'para', 'respondeA', 't', 'texto', 'tipo'].sort());
   assert.equal(m.t, T0);
   assert.equal(m.deNombre, 'Marta Solís');
   assert.equal(m.departamento, 'riesgos');
   assert.equal(m.para, 'todos');
   assert.equal(m.importancia, 2);
   assert.equal(m.costeUsd, 0);
+  assert.equal(m.respondeA, null);
+  assert.equal(m.hilo, null);
   assert.deepEqual(m.datos, { simbolo: 'SOL/USD' });
   const sis = bus.publicar({ de: 'sistema', canal: 'sistema', tipo: 'sistema', texto: 'Arranque.' });
   assert.equal(sis.deNombre, 'Sistema');
@@ -83,7 +85,8 @@ test('canal o tipo fuera de lista: sistema (o error en modo estricto)', () => {
   const estricto = new Bus({ reloj: new RelojSimulado(T0), estricto: true });
   assert.throws(() => estricto.publicar({ de: 'x', canal: 'chismes', tipo: 'nota', texto: 'hola' }), /canal desconocido/);
   assert.equal(CANALES.length, 10);
-  assert.equal(TIPOS.length, 23);
+  assert.equal(TIPOS.length, 24);
+  assert.ok(TIPOS.includes('reunion'));
 });
 
 test('desde(t) incluye los mensajes de ese mismo instante: paginar con el último t visto no pierde ninguno', () => {
@@ -101,4 +104,40 @@ test('desde(t) incluye los mensajes de ese mismo instante: paginar con el últim
   const ids = new Set(vistos.map(m => m.id));
   assert.deepEqual(nuevos.filter(m => !ids.has(m.id)).map(m => m.texto), ['c']);
   assert.deepEqual(bus.ultimos(150, { desde: ultimoT, tipo: 'nota' }).length, 3);
+});
+
+test('conversación: hilo nuevo, respuestas encadenadas y para quién va', () => {
+  const reloj = new RelojSimulado(T0);
+  const bus = new Bus({ reloj, agentes: AGENTES });
+  const propuesta = bus.publicar({ de: 'puesto-tendencia-SOL', para: 'riesgos', canal: 'parque', tipo: 'propuesta', texto: 'Marta, quiero comprar SOL.', hilo: true });
+  assert.equal(propuesta.hilo, propuesta.id, 'hilo: true abre la conversación con su propio id');
+  assert.equal(propuesta.respondeA, null);
+  assert.equal(propuesta.para, 'riesgos');
+  const respuesta = bus.publicar({ de: 'riesgos', para: 'puesto-tendencia-SOL', canal: 'riesgo', tipo: 'aprobacion', texto: 'Lucía, adelante.', respondeA: propuesta.id });
+  assert.equal(respuesta.respondeA, propuesta.id);
+  assert.equal(respuesta.hilo, propuesta.id, 'sin hilo, el del mensaje al que responde');
+  const tercero = bus.publicar({ de: 'ejecutor', para: 'puesto-tendencia-SOL', canal: 'ejecucion', tipo: 'orden', texto: 'Recibido.', respondeA: respuesta.id });
+  assert.equal(tercero.hilo, propuesta.id, 'el hilo se hereda a lo largo de la cadena');
+  assert.deepEqual(bus.ultimos(150, { hilo: propuesta.id }).map(m => m.id), [propuesta.id, respuesta.id, tercero.id]);
+  // Responder a algo que ya no está en memoria: el hilo es ese id.
+  const suelto = bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'nota', texto: 'x', respondeA: 'viejo-0001' });
+  assert.equal(suelto.hilo, 'viejo-0001');
+});
+
+test('ids deterministas: un bus nuevo sobre el mismo fichero sigue la numeración (continuo = latido a latido)', () => {
+  const dir = carpetaTemporal();
+  const reloj = new RelojSimulado(T0);
+  // (a) un solo bus que publica cuatro mensajes
+  const a = new Bus({ reloj, ruta: path.join(dir, 'a.jsonl'), agentes: AGENTES });
+  const idsA = [1, 2, 3, 4].map(i => a.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'nota', texto: `n${i}` }).id);
+  // (b) un bus nuevo por mensaje, como cada latido
+  const idsB = [1, 2, 3, 4].map(i => new Bus({ reloj, ruta: path.join(dir, 'b.jsonl'), agentes: AGENTES }).publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'nota', texto: `n${i}` }).id);
+  assert.deepEqual(idsB, idsA);
+  assert.equal(new Set(idsA).size, 4);
+  // Un fichero con ids de antes (marca al azar) sigue su numeración sin repetir.
+  const ruta = path.join(dir, 'viejo.jsonl');
+  fs.writeFileSync(ruta, JSON.stringify({ id: `${T0.toString(36)}-k3xf`, t: T0, de: 'riesgos', canal: 'riesgo', tipo: 'nota', texto: 'viejo' }) + '\n');
+  const c = new Bus({ reloj, ruta, agentes: AGENTES });
+  assert.equal(c.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'nota', texto: 'nuevo' }).id, `${T0.toString(36)}-k3xg`);
+  fs.rmSync(dir, { recursive: true, force: true });
 });

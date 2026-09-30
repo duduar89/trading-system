@@ -46,7 +46,7 @@ test('acciones con la bolsa cerrada: la orden espera a la apertura + 5 min y ent
   assert.equal(broker.estado.ordenes.length, 0, 'no se envía nada con la bolsa cerrada');
   const p = ctx.estado.pendientes[0];
   assert.equal(p.enviarDesde, calendario.proximaApertura(sabado) + 5 * 60_000);
-  assert.match(mensajes[0].texto, /Bolsa cerrada/);
+  assert.match(mensajes[0].texto, /[Bb]olsa está cerrada/);
   // El lunes a las 9:31 ET aún no; a las 9:35 sí.
   reloj.fijar(p.enviarDesde - 4 * 60_000);
   ctx.vivo.mercadoAbierto = { accion: true };

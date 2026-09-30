@@ -40,6 +40,7 @@ const { volatilidad } = require('../../mercado/indicadores');
 const { dimensionar } = require('../../cuant/dimensionado');
 const universo = require('../../mercado/universo');
 const plantillas = require('../plantillas');
+const conversacion = require('../conversacion');
 const riesgos = require('./riesgos');
 const limitesMod = require('../../riesgo/limites');
 const { directivasVigentes } = require('../megafono');
@@ -236,7 +237,8 @@ async function proponerApertura(ctx, { mesa, simbolo, senal, cierre, tVela, vol 
   const q = ctx.vivo.precios[simbolo];
   const precio = q ? q.precio : null;
   if (!(precio > 0)) {
-    ctx.bus.publicar({ de: agente, canal: 'parque', tipo: 'estado', texto: `Sin precio de ${etiqueta(simbolo)}: no propongo nada.`, datos: { puestoId: pid } });
+    conversacion.seguir(ctx, pid, { de: agente, canal: 'parque', tipo: 'estado', texto: `No tengo precio de ${etiqueta(simbolo)} ahora mismo: no propongo nada.`, datos: { puestoId: pid } });
+    conversacion.terminar(ctx, pid);
     return null;
   }
   const dim = tamanoApertura(ctx, mesa, { peso: senal.peso, precio, stop: senal.stop, volAnual: vol }, { paraProponer: true });
@@ -244,9 +246,10 @@ async function proponerApertura(ctx, { mesa, simbolo, senal, cierre, tVela, vol 
     puestoId: pid, mesaId: mesa.id, simbolo, clase: universo.esCripto(simbolo) ? 'cripto' : 'accion', lado: 'compra', tipo: 'apertura',
     nocional: dim.nocional, cantidad: dim.cantidad, precio, precioT: q.t, stop: senal.stop, precioDecision: cierre, factorTamano: dim.factor.total,
   };
-  ctx.bus.publicar({
-    de: agente, canal: 'parque', tipo: 'propuesta',
-    texto: plantillas.propuesta({ etiqueta: etiqueta(simbolo), lado: 'compra', nocional: dim.nocional, cantidad: dim.cantidad, precio, stop: senal.stop, factor: dim.factor }),
+  // A la Jefa de riesgos, por su nombre: ella contesta en el mismo hilo.
+  conversacion.seguir(ctx, pid, {
+    de: agente, para: 'riesgos', canal: 'parque', tipo: 'propuesta',
+    texto: plantillas.propuesta({ etiqueta: etiqueta(simbolo), lado: 'compra', nocional: dim.nocional, cantidad: dim.cantidad, precio, stop: senal.stop, factor: dim.factor, a: conversacion.pilaDe(ctx, 'riesgos') }),
     datos: { ...propuesta, limitadoPor: dim.limitadoPor, nocionalBase: dim.nocionalBase, capitalMesa: capitalMesa(ctx, mesa) }, importancia: 2,
   });
   // Acciones con la bolsa cerrada (§6.7): la decisión queda pendiente y Riesgos
@@ -264,14 +267,14 @@ async function proponerApertura(ctx, { mesa, simbolo, senal, cierre, tVela, vol 
   const res = await ctx.ejecutor.ejecutar({
     puestoId: pid, mesaId: mesa.id, simbolo, lado: 'compra', nocional: r.nocional, tipo: 'apertura', motivo: 'señal', accion: 'abrir',
     velaT: tVela, stop: senal.stop, objetivoPrecio: senal.objetivoPrecio, regimen: ctx.estado.macro.regimen ? ctx.estado.macro.regimen.valor : null,
-    precioReferencia: precio, pesoSenal: senal.peso, volAnual: Number.isFinite(vol) ? vol : null,
+    precioReferencia: precio, pesoSenal: senal.peso, volAnual: Number.isFinite(vol) ? vol : null, razon: senal.motivo || null,
   });
   await ctx.refrescarCartera();
   return res;
 }
 
 // Venta de todo el puesto por señal, stop o decisión de riesgo (despido).
-async function proponerCierre(ctx, { mesaId, simbolo, tipo = 'cierre', motivo = 'señal', accion = 'cerrar', velaT }) {
+async function proponerCierre(ctx, { mesaId, simbolo, tipo = 'cierre', motivo = 'señal', accion = 'cerrar', velaT, razon = null }) {
   const pid = puestoId(mesaId, simbolo);
   const p = ctx.libros.puesto(pid);
   if (!p || !(p.cantidad > EPS)) return null;
@@ -282,16 +285,16 @@ async function proponerCierre(ctx, { mesaId, simbolo, tipo = 'cierre', motivo = 
     cantidad: p.cantidad, nocional: precio ? p.cantidad * precio : null, precio, precioT: q ? q.t : null,
   };
   if (tipo === 'cierre') {
-    ctx.bus.publicar({
-      de: agenteDePuesto(mesaId, simbolo), canal: 'parque', tipo: 'propuesta',
-      texto: plantillas.propuesta({ etiqueta: etiqueta(simbolo), lado: 'venta', cantidad: p.cantidad, precio }), datos: propuesta, importancia: 2,
+    conversacion.seguir(ctx, pid, {
+      de: agenteDePuesto(mesaId, simbolo), para: 'riesgos', canal: 'parque', tipo: 'propuesta',
+      texto: plantillas.propuesta({ etiqueta: etiqueta(simbolo), lado: 'venta', cantidad: p.cantidad, precio, a: conversacion.pilaDe(ctx, 'riesgos') }), datos: propuesta, importancia: 2,
     });
   }
   const r = riesgos.evaluar(ctx, propuesta);
   if (r.decision === 'vetar') return null;
   const res = await ctx.ejecutor.ejecutar({
     puestoId: pid, mesaId, simbolo, lado: 'venta', cantidad: p.cantidad, cantidadPuesto: p.cantidad, tipo, motivo, accion,
-    velaT: velaT ?? ctx.reloj.ahora(), precioReferencia: precio, cierraTodo: true,
+    velaT: velaT ?? ctx.reloj.ahora(), precioReferencia: precio, cierraTodo: true, ...(razon ? { razon } : {}),
   });
   await ctx.refrescarCartera();
   return res;
@@ -520,12 +523,14 @@ async function procesarMesa(ctx, mesa, ahora) {
     if (typeof ctx.anotarActividad === 'function') {
       ctx.anotarActividad({ agente, accion: 'senal', objetivo: llevaOrden ? 'ejecucion' : 'monitor', detalle: llevaOrden ? accion : 'sin cambio', puestoId: pid });
     }
+    // La señal de abrir abre la conversación de la operación (§6.2); la de
+    // cerrar sigue la que se abrió al comprar.
     if (opera && accion === 'abrir' && !(real.p.cantidad > EPS)) {
-      ctx.bus.publicar({ de: agente, canal: 'parque', tipo: 'senal', texto: plantillas.frase(real.senal.estado || real.senal.motivo), datos: { puestoId: pid, accion, motivo: real.senal.motivo, stop: real.senal.stop }, importancia: 2 });
+      conversacion.abrir(ctx, pid, { de: agente, canal: 'parque', tipo: 'senal', texto: plantillas.frase(real.senal.estado || real.senal.motivo), datos: { puestoId: pid, accion, motivo: real.senal.motivo, stop: real.senal.stop }, importancia: 2 });
       aperturas.push({ mesa, simbolo, senal: real.senal, cierre, tVela, vol });
     } else if (opera && accion === 'cerrar' && real.p.cantidad > EPS) {
-      ctx.bus.publicar({ de: agente, canal: 'parque', tipo: 'senal', texto: plantillas.frase(real.senal.estado || real.senal.motivo), datos: { puestoId: pid, accion, motivo: real.senal.motivo }, importancia: 2 });
-      cierres.push({ mesaId: mesa.id, simbolo, velaT: tVela });
+      conversacion.seguir(ctx, pid, { de: agente, canal: 'parque', tipo: 'senal', texto: plantillas.frase(real.senal.estado || real.senal.motivo), datos: { puestoId: pid, accion, motivo: real.senal.motivo }, importancia: 2 });
+      cierres.push({ mesaId: mesa.id, simbolo, velaT: tVela, razon: real.senal.motivo || null });
     } else if (opera) {
       // Con el fondo bloqueado o la mesa en el banquillo el texto se actualiza
       // en su tarjeta, pero no se repite en el chat en cada vela. En el chat,
@@ -543,7 +548,7 @@ async function procesarMesa(ctx, mesa, ahora) {
   if (sinDecidir > 0) {
     ctx.bus.publicar({
       de: 'cio', canal: 'parque', tipo: 'nota',
-      texto: plantillas.frase(`${mesa.nombre}: ${sinDecidir} ${sinDecidir === 1 ? 'vela' : 'velas'} ${mesa.marco === '1Day' ? 'diarias' : 'de 4H'} sin decidir por el ordenador apagado; se marcan y se decide con la última.`),
+      texto: plantillas.frase(`${mesa.nombre}: ${sinDecidir} ${sinDecidir === 1 ? 'vela' : 'velas'} ${mesa.marco === '1Day' ? (sinDecidir === 1 ? 'diaria' : 'diarias') : 'de 4 horas'} sin decidir porque el ordenador estaba apagado. Las repaso y decido con la última.`),
       datos: { mesaId: mesa.id, sinDecidir, tVela },
     });
   }

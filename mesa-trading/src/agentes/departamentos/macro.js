@@ -32,7 +32,13 @@ async function actualizar(ctx, { forzar = false } = {}) {
   if (ctx.datos.disponible('SPY') && ctx.universo.some(a => a.simbolo === 'SPY')) {
     spyDiario = await ctx.datos.velas('SPY', '1Day', { desde: ahora - DIAS_DIARIAS * DIA, hasta: ahora });
   }
-  const r = calcularRegimen({ btcDiario, spyDiario });
+  // VIXY, el termómetro del miedo (§4.2): solo con claves (va con la SPY) y si
+  // la fuente lo tiene. Si falla su petición, el régimen sigue sin él.
+  let vixyDiario = null;
+  if (spyDiario && ctx.datos.disponible('VIXY')) {
+    try { vixyDiario = await ctx.datos.velas('VIXY', '1Day', { desde: ahora - DIAS_DIARIAS * DIA, hasta: ahora }); } catch (_) { vixyDiario = null; }
+  }
+  const r = calcularRegimen({ btcDiario, spyDiario, vixyDiario });
   const anterior = m.regimen ? m.regimen.valor : null;
 
   // Miedo y codicia: la fuente ya cachea una hora; sin red se queda el último.
@@ -56,7 +62,7 @@ async function actualizar(ctx, { forzar = false } = {}) {
     m.ultimoMensaje = ahora;
     ctx.bus.publicar({
       de: 'macro', canal: 'macro', tipo: 'regimen',
-      texto: plantillas.regimen({ valor: r.valor, puntos: r.puntos, anterior, detalle: r.detalle }),
+      texto: plantillas.regimen({ valor: r.valor, puntos: r.puntos, anterior, detalle: r.detalle, componentes: r.componentes }),
       datos: { valor: r.valor, puntos: r.puntos, anterior, fg: m.fg ? m.fg.valor : null, componentes: r.componentes },
       importancia: cambia ? 3 : 1,
     });

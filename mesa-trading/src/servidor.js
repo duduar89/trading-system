@@ -5,6 +5,8 @@
 //   de la carpeta (../ o rutas absolutas codificadas se rechazan).
 // - GET /api/estado, /api/mensajes?desde= (t mayor O IGUAL; lo que ya no está
 //   en memoria se lee de mensajes.jsonl), /api/operaciones, /api/costes-llm.
+// - GET /api/noticias, /api/historial, /api/decisiones, /api/estrategias y
+//   /api/laboratorio: los informes del panel (src/informes, igual en la web).
 // - SSE en /api/eventos: 'estado' (como mucho uno cada 2 s reales, lo limita
 //   el orquestador), 'mensaje', 'agente', 'ejecucion' y 'ping' cada 15 s. Al
 //   cerrar la conexión se quitan sus oyentes. Como mucho 20 paneles a la vez
@@ -342,6 +344,13 @@ function crearServidorLocal({
     }
     if (req.method === 'GET' && ruta === '/api/operaciones') return enviarJSON(res, 200, orquestador.operaciones.slice(-200));
     if (req.method === 'GET' && ruta === '/api/costes-llm') return enviarJSON(res, 200, costesLLM(path.join(carpetaDatos || orquestador.carpeta, 'llm-costes.jsonl')));
+    // Informes del panel (§7): noticias, historial, decisiones, estrategias y
+    // laboratorio. Una sola entrada para los dos servidores (src/informes):
+    // en la web se sirve exactamente lo mismo, con la instantánea publicada.
+    const inf = /^\/api\/(noticias|historial|decisiones|estrategias|laboratorio)$/.exec(ruta);
+    if (req.method === 'GET' && inf) {
+      return enviarJSON(res, 200, require('./informes').consultar(inf[1], { carpeta: carpetaDatos || orquestador.carpeta, params: url.searchParams, instantanea: () => orquestador.instantanea() }));
+    }
     const m = /^\/api\/comando\/([a-z-]+)$/.exec(ruta);
     if (m) {
       const nombre = m[1];

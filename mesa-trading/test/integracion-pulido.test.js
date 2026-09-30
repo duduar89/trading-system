@@ -237,13 +237,13 @@ test('comité: si un humano reabre y aplica el Megáfono durante la reunión, ca
   assert.equal(r.ok, true);
   const c = delComite(mensajes, desde);
   const riesgosPunto = c.find(m => m.datos && m.datos.punto === 'riesgos');
-  assert.match(riesgosPunto.texto, /^Nivel normal/, 'el nivel de cuando se publica, no el del principio');
+  assert.match(riesgosPunto.texto, /El fondo está en nivel normal/, 'el nivel de cuando se publica, no el del principio');
   assert.equal(riesgosPunto.datos.voto, 'NORMAL');
   assert.match(riesgosPunto.texto, /de bloqueado a normal/);
   assert.match(riesgosPunto.texto, /un humano ha reabierto el fondo/);
   const mf = c.find(m => m.datos && m.datos.punto === 'megafono');
-  assert.doesNotMatch(mf.texto, /ninguna directiva vigente/);
-  assert.match(mf.texto, /1 directiva vigente/);
+  assert.doesNotMatch(mf.texto, /no hay órdenes vigentes/);
+  assert.match(mf.texto, /1 orden vigente/);
   assert.match(mf.texto, /un humano ha aplicado el Megáfono/);
   const d = c.find(m => m.tipo === 'decision');
   assert.equal(d.datos.modo, 'NORMAL', 'nada de DEFENSIVO por un «Nivel bloqueado» que ya no es');
@@ -265,7 +265,7 @@ test('comité: si el cambio llega después de que Riesgos haya votado, los votos
   const d = c.find(m => m.tipo === 'decision');
   assert.equal(d.datos.modo, 'DEFENSIVO', 'con el fondo en pausa al decidir, Riesgos vota DEFENSIVO y es veto');
   assert.deepEqual(d.datos.votos, { macro: 'NORMAL', riesgos: 'DEFENSIVO' });
-  assert.match(d.texto, /Votos recalculados al cerrar: Riesgos DEFENSIVO \(dijo NORMAL; el fondo está ahora en pausa\)/);
+  assert.match(d.texto, /Al cerrar he vuelto a contar los votos: Marta vota ahora DEFENSIVO \(antes dijo NORMAL; el fondo está ahora en pausa\)/);
   await o.detener();
 });
 
@@ -290,7 +290,7 @@ test('comité con LLM: si los votos cambian durante la reunión, su decisión (t
   const c = delComite(mensajes, desde);
   const rp = c.find(m => m.datos && m.datos.punto === 'riesgos');
   assert.equal(rp.datos.fuente, 'plantilla', 'su «Nivel bloqueado: voto DEFENSIVO» ya no es verdad');
-  assert.match(rp.texto, /^Nivel normal/);
+  assert.match(rp.texto, /El fondo está en nivel normal/);
   const d = c.find(m => m.tipo === 'decision');
   assert.equal(d.datos.fuente, 'defecto');
   assert.equal(d.datos.modo, 'NORMAL');

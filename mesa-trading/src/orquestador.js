@@ -37,7 +37,8 @@ const { EventEmitter } = require('events');
 const path = require('path');
 const universoMod = require('./mercado/universo');
 const calendario = require('./mercado/calendario');
-const { mesasIniciales } = require('./estrategias');
+const { mesasIniciales, mesaAmpliada, explicarMesa, MESA_AMPLIADA } = require('./estrategias');
+const registros = require('./registros');
 const { reasignar, REGLAS: REGLAS_ASIGNADOR } = require('./aprendizaje/asignador');
 const { metricasMesa, sharpeRodante } = require('./aprendizaje/evaluador');
 const { evaluarPasoAReal } = require('./aprendizaje/paso-a-real');
@@ -48,8 +49,10 @@ const { Libros } = require('./cartera/libros');
 const { DEPARTAMENTOS, crearPlantilla, puestosDeMesa } = require('./agentes/registro');
 const megafono = require('./agentes/megafono');
 const plantillas = require('./agentes/plantillas');
+const conversacion = require('./agentes/conversacion');
 const { TARIFAS } = require('./agentes/llm');
 const comite = require('./agentes/comite');
+const reuniones = require('./agentes/reuniones');
 const macro = require('./agentes/departamentos/macro');
 const analisis = require('./agentes/departamentos/analisis');
 const riesgos = require('./agentes/departamentos/riesgos');
@@ -170,6 +173,8 @@ class Orquestador extends EventEmitter {
       operacionesSombra: path.join(this.carpeta, 'operaciones-sombra.jsonl'),
       informes: path.join(this.carpeta, 'informes.jsonl'),
       incidentes: path.join(this.carpeta, 'incidentes.jsonl'),
+      // Para las pantallas (src/registros.js): noticias, historial y decisiones.
+      ...registros.rutas(this.carpeta),
     };
     this.incidentes = null;          // RegistroIncidentes, al arrancar (tras tomar la carpeta)
     this.estado = null;
@@ -257,10 +262,12 @@ class Orquestador extends EventEmitter {
     }
     await this._actualizarPrecios(this.reloj.ahora());
     const nuevo = !(guardado && guardado.version === VERSION_ESTADO);
+    let migracion = null;
     if (!nuevo) {
       this.libros = new Libros(guardado.libros);
       delete guardado.libros;
       this.estado = this._completar(guardado);
+      migracion = await this._migrarUniverso();
     } else {
       this.libros = new Libros();
       this.estado = await this._estadoInicial();
@@ -274,6 +281,8 @@ class Orquestador extends EventEmitter {
     this.bus.registrarAgente({ id: 'humano', nombre: 'Tú (megáfono)', departamento: null });
     this.bus.registrarAgente({ id: 'sistema', nombre: 'Sistema', departamento: null });
     for (const m of this.estado.mesas) this._asegurarPuestos(m);
+    this._leerColaHistorial();
+    if (migracion) this._contarMigracion(migracion);
     this.operaciones = leerJSONL(this.rutas.operaciones);
     this.operacionesSombra = leerJSONL(this.rutas.operacionesSombra);
     // Antes de resolverAlArrancar: una venta que se reaplica tras un corte ya
@@ -346,7 +355,9 @@ class Orquestador extends EventEmitter {
       ultimoCierreT: null, actividad: null, picoVigilancia: null, inicioDiaVigilancia: null, diaInicioVigilancia: null, comisionesEstimadas: {},
       macro: { regimen: null, fg: null, ultimaHora: null, ultimoMensaje: null },
       analisis: { ultimaHora: null, porActivo: {} },
-      noticias: { ultima: null, vistos: [], eventosGraves: [] },
+      noticias: { ultima: null, vistos: [], eventosGraves: [], guardados: [], pendientes: [] },
+      historial: { ultimaHora: null },
+      migraciones: {},
       comite: { celebrados: 0, ultimo: null, historial: [], pnlMesas: {} },
       contadores: { vetos: 0, vetosDesdeComite: 0, mensajesPorCanal: {}, contrataciones: 0, kills: 0, reaperturas: 0 },
       conciliacion: { limpia: true, grave: false, resumen: '', gravesSeguidas: 0, clave: null, t: null },
@@ -357,6 +368,8 @@ class Orquestador extends EventEmitter {
     if (e2.fondo && e2.fondo.killReintento === undefined) e2.fondo.killReintento = null;
     e2.laboratorio = { ensayosTotales: 0, sharpesEnsayos: [], ensayos: [], hipotesis: [], aprobadas: [], proximaRevision: null, ...(e.laboratorio || {}) };
     for (const m of e2.mesas) {
+      // Un activo de solo dato (VIXY) no puede estar en ninguna mesa.
+      if (Array.isArray(m.universo)) m.universo = m.universo.filter(s => !universoMod.esSoloDato(s));
       if (!Array.isArray(m.curvaDiaria)) m.curvaDiaria = [];
       if (!Number.isFinite(m.capitalBase)) m.capitalBase = (e2.capitalInicial || 0) * (m.peso || 0);
     }
@@ -375,7 +388,7 @@ class Orquestador extends EventEmitter {
     const cuenta = await this.broker.cuenta();
     const capital = cuenta.patrimonio;
     const disponibles = new Set(this.universo.map(a => a.simbolo));
-    const mesas = mesasIniciales({ hayAlpaca: this.hayAlpaca })
+    const mesas = mesasIniciales({ hayAlpaca: this.hayAlpaca, disponibles: [...disponibles] })
       .map(m => ({ ...m, universo: m.universo.filter(s => disponibles.has(s)) }))
       .filter(m => m.universo.length);
     // Pesos iniciales con el asignador (§5.7): incubación 2 % fija y titulares
@@ -418,6 +431,160 @@ class Orquestador extends EventEmitter {
       sintetico: this.modo === 'sintetico' ? { semilla: this.datos.semilla ?? null, inicio: this.datos.inicio ?? null } : null,
     });
     return e;
+  }
+
+  // Migración del universo del 30-sep-2026 en un fondo que ya existía
+  // (mesasIniciales solo cuenta para un fondo nuevo). Idempotente: cada paso
+  // se apunta en estado.migraciones y no se repite, y solo se hace si los
+  // datos lo permiten (la ampliada necesita sus 10 criptos; DIA, claves).
+  // No toca ninguna posición: añade una mesa en incubación (2 %, del efectivo
+  // sin asignar) y un símbolo más a Momentum ETF, que rota entre los que tiene.
+  // Devuelve lo que hizo (o null) para contarlo cuando el bus ya tenga agentes.
+  async _migrarUniverso() {
+    const e = this.estado;
+    const hechas = e.migraciones || (e.migraciones = {});
+    const ahora = this.reloj.ahora();
+    const hay = new Set(this.universo.map(a => a.simbolo));
+    const hecho = {};
+    if (!hechas.ampliada && MESA_AMPLIADA.universo.every(s => hay.has(s))) {
+      if (!e.mesas.some(m => m.id === MESA_AMPLIADA.id)) {
+        const asignado = e.mesas.reduce((sum, m) => sum + (m.estado !== 'banquillo' && m.peso > 0 ? m.peso : 0), 0);
+        const peso = Math.max(0, Math.min(REGLAS_ASIGNADOR.incubacion, 1 - asignado));
+        let patrimonio = this.vivo.patrimonio;
+        try { patrimonio = (await this.broker.cuenta()).patrimonio; } catch (_) { /* el del arranque */ }
+        const m = mesaAmpliada();
+        Object.assign(m, { peso, fechaAlta: ahora, capitalBase: patrimonio * peso, flujoPendiente: 0, curvaDiaria: [], metricas: null, backtest: null });
+        e.mesas.push(m);
+        e.directivas.multiplicadores = { ...(e.directivas.multiplicadores || {}), [m.id]: 1 };
+        hecho.ampliada = { mesaId: m.id, peso };
+      }
+      hechas.ampliada = ahora;
+    }
+    const etf = e.mesas.find(m => m.id === 'momentum-etf');
+    if (!hechas.dia && hay.has('DIA') && etf) {
+      if (!etf.universo.includes('DIA')) {
+        etf.universo = [...etf.universo, 'DIA'];
+        hecho.dia = { mesaId: etf.id, universo: [...etf.universo] };
+      }
+      hechas.dia = ahora;
+    }
+    return Object.keys(hecho).length ? hecho : null;
+  }
+
+  _contarMigracion(hecho) {
+    const partes = [];
+    if (hecho.ampliada) {
+      const m = this.mesaPorId(hecho.ampliada.mesaId);
+      partes.push(`nueva mesa ${m.nombre} en prueba con el ${f.pct(hecho.ampliada.peso, { decimales: 0 })} (${m.universo.map(etiqueta).join(', ')})`);
+      this.anotarDecision({
+        tipo: 'asignacion', quien: 'humano',
+        resumen: `Alta de ${m.nombre} en incubación con el ${f.pct(hecho.ampliada.peso, { decimales: 0 })}. ${m.nota}`,
+        datos: { migracion: 'universo-2026-09-30', mesaId: m.id, peso: hecho.ampliada.peso, universo: m.universo, nota: m.nota },
+      });
+    }
+    if (hecho.dia) {
+      partes.push('DIA entra en Momentum ETF');
+      this.anotarDecision({
+        tipo: 'asignacion', quien: 'humano', resumen: 'DIA (Dow Jones 30) entra en el universo de Momentum ETF, sin tocar lo que ya tiene abierto.',
+        datos: { migracion: 'universo-2026-09-30', mesaId: hecho.dia.mesaId, universo: hecho.dia.universo },
+      });
+    }
+    this.bus.publicar({
+      de: 'cio', canal: 'direccion', tipo: 'contratacion', importancia: 3,
+      texto: plantillas.frase(`Universo ampliado (decisión de Eduardo, 30-sep): ${partes.join('; ')}. Momentum cripto sigue con sus 6 y no se toca ninguna posición.`, 280),
+      datos: { migracion: 'universo-2026-09-30', ...hecho },
+    });
+  }
+
+  // ---------- Registros para las pantallas (src/registros.js) ----------
+
+  // Una decisión real a data/decisiones.jsonl (§6.10). Nunca lanza.
+  anotarDecision({ tipo, quien, resumen, datos } = {}) {
+    try {
+      return registros.anadir(this.rutas.decisiones, registros.lineaDecision({ t: this.reloj.ahora(), tipo, quien, resumen, datos }));
+    } catch (e) {
+      log.aviso(`decisión sin apuntar: ${e.message}`);
+      return false;
+    }
+  }
+
+  // Lo último que hay en historial.jsonl: tras un corte entre escribir la
+  // línea y guardar el estado, el latido siguiente no la repite.
+  _leerColaHistorial() {
+    const h = this.estado.historial || (this.estado.historial = { ultimaHora: null });
+    this._historialClaves = new Set();
+    for (const l of leerJSONL(this.rutas.historial, 20)) {
+      if (!l || !Number.isFinite(l.t)) continue;
+      this._historialClaves.add(this._claveHistorial(l.motivo, l.t));
+      if (l.motivo === 'hora') {
+        const b = inicioVela(l.t, HORA);
+        if (!(h.ultimaHora >= b)) h.ultimaHora = b;
+      }
+    }
+  }
+
+  _claveHistorial(motivo, t) { return motivo === 'hora' ? `hora|${inicioVela(t, HORA)}` : `${motivo}|${t}`; }
+
+  // Punto de data/historial.jsonl (§6.10) con lo que ya calcula la mesa.
+  // motivo: 'hora' (una por hora de reloj) o el suceso que lo provoca.
+  anotarHistorial(motivo) {
+    try {
+      const ahora = this.reloj.ahora();
+      const clave = this._claveHistorial(motivo, ahora);
+      if (!this._historialClaves) this._historialClaves = new Set();
+      if (this._historialClaves.has(clave)) return false;
+      const linea = this._lineaHistorial(motivo, ahora);
+      if (!registros.anadir(this.rutas.historial, linea)) return false;
+      this._historialClaves.add(clave);
+      if (this._historialClaves.size > 200) this._historialClaves = new Set([...this._historialClaves].slice(-50));
+      if (motivo === 'hora') this.estado.historial.ultimaHora = inicioVela(ahora, HORA);
+      return true;
+    } catch (e) {
+      log.aviso(`historial sin apuntar: ${e.message}`);
+      return false;
+    }
+  }
+
+  _historialHora(ahora) {
+    const h = this.estado.historial;
+    if (h.ultimaHora !== null && h.ultimaHora !== undefined && inicioVela(ahora, HORA) <= h.ultimaHora) return false;
+    return this.anotarHistorial('hora');
+  }
+
+  _lineaHistorial(motivo, ahora) {
+    const e = this.estado;
+    const v = this.vivo;
+    const patrimonio = v.patrimonio;
+    const val = v.valoracion || valoracionVacia();
+    const bench = Object.fromEntries(valorarBenchmarks(e.sombras.benchmarks, v.precios).map(b => [b.id, b.valor]));
+    const opsPorMesa = {};
+    for (const o of this.operaciones) if (o.motivoSalida !== 'prueba') opsPorMesa[o.mesaId] = (opsPorMesa[o.mesaId] || 0) + 1;
+    return {
+      t: ahora,
+      motivo,
+      patrimonio,
+      efectivo: v.cuenta && Number.isFinite(v.cuenta.efectivo) ? v.cuenta.efectivo : null,
+      exposicion: patrimonio > 0 ? val.exposicionBruta / patrimonio : 0,
+      caida: e.pico > 0 ? Math.min(0, patrimonio / e.pico - 1) : 0,
+      sombras: {
+        btc: bench.btc ?? null,
+        cesta: bench['cesta-cripto'] ?? null,
+        sinComite: Number.isFinite(v.patrimonioSombra) ? v.patrimonioSombra : null,
+      },
+      regimen: e.macro.regimen ? e.macro.regimen.valor : null,
+      modoComite: e.directivas.modo || 'NORMAL',
+      mesas: e.mesas.map(m => {
+        const pm = val.porMesa[m.id];
+        const sh = m.metricas && Number.isFinite(m.metricas.sharpe) ? m.metricas.sharpe : null;
+        return {
+          id: m.id, nombre: m.nombre, estado: m.estado, peso: m.peso,
+          patrimonio: operaciones.valorMesa(this, m),
+          pnlAcumulado: pm ? pm.realizado + pm.pnlAbierto : 0,
+          operaciones: opsPorMesa[m.id] || 0,
+          ...(sh !== null ? { sharpe: sh } : {}),
+        };
+      }),
+    };
   }
 
   _aplicarAjustes() {
@@ -681,14 +848,8 @@ class Orquestador extends EventEmitter {
     }
     this.operaciones.push(op);
     try { anadirJSONL(this.rutas.operaciones, op); } catch (e) { log.aviso(e.message); }
-    const mesa = this.mesaPorId(op.mesaId);
-    const de = mesa ? agenteDePuesto(op.mesaId, op.simbolo) : 'ejecutor';
-    const texto = plantillas.cierre({ etiqueta: etiqueta(op.simbolo), pnl: op.pnl, pnlPct: op.pnlPct, motivoSalida: op.motivoSalida, barras: op.barras, rMultiple: op.rMultiple });
-    this.bus.publicar({
-      de, canal: mesa ? 'parque' : 'ejecucion', tipo: 'cierre', texto,
-      datos: { puestoId: op.puestoId, operacionId: op.id, pnl: op.pnl, pnlPct: op.pnlPct, motivoSalida: op.motivoSalida, barras: op.barras },
-      importancia: 2,
-    });
+    // El operador lo cuenta en el hilo de su operación (§6.2); el Auditor le contestará ahí.
+    const texto = operaciones.contarCierre(this, op, this.mesaPorId(op.mesaId));
     // La tarjeta dice lo último que pasó, no el «Largo en…» de la última vela.
     const aux = this.estado.puestos[op.puestoId];
     if (aux) aux.estadoTexto = texto;
@@ -697,6 +858,12 @@ class Orquestador extends EventEmitter {
   async killSwitch(motivo) {
     this.estado.contadores.kills = (this.estado.contadores.kills || 0) + 1;
     this.registrarIncidente('kill', motivo);
+    const manual = Boolean(this._killPedido);
+    this.anotarDecision({
+      tipo: 'kill', quien: manual ? 'humano' : 'riesgos',
+      resumen: `Kill switch${manual ? ' manual' : ' del vigilante'}: se cierra todo y el fondo queda bloqueado hasta Reabrir. ${String(motivo || '').replace(/[.\s]+$/, '')}.`,
+      datos: { motivo: motivo || null, manual, patrimonio: this.vivo.patrimonio, pico: this.estado.pico },
+    });
     let r = null;
     try {
       r = await operaciones.killSwitch(this, motivo);
@@ -708,6 +875,7 @@ class Orquestador extends EventEmitter {
       // Todas las tarjetas dicen el bloqueo, también las de lo que se acaba de
       // cerrar (como en cada vela bloqueada), manual o del vigilante.
       this._seguroSinc('tarjetas de los puestos', () => this._textosAlNivel({ forzar: true }));
+      this._seguroSinc('historial', () => this.anotarHistorial('kill'));
       // El bloqueo queda en disco aunque el kill lance a mitad.
       this._seguroSinc('guardar', () => this.guardar());
       this._emitirEstado({ forzar: true });
@@ -755,9 +923,12 @@ class Orquestador extends EventEmitter {
     this._seguroSinc('pendientes de la bolsa (sombra)', () => mesasDep.procesarPendientesSombra(this));
     await this._seguro('mesas', 'mesas', () => mesasDep.procesar(this));
     await this._cadenciasLargas(ahora);
+    // Reuniones informativas de las 9:00 y las 22:15 de Madrid (§6.9): no cambian nada del fondo.
+    await this._seguro('reuniones', 'cio', () => reuniones.cadencia(this, ahora));
     this._seguroSinc('descansos', () => this._descansos(ahora));
     this._seguroSinc('tarjetas de los puestos', () => this._textosAlNivel());
     this._muestraCurva(ahora);
+    this._seguroSinc('historial', () => this._historialHora(ahora));
     // La actividad del paso va al estado: un comando en el modo latido (otro
     // proceso) publica la misma instantánea que el modo continuo.
     this.estado.actividad = this._actividad.aJSON();
@@ -1135,6 +1306,14 @@ class Orquestador extends EventEmitter {
         },
         pnlDia: pnlDiaMesa[m.id] || 0,
         nota: m.nota || null,
+        diasActiva: Math.max(0, Math.floor((ahora - m.fechaAlta) / DIA)),
+        explicacion: this._explicacion(m),
+        filtros: (m.filtros || []).map(x => ({ id: x.id, parametro: x.parametro ?? null })),
+        sharpeBacktest: m.backtest && Number.isFinite(m.backtest.sharpe) ? m.backtest.sharpe : null,
+        backtest: m.backtest ? {
+          sharpe: m.backtest.sharpe ?? null, maxDD: m.backtest.maxDD ?? null, operaciones: m.backtest.operaciones ?? null,
+          rentabilidad: m.backtest.rentabilidad ?? null, vol: m.backtest.vol ?? null, dias: m.backtest.dias ?? null, t: m.backtest.t ?? null,
+        } : null,
       };
     });
 
@@ -1149,7 +1328,7 @@ class Orquestador extends EventEmitter {
       if (bloqueado && estado !== 'banquillo' && estado !== 'reunion') estado = 'de_pie';
       if (enSala && JEFES.includes(a.id) && estado !== 'descanso') { sala = 'comite'; estado = 'reunion'; }
       return {
-        id: a.id, nombre: a.nombre, departamento: a.departamento, rol: a.rol, queDecide: a.queDecide, usaLLM: a.usaLLM,
+        id: a.id, nombre: a.nombre, genero: a.genero || null, departamento: a.departamento, rol: a.rol, queDecide: a.queDecide, queHace: a.queHace || null, usaLLM: a.usaLLM,
         sala, estado, bocadillo: this._bocadillo(a.id, ahora),
         mesaId: a.mesaId || null, simbolo: a.simbolo || null, etiqueta: a.etiqueta || null, puestoId: a.puestoId || null,
       };
@@ -1237,6 +1416,20 @@ class Orquestador extends EventEmitter {
       avisos,
       actividad: e.actividad || null,
     };
+  }
+
+  // Explicación llana de la mesa con sus parámetros y los límites duros de
+  // verdad (memorizada por contenido: la instantánea sale a menudo).
+  _explicacion(m) {
+    const clave = JSON.stringify([m.familia, m.universo, m.params, m.filtros]);
+    const c = this._explicaciones || (this._explicaciones = new Map());
+    if (!c.has(clave)) {
+      let x = null;
+      try { x = explicarMesa(m, { limites: this.limites }); } catch (_) { x = null; }
+      if (c.size > 100) c.clear();
+      c.set(clave, x);
+    }
+    return c.get(clave);
   }
 
   // Cada cuánto llega una instantánea nueva en el modo latido, en ms reales:
@@ -1410,7 +1603,8 @@ class Orquestador extends EventEmitter {
     const texto = typeof d.texto === 'string' ? d.texto.trim().slice(0, 500) : '';
     if (!texto) return { ok: false, mensaje: 'Escribe qué quieres que haga la mesa.' };
     const ahora = this.reloj.ahora();
-    this.bus.publicar({ de: 'humano', canal: 'megafono', tipo: 'megafono', texto: `«${texto}»`, datos: { texto }, importancia: 3 });
+    // La orden abre una conversación: la Presidenta y el agente afectado le contestan (§6.2).
+    conversacion.megafonoOrden(this, texto);
     // Sin duración escrita, la orden dura hasta el comité siguiente (COMITE_HORAS).
     // Interpretada fuera (web): no se vuelve a llamar al LLM, pero cada
     // directiva pasa otra vez por las reglas contra el estado de ahora.
@@ -1421,7 +1615,7 @@ class Orquestador extends EventEmitter {
     this.estado.contadores.megafono = (this.estado.contadores.megafono || 0) + 1;
     const propuesta = { id: `mf-${ahora.toString(36)}-${this.estado.contadores.megafono}`, texto, directivas: r.directivas, explicacion: r.explicacion, fuente: r.fuente };
     this.estado.megafonoPendiente = propuesta;
-    this.bus.publicar({ de: 'cio', canal: 'megafono', tipo: 'propuesta', texto: plantillas.frase(`Propuesta: ${r.explicacion}`, 280), datos: { id: propuesta.id, directivas: r.directivas, fuente: r.fuente }, importancia: 2, costeUsd: r.costeUsd || 0 });
+    conversacion.megafonoPropuesta(this, { texto: plantillas.frase(`Propuesta: ${r.explicacion}`, 280), datos: { id: propuesta.id, directivas: r.directivas, fuente: r.fuente }, costeUsd: r.costeUsd || 0 });
     return { ok: true, mensaje: 'Propuesta lista: revísala y pulsa Aplicar.', datos: { id: propuesta.id, texto, directivas: propuesta.directivas, explicacion: propuesta.explicacion } };
   }
 
@@ -1434,10 +1628,18 @@ class Orquestador extends EventEmitter {
       if (dir.tipo === 'sin_efecto') continue;
       this.estado.directivas = megafono.aplicarDirectiva(this.estado.directivas, dir, ahora);
       aplicadas++;
-      this.bus.publicar({ de: 'cio', canal: 'megafono', tipo: 'directiva', texto: plantillas.directiva(dir, this.estado.mesas), datos: { ...dir }, importancia: 3 });
+      conversacion.megafonoDirectiva(this, dir, { propuestaId: p.id });
     }
     this.estado.megafonoPendiente = null;
-    if (aplicadas) this._anotarHumana('megafono');
+    if (aplicadas) {
+      this._anotarHumana('megafono');
+      const validas = p.directivas.filter(x => x.tipo !== 'sin_efecto');
+      this.anotarDecision({
+        tipo: 'megafono', quien: 'humano',
+        resumen: plantillas.frase(`Megáfono aplicado: «${p.texto}» → ${validas.map(x => plantillas.directiva(x, this.estado.mesas)).join(' ')}`, 400),
+        datos: { id: p.id, texto: p.texto, directivas: validas, fuente: p.fuente || null },
+      });
+    }
     const vig = megafono.directivasVigentes(this.estado.directivas, ahora);
     return { ok: true, mensaje: aplicadas ? `${aplicadas} directiva${aplicadas === 1 ? '' : 's'} aplicada${aplicadas === 1 ? '' : 's'}.` : 'No había nada que aplicar.', datos: vig };
   }
@@ -1505,6 +1707,7 @@ class Orquestador extends EventEmitter {
     fo.motivo = 'Pausa humana: solo cerrar hasta Reabrir.';
     this._anotarHumana('pausar');
     this.bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'alerta', texto: 'Pausa pedida desde el panel: solo se cierran posiciones hasta que un humano pulse Reabrir.', importancia: 3 });
+    this.anotarDecision({ tipo: 'pausa', quien: 'humano', resumen: 'Pausa pedida desde el panel: solo se cierran posiciones hasta Reabrir.', datos: { accion: 'pausar', nivel: 'pausado' } });
     return { ok: true, mensaje: 'Pausado: solo cerrar hasta Reabrir.' };
   }
 
@@ -1562,6 +1765,7 @@ class Orquestador extends EventEmitter {
       }
       const texto = plantillas.reabrir({ quien: 'un humano desde el panel', patrimonio, pico: this.estado.pico });
       this.bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'alerta', texto, datos: { desde: venia, patrimonio, pico: this.estado.pico }, importancia: 3 });
+      this.anotarDecision({ tipo: 'pausa', quien: 'humano', resumen: texto, datos: { accion: 'reabrir', desde: venia, nivel: 'normal', patrimonio, pico: this.estado.pico } });
       return { ok: true, mensaje: plantillas.frase(`Reabierto: vuelta a nivel normal. ${texto.replace(/^Reabierto por [^.]*\.\s*/, '')}${directivas}`, 400) };
     });
   }

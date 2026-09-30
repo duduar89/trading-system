@@ -45,6 +45,10 @@ const FUENTES = Object.freeze({
   informes: 'informes.jsonl',
   mensajes: 'mensajes.jsonl',
   latidos: 'latidos.jsonl',
+  // Para las pantallas (src/registros.js).
+  noticias: 'noticias.jsonl',
+  historial: 'historial.jsonl',
+  decisiones: 'decisiones.jsonl',
 });
 const FICHERO_POSICIONES = 'espejo.json';
 const CERROJO = '.espejo';

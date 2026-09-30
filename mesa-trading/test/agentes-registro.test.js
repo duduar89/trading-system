@@ -29,7 +29,13 @@ const UNIVERSO = [
 ];
 
 test('DEPARTAMENTOS y SALAS exactamente como §6.1', () => {
-  assert.deepEqual(DEPARTAMENTOS.map(d => ({ ...d })), [
+  // queHace: una frase llana por departamento, sin cifras (pestaña Equipo, §8).
+  for (const d of DEPARTAMENTOS) {
+    assert.equal(typeof d.queHace, 'string', d.id);
+    assert.ok(d.queHace.length > 20 && d.queHace.length <= 140, d.id);
+    assert.doesNotMatch(d.queHace, /\d/, `${d.id}: sin cifras`);
+  }
+  assert.deepEqual(DEPARTAMENTOS.map(({ queHace, ...d }) => d), [
     { id: 'direccion', nombre: 'Dirección', color: '#f5b942', sala: 'direccion' },
     { id: 'macro', nombre: 'Macro', color: '#8b5cf6', sala: 'macro' },
     { id: 'analisis', nombre: 'Análisis', color: '#22c55e', sala: 'analisis' },
@@ -52,6 +58,10 @@ test('plantilla: ids fijos, un analista por activo y un operador por puesto', ()
     assert.ok(ids.includes(id), id);
   }
   const porId = Object.fromEntries(p.map(a => [a.id, a]));
+  // genero ('f' | 'm') en todos, y casa con el rol de los que lo dicen.
+  for (const a of p) assert.ok(a.genero === 'f' || a.genero === 'm', a.id);
+  for (const a of p.filter(x => /^(Operadora|Presidenta|Jefa)\b/.test(x.rol))) assert.equal(a.genero, 'f', a.id);
+  for (const a of p.filter(x => /^(Operador|Director|Auditor|Estratega|Ejecutor)\b/.test(x.rol))) assert.equal(a.genero, 'm', a.id);
   assert.equal(porId.cio.rol, 'Presidenta del comité');
   assert.equal(porId.riesgos.rol, 'Jefa de riesgos');
   assert.equal(porId.laboratorio.rol, 'Director de laboratorio');
@@ -101,4 +111,32 @@ test('contratar: puestos de una mesa nueva sin repetir nombres ni puestos existe
   assert.equal(new Set(todos).size, todos.length);
   // Una mesa ya contratada no se duplica.
   assert.deepEqual(puestosDeMesa(MESAS[0], { plantilla }), []);
+});
+
+test('queHace: cada agente lo lleva en lenguaje llano, además del queDecide técnico', () => {
+  const plantilla = crearPlantilla({ universo: UNIVERSO_COMPLETO, mesas: MESAS_COMPLETAS });
+  for (const a of plantilla) {
+    assert.equal(typeof a.queHace, 'string', a.id);
+    assert.ok(a.queHace.length > 40 && a.queHace.length < 320, `${a.id}: ${a.queHace.length} caracteres`);
+    assert.notEqual(a.queHace, a.queDecide);
+  }
+  assert.match(plantilla.find(a => a.id === 'analista-BTC').queHace, /BTC/);
+  assert.match(plantilla.find(a => a.puestoId).queHace, /Riesgos/);
+});
+
+test('ampliación del 30-sep-2026: los agentes nuevos no cambian el nombre de los de antes; VIXY no tiene agente', () => {
+  const antes = crearPlantilla({ universo: UNIVERSO_COMPLETO, mesas: MESAS_COMPLETAS });
+  const nuevos = ['XRP', 'LTC', 'BCH', 'ADA'].map(e => ({ simbolo: `${e}/USD`, etiqueta: e, clase: 'cripto', nombre: e }));
+  const universo = [...UNIVERSO_COMPLETO.slice(0, 6), ...nuevos, ...UNIVERSO_COMPLETO.slice(6),
+    { simbolo: 'DIA', etiqueta: 'DIA', clase: 'accion', nombre: 'DIA' }, { simbolo: 'VIXY', etiqueta: 'VIXY', clase: 'accion', nombre: 'VIXY' }];
+  const mesas = [
+    ...MESAS_COMPLETAS.map(m => (m.id === 'momentum-etf' ? { ...m, universo: [...m.universo, 'DIA', 'VIXY'] } : m)),
+    { id: 'momentum-ampliada', nombre: 'Momentum cripto ampliada', familia: 'momentum-rotacion', universo: [...CRIPTO, ...nuevos.map(a => a.simbolo)] },
+  ];
+  const despues = crearPlantilla({ universo, mesas });
+  for (const a of antes) assert.equal(despues.find(x => x.id === a.id).nombre, a.nombre, a.id);
+  assert.ok(despues.some(a => a.id === 'analista-XRP') && despues.some(a => a.id === 'puesto-momentum-ampliada-ADA'));
+  assert.ok(!despues.some(a => /VIXY/.test(a.id)));
+  const dePila = despues.map(a => a.nombre.split(' ')[0]);
+  assert.equal(new Set(dePila).size, dePila.length);
 });

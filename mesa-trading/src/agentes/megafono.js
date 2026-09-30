@@ -337,7 +337,7 @@ function interpretarPalabrasClave(texto, { universo = [], mesas = [], horasPorDe
 const SISTEMA = 'Eres el Megáfono de una mesa de trading en papel. Traduces la orden de un humano a directivas de una lista cerrada. '
   + 'Las directivas solo pueden apretar el riesgo (reducir, pausar, solo cerrar) o deshacer una pausa previa (reanudar). '
   + 'Nunca aumentan el riesgo. Si la orden pide otra cosa, devuelve una directiva sin_efecto con el motivo. '
-  + 'Responde en español.';
+  + 'Responde en español de España, en tono llano y cercano, sin jerga: quien escribe no sabe de bolsa.';
 
 function esquemaLLM(universo, mesas) {
   const etiquetas = universo.map(etiquetaDe);
@@ -379,7 +379,7 @@ function instrucciones(horasPorDefecto = HORAS_POR_DEFECTO) {
     '- solo_cerrar: horas (no se abre nada nuevo). reanudar_activo / reanudar_mesa: deshacen una pausa previa.',
     '- sin_efecto: motivo, si la orden no encaja o pide más riesgo.',
     `Horas: entero de ${HORAS_MIN} a ${HORAS_MAX}; si el texto no dice duración, ${horasPorDefecto}. Campos que no apliquen: null.`,
-    'explicacion: una frase corta que diga lo que has entendido, sin cifras que no estén en el texto.',
+    'explicacion: una frase corta y llana que diga lo que has entendido («Entendido: no se abren compras nuevas en Solana»), sin cifras que no estén en el texto.',
   ].join('\n');
 }
 const INSTRUCCIONES = instrucciones();

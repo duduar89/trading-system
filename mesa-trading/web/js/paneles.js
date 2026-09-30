@@ -4,10 +4,10 @@
 // las funciones para mandar comandos.
 (function (raiz, fabrica) {
   const esNode = typeof module === 'object' && module.exports;
-  const mod = fabrica(esNode ? require('./cifras.js') : raiz.Parque.cifras);
+  const mod = esNode ? fabrica(require('./cifras.js'), require('./caras.js')) : fabrica(raiz.Parque.cifras, raiz.Parque.caras);
   if (esNode) module.exports = mod;
   else (raiz.Parque = raiz.Parque || {}).paneles = mod;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (cifras) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (cifras, caras) {
   'use strict';
 
   const MAX_DOM = 300;
@@ -135,6 +135,13 @@
     ultimoFoco: null,
     conexion: { ok: true, motivo: null, hasta: null, reintento: false },
     viejo: null,
+    porId: new Map(),            // id → mensaje de los que hay en memoria (conversaciones)
+    pestana: 'mensajes',         // pestaña del panel lateral: 'mensajes' | 'equipo' | la que se añada
+    busqueda: '',                // lo escrito en el buscador del equipo
+    firmaEquipo: '',
+    feedAbajo: true,             // ¿estaba el feed abajo del todo al cambiar de pestaña?
+    detalleAbierto: new Set(),   // fichas de agente con «Detalle técnico» desplegado (sobrevive al refresco)
+    cacheAgentes: { lista: null, mapa: new Map() },
   };
 
   function colorDep(id) {
@@ -146,12 +153,42 @@
     return d ? d.nombre : '';
   }
 
+  // Plantilla de la última instantánea, por id (para la cara, el rol y el
+  // «→ Marta» de cada mensaje).
+  function agentesPorId() {
+    const inst = est.manejadores.instantanea ? est.manejadores.instantanea() : null;
+    const lista = inst && Array.isArray(inst.agentes) ? inst.agentes : null;
+    if (lista !== est.cacheAgentes.lista) est.cacheAgentes = { lista, mapa: new Map((lista || []).map(a => [a.id, a])) };
+    return est.cacheAgentes.mapa;
+  }
+
+  // Cara de un agente (o del humano, o del sistema) del tamaño pedido.
+  function cara(quien, tam, etiqueta) {
+    if (quien === 'humano' || quien === 'sistema') return caras.nodoCara(quien, { tam, etiqueta });
+    return caras.nodoCara(quien, { tam, color: colorDep(quien && quien.departamento), etiqueta });
+  }
+
+  // Etiqueta del departamento con su color (el color va en una variable CSS:
+  // la CSP no deja atributos style, pero sí fijarla desde JS).
+  function etiquetaDep(depId, texto) {
+    const e = el('span', { class: 'dep-etq', text: texto || nombreDep(depId) || depId });
+    e.style.setProperty('--dep', colorDep(depId));
+    return e;
+  }
+
+  // Abre la ficha de un agente (desde una cara del feed, del equipo o de un puesto).
+  function abrirFichaAgente(id) {
+    if (est.manejadores.alSeleccionar) est.manejadores.alSeleccionar({ tipo: 'agente', id });
+  }
+
   // ---------- inicio ----------
   function iniciar(opciones) {
     est.manejadores = opciones || {};
     est.departamentos = (opciones && opciones.departamentos) || [];
     construirBotonera();
     construirChips();
+    construirPestanas();
+    construirBuscadorEquipo();
     for (const id of ['pildoras', 'acciones']) { const n = $(id); if (n) n.addEventListener('scroll', marcarDesborde, { passive: true }); }
     const feed = $('feed');
     feed.addEventListener('scroll', () => {
@@ -163,7 +200,7 @@
       const lat = $('lateral');
       const abierta = lat.classList.toggle('abierta');
       asa.setAttribute('aria-expanded', String(abierta));
-      if (abierta) bajarDelTodo();
+      if (abierta && est.pestana === 'mensajes') bajarDelTodo();
     });
     window.addEventListener('resize', () => { marcarDesborde(); ajustarModoTarjeta(); });
     document.addEventListener('keydown', (e) => {
@@ -199,6 +236,79 @@
       });
       cont.appendChild(b);
     }
+  }
+
+  // ---------- pestañas del panel lateral (Mensajes, Equipo…) ----------
+  // Cada [role=tab] de #pestanas-lateral enseña su panel (aria-controls) y
+  // esconde los demás. Otra pestaña se añade en index.html con el mismo
+  // patrón, sin tocar esto. Flechas, Inicio y Fin mueven entre pestañas
+  // (tabindex itinerante); en el móvil, elegir una abre la hoja inferior.
+  function pestanas() {
+    const lista = $('pestanas-lateral');
+    return lista ? Array.from(lista.querySelectorAll('[role="tab"]')) : [];
+  }
+
+  function construirPestanas() {
+    const tabs = pestanas();
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => elegirPestana(tab.getAttribute('data-pestana'), { abrirHoja: true }));
+      tab.addEventListener('keydown', (e) => {
+        const n = tabs.length;
+        const ir = { ArrowRight: (i + 1) % n, ArrowLeft: (i - 1 + n) % n, Home: 0, End: n - 1 }[e.key];
+        if (ir === undefined) return;
+        e.preventDefault();
+        const destino = tabs[ir];
+        elegirPestana(destino.getAttribute('data-pestana'), { abrirHoja: true });
+        destino.focus();
+      });
+    });
+  }
+
+  function elegirPestana(id, opciones) {
+    const tabs = pestanas();
+    if (!tabs.length || !tabs.some(t => t.getAttribute('data-pestana') === id)) return;
+    const antes = est.pestana;
+    // Si el feed estaba abajo del todo al irse, al volver sigue abajo.
+    if (antes === 'mensajes' && id !== 'mensajes') est.feedAbajo = pegadoAbajo();
+    est.pestana = id;
+    for (const t of tabs) {
+      const activa = t.getAttribute('data-pestana') === id;
+      t.setAttribute('aria-selected', String(activa));
+      t.setAttribute('tabindex', activa ? '0' : '-1');
+      t.classList.toggle('activa', activa);
+      const panel = $(t.getAttribute('aria-controls'));
+      if (panel) panel.hidden = !activa;
+    }
+    if (opciones && opciones.abrirHoja) {
+      const lat = $('lateral');
+      if (lat && !lat.classList.contains('abierta') && esMovil()) {
+        lat.classList.add('abierta');
+        const asa = $('asa');
+        if (asa) asa.setAttribute('aria-expanded', 'true');
+      }
+    }
+    if (id === 'equipo') { est.firmaEquipo = ''; actualizarEquipo(); }
+    if (id === 'mensajes' && antes !== 'mensajes' && est.feedAbajo !== false) bajarDelTodo();
+  }
+
+  function construirBuscadorEquipo() {
+    const input = $('buscar-equipo');
+    if (!input) return;
+    input.addEventListener('input', () => {
+      est.busqueda = input.value || '';
+      est.firmaEquipo = '';
+      actualizarEquipo();
+    });
+    // Escape en el buscador borra lo escrito (y no cierra la ficha abierta).
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && input.value) {
+        e.stopPropagation();
+        input.value = '';
+        est.busqueda = '';
+        est.firmaEquipo = '';
+        actualizarEquipo();
+      }
+    });
   }
 
   function construirBotonera() {
@@ -318,6 +428,7 @@
     }
     $('p-maqueta').hidden = !(o && o.maqueta);
     actualizarComite(inst, o && o.ahoraServidor);
+    actualizarEquipo(inst);          // la pestaña Equipo, si se ve y ha cambiado alguien
     marcarDesborde();
     const avisos = $('avisos');
     // El recorte de tamaño va delante: con el fondo abierto es lo que más limita
@@ -338,11 +449,35 @@
     if (!Number.isFinite(cab.proximoComite) || !Number.isFinite(ahoraServidor)) { pc.textContent = 'Comité —'; return; }
     const resta = cab.proximoComite - ahoraServidor;
     const reunido = (inst.agentes || []).some(a => a.sala === 'comite');
+    // Los jefes también van a la sala de comité en las reuniones de las 9:00 y
+    // las 22:15 (§6.9): la píldora dice cuál de las dos es.
+    const reunion = reunido ? reunionEnCurso(est.mensajes.length ? est.mensajes : (inst.mensajes || [])) : null;
     // Modo web: convocado desde el panel, se celebra en el latido siguiente.
     const pedido = !reunido && cab.comitePedido === true;
-    pc.textContent = reunido ? 'Comité reunido' : pedido ? 'Comité convocado' : resta > 0 ? `Comité en ${cifras.cuentaAtras(resta)}` : 'Comité pendiente';
+    pc.textContent = reunion ? reunion.nombre : reunido ? 'Comité reunido' : pedido ? 'Comité convocado' : resta > 0 ? `Comité en ${cifras.cuentaAtras(resta)}` : 'Comité pendiente';
     pc.className = 'pildora ' + (reunido || pedido ? 'ambar' : 'gris');
-    pc.title = pedido ? 'Convocado: empieza en el próximo latido.' : `Modo del comité: ${cifras.modoComite(cab.modoComite)}`;
+    pc.title = reunion ? `Reunión informativa: cuenta cómo va el fondo y no cambia nada. Modo del comité: ${cifras.modoComite(cab.modoComite)}`
+      : pedido ? 'Convocado: empieza en el próximo latido.' : `Modo del comité: ${cifras.modoComite(cab.modoComite)}`;
+  }
+
+  // ¿Los jefes están en la sala por una reunión informativa y no por un
+  // comité? Lo dice lo último que se abrió en la sala: la apertura de una
+  // reunión (canal 'direccion', tipo 'reunion', fase 'apertura') o la de un
+  // comité (canal 'comite', tipo 'comite'). En el modo latido los jefes se
+  // quedan unos minutos en la sala tras acabar: sigue siendo esa reunión.
+  // Devuelve { reunion: 'manana'|'cierre', nombre } o null.
+  const NOMBRE_REUNION = { manana: 'Reunión de la mañana', cierre: 'Reunión de cierre' };
+  function reunionEnCurso(mensajes) {
+    for (let k = (mensajes || []).length - 1; k >= 0; k--) {
+      const m = mensajes[k];
+      if (!m) continue;
+      if (m.canal === 'comite' && m.tipo === 'comite') return null;
+      if (m.canal === 'direccion' && m.tipo === 'reunion' && m.datos && m.datos.fase === 'apertura') {
+        const tipo = m.datos.reunion === 'cierre' ? 'cierre' : 'manana';
+        return { reunion: tipo, nombre: NOMBRE_REUNION[tipo] };
+      }
+    }
+    return null;
   }
 
   // ---------- feed ----------
@@ -372,25 +507,63 @@
     return inst && Number.isFinite(inst.ahora) ? inst.ahora : null;
   }
 
-  function nodoMensaje(m) {
+  // Un mensaje del feed: cara, nombre, departamento (con su color), rol, a
+  // quién va y el texto. `o.respuestas`: las respuestas de su conversación,
+  // que van sangradas debajo (más pequeñas). `o.raiz`: si este mensaje es una
+  // respuesta, el que abre la conversación.
+  function nodoMensaje(m, o) {
+    const opc = o || {};
+    const esRespuesta = Boolean(opc.raiz);
+    const agentes = agentesPorId();
+    const ag = agentes.get(m.de) || null;
     const humano = !m.departamento;
+    const delHumano = m.de === 'humano' || (humano && m.canal === 'megafono');
     const megafono = m.canal === 'megafono';
-    // La «M» ámbar es la marca del Megáfono; los avisos del sistema van en gris.
-    const color = !humano ? colorDep(m.departamento) : megafono ? '#f59e0b' : '#64748b';
-    const letra = !humano ? iniciales(m.deNombre) : megafono ? 'M' : 'S';
+    const tam = esRespuesta ? 24 : 40;
+    // Cara: la del agente (la misma que su muñeco); el humano, con el icono
+    // del Megáfono; los avisos del sistema, con el cubo gris.
+    const quien = delHumano ? 'humano' : humano ? 'sistema' : (ag || { id: m.de, nombre: m.deNombre, departamento: m.departamento });
+    const nombre = delHumano ? 'Megáfono' : humano ? (m.deNombre || 'Sistema') : (m.deNombre || (ag && ag.nombre) || m.de);
+    const laCara = cara(quien, tam);
+    // Solo un agente de la plantilla tiene ficha: su cara es el botón que la abre.
+    const avatar = ag
+      ? el('button', { class: 'cara-boton', type: 'button', 'aria-label': `Ficha de ${ag.nombre}`, title: `Ficha de ${ag.nombre}`,
+        'data-msg': m.id, onclick: () => abrirFichaAgente(ag.id) }, laCara)
+      : laCara;
     const destacado = TIPO_DESTACADO[m.tipo];
-    const n = el('article', { class: 'msg' + (megafono ? ' megafono' : '') + (m.tipo === 'veto' || m.tipo === 'alerta' ? ' alerta' : ''),
+    const para = caras.textoPara(m, agentes, est.porId, opc.raiz || null);
+    // El rol, solo en el mensaje que abre (en una respuesta ya se sabe quién es).
+    const rol = !humano && !esRespuesta && ag && ag.rol ? ag.rol : null;
+    const n = el('article', { class: 'msg' + (esRespuesta ? ' respuesta' : '') + (megafono ? ' megafono' : '') + (m.tipo === 'veto' || m.tipo === 'alerta' ? ' alerta' : ''),
       'data-id': m.id },
-    el('div', { class: 'avatar', style: `background:${color}`, 'aria-hidden': 'true', text: letra }),
+    avatar,
     el('div', { class: 'cuerpo' },
       el('div', { class: 'cab' },
-        el('b', { text: humano ? (megafono ? 'Megáfono' : (m.deNombre || 'Sistema')) : (m.deNombre || m.de) }),
-        humano ? null : el('span', { class: 'dep', text: nombreDep(m.departamento) }),
-        destacado && !(humano && m.tipo === 'megafono') ? el('span', { class: 'tipo tipo-' + m.tipo, text: destacado }) : null,
+        el('b', { text: nombre }),
+        delHumano ? el('span', { class: 'dep-etq humano', text: 'Humano' }) : humano ? null : etiquetaDep(m.departamento),
+        destacado && !(delHumano && m.tipo === 'megafono') ? el('span', { class: 'tipo tipo-' + m.tipo, text: destacado }) : null,
         el('time', { text: cifras.hora(m.t), datetime: Number.isFinite(m.t) ? new Date(m.t).toISOString() : null })),
-      el('p', { text: m.texto })));
+      rol || para ? el('div', { class: 'rol' }, rol ? el('span', { class: 'rol-texto', text: rol }) : null,
+        para ? el('span', { class: 'para', text: para }) : null) : null,
+      el('p', { text: m.texto }),
+      opc.respuestas && opc.respuestas.length
+        ? el('div', { class: 'respuestas', role: 'group', 'aria-label': `Respuestas a ${nombre}` }, opc.respuestas.map(r => nodoMensaje(r, { raiz: m })))
+        : null));
     n.dataset.t = m.t;
     n.dataset.dia = cifras.dia(m.t) || '';
+    return n;
+  }
+
+  // Nodo de una conversación entera (la raíz con sus respuestas). Se ordena y
+  // se separa por días por su ÚLTIMO mensaje: una respuesta nueva la trae abajo.
+  function nodoBloque(b) {
+    const n = nodoMensaje(b.raiz, { respuestas: b.respuestas });
+    n.dataset.clave = b.clave;
+    if (b.respuestas.length) {
+      n.dataset.t = b.ultimoT;
+      n.dataset.dia = cifras.dia(b.ultimoT) || '';
+      n.classList.add('conversacion');
+    }
     return n;
   }
 
@@ -416,6 +589,21 @@
     if (primero && primero.classList.contains('msg')) feed.insertBefore(separadorDia(Number(primero.dataset.t)), primero);
   }
 
+  // ¿Dónde va un mensaje nuevo? 'suelto': al final del feed, como siempre;
+  // un nodo: es una respuesta a la conversación que ya está abajo del todo y
+  // va dentro de ella; 'repintar': su conversación está más arriba (o llegó
+  // una respuesta antes que su mensaje), y se rehace el feed para subirla.
+  function destinoDe(m, feed) {
+    const clave = caras.claveHilo(m, est.porId);
+    if (clave === String(m.id)) {
+      const tieneRespuestas = est.mensajes.some(x => x !== m && (x.respondeA === m.id || String(x.hilo) === String(m.id)));
+      return tieneRespuestas ? 'repintar' : 'suelto';
+    }
+    const ultimo = feed.lastElementChild;
+    if (ultimo && ultimo.classList.contains('msg') && ultimo.dataset.clave === clave && ultimo.dataset.dia === (cifras.dia(m.t) || '')) return ultimo;
+    return 'repintar';
+  }
+
   // Añade mensajes nuevos (sin repetir: se quitan los duplicados por id, también
   // los que vuelven a llegar con la instantánea o al reconectar). Devuelve los nuevos.
   function anadirMensajes(lista) {
@@ -424,29 +612,49 @@
       if (!m || !m.id || est.vistos.has(m.id)) continue;
       est.vistos.add(m.id);
       est.mensajes.push(m);
+      est.porId.set(m.id, m);
       nuevos.push(m);
     }
     if (!nuevos.length) return nuevos;
     est.mensajes.sort((a, b) => a.t - b.t);
     if (est.mensajes.length > MAX_MEMORIA) {
-      for (const m of est.mensajes.splice(0, est.mensajes.length - MAX_MEMORIA)) est.vistos.delete(m.id);
+      for (const m of est.mensajes.splice(0, est.mensajes.length - MAX_MEMORIA)) { est.vistos.delete(m.id); est.porId.delete(m.id); }
     }
     const feed = $('feed');
     const abajo = pegadoAbajo();
     const ultimo = feed.lastElementChild;
     const ultimoT = ultimo && ultimo.classList.contains('msg') ? Number(ultimo.dataset.t) : -Infinity;
     const enOrden = nuevos.every(m => m.t >= ultimoT);
-    if (!enOrden || nuevos.length > 60 || (ultimo && !ultimo.classList.contains('msg') && !ultimo.classList.contains('separador-dia'))) {
+    const destinos = enOrden && nuevos.length <= 60 ? nuevos.map(m => destinoDe(m, feed)) : [];
+    if (!enOrden || nuevos.length > 60 || destinos.includes('repintar')
+      || (ultimo && !ultimo.classList.contains('msg') && !ultimo.classList.contains('separador-dia'))) {
       repintarFeed(abajo);
     } else {
       let dia = ultimoDiaDelFeed(feed);
-      for (const m of nuevos) {
-        if (!pasaFiltro(m)) continue;
-        const n = nodoMensaje(m);
+      nuevos.forEach((m, k) => {
+        const destino = destinos[k];
+        if (destino !== 'suelto') {
+          // Respuesta a la conversación de abajo del todo: dentro de ella, sangrada.
+          const raiz = est.porId.get(destino.dataset.id) || null;
+          let resp = destino.querySelector('.respuestas');
+          if (!resp) {
+            const cuerpo = destino.querySelector('.cuerpo');
+            if (!cuerpo) return;
+            resp = el('div', { class: 'respuestas', role: 'group', 'aria-label': `Respuestas a ${(raiz && raiz.deNombre) || 'este mensaje'}` });
+            cuerpo.appendChild(resp);
+            destino.classList.add('conversacion');
+          }
+          resp.appendChild(nodoMensaje(m, { raiz: raiz || m }));
+          destino.dataset.t = m.t;
+          if (!abajo) est.nuevosSinVer++;
+          return;
+        }
+        if (!pasaFiltro(m)) return;
+        const n = nodoBloque({ clave: String(m.id), raiz: m, respuestas: [], ultimoT: m.t });
         if (n.dataset.dia !== dia) { feed.appendChild(separadorDia(m.t)); dia = n.dataset.dia; }
         feed.appendChild(n);
         if (!abajo) est.nuevosSinVer++;
-      }
+      });
       while (feed.childElementCount > MAX_DOM) feed.removeChild(feed.firstElementChild);
       asegurarSeparadorArriba(feed);
       if (abajo) feed.scrollTop = feed.scrollHeight;
@@ -460,25 +668,118 @@
     return nuevos;
   }
 
+  // El feed entero, por conversaciones (caras.organizarHilos): un mensaje
+  // suelto es una conversación de uno. Con un filtro de departamento, una
+  // conversación sale entera si alguno de sus mensajes es de ese departamento.
   function repintarFeed(bajar) {
     const feed = $('feed');
     feed.textContent = '';
-    const lista = est.mensajes.filter(pasaFiltro).slice(-MAX_DOM);
+    const bloques = caras.organizarHilos(est.mensajes, est.porId)
+      .filter(b => pasaFiltro(b.raiz) || b.respuestas.some(pasaFiltro))
+      .slice(-MAX_DOM);
     const frag = document.createDocumentFragment();
     let dia = null;
-    for (const m of lista) {
-      const n = nodoMensaje(m);
-      if (n.dataset.dia !== dia) { frag.appendChild(separadorDia(m.t)); dia = n.dataset.dia; }
+    for (const b of bloques) {
+      const n = nodoBloque(b);
+      if (n.dataset.dia !== dia) { frag.appendChild(separadorDia(Number(n.dataset.t))); dia = n.dataset.dia; }
       frag.appendChild(n);
     }
     feed.appendChild(frag);
-    if (!lista.length) feed.appendChild(el('p', { class: 'vacio', text: 'Sin mensajes de este departamento todavía.' }));
+    if (!bloques.length) feed.appendChild(el('p', { class: 'vacio', text: 'Sin mensajes de este departamento todavía.' }));
     if (bajar !== false) bajarDelTodo();
+  }
+
+  // Los últimos `n` mensajes de un agente (del más nuevo al más viejo).
+  function ultimosMensajesDe(agenteId, n) {
+    const salida = [];
+    for (let k = est.mensajes.length - 1; k >= 0 && salida.length < n; k--) if (est.mensajes[k].de === agenteId) salida.push(est.mensajes[k]);
+    return salida;
   }
 
   function ultimoMensajeDe(agenteId) {
     for (let k = est.mensajes.length - 1; k >= 0; k--) if (est.mensajes[k].de === agenteId) return est.mensajes[k];
     return null;
+  }
+
+  // ---------- pestaña Equipo ----------
+  // Los agentes por departamento (con su color y una frase de qué hace), con
+  // cara, nombre, rol y qué hace; al pulsar, su ficha. Se rehace cuando cambia
+  // la plantilla, el estado de alguien o lo buscado, y solo si se ve.
+  function firmaEquipo(inst) {
+    const ags = (inst && inst.agentes) || [];
+    return `${est.busqueda}|${est.departamentos.map(d => d.id + d.color).join()}|`
+      + ags.map(a => `${a.id}:${a.nombre}:${a.estado}:${a.rol}:${a.mesaId || ''}`).join(';')
+      + '|' + ((inst && inst.mesas) || []).map(m => `${m.id}:${m.nombre}:${m.estado}`).join(';');
+  }
+
+  function actualizarEquipo(instParam) {
+    const cont = $('equipo');
+    if (!cont) return;
+    const inst = instParam || (est.manejadores.instantanea ? est.manejadores.instantanea() : null);
+    const total = ((inst && inst.agentes) || []).length;
+    const cuenta = $('contador-equipo');
+    if (cuenta) cuenta.textContent = total ? cifras.numero(total) : '';
+    if (est.pestana !== 'equipo') return;
+    const firma = firmaEquipo(inst);
+    if (firma === est.firmaEquipo) return;
+    est.firmaEquipo = firma;
+    pintarEquipo(cont, inst);
+  }
+
+  function pintarEquipo(cont, inst) {
+    // Si el foco estaba en una fila, vuelve a la misma persona después de rehacer.
+    const activo = document.activeElement;
+    const focoEn = activo && cont.contains(activo) ? activo.getAttribute('data-agente') : null;
+    cont.textContent = '';
+    if (!inst || !Array.isArray(inst.agentes) || !inst.agentes.length) {
+      cont.appendChild(el('p', { class: 'vacio', text: 'Todavía no ha llegado la plantilla de la mesa.' }));
+      return;
+    }
+    const grupos = caras.agruparEquipo(inst.agentes, est.departamentos, { busqueda: est.busqueda, mesas: inst.mesas });
+    if (!grupos.length) {
+      cont.appendChild(el('p', { class: 'vacio', text: `Nadie del equipo se llama «${est.busqueda.trim()}».` }));
+      return;
+    }
+    const mesas = new Map((inst.mesas || []).map(m => [m.id, m]));
+    const frag = document.createDocumentFragment();
+    for (const g of grupos) {
+      const titulo = `equipo-dep-${g.id}`;
+      const sec = el('section', { class: 'equipo-dep', 'aria-labelledby': titulo });
+      sec.style.setProperty('--dep', g.color);
+      const cuantos = g.agentes.length === g.total ? cifras.numero(g.total) : `${cifras.numero(g.agentes.length)} de ${cifras.numero(g.total)}`;
+      sec.appendChild(el('header', { class: 'equipo-dep-cab' },
+        el('h3', { id: titulo }, el('span', { class: 'punto', 'aria-hidden': 'true' }), g.nombre,
+          el('span', { class: 'cuantos', text: cuantos })),
+        g.frase ? el('p', { text: g.frase }) : null));
+      const lista = el('ul', { class: 'equipo-lista' });
+      let mesaActual;
+      for (const a of g.agentes) {
+        // En Mesas, un rótulo por mesa: cada operador con sus compañeros.
+        if (g.id === 'mesas' && a.mesaId !== mesaActual) {
+          mesaActual = a.mesaId;
+          const m = mesas.get(a.mesaId);
+          lista.appendChild(el('li', { class: 'equipo-mesa', 'aria-hidden': 'true',
+            text: m ? `${m.nombre || m.id} · ${cifras.estadoMesa(m.estado)}` : (a.mesaId || 'Sin mesa') }));
+        }
+        const estado = a.estado && a.estado !== 'trabajando' ? ESTADO_AGENTE[a.estado] || a.estado : null;
+        // Sin aria-label: el lector lee lo que se ve (nombre, estado, rol y qué hace).
+        const b = el('button', { class: 'equipo-persona', type: 'button', 'data-agente': a.id,
+          onclick: () => abrirFichaAgente(a.id) },
+        cara(a, 40),
+        el('span', { class: 'equipo-texto' },
+          el('span', { class: 'equipo-nombre' }, el('b', { text: a.nombre }), estado ? el('span', { class: 'estado-agente estado-' + a.estado, text: estado }) : null),
+          el('span', { class: 'equipo-rol', text: a.rol || '' }),
+          a.queHace ? el('span', { class: 'equipo-hace', text: a.queHace }) : null));
+        lista.appendChild(el('li', {}, b));
+      }
+      sec.appendChild(lista);
+      frag.appendChild(sec);
+    }
+    cont.appendChild(frag);
+    if (focoEn) {
+      const b = cont.querySelector(`[data-agente="${focoEn}"]`);
+      if (b) { try { b.focus({ preventScroll: true }); } catch (_) { b.focus(); } }
+    }
   }
 
   // ---------- tarjeta de detalle ----------
@@ -546,6 +847,7 @@
     t.textContent = '';
     if (!sel || !inst) return;
     const cerrar = botonCerrar();
+    t.classList.toggle('ficha-agente', sel.tipo === 'agente');
     if (sel.tipo === 'puesto') rellenarPuesto(t, sel, inst, cerrar);
     else if (sel.tipo === 'mesa') rellenarMesa(t, sel, inst, cerrar);
     else rellenarAgente(t, sel, inst, cerrar);
@@ -570,9 +872,12 @@
       el('div', { class: 'tarjeta-sub', text: `${p.simbolo} · ${mesa.familia || ''} ${NOMBRE_MARCO[mesa.marco] || mesa.marco || ''} · ${cifras.estadoMesa(mesa.estado)}` }),
       cerrar));
     if (ag) {
-      t.appendChild(el('div', { class: 'tarjeta-persona' },
-        el('span', { class: 'avatar', style: `background:${colorDep(ag.departamento)}`, text: iniciales(ag.nombre) }),
-        el('div', {}, el('b', { text: ag.nombre }), el('span', { text: `${ag.rol} · ${ESTADO_AGENTE[ag.estado] || ag.estado}` }))));
+      // Quién lleva el puesto: su cara y, al pulsar, su ficha.
+      t.appendChild(el('button', { class: 'tarjeta-persona con-ficha', type: 'button', 'aria-label': `Ficha de ${ag.nombre}: ${ag.rol}`,
+        onclick: () => abrirFichaAgente(ag.id) },
+      cara(ag, 40),
+      el('div', {}, el('b', { text: ag.nombre }), el('span', { text: `${ag.rol} · ${ESTADO_AGENTE[ag.estado] || ag.estado}` })),
+      el('span', { class: 'ir', 'aria-hidden': 'true', text: '›' })));
     }
     for (const b of bloqueos) t.appendChild(el('p', { class: 'bloqueo', text: b.texto }));
     const precioTexto = precio === null || precio === undefined ? '—'
@@ -646,21 +951,70 @@
     if (!ag) { t.appendChild(el('p', { class: 'vacio', text: 'Este agente ya no está en la plantilla.' })); t.appendChild(cerrar); return; }
     const llm = inst.llm || {};
     const modelo = ag.id === 'cio' ? llm.modeloComite : llm.modeloAgentes;
-    t.appendChild(el('header', { class: 'tarjeta-cab' },
-      el('div', { class: 'tarjeta-titulo', id: 'tarjeta-titulo', text: ag.nombre }),
-      el('div', { class: 'tarjeta-sub', text: `${ag.rol} · ${nombreDep(ag.departamento)}` }),
+    const estado = ESTADO_AGENTE[ag.estado] || ag.estado || '—';
+    const sala = NOMBRE_SALA[ag.sala] || ag.sala || '—';
+    // Quién es: la cara grande (la de su muñeco), su nombre, su departamento y su rol.
+    t.appendChild(el('header', { class: 'tarjeta-cab ficha-agente-cab' },
+      cara(ag, 96),
+      el('div', { class: 'ficha-agente-quien' },
+        el('div', { class: 'tarjeta-titulo', id: 'tarjeta-titulo', text: ag.nombre }),
+        el('div', { class: 'ficha-agente-etiquetas' }, etiquetaDep(ag.departamento),
+          el('span', { class: 'estado-agente estado-' + (ag.estado || 'trabajando'), text: estado })),
+        el('div', { class: 'tarjeta-sub', text: ag.rol || '—' })),
       cerrar));
-    t.appendChild(el('div', { class: 'tarjeta-persona' },
-      el('span', { class: 'avatar', style: `background:${colorDep(ag.departamento)}`, text: iniciales(ag.nombre) }),
-      el('div', {}, el('b', { text: ESTADO_AGENTE[ag.estado] || ag.estado || '—' }), el('span', { text: NOMBRE_SALA[ag.sala] || ag.sala || '—' }))));
+    // Qué hace, en llano (el texto técnico va en «Detalle técnico»).
+    if (ag.queHace) t.appendChild(el('div', { class: 'que-hace' }, el('h3', { text: 'Qué hace' }), el('p', { text: ag.queHace })));
+    // Si es operador: su mesa y su posición.
+    const puesto = ag.puestoId ? (inst.puestos || []).find(p => p.id === ag.puestoId) : null;
+    const mesa = ag.mesaId ? (inst.mesas || []).find(m => m.id === ag.mesaId) : null;
+    if (puesto || mesa) t.appendChild(bloqueOperador(puesto, mesa));
     t.appendChild(el('dl', { class: 'tabla' },
-      fila('Rol', ag.rol || '—'),
-      fila('Usa LLM', ag.usaLLM ? (llm.activo ? `Sí · ${modelo || '—'}` : 'Sí, pero el LLM está apagado: plantillas') : 'No: reglas y plantillas'),
-      ag.etiqueta ? fila('Activo', ag.etiqueta) : null,
-      fila('Estado', ESTADO_AGENTE[ag.estado] || ag.estado || '—'),
-      fila('Sala', NOMBRE_SALA[ag.sala] || ag.sala || '—')));
-    t.appendChild(el('div', { class: 'que-decide' }, el('h3', { text: 'Qué decide' }), el('p', { text: ag.queDecide || '—' })));
-    t.appendChild(bloqueUltimo(ultimoMensajeDe(ag.id), inst.ahora));
+      fila('Ahora', `${estado} · ${sala}`),
+      ag.etiqueta && !puesto ? fila('Sigue', ag.etiqueta) : null));
+    t.appendChild(bloqueUltimos(ultimosMensajesDe(ag.id, 5), inst.ahora));
+    // Sus decisiones apuntadas (vista Decisiones filtrada por él o ella).
+    if (est.manejadores.alVerDecisiones) {
+      t.appendChild(el('div', { class: 'lista-puestos' },
+        el('button', { class: 'boton enlace', type: 'button', text: 'Ver sus decisiones', 'aria-label': `Ver las decisiones de ${ag.nombre}`,
+          onclick: () => est.manejadores.alVerDecisiones(ag.id) })));
+    }
+    // Detalle técnico: se queda desplegado aunque la ficha se rehaga con cada dato.
+    const det = el('details', { class: 'detalle-tecnico' },
+      el('summary', { text: 'Detalle técnico' }),
+      el('div', { class: 'que-decide' }, el('h3', { text: 'Qué decide' }), el('p', { text: ag.queDecide || '—' })),
+      el('dl', { class: 'tabla' },
+        fila('Usa LLM', ag.usaLLM ? (llm.activo ? `Sí · ${modelo || '—'}` : 'Sí, pero el LLM está apagado: plantillas') : 'No: reglas y plantillas'),
+        fila('Identificador', ag.id)));
+    if (est.detalleAbierto.has(ag.id)) det.open = true;
+    det.addEventListener('toggle', () => { if (det.open) est.detalleAbierto.add(ag.id); else est.detalleAbierto.delete(ag.id); });
+    t.appendChild(det);
+  }
+
+  // La mesa y la posición de un operador, con las cifras de la instantánea.
+  function bloqueOperador(p, mesa) {
+    const pos = p && p.posicion;
+    return el('div', { class: 'bloque-mesa' },
+      el('h3', { text: 'Su mesa y su posición' }),
+      mesa ? el('p', {}, el('b', { text: mesa.nombre || mesa.id }), ` · ${cifras.estadoMesa(mesa.estado)} · peso ${cifras.pct(mesa.peso, { decimales: 0 })}`) : null,
+      pos
+        ? el('dl', { class: 'tabla' },
+          fila('Posición', `${cifras.cantidad(pos.cantidad)} ${p.etiqueta}`),
+          fila('Nocional', cifras.usd(pos.nocional)),
+          fila('Entrada', cifras.precio(pos.entrada)),
+          fila('Stop', Number.isFinite(pos.stop) ? cifras.precio(pos.stop) : '—'),
+          fila('Abierto', `${cifras.usd(pos.pnlAbierto, { signo: true })} (${cifras.pct(pos.pnlAbiertoPct, { signo: true })})`, cifras.claseSigno(pos.pnlAbierto, 0.005)))
+        : p ? el('p', { class: 'nota-mesa', text: mesa && mesa.estado === 'banquillo' ? 'En el banquillo: sin posición.' : 'Sin posición abierta.' }) : null,
+      p && p.estadoTexto ? el('p', { class: 'estado-texto', text: p.estadoTexto }) : null,
+      el('div', { class: 'lista-puestos' },
+        p ? irA({ tipo: 'puesto', id: p.id }, 'Ver su puesto') : null,
+        mesa ? irA({ tipo: 'mesa', id: mesa.id }, 'Ver la mesa') : null));
+  }
+
+  function bloqueUltimos(lista, ahora) {
+    return el('div', { class: 'ultimo' }, el('h3', { text: 'Últimos mensajes' }),
+      lista.length
+        ? el('ul', { class: 'ultimos' }, lista.map(m => el('li', {}, el('time', { text: cifras.momento(m.t, ahora) + ' · ' }), m.texto)))
+        : el('p', { class: 'vacio', text: 'Todavía no ha dicho nada.' }));
   }
 
   function bloqueUltimo(m, ahora) {
@@ -692,9 +1046,22 @@
     fijarInerte(false);
     t.removeAttribute('role');
     t.removeAttribute('aria-modal');
-    if (est.ultimoFoco && est.ultimoFoco.focus && document.contains(est.ultimoFoco)) {
-      try { est.ultimoFoco.focus({ preventScroll: true }); } catch (_) { /* nada */ }
+    const destino = equivalenteVivo(est.ultimoFoco);
+    if (destino && destino.focus) {
+      try { destino.focus({ preventScroll: true }); } catch (_) { /* nada */ }
     }
+  }
+
+  // Lo que abrió la ficha, o su equivalente si mientras tanto se rehízo (la
+  // fila del equipo de esa persona, o la cara de ese mensaje en el feed).
+  function equivalenteVivo(n) {
+    if (!n) return null;
+    if (document.contains(n)) return n;
+    const agente = n.getAttribute && n.getAttribute('data-agente');
+    const msgId = n.getAttribute && n.getAttribute('data-msg');
+    if (agente && $('equipo')) return $('equipo').querySelector(`[data-agente="${agente}"]`);
+    if (msgId && $('feed')) return $('feed').querySelector(`[data-msg="${msgId}"]`);
+    return null;
   }
 
   // La tarjeta se rehace con cada estado, mensaje o movimiento de un agente.
@@ -706,12 +1073,13 @@
     const activo = document.activeElement;
     const teniaFoco = t.contains(activo);
     let indice = -1;
-    if (teniaFoco) indice = Array.from(t.querySelectorAll('button')).indexOf(activo);
+    // «Detalle técnico» (summary) también recibe el foco: cuenta como un botón más.
+    if (teniaFoco) indice = Array.from(t.querySelectorAll('button, summary')).indexOf(activo);
     const scroll = t.scrollTop;
     rellenarTarjeta(est.tarjeta, inst);
     t.scrollTop = scroll;
     if (teniaFoco) {
-      const botones = t.querySelectorAll('button');
+      const botones = t.querySelectorAll('button, summary');
       const destino = (indice >= 0 && botones[indice]) || t.querySelector('.cerrar');
       if (destino) { try { destino.focus({ preventScroll: true }); } catch (_) { destino.focus(); } }
     }
@@ -1157,5 +1525,6 @@
     iniciar, fijarDepartamentos, actualizarBarra, actualizarComite, marcarDesborde, anadirMensajes, repintarFeed, ultimoMensajeDe,
     mostrarTarjeta, ocultarTarjeta, refrescarTarjeta, conexion, refrescarFranja, datosViejos, textoConexion, tostada, abrirModal, cerrarModal,
     textoDirectiva, nombreMesa, frase, valorCriterio, capitalDe, iniciales, get tarjeta() { return est.tarjeta; }, _est: est,
+    elegirPestana, actualizarEquipo, ultimosMensajesDe, reunionEnCurso, get pestana() { return est.pestana; },
   };
 });

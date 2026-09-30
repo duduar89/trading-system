@@ -45,7 +45,7 @@ function crearBenchmarks({ capital, preciosIniciales, hayAlpaca = false, t = nul
     let pesos = def.pesos;
     if (pesos === 'cripto') {
       // Solo las cripto con precio: una cesta a partes iguales de lo que hay.
-      const conPrecio = universo.CRIPTO.filter(s => precioDe(preciosIniciales, s) !== null);
+      const conPrecio = universo.CESTA_CRIPTO.filter(s => precioDe(preciosIniciales, s) !== null);
       pesos = Object.fromEntries(conPrecio.map(s => [s, 1 / conPrecio.length]));
     }
     const sinPrecio = Object.keys(pesos).filter(s => precioDe(preciosIniciales, s) === null);

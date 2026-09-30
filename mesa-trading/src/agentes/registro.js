@@ -4,35 +4,54 @@
 // cambie de cara a nadie en el parqué. Dentro de una plantilla no se repite
 // ningún nombre de pila.
 
+const universoMod = require('../mercado/universo');
+
+// `queHace` (30-sep-2026): qué hace el departamento, en una frase llana y sin
+// cifras, para la pestaña Equipo del panel (§8).
 const DEPARTAMENTOS = Object.freeze([
-  { id: 'direccion', nombre: 'Dirección', color: '#f5b942', sala: 'direccion' },
-  { id: 'macro', nombre: 'Macro', color: '#8b5cf6', sala: 'macro' },
-  { id: 'analisis', nombre: 'Análisis', color: '#22c55e', sala: 'analisis' },
-  { id: 'mesas', nombre: 'Mesas', color: '#3b82f6', sala: 'parque' },
-  { id: 'riesgos', nombre: 'Riesgos', color: '#ef4444', sala: 'riesgos' },
-  { id: 'operaciones', nombre: 'Operaciones', color: '#f97316', sala: 'riesgos' },
-  { id: 'laboratorio', nombre: 'Laboratorio', color: '#06b6d4', sala: 'laboratorio' },
+  { id: 'direccion', nombre: 'Dirección', color: '#f5b942', sala: 'direccion',
+    queHace: 'Preside el comité: decide si el fondo sigue normal, va con la mitad de tamaño o solo cierra posiciones.' },
+  { id: 'macro', nombre: 'Macro', color: '#8b5cf6', sala: 'macro',
+    queHace: 'Lee el ambiente del mercado en conjunto (apetito, neutral o miedo) y pide prudencia cuando hay miedo.' },
+  { id: 'analisis', nombre: 'Análisis', color: '#22c55e', sala: 'analisis',
+    queHace: 'Un analista por activo: sigue su precio cada hora y escribe una nota para los demás. No compran ni venden.' },
+  { id: 'mesas', nombre: 'Mesas', color: '#3b82f6', sala: 'parque',
+    queHace: 'Los operadores: cada uno aplica la regla de su estrategia a un activo y propone comprar o vender.' },
+  { id: 'riesgos', nombre: 'Riesgos', color: '#ef4444', sala: 'riesgos',
+    queHace: 'Revisa cada orden antes de que salga contra los límites de seguridad: la aprueba, la recorta o la prohíbe.' },
+  { id: 'operaciones', nombre: 'Operaciones', color: '#f97316', sala: 'riesgos',
+    queHace: 'Manda al bróker las órdenes aprobadas y lleva las cuentas del fondo, comparándolas con las del bróker.' },
+  { id: 'laboratorio', nombre: 'Laboratorio', color: '#06b6d4', sala: 'laboratorio',
+    queHace: 'Prueba estrategias nuevas con precios del pasado y repasa por qué se ganó o se perdió en cada operación.' },
 ].map(d => Object.freeze(d)));
 
 const SALAS = Object.freeze(['parque', 'direccion', 'macro', 'analisis', 'laboratorio', 'riesgos', 'comite', 'descanso']);
 
 // Puestos fijos. El género del nombre casa con el del rol del contrato
-// («Presidenta», «Jefa», «Director»…).
+// («Presidenta», «Jefa», «Director»…). `genero` ('f' | 'm') lo usa la cara
+// del panel (barba solo en hombres), igual que el rol de los operadores.
 const FIJOS = Object.freeze([
-  { id: 'cio', nombre: 'Carmen Aguirre', departamento: 'direccion', rol: 'Presidenta del comité', usaLLM: true,
-    queDecide: 'Modo del fondo (NORMAL, DEFENSIVO o SOLO_CERRAR), multiplicadores por mesa de {0; 0,5; 1} y vetos de 24 h. Nunca toca los límites duros.' },
-  { id: 'macro', nombre: 'Tomás Herrera', departamento: 'macro', rol: 'Estratega macro', usaLLM: false,
-    queDecide: 'Régimen RISK-ON, NEUTRAL o RISK-OFF por regla fija (BTC y SPY frente a sus medias, volatilidad). Vota DEFENSIVO en RISK-OFF.' },
-  { id: 'riesgos', nombre: 'Marta Solís', departamento: 'riesgos', rol: 'Jefa de riesgos', usaLLM: false,
-    queDecide: 'Aprueba, recorta o veta cada orden contra los límites duros. Su voto DEFENSIVO en el comité es veto.' },
-  { id: 'ejecutor', nombre: 'Raúl Campos', departamento: 'operaciones', rol: 'Ejecutor', usaLLM: false,
-    queDecide: 'Nada de qué comprar: envía las órdenes aprobadas, espera la ejecución y no repite una orden ya enviada.' },
-  { id: 'controller', nombre: 'Inés Ferrer', departamento: 'operaciones', rol: 'Controller', usaLLM: false,
-    queDecide: 'Nada operativo: patrimonio, P&L, caída, exposición y conciliación con el bróker en cada latido.' },
-  { id: 'laboratorio', nombre: 'Álvaro Medina', departamento: 'laboratorio', rol: 'Director de laboratorio', usaLLM: false,
-    queDecide: 'Qué variantes se prueban (gramática cerrada) y si pasan las puertas del walk-forward para entrar en incubación.' },
-  { id: 'auditor', nombre: 'Julián Prieto', departamento: 'laboratorio', rol: 'Auditor post-mortem', usaLLM: true,
-    queDecide: 'La categoría de cada operación cerrada, de una lista cerrada, y la lección en una frase con cifras comprobadas.' },
+  { id: 'cio', nombre: 'Carmen Aguirre', genero: 'f', departamento: 'direccion', rol: 'Presidenta del comité', usaLLM: true,
+    queDecide: 'Modo del fondo (NORMAL, DEFENSIVO o SOLO_CERRAR), multiplicadores por mesa de {0; 0,5; 1} y vetos de 24 h. Nunca toca los límites duros.',
+    queHace: 'Preside la reunión del comité cada 4 horas: escucha a los jefes y decide si el fondo sigue normal, va con la mitad de tamaño o solo cierra. No puede saltarse los límites de seguridad.' },
+  { id: 'macro', nombre: 'Tomás Herrera', genero: 'm', departamento: 'macro', rol: 'Estratega macro', usaLLM: false,
+    queDecide: 'Régimen RISK-ON, NEUTRAL o RISK-OFF por regla fija (BTC y SPY frente a sus medias, volatilidad; VIXY si hay dato). Vota DEFENSIVO en RISK-OFF.',
+    queHace: 'Mira el mercado en conjunto (si el bitcoin y la bolsa van por encima de su media, si hay nervios) y dice si el ambiente es de apetito, neutral o de miedo. Con miedo, pide prudencia en el comité.' },
+  { id: 'riesgos', nombre: 'Marta Solís', genero: 'f', departamento: 'riesgos', rol: 'Jefa de riesgos', usaLLM: false,
+    queDecide: 'Aprueba, recorta o veta cada orden contra los límites duros. Su voto DEFENSIVO en el comité es veto.',
+    queHace: 'Revisa cada compra antes de que salga: si arriesga demasiado la recorta o la prohíbe. Vigila las pérdidas del día y la caída del fondo, y si se pasan de la raya para todo.' },
+  { id: 'ejecutor', nombre: 'Raúl Campos', genero: 'm', departamento: 'operaciones', rol: 'Ejecutor', usaLLM: false,
+    queDecide: 'Nada de qué comprar: envía las órdenes aprobadas, espera la ejecución y no repite una orden ya enviada.',
+    queHace: 'Manda al bróker las compras y ventas ya aprobadas y comprueba que se han hecho. No elige qué comprar: solo ejecuta, y nunca manda dos veces la misma orden.' },
+  { id: 'controller', nombre: 'Inés Ferrer', genero: 'f', departamento: 'operaciones', rol: 'Controller', usaLLM: false,
+    queDecide: 'Nada operativo: patrimonio, P&L, caída, exposición y conciliación con el bróker en cada latido.',
+    queHace: 'Lleva las cuentas: cuánto vale el fondo, cuánto gana o pierde hoy y cuánto está invertido. Cada minuto comprueba que lo que dicen nuestros libros coincide con lo que tiene el bróker.' },
+  { id: 'laboratorio', nombre: 'Álvaro Medina', genero: 'm', departamento: 'laboratorio', rol: 'Director de laboratorio', usaLLM: false,
+    queDecide: 'Qué variantes se prueban (gramática cerrada) y si pasan las puertas del walk-forward para entrar en incubación.',
+    queHace: 'Inventa cada semana variantes de las estrategias y las prueba con años de precios pasados, por tramos que no ha visto al diseñarlas. Solo aprueba las que pasan seis exámenes; las aprobadas empiezan en prueba con poco dinero.' },
+  { id: 'auditor', nombre: 'Julián Prieto', genero: 'm', departamento: 'laboratorio', rol: 'Auditor post-mortem', usaLLM: true,
+    queDecide: 'La categoría de cada operación cerrada, de una lista cerrada, y la lección en una frase con cifras comprobadas.',
+    queHace: 'Repasa cada noche las operaciones cerradas: por qué se ganó o se perdió (señal falsa, stop demasiado cerca, ir contra el mercado…) y apunta la lección. Sus pistas alimentan al laboratorio.' },
 ]);
 
 // Nombres de pila con su género (para «Operador»/«Operadora»). Ninguno
@@ -100,10 +119,11 @@ function pila(nombreCompleto) { return String(nombreCompleto).split(' ')[0]; }
 function agenteAnalista(activo, usados) {
   const etiqueta = etiquetaDe(activo);
   const id = `analista-${etiqueta}`;
-  const { nombre } = asignarNombre(id, usados);
+  const { nombre, genero } = asignarNombre(id, usados);
   return {
-    id, nombre, departamento: 'analisis', rol: `Analista de ${etiqueta}`, usaLLM: true, sala: 'analisis',
+    id, nombre, genero, departamento: 'analisis', rol: `Analista de ${etiqueta}`, usaLLM: true, sala: 'analisis',
     queDecide: `Nada operativo: nota técnica de ${etiqueta} (sesgo, SMA50, RSI, volatilidad) con cifras del código; el LLM solo la redacta.`,
+    queHace: `Sigue ${etiqueta} cada hora: si va por encima o por debajo de su media, si viene con fuerza y lo nervioso que está. Escribe una nota para los demás; no compra ni vende.`,
     simbolo: simboloDe(activo), etiqueta,
   };
 }
@@ -114,9 +134,10 @@ function agentePuesto(mesa, simbolo, usados) {
   const id = `puesto-${puestoId}`;
   const { nombre, genero } = asignarNombre(id, usados);
   return {
-    id, nombre, departamento: 'mesas', rol: `${genero === 'f' ? 'Operadora' : 'Operador'} de ${mesa.nombre || mesa.id} · ${etiqueta}`,
+    id, nombre, genero, departamento: 'mesas', rol: `${genero === 'f' ? 'Operadora' : 'Operador'} de ${mesa.nombre || mesa.id} · ${etiqueta}`,
     usaLLM: false, sala: 'parque',
     queDecide: `Abrir, mantener o cerrar ${etiqueta} según la regla de ${mesa.familia || mesa.id}; el tamaño lo fija el código y lo aprueba Riesgos.`,
+    queHace: `Aplica la estrategia de ${mesa.nombre || mesa.id} a ${etiqueta}: cuando la regla lo dice, propone comprar o vender. No decide cuánto: eso lo calcula el código y lo revisa Riesgos.`,
     mesaId: mesa.id, simbolo: simboloDe(simbolo), etiqueta, puestoId,
   };
 }
@@ -124,20 +145,42 @@ function agentePuesto(mesa, simbolo, usados) {
 // Plantilla completa: fijos, un analista por activo disponible y un operador
 // por puesto (mesa × símbolo). El orden de recorrido es el de la entrada, así
 // que misma entrada → mismos nombres.
+// Los activos de la ampliación del 30-sep-2026 (universo.generacion 2: XRP,
+// LTC, BCH, ADA y DIA) se nombran en una segunda vuelta, después de todos los
+// demás: así su llegada no cambia la cara de nadie que ya estaba. Un activo
+// de solo dato (VIXY) no tiene analista ni puesto.
 function crearPlantilla({ universo = [], mesas = [] } = {}) {
   const usados = new Set(FIJOS.map(a => pila(a.nombre)));
   const agentes = FIJOS.map(a => {
     const dep = DEPARTAMENTOS.find(d => d.id === a.departamento);
     return { ...a, sala: dep.sala };
   });
+  const operables = universo.filter(a => !universoMod.esSoloDato(simboloDe(a)));
   const vistos = new Set();
-  for (const activo of universo) {
-    const e = etiquetaDe(activo);
-    if (!e || vistos.has(e)) continue;
-    vistos.add(e);
-    agentes.push(agenteAnalista(activo, usados));
-  }
-  for (const mesa of mesas) agentes.push(...puestosDeMesa(mesa, { usados }));
+  const nuevo = a => universoMod.generacion(simboloDe(a)) > 1;
+  const analistas = lista => {
+    for (const activo of lista) {
+      const e = etiquetaDe(activo);
+      if (!e || vistos.has(e)) continue;
+      vistos.add(e);
+      agentes.push(agenteAnalista(activo, usados));
+    }
+  };
+  analistas(operables.filter(a => !nuevo(a)));
+  const ids = new Set();
+  const puestos = soloNuevos => {
+    for (const mesa of mesas) {
+      const universoMesa = ((mesa && mesa.universo) || []).filter(s => !universoMod.esSoloDato(simboloDe(s)) && nuevo(s) === soloNuevos);
+      for (const a of puestosDeMesa({ ...mesa, universo: universoMesa }, { usados })) {
+        if (ids.has(a.id)) continue;
+        ids.add(a.id);
+        agentes.push(a);
+      }
+    }
+  };
+  puestos(false);
+  analistas(operables.filter(nuevo));
+  puestos(true);
   return agentes;
 }
 
@@ -148,6 +191,7 @@ function puestosDeMesa(mesa, { plantilla = [], usados = null } = {}) {
   const ids = new Set(plantilla.map(a => a.id));
   const salida = [];
   for (const s of (mesa && mesa.universo) || []) {
+    if (universoMod.esSoloDato(simboloDe(s))) continue;   // VIXY: nadie lo opera
     const id = `puesto-${mesa.id}-${etiquetaDe(s)}`;
     if (ids.has(id)) continue;   // ya contratado: conserva su nombre
     ids.add(id);

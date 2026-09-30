@@ -319,6 +319,7 @@ class AlpacaDatos {
           titular: n.headline || '',
           resumen: n.summary || '',
           fuente: n.source || '',
+          autor: n.author || '',
           t: Date.parse(n.created_at),
           url: n.url || null,
           simbolos: (n.symbols || []).map(s => universo.desdeClave(s)),

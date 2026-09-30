@@ -5,8 +5,16 @@
 //   BTC SMA50 > SMA200 .................... +1, si no −1
 //   Volatilidad 30 d de BTC anualizada > 100 % ... −1 (si no, 0)
 //   SPY cierre > SMA200 (si hay datos) .... +1, si no −1
+//   VIXY cierre > SMA50 de VIXY (si hay datos) ... −1 (si no, 0)
 //
 //   puntos ≥ 2 → RISK-ON · puntos ≤ −2 → RISK-OFF · si no, NEUTRAL
+//
+// VIXY (30-sep-2026) es el termómetro del miedo: un ETF de futuros del VIX a
+// corto plazo que se hunde despacio con el mercado tranquilo y salta con el
+// miedo. Por encima de su media de 50 sesiones = miedo subiendo. Como la
+// volatilidad de BTC, solo RESTA: nunca empuja a RISK-ON, solo hacia la
+// prudencia. Solo cuenta con dato (claves de Alpaca, feed IEX); sin claves no
+// hay VIXY y el régimen es exactamente el de antes.
 //
 // Un componente sin datos suficientes (menos de 200 velas) suma 0 y se dice
 // en el detalle: con poca historia el régimen tiende a NEUTRAL, que es lo
@@ -18,6 +26,7 @@ const { DIA } = require('../util/reloj');
 const formato = require('../util/formato');
 
 const UMBRAL_VOL = 1.0;     // 100 % anual
+const MEDIA_VIXY = 50;      // sesiones
 const PERIODOS_CRIPTO = 365;
 
 // Series precalculadas por array de velas: regimenEnFecha se llama en cada vela
@@ -81,7 +90,18 @@ function ultimoCerrado(velas, t) {
   return res;
 }
 
-function evaluar(btcDiario, iBtc, spyDiario, iSpy) {
+// SMA50 de VIXY, memorizada por array (como series()).
+const cacheVixy = new WeakMap();
+function sma50Vixy(velas) {
+  const g = cacheVixy.get(velas);
+  const ultimaT = velas.length ? velas[velas.length - 1].t : null;
+  if (g && g.largo === velas.length && g.ultimaT === ultimaT) return g.sma;
+  const m = sma(velas.map(v => v.c), MEDIA_VIXY);
+  cacheVixy.set(velas, { largo: velas.length, ultimaT, sma: m });
+  return m;
+}
+
+function evaluar(btcDiario, iBtc, spyDiario, iSpy, vixyDiario = null, iVixy = -1) {
   const componentes = [];
   const partes = [];
   let puntos = 0;
@@ -137,6 +157,23 @@ function evaluar(btcDiario, iBtc, spyDiario, iSpy) {
     partes.push('SPY sin datos (0)');
   }
 
+  // VIXY: solo si llega la serie (con claves). Sin ella, ni componente ni texto:
+  // el régimen sin claves es exactamente el de antes.
+  if (Array.isArray(vixyDiario) && vixyDiario.length) {
+    const m = iVixy >= 0 ? sma50Vixy(vixyDiario)[iVixy] : null;
+    if (m !== null && m !== undefined) {
+      const cV = vixyDiario[iVixy].c;
+      const miedo = cV > m;
+      const p = miedo ? -1 : 0;
+      puntos += p;
+      componentes.push({ nombre: 'vixy_sobre_sma50', valor: cV, referencia: m, puntos: p });
+      partes.push(`VIXY ${formato.precio(cV)} ${miedo ? '> SMA50 (miedo subiendo, −1)' : '≤ SMA50 (0)'}`);
+    } else {
+      componentes.push({ nombre: 'vixy_sobre_sma50', valor: null, referencia: null, puntos: 0 });
+      partes.push('VIXY sin 50 velas (0)');
+    }
+  }
+
   const valor = puntos >= 2 ? 'RISK-ON' : puntos <= -2 ? 'RISK-OFF' : 'NEUTRAL';
   const signo = puntos > 0 ? `+${puntos}` : String(puntos).replace('-', '−');
   return {
@@ -150,10 +187,11 @@ function evaluar(btcDiario, iBtc, spyDiario, iSpy) {
 
 // Régimen con la ÚLTIMA vela de cada serie (se asume que ya están cerradas,
 // como las entrega la fuente de datos).
-function calcularRegimen({ btcDiario, spyDiario } = {}) {
+function calcularRegimen({ btcDiario, spyDiario, vixyDiario } = {}) {
   const btc = Array.isArray(btcDiario) ? btcDiario : [];
   const spy = Array.isArray(spyDiario) ? spyDiario : [];
-  return evaluar(btc, btc.length - 1, spy, spy.length - 1);
+  const vixy = Array.isArray(vixyDiario) && vixyDiario.length ? vixyDiario : null;
+  return evaluar(btc, btc.length - 1, spy, spy.length - 1, vixy, vixy ? vixy.length - 1 : -1);
 }
 
 // Régimen tal y como se habría visto en el instante t: solo velas diarias
@@ -163,23 +201,31 @@ function calcularRegimen({ btcDiario, spyDiario } = {}) {
 // Se memoriza por par de índices: el laboratorio lo pide en cada vela de cada
 // combinación y el texto con cifras (Intl) es lo caro.
 const SIN_SPY = [];
-function regimenEnFecha(btcDiario, spyDiario, t) {
+function regimenEnFecha(btcDiario, spyDiario, t, vixyDiario = null) {
   const btc = Array.isArray(btcDiario) ? btcDiario : [];
   const spy = Array.isArray(spyDiario) && spyDiario.length ? spyDiario : SIN_SPY;
+  const vixy = Array.isArray(vixyDiario) && vixyDiario.length ? vixyDiario : null;
   const iBtc = ultimoCerrado(btc, t);
   const iSpy = ultimoCerrado(spy, t);
+  const iVixy = vixy ? ultimoCerrado(vixy, t) : -1;
   const sb = btc.length ? series(btc, true) : null;
-  if (!sb) return evaluar(btc, iBtc, spy, iSpy);
+  if (!sb) return evaluar(btc, iBtc, spy, iSpy, vixy, iVixy);
   if (!sb.memo) sb.memo = new WeakMap();
   let porSpy = sb.memo.get(spy);
   if (!porSpy || porSpy.largo !== spy.length) {
-    porSpy = { largo: spy.length, mapa: new Map() };
+    porSpy = { largo: spy.length, mapa: new Map(), porVixy: new WeakMap() };
     sb.memo.set(spy, porSpy);
   }
-  const clave = iBtc * 1e6 + (iSpy + 1);
-  let r = porSpy.mapa.get(clave);
-  if (!r) { r = evaluar(btc, iBtc, spy, iSpy); porSpy.mapa.set(clave, r); }
+  let mapa = porSpy.mapa;
+  if (vixy) {
+    let pv = porSpy.porVixy.get(vixy);
+    if (!pv || pv.largo !== vixy.length) { pv = { largo: vixy.length, mapa: new Map() }; porSpy.porVixy.set(vixy, pv); }
+    mapa = pv.mapa;
+  }
+  const clave = (iBtc * 1e6 + (iSpy + 1)) * 1e5 + (iVixy + 1);
+  let r = mapa.get(clave);
+  if (!r) { r = evaluar(btc, iBtc, spy, iSpy, vixy, iVixy); mapa.set(clave, r); }
   return r;
 }
 
-module.exports = { calcularRegimen, regimenEnFecha, cierreVelaDiaria, UMBRAL_VOL };
+module.exports = { calcularRegimen, regimenEnFecha, cierreVelaDiaria, UMBRAL_VOL, MEDIA_VIXY };

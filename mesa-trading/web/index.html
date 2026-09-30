@@ -19,6 +19,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Mesa">
   <link rel="stylesheet" href="css/estilo.css">
+  <link rel="stylesheet" href="css/vistas.css">
 </head>
 <body>
   <div class="app" id="app">
@@ -45,15 +46,25 @@
       </div>
     </header>
 
-    <aside class="lateral" id="lateral" aria-label="Departamentos">
+    <aside class="lateral" id="lateral" aria-label="Mensajes y equipo">
       <div class="lateral-cab">
-        <button class="asa" id="asa" type="button" aria-expanded="false" aria-controls="lateral" aria-label="Abrir o cerrar el panel de departamentos"><span></span></button>
-        <h2>Departamentos</h2>
-        <span class="contador" id="contador" title="Mensajes recibidos">0</span>
+        <button class="asa" id="asa" type="button" aria-expanded="false" aria-controls="lateral" aria-label="Abrir o cerrar el panel de mensajes y equipo"><span></span></button>
+        <div class="pestanas" id="pestanas-lateral" role="tablist" aria-label="Panel lateral">
+          <button class="pestana activa" type="button" role="tab" id="pestana-mensajes" data-pestana="mensajes" aria-selected="true" aria-controls="vista-mensajes" tabindex="0">Mensajes <span class="contador" id="contador" title="Mensajes recibidos">0</span></button>
+          <button class="pestana" type="button" role="tab" id="pestana-equipo" data-pestana="equipo" aria-selected="false" aria-controls="vista-equipo" tabindex="-1">Equipo <span class="contador" id="contador-equipo" title="Personas en la plantilla"></span></button>
+        </div>
       </div>
-      <div class="chips" id="chips" role="toolbar" aria-label="Filtrar mensajes por departamento"></div>
-      <div class="feed" id="feed" role="log" aria-live="polite" aria-relevant="additions" tabindex="0"></div>
-      <button class="nuevos" id="nuevos" type="button" hidden>Nuevos ↓</button>
+      <div class="vista" id="vista-mensajes" role="tabpanel" aria-labelledby="pestana-mensajes">
+        <div class="chips" id="chips" role="toolbar" aria-label="Filtrar mensajes por departamento"></div>
+        <div class="feed" id="feed" role="log" aria-live="polite" aria-relevant="additions" tabindex="0"></div>
+        <button class="nuevos" id="nuevos" type="button" hidden>Nuevos ↓</button>
+      </div>
+      <div class="vista" id="vista-equipo" role="tabpanel" aria-labelledby="pestana-equipo" hidden>
+        <div class="buscador">
+          <input class="campo" id="buscar-equipo" type="search" placeholder="Buscar por nombre o puesto" aria-label="Buscar a alguien del equipo por nombre o puesto" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="equipo" id="equipo"></div>
+      </div>
     </aside>
 
     <main class="escena" id="escena">
@@ -65,6 +76,7 @@
     </main>
 
     <nav class="botonera" id="botonera" aria-label="Mandos de la mesa">
+      <button class="boton" id="abrir-vistas" type="button" aria-expanded="false" aria-controls="vistas" aria-label="Informes" title="Informes: evolución, estrategias, noticias, decisiones y laboratorio"><svg class="icono" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16"/><path d="M5 15l4-5 4 3 6-7"/></svg><span>Informes</span></button>
       <div class="acciones" id="acciones"></div>
       <div class="camara" id="camara" aria-label="Cámara"></div>
     </nav>
@@ -80,9 +92,12 @@
   <script src="js/mapa.js"></script>
   <script src="js/dibujo.js"></script>
   <script src="js/personajes.js"></script>
+  <script src="js/caras.js"></script>
   <script src="js/paneles.js"></script>
   <script src="js/maqueta.js"></script>
   <script src="js/pwa.js"></script>
+  <script src="js/graficas.js"></script>
+  <script src="js/vistas.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

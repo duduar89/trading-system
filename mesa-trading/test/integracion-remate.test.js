@@ -63,8 +63,8 @@ test('comité: la decisión nombra las mesas por su nombre, no por su id', async
   const r = await comite.celebrar(o, { motivo: 'demanda' });
   assert.equal(r.ok, true);
   const d = mensajes.find(m => m.canal === 'comite' && m.tipo === 'decision');
-  assert.match(d.texto, /Mesas paradas: Ruptura Donchian\./);
-  assert.match(d.texto, /Mesas a la mitad: Reversión RSI\./);
+  assert.match(d.texto, /Paro la mesa Ruptura Donchian\./);
+  assert.match(d.texto, /A la mitad: Reversión RSI\./);
   assert.doesNotMatch(d.texto, /\bruptura\b|\breversion\b/);
   await o.detener();
 });

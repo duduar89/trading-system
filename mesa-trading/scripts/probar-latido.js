@@ -16,8 +16,9 @@
 // hipótesis pendientes (scripts/laboratorio.js), que el latido siguiente
 // incorpora.
 // Se compara: estado.json, broker-simulado.json, operaciones (y sombra),
-// órdenes, incidentes, costes del LLM, mensajes (sin su id, que lleva una
-// marca de sesión al azar) e instantánea (sin su marca «publicada»).
+// órdenes, incidentes, costes del LLM, historial, decisiones, noticias, mensajes (con su id,
+// su respondeA y su hilo: los ids son deterministas desde el 30-sep-2026, §6.2)
+// e instantánea (sin su marca «publicada»).
 // Si algo difiere, se arregla la causa, no esta prueba.
 //
 // Solo para ir deprisa: el mercado sintético (una función pura de la semilla y
@@ -176,14 +177,14 @@ async function correr({ modo, carpeta, dias, semilla, conLaboratorio }) {
 // ---- Comparación de lo escrito en disco ----
 
 const FICHEROS_JSON = ['estado.json', 'broker-simulado.json', 'instantanea.json'];
-const FICHEROS_JSONL = ['operaciones.jsonl', 'operaciones-sombra.jsonl', 'ordenes.jsonl', 'incidentes.jsonl', 'llm-costes.jsonl', 'mensajes.jsonl'];
+// historial y decisiones (src/registros.js) también: las pantallas no pueden depender de cómo corre el motor.
+const FICHEROS_JSONL = ['operaciones.jsonl', 'operaciones-sombra.jsonl', 'ordenes.jsonl', 'incidentes.jsonl', 'llm-costes.jsonl', 'mensajes.jsonl', 'historial.jsonl', 'decisiones.jsonl', 'noticias.jsonl'];
 
 function normalizar(nombre, x) {
   if (nombre === 'instantanea.json' && x) {
     const { publicada: _p, ...resto } = x;
-    return { ...resto, mensajes: (resto.mensajes || []).map(({ id: _id, ...m }) => m) };
+    return resto;
   }
-  if (nombre === 'mensajes.jsonl') return x.map(({ id: _id, ...m }) => m);
   return x;
 }
 
@@ -230,9 +231,15 @@ function recuento(dir) {
     mensajes: mensajes.length,
     comites: mensajes.filter(m => m.canal === 'comite' && m.tipo === 'decision').length,
     comitesDemanda: mensajes.filter(m => m.canal === 'comite' && m.tipo === 'comite' && m.datos && m.datos.motivo === 'demanda').length,
+    // Conversaciones (§6.2): mensajes que contestan a otro, hilos de operación con su lección y reuniones (§6.9).
+    respuestas: mensajes.filter(m => m.respondeA).length,
+    lecciones: mensajes.filter(m => m.tipo === 'leccion' && m.respondeA).length,
+    reuniones: mensajes.filter(m => m.tipo === 'reunion' && m.datos && m.datos.fase === 'apertura').length,
     operaciones: leerJSONL(path.join(dir, 'operaciones.jsonl')).length,
     ordenes: leerJSONL(path.join(dir, 'ordenes.jsonl')).length,
     hipotesis: ((estado.laboratorio || {}).hipotesis || []).map(h => h.estado),
+    historial: leerJSONL(path.join(dir, 'historial.jsonl')).length,
+    decisiones: leerJSONL(path.join(dir, 'decisiones.jsonl')).length,
     nivel: estado.fondo && estado.fondo.nivel,
   };
 }
@@ -298,12 +305,20 @@ async function main() {
   const caso = (ok, texto) => { casos.push(ok); console.log(`${ok ? 'OK   ' : 'FALLO'} ${texto}`); };
   const d = r.diferencias;
   caso(!r.mercado.length, `el mercado compartido da los mismos precios que uno aparte${r.mercado.length ? `: ${r.mercado[0]}` : ''}`);
-  caso(!d.length, `${dias} días: continuo = latido a latido en ${['estado.json', 'broker-simulado.json', 'instantanea.json', 'operaciones', 'órdenes', 'incidentes', 'costes', 'mensajes'].join(', ')}${d.length ? `\n        ${d.slice(0, 5).map(x => `${x.fichero} ${x.ruta}: ${JSON.stringify(x.a)?.slice(0, 160)} ≠ ${JSON.stringify(x.b)?.slice(0, 160)}`).join('\n        ')}` : ''}`);
+  caso(!d.length, `${dias} días: continuo = latido a latido en ${['estado.json', 'broker-simulado.json', 'instantanea.json', 'operaciones', 'órdenes', 'incidentes', 'costes', 'mensajes', 'historial', 'decisiones', 'noticias'].join(', ')}${d.length ? `\n        ${d.slice(0, 5).map(x => `${x.fichero} ${x.ruta}: ${JSON.stringify(x.a)?.slice(0, 160)} ≠ ${JSON.stringify(x.b)?.slice(0, 160)}`).join('\n        ')}` : ''}`);
   caso(!r.respuestasDistintas, `los comandos responden lo mismo (${r.respuestas.length}: ${[...new Set(r.respuestas.map(x => x.nombre))].join(', ')})`);
   caso(r.continuo.operaciones > 0 && r.continuo.operaciones === r.latido.operaciones, `operaciones: ${r.continuo.operaciones} y ${r.latido.operaciones}`);
   caso(r.continuo.comites >= Math.floor(dias * 6) && r.continuo.comites === r.latido.comites, `comités: ${r.continuo.comites} y ${r.latido.comites} (a demanda: ${r.latido.comitesDemanda})`);
   caso(r.latido.comitesDemanda >= 1, 'el comité convocado desde el panel se celebra en el latido siguiente');
   caso(r.continuo.mensajes === r.latido.mensajes, `mensajes: ${r.continuo.mensajes} y ${r.latido.mensajes}`);
+  // Las 9:00 y las 22:15 de Madrid caen una vez al día cada una; y los hilos
+  // (quién contesta a quién) salen iguales, ids incluidos.
+  caso(r.latido.reuniones >= 2 * dias - 2 && r.continuo.reuniones === r.latido.reuniones && r.latido.respuestas > 0 && r.continuo.respuestas === r.latido.respuestas,
+    `reuniones: ${r.continuo.reuniones} y ${r.latido.reuniones}; mensajes que contestan a otro: ${r.continuo.respuestas} y ${r.latido.respuestas} (lecciones en su hilo: ${r.latido.lecciones})`);
+  // Una línea de historial por hora (más los sucesos) y alguna decisión: si
+  // no, «iguales» no diría nada (dos ficheros vacíos también lo son).
+  caso(r.latido.historial >= dias * 24 && r.continuo.historial === r.latido.historial && r.latido.decisiones > 0 && r.continuo.decisiones === r.latido.decisiones,
+    `historial: ${r.continuo.historial} y ${r.latido.historial} líneas; decisiones: ${r.continuo.decisiones} y ${r.latido.decisiones}`);
   if (!args['sin-laboratorio']) caso(r.latido.laboratorios > 0 && r.latido.incorporados > 0 && r.latido.incorporados === r.continuo.incorporados, `laboratorio fuera de banda: ${r.latido.laboratorios} resultados, ${r.latido.incorporados} hipótesis incorporadas (${r.latido.hipotesis.join(', ')})`);
   caso(!r.cerrojos.length && !r.resultadoLabSinBorrar, 'al acabar no queda ningún cerrojo ni resultado del laboratorio sin incorporar');
   console.log(`Continuo ${r.continuo.segundos.toFixed(1)} s, latido a latido ${r.latido.segundos.toFixed(1)} s (${r.latido.pasos} latidos, ${r.latido.comandos} comandos). Nivel final ${r.latido.nivel}.`);

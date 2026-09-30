@@ -5,6 +5,7 @@
 const { volatilidad, percentilMovil } = require('../mercado/indicadores');
 const { asegurarFiltros, bloqueo, valorRegimen, valorNumero } = require('./filtros');
 const { DIA } = require('../util/reloj');
+const formato = require('../util/formato');
 
 const MARCOS = Object.freeze({ '1Hour': 3_600_000, '4Hour': 14_400_000, '1Day': 86_400_000 });
 const TEXTO_MARCO = Object.freeze({ '1Hour': '1H', '4Hour': '4H', '1Day': '1D' });
@@ -143,6 +144,38 @@ function textoBloqueo(filtro, contexto, prep, simbolo, i) {
   return `bloqueado por filtro ${filtro.id}`;
 }
 
+// ---------- Textos de la espera y de la señal, en llano (§4.3, 30-sep-2026) ----------
+// Los dice el operador en el chat y en la tarjeta de su puesto: primera
+// persona, sin siglas sueltas y con las MISMAS cifras que calculó la regla.
+// `motivo` sigue siendo el técnico (va a la propuesta y a decisiones.jsonl).
+
+// Un precio con su moneda, como las plantillas: «3.493 $».
+function px(x) { return `${formato.precio(x)} $`; }
+
+// «n días» en las diarias; «n velas de 4 horas» o «n horas» en las demás.
+function tramoLlano(n, marco) {
+  if (marco === '1Day') return `${n} ${n === 1 ? 'día' : 'días'}`;
+  if (marco === '1Hour') return `${n} ${n === 1 ? 'hora' : 'horas'}`;
+  return `${n} ${n === 1 ? 'vela' : 'velas'} de ${marco === '4Hour' ? '4 horas' : marco}`;
+}
+
+function calentandoLlano(et, faltan, marco) {
+  return `Aún no decido en ${et}: me faltan ${tramoLlano(faltan, marco)} de historia para calcular mis medias.`;
+}
+
+// Por qué un filtro de la mesa no deja comprar, con su cifra.
+function bloqueoLlano(filtro, contexto, prep, simbolo, i) {
+  if (!filtro) return '';
+  if (filtro.id === 'regimen-no-riskoff') return `esta mesa no compra con el mercado en modo miedo (Macro dice ${valorRegimen(contexto.regimen)})`;
+  if (filtro.id === 'fg-max') return `el índice de miedo y codicia está en ${valorNumero(contexto.fg)} de 100 y esta mesa no compra por encima de ${filtro.parametro}`;
+  if (filtro.id === 'fg-min') return `el índice de miedo y codicia está en ${valorNumero(contexto.fg)} de 100 y esta mesa no compra por debajo de ${filtro.parametro}`;
+  if (filtro.id === 'vol-max') {
+    const q = volPercentil(prep, simbolo, i);
+    return `se mueve más de lo normal (su volatilidad está en el percentil ${Math.round(q)} de su último año; esta mesa no compra por encima del ${filtro.parametro})`;
+  }
+  return `lo impide el filtro ${filtro.id} de esta mesa`;
+}
+
 function senal(accion, { peso = 0, stop = null, objetivoPrecio = null, motivo = '', estado = '' } = {}) {
   return { accion, peso, stop, objetivoPrecio, motivo, estado };
 }
@@ -154,8 +187,48 @@ function indicesPorT(velas) {
   return m;
 }
 
+// ---------- Explicaciones en lenguaje llano (explicar de cada familia) ----------
+// Para quien no sabe de bolsa: sin jerga, o con la jerga explicada entre
+// paréntesis. Las cifras salen de los parámetros de la mesa, nunca de un LLM.
+
+const numeroLlano = x => String(x).replace('.', ',');
+
+function listaLlana(etiquetas) {
+  const l = etiquetas.filter(Boolean);
+  if (l.length <= 1) return l.join('');
+  return `${l.slice(0, -1).join(', ')} y ${l[l.length - 1]}`;
+}
+
+// «qué vigila»: los activos de la mesa o, sin universo, una frase genérica.
+function activosLlano(universo, porDefecto = 'cada activo de la mesa') {
+  const u = (universo || []).map(etiqueta);
+  return u.length ? listaLlana(u) : porDefecto;
+}
+
+// Lo que añaden los filtros de la mesa (gramática cerrada de filtros.js).
+function explicarFiltros(filtros) {
+  const frases = [];
+  for (const f of filtros || []) {
+    const p = f.parametro ?? (f.parametros && (f.parametros.umbral ?? f.parametros.percentil));
+    if (f.id === 'regimen-no-riskoff') frases.push('no compra nada cuando Macro dice que el mercado está en modo miedo (RISK-OFF)');
+    else if (f.id === 'fg-max') frases.push(`no compra si el índice de miedo y codicia (0 = pánico, 100 = euforia) pasa de ${p}`);
+    else if (f.id === 'fg-min') frases.push(`no compra si el índice de miedo y codicia (0 = pánico, 100 = euforia) baja de ${p}`);
+    else if (f.id === 'vol-max') frases.push(`no compra si el activo se mueve más de lo normal (volatilidad de 30 días por encima de su percentil ${p} histórico)`);
+  }
+  return frases.length ? `Además, ${listaLlana(frases)}.` : null;
+}
+
+// Riesgo común a todas: el stop no existe en el bróker (cripto) y el tamaño lo
+// fija el código con el límite de riesgo por operación.
+function riesgoComun(limites) {
+  const r = limites && Number.isFinite(limites.riesgoPorOperacion) ? limites.riesgoPorOperacion : null;
+  const tope = r !== null ? ` Cada compra se dimensiona para perder como mucho el ${numeroLlano(Math.round(r * 1000) / 10)} % del fondo si salta el stop.` : '';
+  return `El stop lo vigila la mesa en cada latido, no el bróker: con la mesa parada no hay stop.${tope}`;
+}
+
 module.exports = {
+  numeroLlano, listaLlana, activosLlano, explicarFiltros, riesgoComun,
   MARCOS, etiqueta, textoMarco, esCripto, periodosAnio, combinaciones, numeroCombinaciones,
   igual, siguienteMayor, siguienteMenor, DOMINIO_ATR_STOP, volPercentil, velasFiltroVol, velasPorDias,
-  filtroQueBloquea, textoBloqueo, senal, indicesPorT, umbralHueco, reanudaciones, ultimaReanudacion, velasMemoria,
+  filtroQueBloquea, textoBloqueo, senal, px, tramoLlano, calentandoLlano, bloqueoLlano, indicesPorT, umbralHueco, reanudaciones, ultimaReanudacion, velasMemoria,
 };

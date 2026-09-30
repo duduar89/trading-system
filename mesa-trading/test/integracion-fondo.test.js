@@ -210,14 +210,14 @@ test('informe diario: en sintético no se dice un gasto de LLM (sería el del d�
   const { orquestador: o } = await crearOrquestador({ pasos: 1 });
   const mensajes = oir(o);
   operaciones.cierreDiario(o);
-  assert.doesNotMatch(mensajes.find(m => m.tipo === 'informe').texto, /LLM/);
+  assert.doesNotMatch(mensajes.find(m => m.tipo === 'informe').texto, /Gasto en IA|LLM/);
   const tipo = o.reloj.tipo;
   const llm = o.llm;
   const pedidos = [];
   o.reloj.tipo = 'real';
   o.llm = { ...llm, gastoHoy: () => 0.044, gastoEntre: (desde, hasta) => { pedidos.push([desde, hasta]); return 0.22; } };
   try { operaciones.cierreDiario(o); } finally { o.reloj.tipo = tipo; o.llm = llm; }
-  assert.match(mensajes.filter(m => m.tipo === 'informe').pop().texto, /LLM 0,22 \$/);
+  assert.match(mensajes.filter(m => m.tipo === 'informe').pop().texto, /Gasto en IA: 0,22 \$/);
   assert.equal(pedidos.length, 1);
 });
 
@@ -270,19 +270,19 @@ test('capital sin asignar: la instantánea lo da en la cabecera y lo avisa con e
   assert.match(o.instantanea().avisos[0], /^Fondo en pausa/, 'lo que bloquea va delante');
 });
 
-test('la tarjeta del puesto: con posición, el texto va con las cifras de ahora; tras cerrar, dice el cierre (no «Largo en…»)', async () => {
+test('la tarjeta del puesto: con posición, el texto va con las cifras de ahora; tras cerrar, dice el cierre (no «Tengo…»)', async () => {
   const { orquestador: o, reloj } = await crearOrquestador({ pasos: 1 });
   await comprar(o, 'tendencia-ETH', 'tendencia', 'ETH/USD', 3000);
   await o.refrescarCartera();
-  o.estado.puestos['tendencia-ETH'] = { estadoTexto: 'Largo en ETH: 1 a 3.000, stop 2.900, +9,99 %.', ultimaSenal: null, chispa: [] };
+  o.estado.puestos['tendencia-ETH'] = { estadoTexto: 'Tengo 1 ETH comprados a 3.000 $; voy +9,99 %. Si cae a 2.900 $, vendo (stop).', ultimaSenal: null, chispa: [] };
   const vp = o.vivo.valoracion.porPuesto['tendencia-ETH'];
   const t1 = o.instantanea().puestos.find(p => p.id === 'tendencia-ETH').estadoTexto;
-  assert.match(t1, /^Largo en ETH/);
+  assert.match(t1, /^Tengo 0,\d+ ETH comprados/);
   assert.ok(t1.includes(f.pct(vp.pnlAbiertoPct, { signo: true })), t1);
   reloj.avanzar(PASO);
   await mesasDep.proponerCierre(o, { mesaId: 'tendencia', simbolo: 'ETH/USD', tipo: 'cierre', motivo: 'señal', accion: 'cerrar', velaT: reloj.ahora() });
   const t2 = o.instantanea().puestos.find(p => p.id === 'tendencia-ETH').estadoTexto;
-  assert.match(t2, /^Cerrada ETH/);
+  assert.match(t2, /^He cerrado ETH/);
 });
 
 test('ordenador apagado: las velas de 4H intermedias se marcan, la decisión sabe cuál fue la última decidida y se avisa', async () => {
@@ -298,7 +298,7 @@ test('ordenador apagado: las velas de 4H intermedias se marcan, la decisión sab
   } finally { est.decidir = decidir; }
   assert.ok(llamadas.length > 0);
   assert.ok(llamadas.every(x => x.i - x.iAnterior === 3), JSON.stringify(llamadas.slice(0, 3)));
-  assert.ok(mensajes.some(m => /velas de 4H sin decidir por el ordenador apagado/.test(m.texto)));
+  assert.ok(mensajes.some(m => /velas de 4 horas sin decidir porque el ordenador estaba apagado/.test(m.texto)));
 });
 
 // ---------- Laboratorio y Dirección ----------

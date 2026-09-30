@@ -130,7 +130,8 @@ test('tendencia-sma: abre SOLO en la vela en que la señal pasa a LONG (i=6)', (
   assert.ok(Math.abs(s.stop - 3.346875) < 1e-12);
   assert.equal(s.peso, 1);
   assert.equal(s.motivo, 'SMA2 8,000 > SMA3 7,333; cierre 9,000 > SMA4 7,250');
-  assert.match(s.estado, /^Abro SOL/);
+  // El texto del chat, en llano y con las mismas cifras que el motivo técnico.
+  assert.equal(s.estado, 'Mi regla dice comprar SOL: su media de 2 velas de 4 horas (8,000 $) ha cruzado por encima de la de 3 (7,333 $) y el precio sigue sobre su media de 4 (7,250 $). Si cae a 3,347 $, vendo (stop).');
 });
 
 test('tendencia-sma: cierra cuando la rápida cae bajo la lenta (i=10) y espera sin posición', () => {
@@ -140,7 +141,8 @@ test('tendencia-sma: cierra cuando la rápida cae bajo la lenta (i=10) y espera 
   const c = tendencia.decidir(prep, { simbolo: 'SOL/USD', i: 10, posicion: pos });
   assert.equal(c.accion, 'cerrar'); // SMA2 10 < SMA3 10,667
   const espera = tendencia.decidir(prep, { simbolo: 'SOL/USD', i: 11, posicion: null, contexto: {} });
-  assert.equal(espera.estado, 'Sin posición en SOL. Esperando a que SMA 2-3 dé LONG con filtro 4 (4H)');
+  assert.equal(espera.estado, 'No tengo SOL. Compro cuando su media de 2 velas de 4 horas cruce por encima de la de 3 con el precio sobre su media de 4.');
+  assert.equal(c.estado, 'Mi regla dice vender SOL: su media de 2 velas de 4 horas (10,00 $) ha caído por debajo de la de 3 (10,67 $); la subida se ha acabado.');
 });
 
 test('tendencia-sma: trailing = máximo − atrStop·ATR, solo sube', () => {
@@ -170,7 +172,7 @@ test('filtros: solo bloquean ABRIR; cerrar sigue pasando', () => {
   const riskOff = { regimen: { valor: 'RISK-OFF' }, filtros: [{ id: 'regimen-no-riskoff', parametro: null }] };
   const bloqueada = tendencia.decidir(prep, { simbolo: 'SOL/USD', i: 6, posicion: null, contexto: riskOff });
   assert.equal(bloqueada.accion, 'nada');
-  assert.match(bloqueada.estado, /bloqueado por filtro: régimen RISK-OFF/);
+  assert.equal(bloqueada.estado, 'Mi regla daría compra en SOL, pero no compro: esta mesa no compra con el mercado en modo miedo (Macro dice RISK-OFF).');
   const pos = { cantidad: 1, entrada: 9.5, stop: 3, maxPrecio: 12, barrasAbierta: 3 };
   assert.equal(tendencia.decidir(prep, { simbolo: 'SOL/USD', i: 10, posicion: pos, contexto: riskOff }).accion, 'cerrar');
   // Filtros ya creados también valen
@@ -367,12 +369,30 @@ test('mesasIniciales: 4 sin claves y 6 con claves, con la forma de Mesa', () => 
   assert.deepEqual(sin.map(m => m.id), ['tendencia', 'momentum', 'reversion', 'ruptura']);
   const con = mesasIniciales({ hayAlpaca: true });
   assert.deepEqual(con.map(m => m.id), ['tendencia', 'momentum', 'reversion', 'ruptura', 'momentum-etf', 'reversion-etf']);
+  // La ampliada (30-sep-2026) solo con sus 10 criptos disponibles: con las 6
+  // del sintético sería un duplicado de Momentum cripto.
+  const todas = require('../src/mercado/universo').UNIVERSO.map(a => a.simbolo);
+  assert.deepEqual(mesasIniciales({ hayAlpaca: false, disponibles: CRIPTO6 }).map(m => m.id), ['tendencia', 'momentum', 'reversion', 'ruptura']);
+  const amp = mesasIniciales({ hayAlpaca: true, disponibles: todas });
+  assert.deepEqual(amp.map(m => m.id), ['tendencia', 'momentum', 'reversion', 'ruptura', 'momentum-ampliada', 'momentum-etf', 'reversion-etf']);
+  const ma = amp.find(m => m.id === 'momentum-ampliada');
+  assert.equal(ma.nombre, 'Momentum cripto ampliada');
+  assert.equal(ma.familia, 'momentum-rotacion');
+  assert.equal(ma.marco, '1Day');
+  assert.equal(ma.estado, 'incubacion');
+  assert.deepEqual(ma.universo, [...CRIPTO6, 'XRP/USD', 'LTC/USD', 'BCH/USD', 'ADA/USD']);
+  assert.match(ma.nota, /0,82 a 0,58/);
+  assert.match(ma.nota, /0,74 a 0,56/);
+  assert.match(ma.nota, /7 meses/);
+  // La titular no cambia: sus 6.
+  assert.deepEqual(amp.find(m => m.id === 'momentum').universo, CRIPTO6);
+  assert.ok(!amp.some(m => m.universo.includes('VIXY')), 'VIXY no está en ninguna mesa');
   const porId = Object.fromEntries(con.map(m => [m.id, m]));
   assert.deepEqual(porId.tendencia.universo, ['BTC/USD', 'ETH/USD', 'SOL/USD']);
   assert.equal(porId.tendencia.marco, '4Hour');
   assert.deepEqual(porId.momentum.universo, CRIPTO6);
   assert.deepEqual(porId.reversion.universo, ['BTC/USD', 'ETH/USD']);
-  assert.deepEqual(porId['momentum-etf'].universo, ['SPY', 'QQQ', 'IWM', 'TLT', 'GLD']);
+  assert.deepEqual(porId['momentum-etf'].universo, ['SPY', 'QQQ', 'IWM', 'TLT', 'GLD', 'DIA']);
   assert.deepEqual(porId['momentum-etf'].params.lookbacks, [63, 126, 252]);
   assert.deepEqual(porId['reversion-etf'].universo, ['SPY', 'QQQ']);
   for (const m of con) {
@@ -498,4 +518,67 @@ test('comun.umbralHueco: noches, fines de semana y puentes no son hueco; semanas
   assert.equal(comun.ultimaReanudacion([2, 9], 1), -Infinity);
   assert.equal(comun.ultimaReanudacion([2, 9], 5), 2);
   assert.equal(comun.ultimaReanudacion([2, 9], 9), 9);
+});
+
+test('explicar: cada familia se explica en llano con los parámetros REALES de la mesa y sus filtros', () => {
+  const { explicarMesa } = require('../src/estrategias');
+  const campos = ['queMira', 'cuandoCompra', 'cuandoVende', 'cuandoNada', 'riesgo', 'filtros'];
+  for (const e of Object.values(FAMILIAS)) {
+    assert.equal(typeof e.explicar, 'function', e.familia);
+    assert.deepEqual(Object.keys(e.explicacion), campos, e.familia);
+  }
+  const tend = explicarMesa({ familia: 'tendencia-sma', universo: ['BTC/USD', 'ETH/USD'], params: { rapida: 10, lenta: 40 }, filtros: [{ id: 'fg-max', parametro: 80 }] }, { limites: { riesgoPorOperacion: 0.01 } });
+  assert.match(tend.queMira, /BTC y ETH/);
+  assert.match(tend.queMira, /últimas 10 velas/);
+  assert.match(tend.queMira, /últimas 40/);
+  assert.match(tend.filtros, /pasa de 80/);
+  assert.match(tend.riesgo, /1 % del fondo/);
+  const mom = explicarMesa({ familia: 'momentum-rotacion', universo: ['SPY', 'QQQ'], params: FAMILIAS['momentum-rotacion'].parametrosEtf, filtros: [] });
+  assert.match(mom.queMira, /63, 126 y 252 sesiones/);
+  assert.match(mom.cuandoCompra, /principio de cada mes/);
+  assert.equal(mom.filtros, null);
+  const rev = explicarMesa({ familia: 'reversion-rsi', universo: ['BTC/USD'], params: { umbral: 5 }, filtros: [] });
+  assert.match(rev.cuandoCompra, /baja de 5/);
+  const rup = explicarMesa({ familia: 'ruptura-donchian', universo: ['SOL/USD'], params: { entrada: 55 }, filtros: [{ id: 'regimen-no-riskoff', parametro: null }] });
+  assert.match(rup.cuandoCompra, /55 días/);
+  assert.match(rup.filtros, /RISK-OFF/);
+});
+
+// Lo que dice el operador en el chat y en su tarjeta sale de `estado`: en
+// llano para quien no sabe de bolsa (sin «SMA7», «LONG», «top 2»,
+// «rebalanceo» ni «ATR(14)» sueltos) y cabe en una frase de las plantillas.
+test('estado de cada familia: en llano, sin jerga y ≤ plantillas.MAX en todas las velas', () => {
+  const { MAX } = require('../src/agentes/plantillas');
+  const JERGA = /\bSMA\s?\d|\bLONG\b|\bATR\(|\btop \d|[Rr]ebalanceo|Calentando|Largo en|Sin posición en|Sobreventa|RSI\(\d/;
+  const tres = cestaSintetica(['BTC/USD', 'ETH/USD', 'SOL/USD'], 650, 5);
+  const casos = [
+    [tendencia, tres, tendencia.parametrosPorDefecto],
+    [ruptura, tres, ruptura.parametrosPorDefecto],
+    [reversion, tres, { ...reversion.parametrosPorDefecto, umbral: 15 }],
+    [momentum, cestaSintetica(CRIPTO6, 450, 6), momentum.parametrosPorDefecto],
+  ];
+  const vistos = new Set();
+  for (const [e, velas, params] of casos) {
+    const prep = e.preparar(velas, params);
+    const contextos = [{}, { regimen: { valor: 'RISK-OFF' }, filtros: [{ id: 'regimen-no-riskoff', parametro: null }] }];
+    for (const s of Object.keys(velas)) {
+      for (let i = 0; i < velas[s].length; i += 3) {
+        const c = velas[s][i].c;
+        for (const posicion of [null, { cantidad: 1, entrada: c, stop: c * 0.9, maxPrecio: c, barrasAbierta: 9 }]) {
+          for (const contexto of contextos) {
+            const x = e.decidir(prep, { simbolo: s, i, posicion, contexto });
+            if (!x.estado) continue;
+            vistos.add(`${e.familia}:${x.accion}`);
+            assert.ok(x.estado.length <= MAX, `${e.familia} i=${i}: ${x.estado.length} caracteres`);
+            assert.doesNotMatch(x.estado, JERGA, `${e.familia} i=${i}: ${x.estado}`);
+            assert.doesNotMatch(x.estado, /undefined|null|NaN/, x.estado);
+          }
+        }
+      }
+    }
+  }
+  // Se han visto las tres acciones que se cuentan en el chat en cada familia por activo.
+  for (const f of ['tendencia-sma', 'ruptura-donchian', 'reversion-rsi', 'momentum-rotacion']) {
+    for (const a of ['nada', 'abrir', 'cerrar']) assert.ok(vistos.has(`${f}:${a}`), `${f}: ninguna vela con «${a}»`);
+  }
 });

@@ -17,6 +17,10 @@ const FAMILIAS = Object.freeze({
 });
 
 const CRIPTO = Object.freeze(['BTC/USD', 'ETH/USD', 'SOL/USD', 'LINK/USD', 'AVAX/USD', 'DOGE/USD']);
+// «Momentum cripto ampliada» (30-sep-2026): las 6 de la titular + las 4 nuevas.
+const CRIPTO_AMPLIADA = Object.freeze([...CRIPTO, 'XRP/USD', 'LTC/USD', 'BCH/USD', 'ADA/USD']);
+// Momentum ETF con DIA (30-sep-2026).
+const ETF_MOMENTUM = Object.freeze(['SPY', 'QQQ', 'IWM', 'TLT', 'GLD', 'DIA']);
 
 // Copia profunda sencilla: los params de una mesa se persisten y se editan; no
 // deben compartir arrays con los valores por defecto congelados.
@@ -58,17 +62,31 @@ const NOTAS = Object.freeze({
   reversion: 'Backtest real 2021-2026 con costes: Sharpe −0,36. Empieza en prueba con el 2 %.',
   ruptura: 'Correlación diaria con Momentum 0,80: juntas, Sharpe 0,58 y caída 26,0 %; Momentum sola, 0,72 y 11,2 %. No diversifica: empieza en prueba con el 2 %.',
   etf: 'Sin validar con datos reales: empieza en prueba con el 2 %.',
+  ampliada: 'Histórico real mar-2022 → sep-2026: añadir LTC y BCH a Momentum cripto baja su Sharpe de 0,82 a 0,58, y XRP de 0,74 a 0,56; ADA solo tiene 7 meses de datos. La titular sigue con sus 6: esta, con 10, empieza en prueba con el 2 %.',
 });
 
-function mesasIniciales({ hayAlpaca = false } = {}) {
+// La mesa ampliada solo tiene sentido con sus 10 criptos: con las 6 de
+// siempre (modo sintético, que no tiene las nuevas) sería un duplicado de
+// Momentum cripto. Por eso solo se crea si están todas.
+const MESA_AMPLIADA = Object.freeze({ id: 'momentum-ampliada', nombre: 'Momentum cripto ampliada', universo: CRIPTO_AMPLIADA });
+
+function mesaAmpliada() {
+  return mesa(MESA_AMPLIADA.id, MESA_AMPLIADA.nombre, momentumRotacion, MESA_AMPLIADA.universo, null, 'incubacion', NOTAS.ampliada);
+}
+
+// `disponibles` (opcional): los símbolos que la fuente de datos tiene. La
+// ampliada solo entra si están sus 10; sin la lista no se sabe y no entra.
+function mesasIniciales({ hayAlpaca = false, disponibles = null } = {}) {
+  const hay = disponibles ? new Set(disponibles) : null;
   const mesas = [
     mesa('tendencia', 'Tendencia SMA', tendenciaSma, ['BTC/USD', 'ETH/USD', 'SOL/USD'], null, 'incubacion', NOTAS.tendencia),
     mesa('momentum', 'Momentum cripto', momentumRotacion, CRIPTO, null, 'titular', NOTAS.momentum),
     mesa('reversion', 'Reversión RSI', reversionRsi, ['BTC/USD', 'ETH/USD'], null, 'incubacion', NOTAS.reversion),
     mesa('ruptura', 'Ruptura Donchian', rupturaDonchian, ['BTC/USD', 'ETH/USD', 'SOL/USD'], null, 'incubacion', NOTAS.ruptura),
   ];
+  if (hay && MESA_AMPLIADA.universo.every(s => hay.has(s))) mesas.push(mesaAmpliada());
   if (hayAlpaca) {
-    mesas.push(mesa('momentum-etf', 'Momentum ETF', momentumRotacion, ['SPY', 'QQQ', 'IWM', 'TLT', 'GLD'], momentumRotacion.parametrosEtf, 'incubacion', NOTAS.etf));
+    mesas.push(mesa('momentum-etf', 'Momentum ETF', momentumRotacion, ETF_MOMENTUM, momentumRotacion.parametrosEtf, 'incubacion', NOTAS.etf));
     mesas.push(mesa('reversion-etf', 'Reversión ETF', reversionRsi, ['SPY', 'QQQ'], null, 'incubacion', NOTAS.etf));
   }
   return mesas;
@@ -86,4 +104,16 @@ function velasNecesarias(mesa) {
   return comun.velasMemoria(e, p, mesa.filtros || []);
 }
 
-module.exports = { FAMILIAS, mesasIniciales, velasNecesarias, NOTAS_INICIALES: NOTAS };
+// Explicación en lenguaje llano de una mesa con SUS parámetros y filtros
+// (§4.3, explicar): { queMira, cuandoCompra, cuandoVende, cuandoNada, riesgo, filtros }.
+function explicarMesa(m, { limites = null } = {}) {
+  const e = FAMILIAS[m && m.familia];
+  if (!e || typeof e.explicar !== 'function') return null;
+  const base = e.parametrosPara ? e.parametrosPara(m.universo || []) : e.parametrosPorDefecto;
+  return e.explicar({ ...base, ...(m.params || {}) }, { universo: m.universo || [], filtros: m.filtros || [], limites });
+}
+
+module.exports = {
+  FAMILIAS, mesasIniciales, mesaAmpliada, velasNecesarias, explicarMesa,
+  NOTAS_INICIALES: NOTAS, MESA_AMPLIADA, ETF_MOMENTUM, CRIPTO_TITULAR: CRIPTO,
+};

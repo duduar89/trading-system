@@ -85,12 +85,12 @@ test('comité con LLM: una llamada con esquema estricto; Riesgos veta NORMAL; la
   assert.equal(controller.datos.fuente, 'plantilla');
   const macro = delComite.find(m => m.de === 'macro');
   assert.equal(macro.datos.fuente, 'llm');
-  assert.match(macro.texto, /Régimen sin cambios.*Voto NORMAL/);
+  assert.match(macro.texto, /Régimen sin cambios.*Mi voto: NORMAL/);
   const riesgos = delComite.find(m => m.de === 'riesgos');
   assert.equal(riesgos.datos.voto, 'DEFENSIVO');
   const decision = delComite.find(m => m.tipo === 'decision');
   assert.match(decision.texto, /DEFENSIVO/);
-  assert.match(decision.texto, /veto a NORMAL/);
+  assert.match(decision.texto, /Marta ha votado DEFENSIVO y su voto es veto/, 'la Presidenta cita a quien vetó, por su nombre');
   assert.doesNotMatch(decision.texto, /987/);
   assert.equal(decision.costeUsd, 0.0123);
 

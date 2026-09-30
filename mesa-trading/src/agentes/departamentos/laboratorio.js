@@ -32,6 +32,7 @@ const { regimenEnFecha } = require('../../mercado/regimen');
 const { valorEn, RETRASO_FG } = require('../../mercado/sentimiento');
 const postmortem = require('../postmortem');
 const plantillas = require('../plantillas');
+const conversacion = require('../conversacion');
 const f = require('../../util/formato');
 const { diaUTC, DIA } = require('../../util/reloj');
 const { momentos } = require('../../backtest/metricas');
@@ -67,13 +68,19 @@ function crearCargador(ctx, ahora) {
 async function crearContextoHistorico(ctx, cargar) {
   const btc = await cargar('BTC/USD', '1Day');
   const spy = ctx.universo.some(a => a.simbolo === 'SPY') ? await cargar('SPY', '1Day') : null;
+  // VIXY cuenta en el régimen en vivo (macro): aquí igual, para que el
+  // histórico del laboratorio vea el mismo régimen. Sin claves no hay.
+  let vixy = null;
+  if (spy && ctx.datos.disponible('VIXY')) {
+    try { vixy = await cargar('VIXY', '1Day'); } catch (e) { log.aviso(`sin VIXY para el régimen histórico: ${e.message}`); }
+  }
   let fgHist = [];
   try { fgHist = (await ctx.fg.historico()) || []; } catch (e) { log.aviso(`sin histórico de miedo y codicia: ${e.message}`); }
   // Miedo y codicia vigente en t: el de t − RETRASO_FG, como en vivo (el de
   // un día se publica a las 00:00, el mismo instante en que deciden las diarias).
   return t => {
     const f = fgHist.length ? valorEn(fgHist, t - RETRASO_FG) : null;
-    return { regimen: regimenEnFecha(btc, spy, t), fg: f ? f.valor : null };
+    return { regimen: regimenEnFecha(btc, spy, t, vixy), fg: f ? f.valor : null };
   };
 }
 
@@ -150,12 +157,15 @@ function revisionSemanal(ctx) {
     .filter(h => !lab.hipotesis.some(x => x.id === h.id) && !vistas.has(firmaHipotesis(h)));
   lab.proximaRevision = siguienteLunes(ahora);
   for (const h of nuevas) {
-    lab.hipotesis.push({ id: h.id, h, firma: firmaHipotesis(h), descripcion: describirHipotesis(h), estado: 'pendiente', criterios: [], t: ahora, informe: null });
-    ctx.bus.publicar({ de: 'laboratorio', canal: 'laboratorio', tipo: 'hipotesis', texto: plantillas.hipotesis(h), datos: { id: h.id, origen: h.origen, motivo: h.motivo, mesaId: h.mesaId }, importancia: 2 });
+    const entrada = { id: h.id, h, firma: firmaHipotesis(h), descripcion: describirHipotesis(h), estado: 'pendiente', criterios: [], t: ahora, informe: null };
+    lab.hipotesis.push(entrada);
+    // La idea abre su hilo: el resultado del examen le contesta (§6.2).
+    const m = ctx.bus.publicar({ de: 'laboratorio', canal: 'laboratorio', tipo: 'hipotesis', texto: plantillas.hipotesis(h), datos: { id: h.id, origen: h.origen, motivo: h.motivo, mesaId: h.mesaId }, importancia: 2, hilo: true });
+    entrada.mensajeId = m.id;
   }
   if (lab.hipotesis.length > 60) lab.hipotesis.splice(0, lab.hipotesis.length - 60);
   if (!nuevas.length) {
-    ctx.bus.publicar({ de: 'laboratorio', canal: 'laboratorio', tipo: 'nota', texto: `Semana ${semana}: sin hipótesis nuevas (${pistas.length} pistas del Auditor).` });
+    ctx.bus.publicar({ de: 'laboratorio', canal: 'laboratorio', tipo: 'nota', texto: `Esta semana (${semana}) no hay ideas nuevas que probar; el Auditor ha dejado ${pistas.length} ${pistas.length === 1 ? 'pista' : 'pistas'}.` });
   }
   // Modo latido: la evaluación (larga) la hace scripts/laboratorio.js fuera del latido.
   if (!(ctx.opciones && ctx.opciones.laboratorioFuera)) ctx.lanzar('laboratorio', () => evaluarPendientes(ctx));
@@ -209,10 +219,49 @@ async function evaluarUna(ctx, entrada, { ensayosPrevios, sharpesPrevios }) {
     informe: res.informe,
     paramsFinales: res.paramsFinales || null,
     dsr: res.dsr ?? null,
-    walkforward: wf ? { combinaciones: wf.combinaciones || 0, sharpesEnsayos: wf.sharpesEnsayos || [] } : null,
+    walkforward: wf ? {
+      combinaciones: wf.combinaciones || 0, sharpesEnsayos: wf.sharpesEnsayos || [],
+      ventanas: Array.isArray(wf.ventanas) ? wf.ventanas.length : null, entrenoMeses: wf.entrenoMeses ?? null, pruebaMeses: wf.pruebaMeses ?? null,
+      suficiente: wf.suficiente !== false,
+    } : null,
+    ensayosPrevios,
     referenciaDD: { valor: ref.valor ?? null, mesaId: ref.mesaId ?? null },
     tFin: ctx.reloj.ahora(),
   };
+}
+
+// Cómo se compara cada puerta con su umbral (src/cuant/laboratorio.js).
+const COMPARACION = Object.freeze({
+  'Sharpe OOS': '≥', 'Ventanas de prueba en positivo': '≥', 'Sharpe deflactado': '≥', 'Operaciones OOS': '≥',
+  'maxDD OOS': '≤', 'Correlación con mesas activas': '<', 'Datos suficientes': '≥',
+});
+
+// Registro de decisiones (§6.10): TODAS las puertas con su valor, su umbral y
+// si pasó, más el walk-forward y el contador de ensayos. Es lo que dice si el
+// laboratorio trabaja bien (cuántas prueba, cuántas aprueba y por qué).
+function anotarDecisionLaboratorio(ctx, entrada, ev) {
+  if (typeof ctx.anotarDecision !== 'function') return;
+  const h = entrada.h;
+  const lab = ctx.estado.laboratorio;
+  const criterios = (ev.criterios || []).map(c => ({ ...c, comparacion: COMPARACION[c.nombre] || null }));
+  const ok = criterios.filter(c => c.ok).length;
+  const wf = ev.walkforward;
+  ctx.anotarDecision({
+    tipo: 'laboratorio', quien: 'laboratorio',
+    resumen: `Hipótesis ${h.id} ${ev.aprobada ? 'APROBADA' : 'RECHAZADA'}: pasa ${ok} de ${criterios.length} puertas. ${entrada.descripcion || describirHipotesis(h)}.`,
+    datos: {
+      hipotesisId: h.id, aprobada: Boolean(ev.aprobada), descripcion: entrada.descripcion || describirHipotesis(h),
+      hipotesis: { familia: h.familia, marco: h.marco, universo: h.universo, filtros: h.filtros || [], params: h.params || null, origen: h.origen || null, motivo: h.motivo || null, mesaId: h.mesaId || null },
+      criterios, puertasOk: ok, puertasTotal: criterios.length,
+      walkforward: wf ? { ventanas: wf.ventanas ?? null, entrenoMeses: wf.entrenoMeses ?? null, pruebaMeses: wf.pruebaMeses ?? null, combinaciones: wf.combinaciones || 0, suficiente: wf.suficiente !== false } : null,
+      dsr: ev.dsr ?? null,
+      ensayosPrevios: Number.isFinite(ev.ensayosPrevios) ? ev.ensayosPrevios : null,
+      ensayosTotales: lab.ensayosTotales || 0,
+      paramsFinales: ev.paramsFinales || null,
+      referenciaDD: ev.referenciaDD || null,
+      informe: ev.informe || null,
+    },
+  });
 }
 
 // Apunta en el estado lo que devolvió evaluarUna y lo cuenta en el chat.
@@ -238,11 +287,13 @@ function aplicarEvaluacion(ctx, entrada, ev) {
   if (ev.aprobada && !lab.aprobadas.some(a => a.firma === ev.firma)) {
     lab.aprobadas.push({ ...h, params: { ...(h.params || {}), ...(ev.paramsFinales || {}) }, firma: ev.firma, informe: ev.informe, t: ctx.reloj.ahora() });
   }
+  anotarDecisionLaboratorio(ctx, entrada, ev);
   ctx.bus.publicar({
     de: 'laboratorio', canal: 'laboratorio', tipo: 'hipotesis',
-    texto: plantillas.resultadoHipotesis({ id: h.id, aprobada: ev.aprobada, criterios: ev.criterios }),
+    texto: plantillas.resultadoHipotesis({ id: h.id, aprobada: ev.aprobada, criterios: (ev.criterios || []).map(c => ({ ...c, comparacion: c.comparacion || COMPARACION[c.nombre] || null })) }),
     datos: { id: h.id, aprobada: ev.aprobada, criterios: entrada.criterios, informe: ev.informe, ensayos: lab.ensayosTotales, dsr: ev.dsr ?? null },
     importancia: ev.aprobada ? 3 : 2,
+    ...(entrada.mensajeId ? { respondeA: entrada.mensajeId } : {}),
   });
 }
 
@@ -337,7 +388,7 @@ async function backtestsPendientes(ctx) {
         n++;
         ctx.bus.publicar({
           de: 'laboratorio', canal: 'laboratorio', tipo: 'nota',
-          texto: plantillas.frase(`Backtest de referencia de ${mesa.nombre} (${mesa.backtest.dias} días): ${mesa.backtest.operaciones} operaciones, Sharpe ${f.numero(mesa.backtest.sharpe, 2)}, caída máx. ${f.pct(mesa.backtest.maxDD, { decimales: 1 })}.`),
+          texto: plantillas.frase(`He probado ${mesa.nombre} con ${mesa.backtest.dias} días de precios pasados: ${mesa.backtest.operaciones} operaciones, rentabilidad por riesgo (Sharpe) ${f.numero(mesa.backtest.sharpe, 2)} y peor caída ${f.pct(mesa.backtest.maxDD, { decimales: 1 })}.`),
           datos: { mesaId: mesa.id, ...mesa.backtest },
         });
       }
@@ -360,10 +411,15 @@ async function auditoria(ctx, operaciones) {
   for (const l of res) {
     const op = porId.get(l.operacionId) || {};
     ctx.estado.lecciones.push({ t: ahora, ...l, mesaId: l.mesaId ?? op.mesaId ?? null, motivoSalida: l.motivoSalida ?? op.motivoSalida ?? null });
+    // El Auditor le contesta al operador en el hilo de su operación (§6.2).
+    const hilo = conversacion.cierreDe(ctx, l.operacionId);
+    const operador = hilo && conversacion.agente(ctx, hilo.de) && hilo.de !== 'ejecutor' ? hilo.de : conversacion.operadorDe(ctx, l.mesaId ?? op.mesaId, l.simbolo);
+    const mesa = typeof ctx.mesaPorId === 'function' ? ctx.mesaPorId(l.mesaId ?? op.mesaId) : null;
     ctx.bus.publicar({
-      de: 'auditor', canal: 'laboratorio', tipo: 'leccion',
-      texto: plantillas.leccion({ mesaId: l.mesaId, etiqueta: etiqueta(l.simbolo), categoria: l.categoria, pnl: op.pnl, barras: op.barras, leccion: l.leccion }),
+      de: 'auditor', para: operador || 'todos', canal: 'laboratorio', tipo: 'leccion',
+      texto: plantillas.leccion({ mesaId: l.mesaId, mesa: mesa ? mesa.nombre : null, etiqueta: etiqueta(l.simbolo), categoria: l.categoria, pnl: op.pnl, barras: op.barras, leccion: l.leccion, a: operador ? conversacion.pilaDe(ctx, operador) : null }),
       datos: { operacionId: l.operacionId, mesaId: l.mesaId, simbolo: l.simbolo, categoria: l.categoria, fuente: l.fuente },
+      ...(hilo ? { respondeA: hilo.id, hilo: hilo.hilo } : {}),
     });
   }
   const limite = ahora - DIAS_LECCIONES * DIA;

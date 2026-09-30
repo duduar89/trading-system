@@ -37,18 +37,18 @@ test('reglas fijas: una operación por rama, en el orden del contrato', () => {
 
 test('la lección de las reglas lleva cifras de la operación y pasa su propia comprobación', () => {
   const r = pm.clasificarReglas(op({ motivoSalida: 'stop', barras: 2 }));
-  assert.equal(r.leccion, 'SOL tocó el stop en 2 velas y perdió 45,20 $.');
-  assert.ok(r.leccion.length <= 140);
+  assert.equal(r.leccion, 'SOL tocó la salida de emergencia (stop) en 2 velas y perdió 45,20 $: quizá estaba demasiado cerca.');
+  assert.ok(r.leccion.length <= 140, 'cabe con el saludo del Auditor delante');
 });
 
 test('lecciones por reglas: «perdió»/«ganó» con el importe sin signo, sin doble negativo', () => {
   const l = cambios => pm.clasificarReglas(op(cambios)).leccion;
   assert.equal(l({ pnl: -1234.5 }), 'SOL perdió 1.235 $: la señal no se confirmó.');
-  assert.equal(l({ regimenEntrada: 'RISK-OFF' }), 'SOL entró en RISK-OFF y perdió 45,20 $.');
-  assert.equal(l({ deslizamiento: 0.006 }), 'SOL perdió 45,20 $ con 0,60 % de deslizamiento en contra.');
-  assert.equal(l({ pnl: 120, motivoSalida: 'kill' }), 'SOL ganó 120,00 $ pero salió por kill, no por su regla.');
+  assert.equal(l({ regimenEntrada: 'RISK-OFF' }), 'SOL se compró con el mercado en contra (RISK-OFF) y perdió 45,20 $.');
+  assert.equal(l({ deslizamiento: 0.006 }), 'SOL perdió 45,20 $: al ejecutar, el precio se fue un 0,60 % en contra.');
+  assert.equal(l({ pnl: 120, motivoSalida: 'kill' }), 'SOL ganó 120,00 $, pero salió por el kill switch y no por su regla: fue suerte.');
   // La frase neutra sí lleva el signo.
-  assert.equal(l({ pnl: 120 }), 'SOL salió por regla con +120,00 $: la regla funcionó como estaba escrita.');
+  assert.equal(l({ pnl: 120 }), 'SOL salió por su regla con +120,00 $: la estrategia hizo lo que dice su manual.');
   assert.equal(l({ pnl: null }), 'SOL perdió —: la señal no se confirmó.');
   for (const pnl of [-45.2, -1234.5, 0]) assert.doesNotMatch(l({ pnl }), /perdió -/);
 });

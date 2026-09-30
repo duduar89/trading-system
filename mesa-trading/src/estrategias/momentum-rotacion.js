@@ -159,23 +159,35 @@ function textoPerfil(p) {
   return p.ajustarVol ? `momentum ${lb} d ajustado por vol.` : `momentum ${lb} sesiones`;
 }
 
+// Lo mismo en llano, para el chat y la tarjeta del puesto (§4.3).
+function puestoLlano(r, simbolo) {
+  const k = r.filas.findIndex(f => f.simbolo === simbolo);
+  return k < 0 ? null : `el ${k + 1}.º de ${r.filas.length}`;
+}
+function perfilLlano(p) {
+  const dias = c.listaLlana(p.lookbacks.map(String));
+  const unidad = p.ajustarVol ? 'días' : 'sesiones';
+  return `lo que ha subido en ${dias} ${unidad}${p.ajustarVol ? ', descontando lo que se mueve' : ''}`;
+}
+
 function decidir(prep, { simbolo, i, iAnterior, posicion = null, contexto = {}, textos = true } = {}) {
   const p = prep.params;
   const s = prep.porSimbolo[simbolo];
   const et = c.etiqueta(simbolo);
   const prox = p.rebalanceo === 'semanal' ? 'el lunes' : 'a principio de mes';
-  if (!s || i < 0 || i >= s.c.length) return c.senal(posicion ? 'mantener' : 'nada', { estado: textos ? `Sin datos de ${et}` : '' });
+  if (!s || i < 0 || i >= s.c.length) return c.senal(posicion ? 'mantener' : 'nada', { estado: textos ? `No tengo datos de ${et} ahora mismo.` : '' });
 
   if (!esRebalanceo(prep, s, i, iAnterior)) {
     if (posicion) {
       return c.senal('mantener', {
         peso: prep.peso, stop: posicion.stop ?? null,
-        estado: textos ? `Largo en ${et} desde ${formato.precio(posicion.entrada)}; stop ${formato.precio(posicion.stop)}; próximo rebalanceo ${prox}` : '',
+        estado: textos ? `Tengo ${et} desde ${c.px(posicion.entrada)}; si cae a ${c.px(posicion.stop)}, vendo (stop). Vuelvo a repartir ${prox}.` : '',
       });
     }
     if (!textos) return c.senal('nada');
     const r = ranking(prep, s.t[i]);
-    return c.senal('nada', { estado: `Sin posición en ${et}. ${textoPerfil(p)}: ${textoPuesto(r, simbolo)}; próximo rebalanceo ${prox}` });
+    const pl = puestoLlano(r, simbolo);
+    return c.senal('nada', { estado: `No tengo ${et}${pl ? `: es ${pl} por ${perfilLlano(p)}` : ''}. Solo compro los ${p.top} primeros; vuelvo a repartir ${prox}.` });
   }
 
   const r = ranking(prep, s.t[i]);
@@ -184,32 +196,41 @@ function decidir(prep, { simbolo, i, iAnterior, posicion = null, contexto = {}, 
   const motivoBase = textos
     ? (puntuacion === null ? `sin ${Math.max(...p.lookbacks)} velas de historia` : `${textoPuesto(r, simbolo)} en ${textoPerfil(p)}; rentabilidad ${formato.pct(rent, { signo: true })}`)
     : '';
+  // «es el 2.º de 6 por lo que ha subido en 28 días (+12,3 %)», o por qué no hay puesto.
+  const pl = puntuacion === null ? null : puestoLlano(r, simbolo);
+  const motivoLlano = textos
+    ? (pl ? `es ${pl} por ${perfilLlano(p)} (${formato.pct(rent, { signo: true })})` : `aún no tiene ${Math.max(...p.lookbacks)} días de historia`)
+    : '';
 
   if (r.elegidos.has(simbolo)) {
     if (posicion) {
       return c.senal('mantener', {
         peso: prep.peso, stop: posicion.stop ?? null, motivo: motivoBase,
-        estado: textos ? `Sigue ${et} en el top ${p.top}: ${motivoBase}` : '',
+        estado: textos ? `Reparto de nuevo y me quedo ${et}: ${motivoLlano}, sigue entre los ${p.top} primeros.` : '',
       });
     }
     const a = s.atr[i];
-    if (a === null) return c.senal('nada', { estado: textos ? `Calentando ATR de ${et}` : '' });
+    if (a === null) return c.senal('nada', { estado: textos ? `Aún no compro ${et}: me falta historia para calcular cuánto se mueve y dónde poner el stop.` : '' });
     const stop = s.c[i] - p.atrStop * a;
     const filtro = c.filtroQueBloquea(prep, simbolo, i, contexto);
     if (filtro) {
-      return c.senal('nada', { motivo: motivoBase, estado: textos ? `Rebalanceo: ${et} entra en el top ${p.top} pero ${c.textoBloqueo(filtro, contexto, prep, simbolo, i)}` : '' });
+      return c.senal('nada', { motivo: motivoBase, estado: textos ? `Reparto de nuevo: ${et} entra entre los ${p.top} primeros, pero no compro: ${c.bloqueoLlano(filtro, contexto, prep, simbolo, i)}.` : '' });
     }
     return c.senal('abrir', {
       peso: prep.peso, stop, motivo: motivoBase,
-      estado: textos ? `Rebalanceo: compro ${et} (${motivoBase}); stop ${formato.precio(stop)}` : '',
+      estado: textos ? `Reparto de nuevo y mi regla dice comprar ${et}: ${motivoLlano}. Si cae a ${c.px(stop)}, vendo (stop).` : '',
     });
   }
 
   if (posicion) {
-    const porque = textos ? (p.soloPositivos && !(rent > 0) && puntuacion !== null ? `rentabilidad ${formato.pct(rent, { signo: true })} ≤ 0` : `fuera del top ${p.top} (${textoPuesto(r, simbolo)})`) : '';
-    return c.senal('cerrar', { motivo: porque, estado: textos ? `Rebalanceo: vendo ${et}, ${porque}` : '' });
+    const negativa = p.soloPositivos && !(rent > 0) && puntuacion !== null;
+    const porque = textos ? (negativa ? `rentabilidad ${formato.pct(rent, { signo: true })} ≤ 0` : `fuera del top ${p.top} (${textoPuesto(r, simbolo)})`) : '';
+    const porqueLlano = textos
+      ? (negativa ? `en su tramo va ${formato.pct(rent, { signo: true })} y esta mesa solo tiene lo que sube` : `ya no está entre los ${p.top} primeros${pl ? ` (es ${pl})` : ''}`)
+      : '';
+    return c.senal('cerrar', { motivo: porque, estado: textos ? `Reparto de nuevo y mi regla dice vender ${et}: ${porqueLlano}.` : '' });
   }
-  return c.senal('nada', { motivo: motivoBase, estado: textos ? `Rebalanceo: ${et} se queda fuera (${motivoBase})` : '' });
+  return c.senal('nada', { motivo: motivoBase, estado: textos ? `Reparto de nuevo: ${et} se queda fuera (${motivoLlano}; solo entran los ${p.top} primeros).` : '' });
 }
 
 function trailing() { return null; }
@@ -230,9 +251,33 @@ function describir(params) {
   return `${textoPerfil(p)}, top ${p.top}, rebalanceo ${p.rebalanceo}${p.soloPositivos ? ', solo con rentabilidad > 0' : ''}, stop ${formato.numero(p.atrStop, 1)}×ATR(${p.atr})`;
 }
 
+// En lenguaje llano, con los parámetros de la mesa (§4.3, explicar).
+function explicar(params, { universo = [], filtros = [], limites = null } = {}) {
+  const base = params && params.perfil === 'etf' ? parametrosEtf : parametrosPorDefecto;
+  const p = { ...base, ...(params || {}) };
+  const n = (universo || []).length;
+  const quien = c.activosLlano(universo, 'los activos de la mesa');
+  const etf = p.perfil === 'etf';
+  const lb = c.listaLlana(p.lookbacks.map(String));
+  const media = p.lookbacks.length > 1 ? ` (la media de ${etf ? 'las' : 'los'} ${p.lookbacks.length})` : '';
+  const tramo = etf ? `las últimas ${lb} sesiones de bolsa${media}` : `los últimos ${lb} días${media}`;
+  const cuando = p.rebalanceo === 'semanal' ? 'Cada lunes' : 'A principio de cada mes';
+  const top = p.top === 1 ? 'el que más ha subido' : `los ${p.top} que más han subido`;
+  return {
+    queMira: `Mira ${quien}${n ? ` (${n})` : ''} y los ordena por cuánto han subido en ${tramo}${p.ajustarVol ? ', descontando lo nerviosos que son (la subida se divide por su volatilidad: un activo que sube a trompicones puntúa menos)' : ''}.`,
+    cuandoCompra: `${cuando} compra ${top} (momentum: lo que sube tiende a seguir subiendo un tiempo)${p.soloPositivos ? ', pero solo si de verdad ha subido: si todos bajan, se queda en efectivo' : ''}.`,
+    cuandoVende: `${cuando} vende lo que ya no está entre ${p.top === 1 ? 'el primero' : `los ${p.top} primeros`}${p.soloPositivos ? ' o ha dejado de subir' : ''}. Entre medias solo vende si salta el stop de emergencia, a ${c.numeroLlano(p.atrStop)} veces el movimiento típico de ${p.atr} días (ATR) por debajo de la compra.`,
+    cuandoNada: `${p.rebalanceo === 'semanal' ? 'De martes a domingo' : 'El resto del mes'} no toca nada: mantiene lo que tiene.`,
+    riesgo: `Llega tarde a los giros: cuando el mercado se da la vuelta, aguanta hasta el siguiente ${p.rebalanceo === 'semanal' ? 'lunes' : 'mes'} o hasta el stop. Con pocos activos elegidos, el resultado depende mucho de ellos. ${c.riesgoComun(limites)}`,
+    filtros: c.explicarFiltros(filtros),
+  };
+}
+
 module.exports = {
   familia,
   nombre: 'Rotación por momentum',
+  explicacion: explicar(parametrosPorDefecto),
+  explicar,
   descripcion: 'Mantiene los 2 activos con más momentum (cripto: 28 días ajustado por volatilidad, cada lunes; ETF: 63/126/252 sesiones, cada mes), solo si su rentabilidad es positiva; stop de catástrofe a 3×ATR(14).',
   marco,
   parametrosPorDefecto,

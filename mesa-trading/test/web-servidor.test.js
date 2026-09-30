@@ -26,7 +26,7 @@ test('sin sesión: páginas al login, API 401 y solo lo público abierto', async
     assert.equal(r.status, 302, ruta);
     assert.equal(r.headers.location, '/login', ruta);
   }
-  for (const ruta of ['/api/estado', '/api/eventos', '/api/mensajes', '/api/operaciones', '/api/costes-llm', '/api/comando/ajustes', '/api/sesion']) {
+  for (const ruta of ['/api/estado', '/api/eventos', '/api/mensajes', '/api/operaciones', '/api/costes-llm', '/api/comando/ajustes', '/api/sesion', '/api/noticias', '/api/historial', '/api/decisiones']) {
     const r = await pedir(w.base, ruta);
     assert.equal(r.status, 401, ruta);
     assert.equal(r.json.login, '/login', ruta);
@@ -452,6 +452,24 @@ test('mensajes, operaciones y costes del LLM salen de los JSONL de la carpeta', 
   const c = (await pedir(w.base, '/api/costes-llm', { cookie })).json;
   assert.equal(c.totalUsd, 0.25);
   assert.equal(c.llamadas, 1);
+});
+
+test('noticias, historial y decisiones (30-sep-2026) salen de sus JSONL, con la sesión', async (t) => {
+  const w = await arrancarWeb();
+  t.after(w.cerrar);
+  const cookie = await entrar(w.base);
+  const linea = (f, x) => fs.appendFileSync(path.join(w.carpeta, f), `${JSON.stringify(x)}\n`);
+  linea('noticias.jsonl', { t: 10, id: '1', titular: 'uno', clasificacion: null, veto: null });
+  linea('noticias.jsonl', { t: 20, id: '1', clasificacion: [{ simbolo: 'BTC/USD', categoria: 'mercado', grave: false }], veto: null, actualiza: true });
+  linea('historial.jsonl', { t: 10, motivo: 'hora', patrimonio: 1 });
+  linea('historial.jsonl', { t: 20, motivo: 'kill', patrimonio: 2 });
+  linea('decisiones.jsonl', { t: 10, tipo: 'orden', quien: 'x', resumen: 'a', datos: {} });
+  linea('decisiones.jsonl', { t: 20, tipo: 'veto', quien: 'riesgos', resumen: 'b', datos: {} });
+  const n = (await pedir(w.base, '/api/noticias', { cookie })).json;
+  assert.equal(n.length, 1);
+  assert.equal(n[0].clasificacion[0].categoria, 'mercado', 'la actualización se fusiona');
+  assert.deepEqual((await pedir(w.base, '/api/historial?desde=15', { cookie })).json.map(x => x.motivo), ['kill']);
+  assert.deepEqual((await pedir(w.base, '/api/decisiones?tipo=veto', { cookie })).json.map(x => x.resumen), ['b']);
 });
 
 test('salud: sin sesión ni datos del fondo; 503 si el último latido pasa de 3 min', async (t) => {

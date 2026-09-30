@@ -271,11 +271,11 @@ test('ultimos: cripto por latest/quotes (punto medio) sin cabeceras, respaldo en
 
 test('noticias: símbolos cripto sin barra en la consulta y canónicos en la respuesta', async () => {
   const fetch = fetchFalso(() => ({ json: { news: [
-    { id: 7, headline: 'BTC sube', summary: 'resumen', source: 'benzinga', created_at: '2026-09-29T10:00:00Z', url: 'https://x', symbols: ['BTCUSD', 'MSTR'] },
+    { id: 7, headline: 'BTC sube', summary: 'resumen', source: 'benzinga', author: 'Ana Pérez', created_at: '2026-09-29T10:00:00Z', url: 'https://x', symbols: ['BTCUSD', 'MSTR'] },
   ], next_page_token: null } }));
   const d = new AlpacaDatos({ claveId: 'PK', secreto: 'S', fetch, reloj: new RelojSimulado(T0), limitador: null });
   const n = await d.noticias(['BTC/USD', 'SPY'], { desde: Date.UTC(2026, 8, 28), limite: 10 });
-  assert.deepEqual(n, [{ id: 7, titular: 'BTC sube', resumen: 'resumen', fuente: 'benzinga', t: Date.parse('2026-09-29T10:00:00Z'), url: 'https://x', simbolos: ['BTC/USD', 'MSTR'] }]);
+  assert.deepEqual(n, [{ id: 7, titular: 'BTC sube', resumen: 'resumen', fuente: 'benzinga', autor: 'Ana Pérez', t: Date.parse('2026-09-29T10:00:00Z'), url: 'https://x', simbolos: ['BTC/USD', 'MSTR'] }]);
   const ll = fetch.llamadas[0];
   assert.equal(ll.ruta, '/v1beta1/news');
   assert.equal(ll.params.symbols, 'BTCUSD,SPY');

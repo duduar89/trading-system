@@ -846,6 +846,8 @@
     requestAnimationFrame(bucle);
     if (t - est.ultimoPintado < pasoPintado(t) - 1) return;
     est.ultimoPintado = t;
+    // Con los informes abiertos el parqué no se ve: no se pinta (batería del móvil).
+    if (PQ.vistas && PQ.vistas.abierta()) { ultimaActualizacion = t; return; }
     const dt = Math.min(0.1, (t - ultimaActualizacion) / 1000);
     ultimaActualizacion = t;
     est.elenco.actualizar(dt * ritmoAndar(), t);
@@ -1025,7 +1027,18 @@
     alCerrarTarjeta: () => { est.seleccion = null; },
     alSeleccionar: (sel) => seleccionar(sel),
     ahoraServidor: () => ahoraServidor(),
+    // Ficha de un agente → sus decisiones (vista Decisiones filtrada por él).
+    alVerDecisiones: PQ.vistas ? (id) => { deseleccionar(); PQ.vistas.abrir('decisiones', { quien: id }); } : null,
   });
+  // Informes (Evolución, Estrategias, Noticias, Decisiones, Laboratorio): web/js/vistas.js.
+  if (PQ.vistas) {
+    PQ.vistas.iniciar({
+      instantanea: () => est.inst, ahoraServidor: () => ahoraServidor(), token: TOKEN, maqueta: ES_MAQUETA,
+      alCambiar: (abierta) => { if (!abierta) { est.capaClave = ''; est.texturasSucias = true; redimensionar(); } },
+      // La cara de quien decidió → su ficha en el parqué; al cerrarla, el foco vuelve a «Informes».
+      alVerAgente: (id) => seleccionar({ tipo: 'agente', id }, { origen: document.getElementById('abrir-vistas') }),
+    });
+  }
   construir(null);
   redimensionar();
   if (typeof ResizeObserver === 'function') new ResizeObserver(() => redimensionar()).observe(escena);

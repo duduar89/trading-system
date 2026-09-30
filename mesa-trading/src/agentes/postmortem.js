@@ -25,6 +25,10 @@ const SALIDAS_SIN_PISTA = new Set(['kill', 'manual', 'prueba']);
 const etiquetaDe = s => String(s || '').split('/')[0] || 'el activo';
 const num = x => (typeof x === 'number' && Number.isFinite(x) ? x : null);
 
+// En llano (30-sep-2026): se la dice el Auditor al operador, que no tiene por
+// qué saber qué es un régimen o un deslizamiento.
+const SALIDA_LLANA = Object.freeze({ kill: 'el kill switch', manual: 'una orden a mano', prueba: 'una prueba', riesgo: 'una decisión de riesgo', fin: 'el final de la prueba' });
+
 function textoLeccion(categoria, op) {
   const e = etiquetaDe(op.simbolo);
   const p = num(op.pnl);
@@ -33,12 +37,12 @@ function textoLeccion(categoria, op) {
   const pnl = f.usd(p, { signo: true });
   const monto = f.usd(p === null ? null : Math.abs(p));
   switch (categoria) {
-    case 'acierto_de_libro': return `${e} salió por regla con ${pnl}: la regla funcionó como estaba escrita.`;
-    case 'suerte': return `${e} ganó ${monto} pero salió por ${op.motivoSalida || 'otra causa'}, no por su regla.`;
-    case 'contra_regimen': return `${e} entró en RISK-OFF y perdió ${monto}.`;
-    case 'stop_estrecho': return `${e} tocó el stop en ${f.numero(num(op.barras))} velas y perdió ${monto}.`;
-    case 'ejecucion': return `${e} perdió ${monto} con ${f.pct(num(op.deslizamiento))} de deslizamiento en contra.`;
-    case 'noticia': return `${e} perdió ${monto} por un evento de noticias.`;
+    case 'acierto_de_libro': return `${e} salió por su regla con ${pnl}: la estrategia hizo lo que dice su manual.`;
+    case 'suerte': return `${e} ganó ${monto}, pero salió por ${SALIDA_LLANA[op.motivoSalida] || op.motivoSalida || 'otra causa'} y no por su regla: fue suerte.`;
+    case 'contra_regimen': return `${e} se compró con el mercado en contra (RISK-OFF) y perdió ${monto}.`;
+    case 'stop_estrecho': return `${e} tocó la salida de emergencia (stop) en ${f.numero(num(op.barras))} velas y perdió ${monto}: quizá estaba demasiado cerca.`;
+    case 'ejecucion': return `${e} perdió ${monto}: al ejecutar, el precio se fue un ${f.pct(num(op.deslizamiento))} en contra.`;
+    case 'noticia': return `${e} perdió ${monto} por una noticia.`;
     default: return `${e} perdió ${monto}: la señal no se confirmó.`;
   }
 }
@@ -102,7 +106,9 @@ function datosOperacion(op) {
 }
 
 const SISTEMA = 'Eres el Auditor post-mortem de una mesa de trading en papel. Clasificas operaciones cerradas en una lista cerrada '
-  + 'de categorías y escribes una lección de una frase en español. Solo usas cifras que estén en los datos.';
+  + 'de categorías y escribes una lección de una frase en español de España. Solo usas cifras que estén en los datos. '
+  + 'La lección se la dices al operador que llevó la operación: tono llano y cercano, como a un compañero que no sabe de bolsa, '
+  + 'sin jerga ni siglas sin explicar.';
 
 const INSTRUCCIONES = [
   'Para cada operación de «operaciones», elige una categoría:',
@@ -114,7 +120,7 @@ const INSTRUCCIONES = [
   '- acierto_de_libro: ganó saliendo por su regla.',
   '- suerte: ganó, pero no por su regla.',
   '«categoriaPorReglas» es la de las reglas fijas: úsala salvo que los datos digan otra cosa.',
-  'leccion: una frase de 100 caracteres como mucho, con cifras copiadas de los datos y sin adjetivos vacíos.',
+  'leccion: una frase de 100 caracteres como mucho, con cifras copiadas de los datos y sin adjetivos vacíos. Llana: «bajó nada más comprar y saltó la salida de emergencia (stop)», no «stop hit».',
 ].join('\n');
 
 function esquemaLote(ids) {

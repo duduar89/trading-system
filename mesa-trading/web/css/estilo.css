@@ -223,7 +223,7 @@ button { cursor: pointer; }
 .tarjeta-persona { display: flex; gap: 9px; align-items: center; margin: 12px 0 8px; padding: 8px; background: var(--panel-2); border-radius: 9px; }
 .tarjeta-persona div { display: flex; flex-direction: column; min-width: 0; }
 .tarjeta-persona b { font-size: 12.5px; }
-.tarjeta-persona span:not(.avatar) { font-size: 11.5px; color: var(--secundario); }
+.tarjeta-persona div span { font-size: 11.5px; color: var(--secundario); }
 .tabla { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 8px 0; font-size: 12.5px; }
 .tabla dt { color: var(--secundario); }
 .tabla dd { margin: 0; text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -516,4 +516,116 @@ table.resultados .fila-sin-comite th { color: #fcd34d; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* ---------- caras, pestañas del lateral y equipo ---------- */
+/* Caras SVG (caras.js): 24 en las respuestas, 40 en el feed y el equipo,
+   96 en la ficha. El SVG ya es redondo; el span solo fija el tamaño. */
+.cara { flex: none; display: inline-block; border-radius: 50%; line-height: 0; }
+.cara svg { display: block; width: 100%; height: 100%; }
+.cara-24 { width: 24px; height: 24px; }
+.cara-40 { width: 40px; height: 40px; }
+.cara-96 { width: 96px; height: 96px; }
+.cara-boton { flex: none; align-self: flex-start; padding: 0; border: 0; background: none; border-radius: 50%; line-height: 0; }
+.cara-boton:hover .cara { box-shadow: 0 0 0 2px rgba(255, 255, 255, .28); }
+
+/* Pestañas del panel lateral: Mensajes y Equipo (y las que se añadan). */
+.pestanas { display: flex; gap: 4px; min-width: 0; }
+.pestana {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 11px;
+  border-radius: 9px; border: 1px solid transparent;
+  background: transparent; color: var(--secundario);
+  font-size: 13px; font-weight: 750;
+}
+.pestana:hover { color: var(--texto); background: rgba(255, 255, 255, .04); }
+.pestana[aria-selected="true"] { color: var(--texto); background: var(--panel-2); border-color: var(--borde-2); }
+.pestana .contador { margin-left: 0; }
+.contador:empty { display: none; }
+.vista { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.vista[hidden] { display: none; }
+
+/* Feed: departamento con su color, rol y conversaciones. */
+.dep-etq {
+  flex: none; white-space: nowrap;
+  font-size: 10.5px; font-weight: 750; line-height: 16px;
+  padding: 0 6px; border-radius: 999px;
+  color: color-mix(in srgb, var(--dep, #8a93b0) 68%, #fff);
+  background: color-mix(in srgb, var(--dep, #8a93b0) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dep, #8a93b0) 42%, transparent);
+}
+.dep-etq.humano { --dep: #f59e0b; }
+.cab { align-items: center; }
+.rol { display: flex; gap: 6px; align-items: baseline; min-width: 0; font-size: 11px; color: var(--secundario); margin-top: 1px; }
+.rol-texto { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.para { flex: none; white-space: nowrap; color: #c7cde0; font-weight: 700; }
+.respuestas { display: flex; flex-direction: column; gap: 2px; margin: 6px 0 0; padding-left: 9px; border-left: 2px solid var(--borde-2); }
+.msg.respuesta { padding: 5px 4px; gap: 7px; }
+.msg.respuesta + .msg.respuesta { border-top: 0; }
+.msg.respuesta .cab b { font-size: 12px; }
+.msg.respuesta p { font-size: 12px; }
+
+/* Ficha del agente. */
+.ficha-agente-cab { display: flex; gap: 12px; align-items: center; }
+.ficha-agente-quien { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ficha-agente-quien .tarjeta-titulo { font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; }
+.ficha-agente-quien .tarjeta-sub { margin-top: 0; }
+.ficha-agente-etiquetas { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.estado-agente { flex: none; font-size: 10.5px; font-weight: 700; line-height: 16px; padding: 0 7px; border-radius: 999px; color: #c7cde0; background: #2a3354; white-space: nowrap; }
+.estado-agente.estado-reunion { color: #fcd34d; background: rgba(245, 158, 11, .16); }
+.estado-agente.estado-descanso { color: #93c5fd; background: rgba(59, 130, 246, .16); }
+.estado-agente.estado-de_pie { color: #fca5a5; background: rgba(239, 68, 68, .14); }
+.estado-agente.estado-banquillo { color: var(--secundario); background: rgba(255, 255, 255, .05); }
+.que-hace h3 { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--secundario); margin: 14px 0 3px; }
+.que-hace p { margin: 0; font-size: 13px; line-height: 1.45; color: #dfe3ef; }
+.ultimos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ultimos li { font-size: 12px; color: #cfd4e4; overflow-wrap: anywhere; }
+.ultimos time { color: var(--tenue); font-variant-numeric: tabular-nums; }
+.detalle-tecnico { margin: 12px 0 2px; border-top: 1px solid var(--borde); padding-top: 4px; }
+.detalle-tecnico summary { cursor: pointer; padding: 6px 0; font-size: 12px; font-weight: 700; color: var(--secundario); }
+.detalle-tecnico summary:hover { color: var(--texto); }
+.detalle-tecnico .que-decide h3 { margin-top: 4px; }
+.tarjeta-persona.con-ficha { width: 100%; border: 1px solid transparent; color: inherit; text-align: left; }
+.tarjeta-persona.con-ficha:hover { border-color: var(--borde-2); background: #202842; }
+.tarjeta-persona .ir { margin-left: auto; font-size: 18px; color: var(--secundario); }
+
+/* Pestaña Equipo. */
+.buscador { padding: 8px 12px; border-bottom: 1px solid var(--borde); }
+.buscador .campo { padding: 7px 11px; font-size: 13px; }
+.equipo { flex: 1; overflow-y: auto; padding: 2px 8px 16px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #2e3858 transparent; }
+.equipo-dep { margin: 12px 0 2px; }
+.equipo-dep-cab { padding: 0 6px 4px; }
+.equipo-dep-cab h3 { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 13px; font-weight: 800; }
+.equipo-dep-cab .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--dep); flex: none; }
+.equipo-dep-cab .cuantos { margin-left: auto; font-size: 11px; font-weight: 650; color: var(--secundario); font-variant-numeric: tabular-nums; }
+.equipo-dep-cab p { margin: 3px 0 0; font-size: 11.5px; color: var(--secundario); }
+.equipo-lista { list-style: none; margin: 0; padding: 0; }
+.equipo-mesa { padding: 8px 6px 2px; font-size: 10.5px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--secundario); }
+.equipo-persona { display: flex; gap: 10px; align-items: flex-start; width: 100%; padding: 8px 6px; border: 0; border-radius: 9px; background: transparent; color: inherit; text-align: left; }
+.equipo-persona:hover { background: rgba(255, 255, 255, .04); }
+.equipo-texto { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.equipo-nombre { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.equipo-nombre b { font-size: 13px; }
+.equipo-rol { font-size: 11.5px; color: var(--secundario); }
+.equipo-hace { font-size: 12px; color: #c1c8dc; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.ultimo .vacio { padding: 2px 0; }
+/* La ficha de un agente, algo más ancha en escritorio: la cara de 96 y el nombre caben en una fila. */
+@media (min-width: 768px) {
+  .tarjeta.ficha-agente { width: 340px; }
+}
+
+@media (max-width: 767px) {
+  /* La raya del asa, arriba del todo (un botón centra su contenido en
+     vertical y la raya caía encima de las pestañas); las pestañas, debajo y
+     por encima del asa, dentro de los 50 px que asoman con la hoja cerrada. */
+  .asa { display: flex; align-items: flex-start; justify-content: center; }
+  .asa span { margin: 5px auto 0; }
+  .lateral-cab { padding-top: 13px; }
+  .pestanas { position: relative; z-index: 2; }
+  .pestana { height: 34px; }
+  /* 16 px: con menos, Safari del iPhone hace zoom al escribir. */
+  .buscador .campo { font-size: 16px; }
+  .detalle-tecnico summary { padding: 11px 0; }
+  .equipo-persona { padding: 10px 6px; }
 }

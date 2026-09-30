@@ -36,6 +36,19 @@
     return h >>> 0;
   }
 
+  // Apariencia de un agente, determinista por su id: la comparten el muñeco
+  // del parqué y su cara (caras.js), así la cara de Marta tiene la misma piel
+  // y el mismo pelo que la Marta que anda por la oficina.
+  function aspectoDe(id) {
+    const h = hash(id);
+    return {
+      piel: PIELES[h % PIELES.length],
+      pelo: PELOS[(h >>> 4) % PELOS.length],
+      peinado: (h >>> 9) % 3,           // 0 corto, 1 largo, 2 moño
+      desfase: (h % 1000) / 1000,       // para que no tecleen todos a la vez
+    };
+  }
+
   // ---------- bocadillos ----------
 
   // 6 s + 60 ms por carácter, como mucho 12 s (propuesta-visual §4.6).
@@ -93,13 +106,7 @@
     constructor(agente, sitio, mapa) {
       this.id = agente.id;
       this.agente = agente;
-      const h = hash(agente.id);
-      this.aspecto = {
-        piel: PIELES[h % PIELES.length],
-        pelo: PELOS[(h >>> 4) % PELOS.length],
-        peinado: (h >>> 9) % 3,           // 0 corto, 1 largo, 2 moño
-        desfase: (h % 1000) / 1000,       // para que no tecleen todos a la vez
-      };
+      this.aspecto = aspectoDe(agente.id);
       this.sitio = sitio;
       this.destino = null;
       this.ruta = [];
@@ -726,5 +733,6 @@
     Personaje, crearElenco, planificarActividad, intervaloPasoMs, ventanaActividad, textoActividad, elegible, puntoDeObjetivo,
     duracionBocadillo, partirTexto, elegirBocadillos, direccion,
     pintarPersonaje, pintarBocadillos, cajaPersonaje, cabeza, hash, giroCabeza, rafaga,
+    PIELES, PELOS, aspectoDe,
   };
 });

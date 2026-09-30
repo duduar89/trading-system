@@ -480,6 +480,13 @@ function crearServidorWeb({
     }
     if (req.method === 'GET' && ruta === '/api/operaciones') return enviarJSON(res, 200, leerJSONL(lector.rutas.operaciones, 200));
     if (req.method === 'GET' && ruta === '/api/costes-llm') return enviarJSON(res, 200, costesLLM(lector.rutas.costes));
+    // Informes del panel (§7): lo mismo que el modo local (src/informes), con
+    // la instantánea que publicó el último latido.
+    const inf = /^\/api\/(noticias|historial|decisiones|estrategias|laboratorio)$/.exec(ruta);
+    if (req.method === 'GET' && inf) {
+      const instantanea = () => { const r = lector.instantanea(); return r ? r.datos : null; };
+      return enviarJSON(res, 200, require('../informes').consultar(inf[1], { carpeta, params: url.searchParams, instantanea }));
+    }
     const m = /^\/api\/comando\/([a-z-]+)$/.exec(ruta);
     if (m) return comando(req, res, m[1]);
     req.resume();

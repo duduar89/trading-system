@@ -126,22 +126,43 @@ async function revisionMensual(ctx) {
     return c ? c.motivo : '';
   };
 
+  const anotar = d => { if (typeof ctx.anotarDecision === 'function') ctx.anotarDecision(d); };
+  const metricasDe = m => {
+    const x = m.metricas || {};
+    return {
+      operaciones: x.operaciones ?? null, sharpe: x.sharpe ?? null, sharpeAjustado: x.sharpeAjustado ?? null, maxDD: x.maxDD ?? null,
+      diasActiva: diasActiva(m, ahora), sharpeBacktest: m.backtest ? m.backtest.sharpe ?? null : null,
+    };
+  };
   for (const id of r.ascensos) {
     const m = porId.get(id);
     m.estado = 'titular';
     m.nota = `Ascendida el ${new Date(ahora).toISOString().slice(0, 10)}. ${motivoDe(id)}`.trim();
-    ctx.bus.publicar({ de: 'cio', canal: 'direccion', tipo: 'decision', texto: plantillas.frase(`Asciende ${m.nombre} a titular. ${motivoDe(id)}`), datos: { mesaId: id }, importancia: 3 });
+    const texto = plantillas.frase(`Asciendo ${m.nombre} a titular: deja de estar en prueba. ${motivoDe(id)}`);
+    ctx.bus.publicar({ de: 'cio', canal: 'direccion', tipo: 'decision', texto, datos: { mesaId: id }, importancia: 3 });
+    anotar({ tipo: 'ascenso', quien: 'cio', resumen: texto, datos: { mesaId: id, mesa: m.nombre, motivo: motivoDe(id) || null, reglas: 'asignador §5.7', ...metricasDe(m) } });
   }
-  for (const id of r.despidos) await mandarAlBanquillo(ctx, porId.get(id), motivoDe(id) || 'por debajo del umbral');
-  for (const id of r.descartes) await mandarAlBanquillo(ctx, porId.get(id), motivoDe(id) || 'no superó la incubación', { descarte: true });
+  for (const id of r.despidos) {
+    const m = porId.get(id);
+    await mandarAlBanquillo(ctx, m, motivoDe(id) || 'por debajo del umbral');
+    anotar({ tipo: 'despido', quien: 'cio', resumen: `${m.nombre} al banquillo: ${motivoDe(id) || 'por debajo del umbral'}`, datos: { mesaId: id, mesa: m.nombre, motivo: motivoDe(id) || null, ...metricasDe(m) } });
+  }
+  for (const id of r.descartes) {
+    const m = porId.get(id);
+    await mandarAlBanquillo(ctx, m, motivoDe(id) || 'no superó la incubación', { descarte: true });
+    anotar({ tipo: 'descarte', quien: 'cio', resumen: `${m.nombre} descartada tras la incubación: ${motivoDe(id) || 'no superó la incubación'}`, datos: { mesaId: id, mesa: m.nombre, motivo: motivoDe(id) || null, ...metricasDe(m) } });
+  }
 
+  const cambiosPeso = [];
   for (const m of e.mesas) {
     const nuevo = typeof r.pesos[m.id] === 'number' ? r.pesos[m.id] : (m.estado === 'banquillo' ? 0 : m.peso);
+    const antes = m.peso || 0;
     const flujo = fijarPeso(ctx, m, nuevo);
+    if (flujo) cambiosPeso.push({ mesaId: m.id, mesa: m.nombre, de: antes, a: nuevo, flujo, motivo: motivoDe(m.id) || null });
     if (flujo && !r.despidos.includes(m.id) && !r.descartes.includes(m.id)) {
       ctx.bus.publicar({
         de: 'cio', canal: 'direccion', tipo: 'decision',
-        texto: plantillas.frase(`${m.nombre}: peso ${f.pct(nuevo, { decimales: 1 })} (${f.usd(flujo, { signo: true })}). ${motivoDe(m.id)}`, 200),
+        texto: plantillas.frase(`${m.nombre} pasa a manejar el ${f.pct(nuevo, { decimales: 1 })} del capital (${f.usd(flujo, { signo: true })}). ${motivoDe(m.id)}`, 220),
         datos: { mesaId: m.id, peso: nuevo, flujo }, importancia: 2,
       });
     }
@@ -149,11 +170,19 @@ async function revisionMensual(ctx) {
   const resumen = {
     pesos: r.pesos, ascensos: r.ascensos, despidos: r.despidos, descartes: r.descartes, contratadas: contratadas.map(m => m.id),
   };
-  ctx.bus.publicar({
-    de: 'cio', canal: 'direccion', tipo: 'informe',
-    texto: plantillas.frase(`Revisión mensual: ${contratadas.length} contratadas, ${r.ascensos.length} ascensos, ${r.despidos.length} despidos, ${r.descartes.length} descartes; ${r.cambios.length} cambios de peso.`),
-    datos: resumen, importancia: 2,
+  const textoRevision = plantillas.frase(`Revisión del mes: ${contratadas.length} mesas contratadas, ${r.ascensos.length} ascendidas, ${r.despidos.length} al banquillo, ${r.descartes.length} descartadas tras la prueba y ${r.cambios.length} cambios de capital.`);
+  ctx.bus.publicar({ de: 'cio', canal: 'direccion', tipo: 'informe', texto: textoRevision, datos: resumen, importancia: 2 });
+  anotar({
+    tipo: 'asignacion', quien: 'cio', resumen: textoRevision,
+    datos: { ...resumen, cambios: cambiosPeso, contratadas: contratadas.map(m => ({ mesaId: m.id, mesa: m.nombre, hipotesisId: m.hipotesisId || null, peso: m.peso })) },
   });
+  // Historial (§6.10): un punto por cada clase de suceso de esta revisión.
+  if (typeof ctx.anotarHistorial === 'function') {
+    if (cambiosPeso.length || contratadas.length) ctx.anotarHistorial('asignacion');
+    if (r.ascensos.length) ctx.anotarHistorial('ascenso');
+    if (r.despidos.length) ctx.anotarHistorial('despido');
+    if (r.descartes.length) ctx.anotarHistorial('descarte');
+  }
   return resumen;
 }
 

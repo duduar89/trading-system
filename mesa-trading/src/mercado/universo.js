@@ -14,6 +14,14 @@ const UNIVERSO = Object.freeze([
   { simbolo: 'LINK/USD', etiqueta: 'LINK', clase: 'cripto', nombre: 'Chainlink' },
   { simbolo: 'AVAX/USD', etiqueta: 'AVAX', clase: 'cripto', nombre: 'Avalanche' },
   { simbolo: 'DOGE/USD', etiqueta: 'DOGE', clase: 'cripto', nombre: 'Dogecoin' },
+  // Ampliación del 30-sep-2026 (decisión de Eduardo con el histórico real):
+  // solo las opera la mesa «Momentum cripto ampliada», en incubación. La
+  // titular sigue con sus 6 (con LTC y BCH su Sharpe bajaba de 0,82 a 0,58;
+  // con XRP, a 0,56; ADA solo tiene 7 meses de datos en Alpaca).
+  { simbolo: 'XRP/USD', etiqueta: 'XRP', clase: 'cripto', nombre: 'XRP', desde: 2 },
+  { simbolo: 'LTC/USD', etiqueta: 'LTC', clase: 'cripto', nombre: 'Litecoin', desde: 2 },
+  { simbolo: 'BCH/USD', etiqueta: 'BCH', clase: 'cripto', nombre: 'Bitcoin Cash', desde: 2 },
+  { simbolo: 'ADA/USD', etiqueta: 'ADA', clase: 'cripto', nombre: 'Cardano', desde: 2 },
   // ETF: solo con claves de Alpaca (feed IEX).
   { simbolo: 'SPY', etiqueta: 'SPY', clase: 'accion', nombre: 'S&P 500 (SPDR)' },
   { simbolo: 'QQQ', etiqueta: 'QQQ', clase: 'accion', nombre: 'Nasdaq 100 (Invesco QQQ)' },
@@ -23,6 +31,11 @@ const UNIVERSO = Object.freeze([
   { simbolo: 'XLE', etiqueta: 'XLE', clase: 'accion', nombre: 'Energía (Select Sector SPDR)' },
   { simbolo: 'XLK', etiqueta: 'XLK', clase: 'accion', nombre: 'Tecnología (Select Sector SPDR)' },
   { simbolo: 'XLF', etiqueta: 'XLF', clase: 'accion', nombre: 'Financieras (Select Sector SPDR)' },
+  { simbolo: 'DIA', etiqueta: 'DIA', clase: 'accion', nombre: 'Dow Jones 30 (SPDR)', desde: 2 },
+  // SOLO DATO: el termómetro del miedo para Macro (§4.2). Ninguna mesa lo
+  // opera: no tiene analista, ni puesto, ni orden (disponibles() no lo da y
+  // el Ejecutor rechaza cualquier orden suya).
+  { simbolo: 'VIXY', etiqueta: 'VIXY', clase: 'accion', nombre: 'Futuros del VIX a corto (ProShares)', soloDato: true, desde: 2 },
 ].map(a => Object.freeze(a)));
 
 const POR_SIMBOLO = new Map(UNIVERSO.map(a => [a.simbolo, a]));
@@ -59,15 +72,34 @@ function esCripto(s) {
   return String(s || '').includes('/');
 }
 
-// Sin claves de Alpaca solo hay datos (y bróker simulado) de las cripto.
+// Un activo que solo es dato (VIXY): nadie lo opera.
+function esSoloDato(s) {
+  const a = POR_SIMBOLO.get(s);
+  return Boolean(a && a.soloDato);
+}
+
+// Lo que se puede operar. Sin claves de Alpaca solo hay datos (y bróker
+// simulado) de las cripto. Los de solo dato no salen nunca de aquí.
 function disponibles({ hayAlpaca = false } = {}) {
-  return UNIVERSO.filter(a => a.clase === 'cripto' || hayAlpaca);
+  return UNIVERSO.filter(a => !a.soloDato && (a.clase === 'cripto' || hayAlpaca));
+}
+
+// `desde`: 1 (sin campo) el universo original; 2 la ampliación del 30-sep-2026.
+// Sirve para que los agentes nuevos no cambien el nombre de los que ya había
+// (src/agentes/registro.js).
+function generacion(s) {
+  const a = POR_SIMBOLO.get(s);
+  return a && a.desde ? a.desde : 1;
 }
 
 const CRIPTO = Object.freeze(UNIVERSO.filter(a => a.clase === 'cripto').map(a => a.simbolo));
-const ETF = Object.freeze(UNIVERSO.filter(a => a.clase === 'accion').map(a => a.simbolo));
+// La cesta de «comprar y mantener» cripto (§5.5) son las 6 originales: la
+// ampliación no la cambia (una cartera sombra no se redefine a mitad).
+const CESTA_CRIPTO = Object.freeze(['BTC/USD', 'ETH/USD', 'SOL/USD', 'LINK/USD', 'AVAX/USD', 'DOGE/USD']);
+const ETF = Object.freeze(UNIVERSO.filter(a => a.clase === 'accion' && !a.soloDato).map(a => a.simbolo));
+const SOLO_DATO = Object.freeze(UNIVERSO.filter(a => a.soloDato).map(a => a.simbolo));
 
 module.exports = {
-  MARCOS, UNIVERSO, CRIPTO, ETF,
-  porSimbolo, porEtiqueta, clave, desdeClave, disponibles, esCripto,
+  MARCOS, UNIVERSO, CRIPTO, CESTA_CRIPTO, ETF, SOLO_DATO,
+  porSimbolo, porEtiqueta, clave, desdeClave, disponibles, esCripto, esSoloDato, generacion,
 };

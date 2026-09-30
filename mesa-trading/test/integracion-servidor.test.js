@@ -54,12 +54,14 @@ const ELEMENTOS = {
   cotizaciones: { simbolo: 'string', etiqueta: 'string', precio: 'number', var24hPct: 'number|null', t: 'number' },
   departamentos: { id: 'string', nombre: 'string', color: 'string', sala: 'string' },
   agentes: {
-    id: 'string', nombre: 'string', departamento: 'string', rol: 'string', queDecide: 'string', usaLLM: 'boolean', sala: 'string', estado: 'string',
+    id: 'string', nombre: 'string', departamento: 'string', rol: 'string', queDecide: 'string', queHace: 'string', usaLLM: 'boolean', sala: 'string', estado: 'string',
     bocadillo: 'object|null', mesaId: 'string|null', simbolo: 'string|null', etiqueta: 'string|null', puestoId: 'string|null',
   },
   mesas: {
     id: 'string', nombre: 'string', familia: 'string', marco: 'string', estado: 'string', peso: 'number', capital: 'number', multiplicador: 'number',
     universo: 'array', params: 'object', metricas: 'object', pnlDia: 'number', nota: 'string|null',
+    diasActiva: 'number', filtros: 'array', sharpeBacktest: 'number|null', backtest: 'object|null',
+    explicacion: { queMira: 'string', cuandoCompra: 'string', cuandoVende: 'string', cuandoNada: 'string', riesgo: 'string', filtros: 'string|null' },
   },
   puestos: {
     id: 'string', mesaId: 'string', simbolo: 'string', etiqueta: 'string', agenteId: 'string', posicion: 'object|null', pnlDia: 'number',
@@ -157,7 +159,16 @@ test('la instantánea tiene la misma forma que la maqueta de la interfaz', async
   mismasClaves(real.listoParaReal, maq.listoParaReal, 'listoParaReal');
   mismasClaves(real.listoParaReal.comite, maq.listoParaReal.comite, 'listoParaReal.comite');
   mismasClaves(real.listoParaReal.criterios[0], maq.listoParaReal.criterios[0], 'listoParaReal.criterios[0]');
-  const pares = { agentes: [], mesas: [], puestos: [], posiciones: [], benchmarks: [], cotizaciones: [], departamentos: [], curva: [], ejecuciones: [], mensajes: [] };
+  // Campos de datos del 30-sep-2026 (§7: agentes[].queHace; mesas[].explicacion,
+  // filtros, diasActiva, sharpeBacktest y backtest): mientras la maqueta no los
+  // traiga, la real puede llevarlos de más; en cuanto los traiga, se comparan igual.
+  const aun = (lista, claves) => claves.filter(k => !(maq[lista].length && k in maq[lista][0]));
+  const pares = {
+    agentes: aun('agentes', ['queHace']), mesas: aun('mesas', ['explicacion', 'filtros', 'diasActiva', 'sharpeBacktest', 'backtest']),
+    puestos: [], posiciones: [], benchmarks: [], cotizaciones: [], departamentos: [], curva: [], ejecuciones: [],
+    // Conversación del 30-sep-2026 (§6.2): lo mismo, hasta que la maqueta traiga respondeA e hilo.
+    mensajes: aun('mensajes', ['respondeA', 'hilo']),
+  };
   for (const [lista, extras] of Object.entries(pares)) {
     if (!real[lista].length || !maq[lista].length) continue;
     mismasClaves(real[lista][0], maq[lista][0], `${lista}[0]`, extras);

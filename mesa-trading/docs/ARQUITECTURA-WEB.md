@@ -263,7 +263,8 @@ mesa_latidos   (id BIGINT PK AI, inicio DATETIME(3), ms INT, ok TINYINT, resumen
 ```
 
 `fuente` ∈ `operaciones`, `operaciones-sombra`, `ordenes`, `incidentes`,
-`llm-costes`, `informes`, `mensajes`, `latidos`. `linea` = número de línea en su
+`llm-costes`, `informes`, `mensajes`, `latidos`, y desde el 30-sep-2026
+`noticias`, `historial` y `decisiones` (ARQUITECTURA §6.10). `linea` = número de línea en su
 JSONL: por eso la copia es idempotente. Las posiciones copiadas van en
 `data/espejo.json`.
 

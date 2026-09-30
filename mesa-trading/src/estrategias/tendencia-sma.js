@@ -64,24 +64,25 @@ function decidir(prep, { simbolo, i, iAnterior, posicion = null, contexto = {}, 
   const p = prep.params;
   const s = prep.porSimbolo[simbolo];
   const et = c.etiqueta(simbolo);
-  const tm = c.textoMarco(marco);
-  if (!s || i < 0 || i >= s.c.length) return c.senal(posicion ? 'mantener' : 'nada', { estado: textos ? `Sin datos de ${et}` : '' });
+  if (!s || i < 0 || i >= s.c.length) return c.senal(posicion ? 'mantener' : 'nada', { estado: textos ? `No tengo datos de ${et} ahora mismo.` : '' });
   const r = s.rapida[i]; const l = s.lenta[i]; const f = s.filtro[i]; const a = s.atr[i]; const cierre = s.c[i];
   if (r === null || l === null || f === null || a === null) {
     const faltan = calentamiento(p) - 1 - i;
-    return c.senal(posicion ? 'mantener' : 'nada', { estado: textos ? `Calentando indicadores de ${et} (faltan ${faltan} velas ${tm})` : '' });
+    return c.senal(posicion ? 'mantener' : 'nada', { estado: textos ? c.calentandoLlano(et, faltan, marco) : '' });
   }
+  // En llano: «su media de 7 velas de 4 horas (3.493 $)».
+  const media = (n, v) => `su media de ${c.tramoLlano(n, marco)}${v === undefined ? '' : ` (${c.px(v)})`}`;
   const txtMedias = textos ? `SMA${p.rapida} ${formato.precio(r)} ${r > l ? '>' : r < l ? '<' : '='} SMA${p.lenta} ${formato.precio(l)}` : '';
 
   if (posicion) {
     if (r < l) {
-      return c.senal('cerrar', { motivo: txtMedias, estado: textos ? `Cierro ${et}: ${txtMedias} (${tm})` : '' });
+      return c.senal('cerrar', { motivo: txtMedias, estado: textos ? `Mi regla dice vender ${et}: ${media(p.rapida, r)} ha caído por debajo de la de ${p.lenta} (${c.px(l)}); la subida se ha acabado.` : '' });
     }
     return c.senal('mantener', {
       peso: prep.peso,
       stop: posicion.stop ?? null,
       motivo: txtMedias,
-      estado: textos ? `Largo en ${et} desde ${formato.precio(posicion.entrada)}; stop ${formato.precio(posicion.stop)}. Sale si SMA${p.rapida} < SMA${p.lenta} (${tm})` : '',
+      estado: textos ? `Tengo ${et} desde ${c.px(posicion.entrada)}. Vendo si ${media(p.rapida)} cae por debajo de la de ${p.lenta}, o si cae a ${c.px(posicion.stop)} (stop).` : '',
     });
   }
 
@@ -91,16 +92,16 @@ function decidir(prep, { simbolo, i, iAnterior, posicion = null, contexto = {}, 
     const motivo = textos ? `${txtMedias}; cierre ${formato.precio(cierre)} > SMA${p.filtro} ${formato.precio(f)}` : '';
     const filtro = c.filtroQueBloquea(prep, simbolo, i, contexto);
     if (filtro) {
-      return c.senal('nada', { motivo, estado: textos ? `Señal LONG en ${et} ${c.textoBloqueo(filtro, contexto, prep, simbolo, i)}` : '' });
+      return c.senal('nada', { motivo, estado: textos ? `Mi regla daría compra en ${et}, pero no compro: ${c.bloqueoLlano(filtro, contexto, prep, simbolo, i)}.` : '' });
     }
     return c.senal('abrir', {
       peso: prep.peso, stop, motivo,
-      estado: textos ? `Abro ${et}: ${motivo}; stop ${formato.precio(stop)} (${tm})` : '',
+      estado: textos ? `Mi regla dice comprar ${et}: ${media(p.rapida, r)} ha cruzado por encima de la de ${p.lenta} (${c.px(l)}) y el precio sigue sobre su media de ${p.filtro} (${c.px(f)}). Si cae a ${c.px(stop)}, vendo (stop).` : '',
     });
   }
   return c.senal('nada', {
     motivo: textos ? `${txtMedias}; cierre ${formato.precio(cierre)} ${cierre > f ? '>' : '≤'} SMA${p.filtro} ${formato.precio(f)}` : '',
-    estado: textos ? `Sin posición en ${et}. Esperando a que SMA ${p.rapida}-${p.lenta} dé LONG con filtro ${p.filtro} (${tm})` : '',
+    estado: textos ? `No tengo ${et}. Compro cuando ${media(p.rapida)} cruce por encima de la de ${p.lenta} con el precio sobre su media de ${p.filtro}.` : '',
   });
 }
 
@@ -136,9 +137,25 @@ function describir(params) {
   return `SMA ${p.rapida}-${p.lenta} con filtro ${p.filtro}, stop ${formato.numero(p.atrStop, 1)}×ATR(${p.atr}) con trailing`;
 }
 
+// En lenguaje llano, con los parámetros de la mesa (§4.3, explicar).
+function explicar(params, { universo = [], filtros = [], limites = null } = {}) {
+  const p = completar(params);
+  const quien = c.activosLlano(universo);
+  return {
+    queMira: `Mira ${quien} en velas de 4 horas y compara dos medias del precio: la de las últimas ${p.rapida} velas (rápida) y la de las últimas ${p.lenta} (lenta). Una media es el precio promedio de ese tramo: suaviza los vaivenes.`,
+    cuandoCompra: `Compra cuando la media rápida pasa por encima de la lenta (el precio empieza a subir con fuerza) y además el precio está por encima de su media de ${p.filtro} velas (la tendencia de fondo también es alcista).`,
+    cuandoVende: `Vende cuando la media rápida vuelve a caer por debajo de la lenta, o si salta el stop (precio de salida de emergencia) a ${c.numeroLlano(p.atrStop)} veces el movimiento típico de ${p.atr} velas (ATR) por debajo; ese stop sube con el precio y nunca baja.`,
+    cuandoNada: 'Sin cruce hacia arriba, o con el precio por debajo de la media larga, no hace nada y espera en efectivo.',
+    riesgo: `Opera a menudo y paga comisión en cada compra y venta; en mercados de lado da muchas señales falsas. ${c.riesgoComun(limites)}`,
+    filtros: c.explicarFiltros(filtros),
+  };
+}
+
 module.exports = {
   familia,
   nombre: 'Tendencia SMA',
+  explicacion: explicar(parametrosPorDefecto),
+  explicar,
   descripcion: 'Largo cuando la SMA rápida cruza por encima de la lenta con el precio sobre la SMA filtro; sale cuando la rápida cae bajo la lenta o salta el stop (ATR con trailing).',
   marco,
   parametrosPorDefecto,

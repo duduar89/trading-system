@@ -8,8 +8,9 @@ const { evaluarPropuesta } = require('../../riesgo/limites');
 const { vigilar, FACTOR_CAIDA } = require('../../riesgo/vigilante');
 const { directivasVigentes } = require('../megafono');
 const plantillas = require('../plantillas');
+const conversacion = require('../conversacion');
 const { diaUTC, HORA } = require('../../util/reloj');
-const { etiqueta } = require('./comun');
+const { etiqueta, EPS } = require('./comun');
 
 const MINUTO = 60_000;
 
@@ -73,7 +74,8 @@ function contexto(ctx, { sombra = false } = {}) {
 }
 
 // Evalúa una propuesta. Las reales se cuentan en el canal de riesgo con las
-// cifras de cada motivo; las del sombra, en silencio.
+// cifras de cada motivo, contestando al operador por su nombre en el hilo de
+// su operación (§6.2); las del sombra, en silencio.
 function evaluar(ctx, propuesta, { sombra = false } = {}) {
   const r = evaluarPropuesta(propuesta, contexto(ctx, { sombra }));
   if (sombra) return r;
@@ -83,16 +85,23 @@ function evaluar(ctx, propuesta, { sombra = false } = {}) {
     puestoId: propuesta.puestoId, mesaId: propuesta.mesaId, simbolo: propuesta.simbolo, tipo: propuesta.tipo, lado: propuesta.lado,
     decision: r.decision, nocionalPedido: propuesta.nocional ?? null, nocional: r.nocional, cantidad: r.cantidad, motivos: r.motivos,
   };
+  const operador = conversacion.operadorDe(ctx, propuesta.mesaId, propuesta.simbolo);
+  const a = operador ? conversacion.pilaDe(ctx, operador) : null;
+  const para = operador || 'todos';
   if (r.decision === 'vetar') {
     ctx.estado.contadores.vetos++;
     ctx.estado.contadores.vetosDesdeComite++;
-    ctx.bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'veto', texto: plantillas.veto({ etiqueta: e, motivos: r.motivos }), datos, importancia: 2 });
+    const texto = plantillas.veto({ etiqueta: e, lado: propuesta.lado, motivos: r.motivos, a });
+    conversacion.seguir(ctx, propuesta.puestoId, { de: 'riesgos', para, canal: 'riesgo', tipo: 'veto', texto, datos, importancia: 2 });
+    // Una compra vetada acaba ahí su conversación (sin posición no hay más que contar).
+    const p = ctx.libros && typeof ctx.libros.puesto === 'function' ? ctx.libros.puesto(propuesta.puestoId) : null;
+    if (propuesta.lado === 'compra' && !(p && p.cantidad > EPS)) conversacion.terminar(ctx, propuesta.puestoId);
+    if (typeof ctx.anotarDecision === 'function') ctx.anotarDecision({ tipo: 'veto', quien: 'riesgos', resumen: texto, datos });
   } else {
-    ctx.bus.publicar({
-      de: 'riesgos', canal: 'riesgo', tipo: 'aprobacion',
-      texto: plantillas.aprobacion({ etiqueta: e, lado: propuesta.lado, decision: r.decision, nocional: r.nocional, nocionalPedido: propuesta.nocional, cantidad: r.cantidad, motivos: r.motivos }),
-      datos, importancia: r.decision === 'reducir' ? 2 : 1,
-    });
+    const texto = plantillas.aprobacion({ etiqueta: e, lado: propuesta.lado, tipo: propuesta.tipo, decision: r.decision, nocional: r.nocional, nocionalPedido: propuesta.nocional, cantidad: r.cantidad, motivos: r.motivos, a });
+    conversacion.seguir(ctx, propuesta.puestoId, { de: 'riesgos', para, canal: 'riesgo', tipo: 'aprobacion', texto, datos, importancia: r.decision === 'reducir' ? 2 : 1 });
+    // Solo el recorte es una decisión de Riesgos: la aprobación tal cual queda en la orden.
+    if (r.decision === 'reducir' && typeof ctx.anotarDecision === 'function') ctx.anotarDecision({ tipo: 'recorte', quien: 'riesgos', resumen: texto, datos });
   }
   return r;
 }
@@ -169,9 +178,13 @@ function vigilarFondo(ctx) {
   }
   for (const a of r.acciones) {
     if (a.tipo === 'solo_cerrar') {
+      const nuevo = e.fondo.nivel !== 'solo_cerrar';
       e.fondo.nivel = 'solo_cerrar';
       e.fondo.soloCerrarHasta = a.hasta;
       e.fondo.motivo = a.motivo;   // el aviso con las cifras ya salió en r.alertas
+      if (nuevo && typeof ctx.anotarDecision === 'function') {
+        ctx.anotarDecision({ tipo: 'pausa', quien: 'riesgos', resumen: `Solo cerrar hasta las 00:00 UTC: ${a.motivo}`, datos: { accion: 'solo_cerrar', nivel: 'solo_cerrar', hasta: a.hasta, motivo: a.motivo } });
+      }
     }
   }
   return { ...r, dia: diaUTC(ahora), desdeReapertura: ref.desdeReapertura };

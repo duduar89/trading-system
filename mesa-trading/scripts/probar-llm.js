@@ -59,7 +59,7 @@ async function casosRevision() {
 
   console.log('— Post-mortem');
   const perdedora = { id: 'op-1', mesaId: 'tendencia', simbolo: 'SOL/USD', pnl: -45.2, pnlPct: -0.0113, motivoSalida: 'stop', barras: 2 };
-  caso('lección de reglas sin «perdió -»', postmortem.clasificarReglas(perdedora).leccion, 'SOL tocó el stop en 2 velas y perdió 45,20 $.');
+  caso('lección de reglas sin «perdió -»', postmortem.clasificarReglas(perdedora).leccion, 'SOL tocó la salida de emergencia (stop) en 2 velas y perdió 45,20 $: quizá estaba demasiado cerca.');
   const llmSuerte = { activo: true, pedirJSON: async () => ({ ok: true, costeUsd: 0, datos: { clasificaciones: [{ operacionId: 'op-1', categoria: 'suerte', leccion: 'SOL ganó +45,20 $ (+1,13 %) por suerte.' }] } }) };
   const [l1] = await postmortem.lote({ operaciones: [perdedora], llm: llmSuerte });
   caso('una perdedora «de suerte» del LLM cae a reglas', `${l1.fuente}/${l1.categoria}`, 'reglas/stop_estrecho');
@@ -107,7 +107,7 @@ async function casosRevision() {
 
   console.log('— Plantillas y bus');
   caso('informe de un cierre tardío (56 h)', plantillas.informeDiario({ dia: '2026-06-04', desde: Date.UTC(2026, 5, 2, 0, 5), hasta: Date.UTC(2026, 5, 4, 8, 0), patrimonio: 100415, pnlDia: 443.67, pnlDiaPct: 0.00442, operaciones: 5, acierto: 0.4, gastoLLMUsd: 0.22 }),
-    'Cierre (02-jun 00:05 → 04-jun 08:00 UTC, 56 h): 100.415 $ (+443,67 $, +0,44 %). 5 operaciones, acierto 40 %. LLM 0,22 $.');
+    'Cierre (02-jun 00:05 → 04-jun 08:00 UTC, 56 h): el fondo vale 100.415 $ (+443,67 $, +0,44 %). 5 operaciones cerradas, acierto 40 %. Gasto en IA: 0,22 $.');
   caso('despido sin «sigue en sombra»', /sigue en sombra/i.test(plantillas.despido({ nombre: 'Tendencia SMA', motivo: 'maxDD 27 % > 25 %' })), false);
   caso('reabrir con la caída desde el máximo histórico', plantillas.reabrir({ quien: 'Eduardo', patrimonio: 95544, pico: 109000 }),
     'Reabierto por Eduardo. El fondo sigue un 12,34 % (13.456 $) por debajo de su máximo histórico (109.000 $).');
