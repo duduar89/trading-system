@@ -113,6 +113,11 @@ module.exports = [
   { frase: 'Me ha salido un bulto en el labio después del relleno', intencion: 'salud_personal', urgente: true },
   { frase: 'Sigo muy hinchada desde ayer y me duele mucho', intencion: 'salud_personal', urgente: true },
   { frase: 'Tengo fiebre desde el tratamiento', intencion: 'salud_personal', urgente: true },
+  { frase: 'Tengo el labio morado y frío desde el relleno de ayer', intencion: 'salud_personal', urgente: true },
+  // La baja del trabajo no es la baja de los mensajes.
+  { frase: 'Estoy de baja médica, no voy a poder ir a la cita del jueves', intencion: 'salud_personal' },
+  { frase: 'Te mando la foto de la baja', intencion: 'otro' },
+  { frase: 'Estoy de baja por maternidad hasta enero', intencion: 'aplazar', plazo: 'mes', fecha: '2027-01-04' },
 
   // ── Cierres y bajas ──────────────────────────────────────────────────────────────────────
   { frase: 'Ya me lo hice en otra clínica', intencion: 'ya_hecho' },
@@ -128,6 +133,9 @@ module.exports = [
   { frase: 'Borrad mis datos por favor', intencion: 'baja' },
   { frase: 'No quiero recibir más mensajes', intencion: 'baja' },
   { frase: 'Quitadme de vuestra lista', intencion: 'baja' },
+  { frase: 'Quiero darme de baja', intencion: 'baja' },
+  { frase: 'Dadme de baja, por favor', intencion: 'baja' },
+  { frase: 'Quiero la baja', intencion: 'baja' },
   { frase: 'Fatal, nadie me contesta nunca', intencion: 'queja' },
   { frase: 'Quiero poner una reclamación', intencion: 'queja' },
   { frase: 'Esto es un timo', intencion: 'queja' },
