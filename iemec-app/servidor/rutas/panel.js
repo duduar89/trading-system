@@ -1,7 +1,8 @@
 'use strict';
 // API del panel de la clínica. Todo detrás de sesión (servidor/sesion.js). Devuelve lo justo para
 // cada pantalla: hoy, agenda por cabina, bandeja de conversaciones, seguimientos, repesca,
-// plantillas, reseñas y ajustes (qué tratamiento se hace en qué sala).
+// plantillas, reseñas y ajustes (qué tratamiento se hace en qué sala). Cada acción pide su permiso
+// (servidor/permisos.js), todos juntos al principio de rutasPanel.
 const express = require('express');
 const T = require('../../motor/tiempo');
 const { descifrar } = require('../cripto');
@@ -14,13 +15,36 @@ const repesca = require('../repesca/motor');
 const resenasSrv = require('../resenas');
 const { registrar } = require('../eventos');
 const estados = require('../estados-cita');
+const { exige } = require('../permisos');
 
 const madrid = (d) => (d ? T.partesMadrid(new Date(d)) : null);
 const envolver = (fn) => (req, res, next) => fn(req, res).catch(next);
 
+// Contestar una reseña: dirección o marketing; si la reseña tiene alerta clínica (columna alerta_clinica),
+// dirección médica.
+function permisoParaContestar(p) {
+  const [normal, alerta] = [exige('resenas.aprobar'), exige('resenas.alerta_clinica')];
+  return (req, res, next) => {
+    const id = /^\d{1,10}$/.test(req.params.id) ? Number(req.params.id) : 0;
+    p().query('SELECT * FROM resenas WHERE id = ?', [id]).then(([[x]]) => (x?.alerta_clinica ? alerta : normal)(req, res, next), next);
+  };
+}
+
 function rutasPanel({ pool, deps = null }) {
   const r = express.Router();
   const p = () => (typeof pool === 'function' ? pool() : pool);
+
+  // ── Permisos (servidor/permisos.js) ──────────────────────────────────────────────────────
+  // Lo que pide cada ruta, todo aquí y antes de las rutas: quien no tiene el permiso recibe un 403 claro
+  // y la ruta ni se ejecuta. Lo demás (hoy, agenda, tareas, seguimientos…) lo lee todo el personal.
+  r.post('/tareas/:id', exige('tareas.cerrar'));
+  r.post('/citas', exige('citas.reservar'));
+  r.post('/citas/:id/estado', exige('citas.estado'));
+  r.use('/lista-espera', exige('citas.reservar'));
+  r.use('/conversaciones', exige('conversaciones.atender'));
+  r.patch('/seguimientos/:id', exige('seguimientos.editar'));
+  r.post('/resenas/:id/publicar', permisoParaContestar(p));
+  r.put('/ajustes/salas-tratamientos/:tratamiento', exige('salas.editar'));
 
   // ── Hoy ────────────────────────────────────────────────────────────────────────────────────
   r.get('/hoy', envolver(async (req, res) => {

@@ -557,6 +557,7 @@ test('ruta del panel: sin sesión no entra; con sesión marca, explica lo que no
       const ahora = new Date();
       const empezada = await citaAhora(pool, p.id, new Date(ahora.getTime() - 10 * 60000));
       const luego = await citaAhora(pool, p.id, new Date(ahora.getTime() + 3 * 3600000));
+      await pool.query("INSERT INTO usuarios (id, email, nombre, rol) VALUES (1, 'recepcion@iemec', 'Recepción', 'recepcion')");
       const cookie = `iemec_sesion=${encodeURIComponent(firmar({ id: 1, email: 'recepcion@iemec', nombre: 'Recepción', rol: 'recepcion', hasta: Date.now() + 3600000 }))}`;
       await conServidor(crearApp({ pool }), async (base) => {
         const post = (id, cuerpo, sesion = true) => fetch(`${base}/api/panel/citas/${id}/estado`, {
@@ -608,7 +609,7 @@ test('ruta del panel: sin sesión no entra; con sesión marca, explica lo que no
       const reloj = { ahora: en('2026-10-13', '12:00') };
       const app = express();
       app.use(express.json());
-      app.use((req, _res, next) => { req.ahora = reloj.ahora; req.usuario = { email: 'recepcion@iemec' }; next(); });
+      app.use((req, _res, next) => { req.ahora = reloj.ahora; req.usuario = { email: 'recepcion@iemec', rol: 'recepcion' }; next(); });
       app.use('/api/panel', rutasPanel({ pool }));
       await conServidor(app, async (base) => {
         const get = async (ruta) => (await fetch(`${base}/api/panel${ruta}`)).json();

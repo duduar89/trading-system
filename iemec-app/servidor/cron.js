@@ -7,6 +7,7 @@
 const config = require('./config');
 const db = require('./db');
 const cola = require('./cola');
+const acceso = require('./acceso');
 const entrada = require('./entrada');
 const agenda = require('./agenda');
 const repesca = require('./repesca/motor');
@@ -36,6 +37,8 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
     avisosCita: (await avisos.enviarPendientes(d, { ahora })).length,
     peticionesResena: (await resenas.enviarPeticionesPendientes(d, { ahora })).length,
     cola: await cola.procesar(pool, {}, { ahora }),
+    // Retos de passkey y ventanas del límite de intentos ya caducados.
+    accesoCaducado: await acceso.purgar(pool, ahora),
   }), { ahora });
   Object.assign(informe, r.ejecutado ? r.resultado : { saltado: 'otro cron en marcha' });
 

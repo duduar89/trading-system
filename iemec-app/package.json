@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "migrar": "node scripts/migrar.js",
     "semillar": "node scripts/semillar.js",
+    "invitar": "node scripts/invitar.js",
     "preparar-bd": "node scripts/migrar.js && node scripts/semillar.js",
     "dev": "vite",
     "dev:servidor": "node --watch servidor/index.js",
@@ -19,12 +20,14 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",
     "@anthropic-ai/vertex-sdk": "^0.20.0",
+    "@simplewebauthn/server": "^14.0.3",
     "express": "^5.2.1",
     "mysql2": "^3.24.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
+    "@simplewebauthn/browser": "^14.0.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^10.11.0",
