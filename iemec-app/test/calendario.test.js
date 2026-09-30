@@ -624,6 +624,50 @@ test('un aviso que no saldría bien (plantilla aprobada de otra versión, sede s
   }
 });
 
+test('un aviso que falla antes de salir (el código nuevo con la base aún sin migrar) se reintenta; uno que ya salió, no se repite', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const whatsapp = crearWhatsApp('simulado');
+  const deps = { pool, ia: crearIa('simulado'), whatsapp };
+  try {
+    await sembrar(pool);
+    const dada = new Date('2026-10-12T08:00:00Z');
+    const p = await paciente(pool, 'Vera');
+    const c = await agenda.reservar(pool, { pacienteId: p.id, tratamientoId: 'laser-intimo', fecha: '2026-10-15', hora: '17:00', origen: 'recepcion', ahora: dada });
+    await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [dada, c.id]);
+    const llegados = () => whatsapp.enviados.filter((m) => m.telefono === p.telefono).length;
+    const vispera = new Date('2026-10-14T08:05:17.345Z'); // con milisegundos, como el reloj de verdad
+
+    // El despliegue sube el código y, mientras npm install y migrar, el cron sigue: la base aún no tiene
+    // las columnas que lee el aviso.
+    await pool.query('ALTER TABLE citas RENAME COLUMN token_iv TO token_iv_sin_migrar');
+    const r = await avisos.enviarPendientes(deps, { ahora: vispera });
+    assert.deepEqual(r.map((x) => [x.citaId, x.tipo]), [[c.id, 'vispera']]);
+    assert.match(r[0].error, /token_iv/);
+    const [[marca]] = await pool.query('SELECT aviso_24h_en FROM citas WHERE id = ?', [c.id]);
+    assert.equal(marca.aviso_24h_en, null, 'no se queda como avisada');
+    await pool.query('ALTER TABLE citas RENAME COLUMN token_iv_sin_migrar TO token_iv');
+    const r2 = await avisos.enviarPendientes(deps, { ahora: mas(vispera, 1) });
+    assert.deepEqual(r2.map((x) => [x.tipo, x.envio?.estado]), [['vispera', 'enviado']], 'al minuto siguiente, ya migrada, sale');
+    assert.equal(llegados(), 1);
+
+    // Si falla después de mandarlo, se queda marcado: no le llega dos veces.
+    const cerrarConCita = R.cerrarConCita;
+    R.cerrarConCita = async () => { throw new Error('la base se ha caído justo ahora'); };
+    try {
+      const r3 = await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-15T13:05:00Z') });
+      assert.deepEqual(r3.map((x) => [x.tipo, x.error]), [['dos_horas', 'la base se ha caído justo ahora']]);
+    } finally {
+      R.cerrarConCita = cerrarConCita;
+    }
+    assert.equal(llegados(), 2);
+    assert.deepEqual(await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-15T13:06:00Z') }), []);
+    assert.equal(llegados(), 2, 'no se repite');
+  } finally {
+    await pool.end();
+  }
+});
+
 test('un hueco de la lista de espera, desde «Tu cita»: «No me viene bien» lo suelta para el siguiente', async (t) => {
   const pool = await prepararBdDePrueba(t);
   if (!pool) return;

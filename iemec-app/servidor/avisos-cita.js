@@ -14,7 +14,8 @@
 // la hora y la sede; la página «Tu cita» enseña el resto. Con la ventana de 24 h abierta va como
 // texto (con los enlaces); si no, con la plantilla aprobada de su uso. Son mensajes de servicio sobre
 // su propia cita: se mandan aunque haya pedido la baja comercial. Lo llama el cron cada minuto; cada
-// aviso se marca antes de mandarlo, así nunca sale dos veces.
+// aviso se marca antes de mandarlo, así nunca sale dos veces (y si algo falla antes de que salga, se
+// desmarca y se vuelve a intentar al minuto siguiente).
 const T = require('../motor/tiempo');
 const { elegirPlantilla, variablesDe, botonesDe, cabeceraDe } = require('../motor/repesca/plantillas');
 const { direccionPostal } = require('../motor/calendario/ics');
@@ -93,10 +94,30 @@ async function sustituyeAOtra(q, citaId) {
 
 async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
   const { pool } = deps;
-  const { columna, uso } = USOS[tipo];
+  const { columna } = USOS[tipo];
   // Se marca primero: si dos procesos llegan a la vez, solo uno lo manda.
   const [marca] = await pool.query(`UPDATE citas SET ${columna} = ? WHERE id = ? AND ${columna} IS NULL`, [ahora, citaId]);
   if (marca.affectedRows !== 1) return { citaId, tipo, omitido: 'ya avisado' };
+  const paso = { enviando: false };
+  try {
+    return await mandarAviso(deps, citaId, tipo, { ahora, paso });
+  } catch (err) {
+    // Si falla antes de mandarlo (en un despliegue, el código nuevo con la base aún sin migrar; la base
+    // caída un momento), se desmarca y el cron lo vuelve a intentar al minuto siguiente: si no, ese aviso
+    // no saldría nunca. Si ya se ha intentado mandar, no: le podría llegar dos veces. (La marca se busca
+    // sin los milisegundos, que el DATETIME no guarda.)
+    if (!paso.enviando) {
+      await pool.query(`UPDATE citas SET ${columna} = NULL WHERE id = ? AND ${columna} = ?`, [citaId, new Date(Math.floor(ahora.getTime() / 1000) * 1000)])
+        .catch(() => {});
+    }
+    throw err;
+  }
+}
+
+// El aviso, ya marcado. paso.enviando: si ya se ha intentado mandar (a partir de ahí, no se desmarca).
+async function mandarAviso(deps, citaId, tipo, { ahora, paso }) {
+  const { pool } = deps;
+  const { uso } = USOS[tipo];
   const [[fila]] = await pool.query(
     'SELECT c.paciente_id, p.nombre, p.telefono FROM citas c JOIN pacientes p ON p.id = c.paciente_id WHERE c.id = ?', [citaId]);
   if (!fila?.telefono) return { citaId, tipo, omitido: 'sin teléfono' };
@@ -122,6 +143,7 @@ async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
   let envio;
   let plantilla = null;
   if (ventanaAbierta) {
+    paso.enviando = true;
     envio = await R.enviar(deps, conv, { texto: textoLibre(tipo, c, nombre, { cambiada }), autor: 'sistema', ahora });
   } else {
     const plantillas = await R.plantillasBd(pool);
@@ -134,6 +156,7 @@ async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
       await registrar(pool, { tipo: 'aviso_cita_sin_plantilla', entidad: 'cita', entidadId: citaId, datos: { tipo, uso: plantilla?.uso || uso, motivo: falta } });
       return { citaId, tipo, fallido: plantilla ? falta : 'sin plantilla' };
     }
+    paso.enviando = true;
     envio = await R.enviar(deps, conv, { plantilla, ...envioPlantilla, autor: 'sistema', ahora });
   }
   // Un aviso no deja trabajo en la bandeja: si la conversación no tiene nada más en marcha, se
