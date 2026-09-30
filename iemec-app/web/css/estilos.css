@@ -334,6 +334,7 @@ main { display: block; padding-top: var(--cabecera); outline: none; }
 .tarjeta :is(h3, h4) a { color: inherit; text-decoration: none; }
 .tarjeta :is(h3, h4) a::after { content: ""; position: absolute; inset: 0; border-radius: var(--radio); }
 .tarjeta p { color: var(--suave); font-size: .95rem; margin-bottom: 14px; }
+.tarjeta > .boton:last-child { margin-top: auto; }
 .tarjeta .mas { margin-top: auto; display: inline-flex; align-items: center; gap: 8px; font-size: .88rem; font-weight: 500; color: var(--t800); }
 .tarjeta .mas .icono { width: 1.1em; height: 1.1em; transition: transform .2s; }
 .tarjeta:hover .mas .icono { transform: translateX(3px); }
@@ -362,8 +363,10 @@ main { display: block; padding-top: var(--cabecera); outline: none; }
   .tarjeta-tratamiento p { font-size: .88rem; margin-bottom: 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .tarjeta-tratamiento .ficha-mini { margin: 0; }
   .tarjeta-tratamiento .mas { display: none; }
-  .desliza { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; gap: 12px; margin: 0 -16px; padding: 4px 16px 16px; }
+  .lista-tratamientos .desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .desliza { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; gap: 12px; margin: 0 -16px -14px; padding: 4px 16px 30px; }
   .desliza > * { flex: 0 0 82%; scroll-snap-align: start; }
+  .seccion-blanca .desliza { background: var(--blanco); } /* capa de desplazamiento opaca, como su sección */
   .pasos li { display: grid; grid-template-columns: auto 1fr; column-gap: 16px; padding: 18px 18px; }
   .pasos li::before { grid-row: 1 / span 2; margin: 0; }
   .tarjeta > .tarjeta-icono { width: 46px; height: 46px; margin-bottom: 12px; }
@@ -478,14 +481,14 @@ main { display: block; padding-top: var(--cabecera); outline: none; }
 .formulario { display: grid; gap: 18px; }
 .campos-dos { display: grid; gap: 18px; }
 @media (min-width: 720px) { .campos-dos { grid-template-columns: 1fr 1fr; } }
-.campo { display: grid; gap: 6px; border: 0; margin: 0; padding: 0; min-width: 0; }
-.campo label, .campo legend { font-weight: 500; font-size: .95rem; padding: 0; }
-.campo input, .campo select, .campo textarea {
+.campo { display: grid; gap: 6px; align-content: start; border: 0; margin: 0; padding: 0; min-width: 0; }
+.campo > label, .campo legend { font-weight: 500; font-size: .95rem; padding: 0; }
+.campo input:not([type="radio"]), .campo select, .campo textarea {
   width: 100%; min-height: 50px; padding: 12px 14px; border-radius: var(--radio-p); border: 1px solid #aebbb8; background: var(--blanco);
   font-size: 1rem; transition: border-color .2s, box-shadow .2s;
 }
 .campo textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
-.campo input:focus, .campo select:focus, .campo textarea:focus { border-color: var(--t700); box-shadow: 0 0 0 3px rgba(29, 91, 88, .18); outline: none; }
+.campo input:not([type="radio"]):focus, .campo select:focus, .campo textarea:focus { border-color: var(--t700); box-shadow: 0 0 0 3px rgba(29, 91, 88, .18); outline: none; }
 .campo [aria-invalid="true"] { border-color: #a4362c; box-shadow: 0 0 0 3px rgba(164, 54, 44, .12); }
 .ayuda { font-size: .84rem; color: var(--suave); margin: 0; line-height: 1.5; }
 .error { font-size: .86rem; color: #a4362c; font-weight: 500; margin: 0; }

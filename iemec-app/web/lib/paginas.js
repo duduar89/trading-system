@@ -239,9 +239,11 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
 // ── Tratamiento ─────────────────────────────────────────────────────────────────────────────
 function avisoMedico(p) {
   const cirugia = p.tipo === 'cirugia' || /cirujan/i.test(p.profesional || '');
+  // «Lo realiza: equipo médico.»: en minúscula tras los dos puntos, salvo un nombre propio («Dr. …»).
+  const quien = p.profesional && !/^(Dr|Dra)\b/.test(p.profesional) ? p.profesional.charAt(0).toLowerCase() + p.profesional.slice(1) : p.profesional;
   return html`<div class="aviso-medico" role="note">
 <p class="aviso-titulo">${icono('medico')}Tratamiento médico: requiere valoración previa</p>
-<p>${cirugia ? 'Antes de operarte, el cirujano' : 'Antes de hacerlo, un médico'} valora tu caso en una valoración médica y te explica los riesgos y las contraindicaciones. El resultado varía según cada persona.${p.profesional ? ` Lo realiza: ${p.profesional}.` : ''}</p>
+<p>Antes de ${cirugia ? 'operarte' : 'hacerlo'} tienes una valoración médica: ${cirugia ? 'el cirujano' : 'el médico'} estudia tu caso y te explica los riesgos y las contraindicaciones. El resultado varía según cada persona.${quien ? ` Lo realiza: ${quien}.` : ''}</p>
 </div>`;
 }
 

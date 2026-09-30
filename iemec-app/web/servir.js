@@ -67,7 +67,7 @@ if (require.main === module) {
     console.error(`No hay web construida en ${carpeta}: ejecuta antes «npm run web».`);
     process.exit(1);
   }
-  crearServidor(carpeta).listen(puerto, '127.0.0.1', () => console.log(`Web de IEMEC en http://localhost:${puerto}/ (carpeta ${path.relative(process.cwd(), carpeta) || '.'})`));
+  crearServidor(carpeta).listen(puerto, '127.0.0.1', () => console.log(`Web de IEMEC en http://127.0.0.1:${puerto}/ (carpeta ${path.relative(process.cwd(), carpeta) || '.'})`));
 }
 
 module.exports = { crearServidor, leerHtaccess };
