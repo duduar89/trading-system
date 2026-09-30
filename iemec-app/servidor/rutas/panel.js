@@ -37,7 +37,7 @@ function rutasPanel({ pool, deps = null }) {
     const inicioMes = T.desdeMadrid(`${hoy.slice(0, 8)}01`, '00:00');
     const [recuperadas] = await q(
       `SELECT COUNT(*) AS n, COALESCE(SUM(t.precio_eur), 0) AS euros FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id
-        WHERE c.creado_en >= ? AND c.origen = 'ia_whatsapp' AND c.estado NOT IN ('cancelada','reprogramada','retenida')`, [inicioMes]);
+        WHERE c.creado_en >= ? AND c.origen = 'ia_whatsapp' AND c.estado NOT IN ('cancelada','reprogramada','retenida','no_presentada')`, [inicioMes]);
     const sinPaso = await repesca.sinProximoPaso(p(), ahora);
     res.json({
       fecha: hoy,
@@ -100,20 +100,32 @@ function rutasPanel({ pool, deps = null }) {
     res.json({ ...datos, tratamientos });
   }));
 
+  // Apuntar a alguien por su móvil. Si el móvil es de otra persona que la tecleada, 409 con su nombre:
+  // el formulario pide confirmarlo (confirmado: true) antes de apuntarla. Con adelantar, se enlaza la
+  // cita que ya tiene de ese tratamiento (se le ofrecerá solo un hueco antes, y se le cambiará).
   r.post('/lista-espera', envolver(async (req, res) => {
     const b = req.body || {};
     const [[trat]] = await p().query('SELECT id FROM tratamientos WHERE id = ? AND activo = TRUE', [String(b.tratamientoId || '')]);
     if (!trat) return res.status(400).json({ error: 'Elige un tratamiento de la lista', codigo: 'TRATAMIENTO_DESCONOCIDO' });
+    const con = await p().getConnection();
     try {
-      const pacienteId = b.pacienteId ? Number(b.pacienteId) : await listaEspera.pacientePorTelefono(p(), { telefono: b.telefono, nombre: b.nombre });
-      const r2 = await listaEspera.apuntar(p(), {
+      await con.beginTransaction();
+      const pacienteId = b.pacienteId ? Number(b.pacienteId)
+        : await listaEspera.pacientePorTelefono(con, { telefono: b.telefono, nombre: b.nombre, confirmado: Boolean(b.confirmado) });
+      const r2 = await listaEspera.apuntar(con, {
         pacienteId, tratamientoId: b.tratamientoId, desdeFecha: b.desde || null, hastaFecha: b.hasta || null, franja: b.franja || null,
-        citaActualId: b.citaActualId || null, notas: b.notas || null, origen: 'panel', creadoPor: req.usuario?.email || 'panel', ahora: req.ahora || new Date(),
+        citaActualId: b.citaActualId || null, adelantar: Boolean(b.adelantar), notas: b.notas || null, origen: 'panel', creadoPor: req.usuario?.email || 'panel', ahora: req.ahora || new Date(),
       });
-      res.status(r2.nueva ? 201 : 200).json(r2);
+      const [[pac]] = await con.query('SELECT nombre, apellidos FROM pacientes WHERE id = ?', [pacienteId]);
+      await con.commit();
+      res.status(r2.nueva ? 201 : 200).json({ ...r2, paciente: pac ? listaEspera.nombreCorto(pac) : null });
     } catch (err) {
+      await con.rollback().catch(() => {});
+      if (err.codigo === 'OTRO_PACIENTE') return res.status(409).json({ error: err.message, codigo: err.codigo, paciente: err.paciente });
       if (err.codigo) return res.status(400).json({ error: err.message, codigo: err.codigo });
       throw err;
+    } finally {
+      con.release();
     }
   }));
 
@@ -121,6 +133,26 @@ function rutasPanel({ pool, deps = null }) {
     const ok = await listaEspera.quitar(p(), Number(req.params.id), { motivo: req.body?.motivo || 'quitado desde el panel', actor: req.usuario?.email || 'panel', ahora: req.ahora || new Date() });
     if (!ok) return res.status(404).json({ error: 'No está en la lista de espera' });
     res.json({ ok: true });
+  }));
+
+  // Recepción resuelve una oferta en curso (su conversación la lleva una persona: la IA no lee su «sí»).
+  // Al aceptarla, el aviso de cita con su enlace le llega por el cron de avisos.
+  r.post('/lista-espera/ofertas/:id/:accion', envolver(async (req, res) => {
+    const accion = req.params.accion;
+    if (!['aceptar', 'rechazar'].includes(accion)) return res.status(404).json({ error: 'Acción desconocida' });
+    const oferta = await listaEspera.ofertaPorId(p(), Number(req.params.id));
+    if (!oferta) return res.status(404).json({ error: 'No existe esa oferta' });
+    const ahora = req.ahora || new Date();
+    const actor = req.usuario?.email || 'panel';
+    const viva = oferta.estado === 'ofrecida' || (accion === 'aceptar' && oferta.estado === 'caducada' && new Date(oferta.inicio) > ahora);
+    if (!viva) return res.status(409).json({ error: 'Esa oferta ya está cerrada', codigo: 'OFERTA_CERRADA' });
+    if (accion === 'rechazar') {
+      await listaEspera.rechazar(p(), oferta, { ahora, actor });
+      return res.json({ ok: true });
+    }
+    const r2 = await listaEspera.aceptar(p(), oferta, { ahora, actor });
+    if (r2.ocupado) return res.status(409).json({ error: 'Ese hueco ya se ha ocupado', codigo: 'HUECO_OCUPADO' });
+    res.json({ ok: true, ...r2 });
   }));
 
   // ── Bandeja de conversaciones ────────────────────────────────────────────────────────────

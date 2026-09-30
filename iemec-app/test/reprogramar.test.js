@@ -258,3 +258,166 @@ test('la agenda reserva «cambiando» una cita en la misma transacción', async 
     await pool.end();
   }
 });
+
+test('cambiar la cita: lo que nombra de su cita es lo que no le va; lo que pide, adónde la quiere', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const deps = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
+  try {
+    await sembrar(pool);
+    const martes = new Date('2026-10-06T09:00:00Z'); // martes 11:00 en Madrid
+
+    await t.test('el día o la hora de su propia cita: otros días desde mañana, sin ese', async () => {
+      const casos = [
+        ['Alba', 'Tengo cita el jueves a las 12:00 y no voy a poder ir', '2026-10-08', '12:00'],
+        ['Berta', 'Me ha surgido algo el jueves a las 13:30, ¿la podemos mover?', '2026-10-08', '13:30'],
+        ['Carla', 'Necesito cambiar la cita del jueves 8', '2026-10-08', '15:00'],
+        ['Diana', 'Hola, quiero cambiar mi cita del jueves 8 de octubre, a las 17:00', '2026-10-08', '17:00'], // el botón de «Tu cita»
+        ['Elsa', 'Quiero cambiar la cita del jueves', '2026-10-15', '12:00'],
+        ['Fina', 'No voy a poder ir el jueves', '2026-10-15', '17:00'],
+      ];
+      for (const [i, [nombre, , fecha, hora]] of casos.entries()) await conCita(pool, { telefono: `+3461100041${i}`, nombre, fecha, hora });
+      for (const [i, [nombre, frase, fecha, hora]] of casos.entries()) {
+        const r = await R.procesarEntrante(deps, { telefono: `+3461100041${i}`, texto: frase, ahora: martes });
+        assert.equal(r.eleccion, 'propuesta', frase);
+        assert.match(r.respuesta, new RegExp(`Sin problema, ${nombre}\\. Te cambio la cita del jueves ${Number(fecha.slice(8))} de octubre a las ${hora}: te puedo ofrecer `), frase);
+        assert.doesNotMatch(r.respuesta, /ya no me queda hueco/, frase);
+        assert.equal(r.huecos.length, 3, frase);
+        assert.ok(r.huecos.every((h) => h.fecha >= '2026-10-07' && h.fecha !== fecha), `${frase} → ${JSON.stringify(r.huecos)}`);
+      }
+    });
+
+    await t.test('lo que va detrás de «al» es adónde la quiere; solo la hora, ese mismo día', async () => {
+      await conCita(pool, { telefono: '+34611000420', nombre: 'Gala', fecha: '2026-10-08', hora: '18:30' });
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000420', texto: 'Necesito cambiar la cita del jueves al viernes', ahora: martes });
+      assert.ok(r.huecos.length >= 1 && r.huecos.every((h) => h.fecha === '2026-10-09'), JSON.stringify(r.huecos));
+
+      await conCita(pool, { telefono: '+34611000421', nombre: 'Hebe', fecha: '2026-10-13', hora: '12:00' });
+      const r2 = await R.procesarEntrante(deps, { telefono: '+34611000421', texto: '¿Me la retrasas a las 19:00?', ahora: martes });
+      assert.equal(r2.respuesta, 'Soy el asistente virtual de IEMEC. El martes 13 de octubre a las 19:00 lo tengo libre, Hebe. ¿Te cambio la cita a ese hueco?');
+    });
+
+    await t.test('con dos citas, la que nombra', async () => {
+      const { pacienteId } = await conCita(pool, { telefono: '+34611000422', nombre: 'Inés', fecha: '2026-10-13', hora: '15:00' });
+      await agenda.reservar(pool, { pacienteId, tratamientoId: 'limpieza-facial', fecha: '2026-10-16', hora: '12:00', origen: 'recepcion', ahora: new Date('2026-10-01T08:00:00Z') });
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000422', texto: 'Necesito cambiar la del viernes', ahora: martes });
+      assert.match(r.respuesta, /Te cambio la cita del viernes 16 de octubre a las 12:00: te puedo ofrecer /);
+      assert.ok(r.huecos.every((h) => h.fecha !== '2026-10-16'), JSON.stringify(r.huecos));
+    });
+  } finally {
+    await pool.end();
+  }
+});
+
+test('cambiándola, «solo puedo por la tarde» es solo por la tarde (aunque las primeras tardes estén llenas)', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const deps = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
+  try {
+    await sembrar(pool);
+    // La esteticista trabaja por la mañana, salvo el viernes.
+    await pool.query('DELETE FROM profesional_horarios WHERE profesional_id = 20');
+    for (const d of [1, 2, 3, 4, 6]) await pool.query("INSERT INTO profesional_horarios (profesional_id, dia_semana, inicio, fin) VALUES (20, ?, '11:00', '14:00')", [d]);
+    await pool.query("INSERT INTO profesional_horarios (profesional_id, dia_semana, inicio, fin) VALUES (20, 5, '11:00', '20:00')");
+    const martes = new Date('2026-10-06T09:00:00Z');
+
+    const { cita: c } = await conCita(pool, { telefono: '+34611000431', nombre: 'Julia', fecha: '2026-10-09', hora: '17:00' });
+    const r = await R.procesarEntrante(deps, { telefono: '+34611000431', texto: 'Necesito cambiarla, solo puedo por la tarde', ahora: martes });
+    assert.equal(r.eleccion, 'propuesta');
+    assert.equal(r.huecos.length, 3);
+    assert.ok(r.huecos.every((h) => h.hora >= '15:00'), JSON.stringify(r.huecos));
+
+    // Cancelada, «sí, por la tarde» a «¿Te busco otro momento?»: también solo tardes.
+    await R.procesarEntrante(deps, { telefono: '+34611000431', texto: 'Mejor la dejo como está', ahora: mas(martes, 2) });
+    await R.procesarEntrante(deps, { telefono: '+34611000431', texto: 'Quiero cancelar la cita', ahora: mas(martes, 4) });
+    const r2 = await R.procesarEntrante(deps, { telefono: '+34611000431', texto: 'Sí', ahora: mas(martes, 6) });
+    assert.equal(r2.sobreCita, 'cancelada');
+    assert.equal((await cita(pool, c.id)).estado, 'cancelada');
+    const r3 = await R.procesarEntrante(deps, { telefono: '+34611000431', texto: 'Sí, por la tarde', ahora: mas(martes, 8) });
+    assert.ok(r3.huecos.length >= 1 && r3.huecos.every((h) => h.hora >= '15:00'), JSON.stringify(r3.huecos));
+
+    // «¿Tenéis hueco el miércoles por la tarde?»: ese día no hay tardes → otro día, por la tarde.
+    const r4 = await R.procesarEntrante(deps, { telefono: '+34611000431', texto: '¿Tenéis hueco el miércoles por la tarde?', ahora: mas(martes, 10) });
+    assert.match(r4.respuesta, /^Ese día por la tarde lo tengo completo, Julia\. Te puedo ofrecer /);
+    assert.ok(r4.huecos.every((h) => h.hora >= '15:00'), JSON.stringify(r4.huecos));
+  } finally {
+    await pool.end();
+  }
+});
+
+test('«¿Cancelo tu cita?» solo vale si es lo último que le hemos dicho', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const whatsapp = crearWhatsApp('simulado');
+  const deps = { pool, ia: crearIa('simulado'), whatsapp };
+  try {
+    await sembrar(pool);
+    const miercoles = new Date('2026-10-21T07:00:00Z'); // miércoles 9:00 en Madrid
+    const dada = mas(miercoles, -5 * 1440);
+
+    await t.test('le llega el recordatorio de la víspera y contesta «Confirmo»: no se cancela', async () => {
+      const respuestas = ['Confirmo', 'Sí, allí estaré', 'Vale, gracias'];
+      const citas = [];
+      for (const [i, hora] of ['12:00', '15:00', '17:00'].entries()) {
+        const { cita: c } = await conCita(pool, { telefono: `+3461100044${i}`, nombre: `Laura${i}`, fecha: '2026-10-22', hora, dada });
+        await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [dada, c.id]);
+        citas.push(c);
+        const r = await R.procesarEntrante(deps, { telefono: `+3461100044${i}`, texto: 'Igual tengo que cancelar la cita de mañana', ahora: miercoles });
+        assert.equal(r.sobreCita, 'cancelar');
+      }
+      // A las 10:00, el recordatorio de la víspera («¿Nos lo confirmas?»), en la misma conversación.
+      const avisos10 = await avisos.enviarPendientes(deps, { ahora: mas(miercoles, 60) });
+      assert.equal(avisos10.filter((a) => a.tipo === 'vispera').length, 3);
+      for (const [i, respuesta] of respuestas.entries()) {
+        const r = await R.procesarEntrante(deps, { telefono: `+3461100044${i}`, texto: respuesta, ahora: mas(miercoles, 65) });
+        assert.doesNotMatch(String(r.respuesta), /cancelada/, respuesta);
+        assert.equal((await cita(pool, citas[i].id)).estado, 'confirmada', respuesta);
+      }
+    });
+
+    await t.test('a la pregunta, un «vale» no basta para cancelar: se le vuelve a preguntar', async () => {
+      const { cita: c } = await conCita(pool, { telefono: '+34611000450', nombre: 'Marta', fecha: '2026-10-23', hora: '18:30', dada });
+      await R.procesarEntrante(deps, { telefono: '+34611000450', texto: 'Quiero cancelar mi cita', ahora: miercoles });
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000450', texto: 'Vale', ahora: mas(miercoles, 2) });
+      assert.equal(r.respuesta, 'Para no equivocarme, Marta: ¿cancelo tu cita del viernes 23 de octubre a las 18:30? Contesta «sí» para cancelarla o «no» para mantenerla.');
+      assert.equal((await cita(pool, c.id)).estado, 'confirmada');
+      const r2 = await R.procesarEntrante(deps, { telefono: '+34611000450', texto: 'Sí', ahora: mas(miercoles, 3) });
+      assert.equal(r2.sobreCita, 'cancelada');
+      assert.equal((await cita(pool, c.id)).estado, 'cancelada');
+    });
+  } finally {
+    await pool.end();
+  }
+});
+
+test('cambiar una cita desde la conversación de un presupuesto no acepta el presupuesto', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const deps = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
+  try {
+    await sembrar(pool);
+    const lunes = new Date('2026-10-19T08:00:00Z');
+    const { pacienteId, cita: vieja } = await conCita(pool, { telefono: '+34611000460', nombre: 'Ana', fecha: '2026-10-22', hora: '12:00' });
+    const [pr] = await pool.query("INSERT INTO presupuestos (paciente_id, titulo, importe_eur, estado, entregado_en) VALUES (?, 'Hilos tensores (ejemplo)', 900, 'entregado', ?)", [pacienteId, mas(lunes, -3 * 1440)]);
+    await pool.query("INSERT INTO presupuesto_lineas (presupuesto_id, tratamiento_id, concepto, importe_eur) VALUES (?, 'hilos-tensores', 'Hilos', 900)", [pr.insertId]);
+    const [conv] = await pool.query("INSERT INTO conversaciones (telefono, paciente_id, estado, contexto, contexto_id) VALUES ('+34611000460', ?, 'esperando_paciente', 'presupuesto', ?)", [pacienteId, pr.insertId]);
+    const [of] = await pool.query("INSERT INTO ofertas (codigo, nombre, tipo, texto_paciente) VALUES ('plazos-ej', 'Pago a plazos (ejemplo)', 'plazos', 'Puedes pagarlo en 3 plazos sin intereses.')");
+    await pool.query("INSERT INTO ofertas_hechas (oferta_id, paciente_id, conversacion_id, presupuesto_id, estado) VALUES (?, ?, ?, ?, 'propuesta')", [of.insertId, pacienteId, conv.insertId, pr.insertId]);
+
+    const r1 = await R.procesarEntrante(deps, { telefono: '+34611000460', texto: 'Necesito cambiar la cita del jueves', ahora: lunes });
+    assert.equal(r1.conversacionId, conv.insertId);
+    const r2 = await R.procesarEntrante(deps, { telefono: '+34611000460', texto: 'La primera', ahora: mas(lunes, 2) });
+    assert.equal(r2.eleccion, 'reservada');
+    assert.equal((await cita(pool, vieja.id)).estado, 'reprogramada');
+    const [[p]] = await pool.query('SELECT estado FROM presupuestos WHERE id = ?', [pr.insertId]);
+    assert.equal(p.estado, 'entregado', 'cambiar la limpieza no acepta el presupuesto de los hilos');
+    const [[oh]] = await pool.query('SELECT estado FROM ofertas_hechas WHERE conversacion_id = ?', [conv.insertId]);
+    assert.equal(oh.estado, 'propuesta');
+    const [[c]] = await pool.query('SELECT estado FROM conversaciones WHERE id = ?', [conv.insertId]);
+    assert.equal(c.estado, 'esperando_paciente', 'la conversación del presupuesto sigue abierta');
+    const [[s]] = await pool.query("SELECT COUNT(*) AS n FROM seguimientos WHERE conversacion_id = ? AND estado = 'pendiente'", [conv.insertId]);
+    assert.equal(s.n, 1, 'y con su próximo paso: se le vuelve a escribir');
+  } finally {
+    await pool.end();
+  }
+});
