@@ -198,10 +198,10 @@ ${formulario(`/c/${cita.token}/cancelar`, 'Cancelar la cita')}
 <p class="pie">Si algo cambia, te avisamos por WhatsApp.</p>` });
   }
   if (vista === 'retenida') {
-    const fin = new Date(cita.retenida_hasta);
-    const hasta = T.fechaMadrid(fin) === T.fechaMadrid(ahora) ? `las ${T.hhmm(T.minutosMadrid(fin))}` : `el ${textoFechaHora(fin)}`;
+    const fin = cita.retenida_hasta ? new Date(cita.retenida_hasta) : null;
+    const hasta = !fin ? '' : T.fechaMadrid(fin) === T.fechaMadrid(ahora) ? ` hasta las ${T.hhmm(T.minutosMadrid(fin))}` : ` hasta el ${textoFechaHora(fin)}`;
     const cambia = oferta?.cambia_cita_id && oferta.cambiaInicio ? `Al confirmarla, tu cita del ${textoFechaHora(oferta.cambiaInicio)} queda anulada.` : '';
-    return documento({ titulo: 'Confirma tu cita', cuando, cuerpo: `${aviso(mensaje || `Te guardamos este hueco hasta ${hasta}. Confírmalo para que quede reservado.`)}
+    return documento({ titulo: 'Confirma tu cita', cuando, cuerpo: `${aviso(mensaje || `Te guardamos este hueco${hasta}. Confírmalo para que quede reservado.`)}
 ${dato('Tratamiento', esc(cita.tratamiento))}
 ${donde(cita.sede, disp)}
 ${cambia ? `<p class="pie">${esc(cambia)}</p>` : ''}

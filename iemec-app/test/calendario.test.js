@@ -170,6 +170,7 @@ test('los tokens de antes se migran: huella y cifrado, sin el claro, y su enlace
     assert.deepEqual({ ...sede, lat: Number(sede.lat), lng: Number(sede.lng) },
       { codigo: 'iemec', nombre: 'IEMEC', direccion: 'Av. Siglo XXI, 13, local 35', lat: 40.4066059, lng: -3.9001441, principal: 1 });
     assert.deepEqual(await migrar({ bd: BD_PRUEBAS, log: () => {} }), [], 'otra pasada no hace nada');
+    assert.equal(await agenda.cifrarTokensAntiguos(pool), 0);
 
     await conServidor(crearApp({ pool }), async (base) => {
       const pag = await fetch(`${base}/c/${antiguo}`);
@@ -179,6 +180,12 @@ test('los tokens de antes se migran: huella y cifrado, sin el claro, y su enlace
       assert.equal(ics.uid, `cita-${c.insertId}@iemec-clinic.com`);
       assert.equal(ics.location, `IEMEC, ${DIRECCION}`);
     });
+
+    // Cuando una migración de más adelante quite la columna del token en claro, el paso de migrar()
+    // no se rompe: ya no hace nada.
+    await pool.query('ALTER TABLE citas DROP COLUMN token_antiguo');
+    assert.equal(await agenda.cifrarTokensAntiguos(pool), 0);
+    assert.deepEqual(await migrar({ bd: BD_PRUEBAS, log: () => {} }), []);
   } finally {
     await pool.end();
   }

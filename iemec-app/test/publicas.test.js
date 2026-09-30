@@ -8,6 +8,7 @@ const express = require('express');
 const ICAL = require('ical.js');
 const { prepararBdDePrueba } = require('./ayuda-bd');
 const { crearApp } = require('../servidor/index');
+const { paginaCita, vistaDe } = require('../servidor/rutas/publicas');
 const agenda = require('../servidor/agenda');
 const config = require('../servidor/config');
 const T = require('../motor/tiempo');
@@ -60,6 +61,22 @@ function sinTerceros(html) {
   for (const [, url] of html.matchAll(/<(?:link|img|source|iframe)[^>]+(?:href|src)="([^"]+)"/gi)) assert.match(url, /^\//, `recurso de fuera: ${url}`);
   assert.doesNotMatch(html, /fonts\.googleapis|fonts\.gstatic|gstatic|googletagmanager/);
 }
+
+test('la página, sin base: una retenida sin hora de caducidad no inventa una; nada del paciente escapa sin escapar', () => {
+  const cita = {
+    token: 'EJEMPLO-token-no-valido-EJEMPLO-token-nova1', estado: 'retenida', retenida_hasta: null,
+    inicio: T.desdeMadrid('2026-10-06', '17:00'), fin: T.desdeMadrid('2026-10-06', '17:45'),
+    tratamiento: 'Valoración <b>facial</b>', sede: { nombre: 'IEMEC', direccion: 'Av. Siglo XXI, 13, local 35', municipio: 'Boadilla del Monte' },
+  };
+  const html = paginaCita({ cita, marca: 'IEMEC', whatsapp: '34722833285', ahora: new Date('2026-10-01T08:00:00Z') });
+  assert.match(html, /Te guardamos este hueco\. Confírmalo para que quede reservado\./);
+  assert.match(html, /Valoración &lt;b&gt;facial&lt;\/b&gt;/);
+  assert.equal(vistaDe({ ...cita, estado: 'confirmada' }, new Date('2026-10-06T15:10:00Z')), 'empezada');
+  assert.equal(vistaDe({ ...cita, estado: 'confirmada' }, new Date('2026-10-06T15:50:00Z')), 'pasada');
+  assert.equal(vistaDe(cita, new Date('2026-10-06T15:10:00Z')), 'hueco_liberado', 'una retenida que ya empezó no se confirma');
+  assert.equal(vistaDe({ ...cita, estado: 'cancelada', confirmada_en: null, cancelada_por: 'sistema' }, new Date()), 'hueco_liberado');
+  assert.equal(vistaDe({ ...cita, estado: 'cancelada', confirmada_en: new Date(), cancelada_por: 'paciente' }, new Date()), 'cancelada');
+});
 
 test('«Tu cita»: la página según el estado, el .ics y «Añadir al calendario» con un toque', async (t) => {
   const pool = await prepararBdDePrueba(t);

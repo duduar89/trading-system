@@ -83,8 +83,12 @@ async function uidIcs(q, cita) {
 
 // Los tokens de antes de la migración 010, que estaban en claro: se cifran y se borran (su huella
 // ya la calculó la migración; se vuelve a poner por si acaso). Lo llama migrar() en cada pasada:
-// cuando ya no queda ninguno, solo es una consulta. Devuelve cuántos ha cifrado.
+// cuando ya no queda ninguno, solo es una consulta; y cuando una migración quite la columna
+// token_antiguo, ni eso. Devuelve cuántos ha cifrado.
 async function cifrarTokensAntiguos(q) {
+  const [[columna]] = await q.query(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'citas' AND COLUMN_NAME = 'token_antiguo'");
+  if (!Number(columna.n)) return 0;
   const [filas] = await q.query('SELECT id, token_antiguo FROM citas WHERE token_antiguo IS NOT NULL');
   for (const f of filas) {
     const c = cifrar(f.token_antiguo);
