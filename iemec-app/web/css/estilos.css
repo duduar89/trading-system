@@ -4,9 +4,9 @@
 
 :root {
   --t950: #071e1d; --t900: #0b2b2a; --t800: #123f3e; --t700: #1d5b58; --t600: #2a716d;
-  --turquesa: #76c3c7; --aqua: #d4f0f1; --oro: #c9a45c; --champan: #d9bf8f; --rosa: #c48981;
+  --turquesa: #76c3c7; --aqua: #d4f0f1; --oro: #c9a45c; --champan: #d9bf8f;
   --marfil: #f5f7f6; --tinta: #1f232b; --blanco: #fff;
-  --oro-texto: #7d5d22; --suave: #56615f; --borde: #dce3e1; --borde-suave: #e8eeec;
+  --oro-texto: #7d5d22; --suave: #56615f; --borde: #dce3e1;
   --sobre-oscuro: #eef3f1; --sobre-oscuro-suave: #bdcfcc;
   --foco: #7d5d22;
   --radio: 18px; --radio-p: 12px;
@@ -41,7 +41,7 @@ p { margin: 0 0 1em; }
 ul, ol { margin: 0; padding: 0; }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--foco); outline-offset: 3px; border-radius: 4px; }
-.terciopelo :focus-visible, .pie :focus-visible, .cabecera :focus-visible, .barra-movil :focus-visible, .menu-movil :focus-visible { --foco: var(--champan); outline-color: var(--champan); }
+.terciopelo :focus-visible, .cabecera :focus-visible, .barra-movil :focus-visible { --foco: var(--champan); outline-color: var(--champan); }
 [hidden] { display: none !important; }
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .icono { width: 1.5em; height: 1.5em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
@@ -53,6 +53,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .contenedor { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 16px; }
 @media (min-width: 720px) { .contenedor { padding: 0 32px; } }
 .estrecho { max-width: 780px; }
+.estrecho > h2 { margin-bottom: 16px; }
 .seccion { padding: 64px 0; position: relative; }
 @media (min-width: 900px) { .seccion { padding: 96px 0; } }
 .seccion-blanca { background: var(--blanco); }
@@ -65,6 +66,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .titulo-seccion.centrado { margin-left: auto; margin-right: auto; text-align: center; }
 .titulo-seccion.centrado .etiqueta { justify-content: center; }
 .titulo-seccion.centrado .entrada { margin-left: auto; margin-right: auto; }
+.seccion :is(h2, h3) + p:not(.entrada), .seccion :is(h2, h3) + ul { margin-top: 14px; }
+.seccion :is(p, ul) + h3 { margin-top: 28px; }
 
 /* ── Terciopelo: el verde de la recepción, con su grano y su brillo ───────────────────────── */
 .terciopelo {
@@ -201,7 +204,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .desplegable-panel a::after { display: none; }
 .desplegable-panel a:hover { background: rgba(217, 191, 143, .08); }
 .desplegable-panel .icono { color: var(--oro); width: 1.6em; height: 1.6em; }
-.desplegable-panel .todos { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(201, 164, 92, .2); }
+.desplegable-panel .todos { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid rgba(201, 164, 92, .2); }
 .desplegable-panel .todos a { color: var(--champan); }
 .boton-menu {
   display: inline-flex; align-items: center; gap: 8px; min-height: 48px; min-width: 48px; padding: 8px 14px; margin-right: -6px;
@@ -316,7 +319,7 @@ main { display: block; padding-top: var(--cabecera); outline: none; }
 
 /* ── Tarjetas ───────────────────────────────────────────────────────────────────────────── */
 .rejilla { display: grid; gap: 18px; }
-@media (min-width: 640px) { .rejilla-2, .rejilla-3, .rejilla-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 640px) { .rejilla-3, .rejilla-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 980px) { .rejilla-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rejilla-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .rejilla > * { min-width: 0; }
 @media (min-width: 640px) { .rejilla-relacionados { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); } }
@@ -507,7 +510,6 @@ main { display: block; padding-top: var(--cabecera); outline: none; }
 .form-estado.mal { background: #fbeceb; border: 1px solid #e0aaa4; color: #7a2820; }
 .formulario .boton[type="submit"] { justify-self: start; min-width: 220px; }
 @media (max-width: 519px) { .formulario .boton[type="submit"] { width: 100%; } }
-.gracias-caja { max-width: 640px; }
 
 /* ── Listado de tratamientos ─────────────────────────────────────────────────────────────── */
 .filtros { display: grid; gap: 16px; padding: 24px 0 8px; }
@@ -533,7 +535,7 @@ main { display: block; padding-top: var(--cabecera); outline: none; }
 
 /* ── Clínica, tarjetas regalo ────────────────────────────────────────────────────────────── */
 .galeria { display: grid; gap: 14px; grid-template-columns: 1fr; }
-@media (min-width: 720px) { .galeria { grid-template-columns: repeat(2, 1fr); } .galeria figure:first-child { grid-column: 1 / -1; } }
+@media (min-width: 720px) { .galeria { grid-template-columns: repeat(3, 1fr); } .galeria figure:first-child { grid-column: 1 / -1; } }
 .galeria figure { margin: 0; }
 .galeria img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radio-p); }
 .galeria figure:first-child img { aspect-ratio: 16 / 9; }
@@ -544,11 +546,20 @@ main { display: block; padding-top: var(--cabecera); outline: none; }
 .tecnologias .icono { color: var(--oro-texto); }
 .tecnologias b { display: block; font-weight: 600; font-size: .95rem; }
 .tecnologias span { font-size: .88rem; color: var(--suave); }
-.importes { list-style: none; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
-.importe { align-items: flex-start; }
-.importe .cifra { font-family: var(--serif); font-style: italic; font-size: 3rem; line-height: 1; color: var(--t900); margin: 6px 0 14px; font-variant-numeric: lining-nums tabular-nums; }
-.importe .boton { width: 100%; margin-top: auto; }
-.tarjeta-regalo-visual { aspect-ratio: 1.6; border-radius: var(--radio-p); padding: 16px 18px; margin-bottom: 18px; width: 100%; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; box-shadow: 0 16px 30px -18px rgba(7, 30, 29, .7); }
+/* En el móvil, una fila por importe; en escritorio, la tarjeta dibujada. */
+.importes { list-style: none; display: grid; gap: 10px; }
+.importe { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; padding: 12px 14px 12px 20px; }
+.importe h3 { font-family: var(--serif); font-style: italic; font-size: 2rem; line-height: 1; margin: 0; font-variant-numeric: lining-nums; }
+.importe .tarjeta-regalo-visual { display: none; }
+.importe .boton { min-height: 48px; padding: 10px 20px; }
+@media (min-width: 720px) {
+  .importes { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .importe { display: flex; flex-direction: column; align-items: stretch; padding: 14px; }
+  .importe .tarjeta-regalo-visual { display: flex; }
+  .importe h3 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .importe .boton { width: 100%; margin-top: auto; }
+}
+.tarjeta-regalo-visual { aspect-ratio: 1.6; border-radius: var(--radio-p); padding: 16px 18px; margin-bottom: 18px; width: 100%; flex-direction: column; justify-content: space-between; overflow: hidden; box-shadow: 0 16px 30px -18px rgba(7, 30, 29, .7); }
 .tarjeta-regalo-visual .marca-mini { font-weight: 300; letter-spacing: .42em; color: var(--turquesa); font-size: .95rem; }
 .tarjeta-regalo-visual .cifra-mini { font-family: var(--serif); font-style: italic; font-size: 2rem; color: var(--champan); align-self: flex-end; font-variant-numeric: lining-nums; }
 .lista-condiciones { list-style: none; display: grid; gap: 10px; }

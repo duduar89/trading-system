@@ -201,7 +201,7 @@ function construir(opciones = {}) {
     if (av.length) avisos.push({ ruta: p.ruta, avisos: [...new Set(av)] });
   }
   if (Buffer.byteLength(css) > 45 * 1024) errores.push({ tipo: 'tamaño', ruta: ctx.recursos.css, bytes: Buffer.byteLength(css), limite: 45 * 1024 });
-  if (js.length > 20 * 1024) errores.push({ tipo: 'tamaño', ruta: ctx.recursos.js, bytes: js.length, limite: 20 * 1024 });
+  if (Buffer.byteLength(js) > 20 * 1024) errores.push({ tipo: 'tamaño', ruta: ctx.recursos.js, bytes: Buffer.byteLength(js), limite: 20 * 1024 });
 
   // Escribir páginas.
   for (const p of paginas) escribir(p.ruta === '/404.html' ? '404.html' : `${p.ruta.replace(/^\//, '')}index.html`, p.html);
@@ -255,7 +255,7 @@ function construir(opciones = {}) {
     tamanos: {
       html_max: Math.max(...paginas.map((p) => Buffer.byteLength(p.html))),
       css: Buffer.byteLength(css),
-      js: js.length,
+      js: Buffer.byteLength(js),
     },
     fotos: [...fotos.keys()],
     recursos: ctx.recursos,

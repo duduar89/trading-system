@@ -450,10 +450,9 @@ function tarjetasRegalo(ctx) {
 <div class="contenedor">
 <div class="titulo-seccion"><p class="etiqueta">Importes</p><h2 id="t-importes">Elige el importe</h2><p class="entrada">Pídela por WhatsApp con el importe ya escrito y te explicamos cómo recibirla. ${pendiente(t.pago_pendiente)}</p></div>
 <ul class="importes">${t.importes.map((i) => html`<li class="tarjeta importe">
-<div class="tarjeta-regalo-visual terciopelo"><span class="marca-mini">IEMEC</span><span class="cifra-mini">${i} €</span></div>
-<p class="etiqueta">Tarjeta regalo</p>
-<p class="cifra">${i} €</p>
-${botonWhatsapp(B.urlWhatsapp(ctx, `tarjeta regalo de ${i} €`, `web-tarjeta-${i}`), `Pedir la de ${i} €`, 'boton-oscuro')}
+<div class="tarjeta-regalo-visual terciopelo" aria-hidden="true"><span class="marca-mini">IEMEC</span><span class="cifra-mini">${i} €</span></div>
+<h3>${i} €</h3>
+<a class="boton boton-oscuro" href="${B.urlWhatsapp(ctx, `tarjeta regalo de ${i} €`, `web-tarjeta-${i}`)}">${icono('whatsapp')}Pedir<span class="solo-lector"> la tarjeta regalo de ${i} €</span></a>
 </li>`)}</ul>
 </div>
 </section>

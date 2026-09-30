@@ -1,9 +1,14 @@
 {
   "_nota": "Tarjetas regalo de la web actual (45, 70, 140 y 250 €, y el vale físico en estuche). Se piden por WhatsApp con el importe escrito; el pago online queda pendiente (hoy lo cobra la tienda de SITE123). normas.md (e): producto de la clínica para estética y bienestar o pago a cuenta, nunca ligado a un medicamento o producto sanitario ni presentado como descuento.",
-  "importes": [45, 70, 140, 250],
+  "importes": [
+    45,
+    70,
+    140,
+    250
+  ],
   "catalogo": "tarjeta-regalo-online",
   "estuche": {
-    "texto": "También en estuche: la tarjeta impresa en una caja negra o blanca con el logotipo de IEMEC, para entregarla en mano.",
+    "texto": "La tarjeta impresa en una caja negra o blanca con el logotipo de IEMEC, para entregarla en mano.",
     "foto": "vale-regalo-fisico-estuches"
   },
   "para_que": "Sirven para tratamientos de estética y bienestar, como un facial de cabina, un masaje o un head spa, o como pago a cuenta en la clínica.",
