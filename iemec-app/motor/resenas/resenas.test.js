@@ -253,7 +253,7 @@ test('revisar una respuesta antes de publicarla: lo que no puede salir', () => {
   const errores = (texto, extra = {}) => R.revisarRespuesta(texto, { ...c, ...extra }).errores.join(' | ');
   assert.equal(errores('¡Muchas gracias, Laura! Nos alegra mucho que el trato haya estado a la altura. Hasta pronto.'), '');
   assert.match(errores('¡Gracias, Laura! La Dra. Perea estará feliz de leerte.'), /equipo/);
-  assert.match(errores('¡Gracias, Laura! Maribel te manda un abrazo.'), /equipo \(«maribel»\)/);
+  assert.match(errores('¡Gracias, Laura! Maribel te manda un abrazo.'), /equipo \(«Maribel»\)/);
   assert.match(errores('¡Gracias, Laura! Nos alegra que el relleno de labios haya quedado tan bien.'), /tratamiento .*datos de salud/);
   assert.match(errores('¡Gracias, Laura! Tu rosácea está mucho mejor.'), /tratamiento/);
   assert.match(errores('¡Gracias, Laura! Nos vemos el martes 13 de octubre.'), /fecha/);
@@ -336,6 +336,8 @@ test('los KPI de la ficha: respuesta, rechazadas, conversión, ritmo, nota de 90
   assert.deepEqual(m.porSemana.at(-1), { semana: '2026-10-26', resenas: 1 }, 'la semana en curso');
   assert.deepEqual(m.porSemana.filter((s) => s.resenas).map((s) => s.semana), ['2026-09-14', '2026-10-19', '2026-10-26']);
   assert.deepEqual([m.porResponder, m.enHistorial], [2, 1]);
+  // Los borradores del historial no cuentan como «por contestar»: van aparte, poco a poco.
+  assert.equal(R.metricas({ resenas: [{ nota: 5, estado: 'borrador', historial: 1, publicada_en: '2025-02-01T10:00:00Z' }], ahora }).porResponder, 0);
   // Sin datos, sin cifras inventadas.
   const vacio = R.metricas({ ahora });
   assert.deepEqual([vacio.notaTotal, vacio.tasaRespuesta, vacio.horasRespuesta, vacio.peticiones.porCada100], [null, null, null, null]);

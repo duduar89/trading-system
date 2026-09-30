@@ -356,7 +356,7 @@ test('reseñas de Google: análisis y alerta clínica, respuestas sin datos pers
       const aprobar = (r, texto) => S.aprobarYPublicar(pool, google, { resenaId: r.id, texto, aprobadaPor: 'recepcion@iemec', ahora });
       await assert.rejects(aprobar(g2, 'Sentimos lo del relleno'), /datos de salud/);
       await assert.rejects(aprobar(g1, '¡Gracias, Laura! La Dra. Perea está encantada de leerte.'), /equipo/);
-      await assert.rejects(aprobar(g1, '¡Gracias, Laura! Maribel te manda un abrazo.'), /equipo \(«maribel»\)/);
+      await assert.rejects(aprobar(g1, '¡Gracias, Laura! Maribel te manda un abrazo.'), /equipo \(«Maribel»\)/);
       await assert.rejects(aprobar(g1, '¡Gracias, Laura! Te esperamos el martes 13 de octubre en tu próxima cita.'), /fecha.*paciente/);
       await assert.rejects(aprobar(g1, '¡Gracias, Laura! Nos alegra que el aumento de labios haya quedado natural.'), /tratamiento/);
       await assert.rejects(aprobar(g1, '¡Gracias, Laura! Te regalamos un 10 % de descuento: iemec-clinic.com/promo'), /enlaces.*promociones/);

@@ -526,7 +526,7 @@ function aPanel(x) {
 // en cola) y las contestadas de los últimos 60 días, el historial y la ficha.
 async function datosPanel(pool, { ahora = new Date() } = {}) {
   const [todas] = await pool.query(
-    `SELECT nota, estado, con_texto, temas, publicada_en, primera_respuesta_en, respuesta_estado, respuestas_rechazadas FROM resenas`);
+    `SELECT nota, estado, historial, con_texto, temas, publicada_en, primera_respuesta_en, respuesta_estado, respuestas_rechazadas FROM resenas`);
   const [peticiones] = await pool.query(
     'SELECT enviada_en, pulsada_en, variante, recordatorio_enviado_en FROM peticiones_resena WHERE enviada_en > ?', [new Date(ahora.getTime() - 90 * DIA)]);
   const [lista] = await pool.query(

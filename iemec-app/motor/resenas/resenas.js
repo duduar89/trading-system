@@ -397,6 +397,16 @@ const CON_GENERO = /\b(atendid[oa]s?|content[oa]s?|encantad[oa]s?|satisfech[oa]s
 
 const escapar = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const digitos = (s) => String(s || '').replace(/\D/g, '');
+// Lo encontrado (normalizado: «sesion») tal y como está escrito en el texto («sesión»).
+function comoEnElTexto(bruto, buscado) {
+  const palabras = String(bruto).match(/[\p{L}\p{N}]+/gu) || [];
+  const n = buscado.split(' ').length;
+  for (let i = 0; i + n <= palabras.length; i++) {
+    const trozo = palabras.slice(i, i + n).join(' ');
+    if (normalizar(trozo) === buscado) return trozo;
+  }
+  return buscado;
+}
 
 /**
  * Antes de publicar una respuesta (la del borrador o la que ha escrito una persona). Los errores
@@ -417,14 +427,14 @@ function revisarRespuesta(texto, { resena = {}, tratamientos = [], profesionales
 
   const nombres = [...new Set([...TRATAMIENTOS_GENERICOS, ...MEDICAMENTOS, ...MARCAS_SANITARIAS, ...tratamientos].map((x) => normalizar(x)).filter((x) => x.length >= 3))];
   const tratamiento = nombres.find((x) => new RegExp(`\\b${escapar(x)}\\b`).test(t));
-  if (tratamiento) errores.push(`La respuesta nombra un tratamiento («${tratamiento}»): una reseña es pública y no puede llevar datos de salud.`);
+  if (tratamiento) errores.push(`La respuesta nombra un tratamiento («${comoEnElTexto(bruto, tratamiento)}»): una reseña es pública y no puede llevar datos de salud.`);
   const salud = SALUD.exec(t);
-  if (salud) errores.push(`Habla de salud («${salud[1]}»): en público, ni un detalle; se habla en privado.`);
+  if (salud) errores.push(`Habla de salud («${comoEnElTexto(bruto, salud[1])}»): en público, ni un detalle; se habla en privado.`);
 
   const quien = normalizar(primerNombre(resena.autor));
   const equipo = nombresDelEquipo(profesionales);
   const nombrado = t.split(/[^a-z]+/).find((w) => w && w !== quien && equipo.has(w));
-  if (TITULOS_EQUIPO.test(t) || nombrado) errores.push(`Nombra a alguien del equipo${nombrado ? ` («${nombrado}»)` : ''}: en una respuesta pública no se nombra a nadie.`);
+  if (TITULOS_EQUIPO.test(t) || nombrado) errores.push(`Nombra a alguien del equipo${nombrado ? ` («${comoEnElTexto(bruto, nombrado)}»)` : ''}: en una respuesta pública no se nombra a nadie.`);
   if (FECHAS.test(t)) errores.push('Lleva una fecha: en la respuesta no se dice cuándo vino nadie.');
   if (CONFIRMA_PACIENTE.test(t) && !LO_DICE_QUIEN_ESCRIBE.test(normalizar(resena.texto || ''))) {
     errores.push('Da a entender que es paciente y la reseña no lo dice: mejor en general («tu experiencia», «tu opinión»).');
@@ -442,7 +452,7 @@ function revisarRespuesta(texto, { resena = {}, tratamientos = [], profesionales
     errores.push('Es igual que otra respuesta reciente: Google rechaza las repetidas. Cámbiala un poco.');
   }
   const genero = CON_GENERO.exec(t);
-  if (genero) avisos.push(`«${genero[1]}»: mejor en neutro («que el trato haya estado a la altura»).`);
+  if (genero) avisos.push(`«${comoEnElTexto(bruto, genero[1])}»: mejor en neutro («que el trato haya estado a la altura»).`);
   const legal = revisar(bruto, { tipo: 'conversacion' });
   errores.push(...legal.errores);
   return { ok: errores.length === 0, errores, avisos: [...avisos, ...legal.avisos] };
@@ -609,7 +619,8 @@ function metricas({ resenas = [], peticiones = [], ahora = new Date() } = {}) {
     conTextoMes: conTextoMes.length,
     temasMes: Object.entries(temas).map(([tema, n]) => ({ tema, resenas: n, pct: pct(n, conTextoMes.length) }))
       .sort((a, b) => b.resenas - a.resenas || a.tema.localeCompare(b.tema)),
-    porResponder: resenas.filter((r) => ['nueva', 'borrador'].includes(r.estado)).length,
+    // Por contestar: las recientes con borrador (el historial va aparte, poco a poco).
+    porResponder: resenas.filter((r) => ['nueva', 'borrador'].includes(r.estado) && !si(r.historial)).length,
     enHistorial: resenas.filter((r) => r.estado === 'historial').length,
   };
 }
