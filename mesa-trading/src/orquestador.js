@@ -57,6 +57,7 @@ const operaciones = require('./agentes/departamentos/operaciones');
 const mesasDep = require('./agentes/departamentos/mesas');
 const laboratorio = require('./agentes/departamentos/laboratorio');
 const direccion = require('./agentes/departamentos/direccion');
+const { RegistroActividad } = require('./agentes/actividad');
 const { EPS, etiqueta, puestoId, puestoSombraId, agenteDePuesto } = require('./agentes/departamentos/comun');
 const { leerJSON, escribirJSON, anadirJSONL, leerJSONL } = require('./util/almacen');
 const { tomarBloqueo, soltarBloqueo } = require('./util/proceso');
@@ -199,6 +200,7 @@ class Orquestador extends EventEmitter {
     this._bloqueoTomado = false;
     this._deteniendo = false;
     this._pausas = new Set();
+    this._actividad = null;          // RegistroActividad del paso en curso (§7, actividad)
     // Lo que un humano pulsa en el panel y cambia el fondo (Reabrir, Pausar,
     // kill, Megáfono aplicado), numerado: el comité lo mira para decir en su
     // punto lo que cambió mientras estaba reunido. En el modo local, solo en
@@ -341,7 +343,7 @@ class Orquestador extends EventEmitter {
     const base = {
       ultimaVela: {}, comprobadoMesa: {}, curva: [], curvaDiaria: [], lecciones: [], agentes: {}, puestos: {}, inicioDiaPuestos: {},
       pendientes: [], ordenesEnVuelo: {}, ejecuciones: [], megafonoPendiente: null, riesgo: { alertasVistas: {} }, ajustes: {},
-      ultimoCierreT: null, picoVigilancia: null, inicioDiaVigilancia: null, diaInicioVigilancia: null, comisionesEstimadas: {},
+      ultimoCierreT: null, actividad: null, picoVigilancia: null, inicioDiaVigilancia: null, diaInicioVigilancia: null, comisionesEstimadas: {},
       macro: { regimen: null, fg: null, ultimaHora: null, ultimoMensaje: null },
       analisis: { ultimaHora: null, porActivo: {} },
       noticias: { ultima: null, vistos: [], eventosGraves: [] },
@@ -471,6 +473,14 @@ class Orquestador extends EventEmitter {
   mesaPorId(id) { return this.estado.mesas.find(m => m.id === id) || null; }
   agentePorId(id) { return this.plantilla.find(a => a.id === id) || null; }
 
+  // Lo que de verdad hizo un agente en este paso (§7, actividad). Solo dentro
+  // de paso() y solo agentes de la plantilla; lo llama el código que hace el
+  // trabajo. Nunca lanza: el registro no puede tumbar un latido.
+  anotarActividad(entrada) {
+    if (!this._actividad || !entrada || !this.agentePorId(entrada.agente)) return false;
+    try { return this._actividad.anotar(entrada); } catch (_) { return false; }
+  }
+
   _casa(a) {
     const d = DEPARTAMENTOS.find(x => x.id === a.departamento);
     return d ? d.sala : 'parque';
@@ -568,7 +578,10 @@ class Orquestador extends EventEmitter {
     for (const [s, q] of Object.entries(r || {})) if (q && q.precio > 0) { this.vivo.precios[s] = { precio: q.precio, t: q.t }; alguno = true; }
     // Última petición de precios que trajo algo (no la t de la cotización:
     // con la red bien, DOGE ya llega con minutos de retraso).
-    if (alguno) this.vivo.preciosOkT = ahora;
+    if (alguno) {
+      this.vivo.preciosOkT = ahora;
+      this.anotarActividad({ agente: 'controller', accion: 'precios', objetivo: 'pantalla-cotizaciones' });
+    }
     // Bolsa: con Alpaca manda su reloj (cada 5 min); si no, el calendario.
     if (this.hayAlpaca && typeof this.broker.relojMercado === 'function' && this.broker.nombre === 'alpaca-paper') {
       if (this.vivo.relojMercadoT === null || ahora - this.vivo.relojMercadoT >= CADA_RELOJ_MERCADO) {
@@ -711,6 +724,15 @@ class Orquestador extends EventEmitter {
 
   async _paso() {
     const ahora = this.reloj.ahora();
+    this._actividad = new RegistroActividad(ahora);
+    try {
+      return await this._pasoDentro(ahora);
+    } finally {
+      this._actividad = null;
+    }
+  }
+
+  async _pasoDentro(ahora) {
     this.pasos++;
     await this._seguro('precios', 'controller', () => this._actualizarPrecios(ahora));
     await this._seguro('valoración', 'controller', () => this.refrescarCartera());
@@ -722,8 +744,10 @@ class Orquestador extends EventEmitter {
     await this._cadenciaDiaria(ahora);
     await this._seguro('vigilante', 'riesgos', () => this._vigilar(ahora));
     if (Object.keys(this.estado.ordenesEnVuelo).length) await this._seguro('órdenes en vuelo', 'ejecutor', () => this.ejecutor.resolverEnVuelo());
-    await this._seguro('conciliación', 'controller', () => operaciones.conciliarCadaLatido(this));
-    await this._seguro('macro', 'macro', () => macro.actualizar(this));
+    const conc = await this._seguro('conciliación', 'controller', () => operaciones.conciliarCadaLatido(this));
+    if (conc && !conc.aplazada) this.anotarActividad({ agente: 'controller', accion: 'conciliacion', objetivo: 'monitor' });
+    const reg = await this._seguro('macro', 'macro', () => macro.actualizar(this));
+    if (reg) this.anotarActividad({ agente: 'macro', accion: 'regimen', objetivo: 'pantalla-regimen' });
     await this._seguro('análisis', 'analisis', () => analisis.notas(this));
     if (analisis.hayNoticias(this)) this.lanzar('noticias', () => analisis.noticias(this));
     await this._cadenciaComite(ahora);
@@ -734,6 +758,9 @@ class Orquestador extends EventEmitter {
     this._seguroSinc('descansos', () => this._descansos(ahora));
     this._seguroSinc('tarjetas de los puestos', () => this._textosAlNivel());
     this._muestraCurva(ahora);
+    // La actividad del paso va al estado: un comando en el modo latido (otro
+    // proceso) publica la misma instantánea que el modo continuo.
+    this.estado.actividad = this._actividad.aJSON();
     if (this.pasos % Math.max(1, this.opciones.guardarCadaPasos) === 0) this._seguroSinc('guardar', () => this.guardar());
     this._emitirEstado();
     return true;
@@ -755,6 +782,7 @@ class Orquestador extends EventEmitter {
 
   async _vigilar(ahora) {
     const r = riesgos.vigilarFondo(this);
+    this.anotarActividad({ agente: 'riesgos', accion: 'riesgo', objetivo: 'mesas', detalle: 'limites' });
     for (const a of r.acciones) {
       if (a.tipo === 'kill') {
         await this.killSwitch(a.motivo);
@@ -865,6 +893,7 @@ class Orquestador extends EventEmitter {
       c.proximoComite = inicioVela(ahora, ms) + ms;
     }
     const motivo = toca ? 'programado' : 'demanda';
+    this.anotarActividad({ agente: 'cio', accion: 'comite', objetivo: 'sala-comite', detalle: motivo });
     const celebrar = () => comite.celebrar(this, { motivo });
     if (this.opciones.comiteEnSegundoPlano) { this.lanzar('comité', celebrar); return; }
     // Modo latido con LLM: antes de la llamada se guarda que el comité ya no
@@ -1206,6 +1235,7 @@ class Orquestador extends EventEmitter {
       limites: { ...this.limites },
       listoParaReal: this._listoParaReal(patrimonio, ahora),
       avisos,
+      actividad: e.actividad || null,
     };
   }
 

@@ -637,6 +637,7 @@
         limites: Object.assign({}, LIMITES),
         listoParaReal: listoParaReal(cab),
         avisos: avisos(),
+        actividad: copia(actividad),
       };
     }
 
@@ -674,6 +675,14 @@
 
     // ----- avance del tiempo -----
     let proxMensaje = inicio + 1500;
+    // Actividad del «paso» de la maqueta (§7): cada 12 s los precios se mueven
+    // y el vigilante mira, como en cada paso de la mesa de verdad.
+    const actividadDe = t => ({ t, lista: [
+      { agente: 'controller', accion: 'precios', objetivo: 'pantalla-cotizaciones' },
+      { agente: 'riesgos', accion: 'riesgo', objetivo: 'mesas', detalle: 'limites' },
+    ] });
+    let actividad = actividadDe(inicio);
+    let proxActividad = inicio + 12000;
     let proxOperacion = inicio + 6000;
     let proxDescanso = inicio + 14000;
     let proxMuestra = inicio + 4000;
@@ -701,6 +710,7 @@
         for (const a of ACTIVOS) { historia[a.etiqueta].push(precios[a.etiqueta]); if (historia[a.etiqueta].length > 32) historia[a.etiqueta].shift(); }
         proxMuestra = ahora + 4000;
       }
+      if (ahora >= proxActividad) { actividad = actividadDe(ahora); proxActividad = ahora + 12000; }
       if (ahora >= proxCurva) {
         curva.push({ t: ahora, patrimonio: redondear(patrimonio()) });
         if (curva.length > 500) curva.shift();

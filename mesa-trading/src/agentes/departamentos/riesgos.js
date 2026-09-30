@@ -77,6 +77,7 @@ function contexto(ctx, { sombra = false } = {}) {
 function evaluar(ctx, propuesta, { sombra = false } = {}) {
   const r = evaluarPropuesta(propuesta, contexto(ctx, { sombra }));
   if (sombra) return r;
+  if (typeof ctx.anotarActividad === 'function') ctx.anotarActividad({ agente: 'riesgos', accion: 'riesgo', objetivo: 'mesas', detalle: 'propuesta', puestoId: propuesta.puestoId || null });
   const e = etiqueta(propuesta.simbolo);
   const datos = {
     puestoId: propuesta.puestoId, mesaId: propuesta.mesaId, simbolo: propuesta.simbolo, tipo: propuesta.tipo, lado: propuesta.lado,

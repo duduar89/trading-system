@@ -1,9 +1,16 @@
 // Personajes del parqué: dónde está cada agente, cómo anda entre salas y cómo
 // se dibuja; y los bocadillos de lo que dice.
 //
-// Solo se mueven por eventos reales (§4.5 de la propuesta): cambia su `sala` o
-// su `estado` en la instantánea o en un evento `agente`. Andan a 2 teselas/s
-// por las puertas, siguiendo la ruta del mapa.
+// Se mueven por dos cosas reales (§4.5 de la propuesta y §7 `actividad`):
+// - cambia su `sala` o su `estado` en la instantánea o en un evento `agente`
+//   (comité, descanso): van a su nuevo sitio;
+// - la `actividad` del último paso (lo que de verdad hizo cada agente): se
+//   levantan, van a mirar su objetivo (la pantalla de cotizaciones, las mesas,
+//   el puesto de ejecución, su monitor), se quedan 3–6 s y vuelven a su silla.
+//   planificarActividad() reparte la lista a lo largo del intervalo entre pasos
+//   (como mucho 40 s) y nunca más allá.
+// Andan a 2 teselas/s por las puertas, siguiendo la ruta del mapa. El resto
+// (tecleo, algún giro de cabeza) es adorno de dibujo, sin significado.
 (function (raiz, fabrica) {
   const esNode = typeof module === 'object' && module.exports;
   const mod = fabrica(esNode ? require('./mapa.js') : raiz.Parque.mapa);
@@ -69,11 +76,14 @@
     return lineas;
   }
 
+  // Importancia 0: los de actividad (van detrás de cualquier mensaje real).
+  const importanciaDe = x => (Number.isFinite(x.importancia) ? x.importancia : 1);
+
   // Como mucho 5 a la vez: primero los más importantes y, a igualdad, los más nuevos.
   function elegirBocadillos(candidatos, max) {
     return candidatos
       .slice()
-      .sort((a, b) => (b.importancia || 1) - (a.importancia || 1) || b.desde - a.desde)
+      .sort((a, b) => importanciaDe(b) - importanciaDe(a) || b.desde - a.desde)
       .slice(0, max || MAX_BOCADILLOS);
   }
 
@@ -93,6 +103,7 @@
       this.sitio = sitio;
       this.destino = null;
       this.ruta = [];
+      this.paseo = null;          // { fase: 'ida'|'mirar'|'vuelta', punto, mirarMs, ritmo, hasta, texto, mapa }
       this.fase = 0;
       this.bocadillo = null;
       this.textoVisto = '';
@@ -106,6 +117,9 @@
     }
 
     get andando() { return this.ruta.length > 0; }
+
+    // ¿Está en su sitio de casa, sentado o de pie como toca, y libre para un paseo?
+    get libre() { return !this.paseo && !this.andando; }
 
     // Clave de orden de pintado: la posición en el suelo.
     get clave() { return this.col + this.fila; }
@@ -128,7 +142,12 @@
       const p = this.puntoObjetivo(sitio, agente.estado, mapa);
       const mismo = this.destino && Math.abs(this.destino.col - p.col) < 1e-6 && Math.abs(this.destino.fila - p.fila) < 1e-6;
       this.destino = p;
-      if (mismo) {
+      // De paseo y con el mismo sitio de vuelta: sigue su paseo. Si le llaman a
+      // otro sitio (comité, descanso, kill), lo deja y va para allá.
+      if (this.paseo && mismo && !o.instantaneo) return false;
+      const cortado = Boolean(this.paseo);
+      if (cortado) { this.paseo = null; this.ruta = []; }
+      if (mismo && !cortado) {
         if (!this.andando) { this.postura = p.postura; this.mira = sitio ? sitio.mira : this.mira; }
         return false;
       }
@@ -145,9 +164,49 @@
       return true;
     }
 
-    actualizar(dt) {
+    // Empieza un paseo de actividad: ir a `punto`, mirar `mirarMs` y volver.
+    // `ritmo` multiplica la velocidad de andar (para que quepa en el intervalo).
+    iniciarPaseo(punto, mapa, o) {
+      const op = o || {};
+      if (!this.libre || !this.destino) return false;
+      this.paseo = { fase: 'ida', punto, mirarMs: op.mirarMs || 3000, ritmo: op.ritmo || 1, hasta: null, texto: op.texto || null, mapa };
+      const r = mapaMod.ruta(mapa, { col: this.col, fila: this.fila }, punto);
+      this.ruta = r.slice(1);
+      this.postura = 'de_pie';
+      if (!this.ruta.length) this._llegar(op.ahora || 0);
+      return true;
+    }
+
+    // Llega al final de una ruta (de paseo o de un cambio de sitio).
+    _llegar(ahora) {
+      const pa = this.paseo;
+      if (pa && pa.fase === 'ida') {
+        pa.fase = 'mirar';
+        pa.hasta = ahora + pa.mirarMs;
+        this.postura = 'de_pie';
+        this.mira = pa.punto.mira || this.mira;
+        if (pa.texto && !(this.bocadillo && this.bocadillo.hasta > ahora)) {
+          this.decir(pa.texto, 0, ahora, Math.min(2600, pa.mirarMs));
+        }
+        return;
+      }
+      if (pa && pa.fase === 'vuelta') this.paseo = null;
+      if (this.destino) {
+        this.postura = this.destino.postura;
+        if (this.sitio) this.mira = this.sitio.mira;
+      }
+    }
+
+    actualizar(dt, ahora) {
+      const pa = this.paseo;
+      if (pa && pa.fase === 'mirar') {
+        if (!(ahora >= pa.hasta)) return;
+        pa.fase = 'vuelta';
+        this.ruta = mapaMod.ruta(pa.mapa, { col: this.col, fila: this.fila }, this.destino).slice(1);
+        if (!this.ruta.length) { this._llegar(ahora); return; }
+      }
       if (!this.ruta.length) return;
-      let resto = VELOCIDAD * dt;
+      let resto = VELOCIDAD * (pa ? pa.ritmo : 1) * dt;
       while (resto > 0 && this.ruta.length) {
         const obj = this.ruta[0];
         const dc = obj.col - this.col;
@@ -164,17 +223,16 @@
           resto = 0;
         }
       }
-      this.fase += dt * 9;
+      this.fase += dt * 9 * (pa ? Math.min(3, pa.ritmo) : 1);
       this.z = mapaMod.elevacionEn(this.col, this.fila);
-      if (!this.ruta.length && this.destino) {
-        this.postura = this.destino.postura;
-        if (this.sitio) this.mira = this.sitio.mira;
-      }
+      if (!this.ruta.length) this._llegar(ahora);
     }
 
-    decir(texto, importancia, ahora) {
+    // `ms`: duración a mano (los de actividad son cortos); si no, la de siempre.
+    decir(texto, importancia, ahora, ms) {
       if (!texto) return;
-      this.bocadillo = { texto: String(texto), importancia: importancia || 1, desde: ahora, hasta: ahora + duracionBocadillo(texto) };
+      const imp = importancia === 0 ? 0 : (importancia || 1);
+      this.bocadillo = { texto: String(texto), importancia: imp, desde: ahora, hasta: ahora + (ms > 0 ? ms : duracionBocadillo(texto)) };
     }
   }
 
@@ -188,8 +246,26 @@
 
   function crearElenco() {
     const personajes = new Map();
+    let programados = [];         // paseos de actividad que aún no han empezado
+    let ultimaActividadT = null;  // dedupe: cada paso se reproduce una vez
     return {
       personajes,
+      get programados() { return programados.slice(); },
+      get ultimaActividadT() { return ultimaActividadT; },
+      // Reparte la actividad de un paso nuevo (dedupe por su t). → paseos programados.
+      programarActividad(actividad, entrada) {
+        if (!actividad || !Number.isFinite(actividad.t)) return [];
+        if (ultimaActividadT !== null && actividad.t <= ultimaActividadT) return [];
+        ultimaActividadT = actividad.t;
+        const e = entrada || {};
+        if (e.reducir) return [];
+        const ocupados = new Set();
+        for (const p of personajes.values()) if (p.paseo) ocupados.add(p.id);
+        for (const x of programados) ocupados.add(x.id);
+        const plan = planificarActividad(Object.assign({}, e, { actividad, ocupados, personajes }));
+        programados = programados.concat(plan);
+        return plan;
+      },
       // Crea los nuevos donde les toca, quita a los que ya no están y manda a
       // cada uno a su sitio.
       sincronizar(agentes, mapa, asignacion, opciones) {
@@ -209,9 +285,211 @@
         }
         for (const id of Array.from(personajes.keys())) if (!vivos.has(id)) personajes.delete(id);
       },
-      actualizar(dt) { for (const p of personajes.values()) p.actualizar(dt); },
+      // `ahora`: el mismo reloj que se dio a programarActividad (performance.now()).
+      actualizar(dt, ahora) {
+        const t = Number.isFinite(ahora) ? ahora : 0;
+        if (programados.length) {
+          const quedan = [];
+          for (const x of programados) {
+            if (x.inicio > t) { quedan.push(x); continue; }
+            const p = personajes.get(x.id);
+            // Si entre tanto se fue al comité, al descanso o anda por otra cosa, no sale.
+            if (!p || !p.libre || !elegible(p.agente, p.sitio, x.departamentos)) continue;
+            p.iniciarPaseo(x.punto, x.mapa, { mirarMs: x.mirarMs, ritmo: x.ritmo, texto: x.texto, ahora: t });
+          }
+          programados = quedan;
+        }
+        for (const p of personajes.values()) p.actualizar(dt, t);
+      },
+      // ¿Anda alguien? Para el ritmo de pintado (quien mira quieto no cuenta).
+      hayMovimiento() {
+        for (const p of personajes.values()) if (p.andando) return true;
+        return false;
+      },
       lista() { return Array.from(personajes.values()); },
     };
+  }
+
+
+  // ---------- actividad del paso: planificación de paseos ----------
+
+  const PASO_SINTETICO_MS = 5 * 60 * 1000;
+  const VENTANA_MAX_MS = 40000;
+  const MIRAR_MIN_MS = 3000;
+  const MIRAR_MAX_MS = 6000;
+
+  // Intervalo real entre dos pasos: el del cron en el modo web (latidoMs); en
+  // el local sintético, 5 min simulados / velocidad; en el local real, 60 s.
+  function intervaloPasoMs(inst) {
+    const i = inst || {};
+    if (Number.isFinite(i.latidoMs) && i.latidoMs > 0) return i.latidoMs;
+    if (i.modo === 'sintetico') return PASO_SINTETICO_MS / Math.max(1, Number(i.velocidad) || 1);
+    return 60000;
+  }
+
+  // Cuánto tiempo real hay para reproducir la actividad: ~40 s, nunca más del
+  // 90 % del intervalo entre pasos, menos lo que ya pasó desde el paso.
+  function ventanaActividad(inst, edadMs) {
+    const total = Math.min(VENTANA_MAX_MS, 0.9 * intervaloPasoMs(inst));
+    return Math.max(0, total - Math.max(0, edadMs || 0));
+  }
+
+  // Solo sale a pasear quien trabaja en su sala de casa: ni el comité, ni el
+  // descanso, ni el banquillo, ni de pie por el kill.
+  function elegible(agente, sitio, departamentos) {
+    if (!agente || !sitio) return false;
+    const estado = agente.estado || 'trabajando';
+    if (estado !== 'trabajando') return false;
+    const casa = mapaMod.salaCasa(agente, departamentos);
+    return mapaMod.salaDeAgente(agente, departamentos) === casa && sitio.sala === casa;
+  }
+
+  // Punto libre (sin mueble ni tabique) de la sala más cercano a (col, fila).
+  function puntoLibre(mapa, col, fila, sala) {
+    const rej = mapa.rejilla;
+    const ok = (c, f) => {
+      if (c < 0 || f < 0 || c >= mapaMod.COLS || f >= mapaMod.FILAS) return false;
+      const cel = mapaMod.celdaDe(c, f);
+      return mapaMod.libre(rej, cel.i, cel.j) && mapaMod.salaEn(c, f) === sala;
+    };
+    if (ok(col, fila)) return { col, fila };
+    for (let r = 1; r <= 8; r++) {
+      const d = r * mapaMod.CELDA;
+      for (const [dc, df] of [[0, d], [d, 0], [-d, 0], [0, -d], [d, d], [-d, d], [d, -d], [-d, -d]]) {
+        const c = Math.floor((col + dc) / mapaMod.CELDA) * mapaMod.CELDA + mapaMod.CELDA / 2;
+        const f = Math.floor((fila + df) / mapaMod.CELDA) * mapaMod.CELDA + mapaMod.CELDA / 2;
+        if (ok(c, f)) return { col: c, fila: f };
+      }
+    }
+    return null;
+  }
+
+  // Punto al que va cada objetivo (y hacia dónde mira allí). null = no se mueve.
+  function puntoDeObjetivo(mapa, entrada, sitio, semilla) {
+    const obj = entrada.objetivo;
+    if (obj === 'monitor') {
+      const p = mapaMod.posicionDePie(mapa, sitio);
+      return { col: p.col, fila: p.fila, mira: sitio.mira };
+    }
+    if (obj === 'pantalla-cotizaciones') {
+      // Frente a la pantalla gigante de la pared del fondo (fila 0, cols 2–18).
+      const col = 4 + (semilla % 6) * 2.2;
+      const p = puntoLibre(mapa, col, 1.75, 'parque');
+      return p ? { col: p.col, fila: p.fila, mira: 'N' } : null;
+    }
+    if (obj === 'mesas') {
+      // Detrás del operador del puesto (el de la propuesta) o, si no hay, de uno al azar fijo.
+      let g = entrada.puestoId && mapa.puestos.get(entrada.puestoId);
+      if (!g) {
+        const lista = Array.from(mapa.puestos.values());
+        if (!lista.length) return null;
+        g = lista[semilla % lista.length];
+      }
+      const p = puntoLibre(mapa, g.sitio.col + 0.6, g.sitio.fila + 0.55, 'parque');
+      return p ? { col: p.col, fila: p.fila, mira: 'N' } : null;
+    }
+    if (obj === 'ejecucion') {
+      const s = (mapa.sitios.riesgos || []).find(x => x.preferente === 'ejecutor');
+      if (!s) return null;
+      const p = puntoLibre(mapa, s.col - 1.2, s.fila + 0.1, 'riesgos');
+      return p ? { col: p.col, fila: p.fila, mira: 'E' } : null;
+    }
+    if (obj === 'pantalla-regimen') {
+      const p = puntoLibre(mapa, 21.75, 4.75, 'macro');
+      return p ? { col: p.col, fila: p.fila, mira: 'N' } : null;
+    }
+    return null;   // sala-comite: al comité van por su estado (reunion), no de paseo
+  }
+
+  // Frase corta del bocadillo: de la acción, sin cifras.
+  function textoActividad(x) {
+    const d = x.detalle || '';
+    switch (x.accion) {
+      case 'precios': return 'Precios al día';
+      case 'conciliacion': return 'Cuadre con el bróker';
+      case 'riesgo': return d === 'propuesta' ? 'Reviso la propuesta' : 'Límites revisados';
+      case 'regimen': return 'Régimen recalculado';
+      case 'nota': return d ? `Nota técnica de ${d}` : 'Nota técnica';
+      case 'senal': return d === 'abrir' ? 'Señal: abrir' : d === 'cerrar' ? 'Señal: cerrar' : 'Señal: sin cambio';
+      case 'orden': {
+        const [lado, etq] = d.split(' ');
+        return lado === 'compra' || lado === 'venta' ? `Orden de ${lado}${etq ? ` de ${etq}` : ''}` : 'Orden enviada';
+      }
+      default: return null;
+    }
+  }
+
+  function largoRuta(r) {
+    let d = 0;
+    for (let k = 1; k < r.length; k++) d += Math.hypot(r[k].col - r[k - 1].col, r[k].fila - r[k - 1].fila);
+    return d;
+  }
+
+  // Reparte la lista de un paso en paseos a lo largo de `ventanaMs` desde
+  // `ahora`. Determinista (misma entrada → mismo plan). Reglas:
+  // - solo agentes elegibles (trabajando en su sala de casa) y con sitio;
+  // - nadie con un paseo en marcha o pendiente (`ocupados`) sale otra vez;
+  // - un mismo agente con varias entradas las hace una tras otra, sin solapar;
+  //   la que no quepa en la ventana no se hace;
+  // - ida + mirar (3–6 s) + vuelta caben en la ventana: si no, se anda más
+  //   deprisa y se mira menos, en la misma proporción.
+  // → [{ id, accion, objetivo, inicio, fin, mirarMs, ritmo, punto, texto, mapa }]
+  function planificarActividad(entrada) {
+    const e = entrada || {};
+    const act = e.actividad;
+    const mapa = e.mapa;
+    const ventana = e.ventanaMs || 0;
+    if (!act || !Array.isArray(act.lista) || !mapa || !(ventana >= 1500)) return [];
+    const ahora = e.ahora || 0;
+    const ritmoBase = Math.max(1, e.ritmoBase || 1);
+    const agentes = new Map((e.agentes || []).map(a => [a.id, a]));
+    const asignacion = e.asignacion || new Map();
+    const ocupados = e.ocupados || new Set();
+    const candidatos = [];
+    for (const x of act.lista) {
+      const a = agentes.get(x.agente);
+      const sitio = asignacion.get(x.agente);
+      if (!a || !sitio || ocupados.has(a.id) || !elegible(a, sitio, e.departamentos)) continue;
+      const semilla = hash(`${act.t}|${x.agente}|${x.accion}|${x.puestoId || ''}`);
+      const punto = puntoDeObjetivo(mapa, x, sitio, semilla);
+      if (!punto) continue;
+      const ida = largoRuta(mapaMod.ruta(mapa, { col: sitio.col, fila: sitio.fila }, punto));
+      const vuelta = largoRuta(mapaMod.ruta(mapa, punto, { col: sitio.col, fila: sitio.fila }));
+      // +10 %: margen para los giros de la ruta y los fotogramas.
+      candidatos.push({ x, a, punto, semilla, andarMs: ((ida + vuelta) / (VELOCIDAD * ritmoBase)) * 1000 * 1.1 });
+    }
+    const n = candidatos.length;
+    const libreDesde = new Map();   // agente → cuándo acaba su último paseo del plan
+    const plan = [];
+    candidatos.forEach((c, k) => {
+      const mirar0 = MIRAR_MIN_MS + (c.semilla % (MIRAR_MAX_MS - MIRAR_MIN_MS + 1));
+      const total = c.andarMs + mirar0;
+      // Arranques repartidos por la ventana, en el orden del paso; el segundo
+      // paseo de un mismo agente, cuando acaba el primero.
+      const previo = libreDesde.get(c.a.id);
+      const desde = previo !== undefined ? previo + 300 : 0;
+      const cabe = (ventana - desde) * 0.9;
+      // No cabe entero: se anda más deprisa y se mira menos, en la misma
+      // proporción, hasta ×3 (más ya no parece andar); si ni así, no se hace.
+      let f = 1;
+      if (total > cabe) {
+        f = cabe / total;
+        if (previo !== undefined && f < 1 / 3) return;
+      }
+      const dura = total * f;
+      const mirar = Math.round(mirar0 * f);
+      const ritmo = 1 / f;
+      let inicio = Math.min((k / Math.max(1, n)) * ventana, ventana - dura);
+      inicio = Math.max(inicio, desde);
+      if (inicio + dura > ventana + 1e-6) return;
+      libreDesde.set(c.a.id, inicio + dura);
+      plan.push({
+        id: c.a.id, accion: c.x.accion, objetivo: c.x.objetivo, puestoId: c.x.puestoId || null,
+        inicio: ahora + Math.round(inicio), fin: ahora + Math.round(inicio + dura), mirarMs: mirar, ritmo,
+        punto: c.punto, texto: textoActividad(c.x), mapa, departamentos: e.departamentos,
+      });
+    });
+    return plan;
   }
 
   // ---------- dibujo (coordenadas de mundo) ----------
@@ -335,10 +613,14 @@
       rect(ctx, -7, yTronco + 2 + a1, 2.6, 6, 1.2, brazo, contorno);
       rect(ctx, 4.4, yTronco + 2 + a2, 2.6, 6, 1.2, brazo, contorno);
     } else if (sentado) {
+      // De cara: las manos, con un vaivén pequeño si trabaja (adorno).
+      const r = trabajando && mov ? rafaga(t, p.aspecto.desfase) * 0.5 : 0;
+      const m1 = r ? Math.sin(t / 60 + p.aspecto.desfase * 10) * r : 0;
+      const m2 = r ? Math.sin(t / 60 + 2 + p.aspecto.desfase * 10) * r : 0;
       rect(ctx, -6.8, yTronco + 2, 2.4, 7, 1.2, brazo, contorno);
       rect(ctx, 4.4, yTronco + 2, 2.4, 7, 1.2, brazo, contorno);
       ctx.fillStyle = p.aspecto.piel;
-      ctx.beginPath(); ctx.arc(-5.6, yTronco + 9.4, 1.3, 0, Math.PI * 2); ctx.arc(5.6, yTronco + 9.4, 1.3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(-5.6, yTronco + 9.4 + m1, 1.3, 0, Math.PI * 2); ctx.arc(5.6, yTronco + 9.4 + m2, 1.3, 0, Math.PI * 2); ctx.fill();
     } else {
       const s = andar ? paso * 1.8 : 0;
       rect(ctx, -7, yTronco + 1.5 + s, 2.4, 8, 1.2, brazo, contorno);
@@ -350,23 +632,40 @@
     // Cabeza.
     const asiente = hablando && mov ? Math.sin(t / 140) * 0.6 : 0;
     const cy = yTronco - 4.6 + asiente;
+    // Giro de cabeza de adorno (solo sentados trabajando): la cara se asoma
+    // por un lado y el pelo se corre al otro. Suave, sin rebote.
+    const giro = trabajando && mov ? giroCabeza(t, p.aspecto.desfase) : 0;
+    const hx = giro * 0.7;
     ctx.fillStyle = p.aspecto.piel;
-    ctx.beginPath(); ctx.arc(0, cy, 4.7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(hx, cy, 4.7, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = contorno; ctx.stroke();
     ctx.fillStyle = p.aspecto.pelo;
     if (frente) {
-      ctx.beginPath(); ctx.arc(0, cy - 0.6, 4.9, Math.PI * 1.02, Math.PI * 1.98); ctx.closePath(); ctx.fill();
-      if (p.aspecto.peinado === 1) { rect(ctx, -5.2, cy - 2, 2, 6.5, 1, p.aspecto.pelo, null); rect(ctx, 3.2, cy - 2, 2, 6.5, 1, p.aspecto.pelo, null); }
+      ctx.beginPath(); ctx.arc(hx, cy - 0.6, 4.9, Math.PI * 1.02, Math.PI * 1.98); ctx.closePath(); ctx.fill();
+      if (p.aspecto.peinado === 1) { rect(ctx, hx - 5.2, cy - 2, 2, 6.5, 1, p.aspecto.pelo, null); rect(ctx, hx + 3.2, cy - 2, 2, 6.5, 1, p.aspecto.pelo, null); }
       ctx.fillStyle = '#1b1b24';
-      ctx.fillRect(-2.2 * volteo - 0.6, cy + 0.2, 1.3, 1.5);
-      ctx.fillRect(1.2 * volteo - 0.6, cy + 0.2, 1.3, 1.5);
-      if (hablando) { ctx.fillStyle = '#7a2e2e'; ctx.fillRect(-0.9, cy + 2.6, 1.8, 0.9 + Math.abs(asiente)); }
+      const ojos = hx + giro * 0.9;
+      ctx.fillRect(ojos - 2.2 * volteo - 0.6, cy + 0.2, 1.3, 1.5);
+      ctx.fillRect(ojos + 1.2 * volteo - 0.6, cy + 0.2, 1.3, 1.5);
+      if (hablando) { ctx.fillStyle = '#7a2e2e'; ctx.fillRect(ojos - 0.9, cy + 2.6, 1.8, 0.9 + Math.abs(asiente)); }
     } else {
-      ctx.beginPath(); ctx.arc(0, cy - 0.3, 4.85, Math.PI * 0.92, Math.PI * 2.08); ctx.closePath(); ctx.fill();
-      if (p.aspecto.peinado === 1) rect(ctx, -4.4, cy, 8.8, 5.5, 2, p.aspecto.pelo, null);
-      if (p.aspecto.peinado === 2) { ctx.beginPath(); ctx.arc(0, cy - 4.8, 2.1, 0, Math.PI * 2); ctx.fill(); }
+      const px = hx - giro * 1.3;
+      ctx.beginPath(); ctx.arc(px, cy - 0.3, 4.85, Math.PI * 0.92, Math.PI * 2.08); ctx.closePath(); ctx.fill();
+      if (p.aspecto.peinado === 1) rect(ctx, px - 4.4, cy, 8.8, 5.5, 2, p.aspecto.pelo, null);
+      if (p.aspecto.peinado === 2) { ctx.beginPath(); ctx.arc(px, cy - 4.8, 2.1, 0, Math.PI * 2); ctx.fill(); }
     }
     ctx.restore();
+  }
+
+  // Giro de cabeza: ~1,2 s cada 9–16 s (según el agente), a un lado u otro.
+  // Va de 0 a ±1 y vuelve a 0 con una media onda: sin pasarse ni rebotar.
+  function giroCabeza(t, desfase) {
+    const periodo = 9000 + desfase * 7000;
+    const tt = t + desfase * 50000;
+    const x = tt % periodo;
+    if (x > 1200) return 0;
+    const lado = Math.floor(tt / periodo) % 2 ? 1 : -1;
+    return lado * Math.sin((x / 1200) * Math.PI);
   }
 
   // Ráfagas de tecleo: a ratos teclea, a ratos no (si no, parece una máquina).
@@ -424,7 +723,8 @@
 
   return {
     VELOCIDAD, MAX_BOCADILLOS, MAX_CARACTERES_LINEA, MAX_LINEAS, ESCALA,
-    Personaje, crearElenco, duracionBocadillo, partirTexto, elegirBocadillos, direccion,
-    pintarPersonaje, pintarBocadillos, cajaPersonaje, cabeza, hash,
+    Personaje, crearElenco, planificarActividad, intervaloPasoMs, ventanaActividad, textoActividad, elegible, puntoDeObjetivo,
+    duracionBocadillo, partirTexto, elegirBocadillos, direccion,
+    pintarPersonaje, pintarBocadillos, cajaPersonaje, cabeza, hash, giroCabeza, rafaga,
   };
 });

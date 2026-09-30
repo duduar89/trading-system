@@ -932,6 +932,8 @@ visual), próximas cadencias. Campos añadidos después del primer contrato:
 - `caidaMaxima`: la peor caída vista desde el máximo histórico (fracción ≥ 0),
   actualizada en cada valoración (criterio e, §5.8). Un estado anterior la
   toma de sus curvas guardadas.
+- `actividad`: la del último paso (§7), para que la instantánea de un
+  comando del modo latido sea la misma que la del continuo.
 - `incidentesDesde`: desde cuándo hay registro de incidentes (el arranque del
   fondo; en un estado anterior al registro, el primer arranque con él). El
   criterio f no se da por cumplido hasta que cubre 90 días.
@@ -1090,6 +1092,28 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
                      // capital sin asignar: queda en efectivo. Hay solo 1 mesa titular (techo del 40 %) y 3 en
                      // prueba al 2 %: mejor efectivo que capital en estrategias sin ventaja demostrada.»); al final
                      // 'Con el ordenador apagado no hay stops…' y el modo (sintético / bróker simulado)
+  actividad: { t, lista: [{ agente, accion, objetivo?, detalle?, puestoId? }] } | null,
+  // Lo que de verdad hizo cada agente en el ÚLTIMO paso() (desde el 30-sep-2026; src/agentes/actividad.js).
+  //   t: el reloj de la mesa al empezar el paso (el panel lo usa para reproducir cada paso una sola vez).
+  //   Una entrada solo si ese código corrió en ese paso, en el orden en que corrió; determinista (mismo
+  //   paso → misma lista); ≤ 20 (si sobran, salen primero las de rutina: señal sin cambio y notas); sin
+  //   repetir (agente, accion, objetivo, puestoId); solo agentes de la plantilla. null antes del primer paso.
+  //   Se guarda en estado.json: un comando del modo latido publica la misma instantánea que el continuo.
+  //   accion (lista cerrada) → quién y de qué código sale:
+  //     'precios'      controller  _actualizarPrecios trajo alguna cotización        → 'pantalla-cotizaciones'
+  //     'riesgo'       riesgos     vigilante del fondo (cada paso, detalle 'limites') → 'mesas'
+  //                                o riesgos.evaluar de una propuesta real (detalle 'propuesta', con puestoId)
+  //     'conciliacion' controller  conciliarCadaLatido (no aplazada por órdenes en vuelo) → 'monitor'
+  //     'regimen'      macro       macro.actualizar con vela 1H nueva                  → 'pantalla-regimen'
+  //     'nota'         analista-X  analisis.notas calculó su nota (vela 1H nueva; detalle la etiqueta) → 'monitor'
+  //     'senal'        puesto-X    mesas.procesarMesa decidió el puesto con vela nueva (con puestoId):
+  //                                abre o cierra de verdad → 'ejecucion' (detalle 'abrir'|'cerrar');
+  //                                si no → 'monitor' (detalle 'sin cambio')
+  //     'orden'        ejecutor    el Ejecutor mandó una orden al bróker (detalle '<lado> <ETQ>', puestoId) → 'monitor'
+  //     'comite'       cio         se convocó el comité en este paso (detalle 'programado'|'demanda') → 'sala-comite'
+  //   objetivo (lista cerrada): 'pantalla-cotizaciones' (pantalla gigante del fondo del parqué), 'monitor' (el
+  //   suyo), 'mesas' (las de trading; con puestoId, la de ese puesto), 'ejecucion' (puesto del Ejecutor),
+  //   'pantalla-regimen' (sala de macro), 'sala-comite'. El parqué (§8) lo reproduce como paseos.
 }
 ```
 
@@ -1120,6 +1144,22 @@ abra también desde `file://` en modo maqueta).
   abierto, ámbar al enviar orden. Personajes dibujados a mano (cuerpo del
   color del departamento), andan por puertas entre salas cuando cambia su
   `sala`. Bocadillos (máx. 5 a la vez, por importancia).
+- Trabajo real (`actividad` de §7, `personajes.planificarActividad`): con cada
+  `actividad.t` nuevo (una vez por paso: en local llegan varias instantáneas
+  por paso) la lista se reparte en ~40 s, y nunca más del 90 % del intervalo
+  entre pasos (`latidoMs`; en local sintético 5 min / velocidad; en local
+  real 60 s) menos lo que ya pasó. Cada agente se levanta, anda por la ruta
+  del mapa hasta su objetivo (pantalla gigante, las mesas o el puesto de la
+  propuesta, el puesto de ejecución, la pantalla del régimen, o de pie junto a
+  su monitor), mira 3–6 s y vuelve a su silla; si no cabe, anda más deprisa y
+  mira menos en la misma proporción. Un paseo por agente a la vez; quien está
+  en el comité, el descanso, el banquillo, de pie por el kill o fuera de su
+  sala no sale, y si le llaman a mitad de un paseo, lo deja. Bocadillo corto
+  de la acción («Precios al día», «Señal: sin cambio»; sin cifras), con
+  importancia 0: solo si no está diciendo otra cosa y detrás de los mensajes.
+- Vida de adorno (solo dibujo, sin significado): los sentados que trabajan
+  teclean a ráfagas y giran la cabeza ~1 s cada 9–16 s, con fase propia por
+  agente; sin rebotes.
 - Clic en un puesto o agente → tarjeta de detalle (como la imagen 2):
   situación, nocional, cantidad, entrada, stop, objetivo, abierto, P&L del
   día, operaciones, acierto, adherencia, factor, último mensaje, y la mesa del
@@ -1161,8 +1201,10 @@ abra también desde `file://` en modo maqueta).
 - Móvil (< 768 px): barra compacta, panel lateral como hoja inferior, tarjeta
   a pantalla completa.
 - Cifras que cuentan hacia arriba (sin rebote) y respeto a
-  `prefers-reduced-motion`. Tope de 30 fps; capa estática en canvas fuera de
-  pantalla; pausa con la pestaña oculta.
+  `prefers-reduced-motion` (sin adorno y sin paseos de actividad). Tope de
+  30 fps mientras alguien anda, cuenta una cifra, hay un destello o el dedo
+  toca la pantalla; si no, 12 fps (5 con movimiento reducido). Capa estática
+  en canvas fuera de pantalla; pausa con la pestaña oculta.
 - `?maqueta=1` (o abrir `index.html` como fichero): genera una instantánea y
   mensajes falsos con `maqueta.js` para poder trabajar la interfaz sin backend.
 - Franja de arriba. Roja sin conexión, con el motivo si se sabe y reconexión

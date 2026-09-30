@@ -206,6 +206,7 @@ class Ejecutor {
     });
 
     if (orden.mesaId !== 'sombra') (ctx.registroOrdenes || (ctx.registroOrdenes = [])).push({ t: ahora, mesaId: orden.mesaId });
+    if (typeof ctx.anotarActividad === 'function') ctx.anotarActividad({ agente: 'ejecutor', accion: 'orden', objetivo: 'monitor', detalle: `${orden.lado} ${e}`, puestoId: orden.puestoId || null });
     let enviada;
     try {
       enviada = await ctx.broker.enviarOrden(envio);

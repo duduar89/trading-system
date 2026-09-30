@@ -15,6 +15,10 @@
   const ES_MAQUETA = params.get('maqueta') === '1' || location.protocol === 'file:';
   const TOKEN = params.get('token') || '';
   const PASO_MS = 1000 / 30;                      // tope de 30 fps
+  // Sin nadie andando ni nada que animar, basta con 12 fps para el tecleo y
+  // los giros de cabeza (en el móvil, menos CPU); con movimiento reducido, 5.
+  const PASO_QUIETO_MS = 1000 / 12;
+  const PASO_REDUCIDO_MS = 1000 / 5;
   const DESTELLO_MS = 2000;
 
   const escena = document.getElementById('escena');
@@ -34,7 +38,7 @@
     seleccion: null, destellos: new Map(), puestos: new Map(), mesas: new Map(), deps: new Map(),
     ancho: 0, alto: 0, dpr: 1, encuadrada: false, camaraTocada: false, capaClave: '', etiquetasPintadas: [],
     texturasSucias: true, animPatr: null, patrMostrado: null, ultimoPintado: 0, parado: false,
-    rotulosPintados: [], cursor: -1, llegadas: [], relojesClave: '', ventanasClave: '',
+    rotulosPintados: [], cursor: -1, activoHasta: 0, llegadas: [], relojesClave: '', ventanasClave: '',
     stats: { frames: 0, msPintar: 0, maxMs: 0 },
   };
 
@@ -179,6 +183,7 @@
       if (!est.camaraTocada) encuadrar();
     }
     sincronizarPersonas(!anterior);
+    programarActividad(inst);
     // Bocadillos que trae la instantánea (p. ej. al conectar a mitad de una frase).
     const tServ = inst.ahora;
     for (const a of inst.agentes || []) {
@@ -212,6 +217,22 @@
     est.elenco.sincronizar(inst.agentes || [], est.mapa, est.asignacion, {
       instantaneo: primera || reducir,
       forzarDePie: inst.fondo && inst.fondo.nivel === 'bloqueado',
+    });
+  }
+
+  // Actividad del último paso (§7): cada agente va a mirar lo que de verdad
+  // hizo. Una vez por paso (dedupe por actividad.t: en local llegan varias
+  // instantáneas por paso), repartida en el tiempo que queda hasta el siguiente.
+  function programarActividad(inst) {
+    const act = inst.actividad;
+    if (!act || !Number.isFinite(act.t) || !est.mapa) return;
+    const factor = inst.modo === 'sintetico' && Number.isFinite(inst.velocidad) ? Math.max(1, inst.velocidad) : 1;
+    const edadWeb = inst.web && Number.isFinite(inst.edadSeg) ? inst.edadSeg * 1000 : 0;
+    const edad = edadWeb + Math.max(0, (Number.isFinite(inst.ahora) ? inst.ahora : act.t) - act.t) / factor;
+    est.elenco.programarActividad(act, {
+      mapa: est.mapa, agentes: inst.agentes || [], asignacion: est.asignacion, departamentos: inst.departamentos,
+      ventanaMs: pers.ventanaActividad(inst, edad), ahora: performance.now(), ritmoBase: ritmoAndar(),
+      reducir: reducir || (inst.fondo && inst.fondo.nivel === 'bloqueado'),
     });
   }
 
@@ -807,14 +828,27 @@
   }
 
   let ultimaActualizacion = performance.now();
+  // Ritmo de pintado: 30 fps si algo se mueve (alguien anda, la cifra de la
+  // pantalla cuenta, un destello, el dedo en la pantalla); si no, 12 (o 5 con
+  // movimiento reducido): el adorno no necesita más.
+  function pasoPintado(t) {
+    const activo = t < est.activoHasta || est.elenco.hayMovimiento() || est.animPatr || est.destellos.size > 0;
+    if (activo) return PASO_MS;
+    return reducir ? PASO_REDUCIDO_MS : PASO_QUIETO_MS;
+  }
+  function despertar() { est.activoHasta = performance.now() + 1500; }
+  for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown', 'touchstart']) {
+    raiz.addEventListener(ev, despertar, { passive: true, capture: true });
+  }
+
   function bucle(t) {
     if (document.hidden) { est.parado = true; return; }
     requestAnimationFrame(bucle);
-    if (t - est.ultimoPintado < PASO_MS - 1) return;
+    if (t - est.ultimoPintado < pasoPintado(t) - 1) return;
     est.ultimoPintado = t;
     const dt = Math.min(0.1, (t - ultimaActualizacion) / 1000);
     ultimaActualizacion = t;
-    est.elenco.actualizar(dt * ritmoAndar());
+    est.elenco.actualizar(dt * ritmoAndar(), t);
     for (const [id, d] of est.destellos) if (d.hasta < t) est.destellos.delete(id);
     try { pintar(t); } catch (e) { console.error(e); }
   }

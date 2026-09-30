@@ -514,6 +514,12 @@ async function procesarMesa(ctx, mesa, ahora) {
     const agente = agenteDePuesto(mesa.id, simbolo);
     const opera = mesa.estado !== 'banquillo' && e.fondo.nivel !== 'bloqueado';
     const accion = real.senal.accion;
+    // Actividad del paso (§7): el operador decidió su puesto con esta vela; si
+    // abre o cierra, lleva la propuesta al puesto de ejecución.
+    const llevaOrden = opera && ((accion === 'abrir' && !(real.p.cantidad > EPS)) || (accion === 'cerrar' && real.p.cantidad > EPS));
+    if (typeof ctx.anotarActividad === 'function') {
+      ctx.anotarActividad({ agente, accion: 'senal', objetivo: llevaOrden ? 'ejecucion' : 'monitor', detalle: llevaOrden ? accion : 'sin cambio', puestoId: pid });
+    }
     if (opera && accion === 'abrir' && !(real.p.cantidad > EPS)) {
       ctx.bus.publicar({ de: agente, canal: 'parque', tipo: 'senal', texto: plantillas.frase(real.senal.estado || real.senal.motivo), datos: { puestoId: pid, accion, motivo: real.senal.motivo, stop: real.senal.stop }, importancia: 2 });
       aperturas.push({ mesa, simbolo, senal: real.senal, cierre, tVela, vol });

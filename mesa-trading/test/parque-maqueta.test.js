@@ -12,7 +12,7 @@ const claves = o => Object.keys(o).sort();
 const FORMA = {
   raiz: ['version', 'ahora', 'modo', 'broker', 'velocidad', 'fondo', 'cabecera', 'llm', 'curva', 'cotizaciones', 'departamentos', 'agentes',
     'mesas', 'puestos', 'posiciones', 'benchmarks', 'mejora', 'directivas', 'megafonoPendiente', 'mensajes', 'ejecuciones', 'laboratorio', 'limites',
-    'listoParaReal', 'avisos'],
+    'listoParaReal', 'avisos', 'actividad'],
   listoParaReal: ['listo', 'cumplidos', 'total', 'criterios', 'comite', 'nota'],
   criterioReal: ['id', 'nombre', 'valor', 'umbral', 'ok', 'valorTexto', 'umbralTexto', 'detalle'],
   comiteReal: ['sharpeFondo', 'sharpeSinComite', 'bate', 'texto'],

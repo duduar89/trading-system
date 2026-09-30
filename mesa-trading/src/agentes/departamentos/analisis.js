@@ -57,6 +57,7 @@ async function notas(ctx, { forzar = false } = {}) {
   const publicadas = [];
   for (const activo of ctx.universo) {
     const n = await notaDe(ctx, activo, ahora);
+    if (typeof ctx.anotarActividad === 'function') ctx.anotarActividad({ agente: `analista-${n.etiqueta}`, accion: 'nota', objetivo: 'monitor', detalle: n.etiqueta });
     const previa = a.porActivo[n.simbolo] || null;
     const cambia = previa && previa.sesgo !== n.sesgo;
     a.porActivo[n.simbolo] = { sesgo: n.sesgo, sma50: n.sma50, rsi: n.rsi, volAnual: n.volAnual, t: ahora, publicada: previa ? previa.publicada : null };
