@@ -205,13 +205,18 @@ test('revisión legal final: peso en borrador, sin nota de Google, avisos que cu
   // …también en la ficha y en la consulta con el cirujano (que no lleva recuadro); y, donde no consta
   // quién lo hace, el hueco en vez de un «equipo» sin confirmar.
   const fichaDe = (r) => R.textoVisible((PAGINAS.get(r).match(/<div class="ficha">[\s\S]*?<\/dl>/) || [''])[0]);
-  for (const r of ['/cirugia-estetica/consulta-de-cirugia-plastica/', '/cirugia-estetica/otoplastia/', '/cirugia-capilar/reparacion-de-injertos-capilares/']) {
+  for (const r of ['/cirugia-estetica/consulta-de-cirugia-plastica/', '/cirugia-estetica/otoplastia/', '/cirugia-capilar/reparacion-de-injertos-capilares/', '/cirugia-capilar/cicatrices-en-el-cuero-cabelludo/']) {
     assert.match(fichaDe(r), /Lo realiza Cirujano \[PENDIENTE: nombre, especialidad oficial y n\.º de colegiado\]/, r);
   }
-  for (const r of ['/cirugia-capilar/cicatrices-en-el-cuero-cabelludo/', '/medicina-capilar/microneedling-capilar/']) {
+  for (const r of ['/medicina-capilar/diagnostico-capilar/', '/medicina-capilar/microneedling-capilar/']) {
     assert.match(fichaDe(r), /Lo realiza \[PENDIENTE: /, r);
   }
-  assert.match(visible('/cirugia-capilar/cicatrices-en-el-cuero-cabelludo/'), /Si el plan incluye una intervención, antes firmas el consentimiento informado por escrito/);
+  // Las cicatrices del cuero cabelludo pueden acabar en un injerto: son cirugía (quién opera y dónde).
+  const cicatrices = visible('/cirugia-capilar/cicatrices-en-el-cuero-cabelludo/');
+  assert.match(cicatrices, /Cirugía: requiere una consulta previa/);
+  assert.match(cicatrices, /Dónde: \[PENDIENTE: dónde se opera\]/);
+  assert.match(cicatrices, /Si el plan incluye una intervención, antes firmas el consentimiento informado por escrito/);
+  assert.ok(!/Lo realiza: el equipo del área capilar/.test(cicatrices));
   // 8 · El aviso no contradice la página: sin «el médico» donde lo hace estética con el régimen sin
   // confirmar, y sin aviso en la propia consulta de valoración.
   const bb = visible('/medicina-estetica-facial/bb-lips/');
@@ -288,12 +293,19 @@ test('--publicar con lo imprescindible sin resolver: falla con su lista y no dej
   const zip = `${c}.zip`;
   const inf = construir({ salida: c, referencias: null, publicar: true, zip, ajustarDatos: sinResolver });
   const imp = inf.errores.filter((e) => e.tipo === 'imprescindible');
-  for (const dato of ['correo', 'dpd', 'cirugias', 'visto-bueno-medico', 'visto-bueno-legal']) assert.ok(imp.some((e) => e.dato === dato), `falta ${dato} en la lista`);
+  const todos = ['correo', 'dpd', 'cirugias', 'paginas-por-confirmar', 'diagnostico-capilar', 'colegiacion', 'u900', 'intima-autorizacion', 'visto-bueno-medico', 'visto-bueno-legal'];
+  assert.deepEqual(imp.map((e) => e.dato), todos);
+  assert.deepEqual(LANZAMIENTO.datos.filter((d) => d.clase === 'a').map((d) => d.id), todos, 'cada imprescindible de lanzamiento.json se comprueba');
+  // Los que salen de los datos dicen qué falta, uno a uno: la pregunta de cada página y cada persona.
+  const confirmar = imp.find((e) => e.dato === 'paginas-por-confirmar');
+  assert.ok(confirmar.detalle.some((d) => d.ruta === '/medicina-estetica-corporal/lipolaser/' && d.que === 'Pregunta de prueba: ¿se ofrece?' && d.tipo === 'oferta'));
+  assert.ok(imp.find((e) => e.dato === 'colegiacion').detalle.length >= 1);
   // Solo falla por lo imprescindible: todo lo que puede esperar ya sale con su redacción neutra.
   assert.deepEqual(inf.errores.filter((e) => e.tipo !== 'imprescindible'), []);
   for (const e of imp) assert.ok(e.titulo && e.falta && e.responsable && e.como_completar, JSON.stringify(e));
   const lista = explicarImprescindibles(inf).join('\n');
   for (const e of imp) assert.ok(lista.includes(e.titulo) && lista.includes(e.como_completar), e.dato);
+  assert.match(lista, /Qué \(\d+\): ¿Ofrecéis/);
   // Nada que se pueda subir por error: solo el informe, y sin zip.
   assert.deepEqual(fs.readdirSync(c), ['informe.json']);
   assert.ok(!fs.existsSync(zip));
@@ -318,6 +330,118 @@ test('--publicar: los vistos buenos son imprescindibles y una marca nueva sin cl
     ajustarDatos: (d) => { resolverImprescindibles(d); d.contenidos[0].paginas[0].texto.push('Algo que falta [PENDIENTE: dato nuevo sin clasificar].'); },
   });
   assert.ok(nueva.errores.some((e) => e.tipo === 'sin_clasificar' && e.marca === '[PENDIENTE: dato nuevo sin clasificar]'), JSON.stringify(nueva.errores));
+  fs.rmSync(c, { recursive: true, force: true });
+});
+
+test('lo que la clínica tiene que confirmar de cada página: se ve en la vista previa, --publicar no deja pasar ni una pregunta y se puede lanzar sin esas páginas', () => {
+  const { TIPOS_CONFIRMAR } = require('../lib/lanzamiento');
+  // Cada pregunta tiene su tipo y su texto, y está en una página que se publica.
+  const conPreguntas = [];
+  for (const f of fs.readdirSync(path.join(__dirname, '..', 'contenido')).filter((x) => x.endsWith('.json'))) {
+    for (const p of JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'contenido', f), 'utf8')).paginas) {
+      if (!p.confirmar) continue;
+      assert.ok(Array.isArray(p.confirmar) && p.confirmar.length, p.slug);
+      for (const c of p.confirmar) assert.ok(TIPOS_CONFIRMAR[c.tipo] && c.que.length > 20 && /\?/.test(c.que), `${p.slug}: ${JSON.stringify(c)}`);
+      conPreguntas.push(`/${p.especialidad}/${p.slug}/`);
+    }
+  }
+  assert.ok(conPreguntas.length >= 30, `${conPreguntas.length} páginas con preguntas`);
+  // Las del hallazgo de la revisión: la oferta, el producto y su régimen, y el abogado.
+  for (const r of ['/cirugia-estetica/blefaroplastia/', '/estetica-intima-femenina/remodelacion-intima/', '/medicina-estetica-corporal/carboxiterapia/', '/medicina-estetica-facial/protocolos-con-microneedling/', '/medicina-estetica-facial/bb-lips/', '/medicina-estetica-facial/tratamiento-reafirmante-no-invasivo/', '/medicina-estetica-facial/hilos-tensores/', '/medicina-estetica-facial/correccion-de-rellenos/', '/medicina-estetica-corporal/intralipoterapia/', '/medicina-estetica-corporal/subcision/', '/medicina-estetica-facial/bb-glow/', '/medicina-estetica-facial/bioestimulacion-facial/', '/estetica-intima-femenina/aclarado-de-la-zona-intima/', '/estetica-intima-femenina/labioplastia/']) {
+    assert.ok(conPreguntas.includes(r), `${r} sin «confirmar»`);
+  }
+  // En la vista previa, en el recuadro «Nota para la revisión» (con las notas de redacción), que no
+  // cuenta como texto de la página.
+  const carboxi = PAGINAS.get('/medicina-estetica-corporal/carboxiterapia/');
+  assert.match(carboxi, /<aside class="nota-interna nota-pagina">[\s\S]*Antes de publicarla, la clínica tiene que confirmar:[\s\S]*¿Ofrecéis la carboxiterapia\?[\s\S]*Notas de redacción, para el visto bueno médico:[\s\S]*<\/aside>/);
+  assert.ok(!/¿Ofrecéis la carboxiterapia\?|Notas de redacción/.test(R.textoVisible(carboxi)));
+  assert.ok(!/nota-interna/.test(PAGINAS.get('/medicina-estetica-corporal/lipolaser/').split('<main')[0]));
+  // En el informe, el imprescindible con una línea por pregunta.
+  const dato = INFORME.lanzamiento.imprescindibles.find((i) => i.dato === 'paginas-por-confirmar');
+  assert.equal(dato.paginas, conPreguntas.length);
+  assert.ok(dato.detalle.every((d) => conPreguntas.includes(d.ruta) && d.que && d.tipo));
+  // Con todo lo demás resuelto, una sola pregunta basta para que no se publique.
+  const c = temporal('confirmar');
+  const una = construir({
+    salida: c, referencias: null, publicar: true,
+    ajustarDatos: (d) => { resolverImprescindibles(d); d.contenidos.find((x) => x.fichero === 'corporal-y-peso.json').paginas.find((p) => p.slug === 'carboxiterapia').confirmar = [{ tipo: 'oferta', que: '¿Ofrecéis la carboxiterapia?' }]; },
+  });
+  assert.deepEqual(una.errores.map((e) => `${e.tipo}:${e.dato}`), ['imprescindible:paginas-por-confirmar']);
+  assert.deepEqual(fs.readdirSync(c), ['informe.json']);
+  // «solo-lo-confirmado»: sin resolver ninguna pregunta, se publica sin esas páginas, sin enlaces a ellas
+  // y con sus tratamientos del catálogo en «sin página».
+  const solo = construir({
+    salida: c, referencias: null, publicar: true,
+    ajustarDatos: (d) => { resolverImprescindibles(d, { sin: ['paginas-por-confirmar'] }); d.lanzamiento.alternativas.aplicar = ['solo-lo-confirmado']; },
+  });
+  assert.deepEqual(solo.errores, [], JSON.stringify(solo.errores.slice(0, 3)));
+  const publicadas = leerPaginas(c);
+  // Fuera esas páginas y las especialidades que se quedan sin ninguna (hoy, la estética íntima femenina).
+  const vacias = INFORME.especialidades.filter((e) => [...PAGINAS.keys()].filter((r) => r.startsWith(`/${e.slug}/`) && r !== `/${e.slug}/`).every((r) => conPreguntas.includes(r)));
+  assert.equal(publicadas.size, INFORME.paginas - conPreguntas.length - vacias.length);
+  for (const e of vacias) assert.ok(!publicadas.has(`/${e.slug}/`), e.slug);
+  for (const r of conPreguntas) {
+    assert.ok(!publicadas.has(r), `${r} se ha publicado`);
+    for (const [ruta, h] of publicadas) assert.ok(!h.includes(`href="${r}"`), `${ruta} enlaza a ${r}`);
+  }
+  assert.ok(solo.sin_pagina.some((s) => s.catalogo === 'carboxiterapia' && /solo con lo confirmado/.test(s.motivo)));
+  assert.deepEqual(solo.lanzamiento.alternativas.map((a) => a.alternativa), ['solo-lo-confirmado']);
+  comprobarEnlaces(c, publicadas);
+  fs.rmSync(c, { recursive: true, force: true });
+});
+
+test('lanzar sin las cirugías (alternativa «sin-cirugias»): ninguna página anuncia una cirugía, ni la portada, ni el pie, ni el equipo', () => {
+  const c = temporal('sin-cirugias');
+  const inf = construir({
+    salida: c, referencias: null, publicar: true,
+    ajustarDatos: (d) => { resolverImprescindibles(d, { sin: ['cirugias'] }); d.lanzamiento.alternativas.aplicar = ['sin-cirugias']; },
+  });
+  assert.deepEqual(inf.errores, [], JSON.stringify(inf.errores.slice(0, 3)));
+  const paginas = leerPaginas(c);
+  assert.ok(!inf.especialidades.some((e) => /^cirugia-/.test(e.slug)));
+  for (const r of ['/cirugia-estetica/', '/cirugia-capilar/', '/cirugia-capilar/cicatrices-en-el-cuero-cabelludo/', '/estetica-intima-femenina/labioplastia/']) assert.ok(!paginas.has(r), r);
+  // Cada redacción de la alternativa encuentra su texto.
+  for (const r of inf.lanzamiento.alternativas[0].redacciones) assert.ok(r.veces > 0, JSON.stringify(r));
+  const legales = new Set(['/aviso-legal/', '/privacidad/', '/cookies/', '/accesibilidad/']);
+  // Lo que anuncia una cirugía de IEMEC (no «sin cirugía» ni los cuidados «después de un injerto»).
+  const cirugia = /cirug[ií]a (est[eé]tica|capilar|[ií]ntima|pl[aá]stica)|injerto capilar|(?<!(?:después de|hecho) )un injerto\b|microinjerto|cirujan[oa]s? (te|estudia|valora)|consulta con el cirujano|quir[oó]fano|labioplastia|capuch[oó]n|Cirugía: requiere|¿Dónde se opera|\/cirugia-(estetica|capilar)\//i;
+  for (const [ruta, h] of paginas) {
+    if (legales.has(ruta)) continue;
+    const texto = `${R.titulo(h)} ${R.meta(h, 'description')} ${R.textoVisible(h)} ${R.enlaces(h).map((e) => e.valor).join(' ')}`;
+    const m = cirugia.exec(texto);
+    assert.ok(!m, `${ruta}: «${m && texto.slice(Math.max(0, m.index - 60), m.index + 60)}»`);
+  }
+  // La portada y el pie hablan de lo que se publica; en el equipo no sale quien solo opera.
+  assert.match(R.textoVisible(paginas.get('/')), /Medicina estética y medicina capilar, cada una con su equipo\./);
+  assert.match(R.textoVisible(paginas.get('/')), /IEMEC es un centro sanitario de medicina estética y medicina capilar en Boadilla del Monte/);
+  assert.ok(!/Cirujana de Prueba|Vricella/.test(R.textoVisible(paginas.get('/equipo/'))));
+  // Y ninguna URL vieja lleva a ellas: van a /tratamientos/ (o a su tratamiento, si lo tiene).
+  const antes = new Map(INFORME.redirecciones.map((r) => [r.desde, r.hacia]));
+  const ibanACirugia = inf.redirecciones.filter((r) => /^\/cirugia-|labioplastia/.test(antes.get(r.desde) || ''));
+  assert.ok(ibanACirugia.length > 5, `${ibanACirugia.length} URL viejas de cirugía`);
+  assert.ok(inf.redirecciones.every((r) => !/^\/cirugia-|labioplastia/.test(r.hacia)), 'una redirección a una cirugía que no se publica');
+  comprobarEnlaces(c, paginas);
+  fs.rmSync(c, { recursive: true, force: true });
+});
+
+test('colegiación de quien se nombra (LSSI, art. 10.1.d): sin sus datos no se publica; quien no ejerce una profesión sanitaria no va en la tabla', () => {
+  const L = require('../lib/legal');
+  assert.equal(L.colegiacionCompleta({ colegiado: false }), true);
+  assert.equal(L.colegiacionCompleta({ titulo: 'Licenciada en Medicina', colegio: 'X', colegiado: '1', titulo_extranjero: false }), true);
+  assert.equal(L.colegiacionCompleta({ titulo: 'Licenciada en Medicina', colegio: 'X', colegiado: '1', titulo_extranjero: null }), false, 'el título de otro país, sin saber de dónde');
+  assert.equal(L.colegiacionCompleta({ titulo: null, colegio: 'X', colegiado: '1', titulo_extranjero: false }), false);
+  const c = temporal('colegiacion');
+  const inf = construir({
+    salida: c, referencias: null, publicar: true,
+    ajustarDatos: (d) => { resolverImprescindibles(d); d.equipo.personas.find((p) => p.codigo === 'medica-de-prueba').colegiado = null; },
+  });
+  const imp = inf.errores.filter((e) => e.tipo === 'imprescindible');
+  assert.deepEqual(imp.map((e) => e.dato), ['colegiacion']);
+  assert.deepEqual(imp[0].detalle.map((x) => x.que), ['Dra. Médica de Prueba']);
+  // En la vista previa, la tabla del aviso legal no lleva a quien no ejerce una profesión sanitaria.
+  const tabla = L.tablaProfesionales([{ nombre: 'A', titulo: null, especialidad: null, colegio: null, colegiado: null, titulo_extranjero: null }, { nombre: 'B', colegiado: false }]);
+  assert.match(tabla, /\| A \|/);
+  assert.ok(!/\| B \|/.test(tabla));
   fs.rmSync(c, { recursive: true, force: true });
 });
 
@@ -347,8 +471,18 @@ test('--publicar con lo imprescindible resuelto (datos inventados): sin marcas n
   assert.match(visible('/aviso-legal/'), /Inscrita en el Registro Mercantil de Madrid, tomo 40334, folio 7, sección 8\.ª, hoja M-716525, inscripción 1\.ª/);
   assert.match(visible('/aviso-legal/'), /Domicilio social Calle Morella, 6, 2, Boadilla del Monte/);
   assert.match(visible('/aviso-legal/'), /puerta 35-36/);
-  assert.match(visible('/aviso-legal/'), /te los damos si nos los pides/);
-  assert.match(visible('/aviso-legal/'), /Última actualización: 2 de octubre de 2026/);
+  // Colegiación (LSSI, art. 10.1.d): de cada profesional sanitario que se nombra, en el aviso legal y
+  // en /equipo/, sin «te los damos si nos los pides»; quien no ejerce una profesión sanitaria, fuera de
+  // la tabla.
+  const aviso = visible('/aviso-legal/');
+  assert.match(aviso, /Dra\. Médica de Prueba Licenciada en Medicina — Colegio de Médicos de Prueba, n\.º de colegiado 00\/00001 España/);
+  assert.match(aviso, /Dra\. Cirujana de Prueba Licenciada en Medicina Cirugía Plástica, Estética y Reparadora Colegio de Médicos de Prueba, n\.º de colegiado 00\/00000 España/);
+  assert.ok(!/Técnica de Prueba|te los damos si nos los pides|están colegiados|se publican también/i.test(aviso));
+  assert.match(visible('/equipo/'), /Técnica de Prueba Área capilar/);
+  assert.match(visible('/equipo/'), /Dra\. Médica de Prueba Medicina estética Persona inventada para las pruebas del generador\. Licenciada en Medicina · Colegio de Médicos de Prueba, n\.º de colegiado 00\/00001/);
+  assert.match(aviso, /Aneco AP Consulting, S\.L\.U\. \(sociedad limitada unipersonal\)/);
+  assert.match(visible('/privacidad/'), /Aneco AP Consulting, S\.L\.U\. \(sociedad limitada unipersonal; nombre comercial/);
+  assert.match(aviso, /Última actualización: 2 de octubre de 2026/);
   assert.ok(!/Compra de tarjetas regalo|Códigos de conducta/.test(visible('/aviso-legal/')));
   // La versión de la cláusula es la que envía el formulario (y guarda la app), entera.
   const versionForm = /name="version_textos" value="([^"]+)"/.exec(paginas.get('/pedir-cita/'))[1];
@@ -366,10 +500,30 @@ test('--publicar con lo imprescindible resuelto (datos inventados): sin marcas n
   assert.match(oto, /Lo realiza: Dra\. Cirujana de Prueba, especialista en Cirugía Plástica, Estética y Reparadora \(n\.º de colegiado 00\/00000, Colegio de Médicos de Prueba\)\. Dónde: quirófano de un centro hospitalario autorizado\./);
   assert.ok(!/mayores de edad/.test(oto), 'la edad no se afirma hasta que la clínica fije su política');
   assert.match(visible('/cirugia-capilar/'), /¿Dónde se hace la intervención\? En la sala de procedimientos de la clínica de prueba/);
-  assert.match(visible('/medicina-capilar/diagnostico-capilar/'), /Lo realiza El equipo del área capilar de IEMEC/);
-  assert.match(visible('/medicina-estetica-facial/luz-pulsada-intensa-ipl/'), /Lo realiza: personal sanitario, con valoración médica previa/);
+  assert.match(visible('/cirugia-capilar/cicatrices-en-el-cuero-cabelludo/'), /Lo realiza: Dra\. Cirujana de Prueba.*Dónde: en la sala de procedimientos de la clínica de prueba/);
+  assert.match(visible('/medicina-capilar/diagnostico-capilar/'), /Lo realiza Médico/);
+  assert.match(visible('/medicina-capilar/microneedling-capilar/'), /Lo realiza El equipo del área capilar de IEMEC/);
+  // La luz pulsada: «personal sanitario» en la ficha y en el texto (la página no se contradice).
+  const ipl = visible('/medicina-estetica-facial/luz-pulsada-intensa-ipl/');
+  assert.match(ipl, /Lo realiza: personal sanitario, con valoración médica previa/);
+  assert.match(ipl, /En IEMEC lo aplica personal sanitario, tras una valoración médica/);
+  assert.ok(!/enfermer/i.test(ipl));
   assert.ok(!/La valoración la hace/.test(visible('/medicina-estetica-facial/bb-lips/')));
-  assert.ok(!/colegiad/.test(visible('/equipo/').split('Dra. Cirujana de Prueba')[0]), 'colegiación que no consta');
+  // Lo que no consta no se afirma: sin la pregunta de la edad del aclarado (cualquier respuesta sería
+  // una política que la clínica no ha fijado).
+  assert.ok(!/A partir de qué edad|mayores de edad/.test(visible('/estetica-intima-femenina/aclarado-de-la-zona-intima/')));
+  // Tarjetas regalo: una oferta con precio dice los impuestos y el desistimiento; la privacidad, la compra.
+  const tarjetas = visible('/tarjetas-regalo/');
+  assert.match(tarjetas, /Cada importe es el precio final, con los impuestos incluidos\./);
+  assert.match(tarjetas, /puedes desistir de la compra en los 14 días naturales siguientes/);
+  assert.match(visible('/privacidad/'), /Gestionar la compra de una tarjeta regalo que nos pides por WhatsApp, por teléfono o en la clínica/);
+  assert.ok(!/pasarela de pago/.test(visible('/privacidad/')));
+  // El código de campaña: ni se guarda en el navegador ni se dice exento; cookies y privacidad dicen lo mismo.
+  const cookies = visible('/cookies/');
+  assert.match(cookies, /no usa cookies y no guarda nada en tu dispositivo/);
+  assert.ok(!/iemec-campana|LSSI, art\. 22\.2|atender la solicitud que nos haces/.test(cookies));
+  assert.match(visible('/privacidad/'), /Saber de qué campaña llega cada solicitud ?, para medir nuestros anuncios[^.]*que no se guarda en tu dispositivo/);
+  assert.ok(!/validar la base/.test(visible('/privacidad/')));
   // El zip: el contenido de la carpeta, con el .htaccess y sin informe.json.
   const z = leerZip(zip);
   assert.ok(z.has('.htaccess') && z.has('index.html') && z.has('404.html') && z.has('sitemap.xml') && z.has('robots.txt'));
@@ -536,11 +690,12 @@ test('obligatorias de normas.json: pie, tratamiento médico, formulario y aviso 
   }
   const aviso = R.textoVisible(PAGINAS.get('/aviso-legal/'));
   const faltan = ob('aviso_legal').filter((o) => !o.re.test(aviso)).map((o) => o.patron);
-  if (SITIO.correo) assert.deepEqual(faltan, []);
-  else {
-    assert.deepEqual(faltan, ['[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}'], 'solo puede faltar el correo propio, pendiente de la clínica');
-    assert.match(aviso, /Correo electrónico \[PENDIENTE: correo\]/);
-  }
+  // Solo pueden faltar el correo propio y los números de colegiado (imprescindibles de la clínica: el
+  // número, no la palabra, LSSI, art. 10.1.d).
+  const esperadas = [...(SITIO.correo ? [] : ['[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}']), 'n\\.?\\s?º\\s+de\\s+colegiad[oa]\\s+[0-9]'];
+  assert.deepEqual(faltan, esperadas);
+  if (!SITIO.correo) assert.match(aviso, /Correo electrónico \[PENDIENTE: correo\]/);
+  assert.ok(INFORME.obligatorias_pendientes.every((o) => LANZAMIENTO.datos.some((d) => d.clase === 'a' && (d.obligatorias || []).includes(o.patron))), 'cada obligatoria que falta es de un imprescindible');
   assert.ok(!/@gmail\.com/i.test([...PAGINAS.values()].join('')));
 });
 
@@ -553,7 +708,11 @@ test('los [PENDIENTE] se ven en la vista previa (sábado, colegiados…) y el em
   assert.match(PAGINAS.get('/privacidad/'), /<mark class="pendiente">\[PENDIENTE/);
   assert.ok(!/Notas internas/.test(PAGINAS.get('/privacidad/')), 'las notas internas no se publican');
   assert.ok(!/Variante B/.test(PAGINAS.get('/cookies/')));
-  assert.match(R.textoVisible(PAGINAS.get('/cookies/')), /iemec-campana/);
+  // La web no guarda nada en el navegador: ni cookies ni almacenamiento (tampoco el código de campaña).
+  assert.match(R.textoVisible(PAGINAS.get('/cookies/')), /no usa cookies y no guarda nada en tu dispositivo/);
+  assert.ok(!/iemec-campana/.test(R.textoVisible(PAGINAS.get('/cookies/'))));
+  const js = fs.readFileSync(path.join(SALIDA, INFORME.recursos.js), 'utf8');
+  assert.ok(!/sessionStorage|localStorage|document\.cookie/.test(js), 'web.js guarda algo en el navegador');
 });
 
 test('formularios: campos, casillas sin marcar, trampa, versión y envío a la API de la app', () => {

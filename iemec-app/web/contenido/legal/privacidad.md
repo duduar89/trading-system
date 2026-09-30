@@ -18,7 +18,7 @@
 
 ---
 
-**Resumen:** tus datos los trata Aneco AP Consulting, S.L. (IEMEC) para contestar a lo que nos
+**Resumen:** tus datos los trata Aneco AP Consulting, S.L.U. (IEMEC) para contestar a lo que nos
 pides y, si llegas a ser paciente, para atenderte. Solo te enviamos publicidad si marcas la casilla.
 Los mensajes nos llegan a una app de gestión de la clínica y te escribimos por WhatsApp, por
 teléfono o por correo, como prefieras. Puedes pedirnos acceder a tus datos, corregirlos o borrarlos
@@ -28,7 +28,7 @@ cuando quieras.
 
 | | |
 |---|---|
-| **Responsable** | Aneco AP Consulting, S.L. (nombre comercial: Instituto Europeo de Medicina Estética y Capilar, IEMEC) |
+| **Responsable** | Aneco AP Consulting, S.L.U. (sociedad limitada unipersonal; nombre comercial: Instituto Europeo de Medicina Estética y Capilar, IEMEC) |
 | **NIF** | B88613492 |
 | **Dirección** | Avenida Siglo XXI, 13, local 35, 28660 Boadilla del Monte (Madrid) |
 | **Teléfono** | +34 722 83 32 85 |
@@ -42,15 +42,16 @@ cuando quieras.
   prefieres que te contactemos ({{medios_formulario}}: no hay ninguna opción marcada de
   antemano), la página desde la que escribes, la fecha y la hora, y lo que marcas en las casillas.
 - **Campaña de la que llegas:** si entras en la web desde un anuncio o un enlace con código de
-  campaña, ese código (el nombre de la campaña y su origen, como «facebook» o «google»). Nos llega
-  con el formulario y, si nos escribes por WhatsApp, tu mensaje lleva una clave corta de la campaña,
-  no su nombre. No usamos identificadores de clic de Google ni de Meta.
+  campaña, ese código (el nombre de la campaña y su origen, como «facebook» o «google»), que va en la
+  dirección de la página. Nos llega con el formulario de esa página y, si nos escribes por WhatsApp
+  desde ella, tu mensaje lleva una clave corta de la campaña, no su nombre. No lo guardamos en tu
+  dispositivo ni usamos identificadores de clic de Google ni de Meta.
 - **Conversaciones:** lo que nos escribes por WhatsApp o nos cuentas por teléfono, y los datos de
   tus citas (tratamiento, fecha, hora, profesional, recordatorios, confirmaciones y cambios).
 - **Si llegas a ser paciente:** tu historia clínica, que se rige por su propia cláusula.
 - **Al navegar:** los datos técnicos mínimos que registra el servidor para que la web funcione y
-  sea segura (dirección IP, fecha y hora, página pedida). Esta web no usa cookies de analítica ni
-  de publicidad (ver la [Política de cookies](./cookies.md)).
+  sea segura (dirección IP, fecha y hora, página pedida). Esta web no usa cookies ni guarda nada en
+  tu dispositivo (ver la [Política de cookies](./cookies.md)).
 
 El tratamiento que te interesa y lo que escribes en el mensaje **pueden revelar datos de tu
 salud**, que la ley protege de forma especial (RGPD, art. 9). Por eso te pedimos tu consentimiento
@@ -66,11 +67,12 @@ hablaremos en consulta.
 | **Atenderte como paciente** (historia clínica, consentimientos, facturación). | Asistencia sanitaria (RGPD, art. 9.2.h), obligaciones legales (RGPD, art. 6.1.c; Ley 41/2002) y contrato. | Según la cláusula para pacientes y los plazos legales de documentación clínica, mercantil y fiscal. |
 | **Pedirte tu opinión** sobre la atención después de la cita, con un enlace a nuestra ficha de Google. | Interés legítimo en conocer la calidad de nuestra atención (RGPD, art. 6.1.f). Puedes oponerte en cualquier momento y no volveremos a pedírtela. `[PENDIENTE: validar la base con el DPD]` | Lo que dure la gestión de tu cita. Si publicas tu opinión en Google, lo haces tú, con las condiciones de Google. |
 | **Enviarte comunicaciones comerciales** (novedades y propuestas) por WhatsApp o correo, adaptadas a los tratamientos que te interesan. | Solo si marcas la casilla: tu consentimiento (RGPD, arts. 6.1.a y 9.2.a; LSSI, art. 21). Nunca enviamos publicidad de medicamentos de receta. | Hasta que te des de baja. La prueba de tu consentimiento y de tu baja se guarda bloqueada hasta 3 años (plazo de prescripción de la LSSI, art. 45). |
-| **Saber de qué campaña llega cada solicitud**, para medir nuestros anuncios sin seguirte por otras webs. | Interés legítimo (RGPD, art. 6.1.f): es un dato de la campaña, no del tratamiento, y no se cede a nadie. `[PENDIENTE: validar la base con el DPD]` | Lo mismo que la solicitud. |
+| **Saber de qué campaña llega cada solicitud**, para medir nuestros anuncios sin seguirte por otras webs: el código de la campaña de la página a la que llegas, que no se guarda en tu dispositivo. | Interés legítimo (RGPD, art. 6.1.f): es un dato de la campaña, no del tratamiento, y no se cede a nadie. `[PENDIENTE: validar la base con el DPD]` | Lo mismo que la solicitud. |
 | **Seguridad de la web** y prevención del abuso de los formularios (límite de envíos por dirección IP y por teléfono). | Interés legítimo (RGPD, art. 6.1.f). | `[PENDIENTE: plazo de los registros del servidor (p. ej. 90 días)]`; el contador de envíos, un día como mucho (sin guardar la dirección IP ni el teléfono, solo una huella que no se puede deshacer). |
+| **Gestionar la compra de una tarjeta regalo** que nos pides por WhatsApp, por teléfono o en la clínica: el pedido, el cobro, la tarjeta y su canje. | Contrato (RGPD, art. 6.1.b) y obligaciones legales de facturación (RGPD, art. 6.1.c). | Mientras la tarjeta sea válida y, después, los plazos de la normativa mercantil y fiscal (hasta 6 años: Código de Comercio, art. 30). |
 | **Cumplir obligaciones legales** y defendernos de reclamaciones. | Obligación legal (RGPD, art. 6.1.c) e interés legítimo (RGPD, art. 6.1.f). | Bloqueados durante los plazos de prescripción (LOPDGDD, art. 32). |
 
-`[PENDIENTE: solo si vuelven a venderse tarjetas regalo en la web: finalidad «gestionar tu compra», base «contrato» (art. 6.1.b), destinatario «pasarela de pago» y plazos mercantiles y fiscales]`
+`[PENDIENTE: solo si vuelven a venderse tarjetas regalo en la web: la pasarela de pago como destinataria y lo que cambie en la compra]`
 
 **Asistente virtual.** `[PENDIENTE: solo si se activa el asistente virtual]` Algunas respuestas por WhatsApp puede darlas un asistente virtual, que se presenta como tal, no da consejos médicos y te pasa con una persona cuando lo pides o cuando hace falta (Reglamento (UE) 2024/1689, art. 50.1). Nos ayuda a ordenar los mensajes y proponerte citas; ninguna decisión que te afecte jurídicamente se toma sin una persona.
 

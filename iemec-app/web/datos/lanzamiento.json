@@ -1,16 +1,16 @@
 {
-  "_leeme": "Qué falta para publicar la web nueva y cómo se publica mientras tanto. Cada dato pendiente lleva: qué falta, por qué, dónde sale, quién lo da, sus marcas [PENDIENTE: …] en la vista previa y su clase. Clase «a» · imprescindible: sin él la web no cumple la ley o dice algo que puede engañar; «node web/construir.js --publicar» falla y lo lista. Clase «b» · se oculta hasta tenerlo: se publica con una redacción neutra y cierta («publicado»; «en_publicacion» dice cómo: «quitar» borra la marca, «redacciones» cambia un texto exacto de un archivo y «codigo» es lo que hace el generador). Clase «c» · completado ya con una fuente oficial y pública («fuente», «valor»), sin preguntar a la clínica. «como_completar»: dónde se pone el dato cuando llega; después basta con volver a construir con --publicar y subir la carpeta. «vistos_buenos»: la fecha (AAAA-MM-DD) en que el médico responsable y el abogado sanitario con el DPD dan el visto bueno; la del legal es la «Última actualización» de los textos legales. Qué pedir y a quién, y los pasos para lanzar: docs/LANZAR-WEB.md. Revisado el 30-09-2026.",
+  "_leeme": "Qué falta para publicar la web nueva y cómo se publica mientras tanto. Cada dato pendiente lleva: qué falta, por qué, dónde sale, quién lo da y su clase, y cómo se detecta: sus marcas [PENDIENTE: …] en la vista previa, las obligatorias de normas.json que le tocan («obligatorias») o una comprobación sobre los datos («comprobacion»: «confirmar_paginas», lo que la clínica tiene que confirmar de cada página, web/contenido/*.json → «confirmar»; «colegiacion», los datos de colegiación de quien se nombra). Clase «a» · imprescindible: sin él la web no cumple la ley o dice algo que puede engañar; «node web/construir.js --publicar» falla y lo lista. Clase «b» · se oculta hasta tenerlo: se publica con una redacción neutra y cierta («publicado»; «en_publicacion» dice cómo: «quitar» borra la marca, «redacciones» cambia un texto exacto de un archivo, «quitar_preguntas» quita una pregunta frecuente entera y «codigo» es lo que hace el generador). Clase «c» · completado ya con una fuente oficial y pública («fuente», «valor»), sin preguntar a la clínica. «como_completar»: dónde se pone el dato cuando llega; después basta con volver a construir con --publicar y subir la carpeta. «vistos_buenos»: la fecha (AAAA-MM-DD) en que el médico responsable y el abogado sanitario con el DPD dan el visto bueno; la del legal es la «Última actualización» de los textos legales. «alternativas»: lanzar sin las páginas de un imprescindible que tarda, si la clínica lo decide («aplicar»). Qué pedir y a quién, y los pasos para lanzar: docs/LANZAR-WEB.md. Revisado el 30-09-2026.",
   "_version": "2026-09-30",
   "vistos_buenos": {
     "medico": {
       "fecha": null,
       "quien": "El médico responsable (dirección médica)",
-      "_que": "Ha leído las páginas de tratamientos médicos (informe.json → revision_medica) y ha corregido o aprobado lo que dicen: qué es, para quién, duración y sesiones orientativas, riesgos y cuidados."
+      "_que": "Ha leído las páginas de tratamientos médicos (informe.json → revision_medica), con las notas de redacción que la vista previa enseña en cada una («Nota para la revisión»), y ha corregido o aprobado lo que dicen: qué es, para quién, duración y sesiones orientativas, riesgos y cuidados."
     },
     "legal": {
       "fecha": null,
       "quien": "El abogado sanitario y el delegado de protección de datos",
-      "_que": "Han revisado el aviso legal, la privacidad, las cookies, la accesibilidad y las casillas del formulario, con las redacciones neutras de esta lista."
+      "_que": "Han revisado el aviso legal, la privacidad (y validado sus bases legales: la petición de opinión y la medición de campañas), las cookies, la accesibilidad, las casillas del formulario, las condiciones de las tarjetas regalo y las páginas de publicidad sanitaria más delicada (informe.json → revision_legal: publicidad restringida, estética íntima y lo capilar), con las redacciones neutras de esta lista, y han contestado lo que les toca de «confirmar»."
     }
   },
   "datos": [
@@ -18,8 +18,8 @@
       "id": "correo",
       "clase": "a",
       "titulo": "Correo electrónico propio",
-      "falta": "Una dirección de correo con el dominio de la clínica (por ejemplo, hola@iemec-clinic.com) que alguien lea a diario. Un Gmail no vale.",
-      "por_que": "LSSI, art. 10.1.a: el aviso legal da un correo del titular; RGPD, arts. 12 y 13: el formulario y la privacidad dicen dónde ejercer los derechos. normas.json lo exige en el aviso legal y prohíbe el Gmail de la web actual, que no identifica al titular.",
+      "falta": "Una dirección de correo con el dominio de la clínica (por ejemplo, hola@iemec-clinic.com) que alguien lea a diario.",
+      "por_que": "La LSSI (art. 10.1.a) pide un correo de contacto en el aviso legal, y el RGPD (arts. 12 y 13), un sitio donde ejercer los derechos: el formulario y la privacidad lo dicen. La ley no prohíbe un Gmail, pero el correo con el dominio de la clínica deja claro quién es el titular; por eso lo pedimos y normas.json no deja publicar el Gmail de la web actual, que no lo dice.",
       "donde": ["el recuadro de protección de datos de cada formulario «Te llamamos» (páginas de tratamiento y /pedir-cita/)", "/aviso-legal/ (apartados 1 y 9)", "/privacidad/ (apartados 1 y 6)", "/accesibilidad/"],
       "responsable": "Clínica (elige la dirección y quién la lee) y Uebea o quien lleve el dominio (crea el buzón o la redirección y sus registros MX, SPF y DKIM: hoy el dominio no tiene correo)",
       "marcas": ["[PENDIENTE: correo]"],
@@ -41,12 +41,70 @@
       "id": "cirugias",
       "clase": "a",
       "titulo": "Quién opera y dónde",
-      "falta": "Para cada cirugía (pecho, liposucción, abdominoplastia, lipofilling de glúteos, lipotransferencia facial, párpados, orejas, labioplastia e injertos capilares): el nombre del cirujano, su número de colegiado y, si la tiene, su especialidad oficial reconocida en España. Y dónde se operan las cirugías capilares y la labioplastia (¿en la sala de procedimientos de IEMEC, con anestesia local?).",
+      "falta": "Para cada cirugía (pecho, liposucción, abdominoplastia, lipofilling de glúteos, lipotransferencia facial, párpados, orejas, labioplastia, injertos capilares y cicatrices del cuero cabelludo, que puede incluir un injerto): el nombre del cirujano, su número de colegiado y, si la tiene, su especialidad oficial reconocida en España. Y dónde se operan las cirugías capilares y la labioplastia (¿en la sala de procedimientos de IEMEC, con anestesia local?).",
       "por_que": "normas.md, apartado j: cada página de cirugía dice el nombre, la especialidad oficial y el número de colegiado del cirujano y dónde se opera (Código de Deontología Médica 2022, art. 90; Ley 44/2003, art. 16.3; Ley 3/1991, art. 5.1.a). Sin eso, «Lo realiza: cirujano» puede engañar: el título de especialista del Dr. Vricella está pendiente de reconocimiento en España.",
-      "donde": ["las 15 páginas de cirugía (recuadro «Cirugía: requiere una consulta previa» y ficha práctica)", "/cirugia-estetica/consulta-de-cirugia-plastica/ (ficha)", "/cirugia-capilar/ y /cirugia-capilar/reparacion-de-injertos-capilares/ (pregunta «¿Dónde se hace la intervención?»)"],
+      "donde": ["las 16 páginas de cirugía, con las cicatrices del cuero cabelludo (recuadro «Cirugía: requiere una consulta previa» y ficha práctica)", "/cirugia-estetica/consulta-de-cirugia-plastica/ (ficha)", "/cirugia-capilar/ y /cirugia-capilar/reparacion-de-injertos-capilares/ (pregunta «¿Dónde se hace la intervención?»)"],
       "responsable": "Clínica",
       "marcas": ["[PENDIENTE: nombre, especialidad oficial y n.º de colegiado]", "[PENDIENTE: dónde se opera]", "[PENDIENTE: confirmar dónde se opera]"],
-      "como_completar": "Quién: web/datos/equipo.json → en la persona que opera, «colegiado» (y, si los tiene, «especialidad», «colegio» y «titulo») y «opera» con las especialidades o páginas que opera («cirugia-estetica», «cirugia-capilar», «labioplastia»); si opera alguien que no está en el equipo, se añade. Dónde: web/datos/especialidades.json → cirugia-capilar → «donde_cirugia»; web/contenido/intima-y-cirugia.json → labioplastia → sesion.donde, sin el [PENDIENTE]."
+      "como_completar": "Quién: web/datos/equipo.json → en la persona que opera, «colegiado» (y, si los tiene, «especialidad», «colegio» y «titulo») y «opera» con las especialidades o páginas que opera («cirugia-estetica», «cirugia-capilar», «labioplastia»); si opera alguien que no está en el equipo, se añade. Dónde: web/datos/especialidades.json → cirugia-capilar → «donde_cirugia»; web/contenido/intima-y-cirugia.json → labioplastia → sesion.donde, sin el [PENDIENTE]. Si tarda, se puede lanzar sin las cirugías: alternativas → sin-cirugias."
+    },
+    {
+      "id": "paginas-por-confirmar",
+      "clase": "a",
+      "titulo": "Lo que ofrece de verdad cada página",
+      "falta": "Que la clínica confirme, página a página, lo que la web anuncia y no consta: que ofrece ese tratamiento o esa variante; con qué producto y con qué régimen legal (cosmético, producto sanitario o medicamento); y lo que tiene que decir el abogado sanitario (si entra en la autorización o se puede anunciar). La lista, con cada pregunta: informe.json → lanzamiento → imprescindibles → paginas-por-confirmar → detalle, y el recuadro «Nota para la revisión» de cada página en la vista previa.",
+      "por_que": "Anunciar un servicio que no se ofrece engaña (Ley 3/1991, art. 5; RD 1907/1996, art. 7); un medicamento de receta no se anuncia al público (RDLeg 1/2015, art. 80.1) ni un producto sanitario de uso profesional (RD 1591/2009, art. 38), y lo que la autorización no cubre necesita autorización previa (RD 1907/1996, art. 6.2).",
+      "donde": ["las páginas con «confirmar» en web/contenido/*.json"],
+      "responsable": "Clínica (dirección médica) y abogado sanitario",
+      "marcas": [],
+      "comprobacion": "confirmar_paginas",
+      "como_completar": "Con cada respuesta se corrige la página (o, si no se ofrece, pasa a «sin_pagina» de su grupo con el motivo) y se quita esa pregunta de «confirmar» en web/contenido/*.json. Si la clínica prefiere no esperar, se lanza sin las páginas que aún tengan preguntas: alternativas → solo-lo-confirmado."
+    },
+    {
+      "id": "diagnostico-capilar",
+      "clase": "a",
+      "titulo": "Quién hace el diagnóstico capilar",
+      "falta": "La profesión y el título de quien hace el diagnóstico capilar. En la web actual lo firma Paula Vicent Valverde, sin titulación; en la app el rol es «tricólogo», que no es una profesión sanitaria titulada.",
+      "por_que": "La página presenta el diagnóstico como la valoración médica previa que exige cualquier tratamiento médico: si no lo hace un médico, eso engaña (Ley 3/1991, art. 5; RD 1907/1996, art. 7).",
+      "donde": ["/medicina-capilar/diagnostico-capilar/ (ficha y texto)"],
+      "responsable": "Clínica",
+      "marcas": ["[PENDIENTE: profesión y titulación de quien hace el diagnóstico]"],
+      "como_completar": "web/contenido/capilar.json → diagnostico-capilar → sesion.profesional. Si no lo hace un médico: decir quién lo hace y cambiar en el texto «Cualquier tratamiento médico requiere esta valoración médica previa» por quién valora y cuándo interviene el médico."
+    },
+    {
+      "id": "colegiacion",
+      "clase": "a",
+      "titulo": "Título y colegiación de quien se nombra",
+      "falta": "De cada profesional que nombra la web (hoy siete: Maribel Perea, Paola Ranilla, Luisa Aleñar, Marcela Pedraza, Paula Vicent, Marco Vricella y Alfonso Navarro): el título académico oficial, el colegio y el número de colegiado y, si el título es de otro país, el Estado que lo expidió y su homologación o reconocimiento en España. De quien no ejerza una profesión sanitaria (¿Paula Vicent?), decirlo. Si la clínica prefiere no dar los datos de alguien, esa persona no se nombra.",
+      "por_que": "LSSI, art. 10.1.d: quien ejerce una profesión regulada da esos datos con acceso permanente, fácil, directo y gratuito (art. 10.1); darlos solo a quien los pida no lo cumple (infracción leve, art. 38.4.b). En la publicidad sanitaria, además, el número de colegiado de quien se nombra (CDM 2022, art. 90; normas.md, apartado f).",
+      "donde": ["/equipo/", "/aviso-legal/ (apartado 3)", "la portada (el equipo)"],
+      "responsable": "Clínica",
+      "marcas": [],
+      "obligatorias": ["n\\.?\\s?º\\s+de\\s+colegiad[oa]\\s+[0-9]"],
+      "comprobacion": "colegiacion",
+      "como_completar": "web/datos/equipo.json, en cada persona: «titulo», «colegio», «colegiado» y «titulo_extranjero» (false si el título es español; si no, el Estado y su homologación), y «especialidad» solo si es oficial en España. Quien no ejerza una profesión sanitaria: «colegiado»: false (sale en /equipo/ sin colegiación y no va en la tabla del aviso legal). Quien no se vaya a nombrar: se quita de equipo.json."
+    },
+    {
+      "id": "u900",
+      "clase": "a",
+      "titulo": "Qué cubre la unidad U.900",
+      "falta": "Qué actividad concreta cubre la unidad U.900 («Otras unidades asistenciales») según la resolución de autorización CS17886, en especial la medicina capilar: el diagnóstico y el tratamiento médico de la caída del cabello. Basta la resolución, que tiene la clínica.",
+      "por_que": "La publicidad de un centro sanitario se ajusta a lo que tiene autorizado; lo demás necesita autorización previa (RD 1907/1996, art. 6; RD 1277/2003, art. 6.2). El Registro solo dice «U.900 Otras unidades asistenciales», y la medicina estética (U.48) es la mejora estética «corporal o facial»: la medicina capilar no encaja sin duda.",
+      "donde": ["/aviso-legal/ (apartado 2)", "/medicina-capilar/ y sus páginas"],
+      "responsable": "Clínica (la resolución) y abogado sanitario",
+      "marcas": ["[PENDIENTE: qué actividad concreta cubre la U.900 según la resolución de autorización]", "[PENDIENTE: qué cubre la unidad U.900 de la autorización en medicina capilar]"],
+      "como_completar": "Con la resolución: si cubre la medicina capilar, se quita «pendiente» de medicina-capilar en web/datos/especialidades.json y la marca del apartado 2 de web/contenido/legal/aviso-legal.md (o se escribe lo que diga). Si no la cubre, las páginas de medicina capilar que no sean de cabina pasan a web/contenido/pendientes/ hasta tener la autorización."
+    },
+    {
+      "id": "intima-autorizacion",
+      "clase": "a",
+      "titulo": "Qué cubre la autorización en la estética íntima",
+      "falta": "Que el abogado sanitario confirme que la estética íntima que se publica (la labioplastia, el aclarado de la zona íntima externa y la remodelación íntima) encaja en la autorización como cirugía estética, cirugía menor o medicina estética (U.47, U.64 y U.48): la ginecología (U.26) no figura.",
+      "por_que": "La publicidad se ajusta a lo autorizado (RD 1907/1996, art. 6; RD 1277/2003, art. 6.2). Lo que la autorización no cubre, la ginecología funcional, ya está en borradores y no se publica.",
+      "donde": ["/estetica-intima-femenina/"],
+      "responsable": "Abogado sanitario (con la clínica)",
+      "marcas": ["[PENDIENTE: qué servicios de la zona íntima cubre la autorización (la ginecología, U.26, no figura)]"],
+      "como_completar": "Con su visto bueno: quitar «pendiente» de estetica-intima-femenina en web/datos/especialidades.json. Si alguna página no encaja, pasa a web/contenido/pendientes/."
     },
     {
       "id": "visto-bueno-medico",
@@ -64,14 +122,14 @@
       "id": "visto-bueno-legal",
       "clase": "a",
       "titulo": "Visto bueno legal",
-      "falta": "Que el abogado sanitario y el delegado de protección de datos revisen el aviso legal, la privacidad, las cookies, la accesibilidad y las casillas del formulario, con las redacciones de esta lista, y den el visto bueno.",
-      "por_que": "normas.md: «antes de publicar, lo revisan ellos» (puerta ⛔ 9 de PROGRESO.md). Su fecha es la «Última actualización» de los textos legales.",
-      "donde": ["/aviso-legal/", "/privacidad/", "/cookies/", "/accesibilidad/", "las casillas de todos los formularios"],
+      "falta": "Que el abogado sanitario y el delegado de protección de datos revisen el aviso legal, la privacidad (y validen sus bases legales: la petición de opinión después de la cita y la medición de campañas, por interés legítimo), las cookies, la accesibilidad, las casillas del formulario, las condiciones de las tarjetas regalo y las páginas de publicidad sanitaria más delicada (las de publicidad restringida, la estética íntima y lo capilar), con las redacciones de esta lista, y den el visto bueno.",
+      "por_que": "normas.md: «antes de publicar, lo revisan ellos» (puerta ⛔ 9 de PROGRESO.md), también las páginas de publicidad (normas.md, lista para quien revisa). Su fecha es la «Última actualización» de los textos legales.",
+      "donde": ["/aviso-legal/", "/privacidad/", "/cookies/", "/accesibilidad/", "las casillas de todos los formularios", "/tarjetas-regalo/", "las páginas de informe.json → revision_legal"],
       "responsable": "Clínica (abogado sanitario y DPD)",
-      "marcas": ["[PENDIENTE: revisión del abogado sanitario y del DPD]", "[PENDIENTE: fecha de publicación]"],
+      "marcas": ["[PENDIENTE: revisión del abogado sanitario y del DPD]", "[PENDIENTE: fecha de publicación]", "[PENDIENTE: validar la base con el DPD]"],
       "visto_bueno": "legal",
-      "en_publicacion": { "codigo": "El recuadro «revisión del abogado sanitario y del DPD» y las notas para la revisión no se publican nunca (web/lib/paginas.js · legal() y web/lib/markdown.js); la fecha sale de vistos_buenos.legal." },
-      "como_completar": "web/datos/lanzamiento.json → vistos_buenos.legal.fecha."
+      "en_publicacion": { "codigo": "El recuadro «revisión del abogado sanitario y del DPD» y las notas para la revisión no se publican nunca (web/lib/paginas.js · legal() y web/lib/markdown.js); la fecha sale de vistos_buenos.legal. Las dos marcas «validar la base con el DPD» de la privacidad se quitan a mano cuando el DPD las valide: hasta entonces, --publicar no deja publicar." },
+      "como_completar": "Con su visto bueno: quitar de web/contenido/legal/privacidad.md las dos marcas «validar la base con el DPD» (o cambiar la base que diga el DPD) y poner la fecha en web/datos/lanzamiento.json → vistos_buenos.legal.fecha."
     },
     {
       "id": "sabado",
@@ -84,35 +142,6 @@
       "publicado": "Solo el horario confirmado, «Lunes a viernes, de 11:00 a 20:00», y «Otros horarios, consúltanos». Los datos estructurados ya solo llevan de lunes a viernes.",
       "en_publicacion": { "codigo": "web/lib/base.js · horario() y horarioCorto()" },
       "como_completar": "web/datos/sitio.json → horario → Sábado: «abre», «cierra» y «schema»: [\"Saturday\"], y fuera «pendiente»."
-    },
-    {
-      "id": "u900",
-      "clase": "b",
-      "titulo": "Qué cubre la unidad U.900",
-      "falta": "Qué actividad concreta cubre la unidad U.900 («Otras unidades asistenciales») según la resolución de autorización CS17886, en especial la medicina capilar.",
-      "por_que": "El Registro de centros sanitarios solo dice «U.900 Otras unidades asistenciales» (consultado el 30-09-2026); normas.md (apartado a) pide confirmarlo, no retirar la medicina capilar.",
-      "donde": ["/aviso-legal/ (apartado 2)", "/medicina-capilar/"],
-      "responsable": "Clínica",
-      "marcas": ["[PENDIENTE: qué actividad concreta cubre la U.900 según la resolución de autorización]", "[PENDIENTE: qué cubre la unidad U.900 de la autorización en medicina capilar]"],
-      "publicado": "«U.900 Otras unidades asistenciales», como figura en el Registro; /medicina-capilar/ sale sin la nota.",
-      "en_publicacion": {
-        "quitar": ["[PENDIENTE: qué actividad concreta cubre la U.900 según la resolución de autorización]"],
-        "codigo": "web/lib/paginas.js · especialidad(): la nota «pendiente» de la especialidad no se publica"
-      },
-      "como_completar": "Si la resolución dice otra cosa, el apartado 2 de web/contenido/legal/aviso-legal.md; y quitar «pendiente» de medicina-capilar en web/datos/especialidades.json."
-    },
-    {
-      "id": "intima-autorizacion",
-      "clase": "b",
-      "titulo": "Qué cubre la autorización en la estética íntima",
-      "falta": "Confirmar que los servicios de estética íntima que se publican (labioplastia, aclarado de la zona íntima externa y el tercero de la especialidad) encajan en la autorización como cirugía o medicina estética: la ginecología (U.26) no figura.",
-      "por_que": "Lo que la autorización no cubre (la ginecología funcional) ya está en borradores y no se publica; lo publicado se presenta como estética (U.47, U.48 y U.64).",
-      "donde": ["/estetica-intima-femenina/"],
-      "responsable": "Clínica (con el abogado sanitario)",
-      "marcas": ["[PENDIENTE: qué servicios de la zona íntima cubre la autorización (la ginecología, U.26, no figura)]"],
-      "publicado": "La especialidad sale sin la nota.",
-      "en_publicacion": { "codigo": "web/lib/paginas.js · especialidad()" },
-      "como_completar": "Quitar «pendiente» de estetica-intima-femenina en web/datos/especialidades.json."
     },
     {
       "id": "hospital",
@@ -137,18 +166,16 @@
       "titulo": "Política con menores de edad",
       "falta": "A partir de qué edad hace la clínica cada cirugía o tratamiento (la web actual anuncia la otoplastia «a partir de los 10 años»).",
       "por_que": "Escribir «solo para mayores de edad» sin confirmarlo podría ser falso (la otoplastia), y la publicidad no se dirige a menores (Ley 34/1988, art. 3.b): hasta tenerlo, no se dice nada de la edad.",
-      "donde": ["el recuadro de las 15 páginas de cirugía", "/estetica-intima-femenina/aclarado-de-la-zona-intima/ (pregunta sobre la edad)", "/privacidad/ (apartado 7)"],
+      "donde": ["el recuadro de las páginas de cirugía", "/estetica-intima-femenina/aclarado-de-la-zona-intima/ (pregunta «¿A partir de qué edad se puede hacer?»)", "/privacidad/ (apartado 7)"],
       "responsable": "Clínica",
       "marcas": ["[PENDIENTE: política con menores]", "[PENDIENTE: política de la clínica con menores]", "[PENDIENTE: política de la clínica sobre tratamientos estéticos a menores de 18 años]"],
-      "publicado": "Sin frase sobre la edad; la pregunta del aclarado contesta «Lo decide el médico en la valoración, siempre con indicación médica…».",
+      "publicado": "Sin frase sobre la edad, y la pregunta «¿A partir de qué edad se puede hacer?» del aclarado no sale: cualquier respuesta afirmaría una política que no consta.",
       "en_publicacion": {
         "codigo": "web/lib/paginas.js · aviso(): la frase de la edad solo sale con sitio.json → politica_menores",
-        "redacciones": [
-          { "archivo": "contenido/intima-y-cirugia.json", "buscar": "Solo para mayores de edad [PENDIENTE: política de la clínica con menores] y siempre con indicación médica. En la valoración el médico revisa tu piel, tus antecedentes y si hay alguna contraindicación antes de proponerte el tratamiento.", "cambiar_por": "Lo decide el médico en la valoración, siempre con indicación médica: revisa tu piel, tus antecedentes y si hay alguna contraindicación antes de proponerte el tratamiento." }
-        ],
+        "quitar_preguntas": ["¿A partir de qué edad se puede hacer?"],
         "quitar": ["[PENDIENTE: política de la clínica sobre tratamientos estéticos a menores de 18 años]"]
       },
-      "como_completar": "web/datos/sitio.json → «politica_menores» (la frase del recuadro de las cirugías); la pregunta del aclarado y el apartado 7 de la privacidad, a mano."
+      "como_completar": "web/datos/sitio.json → «politica_menores» (la frase del recuadro de las cirugías); la respuesta del aclarado (web/contenido/intima-y-cirugia.json) y el apartado 7 de la privacidad, a mano."
     },
     {
       "id": "valoracion-previa",
@@ -165,43 +192,42 @@
     {
       "id": "area-capilar",
       "clase": "b",
-      "titulo": "Quién hace el diagnóstico y los tratamientos del área capilar",
-      "falta": "Profesión y titulación de quien hace el diagnóstico capilar, el microneedling capilar y el tratamiento de las cicatrices del cuero cabelludo (en la web actual, Paula Vicent Valverde sin titulación; en la app, «tricólogo», que no es una profesión sanitaria titulada).",
-      "donde": ["/medicina-capilar/diagnostico-capilar/", "/medicina-capilar/microneedling-capilar/", "/cirugia-capilar/cicatrices-en-el-cuero-cabelludo/"],
+      "titulo": "Quién hace el microneedling capilar",
+      "falta": "La profesión y el título de quien hace el microneedling capilar (en la app, «tricólogo»). El diagnóstico capilar es imprescindible (diagnostico-capilar) y las cicatrices del cuero cabelludo se tratan como cirugía (cirugias).",
+      "donde": ["/medicina-capilar/microneedling-capilar/"],
       "responsable": "Clínica",
-      "marcas": ["[PENDIENTE: profesión y titulación de quien hace el diagnóstico]", "[PENDIENTE: profesión y titulación de quien lo hace]", "[PENDIENTE: quién lo hace]"],
-      "publicado": "«Lo realiza: el equipo del área capilar de IEMEC», sin profesión ni título; las páginas siguen diciendo que antes de un tratamiento médico hay una valoración médica.",
+      "marcas": ["[PENDIENTE: profesión y titulación de quien lo hace]"],
+      "publicado": "«Lo realiza: el equipo del área capilar de IEMEC», sin profesión ni título; la página dice que antes hay una valoración médica. Su producto sí es imprescindible (paginas-por-confirmar).",
       "en_publicacion": {
         "redacciones": [
-          { "archivo": "contenido/capilar.json", "buscar": "[PENDIENTE: profesión y titulación de quien hace el diagnóstico]", "cambiar_por": "El equipo del área capilar de IEMEC" },
-          { "archivo": "contenido/capilar.json", "buscar": "[PENDIENTE: profesión y titulación de quien lo hace]", "cambiar_por": "El equipo del área capilar de IEMEC" },
-          { "archivo": "contenido/capilar.json", "buscar": "[PENDIENTE: quién lo hace]", "cambiar_por": "El equipo del área capilar de IEMEC" }
+          { "archivo": "contenido/capilar.json", "buscar": "[PENDIENTE: profesión y titulación de quien lo hace]", "cambiar_por": "El equipo del área capilar de IEMEC" }
         ]
       },
-      "como_completar": "web/contenido/capilar.json → sesion.profesional de esas tres páginas."
+      "como_completar": "web/contenido/capilar.json → microneedling-capilar → sesion.profesional."
     },
     {
       "id": "ipl",
       "clase": "b",
       "titulo": "Quién aplica la luz pulsada (IPL)",
       "falta": "Si la aplica enfermería (lo dice el cartel de la portada de la clínica) o un médico (lo dice el catálogo).",
-      "donde": ["/medicina-estetica-facial/luz-pulsada-intensa-ipl/"],
+      "donde": ["/medicina-estetica-facial/luz-pulsada-intensa-ipl/ (ficha y texto)"],
       "responsable": "Clínica",
       "marcas": ["[PENDIENTE: confirmar quién lo hace]"],
-      "publicado": "«Lo realiza: personal sanitario, con valoración médica previa»: las dos fuentes de la clínica dicen personal sanitario.",
+      "publicado": "«Lo realiza: personal sanitario, con valoración médica previa» y, en el texto, «lo aplica personal sanitario, tras una valoración médica»: las dos fuentes de la clínica dicen personal sanitario (enfermería o médico).",
       "en_publicacion": {
         "redacciones": [
-          { "archivo": "contenido/facial-aparatologia.json", "buscar": "Enfermería, con valoración médica previa [PENDIENTE: confirmar quién lo hace]", "cambiar_por": "Personal sanitario, con valoración médica previa" }
+          { "archivo": "contenido/facial-aparatologia.json", "buscar": "Enfermería, con valoración médica previa [PENDIENTE: confirmar quién lo hace]", "cambiar_por": "Personal sanitario, con valoración médica previa" },
+          { "archivo": "contenido/facial-aparatologia.json", "buscar": "lo aplica personal de enfermería [PENDIENTE: confirmar quién lo hace], tras una valoración médica", "cambiar_por": "lo aplica personal sanitario, tras una valoración médica" }
         ]
       },
-      "como_completar": "web/contenido/facial-aparatologia.json → luz-pulsada-intensa-ipl → sesion.profesional."
+      "como_completar": "web/contenido/facial-aparatologia.json → luz-pulsada-intensa-ipl → sesion.profesional y el tercer párrafo del texto."
     },
     {
       "id": "equipo",
       "clase": "b",
-      "titulo": "Titulación y colegiación de cada profesional",
-      "falta": "Por persona: título académico oficial, especialidad oficial si la tiene, colegio y número de colegiado y, si el título es de otro país, el Estado que lo expidió y su homologación o reconocimiento; si Paola Ranilla es «Dra.»; la profesión de Paula Vicent; quién es el responsable asistencial (dirección médica); nombres y titulación del equipo de estética y de enfermería; los retratos que faltan.",
-      "por_que": "LSSI, art. 10.1.d y normas.md, apartado f. Mientras, se publica el nombre y la función de cada persona, sin títulos que no consten, y el aviso legal dice que esos datos se dan a quien los pida.",
+      "titulo": "Lo demás del equipo",
+      "falta": "Lo que no es la colegiación (imprescindible: colegiacion): la especialidad oficial de cada uno, si la tiene; si Paola Ranilla es «Dra.»; quién es el responsable asistencial (dirección médica); nombres y titulación del equipo de estética y de enfermería; los retratos que faltan.",
+      "por_que": "LSSI, art. 10.1.d y normas.md, apartado f. La especialidad no se afirma si no consta (Ley 44/2003, art. 16.3); el responsable asistencial se añade cuando se sepa.",
       "donde": ["/equipo/", "/aviso-legal/ (apartados 2 y 3)"],
       "responsable": "Clínica",
       "marcas": [
@@ -222,7 +248,7 @@
         "[PENDIENTE: si el título es de otro país, Estado y homologación]",
         "[PENDIENTE: enfermería y resto del equipo sanitario]"
       ],
-      "publicado": "En /equipo/, nombre, función y biografía, sin la línea de colegiado; en el aviso legal, la tabla con nombre y área y «el título académico oficial, la especialidad, el colegio y el número de colegiado de cada profesional… te los damos si nos los pides»; el responsable asistencial no se nombra hasta tenerlo.",
+      "publicado": "En /equipo/, nombre, función, biografía y sus datos de colegiación; sin «Dra.» ni especialidad que no consten; el responsable asistencial no se nombra hasta tenerlo; el equipo de estética, sin nombres. En el aviso legal, la tabla con el título, el colegio y el número de cada profesional sanitario que sale en la web.",
       "en_publicacion": { "codigo": "web/lib/paginas.js · equipoPagina() y web/lib/legal.js (tabla de profesionales y responsable asistencial) con web/datos/equipo.json" },
       "como_completar": "web/datos/equipo.json: «titulo», «especialidad», «colegio», «colegiado» y «titulo_extranjero» de cada persona, y «responsable» (el código de la persona); «Dra.» en el nombre si procede."
     },
@@ -289,26 +315,26 @@
       "id": "tarjetas",
       "clase": "b",
       "titulo": "Tarjetas regalo: pago y condiciones de compra",
-      "falta": "Cómo se pagarán (la tienda de SITE123 desaparece con la web nueva), las condiciones de compra (forma de pago, desistimiento de 14 días, confirmación del pedido) y cómo se comprueban las tarjetas ya vendidas, que no llevan código.",
-      "por_que": "La web nueva no vende tarjetas: se piden por WhatsApp. Las condiciones de compra en la web solo hacen falta si vuelve a venderlas (TRLGDCU, arts. 97 a 103; LSSI, arts. 27 y 28). Mientras, quien las venda por WhatsApp explica antes del pago el precio final, la forma de pago, la validez y el desistimiento.",
+      "falta": "Cómo se pagarán cuando cierre la tienda de SITE123, cómo se confirma el pedido y cómo se comprueban las tarjetas ya vendidas, que no llevan código.",
+      "por_que": "La página es una oferta con precio: ya dice que cada importe es el precio final con impuestos (LSSI, art. 10.1.f) y que quien la compra a distancia puede desistir en 14 días (TRLGDCU, arts. 20.1.e, 102 y 104), y la privacidad tiene la finalidad de la compra; eso lo revisa el abogado con el visto bueno legal. Las condiciones de la compra online (pasarela de pago, confirmación del pedido: LSSI, arts. 27 y 28) solo hacen falta si vuelven a venderse en la web.",
       "donde": ["/tarjetas-regalo/", "/aviso-legal/ (apartado 10)", "/privacidad/ (apartado 3)"],
       "responsable": "Clínica",
       "marcas": [
         "[PENDIENTE: pago online de las tarjetas]",
-        "[PENDIENTE: condiciones de compra (pago, desistimiento y confirmación del pedido)]",
+        "[PENDIENTE: cómo se paga y cómo se confirma el pedido]",
         "[PENDIENTE: cómo se comprueban las tarjetas ya vendidas]",
         "[PENDIENTE: condiciones de compra de las tarjetas regalo, solo si vuelven a venderse en la web: precio final con impuestos, forma de pago, validez y canje, desistimiento de 14 días (TRLGDCU, arts. 97, 98, 102 y 103), confirmación del pedido (LSSI, arts. 27 y 28) y que no se canjean por medicamentos ni productos sanitarios como obsequio ni con ventajas de precio (RDLeg 1/2015, art. 80.5-80.6)]",
-        "[PENDIENTE: solo si vuelven a venderse tarjetas regalo en la web: finalidad «gestionar tu compra», base «contrato» (art. 6.1.b), destinatario «pasarela de pago» y plazos mercantiles y fiscales]"
+        "[PENDIENTE: solo si vuelven a venderse tarjetas regalo en la web: la pasarela de pago como destinataria y lo que cambie en la compra]"
       ],
-      "publicado": "La página explica que se piden por WhatsApp, sus condiciones (validez, canje, no se cambian por dinero, pago a cuenta) y cómo canjear las antiguas; el apartado 10 del aviso legal y el párrafo de la privacidad no salen.",
+      "publicado": "La página explica que se piden por WhatsApp, que cada importe es el precio final con impuestos, sus condiciones (validez, canje, no se cambian por dinero, pago a cuenta y el desistimiento de 14 días si se compra a distancia) y cómo canjear las antiguas; la privacidad trata la compra (contrato). El apartado 10 del aviso legal, el de la compra online, no sale.",
       "en_publicacion": {
         "codigo": "web/lib/paginas.js · tarjetasRegalo(): sin las notas",
         "redacciones": [
           { "archivo": "contenido/legal/aviso-legal.md", "buscar": "## 10. Compra de tarjetas regalo\n\n`[PENDIENTE: condiciones de compra de las tarjetas regalo, solo si vuelven a venderse en la web: precio final con impuestos, forma de pago, validez y canje, desistimiento de 14 días (TRLGDCU, arts. 97, 98, 102 y 103), confirmación del pedido (LSSI, arts. 27 y 28) y que no se canjean por medicamentos ni productos sanitarios como obsequio ni con ventajas de precio (RDLeg 1/2015, art. 80.5-80.6)]`\n", "cambiar_por": "" },
-          { "archivo": "contenido/legal/privacidad.md", "buscar": "`[PENDIENTE: solo si vuelven a venderse tarjetas regalo en la web: finalidad «gestionar tu compra», base «contrato» (art. 6.1.b), destinatario «pasarela de pago» y plazos mercantiles y fiscales]`\n", "cambiar_por": "" }
+          { "archivo": "contenido/legal/privacidad.md", "buscar": "`[PENDIENTE: solo si vuelven a venderse tarjetas regalo en la web: la pasarela de pago como destinataria y lo que cambie en la compra]`\n", "cambiar_por": "" }
         ]
       },
-      "como_completar": "web/datos/tarjetas.json (y, si vuelven a venderse online, las condiciones en el aviso legal y la privacidad)."
+      "como_completar": "web/datos/tarjetas.json (y, si vuelven a venderse online, las condiciones en el apartado 10 del aviso legal y la pasarela en la privacidad)."
     },
     {
       "id": "privacidad-plazos",
@@ -327,19 +353,6 @@
         "quitar": ["[PENDIENTE: que el DPD confirme el plazo (la app los borra a los 12 meses: RETENCION_LEADS_MESES)]", "[PENDIENTE: plazo que fije la clínica]"]
       },
       "como_completar": "El apartado 3 de web/contenido/legal/privacidad.md; si el DPD cambia el de las solicitudes, también RETENCION_LEADS_MESES en el .env de la app."
-    },
-    {
-      "id": "privacidad-bases",
-      "clase": "b",
-      "titulo": "Bases legales que valida el DPD",
-      "falta": "Que el DPD confirme la base de la petición de opinión y de la medición de campañas, y que el código de campaña está exento de consentimiento.",
-      "por_que": "El texto propuesto sigue a la AEPD; lo confirma el visto bueno legal, que es imprescindible.",
-      "donde": ["/privacidad/ (apartado 3)", "/cookies/ (apartado 2)"],
-      "responsable": "Clínica (DPD)",
-      "marcas": ["[PENDIENTE: validar la base con el DPD]", "[PENDIENTE: que el DPD confirme que el código de campaña está exento de consentimiento]"],
-      "publicado": "El texto propuesto, sin las notas.",
-      "en_publicacion": { "quitar": ["[PENDIENTE: validar la base con el DPD]", "[PENDIENTE: que el DPD confirme que el código de campaña está exento de consentimiento]"] },
-      "como_completar": "web/contenido/legal/privacidad.md y cookies.md, si el DPD cambia algo."
     },
     {
       "id": "privacidad-proveedores",
@@ -431,18 +444,18 @@
       "id": "registro-mercantil",
       "clase": "c",
       "titulo": "Datos del Registro Mercantil",
-      "falta": "Tomo, folio, sección, hoja e inscripción de Aneco AP Consulting, S.L. (B88613492).",
-      "por_que": "LSSI, art. 10.1.b.",
-      "donde": ["/aviso-legal/ (apartado 1)"],
+      "falta": "Tomo, folio, sección, hoja e inscripción de Aneco AP Consulting (B88613492), y si es unipersonal.",
+      "por_que": "LSSI, art. 10.1.b; y la sociedad unipersonal lo hace constar en su documentación y en sus anuncios obligatorios (Ley de Sociedades de Capital, art. 13.2).",
+      "donde": ["/aviso-legal/ (apartado 1)", "/privacidad/ (apartado 1)", "el pie y el formulario (la razón social)"],
       "marcas": [],
       "antes": ["[PENDIENTE: Madrid]", "[PENDIENTE]"],
-      "valor": "Registro Mercantil de Madrid, tomo 40334, folio 7, sección 8.ª, hoja M-716525, inscripción 1.ª",
+      "valor": "«Inscrita en el Registro Mercantil de Madrid, tomo 40334, folio 7, sección 8.ª, hoja M-716525, inscripción 1.ª». Es unipersonal desde su constitución y ningún acto posterior lo cambia: «Aneco AP Consulting, S.L.U. (sociedad limitada unipersonal)».",
       "fuente": [
-        { "que": "BORME, sección primera (actos inscritos), Madrid, núm. 49, 11-03-2020, anuncio 112305: constitución", "url": "https://www.boe.es/borme/dias/2020/03/11/pdfs/BORME-A-2020-49-28.pdf", "dice": "«ANECO AP CONSULTING SL. Constitución. […] Datos registrales. T 40334 , F 7, S 8, H M 716525, I/A 1 ( 4.03.20).»", "consultado": "2026-09-30" },
-        { "que": "BORME, núm. 149, 05-08-2021, anuncio 371652: ampliación de capital", "url": "https://www.boe.es/borme/dias/2021/08/05/pdfs/BORME-A-2021-149-28.pdf", "dice": "«Datos registrales. T 40334 , F 7, S 8, H M 716525, I/A 2 (29.07.21).»", "consultado": "2026-09-30" },
-        { "que": "BORME, núm. 233, 05-12-2025, anuncio 542275: ampliación del objeto social", "url": "https://www.boe.es/borme/dias/2025/12/05/pdfs/BORME-A-2025-233-28.pdf", "dice": "«Datos registrales. S 8 , H M 716525, I/A 3 (29.11.25).»", "consultado": "2026-09-30" }
+        { "que": "BORME, sección primera (actos inscritos), Madrid, núm. 49, 11-03-2020, anuncio 112305: constitución", "url": "https://www.boe.es/borme/dias/2020/03/11/pdfs/BORME-A-2020-49-28.pdf", "dice": "«ANECO AP CONSULTING SL. Constitución. […] Declaración de unipersonalidad. Socio único: […] Datos registrales. T 40334 , F 7, S 8, H M 716525, I/A 1 ( 4.03.20).»", "consultado": "2026-09-30" },
+        { "que": "BORME, núm. 149, 05-08-2021, anuncio 371652: ampliación de capital", "url": "https://www.boe.es/borme/dias/2021/08/05/pdfs/BORME-A-2021-149-28.pdf", "dice": "«Ampliación de capital. […] Datos registrales. T 40334 , F 7, S 8, H M 716525, I/A 2 (29.07.21).» (sin pérdida de la unipersonalidad)", "consultado": "2026-09-30" },
+        { "que": "BORME, núm. 233, 05-12-2025, anuncio 542275: ampliación del objeto social", "url": "https://www.boe.es/borme/dias/2025/12/05/pdfs/BORME-A-2025-233-28.pdf", "dice": "«Modificaciones estatutarias. […] Ampliación del objeto social. […] Datos registrales. S 8 , H M 716525, I/A 3 (29.11.25).» (sin pérdida de la unipersonalidad)", "consultado": "2026-09-30" }
       ],
-      "como_completar": "Hecho: web/contenido/legal/aviso-legal.md y web/datos/sitio.json → titular."
+      "como_completar": "Hecho: web/contenido/legal/aviso-legal.md, web/contenido/legal/privacidad.md y web/datos/sitio.json → titular (razon_social «S.L.U.»). Si la sociedad deja de ser unipersonal, se inscribe en el Registro y se quita la U."
     },
     {
       "id": "domicilio-social",
@@ -490,5 +503,36 @@
       ],
       "como_completar": "Hecho: web/emblemas/ y web/datos/sitio.json → fse.emblema."
     }
-  ]
+  ],
+  "alternativas": {
+    "_leeme": "Lanzar sin las páginas de un imprescindible que tarda. Lo decide la clínica: se pone el id en «aplicar» y «node web/construir.js --publicar» deja fuera esas páginas (y las especialidades que se quedan sin ninguna: fuera de menús, portada, listados y formularios; quien solo trabaja en ellas tampoco sale en /equipo/), pasa sus tratamientos del catálogo a «sin página», aplica sus redacciones (lo que las anunciaba en otras páginas) y manda sus URL viejas a /tratamientos/. Cuando llega lo que faltaba, se quita de «aplicar» y se vuelve a publicar. La vista previa lo enseña todo siempre.",
+    "aplicar": [],
+    "lista": [
+      {
+        "id": "sin-cirugias",
+        "titulo": "sin las cirugías",
+        "resuelve": ["cirugias"],
+        "cuando": "Si la clínica tarda en decir quién opera y dónde.",
+        "especialidades": ["cirugia-estetica", "cirugia-capilar"],
+        "paginas": ["labioplastia"],
+        "redacciones": [
+          { "archivo": "contenido/capilar.json", "buscar": "Te planteas un tratamiento o un injerto y quieres saber si es adecuado para ti.", "cambiar_por": "Te planteas un tratamiento y quieres saber si es adecuado para ti." },
+          { "archivo": "contenido/capilar.json", "buscar": "Puede incluir un tratamiento médico, aparatología capilar, recomendaciones de cuidado o, si tu caso lo permite, un injerto.", "cambiar_por": "Puede incluir un tratamiento médico, aparatología capilar o recomendaciones de cuidado." },
+          { "archivo": "contenido/capilar.json", "buscar": "la fototerapia LED, recomendaciones de cuidado o, si tu caso lo permite, un injerto capilar.", "cambiar_por": "la fototerapia LED, o recomendaciones de cuidado." },
+          { "archivo": "contenido/capilar.json", "buscar": "te explicaremos otras opciones, como el injerto capilar.", "cambiar_por": "te explicaremos otras opciones." },
+          { "archivo": "contenido/capilar.json", "buscar": "te explicamos otras alternativas, como el injerto capilar.", "cambiar_por": "te explicamos otras alternativas." }
+        ],
+        "quitar_preguntas": ["¿Y si ya me he hecho un injerto?"],
+        "se_pierde": "Las páginas de cirugía estética y capilar y la labioplastia, lo que más se busca, hasta que vuelvan; mientras, la web no anuncia ninguna cirugía (ni en la portada, ni en el pie, ni en el equipo)."
+      },
+      {
+        "id": "solo-lo-confirmado",
+        "titulo": "solo con lo confirmado",
+        "resuelve": ["paginas-por-confirmar"],
+        "cuando": "Si la clínica tarda en confirmar lo que ofrece cada página.",
+        "sin_confirmar": true,
+        "se_pierde": "Las páginas que aún tengan preguntas en «confirmar», hasta que se contesten: cada una vuelve en cuanto se contestan las suyas."
+      }
+    ]
+  }
 }

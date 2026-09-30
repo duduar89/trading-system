@@ -111,6 +111,28 @@ function direccion(ctx, { pendienteLocal = false } = {}) {
   return html`${d.calle}, ${d.cp} ${d.municipio} (${d.provincia})${pendienteLocal ? html` ${pendiente(d.pendiente)}` : ''}`;
 }
 
+// ── Lo que hace IEMEC ───────────────────────────────────────────────────────────────────────
+// Según las especialidades publicadas: si la clínica decide lanzar sin las cirugías
+// (lanzamiento.json → alternativas), la web no las nombra ni en la portada ni en el pie.
+// «medicina estética, medicina y cirugía capilar y cirugía estética».
+function lista(partes) {
+  return partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : partes.join('');
+}
+function areas(ctx, { detalle = false } = {}) {
+  const hay = (slug) => ctx.especialidades.some((e) => e.slug === slug);
+  const partes = [];
+  const facial = hay('medicina-estetica-facial');
+  const corporal = hay('medicina-estetica-corporal');
+  if (facial || corporal) partes.push(detalle && facial && corporal ? 'medicina estética facial y corporal' : 'medicina estética');
+  if (hay('medicina-capilar') && hay('cirugia-capilar')) partes.push('medicina y cirugía capilar');
+  else if (hay('medicina-capilar')) partes.push('medicina capilar');
+  else if (hay('cirugia-capilar')) partes.push('cirugía capilar');
+  if (hay('cirugia-estetica')) partes.push('cirugía estética');
+  return lista(partes);
+}
+// La frase de sitio.json, con «{areas}» según lo publicado.
+const frase = (ctx) => ctx.sitio.frase.split('{areas}').join(areas(ctx));
+
 // ── Pie ─────────────────────────────────────────────────────────────────────────────────────
 function pie(ctx) {
   const s = ctx.sitio;
@@ -119,7 +141,7 @@ function pie(ctx) {
 <div class="pie-rejilla">
 <div class="pie-marca">
 ${marca(ctx, { diferida: true })}
-<p>${s.frase}</p>
+<p>${frase(ctx)}</p>
 <ul class="redes">${s.redes.map((r) => html`<li><a href="${r.url}" rel="noopener" aria-label="${r.red} de IEMEC">${icono(r.icono)}</a></li>`)}</ul>
 </div>
 <nav id="menu-pie" aria-label="Especialidades y páginas">
@@ -357,4 +379,5 @@ ${cuerpo}
 module.exports = {
   documento, urlWhatsapp, textoWhatsapp, telHref, imagen, marca, formulario, preguntas, migas, horario, horarioCorto, direccion,
   clinicaLd, INTERES_GENERAL, empezarPagina, gruposInteres, textosFormulario, versionTextos, conWhatsapp, CONFIRMACION_WHATSAPP,
+  areas, frase,
 };

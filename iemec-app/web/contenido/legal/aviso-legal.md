@@ -26,7 +26,7 @@ de comercio electrónico (LSSI), estos son los datos del titular de esta web:
 
 | | |
 |---|---|
-| **Titular** | Aneco AP Consulting, S.L. |
+| **Titular** | Aneco AP Consulting, S.L.U. (sociedad limitada unipersonal) |
 | **Nombre comercial** | Instituto Europeo de Medicina Estética y Capilar (IEMEC) |
 | **NIF** | B88613492 |
 | **Domicilio social** | Calle Morella, 6, 2, Boadilla del Monte (Madrid) |
@@ -55,7 +55,8 @@ de la Comunidad de Madrid.
 
 ## 3. Profesiones sanitarias
 
-La medicina es una profesión regulada. Los médicos de IEMEC están colegiados y sujetos a:
+La medicina y las demás profesiones sanitarias son profesiones reguladas. Los profesionales
+sanitarios de IEMEC están sujetos a:
 
 - la [Ley 44/2003, de ordenación de las profesiones sanitarias](https://www.boe.es/buscar/act.php?id=BOE-A-2003-21340);
 - la [Ley 41/2002, básica reguladora de la autonomía del paciente](https://www.boe.es/buscar/act.php?id=BOE-A-2002-22188);
@@ -63,7 +64,8 @@ La medicina es una profesión regulada. Los médicos de IEMEC están colegiados 
   del Consejo General de Colegios Oficiales de Médicos (2022);
 - los estatutos de su Colegio de Médicos `[PENDIENTE: enlace a los estatutos del colegio de cada médico, p. ej. el de Madrid]`.
 
-Datos de cada profesional (se publican también en la página «Equipo»):
+Título académico oficial, colegio y número de colegiado de cada profesional sanitario que nombra
+esta web (también en la página «Equipo»):
 
 {{profesionales}}
 
@@ -92,7 +94,7 @@ aviso figura al final.
 ## 5. Propiedad intelectual
 
 Los textos, el diseño, el logotipo y las imágenes propias de esta web son de Aneco AP Consulting,
-S.L. o se usan con licencia. Puedes consultarlos e imprimirlos para uso personal; para cualquier
+S.L.U. o se usan con licencia. Puedes consultarlos e imprimirlos para uso personal; para cualquier
 otro uso necesitas nuestra autorización por escrito. Las marcas de terceros, si aparecen, son de sus
 titulares. El emblema de la Unión Europea se usa conforme a las normas de la Comisión Europea para
 los beneficiarios de sus fondos.
@@ -115,7 +117,7 @@ dispositivo: [Política de cookies](./cookies.md).
 > páginas (`web/emblemas/`).
 
 **FSE+ · Fondo Social Europeo Plus · «Cofinanciado por la Unión Europea».** De acuerdo con las
-obligaciones de publicidad de la subvención recibida, informamos de que Aneco AP Consulting, S.L.
+obligaciones de publicidad de la subvención recibida, informamos de que Aneco AP Consulting, S.L.U.
 ha sido beneficiaria de una ayuda destinada a la contratación de una joven trabajadora, para
 fomentar el empleo juvenil y mejorar sus oportunidades de inserción laboral.
 `[PENDIENTE: convocatoria, organismo que concede la ayuda y fecha hasta la que hay que mantener este aviso]`

@@ -5,10 +5,6 @@
   var d = document;
   var raiz = d.documentElement;
 
-  // ── Almacenamiento de sesión (puede fallar: modo privado, cookies bloqueadas…) ──────────────
-  function leer(clave) { try { return window.sessionStorage.getItem(clave); } catch (e) { return null; } }
-  function guardar(clave, valor) { try { window.sessionStorage.setItem(clave, valor); } catch (e) { /* sin almacenamiento */ } }
-
   // Huella FNV-1a de 32 bits en base 36: la misma que web/lib/modelo.js.
   function huella(s) {
     var h = 0x811c9dc5;
@@ -29,19 +25,17 @@
     } catch (e) { /* mapa roto: se queda en la página */ }
   })();
 
-  // ── Campaña: los utm_* de la visita (sin identificadores de clic de Google ni de Meta) ──────
+  // ── Campaña: los utm_* de la página a la que se llega (sin identificadores de clic de Google ni
+  // de Meta). Solo los de la dirección de esta página: no se guardan en el navegador (ni cookies ni
+  // almacenamiento), así que no hace falta consentimiento; si se pasa a otra página, se pierden.
   var CAMPOS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
   var campana = {};
   (function () {
-    var guardada = leer('iemec-campana');
-    if (guardada) { try { campana = JSON.parse(guardada) || {}; } catch (e) { campana = {}; } }
     var q = new URLSearchParams(location.search);
-    var nueva = false;
     CAMPOS.forEach(function (c) {
       var v = q.get(c);
-      if (v) { campana[c] = v.slice(0, 120); nueva = true; }
+      if (v) campana[c] = v.slice(0, 120);
     });
-    if (nueva) guardar('iemec-campana', JSON.stringify(campana));
   })();
   var codigoCampana = String(campana.utm_campaign || '').trim().toLowerCase().slice(0, 120);
 

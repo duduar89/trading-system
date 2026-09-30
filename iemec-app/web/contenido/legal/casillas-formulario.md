@@ -50,7 +50,7 @@ Encima del botón de enviar, siempre visible (no desplegable), con este título 
 
 | | |
 |---|---|
-| **Responsable** | Aneco AP Consulting, S.L. (IEMEC). |
+| **Responsable** | Aneco AP Consulting, S.L.U. (IEMEC). |
 | **Finalidad** | Contestar a tu solicitud y darte cita por el medio que elijas. Si marcas la segunda casilla, enviarte comunicaciones comerciales. |
 | **Legitimación** | Tu solicitud, y tu consentimiento explícito para el dato de salud que pueda revelar el tratamiento que te interesa. Para las comunicaciones comerciales, tu consentimiento. |
 | **Destinatarios** | El proveedor de la app de gestión de la clínica, como encargado del tratamiento, y WhatsApp (Meta) si eliges que te escribamos por WhatsApp, con posible transferencia a EE. UU. amparada en el Marco de Privacidad de Datos UE-EE. UU. No se ceden a nadie más salvo obligación legal. |
@@ -137,7 +137,7 @@ demostrar el consentimiento):
 | `canal_preferido` | `whatsapp` · `llamada` · `correo` |
 | `consentimiento_datos` | `true` (sin él no se envía) |
 | `consentimiento_comercial` | `true` / `false` |
-| `version_clausula` | la fecha que fije el DPD y una huella de los textos exactos de la primera capa y de las dos casillas: `2026-09-30.ab7f30d1` (cambia sola si cambia una coma) |
+| `version_clausula` | la fecha que fije el DPD y una huella de los textos exactos de la primera capa y de las dos casillas, p. ej. `2026-09-30.6b47d690` en la vista previa de hoy (cambia sola si cambia una coma: con el correo propio, la publicada será otra). La misma sale en `/privacidad/` |
 | `fecha_consentimiento` | fecha y hora del envío |
 | `id_externo` | identificador único del envío (para no duplicar si se reintenta) |
 

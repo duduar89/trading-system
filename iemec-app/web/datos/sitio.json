@@ -6,9 +6,11 @@
   "actualizado": "2026-09-30",
   "nombre": "Instituto Europeo de Medicina Estética y Capilar",
   "nombre_corto": "IEMEC",
-  "frase": "IEMEC es un centro sanitario de medicina estética, cirugía estética y medicina capilar en Boadilla del Monte: te valoramos antes de proponerte nada y te acompañamos en cada paso.",
+  "frase": "IEMEC es un centro sanitario de {areas} en Boadilla del Monte: te valoramos antes de proponerte nada y te acompañamos en cada paso.",
+  "_frase": "{areas} lo pone el generador con las especialidades publicadas (web/lib/base.js · areas()): si se lanza sin las cirugías, no las nombra.",
   "titular": {
-    "razon_social": "Aneco AP Consulting, S.L.",
+    "razon_social": "Aneco AP Consulting, S.L.U.",
+    "_razon_social": "S.L.U.: la sociedad es unipersonal (BORME núm. 49, 11-03-2020, anuncio 112305: «Declaración de unipersonalidad»; ningún acto posterior la pierde) y lo tiene que decir en su documentación y en los anuncios obligatorios (Ley de Sociedades de Capital, art. 13.2). Si deja de serlo, se inscribe y se quita la U.",
     "nif": "B88613492",
     "domicilio_social": "Calle Morella, 6, 2, Boadilla del Monte (Madrid)",
     "registro_mercantil": "Registro Mercantil de Madrid, tomo 40334, folio 7, sección 8.ª, hoja M-716525, inscripción 1.ª",
@@ -111,7 +113,7 @@
   },
   "fse": {
     "titulo": "FSE+ · Fondo Social Europeo Plus · «Cofinanciado por la Unión Europea».",
-    "texto": "De acuerdo con las obligaciones de publicidad de la subvención recibida, informamos de que Aneco AP Consulting, S.L. ha sido beneficiaria de una ayuda destinada a la contratación de una joven trabajadora, para fomentar el empleo juvenil y mejorar sus oportunidades de inserción laboral.",
+    "texto": "De acuerdo con las obligaciones de publicidad de la subvención recibida, informamos de que Aneco AP Consulting, S.L.U. ha sido beneficiaria de una ayuda destinada a la contratación de una joven trabajadora, para fomentar el empleo juvenil y mejorar sus oportunidades de inserción laboral.",
     "emblema": {
       "archivo": "emblemas/cofinanciado-por-la-union-europea.png",
       "alt": "Cofinanciado por la Unión Europea",

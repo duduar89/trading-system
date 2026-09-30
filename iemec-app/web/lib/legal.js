@@ -39,26 +39,27 @@ function datosProfesionales(p) {
 
 const celda = (s) => String(s).replace(/\|/g, '/');
 
-// La tabla del aviso legal (apartado 3), solo con quien sale en la web.
+// ¿Constan los datos de colegiación de quien se nombra en la web? LSSI, art. 10.1.d: título académico
+// oficial, colegio y número de colegiado y, si el título es de otro país, el Estado que lo expidió y su
+// homologación o reconocimiento («titulo_extranjero»; false si es español). Con «colegiado: false» la
+// persona no ejerce una profesión sanitaria regulada y no le aplica. Sin ellos no se publica
+// (lanzamiento.json → colegiacion): se dan o esa persona no se nombra.
+function colegiacionCompleta(p) {
+  if (p.colegiado === false) return true;
+  return tiene(p.colegiado) && tiene(p.colegio) && tiene(p.titulo) && (p.titulo_extranjero === false || tiene(p.titulo_extranjero));
+}
+
+// La tabla del aviso legal (apartado 3): quien sale en la web y ejerce una profesión sanitaria
+// regulada, con sus datos. En la vista previa, lo que falta sale como hueco; al publicar, cada fila va
+// completa (si no, --publicar no deja publicar) y la especialidad que no consta no se afirma.
 function tablaProfesionales(personas, { publicar = false } = {}) {
-  if (!publicar) {
-    const valor = (v, falta) => (v === false ? '—' : tiene(v) ? celda(v) : hueco(falta));
-    const filas = personas.map((p) => `| ${celda(p.nombre)} | ${valor(p.titulo, 'título académico oficial')} | ${valor(p.especialidad, 'especialidad oficial, si la tiene')} | ${tiene(p.colegiado) ? celda(`${tiene(p.colegio) ? `${p.colegio}, ` : ''}n.º ${p.colegiado}`) : hueco('colegio y n.º de colegiado')} | ${valor(p.titulo_extranjero, 'si el título es de otro país, Estado y homologación')} |`);
-    filas.push(`| ${hueco('enfermería y resto del equipo sanitario')} | | | | |`);
-    return ['| Profesional | Título académico oficial | Especialidad oficial | Colegio y n.º de colegiado | Estado que expidió el título y, en su caso, homologación |', '|---|---|---|---|---|', ...filas].join('\n');
-  }
-  // Publicada: nombre y área de cada persona y, si constan, sus datos; si falta alguno, se dan a
-  // quien los pida (lanzamiento.json → equipo).
-  const conDatos = personas.filter((p) => datosProfesionales(p));
-  const faltan = personas.some((p) => p.colegiado === null || p.colegiado === undefined);
-  const otros = (p) => (p.colegiado === false ? '—' : 'Te los damos si nos los pides');
-  const filas = conDatos.length
-    ? ['| Profesional | Área | Título, especialidad y colegiación |', '|---|---|---|', ...personas.map((p) => `| ${celda(p.nombre)} | ${celda(p.cargo)} | ${celda(datosProfesionales(p) || otros(p))} |`)]
-    : ['| Profesional | Área |', '|---|---|', ...personas.map((p) => `| ${celda(p.nombre)} | ${celda(p.cargo)} |`)];
-  const nota = faltan
-    ? '\n\nEl título académico oficial, la especialidad, el colegio y el número de colegiado de cada profesional (y, si su título es de otro país, el Estado que lo expidió y su homologación o reconocimiento en España) te los damos si nos los pides, en la clínica o por correo.'
-    : '';
-  return filas.join('\n') + nota;
+  const reguladas = personas.filter((p) => p.colegiado !== false);
+  const valor = (v, falta, siFalse = '—') => (v === false ? siFalse : tiene(v) ? celda(v) : publicar ? '—' : hueco(falta));
+  const colegiacion = (p) => (tiene(p.colegiado) ? celda(`${tiene(p.colegio) ? `${p.colegio}, ` : ''}n.º de colegiado ${p.colegiado}`) : publicar ? '—' : hueco('colegio y n.º de colegiado'));
+  const filas = reguladas.map((p) => `| ${celda(p.nombre)} | ${valor(p.titulo, 'título académico oficial')} | ${valor(p.especialidad, 'especialidad oficial, si la tiene')} | ${colegiacion(p)} | ${valor(p.titulo_extranjero, 'si el título es de otro país, Estado y homologación', 'España')} |`);
+  if (!publicar) filas.push(`| ${hueco('enfermería y resto del equipo sanitario')} | | | | |`);
+  if (!filas.length) return '';
+  return ['| Profesional | Título académico oficial | Especialidad oficial | Colegio y n.º de colegiado | Estado que expidió el título y, en su caso, homologación |', '|---|---|---|---|---|', ...filas].join('\n');
 }
 
 // «Responsable asistencial (dirección médica): …» (equipo.json → responsable).
@@ -104,4 +105,4 @@ function rellenarLegal(md, datos, opciones = {}) {
     .replace(/\{\{([a-z_]+)\}\}/g, (m, k) => (k in v ? v[k] : m));
 }
 
-module.exports = { rellenarLegal, tablaProfesionales, lineaResponsable, responsable, quienEs, datosProfesionales, fechaLarga, esFecha, tiene };
+module.exports = { rellenarLegal, tablaProfesionales, lineaResponsable, responsable, quienEs, datosProfesionales, colegiacionCompleta, fechaLarga, esFecha, tiene };

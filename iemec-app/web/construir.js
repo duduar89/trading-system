@@ -29,7 +29,8 @@ const P = require('./lib/paginas');
 const { htaccess } = require('./lib/htaccess');
 const R = require('./lib/revision');
 const { avisosEn } = require('./lib/normas');
-const { rellenarLegal } = require('./lib/legal');
+const L = require('./lib/legal');
+const { rellenarLegal } = L;
 const LZ = require('./lib/lanzamiento');
 const { crearZip } = require('./lib/zip');
 
@@ -97,10 +98,13 @@ function construir(opciones = {}) {
   const rutaTextos = opciones.textos !== undefined ? opciones.textos : (opciones.salida || borradores ? null : path.join(RAIZ, 'semillas', 'iemec', 'textos-formulario.json'));
   const datos = cargarDatos({ borradores });
   if (opciones.ajustarDatos) opciones.ajustarDatos(datos); // solo para las pruebas
-  // Al publicar, lo que puede esperar (clase «b») sale con su redacción neutra.
+  // Al publicar: primero las alternativas que haya decidido la clínica (lanzar sin unas páginas) y
+  // después lo que puede esperar (clase «b»), con su redacción neutra.
+  const alternativas = publicar ? LZ.aplicarAlternativas(datos, datos.lanzamiento) : [];
   const redacciones = publicar ? LZ.aplicarRedacciones(datos, datos.lanzamiento) : [];
   const modelo = construirModelo(datos);
   const { sitio, normas } = datos;
+  const datoDe = LZ.clasificador(datos.lanzamiento);
 
   fs.rmSync(salida, { recursive: true, force: true });
   fs.mkdirSync(salida, { recursive: true });
@@ -156,11 +160,13 @@ function construir(opciones = {}) {
   const rutaEmblema = sitio.fse && sitio.fse.emblema ? path.join(WEB, sitio.fse.emblema.archivo) : null;
   const emblema = rutaEmblema && fs.existsSync(rutaEmblema) ? conHuella('recursos', path.basename(rutaEmblema), fs.readFileSync(rutaEmblema)) : null;
 
-  // Equipo visible y tecnología publicada.
+  // Equipo visible y tecnología publicada. Quien solo trabaja en especialidades sin páginas publicadas
+  // no sale (sería anunciarlas).
   const conPagina = new Set(modelo.paginas.flatMap((p) => p.ids));
   const espPublicadas = new Set(modelo.publicadas.map((e) => e.slug));
   const equipoVisible = datos.equipo.personas.filter((p) => (!p.requiere_especialidad || espPublicadas.has(p.requiere_especialidad))
-    && (!p.requiere_catalogo || p.requiere_catalogo.some((id) => conPagina.has(id))));
+    && (!p.requiere_catalogo || p.requiere_catalogo.some((id) => conPagina.has(id)))
+    && (!p.areas || !p.areas.length || p.areas.some((a) => espPublicadas.has(a))));
   const aparatosUsados = new Set(modelo.paginas.flatMap((p) => p.ids).map((id) => modelo.porId.get(id)?.equipo_codigo).filter(Boolean));
   const tecnologia = datos.tecnologia.aparatos.filter((a) => aparatosUsados.has(a.codigo));
 
@@ -169,6 +175,8 @@ function construir(opciones = {}) {
     especialidades: modelo.publicadas,
     preocupaciones: modelo.preocupaciones,
     equipoVisible, tecnologia, og,
+    // ¿Es de un dato imprescindible esta marca? (entonces se ve también al publicar, y lo para).
+    imprescindible: (hueco) => { const d = datoDe(`[PENDIENTE: ${hueco}]`); return !!d && d.clase === 'a'; },
     recursos: { css: conHuella('recursos', 'estilos.css', Buffer.from(css)), js: conHuella('recursos', 'web.js', js), favicon: conHuella('recursos', 'icono.svg', Buffer.from(FAVICON)), apple, emblema },
     fuentes: { precarga: fuentes.filter((f) => f.precarga).map((f) => f.url) },
     foto: (clave) => {
@@ -191,7 +199,7 @@ function construir(opciones = {}) {
   const legales = [
     { ruta: '/aviso-legal/', titulo: 'Aviso legal', tituloSeo: 'Aviso legal · IEMEC', descripcion: 'Aviso legal de IEMEC: titular, datos de contacto, autorización sanitaria CS17886, profesiones sanitarias, uso de la web y ayudas públicas.', md: textoLegal(avisoMd, { quitar: [/^Anexo/] }) },
     { ruta: '/privacidad/', titulo: 'Política de privacidad', tituloSeo: 'Política de privacidad · IEMEC', descripcion: 'Cómo trata IEMEC tus datos: responsable, finalidades, bases legales, plazos, destinatarios, transferencias y cómo ejercer tus derechos.', md: textoLegal(leerLegal('privacidad.md'), { quitar: [/no se publican/i] }) },
-    { ruta: '/cookies/', titulo: 'Política de cookies', tituloSeo: 'Política de cookies · IEMEC', descripcion: 'Esta web no usa cookies de analítica, de publicidad ni de redes sociales, y no necesita tu consentimiento. Qué guarda y cómo borrarlo.', md: textoLegal(leerLegal('cookies.md'), { quitar: [/^Variante B/i], desenvolver: /^Variante A/i }) },
+    { ruta: '/cookies/', titulo: 'Política de cookies', tituloSeo: 'Política de cookies · IEMEC', descripcion: 'La web de IEMEC no usa cookies ni guarda nada en tu dispositivo, y no necesita tu consentimiento. Qué pasa con el código de campaña y los enlaces.', md: textoLegal(leerLegal('cookies.md'), { quitar: [/^Variante B/i], desenvolver: /^Variante A/i }) },
     { ruta: '/accesibilidad/', titulo: 'Accesibilidad', tituloSeo: 'Accesibilidad · IEMEC', descripcion: 'Cómo hemos hecho accesible la web de IEMEC (pautas WCAG 2.2, nivel AA) y cómo avisarnos si encuentras alguna barrera.', md: anexoAcc ? anexoAcc.md.replace(/^##\s+.*\n/, '').replace(/^\s*\*\*Accesibilidad\.\*\*\s*/, '') : '' },
   ];
 
@@ -250,8 +258,12 @@ function construir(opciones = {}) {
   const marcas = paginas.map((p) => ({ ruta: p.ruta, lista: R.textoVisible(p.html).match(/\[PENDIENTE[^\]]*\]/g) || [] })).filter((x) => x.lista.length);
   const porTexto = new Map();
   for (const x of marcas) for (const m of x.lista) { if (!porTexto.has(m)) porTexto.set(m, new Set()); porTexto.get(m).add(x.ruta); }
-  const lanzamiento = LZ.estado(datos.lanzamiento, { marcas, obligatoriasPendientes: pendientesObligatorios, publicar });
-  const datoDe = LZ.clasificador(datos.lanzamiento);
+  // Y lo que falta según los datos: lo que la clínica tiene que confirmar de cada página publicada
+  // («confirmar» de web/contenido/*.json) y la colegiación de quien se nombra en la web.
+  const faltas = [];
+  for (const p of modelo.paginas) for (const c of p.confirmar || []) faltas.push({ comprobacion: 'confirmar_paginas', ruta: p.ruta, que: c.que, tipo: c.tipo });
+  for (const p of equipoVisible) if (!L.colegiacionCompleta(p)) faltas.push({ comprobacion: 'colegiacion', ruta: '/equipo/', que: p.nombre });
+  const lanzamiento = LZ.estado(datos.lanzamiento, { marcas, obligatoriasPendientes: pendientesObligatorios, faltas, publicar });
   if (publicar) {
     // Lo imprescindible que falta, una vez por dato (con cuántas páginas y dónde se pone).
     for (const i of lanzamiento.imprescindibles) errores.push({ tipo: 'imprescindible', ...i });
@@ -325,6 +337,10 @@ function construir(opciones = {}) {
     unidos: modelo.paginas.filter((p) => p.unidos).map((p) => ({ ruta: p.ruta, ids: p.unidos })),
     contenido_pendiente: modelo.paginas.filter((p) => p.origen !== 'provisional' && p.pendiente && p.pendiente.length).map((p) => ({ ruta: p.ruta, pendiente: p.pendiente })),
     revision_medica: modelo.paginas.filter((p) => p.revision_medica).map((p) => p.ruta),
+    // Lo que revisa el abogado sanitario con el DPD para su visto bueno, además de los textos legales:
+    // las condiciones de las tarjetas regalo y las páginas de publicidad sanitaria más delicada (las de
+    // publicidad restringida, la estética íntima y lo capilar).
+    revision_legal: [...rutasLegales, '/tarjetas-regalo/', ...modelo.paginas.filter((p) => p.restringida || p.sensible || /capilar/.test(p.especialidad)).map((p) => p.ruta)],
     pendientes_visibles: marcas.map((x) => ({ ruta: x.ruta, n: x.lista.length })),
     pendientes_textos: [...porTexto].map(([texto, rutas]) => {
       const d = datoDe(texto);
@@ -340,7 +356,9 @@ function construir(opciones = {}) {
       datos: lanzamiento.resumen,
       sin_clasificar: lanzamiento.sin_clasificar,
       vistos_buenos: datos.lanzamiento.vistos_buenos,
-      redacciones: redacciones.map((r) => ({ dato: r.dato, ...(r.archivo ? { archivo: r.archivo } : { quitar: r.quitar }), veces: r.veces })),
+      // Las alternativas aplicadas (lanzar sin unas páginas) y lo que dejan fuera.
+      alternativas: alternativas.map((a) => ({ alternativa: a.alternativa, paginas: a.paginas, redacciones: a.redacciones.map((r) => ({ ...(r.archivo ? { archivo: r.archivo } : { quitar_pregunta: r.quitar_pregunta }), veces: r.veces })) })),
+      redacciones: redacciones.map((r) => ({ dato: r.dato, ...(r.archivo ? { archivo: r.archivo } : r.quitar_pregunta ? { quitar_pregunta: r.quitar_pregunta } : { quitar: r.quitar }), veces: r.veces })),
     },
     redirecciones: red.reglas.map((r) => ({ desde: r.desde, hacia: r.hacia, motivo: r.motivo })),
     anclas: red.anclas,
@@ -389,6 +407,10 @@ function explicarImprescindibles(inf) {
     imp.forEach((e, i) => {
       lineas.push(`  ${i + 1}. ${e.titulo} · ${e.responsable}${e.paginas ? ` · ${e.paginas} ${e.paginas === 1 ? 'página' : 'páginas'} (p. ej. ${e.ejemplo})` : ''}`);
       lineas.push(`     Falta: ${e.falta}`);
+      if (e.detalle && e.detalle.length) {
+        const vistos = [...new Set(e.detalle.map((d) => (d.que.length > 90 ? `${d.que.slice(0, 89)}…` : d.que)))];
+        lineas.push(`     Qué (${e.detalle.length}): ${vistos.slice(0, 3).join(' · ')}${vistos.length > 3 ? ` · y ${vistos.length - 3} más (informe.json)` : ''}`);
+      }
       lineas.push(`     Se pone en: ${e.como_completar}`);
     });
     lineas.push('  Qué pedir y a quién: docs/LANZAR-WEB.md · detalle: informe.json → lanzamiento.');

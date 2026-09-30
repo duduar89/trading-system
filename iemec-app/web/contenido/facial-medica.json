@@ -616,8 +616,13 @@
     "https://iemec-clinic.com/blog/puedo-dormir-boca-abajo-despues-de-ponerme-acido-hialuronico-o-toxina-botulinica",
     "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis el relleno de mentón y el de la línea de la mandíbula? No tienen ficha en la web actual: salen en el blog y en Multiestetica."
+    }
+   ],
    "pendiente": [
-    "Mentón y mandíbula no tienen ficha en la web actual: salen como zonas en el blog y con ficha propia en Multiestetica («Aumento mentón», «Marcación mandibular»). Confirmar que se ofrecen.",
     "Duración (40 minutos pómulos y mandíbula, 30 el mentón, datos del sector) y si se usa crema anestésica (el blog habla de anestesia tópica; el catálogo no la marca): confirmar.",
     "Duración del efecto en mentón y mandíbula: el catálogo propone repetir a los 9 meses (dato del blog); confirmar antes de publicarla.",
     "Surcos nasogenianos: si la clínica confirma que lo ofrece, puede entrar aquí como variante (ver sin_pagina).",
@@ -764,10 +769,15 @@
     "https://iemec-clinic.com/blog/que-beneficios-tiene-el-relleno-de-pomulos-con-acido-hialuronico",
     "https://iemec-clinic.com/blog/cuales-son-los-riesgos-o-efectos-secundarios-del-relleno-de-pomulos-con-acido-hialuronico"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis la corrección de rellenos, también de los hechos en otros centros, y cuánto dura la consulta? No tiene ficha en la web actual (solo el blog y Multiestetica)."
+    }
+   ],
    "pendiente": [
     "Medicamento de receta (id hialuronidasa): no se nombra ni se describe cómo actúa (normas.md, anexo B: «Corrección de rellenos previos»). El id del catálogo lo nombra: la referencia del botón de WhatsApp debe usar un código neutro.",
     "Multiestetica lo anuncia hoy con el nombre del medicamento y con precio, y las entradas del blog sobre pómulos lo nombran: retirarlo o reescribirlo.",
-    "No tiene ficha en la web actual (solo blog y Multiestetica): confirmar que se ofrece, también para rellenos hechos en otros centros, y la duración de la consulta.",
     "Revisión médica de la respuesta sobre síntomas de alarma y de cómo contactar con la clínica si hay una complicación."
    ]
   },
@@ -857,9 +867,14 @@
     "https://iemec-clinic.com/blog/como-mejora-el-laser-fotona-la-firmeza-de-la-piel-sin-cirugia",
     "https://iemec-clinic.com/blog/que-esperar-despues-de-un-relleno-de-pomulos-con-acido-hialuronico"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "Redensificación: ¿qué producto se usa y cuál es su régimen legal? Si no es un bioestimulador, necesita su propia página."
+    }
+   ],
    "pendiente": [
     "Producto sanitario de uso profesional: sin marcas y sin el material en títulos, entradilla ni descripción SEO; el material solo aparece como dato en el cuerpo del texto. La web actual enseña marcas en /marcas y en el texto alternativo de la foto («Karisma y Radiesse»), y /portafolio («RADIESSE + ÁCIDO HIALURÓNICO»): nada de eso se migra.",
-    "Redensificación: régimen legal sin confirmar; confirmar qué producto se usa. Si no fuera un bioestimulador, necesitaría su propia página.",
     "Duración (60 minutos, dato del sector; la redensificación, 45 minutos estimados) e intervalos entre sesiones (unas 6 y 3 semanas en el catálogo): confirmar.",
     "El blog nombra los materiales (hidroxiapatita cálcica, policaprolactona): aquí no se nombran; si se quiere, solo como dato en el cuerpo del texto.",
     "El WhatsApp actual dice «inductor colageno pomulos»: confirmar si el servicio se centra en los pómulos."
@@ -1049,8 +1064,13 @@
     "https://iemec-clinic.com/blog/que-es-la-mesoterapia-facial-y-por-que-es-ideal-para-preparar-tu-piel-antes-del-verano",
     "https://iemec-clinic.com/blog/como-conseguir-una-piel-radiante-antes-del-verano-tratamientos-faciales-rapidos-y-efectivos"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿Qué lleva el cóctel de la mesoterapia facial y de papada? Si lleva un medicamento o una fórmula magistral (un lipolítico, por ejemplo), no se puede anunciar."
+    }
+   ],
    "pendiente": [
-    "Composición del cóctel (en la papada la web no la publica): confirmar. Si llevara algún medicamento o fórmula magistral, como un lipolítico, no podría anunciarse (normas.md, apartado b).",
     "La mesoterapia de papada se presenta aquí como tratamiento de la calidad de la piel, no para reducir grasa: confirmar.",
     "Duración (20 y 30 minutos, datos del sector) y pauta de la papada (4 sesiones semanales en el catálogo): confirmar.",
     "La web dice que también se aplica en el cuerpo: la mesoterapia corporal está en otro grupo.",
@@ -1137,9 +1157,14 @@
     "https://iemec-clinic.com/facial#plasma-rico-en-plaquetas-prp",
     "https://iemec-clinic.com/facial#plasma-rico-en-plaquetas-prp-cuello"
    ],
+   "confirmar": [
+    {
+     "tipo": "autorizacion",
+     "que": "¿Habéis comunicado a la Comunidad de Madrid el uso del plasma del propio paciente, como exige la AEMPS? Sin eso, este tratamiento no se anuncia."
+    }
+   ],
    "pendiente": [
     "Medicamento de receta (ids prp-facial y prp-cuello-escote): la página no lo nombra ni describe cómo se obtiene o se prepara, porque sería una referencia indirecta (normas.md, apartado b y anexo B; resolución de la AEMPS de 2013). Los ids y los mensajes de WhatsApp actuales («PRP pomulos», «PRP cuello y escote») lo nombran: el botón debe llevar un código neutro.",
-    "Confirmar que la clínica ha comunicado a la Comunidad de Madrid el uso de este tratamiento, como exige la normativa (normas.md, apartado b).",
     "Número de sesiones, intervalo y duración (datos del sector: 3 sesiones, una al mes, y unos 75 minutos): confirmar si se quieren concretar.",
     "El blog lo cita como combinable con Pure Glow Up: reescribir esas entradas sin nombrarlo."
    ]
@@ -1210,8 +1235,13 @@
     "https://iemec-clinic.com/blog/como-mejora-el-laser-fotona-la-firmeza-de-la-piel-sin-cirugia",
     "https://iemec-clinic.com/blog/como-actua-el-laser-fotona-en-la-flacidez-del-cuello-y-escote"
    ],
+   "confirmar": [
+    {
+     "tipo": "oferta",
+     "que": "¿Ofrecéis los hilos tensores, y en qué zonas? La web actual no tiene ficha: salen en el blog, en las fichas del equipo y en Multiestetica."
+    }
+   ],
    "pendiente": [
-    "La web actual no tiene ficha de hilos: salen en el blog (como combinables con el láser), en las fichas del equipo y en Multiestetica, con valoración médica previa. Confirmar que se ofrecen y en qué zonas.",
     "Duración (60 minutos, dato del sector), anestesia, recuperación y cuánto se mantiene el efecto: no publicados; confirmar.",
     "Producto sanitario de uso profesional: sin marcas ni material de los hilos."
    ]
@@ -1280,9 +1310,14 @@
    "fuentes": [
     "https://iemec-clinic.com/facial#natulift"
    ],
+   "confirmar": [
+    {
+     "tipo": "producto",
+     "que": "¿Qué es (técnica, aparato y producto) y cuál es su régimen legal? Si es un tratamiento médico o usa un producto sanitario, cambian quién lo hace y los textos."
+    }
+   ],
    "pendiente": [
     "El servicio se llama hoy «Natulift» y puede ser un nombre comercial (no consta como marca en una búsqueda rápida): aquí va con un nombre descriptivo. Decidir el nombre.",
-    "La web no explica la técnica, el aparato ni el producto, y el régimen legal está sin confirmar: explicar qué es antes de publicar. Si fuera un tratamiento médico o usara un producto sanitario, cambiarían el profesional y los textos.",
     "Duración (60 minutos, estimada), número de sesiones y zonas: confirmar. El catálogo indica esteticista.",
     "El mensaje de WhatsApp actual dice «naturlift» (errata)."
    ]

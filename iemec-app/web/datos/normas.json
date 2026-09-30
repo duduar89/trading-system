@@ -1,5 +1,5 @@
 {
-  "_leeme": "Normas legales para el contenido de la web nueva de IEMEC. Patrones de expresión regular válidos en JavaScript (flag i, sin u) y en Python (re.I). Se usan sin distinguir mayúsculas. Explicación de cada regla, fuentes y alternativas: normas.md. Generado el 30-09-2026; revisión jurídica pendiente (abogado sanitario y DPD). Ampliado en la revisión final de la vuelta 9 (nota de Google, EvoSculpt y «4D», «hiperbárica» y enfermedades de la piel).",
+  "_leeme": "Normas legales para el contenido de la web nueva de IEMEC. Patrones de expresión regular válidos en JavaScript (flag i, sin u) y en Python (re.I). Se usan sin distinguir mayúsculas. Explicación de cada regla, fuentes y alternativas: normas.md. Generado el 30-09-2026; revisión jurídica pendiente (abogado sanitario y DPD). Ampliado en la revisión final de la vuelta 9 (nota de Google, EvoSculpt y «4D», «hiperbárica» y enfermedades de la piel). Antes de lanzar (vuelta 9), el colegiado del aviso legal pasa a exigir el número.",
   "_version": "2026-09-30",
   "prohibidas": [
     {
@@ -456,8 +456,8 @@
     },
     {
       "donde": "aviso_legal",
-      "texto_o_patron": "colegiad[oa]",
-      "motivo": "Profesión regulada: colegio y número de colegiado de cada médico (LSSI, art. 10.1.d.1; CDM 2022, art. 90) [PENDIENTE]."
+      "texto_o_patron": "n\\.?\\s?º\\s+de\\s+colegiad[oa]\\s+[0-9]",
+      "motivo": "Profesión regulada: colegio y número de colegiado de cada profesional sanitario que nombra la web, con el número de verdad, no solo la palabra (LSSI, art. 10.1.d.1; CDM 2022, art. 90). Imprescindible para publicar (lanzamiento.json → colegiacion)."
     },
     {
       "donde": "aviso_legal",

@@ -5,6 +5,7 @@ const { html, crudo, texto, pendiente } = require('./html');
 const { icono } = require('./iconos');
 const B = require('./base');
 const L = require('./legal');
+const { TIPOS_CONFIRMAR } = require('./lanzamiento');
 
 const recortar = (s, n) => {
   const t = String(s || '').trim();
@@ -13,6 +14,7 @@ const recortar = (s, n) => {
   return `${corte.slice(0, Math.max(corte.lastIndexOf(' '), n - 20)).replace(/[,;:.\s]+$/, '')}…`;
 };
 const minusculaInicial = (s) => s.charAt(0).toLowerCase() + s.slice(1);
+const mayusculaInicial = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // Título ≤ 65 caracteres y descripción entre 70 y 160.
 function tituloSeo(base, extra = ' · IEMEC Boadilla del Monte') {
@@ -99,7 +101,7 @@ function inicio(ctx) {
 <div>
 <p class="etiqueta">Boadilla del Monte · Madrid</p>
 <h1 id="titulo-portada">Medicina estética y capilar <em>en Boadilla del Monte</em></h1>
-<p class="lema">${s.frase}</p>
+<p class="lema">${B.frase(ctx)}</p>
 <div class="acciones">${botonWhatsapp(wa)}<a class="boton boton-claro" href="/tratamientos/">Ver tratamientos</a></div>
 <p class="sello">${icono('escudo')}${s.registro_sanitario.texto_corto}</p>
 </div>
@@ -128,7 +130,7 @@ ${recepcion ? html`<figure class="portada-foto"><div class="marco-dorado">${B.im
 <div class="titulo-seccion">
 <p class="etiqueta">Especialidades</p>
 <h2 id="t-especialidades">Todo lo que hacemos, <em>en un mismo lugar</em></h2>
-<p class="entrada">Medicina estética, medicina y cirugía capilar y cirugía estética, cada una con su equipo.</p>
+<p class="entrada">${mayusculaInicial(B.areas(ctx))}, cada una con su equipo.</p>
 </div>
 <div class="rejilla rejilla-4">${ctx.especialidades.map((e) => tarjetaEspecialidad(e))}
 <article class="tarjeta tarjeta-especialidad tarjeta-todas">
@@ -170,7 +172,7 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
   return {
     ruta: '/', tipo: 'inicio', whatsapp: wa, ref: 'web-inicio',
     titulo: 'IEMEC · Medicina estética y capilar en Boadilla del Monte',
-    descripcion: 'Instituto Europeo de Medicina Estética y Capilar en Boadilla del Monte: medicina estética facial y corporal, medicina y cirugía capilar y cirugía estética.',
+    descripcion: descripcionSeo(`Instituto Europeo de Medicina Estética y Capilar en Boadilla del Monte: ${B.areas(ctx, { detalle: true })}.`),
     cuerpo,
   };
 }
@@ -214,7 +216,9 @@ function especialidad(ctx, e) {
   const preguntasEsp = html`<div class="preguntas-especialidad"><h2 class="solo-lector">Preguntas frecuentes</h2>${B.preguntas(e.preguntas)}</div>`;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: 'Especialidad', titulo: e.titulo, entradilla: e.entradilla, adorno: e.slug,
-    extra: e.pendiente && !ctx.publicar ? html`<p class="entrada">${pendiente(e.pendiente)}</p>` : '',
+    // La nota de la especialidad: en la vista previa y, si es de un dato imprescindible (qué cubre la
+    // autorización), también al publicar, para que --publicar no deje publicar sin ella.
+    extra: e.pendiente && (!ctx.publicar || ctx.imprescindible(e.pendiente)) ? html`<p class="entrada">${pendiente(e.pendiente)}</p>` : '',
     acciones: html`${botonWhatsapp(wa)}<a class="boton boton-claro" href="#tratamientos">${e.paginas.length === 1 ? 'Ver el tratamiento' : 'Ver los tratamientos'}</a>`,
   })}
 <section class="seccion" id="tratamientos" aria-labelledby="t-lista">
@@ -296,6 +300,20 @@ function aviso(ctx, p, e) {
   return '';
 }
 
+// En la vista previa, lo que falta de cada página, para quien la revisa (el médico, el abogado y la
+// clínica): lo que hay que confirmar antes de publicarla (web/contenido/*.json → «confirmar»:
+// imprescindible, lanzamiento.json → paginas-por-confirmar) y las notas de redacción («pendiente»). No
+// se publica nunca y no cuenta como texto de la página (web/lib/revision.js · textoVisible).
+function notasRevision(p) {
+  const confirmar = p.confirmar || [];
+  const notas = p.origen === 'provisional' ? [] : p.pendiente || [];
+  if (!confirmar.length && !notas.length) return '';
+  return html`<aside class="nota-interna nota-pagina"><p class="etiqueta">Nota para la revisión · no se publicará</p>
+${confirmar.length ? html`<p><strong>Antes de publicarla, la clínica tiene que confirmar:</strong></p><ul>${confirmar.map((c) => html`<li><strong>${TIPOS_CONFIRMAR[c.tipo] || c.tipo}.</strong> ${c.que}</li>`)}</ul>` : ''}
+${notas.length ? html`<p><strong>Notas de redacción, para el visto bueno médico:</strong></p><ul>${notas.map((n) => html`<li>${n}</li>`)}</ul>` : ''}
+</aside>`;
+}
+
 function tratamiento(ctx, p) {
   const e = ctx.especialidades.find((x) => x.slug === p.especialidad);
   // En lo íntimo y el peso, el WhatsApp lleva la referencia de la especialidad, la misma en todas sus
@@ -316,7 +334,7 @@ function tratamiento(ctx, p) {
   if (s.sesiones) rapidos.push(html`<li>${icono('calendario')}${s.sesiones}</li>`);
   // Primero el aviso (y, en el móvil, la ficha justo después: van antes que el texto en el HTML y,
   // en escritorio, la ficha pasa a la columna de la derecha).
-  const avisos = `${p.origen === 'provisional' ? html`<div class="aviso-provisional" role="note"><p>${pendiente('página provisional hecha desde el catálogo; la sustituye el texto final de su grupo cuando llegue')}</p></div>` : ''}${aviso(ctx, p, e)}`;
+  const avisos = `${ctx.publicar ? '' : notasRevision(p)}${p.origen === 'provisional' ? html`<div class="aviso-provisional" role="note"><p>${pendiente('página provisional hecha desde el catálogo; la sustituye el texto final de su grupo cuando llegue')}</p></div>` : ''}${aviso(ctx, p, e)}`;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: e.nombre, titulo: p.titulo, entradilla: p.entradilla, adorno: (p.preocupaciones || [])[0] || e.slug,
     extra: rapidos.length ? html`<ul class="datos-rapidos">${rapidos}</ul>` : '',
@@ -397,7 +415,7 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
   return {
     ruta: '/tratamientos/', tipo: 'tratamientos', whatsapp: wa, ref: 'web-tratamientos', migas: pasos,
     titulo: 'Todos los tratamientos · IEMEC Boadilla del Monte',
-    descripcion: `Los ${total} tratamientos de IEMEC en Boadilla del Monte: medicina estética facial y corporal, medicina y cirugía capilar y cirugía estética.`,
+    descripcion: descripcionSeo(`Los ${total} tratamientos de IEMEC en Boadilla del Monte: ${B.areas(ctx, { detalle: true })}.`),
     cuerpo,
   };
 }
@@ -453,7 +471,7 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
   return {
     ruta: '/equipo/', tipo: 'equipo', whatsapp: wa, ref: 'web-equipo', migas: pasos,
     titulo: 'Equipo médico y de estética · IEMEC Boadilla del Monte',
-    descripcion: 'Conoce al equipo de IEMEC en Boadilla del Monte: medicina estética, cirugía estética, área capilar y equipo de estética, con sus datos.',
+    descripcion: descripcionSeo(`Conoce al equipo de IEMEC en Boadilla del Monte: los profesionales de ${B.areas(ctx)} y el equipo de estética.`),
     cuerpo,
   };
 }
@@ -522,7 +540,7 @@ function tarjetasRegalo(ctx) {
   })}
 <section class="seccion" aria-labelledby="t-importes">
 <div class="contenedor">
-<div class="titulo-seccion"><p class="etiqueta">Importes</p><h2 id="t-importes">Elige el importe</h2><p class="entrada">Pídela por WhatsApp con el importe ya escrito y te explicamos cómo recibirla.${ctx.publicar ? '' : html` ${pendiente(t.pago_pendiente)}`}</p></div>
+<div class="titulo-seccion"><p class="etiqueta">Importes</p><h2 id="t-importes">Elige el importe</h2><p class="entrada">Pídela por WhatsApp con el importe ya escrito y te explicamos cómo recibirla. ${t.precio}${ctx.publicar ? '' : html` ${pendiente(t.pago_pendiente)}`}</p></div>
 <ul class="importes">${t.importes.map((i) => html`<li class="tarjeta importe">
 <div class="tarjeta-regalo-visual terciopelo" aria-hidden="true"><span class="marca-mini">IEMEC</span><span class="cifra-mini">${i} €</span></div>
 <h3>${i} €</h3>

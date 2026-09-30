@@ -593,6 +593,9 @@ mark.pendiente { background: #fff1c2; color: #5a3f00; border: 1px dashed #b88a1a
 .terciopelo mark.pendiente, .pie mark.pendiente { background: #fff1c2; color: #4d3600; }
 .nota-interna { border: 1px dashed #b88a1a; background: #fffaf0; border-radius: var(--radio-p); padding: 14px 18px 4px; margin: 0 0 1.2em; font-size: .9rem; }
 .nota-interna .etiqueta { margin-bottom: 8px; color: #6b4e12; }
+.nota-pagina { color: #3d2c07; overflow-wrap: anywhere; }
+.nota-pagina ul { margin: 0 0 .9em; padding-left: 1.1em; }
+.nota-pagina li { margin-bottom: .3em; }
 .tabla-legal { margin: 0 0 1.2em; overflow-x: auto; }
 .tabla-legal table { width: 100%; border-collapse: collapse; font-size: .92rem; }
 .tabla-legal th, .tabla-legal td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--borde); }
