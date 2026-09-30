@@ -62,7 +62,8 @@ async function tareasDeRecuperacion(q, citaIds) {
   return [...new Set(ids)];
 }
 
-// Tiene cita nueva: las tareas abiertas de llamarle para recuperar otra, hechas.
+// Tiene cita nueva: las tareas abiertas de llamarle para recuperar otra, hechas. Devuelve cuáles (para
+// deshacerlo, si hace falta: la importación de Flowww, que da citas sin pasar por reservar).
 async function cerrarRecuperacion(con, { pacienteId, citaId = null, ahora = new Date() }) {
   const [perdidas] = await con.query("SELECT id FROM citas WHERE paciente_id = ? AND id <> ? AND estado IN ('no_presentada','cancelada')", [pacienteId, citaId || 0]);
   const tareas = await tareasDeRecuperacion(con, perdidas.map((c) => c.id));
@@ -367,5 +368,5 @@ async function caducarRetenciones(pool, ahora = new Date()) {
 
 module.exports = {
   huecos, proximosHuecos, reservar, cambiarEstado, deshacerEstado, ultimoCambio, confirmar, cancelar, confirmarRetenida,
-  caducarRetenciones, cargarDia, sigueEnPie, tareasDeRecuperacion, ErrorAgenda,
+  caducarRetenciones, cargarDia, sigueEnPie, tareasDeRecuperacion, cerrarRecuperacion, ErrorAgenda,
 };
