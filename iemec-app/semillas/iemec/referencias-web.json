@@ -1,5 +1,5 @@
 {
- "_nota": "Generado por web/construir.js: la app traduce la «ref. web-…» de cada WhatsApp y de cada formulario a su tratamiento (id del catálogo), su página y su especialidad. Las páginas de lo íntimo y del peso llevan un código en vez del slug.",
+ "_nota": "Generado por web/construir.js (no se edita a mano): la app traduce la «ref. web-…» de cada WhatsApp y de cada formulario a su tratamiento (id del catálogo), su página y su especialidad. Las páginas de lo íntimo y del peso llevan un código en vez del slug. «grupos»: los valores del «¿Qué te interesa?» del formulario y su texto neutro.",
  "referencias": {
   "web-abdominoplastia": {
    "catalogo": "abdominoplastia",
@@ -770,5 +770,17 @@
     "valoracion-medica"
    ]
   }
+ },
+ "grupos": {
+  "medicina-estetica-facial": "Medicina estética facial",
+  "medicina-estetica-corporal": "Medicina estética corporal",
+  "medicina-capilar": "Medicina capilar",
+  "cirugia-capilar": "Injerto capilar",
+  "estetica-intima-femenina": "Salud íntima femenina",
+  "cirugia-estetica": "Cirugía estética",
+  "estetica-intima-masculina": "Salud íntima masculina",
+  "estetica-y-bienestar": "Estética y bienestar (faciales, masajes, head spa)",
+  "tarjeta-regalo": "Tarjeta regalo",
+  "otra": "Otra cosa / prefiero contarlo por teléfono"
  }
 }

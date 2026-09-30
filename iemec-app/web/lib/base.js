@@ -156,11 +156,15 @@ ${marca(ctx, { diferida: true })}
 // Los valores son grupos (el slug de la especialidad…) o la referencia de la página («web-lipolaser»),
 // nunca un id del catálogo: la app los traduce con semillas/iemec/referencias-web.json. En lo íntimo
 // y el peso se preselecciona el grupo neutro (sin opción repetida) y el tratamiento va en «ref».
-function opcionesInteres(ctx, seleccion) {
+function gruposInteres(ctx) {
   const grupos = ctx.especialidades.map((e) => ({ valor: e.slug, texto: e.grupo_neutro }));
   grupos.push({ valor: 'estetica-y-bienestar', texto: 'Estética y bienestar (faciales, masajes, head spa)' });
   grupos.push({ valor: 'tarjeta-regalo', texto: 'Tarjeta regalo' });
   grupos.push({ valor: 'otra', texto: 'Otra cosa / prefiero contarlo por teléfono' });
+  return grupos;
+}
+function opcionesInteres(ctx, seleccion) {
+  const grupos = gruposInteres(ctx);
   const extra = seleccion && seleccion.texto && !grupos.some((g) => g.valor === seleccion.valor) ? [seleccion] : [];
   return [...extra, ...grupos].map((g) => html`<option value="${g.valor}"${seleccion && g.valor === seleccion.valor ? crudo(' selected') : ''}>${g.texto}</option>`);
 }
@@ -314,5 +318,5 @@ ${cuerpo}
 
 module.exports = {
   documento, urlWhatsapp, textoWhatsapp, telHref, imagen, marca, formulario, preguntas, migas, horario, horarioCorto, direccion,
-  clinicaLd, INTERES_GENERAL, empezarPagina,
+  clinicaLd, INTERES_GENERAL, empezarPagina, gruposInteres,
 };

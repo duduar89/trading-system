@@ -61,7 +61,8 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
    | `MODO_WHATSAPP`, `MODO_IA`, `MODO_GOOGLE`, `MODO_META` | `simulado` hasta tener cuentas; luego `real` |
    | `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (o `WHATSAPP_WEBHOOK_CLAVE`), `WHATSAPP_NUMERO_ID` | webhook de WhatsApp: ver [`WHATSAPP-Y-LEADS.md`](WHATSAPP-Y-LEADS.md) |
    | `META_VERIFY_TOKEN`, `META_APP_SECRET`, `META_TOKEN_PAGINA`, `META_PAGINA_ID` | leads de los formularios de Meta: ídem |
-   | `LEADS_CLAVE` | alta de leads de la web y GHL (`POST /api/leads`), 16 caracteres o más |
+   | `LEADS_CLAVE` | alta de leads de GHL u otra herramienta (`POST /api/leads`), 16 caracteres o más |
+   | `WEB_DOMINIO`, `WEB_ORIGENES` | la web pública (por defecto `https://iemec-clinic.com`): el origen que puede mandar el formulario «Te llamamos» (`POST /web/contacto`) y adónde vuelve quien lo envía sin JavaScript; `WEB_ORIGENES`, otros orígenes separados por comas (un subdominio de prueba) |
    | `IA_PROVEEDOR`, `IA_PROYECTO_GCP`, `IA_REGION`, `IA_MODELO`, `IA_MODELO_RESPALDO` | IA real: Claude por Google Vertex en la UE (`vertex`, el proyecto, `eu`, el modelo elegido y el de respaldo si el principal se niega) |
 
    **Mejor todo en el `.env`:** el cron (paso 4) y el primer enlace (paso 7) son otros procesos,

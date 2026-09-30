@@ -77,7 +77,8 @@ function textoLegal(md, { quitar = [], desenvolver = null } = {}) {
 function construir(opciones = {}) {
   const borradores = !!opciones.borradores;
   const salida = opciones.salida || path.join(WEB, borradores ? 'dist-borradores' : 'dist');
-  const rutaReferencias = opciones.referencias !== undefined ? opciones.referencias : (opciones.salida || borradores ? null : path.join(WEB, 'datos', 'referencias.json'));
+  // Las referencias van con la app (semillas/, que se despliega; web/ no): las usa POST /web/contacto.
+  const rutaReferencias = opciones.referencias !== undefined ? opciones.referencias : (opciones.salida || borradores ? null : path.join(RAIZ, 'semillas', 'iemec', 'referencias-web.json'));
   const datos = cargarDatos({ borradores });
   if (opciones.ajustarDatos) opciones.ajustarDatos(datos); // solo para las pruebas
   const modelo = construirModelo(datos);
@@ -298,8 +299,9 @@ function construir(opciones = {}) {
     recursos: ctx.recursos,
   };
   escribir('informe.json', `${JSON.stringify(informe, null, 1)}\n`);
-  if (rutaReferencias) fs.writeFileSync(rutaReferencias, `${JSON.stringify({ _nota: 'Generado por web/construir.js: la app traduce la «ref. web-…» de cada WhatsApp y de cada formulario a su tratamiento (id del catálogo), su página y su especialidad. Las páginas de lo íntimo y del peso llevan un código en vez del slug.', referencias: refsOrdenadas }, null, 1)}\n`);
-  return { ...informe, salida, archivos: escritos.sort(), referencias: refsOrdenadas };
+  const grupos = Object.fromEntries(B.gruposInteres(ctx).map((g) => [g.valor, g.texto]));
+  if (rutaReferencias) fs.writeFileSync(rutaReferencias, `${JSON.stringify({ _nota: 'Generado por web/construir.js (no se edita a mano): la app traduce la «ref. web-…» de cada WhatsApp y de cada formulario a su tratamiento (id del catálogo), su página y su especialidad. Las páginas de lo íntimo y del peso llevan un código en vez del slug. «grupos»: los valores del «¿Qué te interesa?» del formulario y su texto neutro.', referencias: refsOrdenadas, grupos }, null, 1)}\n`);
+  return { ...informe, salida, archivos: escritos.sort(), referencias: refsOrdenadas, grupos };
 }
 
 if (require.main === module) {

@@ -15,7 +15,9 @@ cron de cada minuto ◀───────────────────
    └─ lead de un formulario → se pide a Meta → alta → secuencia «lead» (primer mensaje ya);
       si Meta no deja leerlo → tarea para recepción
 
-La web / GHL ──POST con X-Clave──▶ /api/leads → alta → secuencia «lead» (en la misma petición)
+GHL u otra herramienta ──POST con X-Clave──▶ /api/leads → alta → secuencia «lead» (en la misma petición)
+La web pública (navegador) ──POST sin clave──▶ /web/contacto → alta con la prueba de los
+      consentimientos → secuencia «lead» si pide WhatsApp; tarea si pide llamada o correo
 ```
 
 La ruta nunca procesa nada: comprueba la firma, guarda el cuerpo tal cual (cifrado, como los
@@ -57,7 +59,8 @@ Con el subdominio de la app (en el ejemplo, `agenda.iemec-clinic.com`, siempre c
 |---|---|
 | Webhook de WhatsApp | `https://agenda.iemec-clinic.com/webhooks/whatsapp` |
 | Webhook de leads de Meta | `https://agenda.iemec-clinic.com/webhooks/meta` |
-| Alta de leads (web, GHL) | `https://agenda.iemec-clinic.com/api/leads` |
+| Alta de leads (GHL u otra herramienta, con clave) | `https://agenda.iemec-clinic.com/api/leads` |
+| Formulario «Te llamamos» de la web pública (sin clave) | `https://agenda.iemec-clinic.com/web/contacto` |
 
 ## Variables nuevas
 
@@ -244,10 +247,31 @@ INSERT INTO mapeo_tratamientos (clave, tratamiento_id, notas) VALUES
   ('OTO26-FAC', 'higiene-facial-triacidos', 'código de la landing de otoño');
 ```
 
-## POST /api/leads (la web y GHL)
+## POST /web/contacto (el formulario de la web pública)
 
-Desde el **servidor** de la web o desde GHL, nunca desde el navegador: la clave no puede ir en la
-página.
+La web nueva es estática (`web/`, en otro dominio): su formulario «Te llamamos» manda un `POST`
+`application/x-www-form-urlencoded` directamente desde el navegador, sin clave. Lo que protege la
+entrada: CORS solo para `WEB_DOMINIO` (y `WEB_ORIGENES`), una trampa para robots, el tiempo de
+rellenado (`t`, en ms; vacío = sin JavaScript, no se descarta), y un límite de 8 envíos por IP cada
+15 minutos y 3 por teléfono al día (`limites_acceso`). Los campos y las respuestas están en
+[`web/README.md`](../web/README.md). Lo que hace:
+
+- valida como la web (los mismos mensajes, en `motor/entrada/web.js`): sin JavaScript contesta
+  `303` a `WEB_DOMINIO/gracias/` o una página sencilla con los errores; con él, `200 {ok: true}`,
+  `422 {ok: false, errores}` o `429`;
+- traduce el «¿Qué te interesa?» y la referencia de la página («web-lipolaser», o el código de lo
+  íntimo) con `semillas/iemec/referencias-web.json`, que genera `npm run web`: nunca llega un id del
+  catálogo;
+- da de alta el lead (`origen` web, `codigo_web` = la referencia, el mensaje cifrado) y guarda en
+  `solicitudes_web` la prueba de los dos consentimientos por separado, con la fecha, la versión de
+  los textos, la página y la preferencia (RGPD, art. 7.1). Un reintento del mismo envío no duplica;
+- quien pide WhatsApp entra en la secuencia «lead» (el seguimiento de su solicitud); quien pide
+  llamada o correo, no: tarea para recepción («Llamar a…», «Escribir a…»).
+
+## POST /api/leads (GHL y otras herramientas)
+
+Desde un **servidor** (GHL u otra herramienta), nunca desde el navegador: la clave no puede ir en
+una página.
 
 ```bash
 curl -X POST https://agenda.iemec-clinic.com/api/leads \

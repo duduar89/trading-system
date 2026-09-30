@@ -74,6 +74,10 @@ const LIMITES = {
   retos: { max: 60, ventanaMs: 15 * 60000 },
   fallos: { max: 20, ventanaMs: 15 * 60000 },
   emergencia: { max: 5, ventanaMs: 15 * 60000 },
+  // El formulario de la web pública: envíos por IP y por teléfono (que nadie use la clínica para
+  // escribir sin parar a un número ajeno).
+  web: { max: 8, ventanaMs: 15 * 60000 },
+  webTelefono: { max: 3, ventanaMs: 24 * 3600000 },
 };
 
 const dame = (pool) => (typeof pool === 'function' ? pool() : pool);
@@ -132,4 +136,5 @@ async function purgarLimites(pool, ahora = new Date()) {
 
 module.exports = {
   origenesPermitidos, CSP_PANEL, cabeceras, mismoOrigen, igualesSeguro, huellaIp, LIMITES, contar, frenar, sumarFallo, purgarLimites,
+  sumarIntento, claveLimite,
 };

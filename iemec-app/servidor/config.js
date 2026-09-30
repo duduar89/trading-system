@@ -24,6 +24,11 @@ const config = {
     password: leer('DB_PASSWORD', 'iemec_local'),
     database: leer('DB_NAME', 'iemec_dev'),
   },
+  // La web pública (web/): su dominio y otros orígenes que pueden mandar el formulario «Te llamamos».
+  web: {
+    dominio: leer('WEB_DOMINIO', 'https://iemec-clinic.com'),
+    origenes: leer('WEB_ORIGENES', ''),
+  },
   // Modo de cada integración: «simulado» (por defecto, nunca sale nada a internet) o «real».
   modos: {
     whatsapp: leer('MODO_WHATSAPP', 'simulado'),
