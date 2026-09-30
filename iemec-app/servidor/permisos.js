@@ -22,8 +22,8 @@ const PERMISOS = {
   'seguimientos.editar': { roles: TODOS, que: 'cambiar seguimientos' },
   'resenas.aprobar': { roles: ['direccion', 'marketing'], que: 'aprobar y publicar respuestas a reseñas' },
   // La reseña con alerta clínica (una posible complicación, una reclamación) la contesta dirección médica,
-  // no marketing. Si el servicio de reseñas también lo comprueba, que lea los roles de aquí.
-  'resenas.alerta_clinica': { roles: ['direccion', 'medico', 'admin'], que: 'contestar reseñas con alerta clínica' },
+  // no marketing ni administración. El servicio de reseñas lee los roles de aquí.
+  'resenas.alerta_clinica': { roles: ['direccion', 'medico'], que: 'contestar reseñas con alerta clínica' },
   'salas.editar': { roles: ['direccion', 'admin'], que: 'cambiar las salas y los tratamientos' },
   // El catálogo de ofertas comerciales (tabla ofertas), para cuando tenga pantalla: su ruta tiene que
   // llevar exige('ofertas.gestionar'). No son las ofertas de hueco de la lista de espera (citas.reservar).

@@ -28,6 +28,9 @@ const RESERVADA = new Date('2026-09-29T08:00:00Z'); // cuando recepción dio las
 
 async function sembrar(pool) {
   await pool.query("INSERT INTO clinica (id, nombre, nombre_corto, direccion, municipio, google_place_id) VALUES (1, 'Instituto Europeo de Medicina Estética y Capilar', 'IEMEC', 'Av. Siglo XXI 13, local 35', 'Boadilla del Monte', 'ChIJiemec')");
+  // Aquí se prueban los estados: la reseña, siempre 2 horas después (la prueba del momento de pedir
+  // se prueba en test/resenas.test.js).
+  await pool.query("UPDATE clinica SET resenas_momentos = '2h'");
   for (const d of [1, 2, 3, 4, 5]) await pool.query("INSERT INTO horario_clinica (dia_semana, abre, cierra) VALUES (?, '11:00', '20:00')", [d]);
   await pool.query("INSERT INTO horario_clinica (dia_semana, abre, cierra) VALUES (6, '10:00', '20:00')");
   await pool.query("INSERT INTO festivos (fecha, nombre, ambito) VALUES ('2026-10-05', 'Virgen del Rosario', 'local'), ('2026-10-12', 'Fiesta Nacional', 'nacional')");
@@ -212,7 +215,7 @@ test('recepción marca qué pasa con cada cita y eso mueve el resto de la app', 
       assert.deepEqual(alTelefono(whatsapp, bea.telefono).map((m) => m.nombre), ['iemec_opinion_visita']);
     });
 
-    await t.test('la reseña se vuelve a mirar al enviarla: una baja o una queja de después mandan', async () => {
+    await t.test('la reseña se vuelve a mirar al enviarla: una baja de después manda; una queja no (se atiende en paralelo)', async () => {
       const begona = await paciente(pool, { nombre: 'Begoña' });
       const quima = await paciente(pool, { nombre: 'Quima' });
       const cb = await citaDe(pool, begona.id, 'limpieza-facial', '2026-10-28', '13:00');
@@ -223,12 +226,17 @@ test('recepción marca qué pasa con cada cita y eso mueve el resto de la app', 
       // Quima escribe una queja a las 13:40; Begoña, «BAJA» a las 14:30.
       await R.procesarEntrante(deps, { telefono: quima.telefono, texto: 'Quiero poner una reclamación', ahora: en('2026-10-28', '13:40') });
       await R.procesarEntrante(deps, { telefono: begona.telefono, texto: 'BAJA', ahora: en('2026-10-28', '14:30') });
-      assert.deepEqual(await resenas.enviarPeticionesPendientes(deps, { ahora: en('2026-10-28', '16:00') }), []);
-      assert.deepEqual(alTelefono(whatsapp, begona.telefono).filter((m) => m.nombre), [], 'ni a la que se dio de baja');
-      assert.deepEqual(alTelefono(whatsapp, quima.telefono).filter((m) => m.nombre), [], 'ni a la que se ha quejado');
+      const [[queja]] = await pool.query('SELECT estado FROM conversaciones WHERE telefono = ?', [quima.telefono]);
+      assert.equal(queja.estado, 'espera_persona', 'la queja la atiende una persona');
+      assert.equal((await resenas.enviarPeticionesPendientes(deps, { ahora: en('2026-10-28', '16:00') })).length, 1);
+      assert.deepEqual(alTelefono(whatsapp, begona.telefono).filter((m) => m.nombre), [], 'no, a la que se dio de baja');
+      // Dejar de pedírsela a quien se queja es pedirla solo a los contentos (Google lo castiga).
+      assert.deepEqual(alTelefono(whatsapp, quima.telefono).filter((m) => m.nombre).map((m) => m.nombre), ['iemec_opinion_visita'], 'sí, a la que se ha quejado');
       const [pb, pq] = [await peticion(pool, cb.id), await peticion(pool, cq.id)];
       assert.deepEqual([pb.estado, pb.motivo], ['omitida', 'se dio de baja de los mensajes']);
-      assert.deepEqual([pq.estado, pq.motivo], ['omitida', 'tiene una queja abierta: primero se atiende']);
+      assert.deepEqual([pq.estado, pq.motivo], ['enviada', null]);
+      const [[sigue]] = await pool.query('SELECT estado FROM conversaciones WHERE telefono = ? ORDER BY id DESC LIMIT 1', [quima.telefono]);
+      assert.equal(sigue.estado, 'espera_persona', 'y la queja sigue con su persona');
     });
 
     await t.test('una cita de tarde: la reseña sale al día siguiente y no le da las gracias «por venir hoy»', async () => {
@@ -238,7 +246,7 @@ test('recepción marca qué pasa con cada cita y eso mueve el resto de la app', 
       assert.equal(madrid(r.efectos.resena.cuando), '2026-10-22 10:30');
       await resenas.enviarPeticionesPendientes(deps, { ahora: en('2026-10-22', '10:31') });
       const [texto] = await textos(pool, luz.telefono);
-      assert.match(texto, /^Hola Luz, gracias por tu visita a IEMEC\./);
+      assert.match(texto, /^Hola Luz, gracias por tu visita a IEMEC del miércoles 21 de octubre\./, 'la de esa visita, con su día');
       assert.doesNotMatch(texto, /\bhoy\b/);
     });
 

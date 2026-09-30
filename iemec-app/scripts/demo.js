@@ -133,7 +133,7 @@ async function cargarDemo({ pool = db.pool(), bd, ahora = new Date(), log = (m) 
     { googleId: 'demo-2', autor: 'Carlos R.', nota: 4, texto: 'Muy contento con el resultado, aunque esperé un rato.', publicadaEn: new Date(ahora.getTime() - 4 * 86400000).toISOString() },
     { googleId: 'demo-3', autor: 'Ana P.', nota: 2, texto: 'Me costó mucho que me contestaran por teléfono.', publicadaEn: new Date(ahora.getTime() - 6 * 86400000).toISOString() },
   ] });
-  await resenas.importarResenas(pool, google);
+  await resenas.importarResenas(pool, google, { ahora });
   log('reseñas de ejemplo');
 }
 

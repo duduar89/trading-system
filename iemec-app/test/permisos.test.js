@@ -103,10 +103,10 @@ test('permisos por rol en las rutas del panel y gestión del equipo', async (t) 
           for (const rol of ROLES) if ((await equipo[rol].c.pedir(`/api/panel/resenas/${await resena({ alerta })}/publicar`, { metodo: 'POST', cuerpo: {} })).status !== 403) pasan.push(rol);
           return pasan;
         };
-        assert.deepEqual(await quien(true), ['direccion', 'medico', 'admin']);
+        assert.deepEqual(await quien(true), ['direccion', 'medico']);
         assert.deepEqual(await quien(false), ['direccion', 'marketing']);
         const r = await equipo.marketing.c.pedir(`/api/panel/resenas/${await resena({ alerta: true })}/publicar`, { metodo: 'POST', cuerpo: {} });
-        assert.equal(r.json.error, 'Con el rol de marketing no se puede contestar reseñas con alerta clínica: lo hace dirección, médico o administración.');
+        assert.equal(r.json.error, 'Con el rol de marketing no se puede contestar reseñas con alerta clínica: lo hace dirección o médico.');
       });
 
       // Si la tabla le quita un permiso a un rol, el servidor se lo niega en ese momento (no solo el panel deja

@@ -95,10 +95,17 @@ const BIBLIOTECA = [
   { uso: 'vale_regalo', categoria: 'marketing', nombre: 'iemec_vale_sin_canjear',
     cuerpo: `Hola {{1}}, tienes una tarjeta regalo de IEMEC de {{2}} esperando. ¿Te buscamos hueco para disfrutarla? ${BAJA}`,
     ejemplos: ['Laura', '70 €'], botones: BOTONES_REPESCA },
-  // Sale 2 horas después de la cita o, si ya es tarde, al día siguiente: el texto no dice «hoy».
+  // La opinión en Google, a todos (normas de Google): sobre esa visita ({{2}}, su día), sin nombrar el
+  // tratamiento, sin pedir estrellas ni sugerir qué escribir o a quién nombrar, sin nada a cambio y
+  // con la baja. Sale 2 horas después, al día siguiente o a los 3 días (la prueba del momento): el
+  // texto no dice «hoy». Y un solo recordatorio, a los 7-9 días, si no abrió el enlace.
   { uso: 'resena', categoria: 'utilidad', nombre: 'iemec_opinion_visita',
-    cuerpo: 'Hola {{1}}, gracias por tu visita a IEMEC. ¿Nos cuentas qué tal tu experiencia? Tu opinión en Google nos ayuda mucho.',
-    ejemplos: ['Laura'],
+    cuerpo: `Hola {{1}}, gracias por tu visita a IEMEC del {{2}}. Si te apetece contar qué tal fue, tu opinión en Google nos ayuda mucho, sea cual sea. ${BAJA}`,
+    ejemplos: ['Laura', 'martes 6 de octubre'],
+    botones: [{ tipo: 'url', texto: 'Dejar mi opinión', url: 'https://agenda.iemec-clinic.com/r/{{1}}', ejemplo: 'Xy12abc' }] },
+  { uso: 'resena_recordatorio', categoria: 'utilidad', nombre: 'iemec_opinion_recordatorio',
+    cuerpo: `Hola {{1}}, hace unos días te preguntamos por tu visita a IEMEC del {{2}}. Si aún te apetece contarlo en Google, aquí tienes el enlace; es el único recordatorio que te enviamos. ${BAJA}`,
+    ejemplos: ['Laura', 'martes 6 de octubre'],
     botones: [{ tipo: 'url', texto: 'Dejar mi opinión', url: 'https://agenda.iemec-clinic.com/r/{{1}}', ejemplo: 'Xy12abc' }] },
 ];
 

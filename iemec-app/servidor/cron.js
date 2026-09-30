@@ -36,6 +36,10 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
     secuencias: (await repesca.avanzarSecuencias(d, { ahora })).length,
     avisosCita: (await avisos.enviarPendientes(d, { ahora })).length,
     peticionesResena: (await resenas.enviarPeticionesPendientes(d, { ahora })).length,
+    // Reseñas, solo con la base y WhatsApp: borrar lo de Google que ya tiene 29 días (en cada vuelta),
+    // los recordatorios y el historial del día. Lo que llama a Google (el enlace de la ficha y publicar
+    // el historial) va con las llamadas lentas a Google: resenas.vueltaGoogle, con el adaptador real.
+    resenas: await resenas.vuelta(d, { ahora }),
     cola: await cola.procesar(pool, {}, { ahora }),
     // Retos de passkey y ventanas del límite de intentos ya caducados.
     accesoCaducado: await acceso.purgar(pool, ahora),
