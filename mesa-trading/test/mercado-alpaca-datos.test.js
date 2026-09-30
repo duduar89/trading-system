@@ -309,3 +309,34 @@ test('ultimos: timeout corto y un solo reintento, para no retener el latido minu
   assert.equal(porDefecto.timeoutUltimosMs, 10_000);
   assert.equal(porDefecto.reintentosUltimos, 1);
 });
+
+test('cripto 1Day: una diaria publicada más de 5 min tarde se vuelve a pedir y entra; un hueco viejo no frena la caché', async () => {
+  const MIN = 60_000;
+  const MARTES = Date.UTC(2026, 8, 29);            // la vela del martes cierra el miércoles 00:00
+  const PUBLICADA = MARTES + DIA + 8 * MIN;         // Alpaca la publica a las 00:08
+  const HUECO = MARTES - 60 * DIA;                  // un día viejo que nunca existió
+  let ahora = MARTES + DIA + MIN;
+  const ad = new AlpacaDatos({ reloj: { ahora: () => ahora }, fetch: () => { throw new Error('sin red'); } });
+  const todas = [];
+  for (let t = MARTES - 200 * DIA; t <= MARTES; t += DIA) if (t !== HUECO) todas.push(t);
+  let pedidas = 0;
+  let desdeUltima = null;
+  ad._get = async (ruta, params) => {
+    pedidas++;
+    const a = Date.parse(params.start); const b = Date.parse(params.end);
+    desdeUltima = a;
+    const bars = todas.filter(t => t >= a && t <= b && (t < MARTES || ahora >= PUBLICADA))
+      .map(t => ({ t: new Date(t).toISOString(), o: 1, h: 1, l: 1, c: 1, v: 1 }));
+    return { bars: { 'LINK/USD': bars } };
+  };
+  const ultima = async () => { const v = await ad.velas('LINK/USD', '1Day', { desde: ahora - 100 * DIA, hasta: ahora }); return v[v.length - 1].t; };
+  for (let m = 1; m <= 7; m++) { ahora = MARTES + DIA + m * MIN; assert.equal(await ultima(), MARTES - DIA); }
+  ahora = PUBLICADA;
+  assert.equal(await ultima(), MARTES, 'la vela tardía entra al publicarse');
+  const antes = pedidas;
+  ahora = MARTES + DIA + 17 * 60 * MIN;
+  assert.equal(await ultima(), MARTES);
+  assert.equal(pedidas, antes, 'ya cubierta: no se vuelve a pedir');
+  // El hueco de hace 60 días no hace que cada lectura pida desde él.
+  assert.ok(desdeUltima === null || desdeUltima > HUECO);
+});

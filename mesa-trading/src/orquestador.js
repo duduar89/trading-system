@@ -1579,6 +1579,7 @@ class Orquestador extends EventEmitter {
       case 'reabrir': r = await this._cmdReabrir(d); break;
       case 'kill': r = await this._cmdKill(d); break;
       case 'ajustes': r = this._cmdAjustes(datos); break;
+      case 'rebalancear': r = this._cmdRebalancear(d); break;
       default: return { ok: false, codigo: 404, mensaje: `Comando desconocido: ${nombre}` };
     }
     // Reabrir, Pausar o el kill cambian el nivel: las tarjetas, en el acto.
@@ -1697,6 +1698,26 @@ class Orquestador extends EventEmitter {
     if (!r2.ok) throw new Error(`venta: ${r2.motivo}`);
     const op = (r2.operaciones || [])[0];
     return `Comprados ${f.cantidad(r1.cantidad, 8)} BTC y vendidos ${f.cantidad(r2.cantidad, 8)}; resultado ${f.usd(op ? op.pnl : null, { signo: true })}.`;
+  }
+
+  // Rebalanceo de una mesa de rotación por momentum ahora, sin esperar al
+  // lunes (o a principio de mes): lo pidió Eduardo el 30-sep-2026 para que la
+  // mesa titular no esperara 5 días vacía tras pasar a Alpaca. Una sola vez:
+  // queda pedido en la mesa y lo hace el paso siguiente (procesarMesa), con la
+  // última vela cerrada y el precio de ese momento. Riesgos y los límites, como
+  // siempre; también en la sombra, para que la comparación siga siendo justa.
+  _cmdRebalancear(d) {
+    const id = typeof d.mesa === 'string' ? d.mesa : '';
+    const mesa = this.estado.mesas.find(m => m.id === id);
+    if (!mesa) return { ok: false, mensaje: `No hay ninguna mesa «${id}».` };
+    if (mesa.familia !== 'momentum-rotacion') return { ok: false, mensaje: `${mesa.nombre} no rebalancea: decide con cada vela.` };
+    if (mesa.estado === 'banquillo') return { ok: false, mensaje: `${mesa.nombre} está en el banquillo: no abre nada.` };
+    if (this.estado.fondo.nivel !== 'normal') return { ok: false, mensaje: 'El fondo no está en marcha normal (pausa, solo cerrar o kill): primero Reabrir.' };
+    if (mesa.rebalanceoYa) return { ok: true, mensaje: `Ya estaba pedido: ${mesa.nombre} rebalancea en el próximo latido.` };
+    mesa.rebalanceoYa = { t: this.reloj.ahora(), quien: 'humano' };
+    this._anotarHumana('rebalancear');
+    this.bus.publicar({ de: 'humano', canal: 'parque', tipo: 'megafono', texto: `Rebalancear ${mesa.nombre} ahora, sin esperar a su día.`, datos: { mesaId: mesa.id }, importancia: 2 });
+    return { ok: true, mensaje: `Pedido: ${mesa.nombre} rebalancea en el próximo paso con los precios de ese momento.` };
   }
 
   _cmdPausar() {

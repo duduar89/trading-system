@@ -177,7 +177,11 @@ function decidir(prep, { simbolo, i, iAnterior, posicion = null, contexto = {}, 
   const prox = p.rebalanceo === 'semanal' ? 'el lunes' : 'a principio de mes';
   if (!s || i < 0 || i >= s.c.length) return c.senal(posicion ? 'mantener' : 'nada', { estado: textos ? `No tengo datos de ${et} ahora mismo.` : '' });
 
-  if (!esRebalanceo(prep, s, i, iAnterior)) {
+  // Rebalanceo pedido desde el panel (orquestador 'rebalancear'): esta vela
+  // cuenta como la del lunes (o la de principio de mes). Solo lo pone
+  // procesarMesa en la decisión de ese paso; el backtest nunca lo pasa.
+  const forzado = Boolean(contexto && contexto.rebalanceoYa);
+  if (!forzado && !esRebalanceo(prep, s, i, iAnterior)) {
     if (posicion) {
       return c.senal('mantener', {
         peso: prep.peso, stop: posicion.stop ?? null,
@@ -211,7 +215,15 @@ function decidir(prep, { simbolo, i, iAnterior, posicion = null, contexto = {}, 
     }
     const a = s.atr[i];
     if (a === null) return c.senal('nada', { estado: textos ? `Aún no compro ${et}: me falta historia para calcular cuánto se mueve y dónde poner el stop.` : '' });
-    const stop = s.c[i] - p.atrStop * a;
+    // Rebalanceo pedido: se entra al precio de ahora, horas después del cierre.
+    // El stop mantiene su distancia (3×ATR) desde ese precio; y si el precio
+    // ya está por debajo del stop que habría puesto la regla con el cierre, la
+    // propia regla lo habría sacado: no se entra.
+    const ahora = forzado && Number.isFinite(contexto.precioAhora) && contexto.precioAhora > 0 ? contexto.precioAhora : null;
+    if (ahora !== null && ahora <= s.c[i] - p.atrStop * a) {
+      return c.senal('nada', { motivo: motivoBase, estado: textos ? `Reparto de nuevo: ${et} entra entre los ${p.top} primeros, pero desde el cierre (${formato.precio(s.c[i])}) ha caído por debajo de su stop (${formato.precio(s.c[i] - p.atrStop * a)}): no entro.` : '' });
+    }
+    const stop = (ahora ?? s.c[i]) - p.atrStop * a;
     const filtro = c.filtroQueBloquea(prep, simbolo, i, contexto);
     if (filtro) {
       return c.senal('nada', { motivo: motivoBase, estado: textos ? `Reparto de nuevo: ${et} entra entre los ${p.top} primeros, pero no compro: ${c.bloqueoLlano(filtro, contexto, prep, simbolo, i)}.` : '' });

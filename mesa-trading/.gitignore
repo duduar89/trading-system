@@ -7,3 +7,4 @@ data-demo/
 VERSION
 # tmp/restart.txt de Passenger en el servidor.
 tmp/
+estudios/
