@@ -39,8 +39,10 @@ claves hay más (analistas y operadores de ETF).
 Además hay **carteras sombra**, que no operan: solo miden. Son comprar y
 mantener BTC, la cesta de las 6 cripto y, con claves, SPY y 50/50 BTC-SPY. La
 más importante es **«mismas mesas sin comité»**: las mismas estrategias sin
-ninguna decisión de la IA. Si el fondo con comité no la supera, la IA no está
-aportando nada y el panel lo dice.
+las decisiones del comité, y con todo lo demás igual que el fondo (límites,
+pausas, kill, Megáfono y noticias; detalle en `04-riesgo-y-mejora.md`). Si el
+fondo con comité no la supera, el comité no está aportando nada y el panel lo
+dice.
 
 ## Cómo se hablan
 

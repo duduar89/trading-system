@@ -26,11 +26,18 @@
       else if (k === 'text') e.textContent = v;
       else e.setAttribute(k, v === true ? '' : v);
     }
+    return poner(e, ...hijos);
+  }
+
+  // Añade hijos saltándose null, undefined y false. Element.append(null) escribe
+  // el texto «null» (salía en el modal Reabrir sin directivas vigentes): por
+  // eso en los paneles nunca se llama a append directamente.
+  function poner(padre, ...hijos) {
     for (const h of hijos.flat()) {
       if (h === null || h === undefined || h === false) continue;
-      e.appendChild(typeof h === 'string' || typeof h === 'number' ? document.createTextNode(String(h)) : h);
+      padre.appendChild(typeof h === 'string' || typeof h === 'number' ? document.createTextNode(String(h)) : h);
     }
-    return e;
+    return padre;
   }
 
   const ICONOS = {
@@ -264,18 +271,21 @@
     }
 
     // Estado de verdad del fondo: además del nivel (vigilante, pausa, kill),
-    // el «solo cerrar» del comité o del Megáfono y el modo DEFENSIVO.
+    // el «solo cerrar» del comité o del Megáfono y, si se puede abrir, el
+    // tamaño REAL de las posiciones nuevas (DEFENSIVO, reducción del Megáfono y
+    // caída, multiplicados: con DEFENSIVO y «a la mitad», ×0,25).
     const n = cifras.nivelEfectivo(inst, inst.ahora);
     const pn = $('p-nivel');
     let textoNivel = '';
     if (n.nivel === 'bloqueado') textoNivel = 'BLOQUEADO';
     else if (n.nivel === 'pausado') textoNivel = 'PAUSADO';
     else if (n.nivel === 'solo_cerrar') textoNivel = n.origen === 'Megáfono' ? `SOLO CERRAR hasta ${cifras.hora(n.hasta)} · Megáfono` : n.origen === 'comité' ? 'SOLO CERRAR · comité' : 'SOLO CERRAR';
-    else if (n.defensivo) textoNivel = 'DEFENSIVO ×0,5';
+    else textoNivel = cifras.rotuloTamano(n.tamano);
+    const tamano = n.nivel === 'normal' ? cifras.explicacionTamano(n.tamano) : '';
     pn.hidden = !textoNivel;
     pn.textContent = textoNivel;
     pn.className = 'pildora ' + (n.nivel === 'bloqueado' ? 'roja fuerte' : 'ambar');
-    pn.title = n.nivel === 'normal' && n.defensivo ? 'Modo DEFENSIVO del comité: las mesas abren con la mitad de capital.' : (n.motivo || '');
+    pn.title = n.nivel === 'normal' ? tamano : (n.motivo || '');
     pn.setAttribute('aria-label', textoNivel ? `Estado del fondo: ${textoNivel}. ${pn.title}` : '');
 
     const pm = $('p-modo');
@@ -299,7 +309,10 @@
     actualizarComite(inst, o && o.ahoraServidor);
     marcarDesborde();
     const avisos = $('avisos');
-    const lista = Array.isArray(inst.avisos) ? inst.avisos : [];
+    // El recorte de tamaño va delante: con el fondo abierto es lo que más limita
+    // (el servidor no lo cuenta en `avisos`).
+    const delServidor = Array.isArray(inst.avisos) ? inst.avisos : [];
+    const lista = tamano && !delServidor.includes(tamano) ? [tamano].concat(delServidor) : delServidor;
     const clave = lista.join('|');
     if (avisos.dataset.clave !== clave) {
       avisos.dataset.clave = clave;
@@ -559,7 +572,7 @@
       fila('Adherencia', cifras.pct(p.adherencia, { decimales: 0 })),
       fila('Factor', Number.isFinite(p.factorBeneficio) ? cifras.numero(p.factorBeneficio, 2) : '—'),
       fila('Precio', precioTexto, edad && edad.viejo ? 'viejo' : ''),
-      fila('Última señal', p.ultimaSenal ? `${p.ultimaSenal.accion} · ${cifras.momento(p.ultimaSenal.t, inst.ahora)}` : '—'));
+      fila('Última señal', p.ultimaSenal ? `${cifras.accionSenal(p.ultimaSenal.accion)} · ${cifras.momento(p.ultimaSenal.t, inst.ahora)}` : '—'));
     t.appendChild(dl);
     if (Array.isArray(p.chispa) && p.chispa.length > 1) t.appendChild(chispaSvg(p.chispa, pos ? (pos.pnlAbierto >= 0 ? '#22c55e' : '#ef4444') : '#8a93b0'));
     if (p.estadoTexto) t.appendChild(el('p', { class: 'estado-texto', text: p.estadoTexto }));
@@ -740,15 +753,23 @@
     if (!fn) return;
     fn(cuerpo);
     if (!d.open) d.showModal();
-    const primero = cuerpo.querySelector('textarea, input:not([disabled]), select, button.primario');
-    if (primero) primero.focus();
+    // El foco va a lo primero que hay que tocar (el campo o el botón principal),
+    // salvo en los modales que se leen (Resultados): ahí va al título, para que
+    // se abran por arriba. Con el «Cerrar» del pie, Resultados se abría
+    // desplazado hasta el laboratorio y «¿Aporta algo el comité?» quedaba fuera.
+    const primero = cuerpo.querySelector('[data-foco-inicial]') || cuerpo.querySelector('textarea, input:not([disabled]), select, button.primario');
+    if (primero) { try { primero.focus({ preventScroll: true }); } catch (_) { primero.focus(); } }
+    d.scrollTop = 0;
+    cuerpo.scrollTop = 0;
   }
 
   function cerrarModal() { const d = $('modal'); if (d.open) d.close(); }
 
-  function cabModal(titulo, texto) {
+  // Con { lectura: true } el foco inicial va al título (modal que se lee, no se rellena).
+  function cabModal(titulo, texto, opciones) {
+    const lectura = Boolean(opciones && opciones.lectura);
     return [
-      el('header', { class: 'modal-cab' }, el('h2', { id: 'modal-titulo', text: titulo }),
+      el('header', { class: 'modal-cab' }, el('h2', { id: 'modal-titulo', text: titulo, tabindex: lectura ? '-1' : null, 'data-foco-inicial': lectura }),
         el('button', { class: 'boton-icono', type: 'button', 'aria-label': 'Cerrar', onclick: cerrarModal }, icono('cerrar'))),
       texto ? el('p', { class: 'modal-texto', text: texto }) : null,
     ];
@@ -799,6 +820,7 @@
   // ---------- resultados: sombras, mejora, mesas, capital sin asignar, laboratorio ----------
 
   const ESTADO_HIPOTESIS = { pendiente: 'Pendiente', evaluando: 'Evaluando', aprobada: 'Aprobada', rechazada: 'Rechazada' };
+  const QUE_COMPARA_COMITE = 'Mismas mesas, mismos límites y mismas órdenes tuyas (kill, pausa, Megáfono); solo cambia lo que decide el comité.';
   const n2 = x => (Number.isFinite(x) ? cifras.numero(x, 2) : '—');
   const conSigno = (texto, x) => (x > 0 && /[1-9]/.test(texto) ? '+' + texto : texto);
 
@@ -819,8 +841,8 @@
   }
 
   function construirResultados(c, inst) {
-    c.append(...cabModal('Resultados', `Lo que gana el fondo frente a sus carteras sombra, todas con costes. Datos de las ${inst ? cifras.hora(inst.ahora) : '—'}.`));
-    if (!inst) { c.append(el('p', { class: 'vacio', text: 'Todavía no hay datos de la mesa.' }), el('div', { class: 'modal-pie' }, el('button', { class: 'boton primario', type: 'button', text: 'Cerrar', onclick: cerrarModal }))); return; }
+    poner(c, ...cabModal('Resultados', `Lo que gana el fondo frente a sus carteras sombra, todas con costes. Datos de las ${inst ? cifras.hora(inst.ahora) : '—'}.`, { lectura: true }));
+    if (!inst) { poner(c, el('p', { class: 'vacio', text: 'Todavía no hay datos de la mesa.' }), el('div', { class: 'modal-pie' }, el('button', { class: 'boton primario', type: 'button', text: 'Cerrar', onclick: cerrarModal }))); return; }
     const cab = inst.cabecera || {};
     const mejora = inst.mejora || {};
     const capital = capitalDe(inst);
@@ -828,8 +850,11 @@
 
     // ¿Aporta algo el comité? (principio 7: se mide contra las mismas mesas sin él).
     const dif = Number.isFinite(mejora.sharpe90Fondo) && Number.isFinite(mejora.sharpe90SinComite) ? mejora.sharpe90Fondo - mejora.sharpe90SinComite : null;
-    c.append(el('section', { class: 'bloque resultados-mejora', 'aria-labelledby': 'res-mejora' },
+    // La sombra «sin comité» sufre lo mismo que el fondo salvo el comité: así la
+    // diferencia no le carga al comité un kill, una pausa o un Megáfono tuyos.
+    poner(c, el('section', { class: 'bloque resultados-mejora', 'aria-labelledby': 'res-mejora' },
       el('h3', { id: 'res-mejora', text: '¿Aporta algo el comité?' }),
+      el('p', { class: 'nota que-compara', text: QUE_COMPARA_COMITE }),
       el('dl', { class: 'tabla' },
         fila('Sharpe 90 d del fondo', n2(mejora.sharpe90Fondo)),
         fila('Sharpe 90 d sin comité', n2(mejora.sharpe90SinComite)),
@@ -840,7 +865,7 @@
     // Sombras.
     const filas = [{ id: 'fondo', nombre: 'El fondo', valor: cab.patrimonio, rentabilidad: rentFondo, sharpe90: mejora.sharpe90Fondo, fondo: true }]
       .concat(inst.benchmarks || []);
-    c.append(el('section', { class: 'bloque', 'aria-labelledby': 'res-sombras' },
+    poner(c, el('section', { class: 'bloque', 'aria-labelledby': 'res-sombras' },
       el('h3', { id: 'res-sombras', text: 'Frente a las carteras sombra' }),
       el('div', { class: 'tabla-scroll' }, el('table', { class: 'resultados' },
         el('thead', {}, el('tr', {}, ['Cartera', 'Valor', 'Rentab.', 'Sharpe 90 d', 'Fondo − esta'].map(x => el('th', { scope: 'col', text: x })))),
@@ -854,7 +879,7 @@
 
     // Mesas y capital sin asignar.
     const sa = cifras.sinAsignar(inst);
-    c.append(el('section', { class: 'bloque', 'aria-labelledby': 'res-mesas' },
+    poner(c, el('section', { class: 'bloque', 'aria-labelledby': 'res-mesas' },
       el('h3', { id: 'res-mesas', text: 'Mesas' }),
       sa && sa.fraccion > 0.0005 ? el('p', { class: 'aviso-sin-asignar',
         text: `Sin asignar: ${cifras.pct(sa.fraccion, { decimales: 0 })} del patrimonio${Number.isFinite(sa.usd) ? ` (${cifras.usd(sa.usd)})` : ''}. Queda en efectivo: ninguna mesa lo usa.` }) : null,
@@ -872,7 +897,7 @@
     // Laboratorio.
     const lab = inst.laboratorio || {};
     const hip = Array.isArray(lab.hipotesis) ? lab.hipotesis : [];
-    c.append(el('section', { class: 'bloque', 'aria-labelledby': 'res-lab' },
+    poner(c, el('section', { class: 'bloque', 'aria-labelledby': 'res-lab' },
       el('h3', { id: 'res-lab', text: 'Laboratorio' }),
       el('p', { class: 'nota', text: `${cifras.numero(lab.ensayosTotales)} ensayos acumulados (cuentan para el Sharpe deflactado). Próxima revisión: ${cifras.momento(lab.proximaRevision, inst.ahora)}.` }),
       hip.length ? el('ul', { class: 'hipotesis' }, hip.map(h => el('li', { class: 'hip-' + h.estado },
@@ -882,7 +907,7 @@
         (h.criterios || []).length ? el('ul', { class: 'criterios' }, h.criterios.map(k => el('li', { class: k.ok ? 'ok' : 'error' },
           el('b', { text: k.nombre }), el('span', { text: `${valorCriterio(k, k.valor)} (${k.ok ? 'pasa' : 'no pasa'}: ${valorCriterio(k, k.umbral)})` })))) : null)))
         : el('p', { class: 'vacio', text: 'Sin hipótesis todavía.' })));
-    c.append(el('div', { class: 'modal-pie' }, el('button', { class: 'boton primario', type: 'button', text: 'Cerrar', onclick: cerrarModal })));
+    poner(c, el('div', { class: 'modal-pie' }, el('button', { class: 'boton primario', type: 'button', text: 'Cerrar', onclick: cerrarModal })));
   }
 
   const MODALES = {
@@ -893,7 +918,7 @@
       const res = zonaResultado();
       const b = el('button', { class: 'boton primario', type: 'button', text: 'Convocar ahora' });
       b.addEventListener('click', () => ejecutar(b, res, 'comite', {}));
-      c.append(...cabModal('Convocar el comité', 'Reúne ahora a Dirección, Macro, Riesgos, el Controller y el Laboratorio. La Presidenta decide el modo del fondo; el voto DEFENSIVO de Riesgos es veto.'), res, pieModal(b));
+      poner(c, ...cabModal('Convocar el comité', 'Reúne ahora a Dirección, Macro, Riesgos, el Controller y el Laboratorio. La Presidenta decide el modo del fondo; el voto DEFENSIVO de Riesgos es veto.'), res, pieModal(b));
     },
     megafono(c) {
       const inst = est.manejadores.instantanea ? est.manejadores.instantanea() : null;
@@ -909,14 +934,14 @@
         propuesta.textContent = '';
         if (!p) { propuesta.hidden = true; aplicar.hidden = true; return; }
         propuesta.hidden = false;
-        propuesta.append(el('h3', { text: 'Propuesta' }), el('p', { class: 'explicacion', text: p.explicacion || '' }),
+        poner(propuesta, el('h3', { text: 'Propuesta' }), el('p', { class: 'explicacion', text: p.explicacion || '' }),
           el('ul', {}, (p.directivas || []).map(d => el('li', { class: d.tipo === 'sin_efecto' ? 'sin-efecto' : '', text: textoDirectiva(d, inst && inst.mesas) }))));
         const util = (p.directivas || []).some(d => d.tipo !== 'sin_efecto');
         aplicar.hidden = false;
         aplicar.disabled = !util;
         // Con una propuesta delante, lo principal es Aplicar; reinterpretar pasa a segundo plano.
         interpretar.classList.toggle('primario', !util);
-        if (!util) propuesta.append(el('p', { class: 'nota', text: 'No hay nada que aplicar. Reescribe la orden con otras palabras.' }));
+        if (!util) poner(propuesta, el('p', { class: 'nota', text: 'No hay nada que aplicar. Reescribe la orden con otras palabras.' }));
       };
       interpretar.addEventListener('click', async () => {
         const texto = area.value.trim();
@@ -931,7 +956,7 @@
         const r = await ejecutar(aplicar, res, 'megafono-aplicar', { id });
         if (r && r.ok) { aplicar.hidden = true; propuesta.hidden = true; interpretar.classList.add('primario'); }
       });
-      c.append(...cabModal('Megáfono', 'Dile a la mesa qué quieres con tus palabras. Se traduce a directivas de una lista cerrada que solo aprietan y caducan solas; no entra nada hasta que pulses Aplicar.'),
+      poner(c, ...cabModal('Megáfono', 'Dile a la mesa qué quieres con tus palabras. Se traduce a directivas de una lista cerrada que solo aprietan y caducan solas; no entra nada hasta que pulses Aplicar.'),
         el('label', { class: 'etiqueta-campo', text: 'Orden' }), area, propuesta, res, pieModal(interpretar, aplicar));
       if (inst && inst.megafonoPendiente) { area.value = inst.megafonoPendiente.texto || ''; verPropuesta(inst.megafonoPendiente); }
     },
@@ -942,7 +967,7 @@
       const orden = el('button', { class: 'boton', type: 'button', text: 'Hacer la orden mínima' });
       const conf = confirmacion('PRUEBA', orden);
       orden.addEventListener('click', () => ejecutar(orden, res, 'prueba', { ordenMinima: true, confirmacion: conf.valor() }));
-      c.append(...cabModal('Prueba', 'Comprueba que responden el bróker, los datos de mercado, el índice de miedo y codicia y el LLM. No toca la cartera.'),
+      poner(c, ...cabModal('Prueba', 'Comprueba que responden el bróker, los datos de mercado, el índice de miedo y codicia y el LLM. No toca la cartera.'),
         el('div', { class: 'bloque' }, el('h3', { text: 'Orden mínima (opcional)' }),
           el('p', { class: 'modal-texto', text: 'Compra y vende 15 $ de BTC en la cuenta de papel para ver el circuito completo de una orden.' }), conf.campo, orden),
         res, pieModal(comprobar));
@@ -951,7 +976,7 @@
       const res = zonaResultado();
       const b = el('button', { class: 'boton primario ambar', type: 'button', text: 'Pausar todo' });
       b.addEventListener('click', () => ejecutar(b, res, 'pausar', {}));
-      c.append(...cabModal('Pausar todo', 'Pasa el fondo a «solo cerrar» hasta que alguien pulse Reabrir: no se abre nada nuevo; las salidas y los stops siguen funcionando.'), res, pieModal(b));
+      poner(c, ...cabModal('Pausar todo', 'Pasa el fondo a «solo cerrar» hasta que alguien pulse Reabrir: no se abre nada nuevo; las salidas y los stops siguen funcionando.'), res, pieModal(b));
     },
     reabrir(c) {
       const inst = est.manejadores.instantanea ? est.manejadores.instantanea() : null;
@@ -966,7 +991,7 @@
       const d = (inst && inst.directivas) || {};
       if (d.modo === 'SOLO_CERRAR') notas.push('El comité tiene el fondo en SOLO CERRAR: Reabrir no lo quita; lo cambia el próximo comité.');
       if (Number.isFinite(d.soloCerrarHasta) && n && (n.origen === 'Megáfono' || d.soloCerrarHasta > inst.ahora)) notas.push(`El Megáfono tiene «solo cerrar» hasta las ${cifras.hora(d.soloCerrarHasta)}: Reabrir no lo quita.`);
-      c.append(...cabModal('Reabrir', 'Vuelve a nivel normal si la conciliación con el bróker está limpia. Es la única salida de una pausa o de un kill switch. No quita las directivas del Megáfono ni las del comité.'),
+      poner(c, ...cabModal('Reabrir', 'Vuelve a nivel normal si la conciliación con el bróker está limpia. Es la única salida de una pausa o de un kill switch. No quita las directivas del Megáfono ni las del comité.'),
         notas.length ? el('ul', { class: 'notas-reabrir' }, notas.map(x => el('li', { text: x }))) : null, conf.campo, res, pieModal(b));
     },
     kill(c) {
@@ -974,13 +999,13 @@
       const b = el('button', { class: 'boton primario peligro', type: 'button', text: 'Activar kill switch' });
       const conf = confirmacion('KILL', b);
       b.addEventListener('click', () => ejecutar(b, res, 'kill', { confirmacion: conf.valor() }));
-      c.append(...cabModal('Kill switch', 'Cancela todas las órdenes, cierra TODAS las posiciones a mercado y bloquea el fondo. Solo sale con Reabrir.'),
+      poner(c, ...cabModal('Kill switch', 'Cancela todas las órdenes, cierra TODAS las posiciones a mercado y bloquea el fondo. Solo sale con Reabrir.'),
         el('p', { class: 'advertencia', text: 'Las ventas a mercado pueden salir peor que el último precio.' }), conf.campo, res, pieModal(b));
     },
     async ajustes(c) {
       const inst = est.manejadores.instantanea ? est.manejadores.instantanea() : null;
       const res = zonaResultado();
-      c.append(...cabModal('Ajustes', 'Los límites duros se ven pero no se cambian desde aquí: viven en config.js.'), el('p', { class: 'cargando', text: 'Cargando…' }));
+      poner(c, ...cabModal('Ajustes', 'Los límites duros se ven pero no se cambian desde aquí: viven en config.js.'), el('p', { class: 'cargando', text: 'Cargando…' }));
       let r = null;
       try { r = est.manejadores.ajustes ? await est.manejadores.ajustes() : null; } catch (_) { r = null; }
       const a = Object.assign({
@@ -1023,7 +1048,7 @@
           if (rr && rr.ok) Object.assign(a, cambios, (rr.datos && typeof rr.datos === 'object') ? rr.datos : {});
         });
       });
-      c.append(form, tabla, res, pieModal(guardar));
+      poner(c, form, tabla, res, pieModal(guardar));
     },
   };
 

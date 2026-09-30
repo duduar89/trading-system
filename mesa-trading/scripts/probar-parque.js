@@ -110,5 +110,24 @@ const conMesas = n => {
 const filas12 = Array.from(new Set(Array.from(mapa.construirMapa(conMesas(12)).puestos.values()).map(p => p.f0))).sort((a, b) => a - b);
 caso('12 mesas: filas del parqué', filas12, [3.2, 5.14, 7.08, 9.02, 10.96, 12.9]);
 
+// 9. Pulido final (revisión FINAL): tamaño real, señal, rótulos y cotizaciones.
+const hasta = T0 + 3 * 3600000;
+const defMeg = cifras.nivelEfectivo({ ahora: T0, fondo: { nivel: 'normal', multiplicadorCaida: 1 }, directivas: { modo: 'DEFENSIVO', reduccion: { factor: 0.5, hasta } } }, T0);
+caso('DEFENSIVO (×0,5 al capital de la mesa) y Megáfono «a la mitad» (×0,5 al nocional): 0,5 · 0,5', defMeg.tamano.factor, 0.25, 1e-12);
+caso('píldora con los dos', cifras.rotuloTamano(defMeg.tamano), 'DEFENSIVO + MEGÁFONO ×0,25');
+caso('con la caída del vigilante además: 0,5 · 0,5 · 0,5', cifras.tamanoEntradas(true, { factor: 0.5 }, 0.5).factor, 0.125, 1e-12);
+caso('última señal «nada» en la ficha', cifras.accionSenal('nada'), 'Esperar');
+const junto = dibujo.colocarRotulos([{ id: 'r', inicio: { x: 40, y: 100 }, fin: null, formas: [{ texto: 'RUPTURA DONCHIAN · 1D', w: 150 }, { texto: 'RUPTURA DONCHIAN', w: 120 }], prioridad: 0.4 }],
+  { ancho: 390, alto: 844, h: 14, ocupado: [] });
+// Acabaría en x = 40: con 150 px empezaría en −110; pegado al borde (x = 4) cabe entero sin pisar nada.
+caso('rótulo cuyo sitio empieza en x = −110: pegado al borde, dentro del lienzo', junto.map(r => [r.x, r.x + r.w]), [[4, 154]]);
+const cot = crearMaqueta({ semilla: 7, ahora: T0 }).instantanea();
+const medidas = { font: '' };
+const ctxMedir = { set font(f) { medidas.font = f; }, get font() { return medidas.font; }, measureText: t => ({ width: t.length * Number(/(\d+)px/.exec(medidas.font)[1]) * 0.55 }) };
+// DOGE (4 × 20 × 0,55 = 44), «108.974» (7 × 11 = 77), «▲ +10,37 %» (10 × 18 × 0,55 = 99): 44 + 12 + 77 + 12 + 99 = 244 ≤ 260.
+const filasCot = [{ simbolo: 'DOGE/USD', etiqueta: 'DOGE', precio: 108974, var24hPct: 0.1037, t: T0 }];
+const disp = dibujo.disposicionCotizaciones(ctxMedir, filasCot, { ahora: T0, limites: cot.limites }, { fuente: 20, xPrecio: 0, ancho: 260 });
+caso('dos columnas: precio acaba en 44 + 12 + 77 = 133 y la variación en 260, con flecha', [disp.xPrecio, disp.xVar, disp.flecha, disp.fuente], [133, 260, true, 20]);
+
 console.log(fallos ? `\n${fallos} caso(s) con FALLO` : '\nTodos los casos cuadran.');
 process.exit(fallos ? 1 : 0);

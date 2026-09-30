@@ -41,7 +41,9 @@ function isoCompacto(t) {
 // El sombra «sin comité» (§6.7) no pasa por el bróker: se llena en los libros
 // al precio actual con los MISMOS costes que el bróker simulado (comisión
 // cripto cobrada en el activo al comprar, en dólares al vender).
-function llenarSombra({ lado, simbolo, precio, nocional, cantidad }) {
+// `precioEjecutado` (solo ventas): el precio al que ya vendió el fondo (el
+// kill), que trae su deslizamiento; solo se añade la comisión.
+function llenarSombra({ lado, simbolo, precio, nocional, cantidad, precioEjecutado }) {
   const c = COSTES_POR_DEFECTO.comision(simbolo);
   const d = COSTES_POR_DEFECTO.deslizamiento(simbolo);
   if (lado === 'compra') {
@@ -55,7 +57,7 @@ function llenarSombra({ lado, simbolo, precio, nocional, cantidad }) {
       efectivoDelta: -(cripto ? nocional : nocional * (1 + c)),
     };
   }
-  const precioEjec = precio * (1 - d);
+  const precioEjec = precioEjecutado > 0 ? precioEjecutado : precio * (1 - d);
   const bruto = cantidad * precioEjec;
   const comision = bruto * c;
   return { precio: precioEjec, cantidad, comision, efectivoDelta: bruto - comision };

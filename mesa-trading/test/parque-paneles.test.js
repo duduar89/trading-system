@@ -45,3 +45,214 @@ test('capital de partida sacado de las sombras (todas empiezan con él)', () => 
   assert.ok(Math.abs(paneles.capitalDe(inst) - 100000) < 1e-6);
   assert.equal(paneles.capitalDe({ benchmarks: [{ valor: null, rentabilidad: null }] }), null);
 });
+
+// ---------- con un DOM falso: modales, píldora del nivel y ficha del puesto ----------
+// Lo justo del DOM que usa paneles.js. Como el de verdad, Element.append(null)
+// escribe el texto «null» (así se veía en el modal Reabrir).
+class FNodo {
+  constructor(doc) { this.ownerDocument = doc; this.childNodes = []; this.parentNode = null; }
+  appendChild(n) {
+    if (n.nodeType === 11) { for (const c of n.childNodes.slice()) this.appendChild(c); return n; }
+    if (n.parentNode) n.parentNode.removeChild(n);
+    n.parentNode = this;
+    this.childNodes.push(n);
+    return n;
+  }
+  append(...ns) { for (const n of ns) this.appendChild(n instanceof FNodo ? n : this.ownerDocument.createTextNode(String(n))); }
+  insertBefore(n, ref) {
+    if (!ref) return this.appendChild(n);
+    if (n.parentNode) n.parentNode.removeChild(n);
+    n.parentNode = this;
+    this.childNodes.splice(this.childNodes.indexOf(ref), 0, n);
+    return n;
+  }
+  removeChild(n) { this.childNodes.splice(this.childNodes.indexOf(n), 1); n.parentNode = null; return n; }
+  remove() { if (this.parentNode) this.parentNode.removeChild(this); }
+  get textContent() { return this.childNodes.map(c => c.textContent).join(''); }
+  set textContent(v) {
+    for (const c of this.childNodes) c.parentNode = null;
+    this.childNodes = [];
+    if (v !== '' && v !== null && v !== undefined) this.appendChild(this.ownerDocument.createTextNode(String(v)));
+  }
+  contains(n) { for (let x = n; x; x = x.parentNode) if (x === this) return true; return false; }
+}
+class FTexto extends FNodo {
+  constructor(doc, t) { super(doc); this.nodeType = 3; this.data = t; }
+  get textContent() { return this.data; }
+  set textContent(v) { this.data = String(v); }
+}
+class FElemento extends FNodo {
+  constructor(doc, tag) {
+    super(doc);
+    this.nodeType = 1; this.tagName = tag.toUpperCase(); this.atributos = new Map();
+    this.style = { cssText: '', setProperty() {} }; this.dataset = {}; this.oyentes = {}; this.scrollTop = 0; this.open = false;
+  }
+  get children() { return this.childNodes.filter(c => c.nodeType === 1); }
+  get firstElementChild() { return this.children[0] || null; }
+  get lastElementChild() { const h = this.children; return h[h.length - 1] || null; }
+  get previousElementSibling() { const h = this.parentNode ? this.parentNode.children : []; return h[h.indexOf(this) - 1] || null; }
+  get childElementCount() { return this.children.length; }
+  get className() { return this.getAttribute('class') || ''; }
+  set className(v) { this.setAttribute('class', v); }
+  get id() { return this.getAttribute('id') || ''; }
+  get hidden() { return this.hasAttribute('hidden'); }
+  set hidden(v) { if (v) this.setAttribute('hidden', ''); else this.removeAttribute('hidden'); }
+  get disabled() { return this.hasAttribute('disabled'); }
+  set disabled(v) { if (v) this.setAttribute('disabled', ''); else this.removeAttribute('disabled'); }
+  get title() { return this.getAttribute('title') || ''; }
+  set title(v) { this.setAttribute('title', v); }
+  get classList() {
+    const lista = () => this.className.split(/\s+/).filter(Boolean);
+    const cl = {
+      contains: c => lista().includes(c),
+      add: (...cs) => { this.className = [...new Set([...lista(), ...cs])].join(' '); },
+      remove: (...cs) => { this.className = lista().filter(x => !cs.includes(x)).join(' '); },
+      toggle: (c, f) => { const poner = f === undefined ? !lista().includes(c) : Boolean(f); if (poner) cl.add(c); else cl.remove(c); return poner; },
+    };
+    return cl;
+  }
+  setAttribute(k, v) { this.atributos.set(k, String(v)); }
+  getAttribute(k) { return this.atributos.has(k) ? this.atributos.get(k) : null; }
+  hasAttribute(k) { return this.atributos.has(k); }
+  removeAttribute(k) { this.atributos.delete(k); }
+  addEventListener(tipo, fn) { (this.oyentes[tipo] = this.oyentes[tipo] || []).push(fn); }
+  click() { for (const fn of this.oyentes.click || []) fn({ target: this, preventDefault() {} }); }
+  focus() { this.ownerDocument.activeElement = this; }
+  showModal() { this.open = true; }
+  close() { this.open = false; }
+  set innerHTML(v) { this._html = v; }
+  get innerHTML() { return this._html || ''; }
+  getBoundingClientRect() { return { x: 0, y: 0, width: 0, height: 0, top: 0, left: 0 }; }
+  descendientes() { const s = []; const ir = n => { for (const c of n.children) { s.push(c); ir(c); } }; ir(this); return s; }
+  querySelectorAll(selector) { return this.descendientes().filter(n => selector.split(',').some(s => encaja(n, s.trim()))); }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+}
+// Selectores simples: etiqueta, #id, .clase, [atributo], [atributo="v"] y :not([atributo]).
+function encaja(n, sel) {
+  let excluido = false;
+  let resto = sel.replace(/:not\(\[([\w-]+)\]\)/g, (_, a) => { if (n.hasAttribute(a)) excluido = true; return ''; });
+  if (excluido) return false;
+  const m = /^([a-z0-9]*)/i.exec(resto);
+  if (m[1] && n.tagName !== m[1].toUpperCase()) return false;
+  resto = resto.slice(m[1].length);
+  for (const [, tipo, valor, attr, v] of resto.matchAll(/([#.])([\w-]+)|\[([\w-]+)(?:="([^"]*)")?\]/g)) {
+    if (tipo === '#' && n.id !== valor) return false;
+    if (tipo === '.' && !n.classList.contains(valor)) return false;
+    if (attr && (!n.hasAttribute(attr) || (v !== undefined && n.getAttribute(attr) !== v))) return false;
+  }
+  return true;
+}
+function crearDocumento() {
+  const doc = { oyentes: {}, addEventListener() {} };
+  doc.createElement = tag => new FElemento(doc, tag);
+  doc.createElementNS = (_, tag) => new FElemento(doc, tag);
+  doc.createTextNode = t => new FTexto(doc, t);
+  doc.createDocumentFragment = () => { const f = new FElemento(doc, 'fragmento'); f.nodeType = 11; return f; };
+  doc.body = doc.createElement('body');
+  doc.activeElement = doc.body;
+  doc.contains = n => doc.body.contains(n);
+  doc.getElementById = id => (doc.body.id === id ? doc.body : doc.body.querySelector(`#${id}`));
+  const ids = ['barra', 'lateral', 'lienzo', 'botonera', 'acciones', 'camara', 'chips', 'pildoras', 'feed', 'nuevos', 'asa', 'contador',
+    'franja', 'avisos', 'tostadas', 'anuncio', 'p-regimen', 'p-fg', 'p-comite', 'p-nivel', 'p-modo', 'p-llm', 'p-maqueta',
+    'v-patrimonio', 'v-resultado', 'v-resultado-pct', 'v-caida', 'v-exposicion', 'v-posiciones'];
+  for (const id of ids) { const e = doc.createElement(id === 'lienzo' ? 'canvas' : 'div'); e.setAttribute('id', id); doc.body.appendChild(e); }
+  const tarjeta = doc.createElement('section'); tarjeta.setAttribute('id', 'tarjeta'); tarjeta.hidden = true; doc.body.appendChild(tarjeta);
+  const modal = doc.createElement('dialog'); modal.setAttribute('id', 'modal'); doc.body.appendChild(modal);
+  const cuerpo = doc.createElement('div'); cuerpo.setAttribute('id', 'modal-cuerpo'); modal.appendChild(cuerpo);
+  return doc;
+}
+
+const { crearMaqueta } = require('../web/js/maqueta.js');
+const cifras = require('../web/js/cifras.js');
+const T0 = Date.UTC(2026, 8, 30, 0, 45);                // 02:45 en Madrid
+const DOC = crearDocumento();
+globalThis.document = DOC;
+globalThis.window = { matchMedia: () => ({ matches: false }), addEventListener() {} };
+let instActual = null;
+paneles.iniciar({ instantanea: () => instActual, ahoraServidor: () => T0, comando: async () => ({ ok: true }) });
+const $ = id => DOC.getElementById(id);
+const nuevaInst = () => JSON.parse(JSON.stringify(crearMaqueta({ semilla: 7, ahora: T0 }).instantanea()));
+
+test('modal Reabrir sin directivas vigentes: ningún «null» suelto entre la explicación y el campo', () => {
+  const i = nuevaInst();
+  i.fondo.nivel = 'pausado';
+  instActual = i;
+  paneles.abrirModal('reabrir');
+  const cuerpo = $('modal-cuerpo');
+  const sueltos = cuerpo.childNodes.filter(n => n.nodeType === 3).map(n => n.textContent);
+  assert.deepEqual(sueltos, [], `textos sueltos en #modal-cuerpo: ${JSON.stringify(sueltos)}`);
+  assert.doesNotMatch(cuerpo.textContent, /null|undefined/);
+  assert.equal(DOC.activeElement.tagName, 'INPUT', 'el foco va al campo REABRIR');
+  paneles.cerrarModal();
+});
+
+test('Resultados se abre por arriba: foco en el título, no en el «Cerrar» del pie, y scroll a 0', () => {
+  instActual = nuevaInst();
+  $('modal').scrollTop = 1721;                         // donde lo dejaba el foco en «Cerrar»
+  paneles.abrirModal('resultados');
+  const foco = DOC.activeElement;
+  assert.notEqual(foco.textContent, 'Cerrar', 'el foco no puede ir al botón del pie');
+  assert.equal(foco.id, 'modal-titulo');
+  assert.equal(foco.getAttribute('tabindex'), '-1');
+  assert.equal($('modal').scrollTop, 0);
+  // Lo primero después de la cabecera es «¿Aporta algo el comité?», con qué compara.
+  const bloques = $('modal-cuerpo').children.filter(n => n.tagName === 'SECTION');
+  assert.equal(bloques[0].querySelector('h3').textContent, '¿Aporta algo el comité?');
+  assert.equal(bloques[0].querySelector('.que-compara').textContent,
+    'Mismas mesas, mismos límites y mismas órdenes tuyas (kill, pausa, Megáfono); solo cambia lo que decide el comité.');
+  paneles.cerrarModal();
+  // Los modales con campo siguen poniendo el foco en el campo.
+  paneles.abrirModal('kill');
+  assert.equal(DOC.activeElement.tagName, 'INPUT');
+  paneles.cerrarModal();
+});
+
+test('píldora y avisos con el tamaño REAL: DEFENSIVO ×0,5 por la reducción del Megáfono = ×0,25', () => {
+  const i = nuevaInst();
+  const hasta = T0 + 3 * 3600000;                      // 05:45 en Madrid
+  i.directivas.modo = 'DEFENSIVO';
+  i.cabecera.modoComite = 'DEFENSIVO';
+  i.directivas.reduccion = { factor: 0.5, hasta };
+  i.fondo.factorTamano = { total: 0.25, comite: 0.5, megafono: 0.5, caida: 1 };
+  instActual = i;
+  paneles.actualizarBarra(i, { ahoraServidor: T0 });
+  const pn = $('p-nivel');
+  assert.equal(pn.hidden, false);
+  assert.equal(pn.textContent, 'DEFENSIVO + MEGÁFONO ×0,25');
+  const aviso = 'Posiciones nuevas a ×0,25 del tamaño normal: modo DEFENSIVO del comité (×0,5) y reducción del Megáfono (×0,5 hasta las 05:45).';
+  assert.equal(pn.title, aviso);
+  assert.equal($('avisos').children[0].textContent, aviso, 'el recorte va el primero de los avisos');
+  // Solo la reducción del Megáfono (comité en NORMAL): también se ve.
+  i.directivas.modo = 'NORMAL'; i.cabecera.modoComite = 'NORMAL';
+  i.fondo.factorTamano = { total: 0.5, comite: 1, megafono: 0.5, caida: 1 };
+  paneles.actualizarBarra(i, { ahoraServidor: T0 });
+  assert.equal(pn.hidden, false);
+  assert.equal(pn.textContent, 'RIESGO ×0,5 hasta 05:45 · Megáfono');
+  assert.equal($('avisos').children[0].textContent, 'Posiciones nuevas a ×0,5 del tamaño normal: reducción del Megáfono (×0,5 hasta las 05:45).');
+  // Con el fondo en pausa manda la pausa: el tamaño no importa (no se abre nada).
+  i.fondo.nivel = 'pausado';
+  paneles.actualizarBarra(i, { ahoraServidor: T0 });
+  assert.equal(pn.textContent, 'PAUSADO');
+  assert.ok(!$('avisos').children.some(a => /Posiciones nuevas/.test(a.textContent)));
+  // Sin recortes, ni píldora ni aviso.
+  i.fondo.nivel = 'normal';
+  i.fondo.factorTamano = { total: 1, comite: 1, megafono: 1, caida: 1 };
+  paneles.actualizarBarra(i, { ahoraServidor: T0 });
+  assert.equal(pn.hidden, true);
+});
+
+test('ficha del puesto: la última señal con palabras, no con el id («nada»)', () => {
+  const i = nuevaInst();
+  const p = i.puestos.find(x => !x.posicion);
+  p.ultimaSenal = { accion: 'nada', t: Date.UTC(2026, 8, 30, 0, 0) };
+  instActual = i;
+  paneles.mostrarTarjeta({ tipo: 'puesto', id: p.id }, i);
+  const dts = $('tarjeta').querySelectorAll('dt');
+  const dt = dts.find(d => d.textContent === 'Última señal');
+  const dd = dt.parentNode.children[dt.parentNode.children.indexOf(dt) + 1];
+  assert.equal(dd.textContent, 'Esperar · 02:00');
+  paneles.ocultarTarjeta();
+  assert.equal(cifras.accionSenal('abrir'), 'Comprar');
+  assert.equal(cifras.accionSenal('cerrar'), 'Vender');
+  assert.equal(cifras.accionSenal('mantener'), 'Mantener');
+});

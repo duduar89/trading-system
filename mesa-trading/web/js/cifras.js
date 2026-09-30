@@ -199,10 +199,76 @@
 
   const vigente = (hasta, ahora) => hasta === null || hasta === undefined || !valido(ahora) || hasta > ahora;
 
+  // Factor «×0,25»: hasta tres decimales, sin ceros de más.
+  const factorTexto = f => `×${agrupar(nf(0, 3).format(f))}`;
+
+  // Tamaño real de las posiciones nuevas frente al normal. Se multiplican tres
+  // recortes del fondo entero: el modo DEFENSIVO del comité (×0,5 al capital de
+  // cada mesa, src/agentes/departamentos/mesas.js), la reducción del Megáfono y
+  // la de la caída desde el máximo (las dos en src/riesgo/limites.js, sobre el
+  // nocional ya recortado). Con DEFENSIVO y «reduce a la mitad» sale ×0,25.
+  // El multiplicador por mesa del comité no entra: es de cada mesa (su ficha).
+  const FACTOR_DEFENSIVO = 0.5;
+  function tamanoEntradas(defensivo, reduccion, multiplicadorCaida) {
+    const partes = [];
+    if (defensivo) {
+      partes.push({ origen: 'comité', rotulo: 'DEFENSIVO', factor: FACTOR_DEFENSIVO, hasta: null,
+        texto: `modo DEFENSIVO del comité (${factorTexto(FACTOR_DEFENSIVO)})` });
+    }
+    if (reduccion && valido(reduccion.factor) && reduccion.factor < 1) {
+      partes.push({ origen: 'Megáfono', rotulo: 'MEGÁFONO', factor: reduccion.factor, hasta: valido(reduccion.hasta) ? reduccion.hasta : null,
+        texto: `reducción del Megáfono (${factorTexto(reduccion.factor)}${valido(reduccion.hasta) ? ` hasta las ${hora(reduccion.hasta)}` : ''})` });
+    }
+    if (valido(multiplicadorCaida) && multiplicadorCaida < 1) {
+      partes.push({ origen: 'vigilante', rotulo: 'CAÍDA', factor: multiplicadorCaida, hasta: null,
+        texto: `caída desde el máximo (${factorTexto(multiplicadorCaida)})` });
+    }
+    const factor = partes.reduce((f, p) => f * p.factor, 1);
+    return { factor, partes };
+  }
+
+  // El mismo recorte a partir del `fondo.factorTamano` del servidor (§7), que
+  // es el que se aplica de verdad: manda él y la interfaz no lo recalcula.
+  // `reduccion` (directivas) solo pone el «hasta» del Megáfono.
+  function tamanoDelServidor(ft, reduccion) {
+    const f = x => (valido(x) ? x : 1);
+    const t = tamanoEntradas(f(ft.comite) < 1, f(ft.megafono) < 1 ? { factor: f(ft.megafono), hasta: reduccion ? reduccion.hasta : null } : null, f(ft.caida));
+    const comite = t.partes.find(p => p.origen === 'comité');
+    if (comite && f(ft.comite) !== FACTOR_DEFENSIVO) {
+      comite.factor = f(ft.comite);
+      comite.texto = `modo DEFENSIVO del comité (${factorTexto(comite.factor)})`;
+    }
+    t.factor = valido(ft.total) ? ft.total : t.partes.reduce((x, p) => x * p.factor, 1);
+    return t;
+  }
+
+  // Píldora del tamaño: «DEFENSIVO ×0,5», «RIESGO ×0,5 hasta 11:40 · Megáfono»,
+  // «CAÍDA ×0,5» o, con varios, «DEFENSIVO + MEGÁFONO ×0,25». '' si no hay recorte.
+  function rotuloTamano(tam) {
+    const partes = (tam && tam.partes) || [];
+    if (!partes.length) return '';
+    if (partes.length === 1) {
+      const p = partes[0];
+      if (p.origen === 'Megáfono') return `RIESGO ${factorTexto(p.factor)}${valido(p.hasta) ? ` hasta ${hora(p.hasta)}` : ''} · Megáfono`;
+      return `${p.rotulo} ${factorTexto(p.factor)}`;
+    }
+    return `${partes.map(p => p.rotulo).join(' + ')} ${factorTexto(tam.factor)}`;
+  }
+
+  // La frase entera, para el aviso y el título de la píldora.
+  function explicacionTamano(tam) {
+    const partes = (tam && tam.partes) || [];
+    if (!partes.length) return '';
+    const causas = partes.map(p => p.texto);
+    const lista = causas.length > 1 ? `${causas.slice(0, -1).join(', ')} y ${causas[causas.length - 1]}` : causas[0];
+    return `Posiciones nuevas a ${factorTexto(tam.factor)} del tamaño normal: ${lista}.`;
+  }
+
   // Qué puede hacer de verdad el fondo ahora. `fondo.nivel` solo cuenta el
   // vigilante, la pausa y el kill; el SOLO_CERRAR del comité y el «solo cerrar»
   // del Megáfono también bloquean aperturas (src/riesgo/limites.js) sin tocarlo.
   // `ahora` es el reloj de la mesa (inst.ahora o su proyección), nunca Date.now().
+  // `tamano`: el recorte real de las posiciones nuevas (tamanoEntradas).
   function nivelEfectivo(inst, ahora) {
     const i = inst || {};
     const fondo = i.fondo || {};
@@ -210,7 +276,9 @@
     const modo = d.modo || (i.cabecera && i.cabecera.modoComite) || 'NORMAL';
     const t = valido(ahora) ? ahora : i.ahora;
     const reduccion = d.reduccion && Number.isFinite(d.reduccion.factor) && vigente(d.reduccion.hasta, t) ? d.reduccion : null;
-    const base = { defensivo: modo === 'DEFENSIVO', reduccion };
+    const ft = fondo.factorTamano;
+    const tamano = ft && typeof ft === 'object' ? tamanoDelServidor(ft, reduccion) : tamanoEntradas(modo === 'DEFENSIVO', reduccion, fondo.multiplicadorCaida);
+    const base = { defensivo: modo === 'DEFENSIVO', reduccion, tamano };
     if (fondo.nivel && fondo.nivel !== 'normal') return Object.assign(base, { nivel: fondo.nivel, origen: 'fondo', motivo: fondo.motivo || null, hasta: null });
     if (modo === 'SOLO_CERRAR') return Object.assign(base, { nivel: 'solo_cerrar', origen: 'comité', motivo: 'Decisión del comité: solo cerrar.', hasta: null });
     if (valido(d.soloCerrarHasta) && vigente(d.soloCerrarHasta, t)) {
@@ -250,6 +318,10 @@
     }
     return salida.concat(bloqueosMesa(inst, puesto.mesaId, t));
   }
+
+  // Última señal de la estrategia de un puesto (§4.3: la acción viaja como id).
+  const ACCION_SENAL = { abrir: 'Comprar', mantener: 'Mantener', cerrar: 'Vender', nada: 'Esperar' };
+  const accionSenal = a => ACCION_SENAL[a] || (a ? String(a).replace(/_/g, ' ') : '—');
 
   // Capital que ninguna mesa tiene asignado (queda en efectivo). Manda el
   // cabecera.sinAsignar del servidor (§7); sin él (servidor viejo), 1 − Σ pesos
@@ -339,5 +411,6 @@
     rotuloMesa, datosParados, MARCO_CORTO,
     usd, pct, precio, cantidad, numero, hora, dia, fechaCorta, momento, hace, cuentaAtras, claseSigno, suavizar, reducirMovimiento, animar, agrupar,
     ZONA, ESTADO_MESA, MODO_COMITE, estadoMesa, modoComite, nivelEfectivo, bloqueosMesa, bloqueosPuesto, sinAsignar, medidaLimites, motivo503, precioViejo,
+    FACTOR_DEFENSIVO, tamanoEntradas, rotuloTamano, explicacionTamano, factorTexto, ACCION_SENAL, accionSenal,
   };
 });

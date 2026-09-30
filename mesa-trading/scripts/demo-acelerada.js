@@ -17,7 +17,8 @@
 //     data/) el estado se recupera igual;
 //   - ninguna operación se apunta dos veces en operaciones.jsonl (mismo id y
 //     misma entrada) y el bloqueo de la carpeta (.proceso) se suelta al parar;
-//   - al final, un kill switch forzado lo cierra todo y deja el fondo bloqueado.
+//   - al final, un kill switch forzado lo cierra todo y deja el fondo bloqueado,
+//     y cierra también la sombra «mismas mesas sin comité» (§5.5).
 // Sin --con-llm no se usa el LLM aunque haya clave en el .env (la demo no gasta).
 
 const fs = require('fs');
@@ -229,6 +230,7 @@ async function ejecutarDemo({ dias = 60, semilla = 42, inicio = INICIO_POR_DEFEC
   if (errores) fallar(`${errores} errores dentro de los departamentos (el primero: ${(orq.errores[0] || {}).mensaje || 'antes del reinicio'})`);
 
   // ---- Kill switch forzado ----
+  const antesKill = { fondo: orq.vivo.patrimonio, sinComite: orq.vivo.patrimonioSombra };
   const rKill = await orq.comando('kill', { confirmacion: 'KILL' });
   if (!rKill.ok) fallar(`el kill no respondió ok: ${rKill.mensaje}`);
   const posTrasKill = await p.broker.posiciones();
@@ -243,6 +245,13 @@ async function ejecutarDemo({ dias = 60, semilla = 42, inicio = INICIO_POR_DEFEC
   const rSinConfirmar = await orq.comando('kill', {});
   if (rSinConfirmar.codigo !== 400) fallar('un kill sin confirmación no devuelve 400');
   await comprobarCuadre('tras el kill');
+  // La sombra «sin comité» sufre el kill como el fondo (§5.5): no le queda nada
+  // abierto (salvo acciones que esperan a la apertura, como las reales), y no
+  // abre nada con el fondo bloqueado.
+  const esperanSombra = new Set((orq.estado.sombra.pendientes || []).filter(o => o.lado === 'venta').map(o => o.puestoId));
+  const sombraAbierta = orq.libros.listaPuestos({ sombra: true }).filter(x => x.cantidad > 1e-12 && !esperanSombra.has(x.puestoId));
+  if (sombraAbierta.length) fallar(`tras el kill la sombra «sin comité» sigue abierta en ${sombraAbierta.map(x => x.puestoId).join(', ')}`);
+  const trasKill = { fondo: orq.vivo.patrimonio, sinComite: orq.vivo.patrimonioSombra };
   await orq.detener();
   if (fs.existsSync(path.join(dir, '.proceso'))) fallar('el bloqueo de la carpeta (.proceso) no se suelta al parar');
   const vistas = new Set();
@@ -272,7 +281,7 @@ async function ejecutarDemo({ dias = 60, semilla = 42, inicio = INICIO_POR_DEFEC
     kills, reaperturas,
     laboratorio: { ensayos: e.laboratorio.ensayosTotales, hipotesis: e.laboratorio.hipotesis.length, aprobadas: e.laboratorio.hipotesis.filter(h => h.estado === 'aprobada').length },
     mesas: inst.mesas.map(m => ({ id: m.id, estado: m.estado, peso: m.peso, operaciones: m.metricas.operaciones, pnlTotal: m.metricas.pnlTotal })),
-    kill: { cerradas: rKill.datos ? rKill.datos.cerradas.length : 0 },
+    kill: { cerradas: rKill.datos ? rKill.datos.cerradas.length : 0, antes: antesKill, tras: trasKill },
     reinicioIgual: antes === despues,
     errores,
   };
@@ -296,6 +305,7 @@ function imprimir({ resumen: r, fallos }) {
     `Mensajes por canal: ${Object.entries(r.mensajesPorCanal).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ')}`,
     `Coste LLM: ${f.usd(r.costeLLMUsd)}`,
     `Reinicio simulado: ${r.reinicioIgual ? 'estado recuperado igual' : 'DISTINTO'} · kill final: ${r.kill.cerradas} posiciones cerradas, fondo bloqueado`,
+    `Fondo − sin comité: ${f.usd(r.kill.antes.fondo - r.kill.antes.sinComite, { signo: true })} antes del kill, ${f.usd(r.kill.tras.fondo - r.kill.tras.sinComite, { signo: true })} después (el kill cierra las dos carteras)`,
   ];
   console.log(lineas.join('\n'));
   if (fallos.length) {

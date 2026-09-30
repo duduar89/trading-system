@@ -37,6 +37,9 @@ body {
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+/* Título de un modal que se lee (Resultados): recibe el foco al abrir para que se abra por
+   arriba y el lector empiece por él; no es un control, así que sin anillo. */
+.modal-cab h2[tabindex="-1"]:focus, .modal-cab h2[tabindex="-1"]:focus-visible { outline: none; }
 
 .app {
   display: grid;

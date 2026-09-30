@@ -12,6 +12,16 @@
 //   6. Megáfono: lo pendiente.
 //   7. Presidenta: decisión.
 //
+// Datos frescos: el comité tarda (pausas de pantalla, la llamada al LLM) y
+// mientras está reunido un humano puede reabrir, pausar, lanzar el kill o
+// aplicar el Megáfono, y el latido sigue. Por eso cada punto se redacta con el
+// estado del momento en que se publica (reunirDatos otra vez), y si cambió
+// desde que empezó la reunión, el punto afectado lo dice (notaCambios). La
+// decisión se toma con el estado del final: los votos se recalculan y, si ya
+// se habían dicho otros, la decisión lo dice. La del LLM se pidió con los
+// datos del principio: si los votos cambiaron, no se aplica (plan por defecto
+// con los votos del final).
+//
 // La decisión es UNA llamada al LLM (uso 'comite') con esquema estricto:
 // modo de una lista, multiplicadores de {0; 0,5; 1}, vetos de 24 h de activos
 // del universo. Sin LLM, o si no valida: plan por defecto (mayoría de votos,
@@ -133,6 +143,58 @@ function reunirDatos(ctx) {
   return { hora: f.hora(ahora), controller, macro, riesgos, mesas, laboratorio, megafono, votos: { macro: votoMacro, riesgos: votoRiesgos }, eventosGraves: [...new Set(graves)] };
 }
 
+const NIVEL_TEXTO = Object.freeze({ normal: 'normal', solo_cerrar: 'solo cerrar', pausado: 'en pausa', bloqueado: 'bloqueado' });
+const ACCION_HUMANA = Object.freeze({
+  reabrir: 'ha reabierto el fondo', pausar: 'ha pausado el fondo', kill: 'ha lanzado el kill switch', megafono: 'ha aplicado el Megáfono',
+});
+const NOMBRE_VOTO = Object.freeze({ macro: 'Macro', riesgos: 'Riesgos' });
+
+const conHumano = (humanas, tipos) => {
+  const hechas = [...new Set(humanas.map(a => a.tipo).filter(t => tipos.includes(t)))];
+  if (!hechas.length) return '';
+  const partes = hechas.map(t => ACCION_HUMANA[t]);
+  return `un humano ${partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : partes[0]}`;
+};
+
+// Lo que cambió en un punto desde que se abrió la reunión (datos `antes`) hasta
+// que se publica (`ahora`), dicho por quien lo presenta; null si nada.
+// `humanas`: lo que se pulsó en el panel mientras tanto ({ tipo }).
+function notaCambios(punto, antes, ahora, humanas = []) {
+  if (punto === 'controller') {
+    const kill = humanas.some(a => a.tipo === 'kill') || (antes.riesgos.nivel !== 'bloqueado' && ahora.riesgos.nivel === 'bloqueado');
+    return kill ? 'Durante el comité se ha lanzado el kill switch.' : null;
+  }
+  if (punto === 'macro') {
+    return antes.macro.regimen !== ahora.macro.regimen ? `Al abrir el comité el régimen era ${antes.macro.regimen}.` : null;
+  }
+  if (punto === 'riesgos') {
+    const quien = conHumano(humanas, ['reabrir', 'pausar', 'kill']);
+    if (antes.riesgos.nivel !== ahora.riesgos.nivel) {
+      return `Durante el comité el fondo ha pasado de ${NIVEL_TEXTO[antes.riesgos.nivel] || antes.riesgos.nivel} a ${NIVEL_TEXTO[ahora.riesgos.nivel] || ahora.riesgos.nivel}${quien ? `: ${quien}` : ''}.`;
+    }
+    if (antes.votos.riesgos !== ahora.votos.riesgos) return `Al abrir el comité mi voto era ${antes.votos.riesgos}.`;
+    return quien ? `Durante el comité ${quien}.` : null;
+  }
+  if (punto === 'megafono') {
+    const quien = conHumano(humanas, ['megafono']);
+    if (quien) return `Durante el comité ${quien}.`;
+    if (antes.megafono.vigentes !== ahora.megafono.vigentes) return `Al abrir el comité había ${antes.megafono.vigentes} vigente${antes.megafono.vigentes === 1 ? '' : 's'}.`;
+    return null;
+  }
+  return null;
+}
+
+// Entrada del LLM (y con la que se comprueban sus cifras) para unos datos.
+function entradaDe(ctx, datos, plan) {
+  return {
+    hora: datos.hora, controller: datos.controller, macro: datos.macro, riesgos: datos.riesgos,
+    mesas: { mejor: datos.mesas.mejor, peor: datos.mesas.peor, lista: datos.mesas.lista.map(m => ({ id: m.id, nombre: m.nombre, estado: m.estado, peso: m.peso, pnl: m.pnl })) },
+    laboratorio: datos.laboratorio, megafono: datos.megafono, votos: datos.votos, eventosGraves: datos.eventosGraves,
+    planPorDefecto: { modo: plan.modo, multiplicadores: plan.multiplicadores, vetos: plan.vetos },
+    limites: { maxExposicionBruta: ctx.limites.maxExposicionBruta, maxExposicionCripto: ctx.limites.maxExposicionCripto, perdidaDiariaSoloCerrar: ctx.limites.perdidaDiariaSoloCerrar, caidaKill: ctx.limites.caidaKill },
+  };
+}
+
 // Mayoría de votos; en empate, el más prudente. El DEFENSIVO de Riesgos es veto.
 function planPorDefecto(datos, mesasActivas) {
   const votos = Object.values(datos.votos);
@@ -239,69 +301,97 @@ async function celebrar(ctx, { motivo = 'programado' } = {}) {
       texto: `Abro el comité de las ${f.hora(t0)}${motivo === 'demanda' ? ' (convocado a demanda)' : ''}. Orden del día: siete puntos.`,
       datos: { motivo }, importancia: 3,
     });
-    const datos = reunirDatos(ctx);
+    // Lo que se pulse en el panel desde ahora (Reabrir, Pausar, kill, Megáfono).
+    const seq0 = ctx.seqHumana || 0;
+    const humanas = () => (ctx.accionesHumanas || []).filter(a => a.seq > seq0);
+    const inicio = reunirDatos(ctx);
     const mesasActivas = e.mesas.filter(m => m.estado !== 'banquillo');
     const simbolos = ctx.universo.map(a => a.simbolo);
-    const plan = planPorDefecto(datos, mesasActivas);
-    let decision = { ...plan, vetoRiesgos: false };
-    let fuente = 'defecto';
-    let razon = null;
     let costeUsd = 0;
-    const intervenciones = {};
     let motivoDefecto = null;
+    let respuestaLLM = null;          // lo que devolvió el LLM, pedido con los datos de `inicio`
+    const intervenciones = {};        // sin comprobar: cada una se comprueba al publicar su punto
 
     if (ctx.llm && ctx.llm.activo) {
-      const entrada = {
-        hora: datos.hora, controller: datos.controller, macro: datos.macro, riesgos: datos.riesgos,
-        mesas: { mejor: datos.mesas.mejor, peor: datos.mesas.peor, lista: datos.mesas.lista.map(m => ({ id: m.id, nombre: m.nombre, estado: m.estado, peso: m.peso, pnl: m.pnl })) },
-        laboratorio: datos.laboratorio, megafono: datos.megafono, votos: datos.votos, eventosGraves: datos.eventosGraves,
-        planPorDefecto: { modo: plan.modo, multiplicadores: plan.multiplicadores, vetos: plan.vetos },
-        limites: { maxExposicionBruta: ctx.limites.maxExposicionBruta, maxExposicionCripto: ctx.limites.maxExposicionCripto, perdidaDiariaSoloCerrar: ctx.limites.perdidaDiariaSoloCerrar, caidaKill: ctx.limites.caidaKill },
-      };
+      const entrada = entradaDe(ctx, inicio, planPorDefecto(inicio, mesasActivas));
       const r = await ctx.llm.pedirJSON({
         uso: 'comite', proposito: 'comite', sistema: SISTEMA, instrucciones: INSTRUCCIONES, entrada,
         esquema: esquemaDecision(mesasActivas, simbolos), maxTokens: 4000, esfuerzo: 'medium',
       });
       costeUsd = r.costeUsd || 0;
       if (r.ok) {
-        decision = normalizarDecision(r.datos, mesasActivas, simbolos, datos.votos);
-        fuente = 'llm';
-        const rz = String(r.datos.razon || '').trim();
-        // Con el veto de Riesgos el modo aplicado no es el que razonó el LLM.
-        const razonCuadra = rz && !decision.vetoRiesgos && !nombra(RE_MODO, rz).some(m => m !== decision.modo) && !contradice('decision', rz, datos);
-        if (razonCuadra && verificarCifras(rz, entrada).ok) razon = plantillas.frase(rz, 200);
+        respuestaLLM = r.datos;
         for (const it of r.datos.intervenciones || []) {
           const texto = String(it.texto || '').trim();
-          if (!texto || !PUNTOS.includes(it.agente) || intervenciones[it.agente]) continue;
-          if (contradice(it.agente, texto, datos)) continue;
-          if (verificarCifras(texto, entradaDelPunto(entrada, it.agente)).ok) intervenciones[it.agente] = plantillas.frase(texto, 200);
+          if (texto && PUNTOS.includes(it.agente) && !intervenciones[it.agente]) intervenciones[it.agente] = texto;
         }
       } else {
         motivoDefecto = r.motivo;
       }
     }
 
+    const votosDichos = {};
+    let nivelDicho = null;
     for (const punto of PUNTOS) {
       await pausa();
-      let texto = intervenciones[punto] || textoPlantilla(punto, datos);
+      // El estado del momento en que se publica el punto, no el del principio.
+      const datos = reunirDatos(ctx);
+      const entradaPunto = entradaDelPunto(entradaDe(ctx, datos, planPorDefecto(datos, mesasActivas)), punto);
+      const propuesta = intervenciones[punto];
+      const vale = propuesta && !contradice(punto, propuesta, datos) && verificarCifras(propuesta, entradaPunto).ok;
+      let texto = vale ? plantillas.frase(propuesta, 200) : textoPlantilla(punto, datos);
       const esVoto = punto === 'macro' || punto === 'riesgos';
       // El voto del código se dice siempre, salvo que el texto ya lo diga con ese valor.
-      if (esVoto && intervenciones[punto] && !new RegExp(`\\bvoto:? ${datos.votos[punto]}\\b`, 'i').test(texto)) texto = plantillas.frase(`${texto} Voto ${datos.votos[punto]}.`, 200);
+      if (esVoto && vale && !new RegExp(`\\bvoto:? ${datos.votos[punto]}\\b`, 'i').test(texto)) texto = plantillas.frase(`${texto} Voto ${datos.votos[punto]}.`, 200);
+      const cambio = notaCambios(punto, inicio, datos, humanas());
+      if (cambio) texto = plantillas.frase(`${texto} ${cambio}`, 240);
+      if (esVoto) votosDichos[punto] = datos.votos[punto];
+      if (punto === 'riesgos') nivelDicho = datos.riesgos.nivel;
       ctx.bus.publicar({
         de: PORTAVOZ[punto], canal: 'comite', tipo: esVoto ? 'voto' : 'informe', texto,
-        datos: { punto, fuente: intervenciones[punto] ? 'llm' : 'plantilla', ...(esVoto ? { voto: datos.votos[punto] } : {}), ...(punto === 'riesgos' ? { cercanos: datos.riesgos.cercanos } : {}) },
+        datos: {
+          punto, fuente: vale ? 'llm' : 'plantilla', ...(esVoto ? { voto: datos.votos[punto] } : {}), ...(punto === 'riesgos' ? { cercanos: datos.riesgos.cercanos } : {}),
+          ...(cambio ? { cambio } : {}),
+        },
         importancia: 2,
       });
     }
     await pausa();
+    // La decisión, con el estado del final de la reunión.
+    const final = reunirDatos(ctx);
+    const activasFinal = e.mesas.filter(m => m.estado !== 'banquillo');
+    const plan = planPorDefecto(final, activasFinal);
+    let decision = { ...plan, vetoRiesgos: false };
+    let fuente = 'defecto';
+    let razon = null;
+    const cambiados = Object.keys(final.votos).filter(k => final.votos[k] !== inicio.votos[k]);
+    if (respuestaLLM && cambiados.length) {
+      motivoDefecto = `los votos cambiaron durante el comité (${cambiados.map(k => `${NOMBRE_VOTO[k] || k} ${inicio.votos[k]} → ${final.votos[k]}`).join(', ')}): la decisión del LLM se tomó con los de antes`;
+    } else if (respuestaLLM) {
+      decision = normalizarDecision(respuestaLLM, mesasActivas, simbolos, final.votos);
+      fuente = 'llm';
+      const rz = String(respuestaLLM.razon || '').trim();
+      // Con el veto de Riesgos el modo aplicado no es el que razonó el LLM.
+      const razonCuadra = rz && !decision.vetoRiesgos && !nombra(RE_MODO, rz).some(m => m !== decision.modo) && !contradice('decision', rz, final);
+      if (razonCuadra && verificarCifras(rz, entradaDe(ctx, final, plan)).ok) razon = plantillas.frase(rz, 200);
+    }
     const ahora = ctx.reloj.ahora();
     aplicarDecision(ctx, decision, ahora);
     let texto = plantillas.decisionComite({ ...decision, fuente }, e.mesas);
-    if (decision.vetoRiesgos) texto = plantillas.frase(`${texto} Riesgos vota ${datos.votos.riesgos}: veto a NORMAL.`, 200);
+    if (decision.vetoRiesgos) texto = plantillas.frase(`${texto} Riesgos vota ${final.votos.riesgos}: veto a NORMAL.`, 200);
+    // Un voto dicho en su punto que ya no es el del final: se recalculó.
+    const recalculados = Object.keys(votosDichos).filter(k => votosDichos[k] !== final.votos[k]);
+    if (recalculados.length) {
+      const porque = k => (k === 'riesgos' && nivelDicho !== final.riesgos.nivel ? `; el fondo está ahora ${NIVEL_TEXTO[final.riesgos.nivel] || final.riesgos.nivel}` : '');
+      texto = plantillas.frase(`${texto} Votos recalculados al cerrar: ${recalculados.map(k => `${NOMBRE_VOTO[k] || k} ${final.votos[k]} (dijo ${votosDichos[k]}${porque(k)})`).join(', ')}.`, 280);
+    }
     if (razon) texto = plantillas.frase(`${texto} ${razon}`, 280);
     ctx.bus.publicar({
       de: 'cio', canal: 'comite', tipo: 'decision', texto,
-      datos: { modo: decision.modo, multiplicadores: decision.multiplicadores, vetos: decision.vetos, fuente, votos: datos.votos, motivoPlanPorDefecto: motivoDefecto },
+      datos: {
+        modo: decision.modo, multiplicadores: decision.multiplicadores, vetos: decision.vetos, fuente, votos: final.votos, motivoPlanPorDefecto: motivoDefecto,
+        ...(recalculados.length ? { votosDichos } : {}),
+      },
       importancia: 3, costeUsd,
     });
     const c = e.comite;
@@ -318,4 +408,4 @@ async function celebrar(ctx, { motivo = 'programado' } = {}) {
   }
 }
 
-module.exports = { celebrar, reunirDatos, planPorDefecto, esquemaDecision, normalizarDecision, aplicarDecision, contradice, entradaDelPunto, JEFES, PUNTOS, MODOS };
+module.exports = { celebrar, reunirDatos, planPorDefecto, esquemaDecision, normalizarDecision, aplicarDecision, contradice, entradaDelPunto, entradaDe, notaCambios, JEFES, PUNTOS, MODOS };

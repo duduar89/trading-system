@@ -1,5 +1,6 @@
 'use strict';
 // Arranque de la mesa: node src/index.js [--modo=auto|alpaca|simulado|sintetico] [--velocidad=600] [--puerto=8765] [--datos=carpeta]
+// (--puerto=0: el sistema elige un puerto libre y el banner dice cuál)
 //
 //   alpaca     cuenta PAPER de Alpaca (datos y bróker, con un solo limitador para los dos)
 //   simulado   precios reales de cripto de Alpaca (sin claves) y bróker simulado con 100.000 $
@@ -221,7 +222,6 @@ async function main() {
     `  Datos: ${config.carpetaDatos}`,
   ];
   const avisos = avisosDeArranque({ config, llm, orquestador });
-  console.log([...lineas, ...avisos.map(a => `  Aviso: ${a}`), '  Ctrl+C para parar (guarda el estado).', ''].join('\n'));
 
   let parar = false;
   let cerrando = null;
@@ -276,6 +276,12 @@ async function main() {
   // SIGHUP solo en Windows (cerrar la ventana de la consola). En Linux y Mac,
   // manejarlo anularía el nohup de quien arranca la mesa en segundo plano.
   if (process.platform === 'win32') process.on('SIGHUP', () => cerrar('Ventana cerrada', TOPE_CIERRE_VENTANA_MS));
+
+  // El banner, DESPUÉS de los manejadores: dice «Ctrl+C para parar (guarda el
+  // estado)», y un Ctrl+C que llegara entre el banner y process.on('SIGINT')
+  // mataría el proceso sin guardar ni soltar el bloqueo (quien lanza la mesa
+  // desde un script manda la señal en cuanto lee la línea).
+  console.log([...lineas, ...avisos.map(a => `  Aviso: ${a}`), '  Ctrl+C para parar (guarda el estado).', ''].join('\n'));
 
   // Bucle: tiempo real → un paso por latido; sintético → avanza el reloj 5 min
   // y duerme (5 min / velocidad) de tiempo real.

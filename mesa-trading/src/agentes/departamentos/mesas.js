@@ -6,8 +6,11 @@
 //   capital de mesa = patrimonio · peso · multiplicador del comité · (0,5 si DEFENSIVO)
 //
 // En paralelo, el puesto sombra «sin comité» decide lo mismo con su propia
-// posición y su propia cartera: multiplicador 1, sin directivas y sin bróker
-// (se llena en los libros al precio actual con los costes del simulado).
+// posición y su propia cartera, sin bróker (se llena en los libros al precio
+// actual con los costes del simulado). Sufre todo lo que no es el comité
+// (§5.5): el nivel del fondo real, el kill, el Megáfono y las noticias graves;
+// no le llegan el DEFENSIVO ni el SOLO_CERRAR del comité, sus multiplicadores
+// por mesa ni sus vetos.
 //
 // En vivo se prepara con velasNecesarias(mesa) velas: así la decisión y el
 // stop del último índice son los del backtest con todo el histórico
@@ -31,6 +34,8 @@ const { dimensionar } = require('../../cuant/dimensionado');
 const universo = require('../../mercado/universo');
 const plantillas = require('../plantillas');
 const riesgos = require('./riesgos');
+const { normalizarDirectivas } = require('../../riesgo/limites');
+const { directivasVigentes } = require('../megafono');
 const { valorEn, RETRASO_FG } = require('../../mercado/sentimiento');
 const calendario = require('../../mercado/calendario');
 const { inicioVela, MIN } = require('../../util/reloj');
@@ -39,10 +44,28 @@ const { EPS, etiqueta, puestoId, puestoSombraId, agenteDePuesto, precioDe, isoCo
 const MARCOS = universo.MARCOS;
 const COMPROBAR_ACCIONES = 15 * MIN;
 const ESPERA_VELA = 10 * MIN;
+// Modo DEFENSIVO del comité: las mesas operan con la mitad de capital (§6.7).
+const FACTOR_DEFENSIVO = 0.5;
 
 function multiplicador(ctx, mesaId) {
   const m = ctx.estado.directivas.multiplicadores;
   return m && typeof m[mesaId] === 'number' ? m[mesaId] : 1;
+}
+
+// Recorte que se aplica DE VERDAD al tamaño de cada apertura nueva del fondo
+// real (§7, fondo.factorTamano): el DEFENSIVO del comité aquí, en el capital
+// de la mesa; la reducción del Megáfono y la caída, en limites.js sobre el
+// nocional. Se lee de las mismas fuentes que usan ellos, para que la interfaz
+// no lo recalcule (y no diga ×0,5 cuando es ×0,25). El multiplicador por mesa
+// del comité no entra: es de cada mesa.
+function factorTamano(ctx, ahora = ctx.reloj.ahora()) {
+  const e = ctx.estado;
+  const comite = e.directivas.modo === 'DEFENSIVO' ? FACTOR_DEFENSIVO : 1;
+  const r = normalizarDirectivas(directivasVigentes(e.directivas, ahora), ahora).reduccion;
+  const megafono = r ? r.factor : 1;
+  const mc = e.fondo.multiplicadorCaida;
+  const caida = typeof mc === 'number' && mc > 0 && mc < 1 ? mc : 1;
+  return { total: comite * megafono * caida, comite, megafono, caida };
 }
 
 // Capital con el que dimensiona la mesa. Con multiplicador 0 se dimensiona
@@ -53,7 +76,7 @@ function capitalMesa(ctx, mesa, { sombra = false, paraProponer = false } = {}) {
   if (sombra) return (ctx.vivo.patrimonioSombra || 0) * peso;
   let mult = multiplicador(ctx, mesa.id);
   if (paraProponer && mult === 0) mult = 1;
-  const defensivo = ctx.estado.directivas.modo === 'DEFENSIVO' ? 0.5 : 1;
+  const defensivo = ctx.estado.directivas.modo === 'DEFENSIVO' ? FACTOR_DEFENSIVO : 1;
   return (ctx.vivo.patrimonio || 0) * peso * mult * defensivo;
 }
 
@@ -98,8 +121,19 @@ function contextoEstrategia(ctx, mesa, t = ctx.reloj.ahora()) {
   return { regimen: m.regimen ? m.regimen.valor : null, fg, filtros: mesa.filtros || [] };
 }
 
+// Tarjeta del puesto (estadoTexto): si el fondo no deja abrir (kill, pausa,
+// solo cerrar por la pérdida del día) o la mesa está en el banquillo, lo dice
+// eso; si no, la espera de la estrategia (textoEstrategia).
 function textoPuesto(ctx, mesa, simbolo, senal, pLibros) {
-  if (ctx.estado.fondo.nivel === 'bloqueado') return 'Fondo bloqueado por el kill switch: no se opera hasta Reabrir.';
+  return textoNivel(ctx, mesa, simbolo, pLibros) || textoEstrategia(ctx, mesa, simbolo, senal, pLibros);
+}
+
+// Lo que dice la tarjeta por el nivel del fondo o el banquillo, o null. Con
+// posición, la pausa y el solo cerrar no tapan la posición (la instantánea la
+// rehace con las cifras de ahora); el kill sí, como en cada vela bloqueada.
+function textoNivel(ctx, mesa, simbolo, pLibros) {
+  const nivel = ctx.estado.fondo.nivel;
+  if (nivel === 'bloqueado') return 'Fondo bloqueado por el kill switch: no se opera hasta Reabrir.';
   if (mesa.estado === 'banquillo') {
     // Con peso 0 la sombra de la mesa dimensiona con 0 $: no abre nada; lo que
     // tuviera abierto en sombra solo se cierra por su regla.
@@ -108,6 +142,15 @@ function textoPuesto(ctx, mesa, simbolo, senal, pLibros) {
       ? `Mesa en el banquillo: no abre nada; solo termina en sombra lo que tenía abierto en ${etiqueta(simbolo)}.`
       : 'Mesa en el banquillo: no abre nada, ni real ni en sombra.';
   }
+  if (pLibros && pLibros.cantidad > EPS) return null;
+  if (nivel === 'pausado') return 'Fondo en pausa: no se abre nada hasta Reabrir.';
+  if (nivel === 'solo_cerrar') return 'Solo cerrar hasta las 00:00 UTC por la pérdida del día: no se abre nada.';
+  return null;
+}
+
+// La espera de la estrategia (o la posición, con sus cifras): lo que dice el
+// operador en el chat con cada vela.
+function textoEstrategia(ctx, mesa, simbolo, senal, pLibros) {
   const pos = pLibros && pLibros.cantidad > EPS ? pLibros : null;
   // El % abierto es el de la tabla del puesto (neto de la comisión de entrada).
   const vp = ctx.vivo.valoracion && ctx.vivo.valoracion.porPuesto ? ctx.vivo.valoracion.porPuesto[puestoId(mesa.id, simbolo)] : null;
@@ -118,6 +161,36 @@ function textoPuesto(ctx, mesa, simbolo, senal, pLibros) {
     posicion: pos ? { cantidad: pos.cantidad, entrada: pos.costeMedio, stop: pos.stop, pnlAbiertoPct: pct } : null,
     estadoEstrategia: senal ? senal.estado : null,
   });
+}
+
+// Rehace en el acto la tarjeta de cada puesto con el nivel del fondo de ahora
+// (tras Reabrir, Pausar, el kill o un cambio del vigilante). Si no, la de un
+// puesto sin posición seguía con el nivel viejo hasta su vela siguiente: hasta
+// 4 h en las mesas de 4H y 24 h en las de 1D. En nivel normal y sin posición
+// vuelve a la espera de la estrategia en su última vela (aux.espera); si en
+// esa vela tenía posición o iba a abrir, esa frase ya no vale y dice
+// «Esperando señal». Sin ninguna vela todavía, la tarjeta queda vacía y la
+// instantánea dice «Esperando la primera vela…».
+function refrescarTextos(ctx) {
+  const e = ctx.estado;
+  let n = 0;
+  for (const mesa of e.mesas) {
+    for (const s of mesa.universo) {
+      const pid = puestoId(mesa.id, s);
+      const p = ctx.libros.puesto(pid);
+      const nivel = textoNivel(ctx, mesa, s, p);
+      let aux = e.puestos[pid];
+      if (!aux) {
+        if (!nivel) continue;
+        aux = e.puestos[pid] = { estadoTexto: '', ultimaSenal: null, chispa: [] };
+      }
+      if (nivel) aux.estadoTexto = nivel;
+      else if (!aux.ultimaSenal && !(p && p.cantidad > EPS)) aux.estadoTexto = '';
+      else aux.estadoTexto = textoEstrategia(ctx, mesa, s, { estado: aux.espera || null }, p);
+      n++;
+    }
+  }
+  return n;
 }
 
 // Marca las velas que faltan desde la última decidida (desde…i), sube el
@@ -283,23 +356,45 @@ function abrirSombra(ctx, { mesa, simbolo, senal, cierre, tVela, vol }) {
   return llenarAperturaSombra(ctx, { ...orden, precio: q.precio, precioT: q.t });
 }
 
-function cerrarSombra(ctx, { puestoId: sid, motivo = 'señal', clave }) {
+function cerrarSombra(ctx, { puestoId: sid, motivo = 'señal', clave, precioEjecutado = null }) {
   const p = ctx.libros.puesto(sid);
   if (!p || !(p.cantidad > EPS)) return null;
   // Acciones con la bolsa cerrada: a la apertura, como la real (no al precio de la noche).
-  if (bolsaCerrada(ctx, p.simbolo)) { encolarSombra(ctx, { puestoId: sid, mesaId: p.mesaId, simbolo: p.simbolo, lado: 'venta', motivo, clave: clave || null }); return null; }
+  if (!(precioEjecutado > 0) && bolsaCerrada(ctx, p.simbolo)) { encolarSombra(ctx, { puestoId: sid, mesaId: p.mesaId, simbolo: p.simbolo, lado: 'venta', motivo, clave: clave || null }); return null; }
   const q = ctx.vivo.precios[p.simbolo];
   const precio = q && q.precio > 0 ? q.precio : p.ultimoPrecio;
-  if (!(precio > 0)) return null;
-  const fill = llenarSombra({ lado: 'venta', simbolo: p.simbolo, precio, cantidad: p.cantidad });
+  if (!(precio > 0) && !(precioEjecutado > 0)) return null;
+  const fill = llenarSombra({ lado: 'venta', simbolo: p.simbolo, precio, cantidad: p.cantidad, precioEjecutado });
+  const sufijo = motivo === 'stop' || motivo === 'kill' ? motivo : 'cerrar';
   const res = ctx.libros.aplicarEjecucion({
     puestoId: sid, lado: 'venta', cantidad: p.cantidad, precio: fill.precio, comision: fill.comision, t: ctx.reloj.ahora(), motivo,
-    idCliente: `sombra-${sid}-${clave || isoCompacto(ctx.reloj.ahora())}-${motivo === 'stop' ? 'stop' : 'cerrar'}`, precioReferencia: precio,
+    idCliente: `sombra-${sid}-${clave || isoCompacto(ctx.reloj.ahora())}-${sufijo}`, precioReferencia: precio > 0 ? precio : fill.precio,
   });
   ctx.estado.sombra.efectivo += fill.efectivoDelta;
   if (res.operacionCerrada) ctx.registrarOperacion(res.operacionCerrada);
   ctx.revalorarSombra();
   return fill;
+}
+
+// Kill (§5.5): la sombra «sin comité» lo sufre como el fondo. Se cierra todo lo
+// suyo en el mismo instante: al precio al que vendió el fondo cada símbolo
+// (`preciosVenta`, el de la ejecución del kill, con su deslizamiento) y, si el
+// fondo no lo tenía o no llegó a venderlo, al precio de ahora con los costes
+// del simulado. Las acciones con la bolsa cerrada, a la apertura, como las
+// reales. Las compras que esperaban a la apertura se descartan, como las del
+// fondo (el kill vacía su cola). Después, con el fondo bloqueado, Riesgos le
+// veta toda apertura hasta Reabrir (contexto de la sombra).
+function killSombra(ctx, preciosVenta = {}) {
+  const s = ctx.estado.sombra;
+  if (s && Array.isArray(s.pendientes)) s.pendientes = s.pendientes.filter(o => o.lado !== 'compra');
+  const ahora = ctx.reloj.ahora();
+  let n = 0;
+  for (const p of ctx.libros.listaPuestos({ sombra: true })) {
+    if (!(p.cantidad > EPS)) continue;
+    const px = preciosVenta[p.simbolo];
+    if (cerrarSombra(ctx, { puestoId: p.puestoId, motivo: 'kill', clave: isoCompacto(ahora), precioEjecutado: px > 0 ? px : null })) n++;
+  }
+  return n;
 }
 
 // Cola del sombra a la apertura + 5 min: primero las ventas (liberan efectivo)
@@ -383,6 +478,10 @@ async function procesarMesa(ctx, mesa, ahora) {
     // Real
     const real = decidirPuesto(ctx, { mesa, est, prep, simbolo, i, desde, tDecision, pid });
     aux.ultimaSenal = { accion: real.senal.accion, t: ahora };
+    // La espera de la estrategia se guarda para rehacer la tarjeta si cambia el
+    // nivel del fondo antes de la vela siguiente (refrescarTextos). Solo vale
+    // sin posición y sin nada que hacer: «Abro…» o «Largo en…» caducan solos.
+    aux.espera = !(real.p.cantidad > EPS) && real.senal.accion === 'nada' ? (real.senal.estado || null) : null;
     aux.estadoTexto = textoPuesto(ctx, mesa, simbolo, real.senal, real.p);
     const agente = agenteDePuesto(mesa.id, simbolo);
     const opera = mesa.estado !== 'banquillo' && e.fondo.nivel !== 'bloqueado';
@@ -395,8 +494,9 @@ async function procesarMesa(ctx, mesa, ahora) {
       cierres.push({ mesaId: mesa.id, simbolo, velaT: tVela });
     } else if (opera) {
       // Con el fondo bloqueado o la mesa en el banquillo el texto se actualiza
-      // en su tarjeta, pero no se repite en el chat en cada vela.
-      ctx.bus.publicar({ de: agente, canal: 'parque', tipo: 'estado', texto: aux.estadoTexto, datos: { puestoId: pid, accion } });
+      // en su tarjeta, pero no se repite en el chat en cada vela. En el chat,
+      // la espera de la estrategia (la pausa ya la dicen la píldora y la tarjeta).
+      ctx.bus.publicar({ de: agente, canal: 'parque', tipo: 'estado', texto: textoEstrategia(ctx, mesa, simbolo, real.senal, real.p), datos: { puestoId: pid, accion } });
     }
 
     // Sombra: misma regla, su propia posición.
@@ -431,6 +531,6 @@ async function procesar(ctx) {
 }
 
 module.exports = {
-  procesar, procesarMesa, proponerApertura, proponerCierre, abrirSombra, cerrarSombra, procesarPendientesSombra, redimensionarPendiente,
-  capitalMesa, multiplicador, paramsDe, cargarVelas, desdeCalentamiento, contextoEstrategia, textoPuesto,
+  procesar, procesarMesa, proponerApertura, proponerCierre, abrirSombra, cerrarSombra, killSombra, procesarPendientesSombra, redimensionarPendiente,
+  capitalMesa, multiplicador, factorTamano, FACTOR_DEFENSIVO, paramsDe, cargarVelas, desdeCalentamiento, contextoEstrategia, textoPuesto, textoNivel, textoEstrategia, refrescarTextos,
 };

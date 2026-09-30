@@ -32,7 +32,7 @@
   const est = {
     inst: null, recibido: 0, mapa: null, firma: null, asignacion: new Map(), elenco: pers.crearElenco(), items: [],
     seleccion: null, destellos: new Map(), puestos: new Map(), mesas: new Map(), deps: new Map(),
-    ancho: 0, alto: 0, dpr: 1, encuadrada: false, capaClave: '', etiquetasPintadas: [],
+    ancho: 0, alto: 0, dpr: 1, encuadrada: false, camaraTocada: false, capaClave: '', etiquetasPintadas: [],
     texturasSucias: true, animPatr: null, patrMostrado: null, ultimoPintado: 0, parado: false,
     rotulosPintados: [], cursor: -1, llegadas: [], relojesClave: '', ventanasClave: '',
     stats: { frames: 0, msPintar: 0, maxMs: 0 },
@@ -99,11 +99,26 @@
       // En el móvil se empieza cerca del parqué; pellizcando se ve la oficina entera.
       camara.zoom = 0.5;
       const centro = iso.proyectar(10, 8, 20);
-      camara.x = est.ancho / 2 - centro.x * camara.zoom;
+      camara.x = est.ancho / 2 - centro.x * camara.zoom + desplazamientoParque();
       camara.y = est.alto * 0.34 - centro.y * camara.zoom;
       camara.version++;
     }
     est.encuadrada = true;
+    est.camaraTocada = false;
+  }
+
+  // En el móvil el principio de las filas del parqué cae en el borde izquierdo
+  // y sus rótulos (lo que se toca para abrir la ficha de la mesa) no cabían. Se
+  // corre la vista a la derecha lo que haga falta para uno corto (~120 px),
+  // pero solo lo que deje la etiqueta del último puesto dentro de la pantalla.
+  function desplazamientoParque() {
+    if (!est.mapa || !est.mapa.rotulosFila.length) return 0;
+    const centro = iso.proyectar(10, 8, 20);
+    const x0 = est.ancho / 2 - centro.x * 0.5;
+    const enPantalla = (col, fila, zz) => x0 + iso.proyectar(col, fila, zz).x * 0.5;
+    const inicio = Math.min(...est.mapa.rotulosFila.map(r => enPantalla(r.col, r.fila, r.z || 52)));
+    const fin = Math.max(...Array.from(est.mapa.puestos.values()).map(g => enPantalla(g.ancla.col, g.ancla.fila, g.ancla.z)));
+    return Math.max(0, Math.min(120 - inicio, est.ancho - 26 - fin));   // media etiqueta (~20 px) y 6 de margen
   }
 
   // Que la oficina no se pierda de vista: siempre queda un trozo dentro.
@@ -126,7 +141,7 @@
     const centroMundo = est.ancho ? camara.pantallaAMundo(est.ancho / 2, est.alto / 2) : null;
     est.ancho = w; est.alto = h; est.dpr = dpr;
     for (const c of [lienzo, capa]) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
-    if (!est.encuadrada) encuadrar();
+    if (!est.encuadrada || !est.camaraTocada) encuadrar();
     else if (centroMundo) {
       camara.x = w / 2 - centroMundo.x * camara.zoom;
       camara.y = h / 2 - centroMundo.y * camara.zoom;
@@ -151,7 +166,14 @@
     est.deps = new Map(deps.map(d => [d.id, d]));
     paneles.fijarDepartamentos(deps);
     const firma = mapaMod.firmaEstructura(inst);
-    if (firma !== est.firma) { construir(inst); est.firma = firma; }
+    if (firma !== est.firma) {
+      construir(inst);
+      est.firma = firma;
+      // El encuadre del móvil depende de las filas del parqué: se rehace con
+      // la primera instantánea (y al contratar o despedir mesas) mientras nadie
+      // haya movido la cámara.
+      if (!est.camaraTocada) encuadrar();
+    }
     sincronizarPersonas(!anterior);
     // Bocadillos que trae la instantánea (p. ej. al conectar a mitad de una frase).
     const tServ = inst.ahora;
@@ -265,19 +287,37 @@
     // API responde 503 mientras el orquestador arranca). Sin motivo: red.
     let motivo = null;
     let esperaMostrada = 0;
+    let reintentando = false;
+    let inicioConexion = 0;
+    let avisoLento = null;
+
+    // Tiempos máximos. Con el proceso de la mesa colgado (vivo pero sin
+    // contestar), fetch y EventSource esperaban para siempre: la franja se
+    // quedaba en «reintentando en 1 s…» sin reintentar ni alargar la espera.
+    const TOPE_ESTADO_MS = 15000;          // GET /api/estado entero (cabeceras y cuerpo)
+    const TOPE_ABRIR_SSE_MS = 20000;       // EventSource que no llega a abrirse
+    const TOPE_SONDEO_MS = 10000;
+
+    // fetch con tope: aborta (también la lectura del cuerpo) si no ha acabado a tiempo.
+    function conTope(ruta, opciones, ms, leer) {
+      const ac = typeof AbortController === 'function' ? new AbortController() : null;
+      const reloj = ac ? setTimeout(() => ac.abort(), ms) : null;
+      return fetch(ruta, Object.assign({}, opciones, ac ? { signal: ac.signal } : {}))
+        .then(leer)
+        .finally(() => { if (reloj) clearTimeout(reloj); });
+    }
 
     function traerEstado() {
-      return fetch('/api/estado', { headers: cabeceras(), cache: 'no-store' })
-        .then(r => {
-          if (r.status === 401 || r.status === 403) { const e = new Error(`HTTP ${r.status}`); e.codigo = r.status; throw e; }
-          if (r.status === 503) {
-            return r.json().catch(() => null).then(j => {
-              const e = new Error('HTTP 503'); e.codigo = 503; e.motivo = cifras.motivo503(j); throw e;
-            });
-          }
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json();
-        });
+      return conTope('/api/estado', { headers: cabeceras(), cache: 'no-store' }, TOPE_ESTADO_MS, r => {
+        if (r.status === 401 || r.status === 403) { const e = new Error(`HTTP ${r.status}`); e.codigo = r.status; throw e; }
+        if (r.status === 503) {
+          return r.json().catch(() => null).then(j => {
+            const e = new Error('HTTP 503'); e.codigo = 503; e.motivo = cifras.motivo503(j); throw e;
+          });
+        }
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      });
     }
 
     // EventSource no enseña el código HTTP: si falla antes de abrir con la API
@@ -286,6 +326,7 @@
     function sondearEventos() {
       if (typeof AbortController !== 'function') return;
       const ac = new AbortController();
+      const reloj = setTimeout(() => ac.abort(), TOPE_SONDEO_MS);
       fetch(conToken('/api/eventos'), { headers: cabeceras(), cache: 'no-store', signal: ac.signal })
         .then(r => {
           // Un 503 trae un JSON corto (no es el SSE): se lee para saber si es
@@ -299,13 +340,18 @@
             if (motivo !== antes && !abierto) man.conexion(false, esperaMostrada, motivo);
           });
         })
-        .catch(() => { /* sin red: ya lo dice la franja */ });
+        .catch(() => { /* sin red: ya lo dice la franja */ })
+        .finally(() => clearTimeout(reloj));
     }
 
     function conectar() {
       temporizador = null;
       let apiBien = false;
       let sseFallo = false;
+      inicioConexion = Date.now();
+      // Si el intento tarda (mesa colgada), la franja deja de prometer «en N s».
+      if (avisoLento) clearTimeout(avisoLento);
+      avisoLento = reintentando ? setTimeout(() => { avisoLento = null; if (!abierto) man.conexion(false, 0, motivo); }, 3000) : null;
       traerEstado().then(i => {
         apiBien = true;
         if (motivo === 'token' || motivo === 'token-malo' || motivo === 'arrancando') motivo = null;
@@ -325,7 +371,11 @@
       try {
         es = new EventSource(conToken('/api/eventos'));
       } catch (_) { reintentar(); return; }
-      es.onopen = () => { abierto = true; espera = 1000; motivo = null; ultimoLatido = Date.now(); man.conexion(true); };
+      es.onopen = () => {
+        abierto = true; reintentando = false; espera = 1000; motivo = null; ultimoLatido = Date.now();
+        if (avisoLento) { clearTimeout(avisoLento); avisoLento = null; }
+        man.conexion(true);
+      };
       es.onerror = () => {
         // Falla antes de abrir: si la API ya respondió bien, se pregunta por qué
         // (si aún no, lo hará ella al responder).
@@ -344,8 +394,10 @@
     }
 
     function reintentar() {
-      if (es) { es.onerror = null; es.close(); es = null; }
+      if (es) { es.onerror = null; es.onopen = null; es.close(); es = null; }
       abierto = false;
+      reintentando = true;
+      if (avisoLento) { clearTimeout(avisoLento); avisoLento = null; }
       if (temporizador) return;
       const e = espera;
       espera = Math.min(30000, espera * 2);
@@ -354,8 +406,13 @@
       temporizador = setTimeout(conectar, e);
     }
 
-    // Sin ningún evento (ni ping) en 45 s: la conexión está muerta aunque no lo diga.
-    setInterval(() => { if (es && abierto && Date.now() - ultimoLatido > 45000) reintentar(); }, 5000);
+    // Sin ningún evento (ni ping) en 45 s: la conexión está muerta aunque no lo
+    // diga. Y un EventSource que no llega a abrirse en 20 s (mesa colgada) se
+    // da por fallido: así la espera crece en lugar de quedarse colgada.
+    setInterval(() => {
+      if (es && abierto && Date.now() - ultimoLatido > 45000) reintentar();
+      else if (es && !abierto && !temporizador && Date.now() - inicioConexion > TOPE_ABRIR_SSE_MS) reintentar();
+    }, 5000);
     conectar();
 
     async function pedir(metodo, ruta, cuerpo) {
@@ -585,41 +642,34 @@
     ctx.font = `800 ${Math.round(9.5 * escala * 10) / 10}px ${dibujo.FUENTE}`;
     ctx.textBaseline = 'middle';
     const h = Math.round(16 * escala);
-    // Lo ya pintado (etiquetas de puesto y rótulos anteriores): un rótulo que
-    // se montaría encima pasa a su forma corta y, si ni así cabe, no se pinta
-    // hasta acercar la cámara (un texto encima de otro no se lee).
-    const ocupado = est.etiquetasPintadas.map(e => ({ x: e.x, y: e.y, w: e.w, h: e.h }));
-    // Sitio libre para un rótulo de ancho w: el de siempre o, si pisa algo, un
-    // poco más a la izquierda (como mucho 160 px); null si no hay.
-    const colocar = (x0, y, w) => {
-      let x = x0;
-      for (let k = 0; k < 4 && x >= x0 - 160; k++) {
-        const o = ocupado.find(b => x < b.x + b.w && b.x < x + w && y < b.y + b.h && b.y < y + h);
-        if (!o) return x;
-        x = Math.round(o.x - w - 4);
-      }
-      return null;
-    };
-    for (const r of est.mapa.rotulosFila) {
-      // A la altura de las etiquetas de puesto y a la izquierda de la fila: la
-      // fila de delante queda más abajo y la de detrás más a la derecha. Si la
-      // fila la comparten varias mesas, sus rótulos se apilan hacia abajo.
+    // A la altura de las etiquetas de puesto y a la izquierda de la fila: la
+    // fila de delante queda más abajo y la de detrás más a la derecha. Si la
+    // fila la comparten varias mesas, sus rótulos se apilan hacia abajo. Dónde
+    // cabe cada uno (sin salirse del lienzo ni pisar lo ya pintado, y por peso
+    // de la mesa) lo decide dibujo.colocarRotulos.
+    const selMesa = est.seleccion && est.seleccion.tipo === 'mesa' ? est.seleccion.id : null;
+    const porId = new Map();
+    const items = est.mapa.rotulosFila.map(r => {
       const mesa = est.mesas.get(r.mesaId) || {};
-      const a = camara.aPantalla(r.col, r.fila, r.z || 52);
       const estado = mesa.estado || r.estado;
-      const sel = est.seleccion && est.seleccion.tipo === 'mesa' && est.seleccion.id === r.mesaId;
-      const y = Math.round(a.y - h + (r.orden || 0) * (h + 2));
-      let texto = cifras.rotuloMesa(r, mesa, inst);
-      let w = ctx.measureText(texto).width + 20;
-      let x = colocar(Math.round(a.x - w - 4), y, w);
-      if (x === null) {
-        texto = cifras.rotuloMesa(r, mesa, inst, { compacto: true });
-        w = ctx.measureText(texto).width + 20;
-        x = colocar(Math.round(a.x - w - 4), y, w);
-        if (x === null) { if (!sel) continue; x = Math.round(a.x - w - 4); }
-      }
-      const bloqueada = cifras.bloqueosMesa(inst, r.mesaId, inst && inst.ahora).length > 0;
-      ocupado.push({ x, y, w, h });
+      const a = camara.aPantalla(r.col, r.fila, r.z || 52);
+      const f = !r.compartida && Number.isFinite(r.colFin) ? camara.aPantalla(r.colFin, r.fila, r.z || 52) : null;
+      const formas = [cifras.rotuloMesa(r, mesa, inst), cifras.rotuloMesa(r, mesa, inst, { compacto: true })]
+        .map(texto => ({ texto, w: Math.ceil(ctx.measureText(texto).width + 20) }));
+      porId.set(r.mesaId, { mesa, estado });
+      return {
+        id: r.mesaId, formas, seleccionado: selMesa === r.mesaId,
+        prioridad: estado === 'banquillo' ? -1 : (Number.isFinite(mesa.peso) ? mesa.peso : 0),
+        inicio: { x: Math.round(a.x - 4), y: Math.round(a.y - h + (r.orden || 0) * (h + 2)) },
+        fin: f ? { x: Math.round(f.x + 4), y: Math.round(f.y - h) } : null,
+      };
+    });
+    const colocados = dibujo.colocarRotulos(items, { ancho: est.ancho, alto: est.alto, h, ocupado: est.etiquetasPintadas });
+    for (const c of colocados) {
+      const { x, y, w, texto } = c;
+      const { estado } = porId.get(c.id);
+      const sel = selMesa === c.id;
+      const bloqueada = cifras.bloqueosMesa(inst, c.id, inst && inst.ahora).length > 0;
       ctx.fillStyle = sel ? 'rgba(40, 32, 8, 0.95)' : 'rgba(20, 27, 50, 0.82)';
       pillRedonda(x, y, w, h, h / 2); ctx.fill();
       if (sel || bloqueada) { ctx.lineWidth = 1.4; ctx.strokeStyle = sel ? '#fbbf24' : '#f59e0b'; ctx.stroke(); }
@@ -627,7 +677,7 @@
       ctx.beginPath(); ctx.arc(x + 8, y + h / 2, 2.6, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = bloqueada ? '#fcd34d' : estado === 'incubacion' ? '#67e8f9' : estado === 'banquillo' ? '#94a3b8' : '#dbe3f5';
       ctx.fillText(texto, x + 14, y + h / 2 + 0.5);
-      est.rotulosPintados.push({ x, y, w, h, mesaId: r.mesaId });
+      est.rotulosPintados.push({ x, y, w, h, mesaId: c.id });
     }
     ctx.textBaseline = 'alphabetic';
   }
@@ -663,6 +713,7 @@
     const sel = lista[est.cursor];
     const pto = puntoDe(sel);
     if (pto) {
+      est.camaraTocada = true;
       camara.x += est.ancho / 2 - pto.x;
       camara.y += est.alto / 2 - pto.y;
       camara.version++;
@@ -804,6 +855,11 @@
   }
 
   lienzo.addEventListener('pointerdown', (e) => {
+    // Con el dedo (o el lápiz), sin los eventos de ratón de compatibilidad: su
+    // mousedown llegaba después de abrir la ficha, caía sobre el lienzo ya
+    // inerte y se llevaba el foco de «Cerrar» a <body>. El pellizco y el
+    // arrastre no dependen de ellos (touch-action: none y eventos pointer).
+    if (e.pointerType && e.pointerType !== 'mouse') e.preventDefault();
     lienzo.setPointerCapture(e.pointerId);
     const p = posEvento(e);
     punteros.set(e.pointerId, p);
@@ -827,12 +883,14 @@
       const cx = (a.x + b.x) / 2; const cy = (a.y + b.y) / 2;
       camara.mover(cx - pellizco.cx, cy - pellizco.cy);
       if (pellizco.d > 0) camara.zoomEn(cx, cy, d / pellizco.d);
+      est.camaraTocada = true;
       pellizco = { d, cx, cy };
       limitarCamara();
     } else if (arrastre) {
       const dx = p.x - arrastre.x; const dy = p.y - arrastre.y;
       if (!arrastre.movido && Math.hypot(dx, dy) > 4) { arrastre.movido = true; lienzo.classList.add('arrastrando'); }
       if (arrastre.movido) {
+        est.camaraTocada = true;
         camara.mover(dx, dy);
         limitarCamara();
         arrastre.x = p.x; arrastre.y = p.y;
@@ -856,6 +914,7 @@
     const p = posEvento(e);
     const k = e.ctrlKey ? 0.012 : 0.0016;
     camara.zoomEn(p.x, p.y, Math.exp(-e.deltaY * k));
+    est.camaraTocada = true;
     limitarCamara();
   }, { passive: false });
   lienzo.addEventListener('keydown', (e) => {
@@ -874,7 +933,7 @@
       return;
     }
     const fn = mapaTeclas[e.key];
-    if (fn) { e.preventDefault(); fn(); limitarCamara(); }
+    if (fn) { e.preventDefault(); fn(); if (e.key !== '0') est.camaraTocada = true; limitarCamara(); }
   });
 
   function mandoCamara(id) {
@@ -884,7 +943,7 @@
       mas: () => camara.zoomEn(est.ancho / 2, est.alto / 2, 1.25), menos: () => camara.zoomEn(est.ancho / 2, est.alto / 2, 1 / 1.25),
       encuadrar: () => encuadrar(),
     };
-    if (acciones[id]) { acciones[id](); limitarCamara(); }
+    if (acciones[id]) { acciones[id](); if (id !== 'encuadrar') est.camaraTocada = true; limitarCamara(); }
   }
 
   // ---------- arranque ----------

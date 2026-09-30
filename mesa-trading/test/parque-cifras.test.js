@@ -221,3 +221,42 @@ test('clase de color por signo', () => {
   assert.equal(cifras.claseSigno(0.001, 0.005), 'cero');
   assert.equal(cifras.claseSigno(undefined), 'cero');
 });
+
+test('tamaño real de las aperturas: DEFENSIVO ×0,5 por la reducción del Megáfono ×0,5 = ×0,25', () => {
+  const ahora = Date.UTC(2026, 8, 30, 8, 40);           // 10:40 en Madrid
+  const hasta = ahora + 3 * 3600000;                    // 13:40
+  const base = { ahora, fondo: { nivel: 'normal', multiplicadorCaida: 1 }, directivas: { modo: 'DEFENSIVO', reduccion: { factor: 0.5, hasta } } };
+  // Sin fondo.factorTamano (servidor viejo): se calcula igual que mesas.js × limites.js.
+  let n = cifras.nivelEfectivo(base, ahora);
+  assert.equal(n.tamano.factor, 0.25);
+  assert.equal(cifras.rotuloTamano(n.tamano), 'DEFENSIVO + MEGÁFONO ×0,25');
+  assert.equal(cifras.explicacionTamano(n.tamano),
+    'Posiciones nuevas a ×0,25 del tamaño normal: modo DEFENSIVO del comité (×0,5) y reducción del Megáfono (×0,5 hasta las 13:40).');
+  // La reducción del Megáfono sola también se ve.
+  n = cifras.nivelEfectivo({ ...base, directivas: { modo: 'NORMAL', reduccion: { factor: 0.5, hasta } } }, ahora);
+  assert.equal(cifras.rotuloTamano(n.tamano), 'RIESGO ×0,5 hasta 13:40 · Megáfono');
+  // Una reducción caducada ya no cuenta.
+  n = cifras.nivelEfectivo({ ...base, directivas: { modo: 'NORMAL', reduccion: { factor: 0.5, hasta: ahora - 1 } } }, ahora);
+  assert.equal(cifras.rotuloTamano(n.tamano), '');
+  // Con la caída del vigilante también: 0,5 × 0,5 × 0,5.
+  n = cifras.nivelEfectivo({ ...base, fondo: { nivel: 'normal', multiplicadorCaida: 0.5 } }, ahora);
+  assert.equal(n.tamano.factor, 0.125);
+  assert.equal(cifras.rotuloTamano(n.tamano), 'DEFENSIVO + MEGÁFONO + CAÍDA ×0,125');
+  assert.equal(cifras.rotuloTamano(cifras.tamanoEntradas(true, null, 1)), 'DEFENSIVO ×0,5');
+});
+
+test('manda el fondo.factorTamano del servidor (§7): la interfaz no lo recalcula', () => {
+  const ahora = Date.UTC(2026, 8, 30, 8, 40);
+  const hasta = ahora + 3 * 3600000;
+  // El servidor aplica la reducción más dura (0,3) aunque las directivas enseñen otra.
+  const inst = { ahora, fondo: { nivel: 'normal', multiplicadorCaida: 1, factorTamano: { total: 0.15, comite: 0.5, megafono: 0.3, caida: 1 } },
+    directivas: { modo: 'DEFENSIVO', reduccion: { factor: 0.5, hasta } } };
+  const n = cifras.nivelEfectivo(inst, ahora);
+  assert.equal(n.tamano.factor, 0.15);
+  assert.equal(cifras.rotuloTamano(n.tamano), 'DEFENSIVO + MEGÁFONO ×0,15');
+  assert.match(cifras.explicacionTamano(n.tamano), /reducción del Megáfono \(×0,3 hasta las 13:40\)/);
+  // Todo a 1: sin recorte, aunque las directivas digan DEFENSIVO (el servidor manda).
+  const nada = cifras.nivelEfectivo({ ...inst, fondo: { nivel: 'normal', factorTamano: { total: 1, comite: 1, megafono: 1, caida: 1 } } }, ahora);
+  assert.equal(cifras.rotuloTamano(nada.tamano), '');
+  assert.equal(cifras.explicacionTamano(nada.tamano), '');
+});

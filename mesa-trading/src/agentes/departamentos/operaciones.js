@@ -694,8 +694,9 @@ function informeSemanal(ctx) {
 
 // Kill switch (§7): bloquea (y lo guarda ya: un kill que muere a mitad tiene
 // que arrancar bloqueado), cancela todo y vende todo lo del bróker con el
-// Ejecutor, repartiendo cada venta entre los puestos del símbolo. Los puestos
-// sombra no se tocan: son una cartera hipotética.
+// Ejecutor, repartiendo cada venta entre los puestos del símbolo. La sombra
+// «sin comité» lo sufre igual (§5.5): la cierra el orquestador, al precio de
+// estas ventas (preciosVenta), aunque el kill falle a mitad.
 // Si el bróker falla a mitad (red caída, una venta rechazada), el fondo queda
 // bloqueado y lo que quede se vuelve a intentar vender solo, con esperas
 // crecientes (reintentarKill, desde el vigilante del orquestador).
@@ -773,6 +774,7 @@ async function venderKill(ctx) {
   const ahora = ctx.reloj.ahora();
   const cerradas = [];
   const errores = [];
+  const preciosVenta = {};         // símbolo → precio medio al que vendió el kill (la sombra cierra a ese)
   const esperanApertura = new Set(e.pendientes.filter(o => o.lado === 'venta' && o.tipo === 'kill').map(o => o.simbolo));
 
   const leerPosiciones = async () => {
@@ -793,6 +795,7 @@ async function venderKill(ctx) {
     } catch (err) {
       r = { ok: false, motivo: err.message };
     }
+    if (r && r.ok && r.precio > 0) preciosVenta[simbolo] = r.precio;
     if (r && r.ok) return 'ok';
     if (r && r.pendiente) { esperanApertura.add(simbolo); return 'espera'; }
     return (r && r.motivo) || 'error';
@@ -828,7 +831,10 @@ async function venderKill(ctx) {
     try {
       const barrido = await ctx.broker.cerrarTodo();
       for (const o of barrido.ordenes || []) {
-        try { await ctx.ejecutor.seguirAjena(o, { tipo: 'kill', motivo: 'kill', accion: 'kill' }); } catch (err) { log.aviso(`liquidación de ${o.simbolo}: ${err.message}`); }
+        try {
+          const r = await ctx.ejecutor.seguirAjena(o, { tipo: 'kill', motivo: 'kill', accion: 'kill' });
+          if (r && r.ok && r.precio > 0) preciosVenta[o.simbolo] = r.precio;
+        } catch (err) { log.aviso(`liquidación de ${o.simbolo}: ${err.message}`); }
       }
       for (const x of barrido.errores || []) {
         if (x.tipo === 'mercado_cerrado') esperanApertura.add(x.simbolo); else errores.push(x);
@@ -841,7 +847,7 @@ async function venderKill(ctx) {
   // Sin la lista del bróker no se puede saber qué queda: al menos lo de los libros.
   let quedan = quedanEnBroker(ctx);
   if (posiciones === null && !quedan.length) quedan = [...new Set(ctx.libros.listaPuestos({ sombra: false }).filter(p => p.cantidad > EPS).map(p => p.simbolo))];
-  return { cerradas, errores, esperanApertura: [...esperanApertura], quedanEnBroker: quedan.filter(s => !esperanApertura.has(s)), abiertos };
+  return { cerradas, errores, esperanApertura: [...esperanApertura], quedanEnBroker: quedan.filter(s => !esperanApertura.has(s)), abiertos, preciosVenta };
 }
 
 module.exports = {

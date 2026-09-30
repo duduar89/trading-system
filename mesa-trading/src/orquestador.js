@@ -169,6 +169,17 @@ class Orquestador extends EventEmitter {
     this._bloqueoTomado = false;
     this._deteniendo = false;
     this._pausas = new Set();
+    // Lo que un humano pulsa en el panel y cambia el fondo (Reabrir, Pausar,
+    // kill, Megáfono aplicado), numerado: el comité lo mira para decir en su
+    // punto lo que cambió mientras estaba reunido. Solo en memoria.
+    this.accionesHumanas = [];
+    this.seqHumana = 0;
+  }
+
+  _anotarHumana(tipo) {
+    this.seqHumana++;
+    this.accionesHumanas.push({ seq: this.seqHumana, t: this.reloj.ahora(), tipo });
+    if (this.accionesHumanas.length > 50) this.accionesHumanas.shift();
   }
 
   // ---------- Arranque ----------
@@ -210,6 +221,8 @@ class Orquestador extends EventEmitter {
       this.estado = await this._estadoInicial();
     }
     this._aplicarAjustes();
+    // Las tarjetas guardadas están escritas con el nivel guardado.
+    this._nivelTextos = this.estado.fondo.nivel;
     this.plantilla = crearPlantilla({ universo: this.universo, mesas: this.estado.mesas });
     for (const a of this.plantilla) this.bus.registrarAgente(a);
     this.bus.registrarAgente({ id: 'humano', nombre: 'Tú (megáfono)', departamento: null });
@@ -561,9 +574,17 @@ class Orquestador extends EventEmitter {
 
   async killSwitch(motivo) {
     this.estado.contadores.kills = (this.estado.contadores.kills || 0) + 1;
+    let r = null;
     try {
-      return await operaciones.killSwitch(this, motivo);
+      r = await operaciones.killSwitch(this, motivo);
+      return r;
     } finally {
+      // La sombra «sin comité» sufre el kill como el fondo (§5.5): se cierra
+      // al precio al que vendió el fondo, también si el kill falló a mitad.
+      this._seguroSinc('kill en la sombra', () => mesasDep.killSombra(this, (r && r.preciosVenta) || {}));
+      // Todas las tarjetas dicen el bloqueo, también las de lo que se acaba de
+      // cerrar (como en cada vela bloqueada), manual o del vigilante.
+      this._seguroSinc('tarjetas de los puestos', () => this._textosAlNivel({ forzar: true }));
       // El bloqueo queda en disco aunque el kill lance a mitad.
       this._seguroSinc('guardar', () => this.guardar());
       this._emitirEstado({ forzar: true });
@@ -596,6 +617,7 @@ class Orquestador extends EventEmitter {
     await this._seguro('mesas', 'mesas', () => mesasDep.procesar(this));
     await this._cadenciasLargas(ahora);
     this._seguroSinc('descansos', () => this._descansos(ahora));
+    this._seguroSinc('tarjetas de los puestos', () => this._textosAlNivel());
     this._muestraCurva(ahora);
     if (this.pasos % Math.max(1, this.opciones.guardarCadaPasos) === 0) this._seguroSinc('guardar', () => this.guardar());
     this._emitirEstado();
@@ -604,6 +626,16 @@ class Orquestador extends EventEmitter {
 
   _seguroSinc(nombre, fn) {
     try { return fn(); } catch (e) { this._error(nombre, 'sistema', e); return null; }
+  }
+
+  // Si el nivel del fondo cambió (Reabrir, Pausar, kill, vigilante,
+  // conciliación), la tarjeta de cada puesto se rehace en el acto: la
+  // instantánea usa la guardada cuando el puesto no tiene posición.
+  _textosAlNivel({ forzar = false } = {}) {
+    const nivel = this.estado.fondo.nivel;
+    if (!forzar && this._nivelTextos === nivel) return 0;
+    this._nivelTextos = nivel;
+    return mesasDep.refrescarTextos(this);
   }
 
   async _vigilar(ahora) {
@@ -856,7 +888,7 @@ class Orquestador extends EventEmitter {
     const val = v.valoracion || valoracionVacia();
     const reg = e.macro.regimen;
     const vigentes = megafono.directivasVigentes(e.directivas, ahora);
-    const defensivo = e.directivas.modo === 'DEFENSIVO' ? 0.5 : 1;
+    const tamano = mesasDep.factorTamano(this, ahora);
     const bloqueado = e.fondo.nivel === 'bloqueado';
 
     const opsPorPuesto = new Map();
@@ -910,7 +942,7 @@ class Orquestador extends EventEmitter {
       });
       return {
         id: m.id, nombre: m.nombre, familia: m.familia, marco: m.marco, estado: m.estado, peso: m.peso,
-        capital: m.estado === 'banquillo' ? 0 : patrimonio * m.peso * mult * defensivo, multiplicador: mult,
+        capital: m.estado === 'banquillo' ? 0 : patrimonio * m.peso * mult * tamano.comite, multiplicador: mult,
         universo: m.universo.map(etiqueta), params: m.params,
         metricas: {
           operaciones: met.operaciones, acierto: met.acierto, factorBeneficio: met.factorBeneficio, sharpe: met.sharpe,
@@ -959,7 +991,7 @@ class Orquestador extends EventEmitter {
       modo: this.modo,
       broker: this.broker.nombre,
       velocidad: this.velocidad,
-      fondo: { nivel: e.fondo.nivel, motivo: e.fondo.motivo || null, multiplicadorCaida: e.fondo.multiplicadorCaida },
+      fondo: { nivel: e.fondo.nivel, motivo: e.fondo.motivo || null, multiplicadorCaida: e.fondo.multiplicadorCaida, factorTamano: tamano },
       cabecera: {
         patrimonio,
         pnlDia: patrimonio - e.patrimonioInicioDia,
@@ -1122,7 +1154,9 @@ class Orquestador extends EventEmitter {
       case 'ajustes': r = this._cmdAjustes(datos); break;
       default: return { ok: false, codigo: 404, mensaje: `Comando desconocido: ${nombre}` };
     }
-    if (r.ok) { this._seguroSinc('guardar', () => this.guardar()); this._emitirEstado({ forzar: true }); }
+    // Reabrir, Pausar o el kill cambian el nivel: las tarjetas, en el acto.
+    const tarjetas = this._seguroSinc('tarjetas de los puestos', () => this._textosAlNivel());
+    if (r.ok || tarjetas) { this._seguroSinc('guardar', () => this.guardar()); this._emitirEstado({ forzar: true }); }
     return r;
   }
 
@@ -1161,6 +1195,7 @@ class Orquestador extends EventEmitter {
       this.bus.publicar({ de: 'cio', canal: 'megafono', tipo: 'directiva', texto: plantillas.directiva(dir, this.estado.mesas), datos: { ...dir }, importancia: 3 });
     }
     this.estado.megafonoPendiente = null;
+    if (aplicadas) this._anotarHumana('megafono');
     const vig = megafono.directivasVigentes(this.estado.directivas, ahora);
     return { ok: true, mensaje: aplicadas ? `${aplicadas} directiva${aplicadas === 1 ? '' : 's'} aplicada${aplicadas === 1 ? '' : 's'}.` : 'No había nada que aplicar.', datos: vig };
   }
@@ -1226,6 +1261,7 @@ class Orquestador extends EventEmitter {
     if (fo.nivel === 'pausado') return { ok: true, mensaje: 'Ya estaba en pausa.' };
     fo.nivel = 'pausado';
     fo.motivo = 'Pausa humana: solo cerrar hasta Reabrir.';
+    this._anotarHumana('pausar');
     this.bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'alerta', texto: 'Pausa pedida desde el panel: solo se cierran posiciones hasta que un humano pulse Reabrir.', importancia: 3 });
     return { ok: true, mensaje: 'Pausado: solo cerrar hasta Reabrir.' };
   }
@@ -1270,6 +1306,7 @@ class Orquestador extends EventEmitter {
         this.estado.diaInicioVigilancia = diaUTC(ahora);
       }
       this.estado.contadores.reaperturas = (this.estado.contadores.reaperturas || 0) + 1;
+      this._anotarHumana('reabrir');
       for (const a of this.plantilla) {
         const m = a.mesaId ? this.mesaPorId(a.mesaId) : null;
         this.moverAgente(a.id, null, m && m.estado === 'banquillo' ? 'banquillo' : 'trabajando');
@@ -1288,10 +1325,12 @@ class Orquestador extends EventEmitter {
     const motivo = 'kill switch manual desde el panel';
     const fo = this.estado.fondo;
     this._killPedido = true;
+    this._anotarHumana('kill');
     if (fo.nivel !== 'bloqueado') {
       fo.nivel = 'bloqueado';
       fo.motivo = motivo;
       fo.soloCerrarHasta = null;
+      this._seguroSinc('tarjetas de los puestos', () => this._textosAlNivel());
       this._seguroSinc('guardar', () => this.guardar());
       this._emitirEstado({ forzar: true });
     }

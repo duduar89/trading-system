@@ -10,6 +10,8 @@ const { LIMITES_DUROS } = require('../src/config');
 const { evaluarPropuesta } = require('../src/riesgo/limites');
 const { vigilar } = require('../src/riesgo/vigilante');
 const { casiIgual } = require('../src/util/numeros');
+const { directivasSinComite } = require('../src/agentes/departamentos/riesgos');
+const { factorTamano } = require('../src/agentes/departamentos/mesas');
 
 let fallos = 0;
 function caso(nombre, obtenido, esperado, tol = 1e-9) {
@@ -75,6 +77,27 @@ veto('10 órdenes en el minuto', evaluarPropuesta(prop(), ctx({ ordenes: { ultim
 veto('4 órdenes de la mesa en la hora', evaluarPropuesta(prop(), ctx({ ordenes: { ultimoMinuto: 0, ultimaHoraPorMesa: { tendencia: 4 } } })), 'maxOrdenesMesaHora');
 veto('8 $ < mínimo 10 $', evaluarPropuesta(prop({ nocional: 8 }), ctx()), 'minNocionalOrden');
 veto('recortado a 5 $ < mínimo', evaluarPropuesta(prop({ tipo: 'aumento' }), ctx({ valoracion: { ...vacio, exposicionBruta: 9995, exposicionCripto: 9995, exposicionPorActivo: { 'BTC/USD': 9995 }, posicionesAbiertas: 1 } })), 'minNocionalOrden');
+
+console.log('— Sombra «mismas mesas sin comité» (§5.5): todo menos las decisiones del comité');
+// Comité: SOLO_CERRAR, tendencia ×0 y BTC vetado 24 h. Megáfono: reducir ×0,5.
+const dirs = {
+  modo: 'SOLO_CERRAR', multiplicadores: { tendencia: 0 },
+  activosVetados: [{ simbolo: 'BTC/USD', hasta: AHORA + 24 * HORA, motivo: 'comité', origen: 'comite' }],
+  mesasPausadas: [], soloCerrarHasta: null, reduccion: { factor: 0.5, hasta: AHORA + 3 * HORA, origen: 'megafono' },
+};
+caso('el fondo: vetada por el comité (solo cerrar, BTC vetado, ×0)', limitesDe(evaluarPropuesta(prop(), ctx({ directivas: dirs }))), ['soloCerrar', 'activoVetado', 'multiplicadorComite']);
+const sinComite = directivasSinComite(dirs, AHORA);
+caso('la sombra: sin lo del comité, solo el ×0,5 del Megáfono → 5.000 × 0,5', decision(evaluarPropuesta(prop(), ctx({ directivas: sinComite }))), 'reducir 2500');
+caso('la sombra con el fondo real en pausa → vetada', limitesDe(evaluarPropuesta(prop(), ctx({ directivas: sinComite, nivel: 'pausado' }))), ['nivel']);
+const conNoticia = directivasSinComite({ ...dirs, activosVetados: [...dirs.activosVetados, { simbolo: 'BTC/USD', hasta: AHORA + HORA, motivo: 'noticia grave', origen: 'noticias' }] }, AHORA);
+caso('la sombra con una noticia grave de BTC → vetada (no es del comité)', limitesDe(evaluarPropuesta(prop(), ctx({ directivas: conNoticia }))), ['activoVetado']);
+
+console.log('— Recorte real del tamaño (fondo.factorTamano, §7)');
+const ctxFondo = (directivas, multiplicadorCaida) => ({ estado: { directivas, fondo: { multiplicadorCaida } }, reloj: { ahora: () => AHORA } });
+const conMegafono = { ...dirs, modo: 'DEFENSIVO', multiplicadores: {}, activosVetados: [] };
+caso('DEFENSIVO × Megáfono ×0,5 × caída ×0,5 = 0,125', factorTamano(ctxFondo(conMegafono, 0.5), AHORA), { total: 0.125, comite: 0.5, megafono: 0.5, caida: 0.5 });
+caso('… Riesgos aplica Megáfono × caída al nocional: 5.000 × 0,25', decision(evaluarPropuesta(prop(), ctx({ directivas: conMegafono, multiplicadorCaida: 0.5 }))), 'reducir 1250');
+caso('la reducción del Megáfono caduca a su hora', factorTamano(ctxFondo(conMegafono, 1), AHORA + 3 * HORA), { total: 0.5, comite: 0.5, megafono: 1, caida: 1 });
 
 console.log('— Vigilante (inicio del día 100.000 $, pico 100.000 $, martes 15:00 UTC)');
 const v = (extra = {}) => vigilar({ ahora: AHORA, patrimonio: 100000, patrimonioInicioDia: 100000, pico: 100000, puestos: [], precios: {}, limites: L, nivelActual: 'normal', soloCerrarHasta: null, ...extra });

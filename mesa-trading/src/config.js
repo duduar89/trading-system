@@ -60,6 +60,15 @@ function esLoopback(host) {
 }
 
 // Argumentos de línea de órdenes del tipo --modo=sintetico --velocidad=600
+// --puerto=N. El 0 vale: el sistema elige un puerto libre y el banner dice
+// cuál (lo usan las pruebas que lanzan la mesa en paralelo: un puerto «libre»
+// pedido antes y soltado lo puede coger otro proceso mientras la mesa arranca).
+// Sin número válido, el de siempre.
+function puertoDeArgs(v) {
+  const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+  return Number.isInteger(n) && n >= 0 && n <= 65535 ? n : 8765;
+}
+
 function leerArgs(argv = process.argv.slice(2)) {
   const args = {};
   for (const a of argv) {
@@ -115,7 +124,7 @@ function crearConfig(args = leerArgs()) {
     raiz: RAIZ,
     carpetaDatos: String(args.datos || process.env.CARPETA_DATOS || path.join(RAIZ, 'data')),
     modo,
-    puerto: num('PUERTO', Number(args.puerto) || 8765),
+    puerto: num('PUERTO', puertoDeArgs(args.puerto)),
     host: process.env.HOST || '127.0.0.1',
     tokenPanel: process.env.PANEL_TOKEN || '',
     velocidad: Number(args.velocidad) || num('VELOCIDAD', 1), // solo modo sintético

@@ -230,6 +230,14 @@
     let velocidad = 1;
     const directivas = { modo: 'NORMAL', multiplicadores: Object.fromEntries(MESAS.map(m => [m.id, 1])), activosVetados: [],
       mesasPausadas: [], soloCerrarHasta: null, reduccion: null };
+    // §7 fondo.factorTamano: DEFENSIVO (×0,5) × reducción del Megáfono vigente × caída.
+    const factorTamano = (ahora) => {
+      const r = directivas.reduccion;
+      const comite = directivas.modo === 'DEFENSIVO' ? 0.5 : 1;
+      const megafono = r && (r.hasta === null || r.hasta === undefined || r.hasta > ahora) ? r.factor : 1;
+      const caida = Number.isFinite(fondo.multiplicadorCaida) ? fondo.multiplicadorCaida : 1;
+      return { total: comite * megafono * caida, comite, megafono, caida };
+    };
     let megafonoPendiente = null;
     const mensajes = [];
     const ejecuciones = [];
@@ -564,7 +572,7 @@
       const rentBtc = precios.BTC / (ACTIVOS[0].precio / 1.004) - 1;
       return {
         version: 1, ahora, modo: 'sintetico', broker: 'simulado', velocidad,
-        fondo: copia(fondo),
+        fondo: Object.assign(copia(fondo), { factorTamano: factorTamano(ahora) }),
         cabecera: cab,
         llm: { activo: true, modeloComite, modeloAgentes, gastoHoyUsd: Math.round(gastoLLM * 10000) / 10000, presupuestoDiaUsd: presupuesto },
         curva: curva.slice(-500).map(p => ({ t: p.t, patrimonio: p.patrimonio })),

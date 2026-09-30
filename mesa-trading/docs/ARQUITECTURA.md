@@ -474,6 +474,36 @@ Pérdida del día ≤ −2 % → `solo_cerrar` hasta las 00:00 UTC siguientes;
 `spy` y `btc-spy` (50/50). Comprar y mantener, sin rebalanceo. La sombra
 **«mismas mesas sin comité»** la calcula F con puestos `sombra: true`.
 
+Qué compara exactamente «mismas mesas sin comité»: el fondo real frente a sí
+mismo sin las decisiones del comité, y nada más. Por eso sufre todo lo que no
+es el comité, igual que el fondo:
+- Las mismas mesas, pesos, señales y stops (misma estrategia por puesto, con
+  su propia posición), sin bróker: se llena al precio del latido con los costes
+  del bróker simulado (comisión y deslizamiento), y las acciones con la bolsa
+  cerrada esperan a la apertura en su propia cola (`estado.sombra.pendientes`).
+- Los límites duros de §5.3 sobre su propia cartera (peso por activo,
+  exposiciones, posiciones, riesgo por operación, precio viejo, desvío,
+  mínimo por orden) y la caída desde SU máximo (×0,5 al −10 %).
+- El nivel del fondo real: con `solo_cerrar` (pérdida del día), `pausado`
+  (botón o conciliación) o `bloqueado` no abre nada.
+- El kill switch, manual o del vigilante: en el mismo instante se cierran
+  todas sus posiciones, cada símbolo al precio medio al que lo vendió el fondo
+  en ese kill (si el fondo no lo tenía o no llegó a venderlo, al precio de
+  ahora con los costes del simulado; las acciones con la bolsa cerrada, a la
+  apertura), y se descartan sus compras en cola. Luego no abre hasta Reabrir.
+- Las directivas del Megáfono (solo cerrar, pausa de activo o de mesa,
+  reducción de riesgo) y los vetos por noticias graves (no los decide el comité).
+
+Lo único que no le llega son las decisiones del comité: el modo DEFENSIVO
+(capital de mesa ×0,5) y SOLO_CERRAR, los multiplicadores por mesa
+({0; 0,5; 1}) y sus vetos de 24 h (`origen: 'comite'`). Su patrimonio lo mide
+su efectivo (`estado.sombra.efectivo`, parte del capital inicial) más sus
+posiciones; su curva diaria (`sombras.curvas['sin-comite']`) se anota en el
+cierre diario como la del fondo. Así, «fondo − sin comité» (Sharpe 90 d y
+patrimonio) es lo que aporta el comité, sin cargarle el kill, las pausas, el
+vigilante ni el Megáfono. Los stops de la sombra los mira el vigilante en cada
+latido, como los reales (con el fondo bloqueado ya no tiene nada abierto).
+
 ### 5.6 Evaluador (`src/aprendizaje/evaluador.js`)
 
 ```js
@@ -666,7 +696,7 @@ cierre de vela del marco de la mesa
  → Jefa de riesgos: evaluarPropuesta()                 [bus: 'aprobacion' | 'veto']
  → Ejecutor: registro de INTENCIÓN en ordenes.jsonl → enviarOrden() → esperarEjecucion()   [bus: 'orden', 'ejecucion']
  → libros.aplicarEjecucion()                           [bus: 'cierre' si se cierra]
- → (en paralelo, el puesto sombra «sin comité» hace lo mismo con multiplicador 1 y sin directivas, sin bróker)
+ → (en paralelo, el puesto sombra «sin comité» hace lo mismo sin bróker y sin las decisiones del comité: §5.5)
 ```
 - `idCliente = mt-<sal>-<mesaId>-<CLAVE>-<velaISO compacta>-<accion>-<n>` (≤ 128).
   `sal` = `estado.creado` (instante en que se creó el estado.json de esa
@@ -733,6 +763,24 @@ aplicado no es el que razonó) y no nombra otro modo. Durante el comité, los
 jefes van a la sala de comité (evento `agente`); las pausas entre puntos son
 solo de pantalla y `detener()` las corta.
 
+Datos frescos: el comité tarda (pausas de pantalla, la llamada al LLM) y el
+latido sigue mientras tanto. Cada punto se redacta con el estado del momento
+en que se publica (`reunirDatos` otra vez, también el voto) y la intervención
+del LLM, pedida con los datos del principio, solo sale si cuadra con los de
+ese momento. Si desde que se abrió la reunión cambió algo de ese punto, lo dice
+quien lo presenta: el nivel del fondo en el de Riesgos («Durante el comité el
+fondo ha pasado de bloqueado a normal: un humano ha reabierto el fondo»), el
+kill en el del Controller, el régimen en el de Macro y el Megáfono aplicado en
+el suyo (el orquestador anota en memoria, numerado, lo que un humano pulsa:
+Reabrir, Pausar, kill y Megáfono aplicado). La decisión se toma con el estado
+del final de la reunión: votos y plan por defecto recalculados; si un voto ya
+dicho en su punto cambió, la decisión lo dice («Votos recalculados al cerrar:
+Riesgos DEFENSIVO (dijo NORMAL; el fondo está ahora en pausa)»). Si los votos
+del final no son los del principio, la decisión del LLM (tomada con los de
+antes) no se aplica: plan por defecto con los del final, y
+`motivoPlanPorDefecto` dice por qué. La razón del LLM se comprueba con los
+datos del final.
+
 ### 6.9 Cadencias del orquestador (F: `src/orquestador.js`)
 
 En cada `paso()` (tiempo real: cada 60 s; sintético: cada 5 min simulados):
@@ -783,6 +831,9 @@ visual), próximas cadencias. Campos añadidos después del primer contrato:
 - `noticias.ultimaOk`: última clasificación de noticias que salió bien (las
   noticias solo se marcan vistas tras clasificarlas).
 - `mesas[].nota`, `mesas[].firmaHipotesis` (las contratadas del laboratorio).
+- `puestos[id].espera`: la espera de la estrategia en la última vela (solo si
+  entonces no tenía posición ni iba a abrir), para rehacer la tarjeta del
+  puesto en el acto cuando cambia el nivel del fondo (§7, `estadoTexto`).
 Además `data/.proceso` (el bloqueo de la carpeta, con el pid), `mensajes.jsonl`,
 `ordenes.jsonl`, `operaciones.jsonl`, `operaciones-sombra.jsonl`,
 `llm-costes.jsonl`, `informes.jsonl`, `broker-simulado.json`, `cache/`.
@@ -802,7 +853,8 @@ Arranque (`src/index.js`), en este orden:
 
 ## 7. API HTTP y eventos (F ↔ E)
 
-Servidor `node:http` en `127.0.0.1:8765` (variables `PUERTO`, `HOST`). Si hay
+Servidor `node:http` en `127.0.0.1:8765` (variables `PUERTO`, `HOST`; `--puerto=0`
+deja que el sistema elija un puerto libre y el banner dice cuál). Si hay
 `PANEL_TOKEN`, todo `/api/*` (GET, POST y el SSE) lo pide en la cabecera
 `x-panel-token` o en `?token=` (EventSource no admite cabeceras); los
 estáticos se sirven sin token. Con `HOST` abierto a la red (0.0.0.0 o una IP
@@ -854,7 +906,15 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
 ```js
 {
   version: 1, ahora, modo: 'alpaca'|'simulado'|'sintetico', broker: 'alpaca-paper'|'simulado', velocidad,
-  fondo: { nivel: 'normal'|'solo_cerrar'|'pausado'|'bloqueado', motivo, multiplicadorCaida },
+  fondo: { nivel: 'normal'|'solo_cerrar'|'pausado'|'bloqueado', motivo, multiplicadorCaida,
+           factorTamano: { total, comite, megafono, caida } },
+  // factorTamano: el recorte que se aplica DE VERDAD al tamaño de cada apertura nueva, para que la
+  //   interfaz no lo recalcule. total = comite × megafono × caida. comite: 0,5 con el modo DEFENSIVO
+  //   del comité (al capital de cada mesa, mesas.js), 1 si no; megafono: el factor de la reducción del
+  //   Megáfono vigente (la más dura), 1 si no hay; caida: multiplicadorCaida del vigilante (limites.js
+  //   aplica estos dos al nocional). El multiplicador por mesa del comité no entra (es de cada mesa:
+  //   mesas[].multiplicador). No dice si se puede abrir: con nivel ≠ normal, SOLO_CERRAR del comité o
+  //   «solo cerrar» del Megáfono no se abre nada, y eso lo cuentan nivel, directivas y avisos.
   cabecera: { patrimonio, pnlDia, pnlDiaPct, caida, exposicionBrutaPct, exposicionCriptoPct, posiciones,
               regimen: { valor, detalle }, miedoCodicia: { valor, etiqueta, sintetico } | null,
               proximoComite, modoComite: 'NORMAL'|'DEFENSIVO'|'SOLO_CERRAR',
@@ -880,7 +940,11 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
               pnlDia, operaciones, acierto, factorBeneficio, adherencia, estadoTexto, ultimaSenal: { accion, t } | null,
               chispa: [number] /* últimos 16 cierres */ }],
   // estadoTexto: con posición abierta se rehace con las cifras de ahora (las de `posicion`); tras un
-  //   cierre dice el cierre; sin posición, la espera de la estrategia en la última vela.
+  //   cierre dice el cierre; sin posición, la espera de la estrategia en la última vela. Si el fondo no
+  //   deja abrir, lo dice: bloqueado (todos los puestos), pausa o solo cerrar por la pérdida del día (los
+  //   que no tienen posición). Cuando cambia el nivel (Reabrir, Pausar, kill, vigilante) se rehace en el
+  //   acto, sin esperar a la vela siguiente; al volver a normal, la espera de la última vela si entonces
+  //   no tenía posición ni iba a abrir, y si no «Esperando señal».
   posiciones: [{ simbolo, etiqueta, cantidad, precioMedio, precio, valor, pnl }],
   benchmarks: [{ id, nombre, valor, rentabilidad, sharpe90 }],        // incluye 'sin-comite'
   mejora: { sharpe90Fondo, sharpe90SinComite, sharpe90Btc, texto },

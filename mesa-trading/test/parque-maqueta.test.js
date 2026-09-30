@@ -12,7 +12,7 @@ const claves = o => Object.keys(o).sort();
 const FORMA = {
   raiz: ['version', 'ahora', 'modo', 'broker', 'velocidad', 'fondo', 'cabecera', 'llm', 'curva', 'cotizaciones', 'departamentos', 'agentes',
     'mesas', 'puestos', 'posiciones', 'benchmarks', 'mejora', 'directivas', 'megafonoPendiente', 'mensajes', 'ejecuciones', 'laboratorio', 'limites', 'avisos'],
-  fondo: ['nivel', 'motivo', 'multiplicadorCaida'],
+  fondo: ['nivel', 'motivo', 'multiplicadorCaida', 'factorTamano'],
   cabecera: ['patrimonio', 'pnlDia', 'pnlDiaPct', 'caida', 'exposicionBrutaPct', 'exposicionCriptoPct', 'posiciones', 'regimen', 'miedoCodicia', 'proximoComite', 'modoComite',
     'sinAsignar', 'vigilancia'],
   sinAsignar: ['fraccion', 'usd'],
@@ -45,6 +45,10 @@ function comprobarForma(i) {
   assert.ok(['alpaca-paper', 'simulado'].includes(i.broker));
   assert.deepEqual(claves(i.fondo), FORMA.fondo.slice().sort());
   assert.ok(['normal', 'solo_cerrar', 'pausado', 'bloqueado'].includes(i.fondo.nivel));
+  // §7: el recorte real de las aperturas, total = comité × Megáfono × caída.
+  const ft = i.fondo.factorTamano;
+  assert.deepEqual(claves(ft), ['caida', 'comite', 'megafono', 'total']);
+  assert.ok(Math.abs(ft.total - ft.comite * ft.megafono * ft.caida) < 1e-12);
   assert.deepEqual(claves(i.cabecera), FORMA.cabecera.slice().sort());
   assert.deepEqual(claves(i.cabecera.regimen), ['detalle', 'valor']);
   assert.deepEqual(claves(i.cabecera.miedoCodicia), ['etiqueta', 'sintetico', 'valor']);

@@ -30,6 +30,8 @@ estar encendido meses, lo sensato es un servidor pequeño siempre encendido.
 **Kill switch:** cancela todas las órdenes, cierra todas las posiciones y deja
 el fondo **bloqueado**. Si el proceso se reinicia, arranca bloqueado. Solo se
 reabre escribiendo REABRIR, y solo si las posiciones cuadran con el bróker.
+También cierra la cartera sombra «mismas mesas sin comité», al mismo precio al
+que vendió el fondo (ver abajo por qué).
 
 **El bróker es la verdad.** Cada minuto el Controller compara las posiciones
 del sistema con las de Alpaca. Si difieren por la comisión que Alpaca cobra en
@@ -44,8 +46,28 @@ de reenviarla.
 ## Cómo mejora (y por qué despacio)
 
 Mejorar **no** es que el P&L de esta semana suba. Es que el Sharpe de 90 días
-del fondo suba frente a sus carteras sombra, con todos los costes. Hay cuatro
-mecanismos, todos con reglas fijadas de antemano:
+del fondo suba frente a sus carteras sombra, con todos los costes.
+
+**Qué mide «mismas mesas sin comité».** Si el comité aporta algo. Por eso esa
+sombra es el mismo fondo sin las decisiones del comité, y sufre todo lo demás
+igual que el fondo:
+
+| Le llega a la sombra | No le llega |
+|---|---|
+| Las mismas mesas, pesos, señales y stops, con comisión y deslizamiento | El modo DEFENSIVO del comité (capital de mesa a la mitad) |
+| Los límites duros sobre su propia cartera, y la caída desde su máximo | El modo SOLO_CERRAR del comité |
+| El nivel del fondo real: solo cerrar por la pérdida del día, pausa, bloqueo | Los multiplicadores por mesa del comité (×0, ×0,5) |
+| El kill switch: cierra todo a la vez, al precio al que vendió el fondo | Los vetos de 24 h del comité |
+| El Megáfono: solo cerrar, pausas de activo o de mesa, reducción de riesgo | |
+| Los vetos por noticias graves | |
+
+Así, la diferencia «fondo − sin comité» es lo que hizo el comité, y no se le
+carga lo que hicieron el kill, las pausas, el vigilante o el Megáfono. Antes la
+sombra no sufría nada de eso: tras la demo de 60 días (semilla 42), cuyo final
+fuerza un kill, las dos curvas coincidían hasta el kill y luego el panel decía
+que el comité restaba 555 $, cuando lo que restaba era el kill.
+
+Hay cuatro mecanismos de mejora, todos con reglas fijadas de antemano:
 
 1. **Reparto mensual del capital** (día 1 de cada mes). Cada mesa parte de un
    peso por paridad de riesgo y se inclina según su Sharpe, pero contraído:

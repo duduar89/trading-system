@@ -253,8 +253,10 @@
         // Rótulo de la mesa a la izquierda del principio de la FILA (el único
         // hueco libre en la proyección): si la fila es compartida, los rótulos
         // se apilan por `orden` y llevan de qué activo a qué activo va su tramo.
+        // `colFin`: donde acaba su tramo (si el principio cae fuera de la
+        // pantalla, el rótulo puede ir detrás del último puesto).
         rotulosFila.push({ mesaId: g.mesa.id, nombre: g.mesa.nombre || g.mesa.id, marco: g.mesa.marco || '', estado: g.mesa.estado || '',
-          col: INICIO_FILA + (hechos[0].c0 - c0) - 0.1, fila: fila + 0.18, z: hechos[0].mesa.alto + 34, orden, compartida,
+          col: INICIO_FILA + (hechos[0].c0 - c0) - 0.1, colFin: hechos[hechos.length - 1].c1 + 0.1, fila: fila + 0.18, z: hechos[0].mesa.alto + 34, orden, compartida,
           desde: lista[0].p.etiqueta || '', hasta: lista[lista.length - 1].p.etiqueta || '' });
         c0 += anchoPuesto * lista.length + HUECO_ENTRE_MESAS;
       });

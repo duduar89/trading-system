@@ -29,7 +29,7 @@ const tipoDe = v => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v
 // Tipos de §7 (los '|' admiten varios).
 const FORMA = {
   version: 'number', ahora: 'number', modo: 'string', broker: 'string', velocidad: 'number',
-  fondo: { nivel: 'string', motivo: 'string|null', multiplicadorCaida: 'number' },
+  fondo: { nivel: 'string', motivo: 'string|null', multiplicadorCaida: 'number', factorTamano: { total: 'number', comite: 'number', megafono: 'number', caida: 'number' } },
   cabecera: {
     patrimonio: 'number', pnlDia: 'number', pnlDiaPct: 'number', caida: 'number', exposicionBrutaPct: 'number', exposicionCriptoPct: 'number',
     posiciones: 'number', regimen: { valor: 'string', detalle: 'string' }, miedoCodicia: 'object|null', proximoComite: 'number', modoComite: 'string',
@@ -132,7 +132,11 @@ test('la instantánea tiene la misma forma que la maqueta de la interfaz', async
   const real = (await pedir(srv.base, '/api/estado')).json;
   const maq = crearMaqueta({ semilla: 7, ahora: real.ahora }).instantanea();
   mismasClaves(real, maq, '$');
-  for (const k of ['fondo', 'cabecera', 'llm', 'mejora', 'directivas', 'laboratorio']) mismasClaves(real[k], maq[k], k);
+  // fondo.factorTamano es de la última ronda (§7): mientras la maqueta no lo
+  // traiga, la real puede llevarlo de más; en cuanto lo traiga, se compara igual.
+  const nuevos = { fondo: maq.fondo && 'factorTamano' in maq.fondo ? [] : ['factorTamano'] };
+  for (const k of ['fondo', 'cabecera', 'llm', 'mejora', 'directivas', 'laboratorio']) mismasClaves(real[k], maq[k], k, nuevos[k] || []);
+  if (maq.fondo && maq.fondo.factorTamano) mismasClaves(real.fondo.factorTamano, maq.fondo.factorTamano, 'fondo.factorTamano');
   mismasClaves(real.cabecera.regimen, maq.cabecera.regimen, 'cabecera.regimen');
   mismasClaves(real.cabecera.sinAsignar, maq.cabecera.sinAsignar, 'cabecera.sinAsignar');
   mismasClaves(real.cabecera.vigilancia, maq.cabecera.vigilancia, 'cabecera.vigilancia');
@@ -566,21 +570,18 @@ function entornoHijo(extra = {}) {
   return { ...env, ANTHROPIC_BASE_URL: 'http://127.0.0.1:9', ...extra };
 }
 
-function puertoLibre() {
-  return new Promise((resolver, rechazar) => {
-    const s = net.createServer();
-    s.once('error', rechazar);
-    s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolver(port)); });
-  });
-}
-
 // Lanza node src/index.js en sintético. `esperar(re)` resuelve cuando la salida
-// (stdout + stderr) casa con re; `fin` con { codigo, salida }.
+// (stdout + stderr) casa con re; `fin` con { codigo, salida }; `puerto()` con el
+// puerto en que escucha, leído del banner.
+// Por defecto escucha en el puerto 0 y el sistema elige uno libre: un puerto
+// «libre» pedido antes y cerrado para dárselo al hijo lo podía coger otro
+// fichero de pruebas en paralelo mientras el hijo arrancaba (la prueba del
+// segundo Ctrl+C caía 1 de cada 6 pasadas con «puerto en uso»).
 // Si una prueba falla a mitad, ningún proceso hijo se queda corriendo.
 const hijos = new Set();
 process.on('exit', () => { for (const h of hijos) { try { h.kill('SIGKILL'); } catch (_) { /* ya salió */ } } });
 
-function lanzarMesa({ puerto, datos, env = {}, precarga = null, args = [] }) {
+function lanzarMesa({ puerto = 0, datos, env = {}, precarga = null, args = [] }) {
   const argv = [...(precarga ? ['-r', precarga] : []), path.join(RAIZ, 'src', 'index.js'), '--modo=sintetico', '--velocidad=1', `--puerto=${puerto}`, `--datos=${datos}`, ...args];
   const hijo = spawn(process.execPath, argv, { cwd: RAIZ, env: entornoHijo(env), stdio: ['ignore', 'pipe', 'pipe'] });
   hijos.add(hijo);
@@ -591,9 +592,13 @@ function lanzarMesa({ puerto, datos, env = {}, precarga = null, args = [] }) {
   hijo.stdout.on('data', d => { salida += d; mirar(); });
   hijo.stderr.on('data', d => { salida += d; mirar(); });
   const fin = new Promise(resolver => hijo.on('close', (codigo, senal) => resolver({ codigo, senal, salida })));
-  return {
+  const m = {
     hijo, fin,
     get salida() { return salida; },
+    async puerto() {
+      const banner = await m.esperar(/Panel: http:\/\/127\.0\.0\.1:(\d+)\//);
+      return Number(/Panel: http:\/\/127\.0\.0\.1:(\d+)\//.exec(banner)[1]);
+    },
     esperar(re, ms = 15_000) {
       if (re.test(salida)) return Promise.resolve(salida);
       return new Promise((resolver, rechazar) => {
@@ -603,6 +608,7 @@ function lanzarMesa({ puerto, datos, env = {}, precarga = null, args = [] }) {
       });
     },
   };
+  return m;
 }
 
 async function conTope(promesa, ms, que) {
@@ -611,9 +617,48 @@ async function conTope(promesa, ms, que) {
   try { return await Promise.race([promesa, tope]); } finally { clearTimeout(t); }
 }
 
+test('arranque: con --puerto=0 escucha en el puerto libre que elige el sistema y el banner dice cuál', async () => {
+  const datos = path.join(carpetaTemporal(), 'p0');
+  const m = lanzarMesa({ puerto: 0, datos });
+  try {
+    await m.esperar(/Ctrl\+C para parar/);
+    const p = await m.puerto();
+    assert.ok(Number.isInteger(p) && p > 0, `puerto del banner: ${p}`);
+    assert.notEqual(p, 8765, '0 no es «el de por defecto»: lo elige el sistema');
+    const r = await pedir(`http://127.0.0.1:${p}`, '/');
+    assert.equal(r.status, 200);
+    assert.match(r.texto, /<!doctype html>/i);
+  } finally {
+    m.hijo.kill('SIGINT');
+  }
+  const r = await conTope(m.fin, 15_000, 'Ctrl+C');
+  assert.equal(r.codigo, 0, r.salida);
+});
+
+test('arranque: un Ctrl+C que llega justo tras el banner se atiende (los manejadores van antes de decir «Ctrl+C para parar»)', async () => {
+  // El hijo se queda 300 ms quieto justo después de escribir el banner, como un
+  // proceso al que el sistema no da CPU en ese momento (pasa con las pruebas en
+  // paralelo). Si el Ctrl+C llega antes de que tenga su manejador, Node aplica
+  // el de por defecto: muere sin guardar ni soltar el bloqueo.
+  const precarga = path.join(carpetaTemporal(), 'lento-tras-banner.js');
+  fs.writeFileSync(precarga, `'use strict';
+const log = console.log;
+console.log = (...a) => { log(...a); if (/Ctrl\\+C para parar/.test(String(a[0]))) { const t = Date.now() + 300; while (Date.now() < t) {} } };
+`);
+  const datos = path.join(carpetaTemporal(), 'banner');
+  const m = lanzarMesa({ datos, precarga });
+  await m.esperar(/Ctrl\+C para parar/);
+  m.hijo.kill('SIGINT');
+  const r = await conTope(m.fin, 15_000, 'Ctrl+C tras el banner');
+  assert.equal(r.senal, null, `murió por la señal sin atenderla. Salida:\n${r.salida}`);
+  assert.equal(r.codigo, 0, r.salida);
+  assert.match(r.salida, /Estado guardado/);
+  assert.equal(fs.existsSync(path.join(datos, '.proceso')), false, 'suelta el bloqueo');
+});
+
 test('arranque: HOST abierto a la red sin PANEL_TOKEN no arranca ni toca la carpeta', async () => {
   const datos = path.join(carpetaTemporal(), 'datos');
-  const m = lanzarMesa({ puerto: await puertoLibre(), datos, env: { HOST: '0.0.0.0', PANEL_TOKEN: '' } });
+  const m = lanzarMesa({ datos, env: { HOST: '0.0.0.0', PANEL_TOKEN: '' } });
   const r = await conTope(m.fin, 15_000, 'arranque');
   assert.equal(r.codigo, 1, r.salida);
   assert.match(r.salida, /HOST=0\.0\.0\.0/);
@@ -625,10 +670,10 @@ test('arranque: HOST abierto a la red sin PANEL_TOKEN no arranca ni toca la carp
 test('arranque: un solo proceso por carpeta, y escucha ANTES de iniciar (un puerto ocupado no toca los datos)', async () => {
   const x = path.join(carpetaTemporal(), 'x');
   const y = path.join(carpetaTemporal(), 'y');
-  const p1 = await puertoLibre();
-  const a = lanzarMesa({ puerto: p1, datos: x });
+  const a = lanzarMesa({ datos: x });
   try {
     await a.esperar(/Ctrl\+C para parar/);
+    const p1 = await a.puerto();
     assert.ok(fs.existsSync(path.join(x, '.proceso')));
     // A ×1 el primer latido va justo tras el banner y el siguiente, 5 min después:
     // se espera a que estado.json deje de cambiar.
@@ -644,7 +689,7 @@ test('arranque: un solo proceso por carpeta, y escucha ANTES de iniciar (un puer
     const estadoAntes = fs.readFileSync(path.join(x, 'estado.json'), 'utf8');
     const brokerAntes = fs.readFileSync(path.join(x, 'broker-simulado.json'), 'utf8');
     // Misma carpeta, otro puerto: se niega sin escribir nada en la carpeta del otro.
-    const b = lanzarMesa({ puerto: await puertoLibre(), datos: x });
+    const b = lanzarMesa({ datos: x });
     const rb = await conTope(b.fin, 15_000, 'segundo proceso');
     assert.equal(rb.codigo, 1, rb.salida);
     assert.match(rb.salida, /Otra mesa ya usa la carpeta/);
@@ -677,7 +722,7 @@ if (modo === 'falla') Orquestador.prototype.detener = async () => { throw Object
 `);
   // Colgado (la red no responde dentro del latido): el segundo Ctrl+C sale en el acto.
   const datos1 = path.join(carpetaTemporal(), 'c1');
-  const a = lanzarMesa({ puerto: await puertoLibre(), datos: datos1, precarga, env: { PRUEBA_DETENER: 'colgado' } });
+  const a = lanzarMesa({ datos: datos1, precarga, env: { PRUEBA_DETENER: 'colgado' } });
   await a.esperar(/Ctrl\+C para parar/);
   a.hijo.kill('SIGINT');
   await a.esperar(/otro Ctrl\+C sale ya/i);
@@ -690,7 +735,7 @@ if (modo === 'falla') Orquestador.prototype.detener = async () => { throw Object
   assert.doesNotMatch(ra.salida, /Estado guardado/);
   assert.equal(fs.existsSync(path.join(datos1, '.proceso')), false, 'suelta el bloqueo también al salir deprisa');
   // Falla al guardar: lo dice y sale con 1.
-  const b = lanzarMesa({ puerto: await puertoLibre(), datos: path.join(carpetaTemporal(), 'c2'), precarga, env: { PRUEBA_DETENER: 'falla' } });
+  const b = lanzarMesa({ datos: path.join(carpetaTemporal(), 'c2'), precarga, env: { PRUEBA_DETENER: 'falla' } });
   await b.esperar(/Ctrl\+C para parar/);
   b.hijo.kill('SIGINT');
   const rb = await conTope(b.fin, 10_000, 'cierre fallido');

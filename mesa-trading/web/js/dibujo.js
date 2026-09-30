@@ -865,8 +865,14 @@
 
   // Texto corto del nivel efectivo del fondo (barra, pantalla gigante): dice
   // también de dónde viene un «solo cerrar» que no pone el vigilante.
+  // Con el fondo abierto dice el tamaño REAL de las posiciones nuevas
+  // (DEFENSIVO, reducción del Megáfono y caída multiplicados; cifras.tamanoEntradas).
   function textoNivel(n) {
-    if (!n || n.nivel === 'normal') return n && n.defensivo ? 'DEFENSIVO ×0,5' : '';
+    if (!n) return '';
+    if (n.nivel === 'normal' || !n.nivel) {
+      const tam = n.tamano || cifras.tamanoEntradas(n.defensivo, n.reduccion, null);
+      return cifras.rotuloTamano(tam).toUpperCase();
+    }
     if (n.nivel === 'bloqueado') return 'BLOQUEADO';
     if (n.nivel === 'pausado') return 'PAUSADO · SOLO CERRAR';
     if (n.origen === 'comité') return 'SOLO CERRAR · COMITÉ';
@@ -882,12 +888,43 @@
     return cot.map((q, k) => ({ q, k })).sort((a, b) => (conPos.has(b.q.simbolo) - conPos.has(a.q.simbolo)) || a.k - b.k).map(x => x.q);
   }
 
-  // Una fila de cotización. Un precio parado (más viejo que el límite de §5.3,
-  // o sin hora) se pinta apagado y, en lugar de la variación, dice su edad.
-  function filaCotizacion(c, q, inst, x, y, o) {
+  // Lo que dice la columna de variación: la variación con su flecha o, con el
+  // precio parado (más viejo que el límite de §5.3, o sin hora), su edad.
+  function textoVariacion(q, inst, flecha) {
     const edad = cifras.precioViejo(q, inst.ahora, inst.limites);
-    const viejo = !!(edad && edad.viejo);
-    c.globalAlpha = viejo ? 0.45 : 1;
+    if (edad && edad.viejo) return { texto: edad.edadMs === null ? 'sin hora' : cifras.hace(edad.edadMs), viejo: true };
+    const f = !flecha ? '' : q.var24hPct > 0 ? '▲ ' : q.var24hPct < 0 ? '▼ ' : '';
+    return { texto: f + cifras.pct(q.var24hPct, { signo: true }), viejo: false };
+  }
+
+  // Dónde va cada cifra de una columna de cotizaciones de `ancho` px, midiendo
+  // lo que se va a pintar: etiqueta | precio (a la derecha) | variación (a la
+  // derecha, al final). El precio queda en `xPrecio` si cabe; si no, se corre.
+  // Si ni así hay HUECO entre las tres, primero se quita la flecha y después se
+  // baja el cuerpo (tope 14 px). Con dos columnas y cripto a ±10 %, antes la
+  // variación se montaba sobre el precio (DOGE «0,1795» con «+10,37 %»).
+  const HUECO_COT = 12;
+  function disposicionCotizaciones(c, filas, inst, o) {
+    const medir = (peso, px, textos) => Math.max(0, ...textos.map(t => { c.font = `${peso} ${px}px ${FUENTE}`; return c.measureText(t).width; }));
+    let ultima = null;
+    for (let fuente = o.fuente; fuente >= 14; fuente--) {
+      for (const flecha of [true, false]) {
+        const wE = medir(800, fuente, filas.map(q => q.etiqueta || q.simbolo));
+        const wP = medir(600, fuente, filas.map(q => cifras.precio(q.precio)));
+        const wV = medir(700, fuente - 2, filas.map(q => textoVariacion(q, inst, flecha).texto));
+        const xPrecio = Math.max(o.xPrecio || 0, Math.ceil(wE + HUECO_COT + wP));
+        ultima = { fuente, flecha, xPrecio, xVar: o.ancho };
+        if (xPrecio + HUECO_COT + wV <= o.ancho) return ultima;
+      }
+    }
+    return ultima;
+  }
+
+  // Una fila de cotización. Un precio parado se pinta apagado y, en lugar de
+  // la variación, dice su edad.
+  function filaCotizacion(c, q, inst, x, y, o) {
+    const v = textoVariacion(q, inst, o.flecha !== false);
+    c.globalAlpha = v.viejo ? 0.45 : 1;
     c.fillStyle = '#e6e9f2';
     c.font = `800 ${o.fuente}px ${FUENTE}`;
     c.fillText(q.etiqueta || q.simbolo, x, y);
@@ -895,14 +932,8 @@
     c.font = `600 ${o.fuente}px ${FUENTE}`;
     c.fillText(cifras.precio(q.precio), x + o.xPrecio, y);
     c.font = `700 ${o.fuente - 2}px ${FUENTE}`;
-    if (viejo) {
-      c.fillStyle = '#fcd34d';
-      c.fillText(edad.edadMs === null ? 'sin hora' : cifras.hace(edad.edadMs), x + o.xVar, y);
-    } else {
-      c.fillStyle = colorVar(q.var24hPct);
-      const flecha = q.var24hPct > 0 ? '▲ ' : q.var24hPct < 0 ? '▼ ' : '';
-      c.fillText(flecha + cifras.pct(q.var24hPct, { signo: true }), x + o.xVar, y);
-    }
+    c.fillStyle = v.viejo ? '#fcd34d' : colorVar(q.var24hPct);
+    c.fillText(v.texto, x + o.xVar, y);
     c.textAlign = 'left';
     c.globalAlpha = 1;
   }
@@ -952,21 +983,25 @@
     c.fillStyle = '#8a93b0';
     c.font = `700 22px ${FUENTE}`;
     c.fillText('COTIZACIONES', 30, 100);
+    // El bloque va de x = 30 a la raya de x1 − 16 (584).
     const todas = inst.cotizaciones || [];
     if (todas.length <= 6) {
-      todas.forEach((q, k) => filaCotizacion(c, q, inst, 30, 142 + k * 36, { fuente: 26, xPrecio: 360, xVar: 536 }));
+      const d = disposicionCotizaciones(c, todas, inst, { fuente: 26, xPrecio: 360, ancho: 536 });
+      todas.forEach((q, k) => filaCotizacion(c, q, inst, 30, 142 + k * 36, d));
     } else {
       const orden = ordenarCotizaciones(inst);
       const MAX = 14;
+      const ANCHO_COL = 260; const X_COL2 = 30 + ANCHO_COL + 22;   // la segunda acaba en 572
       const visibles = orden.length > MAX ? orden.slice(0, MAX - 1) : orden;
+      const d = disposicionCotizaciones(c, visibles, inst, { fuente: 20, xPrecio: 0, ancho: ANCHO_COL });
       visibles.forEach((q, k) => {
         const col = k < 7 ? 0 : 1;
-        filaCotizacion(c, q, inst, col ? 300 : 30, 130 + (k % 7) * 30, { fuente: 20, xPrecio: 158, xVar: 262 });
+        filaCotizacion(c, q, inst, col ? X_COL2 : 30, 130 + (k % 7) * 30, d);
       });
       if (orden.length > MAX) {
         c.fillStyle = '#8a93b0';
         c.font = `700 18px ${FUENTE}`;
-        c.fillText(`+${cifras.numero(orden.length - (MAX - 1))} más`, 300, 130 + 6 * 30);
+        c.fillText(`+${cifras.numero(orden.length - (MAX - 1))} más`, X_COL2, 130 + 6 * 30);
       }
     }
 
@@ -1097,10 +1132,33 @@
     rectRedondo(c, 0, 0, W, H, 12); c.fill();
     c.strokeStyle = '#4b1d1d'; c.lineWidth = 4;
     rectRedondo(c, 2, 2, W - 4, H - 4, 10); c.stroke();
+    // Lo que mide el vigilante (tras reabrir un kill, desde la reapertura; la
+    // cabecera sigue contando desde el máximo histórico). Si el aviso no cabe a
+    // la derecha del título, va en una segunda línea: en la misma se pisaban
+    // unos 90 px («medido desde la reapertura» encima de «LÍMITES DEL FONDO»).
+    const med = inst ? cifras.medidaLimites(inst) : null;
+    const TITULO = 'LÍMITES DEL FONDO'; const SUB = 'medido desde la reapertura';
+    c.font = `800 24px ${FUENTE}`;
+    const wTitulo = c.measureText(TITULO).width;
+    c.font = `700 16px ${FUENTE}`;
+    const enLinea = med && med.desdeReapertura && 24 + wTitulo + 16 + c.measureText(SUB).width <= W - 24;
+    const dosLineas = med && med.desdeReapertura && !enLinea;
     c.fillStyle = '#fca5a5';
     c.font = `800 24px ${FUENTE}`;
-    c.fillText('LÍMITES DEL FONDO', 24, 40);
+    c.fillText(TITULO, 24, dosLineas ? 34 : 40);
     if (!inst) return;
+    if (med.desdeReapertura) {
+      c.fillStyle = '#fbbf24';
+      if (enLinea) {
+        c.font = `700 16px ${FUENTE}`;
+        c.textAlign = 'right';
+        c.fillText(SUB, W - 24, 40);
+        c.textAlign = 'left';
+      } else {
+        c.font = `700 15px ${FUENTE}`;
+        c.fillText(SUB, 24, 57);
+      }
+    }
     const cab = inst.cabecera || {};
     const lim = inst.limites || {};
     const x = 24; const w = W - 48;
@@ -1108,16 +1166,6 @@
       `${cifras.pct(cab.exposicionBrutaPct, { decimales: 0 })} / ${cifras.pct(lim.maxExposicionBruta, { decimales: 0 })}`);
     barraLimite(c, x, 136, w, 'Exposición cripto', cab.exposicionCriptoPct, lim.maxExposicionCripto,
       `${cifras.pct(cab.exposicionCriptoPct, { decimales: 0 })} / ${cifras.pct(lim.maxExposicionCripto, { decimales: 0 })}`);
-    // Lo que mide el vigilante (tras reabrir un kill, desde la reapertura; la
-    // cabecera sigue contando desde el máximo histórico).
-    const med = cifras.medidaLimites(inst);
-    if (med.desdeReapertura) {
-      c.fillStyle = '#fbbf24';
-      c.font = `700 16px ${FUENTE}`;
-      c.textAlign = 'right';
-      c.fillText('medido desde la reapertura', W - 24, 40);
-      c.textAlign = 'left';
-    }
     barraLimite(c, x, 188, w, 'Pérdida del día', med.perdida ?? 0, lim.perdidaDiariaSoloCerrar,
       `${med.perdida === null ? '—' : cifras.pct(-med.perdida)} / −${cifras.pct(lim.perdidaDiariaSoloCerrar)}`);
     barraLimite(c, x, 240, w, 'Caída desde máximo', med.caida ?? 0, lim.caidaKill,
@@ -1169,6 +1217,81 @@
     c.fillText(resta === null ? 'Próximo: —' : `Próximo en ${cifras.cuentaAtras(resta)}`, 20, 126);
   }
 
+  // ---------- rótulos de fila del parqué (px CSS, sin lienzo: se prueba en Node) ----------
+
+  // Sitio de cada rótulo de mesa en pantalla. Por orden: el de siempre (acaba
+  // en `inicio.x`, a la izquierda del principio de la fila) o, si pisa algo,
+  // algo más a la izquierda (hasta 160 px); pegado al borde izquierdo si se
+  // sale del lienzo; detrás del final de la fila (`fin`, solo en filas no
+  // compartidas). Cada sitio primero con el texto largo y luego con el corto
+  // (`formas`). Nunca fuera del lienzo ni encima de lo ya pintado: si no cabe,
+  // no se pinta hasta acercar la cámara, salvo el de la mesa elegida. En el
+  // móvil los rótulos empezaban en x = −35… −133 (cortados) y son lo que se
+  // toca para abrir la ficha de la mesa.
+  // Van por prioridad (la elegida y después más peso): con poco sitio cede una
+  // incubada del 2 %, no una titular del 40 %.
+  //   items: [{ id, inicio: { x, y }, fin: { x, y } | null, formas: [{ texto, w }], prioridad, seleccionado }]
+  //   o: { ancho, alto, h, ocupado: [{ x, y, w, h }], margen }
+  //   → [{ id, x, y, w, h, texto, forma }]   (forma: 0 largo, 1 corto)
+  function colocarRotulos(items, o) {
+    const margen = Number.isFinite(o.margen) ? o.margen : 4;
+    const h = o.h;
+    const ocupado = (o.ocupado || []).map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h }));
+    const choca = (x, y, w) => ocupado.find(b => x < b.x + b.w && b.x < x + w && y < b.y + b.h && b.y < y + h);
+    const dentro = (x, y, w) => x >= margen && x + w <= o.ancho - margen && y >= 0 && y + h <= o.alto;
+    const libre = (x, y, w) => dentro(x, y, w) && !choca(x, y, w);
+    const sitios = [
+      // El de siempre, corriéndose a la izquierda de lo que pisa.
+      (it, w) => {
+        let x = Math.round(it.inicio.x - w);
+        for (let k = 0; k < 4 && x >= it.inicio.x - w - 160; k++) {
+          if (!dentro(x, it.inicio.y, w)) return null;
+          const b = choca(x, it.inicio.y, w);
+          if (!b) return { x, y: it.inicio.y };
+          x = Math.round(b.x - w - 4);
+        }
+        return null;
+      },
+      // Pegado al borde izquierdo, si el de siempre se sale.
+      (it, w) => (it.inicio.x - w < margen && libre(margen, it.inicio.y, w) ? { x: margen, y: it.inicio.y } : null),
+      // Detrás del final de la fila, corriéndose un poco a la derecha.
+      (it, w) => {
+        if (!it.fin) return null;
+        let x = Math.round(it.fin.x);
+        for (let k = 0; k < 3 && x <= it.fin.x + 40; k++) {
+          if (!dentro(x, it.fin.y, w)) return null;
+          const b = choca(x, it.fin.y, w);
+          if (!b) return { x, y: it.fin.y };
+          x = Math.round(b.x + b.w + 4);
+        }
+        return null;
+      },
+    ];
+    const orden = items.map((it, k) => ({ it, k })).sort((a, b) =>
+      (Boolean(b.it.seleccionado) - Boolean(a.it.seleccionado)) || ((b.it.prioridad || 0) - (a.it.prioridad || 0)) || a.k - b.k);
+    const salida = [];
+    for (const { it } of orden) {
+      let hecho = null;
+      for (const sitio of sitios) {
+        for (let forma = 0; forma < it.formas.length && !hecho; forma++) {
+          const p = sitio(it, it.formas[forma].w);
+          if (p) hecho = { id: it.id, x: p.x, y: p.y, w: it.formas[forma].w, h, texto: it.formas[forma].texto, forma };
+        }
+        if (hecho) break;
+      }
+      if (!hecho && it.seleccionado) {
+        // La elegida se ve siempre (con el texto corto, dentro del lienzo).
+        const f = it.formas.length - 1; const w = it.formas[f].w;
+        const x = Math.max(margen, Math.min(o.ancho - margen - w, Math.round(it.inicio.x - w)));
+        hecho = { id: it.id, x, y: it.inicio.y, w, h, texto: it.formas[f].texto, forma: f };
+      }
+      if (!hecho) continue;
+      ocupado.push({ x: hecho.x, y: hecho.y, w: hecho.w, h });
+      salida.push(hecho);
+    }
+    return salida;
+  }
+
   function pintarPizarra(tex, tipo) {
     const c = tex.getContext('2d');
     const W = tex.width; const H = tex.height;
@@ -1195,6 +1318,6 @@
     pintarEdificio, pintarTrozoPared, pintarBordeDelantero, pintarMueble, pintarMonitor, pintarPantallaPared,
     pintarPantallaGigante, pintarLimites, pintarPantallaRegimen, pintarPantallaComite, pintarPizarra,
     pintarVentanaTex, pintarRelojesTex, colorCielo, horaDe, TEX_VENTANA, TEX_RELOJES,
-    estadoMonitor, COLORES_MONITOR, textoNivel,
+    estadoMonitor, COLORES_MONITOR, textoNivel, colocarRotulos, disposicionCotizaciones,
   };
 });

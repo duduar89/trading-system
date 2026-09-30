@@ -26,21 +26,33 @@ function contarOrdenes(ctx, ahora) {
   return { ultimoMinuto, ultimaHoraPorMesa: porMesa };
 }
 
-// Contexto de evaluarPropuesta. El sombra «sin comité» (§6.7) usa su propia
-// cartera, sin directivas y en nivel normal: mide qué habría pasado sin el
-// comité, pero con los mismos límites duros.
+// Lo que le llega a la sombra «sin comité» de las directivas vigentes: todo
+// menos las decisiones del comité (§5.5). Se quitan su modo (DEFENSIVO o
+// SOLO_CERRAR), sus multiplicadores por mesa y sus vetos de 24 h; se quedan
+// las del Megáfono (solo cerrar, pausas de activo y de mesa, reducción) y los
+// vetos por noticias graves, que no decide el comité.
+function directivasSinComite(directivas, ahora) {
+  const v = directivasVigentes(directivas, ahora);
+  return { ...v, modo: 'NORMAL', multiplicadores: {}, activosVetados: (v.activosVetados || []).filter(x => x.origen !== 'comite') };
+}
+
+// Contexto de evaluarPropuesta. La sombra «sin comité» (§5.5, §6.7) mide si
+// el comité aporta algo: sufre todo lo que no es el comité, igual que el
+// fondo. Usa su propia cartera (patrimonio, exposición y la caída desde SU
+// máximo, límites duros) y el nivel del fondo real (solo cerrar, pausa,
+// bloqueo), con las directivas sin las del comité (directivasSinComite). Sus
+// órdenes no van al bróker: no cuentan para el ritmo de órdenes.
 function contexto(ctx, { sombra = false } = {}) {
   const ahora = ctx.reloj.ahora();
   const v = ctx.vivo;
   if (sombra) {
-    // La caída desde el máximo es un límite duro, no una decisión del comité:
-    // el sombra también la sufre, medida sobre su propia cartera.
     const s = ctx.estado.sombra;
     const caida = s.pico > 0 ? v.patrimonioSombra / s.pico - 1 : 0;
     return {
-      ahora, patrimonio: v.patrimonioSombra, valoracion: v.valoracionSombra, nivel: 'normal',
+      ahora, patrimonio: v.patrimonioSombra, valoracion: v.valoracionSombra, nivel: ctx.estado.fondo.nivel,
       multiplicadorCaida: caida <= -ctx.limites.caidaReducir + 1e-9 ? FACTOR_CAIDA : 1,
-      directivas: null, ordenes: { ultimoMinuto: 0, ultimaHoraPorMesa: {} }, mercadoAbierto: v.mercadoAbierto, limites: ctx.limites,
+      directivas: directivasSinComite(ctx.estado.directivas, ahora),
+      ordenes: { ultimoMinuto: 0, ultimaHoraPorMesa: {} }, mercadoAbierto: v.mercadoAbierto, limites: ctx.limites,
     };
   }
   return {
@@ -160,4 +172,4 @@ function vigilarFondo(ctx) {
   return { ...r, dia: diaUTC(ahora), desdeReapertura: ref.desdeReapertura };
 }
 
-module.exports = { evaluar, vigilarFondo, referenciasVigilancia, contexto, contarOrdenes, alertaUnaVez };
+module.exports = { evaluar, vigilarFondo, referenciasVigilancia, contexto, directivasSinComite, contarOrdenes, alertaUnaVez };
