@@ -1,0 +1,13 @@
+﻿Código;Nombre;Apellidos;Móvil;Teléfono;Email;Fecha nacimiento;DNI;Observaciones;Acepta publicidad
+1001;Carmen;Ruiz Soler;"+34 611 000 401";;carmen.ruiz@ejemplo.invalid;03/04/1971;00000000T;"Alérgica al látex; prefiere tardes";Sí
+1002;Lucía;Ruiz Soler;611000401;;;;;;
+1003;Laura;Gómez Ruiz;611 00 03 01;;;29/02/1988;;;No
+1004;Marta;Vidal;0034-611-000-302;;MARTA.VIDAL@EJEMPLO.INVALID;;;;
+1005;Sergio;Marín;6,11000501E+08;;;;;"Paciente con
+dos líneas de nota y ""comillas""";x
+1006;Irene;Mora;12345;;irene@;;;;
+1007;Julia;Ramos;;916 32 00 00 / 611 000 701;;15-06-1990;;;
+1008;Carmen;Ruiz;+34611000401;;;;;;
+1009;;Sin Nombre;611000901;;;;;;
+1010;Pablo;Castro;(+34) 611.000.111;;;;;;Pendiente
+1011;Nuria;Cano;611000121;;;;;;No
