@@ -8,3 +8,10 @@ dist/
 test-results/
 playwright-report/
 *.log
+
+# Exportaciones de Flowww (CSV) y sus mapas: datos de pacientes, nunca al repositorio (que es público).
+# Van fuera de esta carpeta (docs/MIGRAR-FLOWWW.md); los de las pruebas, inventados, sí se suben.
+*.csv
+mapa*.json
+!test/fixtures/**/*.csv
+!test/fixtures/**/mapa*.json
