@@ -619,7 +619,7 @@ async function planificar(con, { pacientes, citas, mapa, ahora, aplicar, sinReco
   const plan = {
     aplicar, aplicado: false, ahora, lote: null, sinRecordatorios, errores: [], pacientes: [], citas: [],
     servicios: new Map(), profesionales: new Map(), salas: new Map(), estados: new Map(),
-    dudosas: [], codigosNoUnicos: [], variosServicios: [], retiradas: [], reaparecidas: [], importadasFuera: 0, rangoCitas: null,
+    dudosas: [], codigosNoUnicos: [], variosServicios: [], retiradas: [], reaparecidas: [], importadasFuera: 0, rangoCitas: null, notasIlegibles: [],
   };
   const m = F.leerMapa(mapa);
   plan.errores.push(...m.errores);
@@ -662,7 +662,7 @@ function pruebaDe(c, plan, ahora) {
 
 // Lo que se completa en la ficha de quien ya estaba, si sigue vacío. Para poder deshacerlo (solo si
 // sigue siendo lo que se puso), va al lote cifrado: los eventos se guardan en claro.
-async function completar(con, e, hecho) {
+async function completar(con, e, { hecho, plan }) {
   const x = e.completar || {};
   if (!e.completarTelefono && !e.completar) return;
   const [[p]] = await con.query('SELECT telefono, apellidos, email, fecha_nacimiento, notas_cifradas, notas_iv, notas_tag FROM pacientes WHERE id = ? FOR UPDATE', [e.pacienteId]);
@@ -674,13 +674,14 @@ async function completar(con, e, hecho) {
   if (x.fechaNacimiento && !p.fecha_nacimiento) cambios.fecha_nacimiento = puesto.fechaNacimiento = x.fechaNacimiento;
   if (x.notas) {
     // Las de Flowww se añaden a las suyas (si no las tiene ya: la segunda importación no las repite).
+    // Si las suyas no se pueden leer (otra clave), no se tocan y el informe lo dice: a mano.
     let suyas = null;
     let legibles = true;
     try {
       suyas = p.notas_cifradas ? descifrar(p.notas_cifradas, p.notas_iv, p.notas_tag) : null;
     } catch {
       legibles = false;
-      e.notasIlegibles = true;
+      plan.notasIlegibles.push(e.pacienteId);
     }
     if (legibles && !(suyas || '').includes(x.notas)) {
       const n = cifrar(suyas ? `${suyas}\n\nObservaciones de Flowww: ${x.notas}` : x.notas);
@@ -742,7 +743,7 @@ async function escribir(con, ctx, { ahora, actor, sinRecordatorios }) {
         const [r] = await con.query('UPDATE pacientes SET flowww_id = ? WHERE id = ? AND flowww_id IS NULL', [e.flowwwId, e.pacienteId]);
         if (r.affectedRows) hecho.vinculados.push({ id: e.pacienteId, flowwwId: e.flowwwId });
       }
-      await completar(con, e, hecho);
+      await completar(con, e, { hecho, plan });
     }
   }
   for (const e of plan.pacientes.filter((x) => ['nuevo', 'existente'].includes(x.accion))) await registrarMarketing(con, e, { plan, hecho, ahora, segundo, actor });

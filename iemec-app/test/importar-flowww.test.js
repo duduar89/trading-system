@@ -765,6 +765,18 @@ test('a quien ya estaba en la app se le completa la ficha con lo de Flowww, sin 
     const antes = await ficha(app.laura);
     assert.deepEqual([antes.flowww_id, antes.apellidos, antes.email, antes.fecha_nacimiento, antes.notas_cifradas], [null, null, null, null, null]);
     assert.equal(notas(await ficha(ana.insertId)), 'Prefiere mañanas', 'sus notas, como estaban');
+
+    // Unas notas de la app que no se pueden leer con esta clave (se cifraron con otra) no se tocan, y
+    // las de Flowww no se pierden calladas: el informe dice a quién hay que pasárselas a mano.
+    const clave = process.env.CLAVE_CIFRADO;
+    process.env.CLAVE_CIFRADO = crypto.randomBytes(32).toString('hex');
+    const otra = cifrar('Cifradas con otra clave');
+    if (clave === undefined) delete process.env.CLAVE_CIFRADO; else process.env.CLAVE_CIFRADO = clave;
+    const [eva] = await pool.query("INSERT INTO pacientes (nombre, apellidos, email, notas_cifradas, notas_iv, notas_tag) VALUES ('Eva', 'Mena', 'eva@ejemplo.invalid', ?, ?, ?)",
+      [otra.cifrado, otra.iv, otra.tag]);
+    const r2 = await I.importar(pool, { pacientes: csv('clientes.csv', 'Código;Nombre;Apellidos;Email;Observaciones\n1005;Eva;Mena;eva@ejemplo.invalid;Toma Sintrom\n'), aplicar: true, ahora: AHORA });
+    assert.match(r2.informe, new RegExp(`Ojo: a 1 paciente que ya estaba no se le han podido añadir sus observaciones de Flowww: sus notas de la app no se pueden leer con esta CLAVE_CIFRADO \\(paciente ${eva.insertId}\\); pasadlas a mano\\.`));
+    assert.deepEqual((await ficha(eva.insertId)).notas_cifradas, otra.cifrado, 'las suyas, sin tocar');
   } finally {
     await pool.end();
   }

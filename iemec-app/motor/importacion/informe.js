@@ -326,6 +326,12 @@ function ojo(plan) {
     salida.push(`${plural(retiradas, 'cita importada antes se queda', 'citas importadas antes se quedan')} sin recordatorios y con una tarea porque en este fichero ya no ${retiradas === 1 ? 'es' : 'son'} así: `
       + 'si no es la exportación completa de las citas (todas, desde hoy), no lo apliques');
   }
+  // Al aplicar: las observaciones de Flowww que no se han podido añadir a las de la ficha.
+  const ilegibles = plan.notasIlegibles || [];
+  if (ilegibles.length) {
+    salida.push(`${ilegibles.length === 1 ? 'a 1 paciente que ya estaba no se le han' : `a ${ilegibles.length} pacientes que ya estaban no se les han`} podido añadir sus observaciones de Flowww: `
+      + `sus notas de la app no se pueden leer con esta CLAVE_CIFRADO (${ilegibles.map((id) => `paciente ${id}`).join(', ')}); pasadlas a mano`);
+  }
   return salida;
 }
 
