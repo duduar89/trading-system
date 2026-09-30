@@ -717,7 +717,8 @@ async function contestar(deps, conv, respuesta, ahora, extra = {}) {
 // «reprogramada». Lo que necesita valoración, o viene de Treatwell, lo cambia una persona.
 async function atenderCambio(deps, conv, c, { texto, ahora, datos, nombre, hola = '' }) {
   const { pool } = deps;
-  if (!c.reservable_ia || c.origen === 'treatwell') return cambioAPersona(deps, conv, c, { ahora, nombre, hola, texto, porque: 'no_reservable' });
+  if (c.origen === 'treatwell') return cambioAPersona(deps, conv, c, { ahora, nombre, hola, texto, porque: 'treatwell' });
+  if (!c.reservable_ia) return cambioAPersona(deps, conv, c, { ahora, nombre, hola, texto, porque: 'no_reservable' });
   await pool.query('UPDATE conversaciones SET reprograma_cita_id = ? WHERE id = ?', [c.id, conv.id]);
   const hoy = T.fechaMadrid(ahora);
   const manana = T.sumarDias(hoy, 1);
@@ -730,14 +731,16 @@ async function atenderCambio(deps, conv, c, { texto, ahora, datos, nombre, hola 
     texto: `${hola}Sin problema${n}. Te cambio la cita del ${textoDia(c.fecha).slice(3)} a las ${c.hora}: te puedo ofrecer ${textoHuecos(huecos)}. ¿Cuál te viene mejor? Si prefieres cancelarla, dímelo.` });
 }
 
-// Cambiar la cita con una persona: lo que la IA no puede mover (valoración, Treatwell), cuando no hay
-// huecos o cuando no se entiende lo que dice. Mientras, su cita sigue en pie.
+// Cambiar la cita con una persona: lo que la IA no puede mover (valoración; lo reservado en Treatwell,
+// que hay que cambiar también allí), cuando no hay huecos o cuando no se entiende lo que dice.
+// Mientras, su cita sigue en pie.
 async function cambioAPersona(deps, conv, c, { ahora, nombre, hola = '', texto = '', porque }) {
   const { pool } = deps;
   const n = nombre ? `, ${nombre}` : '';
   const cuando = `${textoDia(c.fecha).slice(3)} a las ${c.hora}`;
   const motivo = {
     no_reservable: `Quiere cambiar o cancelar su cita del ${cuando}`,
+    treatwell: `Quiere cambiar o cancelar su cita del ${cuando}, reservada en Treatwell: hacerlo también allí`,
     sin_huecos: `Quiere cambiar su cita del ${cuando} y no hay huecos para lo que pide`,
     no_entendido: `Quiere cambiar su cita del ${cuando}: no se entiende su respuesta`,
   }[porque];
@@ -750,6 +753,7 @@ async function cambioAPersona(deps, conv, c, { ahora, nombre, hola = '', texto =
   const sigue = `mientras, tu cita ${textoDia(c.fecha)} a las ${c.hora} sigue en pie`;
   const respuesta = {
     no_reservable: `${hola}Sin problema${n}. Una persona del equipo te ayuda ahora mismo a buscar otro momento. Si prefieres cancelarla, puedes hacerlo desde aquí: ${c.url}`,
+    treatwell: `${hola}Sin problema${n}. Esa cita se reservó en Treatwell: una persona del equipo te ayuda ahora mismo a cambiarla o cancelarla y te lo confirma por aquí.`,
     sin_huecos: `${hola}Ahora mismo no veo huecos para eso${n}. Una persona del equipo te ayuda por aquí a buscar otro momento; ${sigue}.`,
     no_entendido: `${hola}Perdona${n}, no te he entendido bien. Una persona del equipo te ayuda ahora mismo a buscar otro momento; ${sigue}.`,
   }[porque];
@@ -766,9 +770,11 @@ async function dejarComoEsta(deps, conv, c, { ahora, nombre, hola = '' }) {
   return contestar(deps, conv, `${hola}Perfecto${nombre ? `, ${nombre}` : ''}, la dejamos como está: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`, ahora, { sobreCita: 'mantiene' });
 }
 
-// «Cancela mi cita»: se le pregunta una vez antes de hacerlo (y se le ofrece cambiarla).
+// «Cancela mi cita»: se le pregunta una vez antes de hacerlo (y se le ofrece cambiarla). Lo de
+// Treatwell lo cancela una persona (también allí).
 async function preguntarCancelar(deps, conv, c, { ahora, nombre, hola = '' }) {
   const { pool } = deps;
+  if (c.origen === 'treatwell') return cambioAPersona(deps, conv, c, { ahora, nombre, hola, porque: 'treatwell' });
   await pool.query("UPDATE seguimientos SET estado = 'cancelado', resultado = 'quiere cancelar su cita' WHERE conversacion_id = ? AND estado = 'pendiente'", [conv.id]);
   await pool.query(`UPDATE conversaciones SET estado = 'esperando_paciente', proximo_paso = 'cita', proximo_paso_en = ?,
                       reprograma_cita_id = NULL, huecos_ofrecidos = NULL, huecos_ofrecidos_en = NULL WHERE id = ?`, [c.inicio, conv.id]);
@@ -900,7 +906,7 @@ async function avisarSiHayAntes(deps, conv, ofrecidos, { texto, ahora, datos, no
   const { pool } = deps;
   const n = nombre ? `, ${nombre}` : '';
   const tratamientoId = conv.huecos_tratamiento_id;
-  const primero = ofrecidos.map((h) => h.fecha).sort()[0];
+  const primero = ofrecidos.filter((h) => T.desdeMadrid(h.fecha, h.hora) > ahora).map((h) => h.fecha).sort()[0];
   const desde = T.sumarDias(T.fechaMadrid(ahora), 1);
   const hasta = T.sumarDias(primero, -1);
   const franja = detectarFranja(normalizar(texto));

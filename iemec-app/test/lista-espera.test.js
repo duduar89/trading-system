@@ -314,6 +314,46 @@ test('lista de espera: adelantar la cita, alta por WhatsApp y baja', async (t) =
   }
 });
 
+test('lista de espera: si no se le puede avisar, no se le guarda el hueco', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const caido = { modo: 'simulado', enviados: [], async enviarTexto() { throw new Error('WhatsApp caído'); }, async enviarPlantilla() { throw new Error('WhatsApp caído'); } };
+  try {
+    await sembrar(pool);
+    const lunes = new Date('2026-10-19T08:00:00Z'); // lunes 10:00 en Madrid
+    const ana = await enLista(pool, { nombre: 'Ana', telefono: '+34611000701', ahora: mas(lunes, -60) });
+    const bea = await enLista(pool, { nombre: 'Bea', telefono: '+34611000702', ahora: mas(lunes, -50) });
+    const x = await conCita(pool, { nombre: 'Xena', telefono: '+34611000711', fecha: '2026-10-21', hora: '17:00' });
+    await agenda.cancelar(pool, { id: x.cita.id, por: 'paciente', ahora: mas(lunes, 1) });
+
+    await t.test('con WhatsApp caído, el hueco se suelta en el acto y ella sigue en la lista', async () => {
+      const i = await espera.vuelta({ pool, ia: crearIa('simulado'), whatsapp: caido }, { ahora: mas(lunes, 2) });
+      assert.equal(i.ofrecidas, 0);
+      const [o] = await ofertasDe(pool, ana.id);
+      assert.equal(o.estado, 'anulada');
+      assert.equal((await cita(pool, o.cita_id)).estado, 'cancelada');
+      assert.equal((await entrada(pool, ana.id)).estado, 'esperando');
+    });
+
+    await t.test('sin plantilla aprobada ni ventana abierta: tarea para recepción y sigue en la lista', async () => {
+      await pool.query("UPDATE plantillas SET estado = 'pausada' WHERE uso = 'hueco_liberado'");
+      const deps = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
+      const i = await espera.vuelta(deps, { ahora: mas(lunes, 3) });
+      assert.equal(i.ofrecidas, 0);
+      const [o] = await ofertasDe(pool, bea.id);
+      assert.equal(o.estado, 'anulada', 'le tocaba a Bea (Ana ya lo tuvo)');
+      assert.equal((await entrada(pool, bea.id)).estado, 'esperando');
+      const [[tarea]] = await pool.query('SELECT titulo FROM tareas WHERE paciente_id = ?', [bea.pacienteId]);
+      assert.match(tarea.titulo, /falta la plantilla aprobada «hueco_liberado»/);
+      assert.deepEqual(deps.whatsapp.enviados, []);
+      const [[n]] = await pool.query("SELECT COUNT(*) AS n FROM citas WHERE estado = 'retenida'");
+      assert.equal(n.n, 0, 'ningún hueco guardado para nadie');
+    });
+  } finally {
+    await pool.end();
+  }
+});
+
 test('lista de espera en el panel: apuntar, ver y quitar', async (t) => {
   const pool = await prepararBdDePrueba(t);
   if (!pool) return;

@@ -212,6 +212,16 @@ test('cambiar y cancelar la cita por WhatsApp', async (t) => {
       assert.equal((await cita(pool, c.id)).estado, 'confirmada');
     });
 
+    await t.test('lo reservado en Treatwell no se cancela ni se cambia solo en nuestra agenda: a una persona', async () => {
+      const [p] = await pool.query("INSERT INTO pacientes (nombre, telefono) VALUES ('Wendy', '+34611000309')");
+      const c = await agenda.reservar(pool, { pacienteId: p.insertId, tratamientoId: 'limpieza-facial', fecha: '2026-10-29', hora: '12:00', origen: 'treatwell', ahora: new Date('2026-10-01T08:00:00Z') });
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000309', texto: 'Quiero cancelar mi cita', ahora: martes });
+      assert.match(r.respuesta, /Esa cita se reservó en Treatwell: una persona del equipo te ayuda ahora mismo a cambiarla o cancelarla/);
+      assert.equal((await cita(pool, c.id)).estado, 'confirmada');
+      const [[tarea]] = await pool.query("SELECT titulo FROM tareas WHERE conversacion_id = ? AND estado = 'abierta'", [r.conversacionId]);
+      assert.match(tarea.titulo, /reservada en Treatwell: hacerlo también allí/);
+    });
+
     await t.test('un tratamiento que necesita valoración lo cambia una persona, como antes', async () => {
       await conCita(pool, { telefono: '+34611000308', nombre: 'Sara', tratamiento: 'hilos-tensores', fecha: '2026-10-22', hora: '12:00' });
       const r = await R.procesarEntrante(deps, { telefono: '+34611000308', texto: '¿Puedo cambiarla a otro día?', ahora: martes });

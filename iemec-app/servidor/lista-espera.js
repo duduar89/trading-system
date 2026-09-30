@@ -223,8 +223,11 @@ async function guardarHueco(q, { entrada, hueco, ahora = new Date() }) {
   return { id: r.insertId, citaId: cita.id, caducaEn };
 }
 
+// No se le pudo avisar (sin plantilla, WhatsApp caído): el hueco se suelta y él sigue esperando.
 async function anularOferta(q, ofertaId, { ahora = new Date(), motivo }) {
+  const [[o]] = await q.query('SELECT lista_espera_id FROM lista_espera_ofertas WHERE id = ?', [ofertaId]);
   await anularOfertas(q, 'o.id = ?', [ofertaId], { ahora, motivo });
+  if (o) await q.query("UPDATE lista_espera SET estado = 'esperando' WHERE id = ? AND estado = 'ofrecido'", [o.lista_espera_id]);
 }
 
 // La oferta a la que puede estar contestando: la que está en curso o una que acaba de caducar (si

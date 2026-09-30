@@ -72,6 +72,12 @@ async function ofrecer(deps, hueco, entrada, { ahora }) {
       plantilla, variables: [entrada.nombre || 'hola', `tu ${R.enMinuscula(c.tratamiento)}`, R.textoDia(c.fecha).slice(3), c.hora], autor: 'sistema', ahora,
     });
   }
+  if (envio.estado !== 'enviado') {
+    // No le ha llegado: no se le guarda un hueco que no sabe que tiene (el siguiente minuto, a otro).
+    await LE.anularOferta(pool, guardado.id, { ahora, motivo: 'no se pudo enviar' });
+    await registrar(pool, { tipo: 'lista_espera_envio_fallido', entidad: 'lista_espera', entidadId: entrada.id, datos: { hueco: `${hueco.fecha} ${hueco.hora}` } });
+    return { entrada: entrada.id, fallido: 'envío' };
+  }
   await pool.query("UPDATE conversaciones SET estado = 'esperando_paciente', proximo_paso = 'espera_respuesta', proximo_paso_en = ? WHERE id = ? AND estado IN ('ia_activa','esperando_paciente','cerrada')",
     [guardado.caducaEn, conv.id]);
   return { entrada: entrada.id, oferta: guardado.id, cita: guardado.citaId, envio };
