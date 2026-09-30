@@ -3,7 +3,9 @@
 // (servidor/entrada.js) y la web o GHL (POST /api/leads). Un solo camino para todos:
 //   · el teléfono se guarda en formato internacional (E.164; sin prefijo, España);
 //   · el tratamiento sale de lo que respondió, del mapeo de campañas y anuncios o del catálogo
-//     (nombre y alias);
+//     (nombre y alias). Vale también un agrupador (Head Spa japonés, programa de acné…): no se
+//     reserva, pero es lo que nombran los anuncios; la conversación le pregunta el nivel o la técnica
+//     (o lo pasa a recepción). Un interés concreto no se pierde porque vuelva por el agrupador;
 //   · el mismo envío otra vez (Meta o GHL reintentan) no se duplica;
 //   · un lead en marcha con el mismo teléfono no se duplica ni vuelve a empezar su secuencia: se
 //     apunta que ha vuelto y se guarda su interés nuevo. «En marcha» es que algo se mueve: su
@@ -28,10 +30,11 @@ const EN_CURSO = "('nuevo','contactado','conversando','cita')";
 const DOS_HORAS = 2 * 3600000;
 const cortar = (v, max = 160) => (v == null || v === '' ? null : String(v).slice(0, max));
 
+// Lo que se reserva y los agrupadores; lo retirado del catálogo, no.
 async function catalogo(q) {
-  const [tratamientos] = await q.query('SELECT id, nombre, alias, activo FROM tratamientos WHERE activo = TRUE');
+  const [tratamientos] = await q.query('SELECT id, nombre, alias, activo, notas FROM tratamientos WHERE activo = TRUE OR notas LIKE ?', [`${E.NOTA_AGRUPADOR}%`]);
   const [mapeo] = await q.query('SELECT clave, tratamiento_id FROM mapeo_tratamientos');
-  return { tratamientos, mapeo };
+  return { tratamientos: tratamientos.filter((t) => t.activo || E.esAgrupador(t)), mapeo };
 }
 
 // «(formulario de Meta · Otoño facial)»: de dónde viene, al final del título de la tarea (lo primero,
@@ -77,7 +80,10 @@ async function sigueEnMarcha(q, lead, ahora) {
 // Si su secuencia no está en marcha (le atiende una persona o la IA, o espera un seguimiento) y nadie
 // tiene ya una tarea suya, tarea para que alguien le conteste.
 async function yaEnMarcha(con, previo, marcha, { d, nombre, email, tratamientoId, tratNombre, telefono, ahora }) {
-  const nuevoInteres = tratamientoId && tratamientoId !== previo.tratamiento_interes_id ? tratamientoId : null;
+  let nuevoInteres = tratamientoId && tratamientoId !== previo.tratamiento_interes_id ? tratamientoId : null;
+  // Ya había elegido el nivel o la técnica («el Detox») y vuelve por el agrupador (otro anuncio del
+  // Head Spa): se queda lo concreto.
+  if (nuevoInteres && previo.tratamiento_interes_id && await R.esOpcionDe(con, previo.tratamiento_interes_id, nuevoInteres)) nuevoInteres = null;
   await con.query(
     `UPDATE leads SET nombre = COALESCE(nombre, ?), email = COALESCE(email, ?), tratamiento_interes_id = COALESCE(?, tratamiento_interes_id),
                       ctwa_clid = COALESCE(ctwa_clid, ?) WHERE id = ?`, [nombre, email, nuevoInteres, cortar(d.ctwaClid, 255), previo.id]);

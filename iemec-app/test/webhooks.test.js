@@ -587,7 +587,9 @@ test('entrada de leads y WhatsApp: lo que encontró la revisión', async (t) => 
 
       await t.test('conversación que lleva una persona + formulario: el lead se queda con ella, sin plantilla y con tarea; su BAJA lo para todo', async () => {
         const tel = '+34611000601';
-        await postWhatsApp(aviso({ de: '34611000601', perfil: 'Rocío', mensajes: [texto('34611000601', 'Hola, ¿qué precio tiene la limpieza facial?', en(martes))] }));
+        // Una pregunta sin respuesta aprobada: la lleva una persona («¿qué precio tiene?» ya no: pide
+        // información y la IA le contesta).
+        await postWhatsApp(aviso({ de: '34611000601', perfil: 'Rocío', mensajes: [texto('34611000601', 'Hola, ¿hacéis financiación?', en(martes))] }));
         await procesar(martes);
         let conv = await conversacionDe(tel);
         assert.deepEqual([conv.estado, conv.lead_id], ['espera_persona', null]);

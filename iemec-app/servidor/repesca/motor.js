@@ -25,10 +25,11 @@ const { comprobarOfertaPropuesta } = require('../../motor/repesca/ofertas');
 const { revisar, esSensible } = require('../../motor/repesca/filtro-legal');
 const { elegirPlantilla, rellenar, BIBLIOTECA } = require('../../motor/repesca/plantillas');
 const S = require('../../motor/repesca/secuencias');
+const { elegirOpcion, textoOpciones } = require('../../motor/repesca/opciones');
 const { combinar, textoSimulado } = require('../integraciones/ia');
 const { cifrar, descifrar } = require('../cripto');
 const { apuntarBaja, tieneBaja } = require('../bajas');
-const { limpiarNombre, nombrePila, telefonoLegible } = require('../../motor/entrada/leads');
+const { limpiarNombre, nombrePila, telefonoLegible, esAgrupador, buscarEnMensaje, NOTA_AGRUPADOR } = require('../../motor/entrada/leads');
 const { registrar } = require('../eventos');
 const agenda = require('../agenda');
 const LE = require('../lista-espera');
@@ -93,18 +94,20 @@ async function historial(q, conversacionId, n = 10) {
   return filas.reverse().map((f) => ({ autor: f.autor, texto: descifrar(f.cuerpo_cifrado, f.iv, f.tag), en: f.creado_en }));
 }
 
-// Todo lo que la política necesita saber de este paciente y esta conversación.
-async function cargarContexto(q, conv, ahora) {
+// Todo lo que la política necesita saber de este paciente y esta conversación. tratamientoId: el que
+// acaba de nombrar (manda sobre lo demás).
+async function cargarContexto(q, conv, ahora, { tratamientoId = null } = {}) {
   const p = T.partesMadrid(ahora);
   const calendario = await calendarioDesdeBd(q);
   const [[paciente]] = conv.paciente_id ? await q.query('SELECT * FROM pacientes WHERE id = ?', [conv.paciente_id]) : [[null]];
   let tratamiento = null;
   let importe = null;
+  if (tratamientoId) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [tratamientoId]);
   if (conv.contexto === 'presupuesto' && conv.contexto_id) {
     const [[pres]] = await q.query('SELECT * FROM presupuestos WHERE id = ?', [conv.contexto_id]);
     importe = pres ? Number(pres.importe_eur) : null;
     const [[linea]] = await q.query('SELECT tratamiento_id FROM presupuesto_lineas WHERE presupuesto_id = ? AND tratamiento_id IS NOT NULL ORDER BY importe_eur DESC LIMIT 1', [conv.contexto_id]);
-    if (linea) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [linea.tratamiento_id]);
+    if (linea && !tratamiento) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [linea.tratamiento_id]);
   }
   // Si la conversación va de una cita suya (recuperar un «no vino», repetir un tratamiento), manda esa.
   if (!tratamiento && ['cancelacion', 'toca_repetir', 'cita'].includes(conv.contexto) && conv.contexto_id && conv.paciente_id) {
@@ -119,6 +122,13 @@ async function cargarContexto(q, conv, ahora) {
     const [[c]] = await q.query('SELECT tratamiento_id FROM citas WHERE paciente_id = ? ORDER BY inicio DESC LIMIT 1', [conv.paciente_id]);
     if (c) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [c.tratamiento_id]);
   }
+  // Quien escribe sin ser lead ni paciente y nombró un tratamiento: el de los huecos que se le ofrecieron.
+  if (!tratamiento && conv.huecos_tratamiento_id) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [conv.huecos_tratamiento_id]);
+  tratamiento = tratamiento || null;
+  // Si agrupa varias técnicas o niveles, cuáles se le pueden preguntar.
+  const agrupador = esAgrupador(tratamiento)
+    ? { id: tratamiento.id, nombre: tratamiento.nombre, opciones: (await opcionesDeAgrupador(q, tratamiento)).map((o) => ({ id: o.id, nombre: o.nombre })) }
+    : null;
   if (tratamiento && importe == null && tratamiento.precio_eur != null) importe = Number(tratamiento.precio_eur);
   const [ofertasFilas] = await q.query('SELECT * FROM ofertas WHERE activa = TRUE');
   const ofertas = ofertasFilas.map((o) => ({
@@ -136,7 +146,7 @@ async function cargarContexto(q, conv, ahora) {
   let respuestas = [];
   if (tratamiento) [respuestas] = await q.query('SELECT * FROM respuestas_aprobadas WHERE aprobada = TRUE AND tratamiento_id = ?', [tratamiento.id]);
   return {
-    calendario, paciente, tratamiento, importe, ofertas, hechas, respuestas,
+    calendario, paciente, tratamiento, importe, ofertas, hechas, respuestas, agrupador,
     ctx: {
       hoy: p.fecha, ahoraMin: p.minutos, calendario,
       tratamiento: tratamiento
@@ -148,8 +158,76 @@ async function cargarContexto(q, conv, ahora) {
       tieneRespuestaAprobada: respuestas.length > 0,
       reservable: tratamiento ? Boolean(tratamiento.reservable_ia) : false,
       horaHabitual: paciente?.hora_habitual_respuesta ? String(paciente.hora_habitual_respuesta).slice(0, 5) : null,
+      agrupador,
     },
   };
+}
+
+// ── Lo que le interesa: tratamientos que agrupan varios y el que nombra ────────────────────────
+
+const MAX_OPCIONES = 5;
+const restringido = (t) => Boolean(t.publicidad_restringida) || t.regimen_legal === 'medicamento_receta';
+
+// Las opciones de un agrupador que se le pueden preguntar: los niveles o técnicas que se reservan, de
+// su misma familia y subfamilia (las del Head Spa japonés: Express, Detox, Synergie y Zen Premium).
+// Ninguna si hay una sola o demasiadas, o si algo es íntimo o de publicidad restringida: eso se lo
+// cuenta recepción.
+async function opcionesDeAgrupador(q, t) {
+  if (!t?.subfamilia || esSensible(t) || restringido(t)) return [];
+  const [filas] = await q.query(
+    `SELECT id, nombre, alias, familia, sensible, publicidad_restringida, regimen_legal, reservable_ia FROM tratamientos
+      WHERE activo = TRUE AND familia = ? AND subfamilia = ? AND id <> ? ORDER BY duracion_min, nombre`, [t.familia, t.subfamilia, t.id]);
+  if (filas.length < 2 || filas.length > MAX_OPCIONES || filas.some((o) => esSensible(o) || restringido(o))) return [];
+  return filas;
+}
+
+// ¿Es este tratamiento uno de los niveles o técnicas que agrupa aquel? (servidor/leads.js: quien ya
+// eligió «el Detox» no vuelve al Head Spa japonés por otro anuncio.)
+async function esOpcionDe(q, opcionId, agrupadorId) {
+  const [[a]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [agrupadorId]);
+  if (!esAgrupador(a) || !a.subfamilia) return false;
+  const [[o]] = await q.query('SELECT id FROM tratamientos WHERE id = ? AND activo = TRUE AND familia = ? AND subfamilia = ? AND id <> ?', [opcionId, a.familia, a.subfamilia, a.id]);
+  return Boolean(o);
+}
+
+// Lo que le interesa queda en su lead: si no lo sabíamos, o era un agrupador y ya ha dicho cuál.
+async function fijarInteres(q, conv, tratamientoId, anterior = null) {
+  if (!conv.lead_id || !tratamientoId || tratamientoId === anterior) return;
+  await q.query('UPDATE leads SET tratamiento_interes_id = ? WHERE id = ? AND (tratamiento_interes_id IS NULL OR tratamiento_interes_id = ?)',
+    [tratamientoId, conv.lead_id, anterior || '']);
+}
+
+const clave = (t) => normalizar(t).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+// ¿Nombra lo que le interesa? Solo si no lo sabemos, o si es un agrupador y dice el nivel o la
+// técnica. Sin saberlo: el texto del botón de WhatsApp de la web («Hola vengo de la web quisiera
+// reservar una cita para…», que el catálogo reparte uno por tratamiento) o su nombre o un alias
+// (motor/entrada/leads.js → buscarEnMensaje). Lo que no está claro (dos a la vez) no se adivina.
+async function tratamientoNombrado(q, texto, datos) {
+  if (datos.agrupador) {
+    const [opciones] = datos.agrupador.opciones.length
+      ? await q.query('SELECT id, nombre, alias FROM tratamientos WHERE id IN (?)', [datos.agrupador.opciones.map((o) => o.id)])
+      : [[]];
+    return elegirOpcion(texto, opciones, { porOrden: false })?.id || null;
+  }
+  if (datos.tratamiento) return null;
+  const [filas] = await q.query('SELECT id, nombre, alias, activo, notas, texto_whatsapp FROM tratamientos WHERE activo = TRUE OR notas LIKE ?', [`${NOTA_AGRUPADOR}%`]);
+  const validos = filas.filter((t) => t.activo || esAgrupador(t));
+  const boton = validos.filter((t) => t.texto_whatsapp && clave(t.texto_whatsapp) === clave(texto));
+  if (boton.length === 1) return boton[0].id;
+  return buscarEnMensaje(texto, validos);
+}
+
+// Lo que no dice qué le interesa, aunque nombre un tratamiento («ya me hice la limpieza en otro sitio»).
+const NO_ES_INTERES = new Set(['baja', 'salud_personal', 'queja', 'ya_hecho', 'no_interesa']);
+
+// La respuesta aprobada que mejor contesta a «quiero información» o «¿qué precio tiene?»: la del
+// precio si pregunta el precio; si no, la que cuenta qué es (en qué consiste, para quién, cómo
+// funciona); si no, la primera.
+function respuestaParaInformacion(respuestas, texto) {
+  const de = (rx) => respuestas.find((r) => rx.test(normalizar(r.pregunta)));
+  const precio = /precio|cuesta|cuanto vale|coste|cuanto sale/.test(normalizar(texto)) ? de(/precio|cuesta|cuanto vale|coste|financ/) : null;
+  return precio || de(/que es\b|en que consiste|para que sirve|para quien|como funciona|en que se diferencia/) || respuestas[0] || null;
 }
 
 function parseJson(v) {
@@ -300,11 +378,25 @@ async function retomar(con, conv, { ahora, texto, datos }) {
   return cuando;
 }
 
+const OTRA_FRANJA = { manana: 'tarde', tarde: 'manana' };
+
+// Los huecos que se le proponen. Si ha dicho una franja («por la tarde», «por la mañana»), todos de
+// esa franja; si en esa no queda nada estos días, se le dice y se le ofrecen de la otra
+// (franjaSinHuecos, franjaOfrecida). Con fecha límite (llegar bien a un evento), ninguno después.
+// Los tratamientos que necesitan valoración previa (reservable_ia = 0) los agenda una persona.
 async function huecosParaProponer(pool, pedido, tratamiento, ahora) {
-  // Los tratamientos que necesitan valoración previa (reservable_ia = 0) los agenda una persona.
-  if (!pedido || !tratamiento || !tratamiento.reservable_ia) return [];
-  const lista = await agenda.proximosHuecos(pool, { tratamientoId: tratamiento.id, desdeFecha: pedido.desdeFecha, dias: 10, n: 3, preferencia: pedido.franja, ahora });
-  return lista.map((h) => ({ fecha: h.fecha, hora: h.hora, texto: `${textoDia(h.fecha)} a las ${h.hora}` }));
+  const salida = { huecos: [], franjaSinHuecos: null, franjaOfrecida: null };
+  if (!pedido || !tratamiento || !tratamiento.reservable_ia) return salida;
+  const buscar = async (franja) => (await agenda.proximosHuecos(pool, {
+    tratamientoId: tratamiento.id, desdeFecha: pedido.desdeFecha, dias: franja ? 21 : 10, n: 3, preferencia: franja, estricta: Boolean(franja), ahora,
+  })).filter((h) => !pedido.hastaFecha || h.fecha <= pedido.hastaFecha);
+  let lista = await buscar(pedido.franja || null);
+  if (!lista.length && OTRA_FRANJA[pedido.franja]) {
+    lista = await buscar(OTRA_FRANJA[pedido.franja]);
+    if (lista.length) Object.assign(salida, { franjaSinHuecos: pedido.franja, franjaOfrecida: OTRA_FRANJA[pedido.franja] });
+  }
+  salida.huecos = lista.map((h) => ({ fecha: h.fecha, hora: h.hora, texto: `${textoDia(h.fecha)} a las ${h.hora}` }));
+  return salida;
 }
 
 // Lo que se le ofrece queda guardado en la conversación: si contesta «el martes a las 11», se sabe
@@ -385,9 +477,17 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
     }
   }
 
-  const datos = await cargarContexto(pool, conv, ahora);
+  let datos = await cargarContexto(pool, conv, ahora);
   const hist = await historial(pool, conv.id);
   const reglas = interpretar(texto);
+  // Si no sabíamos qué le interesa (o era un agrupador) y lo nombra, manda eso.
+  if (!NO_ES_INTERES.has(reglas.intencion)) {
+    const nombrado = await tratamientoNombrado(pool, texto, datos);
+    if (nombrado) {
+      await fijarInteres(pool, conv, nombrado, datos.tratamiento?.id || null);
+      datos = await cargarContexto(pool, conv, ahora, { tratamientoId: nombrado });
+    }
+  }
   const primerMensajeIa = !hist.some((m) => m.autor === 'ia');
   const hola = primerMensajeIa ? 'Soy el asistente virtual de IEMEC. ' : '';
   const nombrePila = nombre || datos.paciente?.nombre || (await nombreDelLead(pool, conv)) || null;
@@ -425,24 +525,37 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
     con2.release();
   }
 
-  const huecos = await huecosParaProponer(pool, aplicado.huecosPedidos, datos.tratamiento, ahora);
+  const propuesta = await huecosParaProponer(pool, aplicado.huecosPedidos, datos.tratamiento, ahora);
+  const { huecos } = propuesta;
   if (huecos.length) await guardarHuecos(pool, conv.id, huecos, datos.tratamiento.id, ahora);
   else if (aplicado.huecosPedidos && !aplicado.huecosPedidos.opcional) {
     // Quería cita y la IA no puede ofrecer huecos: que no se quede esperando a nadie.
     await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, conversacion_id, vence_en) VALUES ('atender_conversacion', ?, ?, ?, ?)",
       ['Quiere cita: proponerle huecos a mano', conv.paciente_id, conv.id, new Date(ahora.getTime() + 2 * 3600000)]);
   }
+  if (propuesta.franjaSinHuecos) {
+    decision.guia += ` En la franja que pidió (${FRANJA_TEXTO[propuesta.franjaSinHuecos]}) no queda nada estos días: díselo y ofrécele los de la otra (${FRANJA_TEXTO[propuesta.franjaOfrecida]}).`;
+  }
+  const opcion = decision.acciones.find((x) => x.tipo === 'preguntar_opcion');
   const datosRedaccion = {
     nombre: nombrePila, huecos, huecosTexto: textoHuecos(huecos), primerMensajeIa,
     ofertaTexto: aplicado.oferta?.textoPaciente || null,
-    respuestaAprobada: datos.respuestas[0]?.respuesta || null,
+    respuestaAprobada: (decision.intencion === 'informacion' ? respuestaParaInformacion(datos.respuestas, texto) : datos.respuestas[0])?.respuesta || null,
     fecha: decision.acciones.find((x) => x.tipo === 'programar_seguimiento')?.texto || null,
+    conTratamiento: Boolean(datos.tratamiento),
+    franjaSinHuecos: propuesta.franjaSinHuecos, franjaOfrecida: propuesta.franjaOfrecida,
+    opcionesTexto: opcion ? textoOpciones(datos.agrupador.opciones.map((o) => o.nombre)) : null,
   };
   let respuesta;
   try { respuesta = ia.modo === 'real' ? await ia.redactar({ decision, datos: datosRedaccion, historial: hist }) : null; } catch { respuesta = null; }
   if (!respuesta || !revisar(respuesta, { tipo: 'conversacion' }).ok) respuesta = textoSimulado(decision, datosRedaccion);
 
   const envio = await enviar(deps, conv, { texto: respuesta, autor: 'ia', ahora });
+  // «¿Cuál te interesa?»: su respuesta se entiende con las opciones que se le dijeron (atenderPregunta).
+  if (opcion && envio.estado === 'enviado') {
+    await ponerPregunta(pool, conv.id, { tipo: 'elegir_opcion', agrupadorId: datos.tratamiento.id, opciones: opcion.opciones, franja: interp.franja || null,
+      plazo: interp.plazo || null, mensajeId: envio.mensajeId }, ahora);
+  }
   return { conversacionId: conv.id, interpretacion: interp, decision, respuesta, huecos, envio, seguimientoId: aplicado.seguimientoId };
 }
 
@@ -459,10 +572,15 @@ async function sinRepesca(deps, conv, { texto, ahora, datos, hist, reglas, nombr
   if (conv.pregunta_pendiente) await pool.query('UPDATE conversaciones SET pregunta_pendiente = NULL WHERE id = ?', [conv.id]);
 
   // 1. Contesta a lo último que le preguntamos: «¿Cancelo tu cita?», «¿Te busco otro momento?», «¿Te
-  //    aviso…?» (la de la lista de espera, «¿Te la cambio a este hueco?», la contesta la oferta).
+  //    aviso…?», «¿Cuál te interesa?» (la de la lista de espera, «¿Te la cambio a este hueco?», la
+  //    contesta la oferta).
   if (pregunta && pregunta.tipo !== 'cambio_por_hueco') {
     const r = await atenderPregunta(deps, conv, pregunta, { ...comun, ofrecidos });
-    if (r) { await marcar(pregunta.tipo === 'avisar_hueco' ? 'lista_espera' : 'cita'); return r; }
+    if (r) {
+      const intencion = { avisar_hueco: 'lista_espera', elegir_opcion: r.opcion ? 'reservar' : null }[pregunta.tipo];
+      if (intencion !== null) await marcar(intencion || 'cita');
+      return r;
+    }
   }
   // 2. Se le está guardando un hueco de la lista de espera: «Sí, guárdamelo» o «No me viene bien».
   const oferta = conv.paciente_id ? await LE.ofertaParaResponder(pool, conv.paciente_id, ahora) : null;
@@ -611,7 +729,9 @@ async function reservarElegido(deps, conv, { fecha, hora, tratamientoId }, { aho
 async function ofrecerYEsperar(deps, conv, { huecos, texto, ahora, datos, frase, tratamientoId, nombre, hola, reprograma = null, pedido = {} }) {
   const { pool } = deps;
   if (!huecos.length && reprograma) return cambioAPersona(deps, conv, reprograma, { ahora, nombre, hola, porque: 'sin_huecos' });
-  const decision = decidir({ intencion: 'preferencia_horario' }, { ...datos.ctx, frase });
+  // Los huecos ya son de un tratamiento concreto: aunque la conversación viniera de un agrupador, no
+  // se vuelve a preguntar cuál.
+  const decision = decidir({ intencion: 'preferencia_horario' }, { ...datos.ctx, agrupador: null, frase });
   decision.intencion = 'eleccion_hueco';
   const respuesta = huecos.length ? texto : `${hola}Ahora mismo no me queda ningún hueco libre para eso${nombre ? `, ${nombre}` : ''}. ¿Quieres que te avise si se libera uno?`;
   await enTransaccion(pool, async (con) => {
@@ -887,20 +1007,65 @@ async function preguntarCancelar(deps, conv, c, { ahora, nombre, hola = '', otra
 }
 
 // «Sí, cancélala»: se cancela (su hueco queda para la lista de espera) y se le ofrece buscar otro
-// momento. La conversación se cierra con la pregunta en el aire: si contesta en 24 h, se reabre.
+// momento. La conversación se cierra con la pregunta en el aire: si contesta en 24 h, se reabre. Si
+// no reserva otra, entra en la secuencia para recuperarla (recuperarCancelada).
 async function cancelarPorWhatsapp(deps, conv, c, { ahora, nombre, hola = '' }) {
   const { pool } = deps;
+  let recuperar = null;
   try {
-    await agenda.cancelar(pool, { id: c.id, por: 'paciente', motivo: 'cancelada por WhatsApp', actor: 'paciente', ahora });
+    const hecha = await agenda.cancelar(pool, { id: c.id, por: 'paciente', motivo: 'cancelada por WhatsApp', actor: 'paciente', ahora,
+      alCambiar: async (con, cita) => ({ recuperar: await recuperarCancelada(con, cita, ahora) }) });
+    recuperar = hecha.efectos?.recuperar || null;
   } catch (err) {
     if (err.codigo !== 'ESTADO_NO_VALIDO') throw err;
   }
   await pool.query("UPDATE seguimientos SET estado = 'cancelado', resultado = 'canceló su cita' WHERE conversacion_id = ? AND estado = 'pendiente'", [conv.id]);
   await pool.query(`UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cancelada', proximo_paso = 'cerrada', proximo_paso_en = NULL,
                       reprograma_cita_id = NULL, huecos_ofrecidos = NULL, huecos_ofrecidos_en = NULL WHERE id = ?`, [conv.id]);
-  await anotar(pool, conv, 'cita', [{ tipo: 'cancelar_cita', citaId: c.id }], 'cerrada');
+  await anotar(pool, conv, 'cita', [{ tipo: 'cancelar_cita', citaId: c.id, ...(recuperar ? { recuperar } : {}) }], 'cerrada');
   return preguntar(deps, conv, `${hola}Hecho${nombre ? `, ${nombre}` : ''}: tu cita del ${textoDia(c.fecha).slice(3)} a las ${c.hora} queda cancelada. ¿Quieres que te busque otro momento más adelante?`,
-    { tipo: 'buscar_otro', tratamientoId: c.tratamiento_id }, ahora, { sobreCita: 'cancelada' });
+    { tipo: 'buscar_otro', tratamientoId: c.tratamiento_id, citaId: c.id }, ahora, { sobreCita: 'cancelada', recuperar });
+}
+
+// ¿Por qué no se le pueden mandar mensajes comerciales? La baja, o ni consentimiento ni ser cliente
+// (lo que mira la secuencia antes de cada paso). Los límites de la semana y del mes y el silencio
+// pactado solo retrasan el mensaje: esos no cuentan.
+async function sinPermisoComercial(q, pacienteId, ahora) {
+  const p = await permisoComercial(q, { paciente_id: pacienteId }, ahora);
+  if (p.ok) return null;
+  if (/baja/.test(p.motivo)) return 'se dio de baja de los mensajes comerciales';
+  if (/consentimiento/.test(p.motivo)) return 'no tiene consentimiento para mensajes comerciales';
+  return null;
+}
+
+// Canceló por WhatsApp (dentro de la transacción de la cancelación; lo que devuelve queda en el hecho
+// de la cita). Si no reserva otra, entra en la secuencia «cancelación» (la plantilla, a las 48 h; si
+// contesta o reserva, se para). No se duplica: si ya tiene otra cita por delante o ya está en esa
+// secuencia (la de un «no vino» u otra cancelación), nada. Sin permiso para mensajes comerciales, como
+// un «no vino»: la recupera una persona llamándole (si no contesta a «¿Te busco otro momento?»).
+async function recuperarCancelada(con, cita, ahora) {
+  const [[otra]] = await con.query(
+    `SELECT id FROM citas WHERE paciente_id = ? AND id <> ? AND inicio > ?
+        AND (estado = 'confirmada' OR (estado = 'retenida' AND retenida_hasta > ?)) LIMIT 1`, [cita.paciente_id, cita.id, ahora, ahora]);
+  if (otra) return { omitido: 'ya tiene otra cita' };
+  const [[ya]] = await con.query("SELECT id FROM inscripciones WHERE paciente_id = ? AND secuencia = 'cancelacion' AND estado IN ('activa','pausada') LIMIT 1", [cita.paciente_id]);
+  if (ya) return { omitido: 'ya está en la secuencia para recuperar una cita', inscripcion: ya.id };
+  const motivo = await sinPermisoComercial(con, cita.paciente_id, ahora);
+  if (!motivo) return { inscripcion: await inscribir(con, { secuencia: 'cancelacion', pacienteId: cita.paciente_id, citaId: cita.id, inicio: ahora }) };
+  const p = T.partesMadrid(new Date(cita.inicio));
+  const [t] = await con.query("INSERT INTO tareas (tipo, titulo, paciente_id, vence_en) VALUES ('llamar', ?, ?, ?)",
+    [`Canceló por WhatsApp su cita ${textoDia(p.fecha)} a las ${p.hora}: llamarle para buscarle otro hueco (${motivo})`.slice(0, 200), cita.paciente_id,
+      new Date(ahora.getTime() + VENTANA_MS)]);
+  return { omitido: motivo, tarea: t.insertId };
+}
+
+// «No, por ahora no» a «¿Te busco otro momento?»: no se le persigue por esa cita (ni la plantilla de
+// las 48 h ni la llamada).
+async function noRecuperar(q, citaId, { ahora, motivo }) {
+  if (!citaId) return;
+  await q.query("UPDATE inscripciones SET estado = 'cancelada', motivo_fin = ? WHERE cita_id = ? AND secuencia = 'cancelacion' AND estado IN ('activa','pausada')", [motivo, citaId]);
+  const tareas = await agenda.tareasDeRecuperacion(q, [citaId]);
+  if (tareas.length) await q.query("UPDATE tareas SET estado = 'cancelada', resultado = ?, hecha_en = ? WHERE id IN (?) AND estado = 'abierta'", [motivo, ahora, tareas]);
 }
 
 // Contesta a una pregunta nuestra. null si su respuesta no va con ella (sigue lo demás).
@@ -926,9 +1091,12 @@ async function atenderPregunta(deps, conv, pregunta, { texto, ahora, datos, regl
     return null;
   }
 
+  if (pregunta.tipo === 'elegir_opcion') return atenderOpcion(deps, conv, pregunta, { texto, ahora, datos, reglas, nombre, hola });
+
   if (pregunta.tipo === 'buscar_otro') {
     if (no) {
       await pool.query("UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cancelada', proximo_paso = 'cerrada' WHERE id = ?", [conv.id]);
+      await noRecuperar(pool, pregunta.citaId, { ahora, motivo: 'no quiere otra cita por ahora' });
       await anotar(pool, conv, 'cita', [{ tipo: 'cerrar', motivo: 'no quiere otra cita por ahora' }], 'cerrada');
       return contestar(deps, conv, `${hola}De acuerdo${n}. Cuando quieras, escríbenos por aquí y te buscamos hueco.`, ahora, { sobreCita: 'sin_otra' });
     }
@@ -976,6 +1144,58 @@ async function atenderPregunta(deps, conv, pregunta, { texto, ahora, datos, regl
   return null;
 }
 
+// ── Dice qué nivel o técnica quiere (de un tratamiento que agrupa varios) ──────────────────────
+
+// Lo que puede querer decir con su respuesta a «¿Cuál te interesa?» aunque no nombre ninguna.
+const QUIERE_ELEGIR = new Set(['informacion', 'reservar', 'acepta', 'pregunta', 'preferencia_horario', 'otro']);
+
+// Contesta a «¿Cuál te interesa?». Si elige una, queda en su lead y, si la IA puede darle cita, se le
+// proponen huecos (en su franja y desde el día que pidió, si lo dijo al preguntar o al contestar); si
+// no, una persona. Si no elige («¿cuál me recomiendas?», «no sé»), no se le vuelve a preguntar lo
+// mismo: le ayuda una persona. Lo que no va con la pregunta («el mes que viene») sigue la repesca.
+async function atenderOpcion(deps, conv, pregunta, { texto, ahora, reglas, nombre, hola = '' }) {
+  const { pool } = deps;
+  const n = nombre ? `, ${nombre}` : '';
+  const ids = Array.isArray(pregunta.opciones) ? pregunta.opciones.map(String) : [];
+  const [filas] = ids.length ? await pool.query('SELECT id, nombre, alias, reservable_ia FROM tratamientos WHERE id IN (?) AND activo = TRUE', [ids]) : [[]];
+  const opciones = ids.map((id) => filas.find((f) => f.id === id)).filter(Boolean);
+  const elegida = elegirOpcion(texto, opciones);
+  if (!elegida) {
+    if (!QUIERE_ELEGIR.has(reglas.intencion)) return null;
+    const [[a]] = await pool.query('SELECT nombre FROM tratamientos WHERE id = ?', [pregunta.agrupadorId]);
+    return conPersona(deps, conv, { ahora, texto, motivo: `No sabe qué opción de «${a?.nombre || 'su tratamiento'}» elegir: ayudarle y proponerle cita`,
+      respuesta: `${hola}Sin problema${n}. Una persona del equipo te ayuda a elegir y te propone cita por aquí enseguida.`, extra: { opcion: null } });
+  }
+  await fijarInteres(pool, conv, elegida.id, pregunta.agrupadorId);
+  if (!elegida.reservable_ia) {
+    return conPersona(deps, conv, { ahora, texto, motivo: `Quiere ${enMinuscula(elegida.nombre)}: proponerle cita`,
+      respuesta: `${hola}¡Perfecto${n}! Una persona del equipo te propone hueco por aquí enseguida.`, extra: { opcion: elegida.id } });
+  }
+  const datos = await cargarContexto(pool, conv, ahora, { tratamientoId: elegida.id });
+  const hoy = T.fechaMadrid(ahora);
+  const franja = reglas.franja || pregunta.franja || null;
+  const plazo = reglas.plazo || pregunta.plazo || null;
+  const cuando = plazo ? calcularSeguimiento(plazo, { hoy, ahoraMin: T.minutosMadrid(ahora), calendario: datos.calendario }).fecha : hoy;
+  const desde = cuando > hoy ? cuando : hoy;
+  const p = await huecosParaProponer(pool, { desdeFecha: desde, franja }, elegida, ahora);
+  const lista = p.franjaSinHuecos
+    ? `por la ${FRANJA_TEXTO[p.franjaSinHuecos]} no me queda nada estos días, pero por la ${FRANJA_TEXTO[p.franjaOfrecida]} te puedo ofrecer ${textoHuecos(p.huecos)}`
+    : `te puedo ofrecer ${textoHuecos(p.huecos)}`;
+  const r = await ofrecerYEsperar(deps, conv, { huecos: p.huecos.map(({ fecha, hora }) => ({ fecha, hora })), ahora, datos, frase: texto, tratamientoId: elegida.id,
+    nombre, hola, pedido: { desde, franja }, texto: `${hola}¡Perfecto${n}! Para ${enMinuscula(elegida.nombre)} ${lista}. ¿Cuál te viene mejor?` });
+  return { ...r, opcion: elegida.id };
+}
+
+// A una persona, con su tarea, y se le dice.
+async function conPersona(deps, conv, { ahora, texto = '', motivo, respuesta, extra = {} }) {
+  const decision = { intencion: 'eleccion_opcion', acciones: [{ tipo: 'pasar_a_persona', motivo }], proximoPaso: 'persona' };
+  await enTransaccion(deps.pool, async (con) => {
+    const [[fresca]] = await con.query('SELECT * FROM conversaciones WHERE id = ? FOR UPDATE', [conv.id]);
+    await aplicarDecision(con, fresca, decision, { ahora, texto, datos: null });
+  });
+  return contestar(deps, conv, respuesta, ahora, { ...extra, decision });
+}
+
 // «Sí, avísame»: a la lista de espera, con lo que diga al contestar («sí, pero solo por las tardes»,
 // «hasta el viernes») por encima de lo que le preguntamos. Si aún tiene huecos propuestos, puede
 // seguir eligiendo uno; si no, la conversación se cierra: le escribiremos cuando se libere un hueco.
@@ -1000,12 +1220,14 @@ async function apuntarEnEspera(deps, conv, pregunta, { texto = '', ahora, nombre
     return contestar(deps, conv, `${hola}¡Apuntado${n}! Si se libera un hueco antes del ${textoDia(T.sumarDias(hasta, 1)).slice(3)}, te lo guardo y te aviso por aquí. `
       + 'Si mientras quieres asegurarte uno de los que te propuse, dime cuál.', ahora, { listaEspera: 'apuntado' });
   }
-  const [[trat]] = await pool.query('SELECT nombre FROM tratamientos WHERE id = ?', [pregunta.tratamientoId]);
+  const [[trat]] = await pool.query('SELECT nombre, familia, sensible FROM tratamientos WHERE id = ?', [pregunta.tratamientoId]);
   await pool.query("UPDATE seguimientos SET estado = 'cancelado', resultado = 'en la lista de espera' WHERE conversacion_id = ? AND estado = 'pendiente'", [conv.id]);
   await pool.query(`UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'lista_espera', proximo_paso = 'cerrada', proximo_paso_en = NULL,
                       huecos_ofrecidos = NULL, huecos_ofrecidos_en = NULL WHERE id = ?`, [conv.id]);
   await anotar(pool, conv, 'lista_espera', [{ tipo: 'apuntar_lista_espera' }], 'cerrada');
-  return contestar(deps, conv, `${hola}¡Apuntado${n}! En cuanto se libere un hueco para ${enMinuscula(trat?.nombre || 'tu tratamiento')}, te lo guardo y te aviso por aquí.`,
+  // Lo íntimo no se nombra.
+  const para = trat && !esSensible(trat) ? enMinuscula(trat.nombre) : 'tu tratamiento';
+  return contestar(deps, conv, `${hola}¡Apuntado${n}! En cuanto se libere un hueco para ${para}, te lo guardo y te aviso por aquí.`,
     ahora, { listaEspera: 'apuntado' });
 }
 
@@ -1243,7 +1465,7 @@ async function procesarSeguimientos(deps, { ahora = new Date(), limite = 20 } = 
       continue;
     }
 
-    const tratamiento = await nombreTratamiento(pool, conv);
+    const tratamiento = fraseTratamiento('como_quedamos', await referenciaTratamiento(pool, conv));
     const nombre = await nombreParaSaludar(pool, { pacienteId: conv.paciente_id, leadId: s.lead_id || conv.lead_id, conv });
     const ventanaAbierta = conv.ventana_hasta && new Date(conv.ventana_hasta) > ahora;
     let envio;
@@ -1274,19 +1496,63 @@ async function procesarSeguimientos(deps, { ahora = new Date(), limite = 20 } = 
   return resultados;
 }
 
-// Cómo se nombra su tratamiento en los mensajes que salen sin que el paciente pregunte. Lo íntimo
-// (ginecoestética, sexualidad masculina, pérdida de peso o lo que marque la clínica) no se nombra, ni
-// por su familia: es un dato de salud y se lee en la pantalla bloqueada. Los de publicidad
+// Cómo se puede nombrar un tratamiento en los mensajes que salen sin que el paciente pregunte. Lo
+// íntimo (ginecoestética, sexualidad masculina, pérdida de peso o lo que marque la clínica) no se
+// nombra, ni por su familia: es un dato de salud y se lee en la pantalla bloqueada. Los de publicidad
 // restringida (medicamentos con receta, productos sanitarios) tampoco: se habla de su familia
-// («medicina estética facial»).
-async function nombreTratamiento(q, conv) {
-  const t = (await cargarContexto(q, conv, new Date())).tratamiento;
-  if (!t || esSensible(t)) return 'tu tratamiento';
-  if (t.publicidad_restringida || t.regimen_legal === 'medicamento_receta') {
+// («medicina estética facial»). → { nombre } | { familia } | { oculto: true } (hay tratamiento, pero
+// no se nombra) | null (no se sabe cuál es).
+async function referenciaDe(q, t) {
+  if (!t) return null;
+  if (esSensible(t)) return { oculto: true };
+  if (restringido(t)) {
     const [[f]] = await q.query('SELECT nombre FROM familias WHERE codigo = ?', [t.familia]);
-    return f ? enMinuscula(f.nombre) : 'tu tratamiento';
+    return f ? { familia: enMinuscula(f.nombre) } : { oculto: true };
   }
-  return enMinuscula(t.nombre);
+  return { nombre: enMinuscula(t.nombre) };
+}
+
+async function referenciaTratamiento(q, conv) {
+  return referenciaDe(q, (await cargarContexto(q, conv, new Date())).tratamiento);
+}
+
+async function nombreTratamiento(q, conv) {
+  const r = await referenciaTratamiento(q, conv);
+  return r?.nombre || r?.familia || 'tu tratamiento';
+}
+
+// Cómo va su tratamiento en cada plantilla que lo lleva en {{2}}, para que se lea bien con lo que
+// sepamos: [con su nombre, con su familia, sin nombrarlo (íntimo), sin saber cuál es]. Nada de «tu
+// interés en tu tratamiento».
+const tal = (x) => x;
+const FRASE_TRATAMIENTO = {
+  lead_primer_contacto: [tal, tal, 'IEMEC', 'IEMEC'], //                         «Gracias por tu interés en {{2}}.»
+  lead_sin_cita: [tal, tal, 'nuestros tratamientos', 'nuestros tratamientos'], // «por tu consulta sobre {{2}}»
+  lead_ultimo_intento: [tal, tal, 'tu consulta', 'tu consulta'], //              «si quieres retomar lo de {{2}}»
+  cancelacion_recuperar: [tal, tal, 'hace unos días', 'hace unos días'], //      «tuviste que cancelar tu cita de {{2}}»
+  presupuesto_2d: [tal, tal, 'tu valoración', 'tu valoración'], //               «el plan de tratamiento de {{2}} que te preparamos»
+  presupuesto_7d: [tal, tal, 'tratamiento', 'tratamiento'], //                   «sobre tu plan de {{2}}»
+  presupuesto_21d: [tal, tal, 'tratamiento', 'tratamiento'], //                  «guardamos tu plan de {{2}}»
+  como_quedamos: [tal, (f) => `tu tratamiento de ${f}`, 'tu tratamiento', 'una primera valoración'], // «buscarte hueco para {{2}}»
+  hueco_liberado: [(n) => `tu ${n}`, (f) => `tu tratamiento de ${f}`, 'tu tratamiento', 'tu tratamiento'], // «lista de espera para {{2}}»
+};
+
+function fraseTratamiento(uso, ref) {
+  const f = FRASE_TRATAMIENTO[uso];
+  if (!f) return null;
+  if (ref?.nombre) return f[0](ref.nombre);
+  if (ref?.familia) return f[1](ref.familia);
+  return ref ? f[2] : f[3];
+}
+
+// Las variables de una plantilla que sale sola: {{1}} el nombre (o «buenos días») y {{2}} su
+// tratamiento, dicho como pide esa plantilla. null si pide algo que no tenemos (el importe de una
+// tarjeta regalo): entonces no sale y lo escribe una persona.
+async function variablesDelPaso(q, p, { nombre, conv }) {
+  const n = new Set(p.cuerpo.match(/\{\{\d+\}\}/g) || []).size;
+  if (n <= 1) return [nombre].slice(0, n);
+  if (n > 2 || !FRASE_TRATAMIENTO[p.uso]) return null;
+  return [nombre, fraseTratamiento(p.uso, await referenciaTratamiento(q, conv))];
 }
 
 // Mete a alguien en una secuencia (lead nuevo, cancelación, presupuesto, toca repetir…).
@@ -1376,8 +1642,12 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
     }
     if (!p) {
       // Mientras Meta no apruebe la plantilla, le escribe o le llama una persona.
-      await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, lead_id, vence_en) VALUES ('llamar', ?, ?, ?, ?)",
+      const [t] = await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, lead_id, vence_en) VALUES ('llamar', ?, ?, ?, ?)",
         [`${S.SECUENCIAS[ins.secuencia].nombre}: aún no hay plantilla aprobada («${uso}»), escribir o llamar a mano a ${await quienEs(pool, ins, telefono)}`.slice(0, 200), ins.paciente_id, ins.lead_id, new Date(ahora.getTime() + 3600000)]);
+      // La de recuperar una cita queda en el hecho de esa cita: si reserva otra, se cierra sola (agenda).
+      if (ins.secuencia === 'cancelacion' && ins.cita_id) {
+        await registrar(pool, { tipo: 'cita_recuperacion', entidad: 'cita', entidadId: ins.cita_id, datos: { efectos: { recuperar: { tarea: t.insertId } } } });
+      }
       await avanzar({ fallido: 'sin plantilla' });
       continue;
     }
@@ -1399,8 +1669,14 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
     } finally {
       con3.release();
     }
-    const nombre = await nombreDe(pool, ins, { conv, ahora });
-    const variables = [nombre, await nombreTratamiento(pool, conv)].slice(0, (p.cuerpo.match(/\{\{\d+\}\}/g) || []).length);
+    const variables = await variablesDelPaso(pool, p, { nombre: await nombreDe(pool, ins, { conv, ahora }), conv });
+    if (!variables) {
+      await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, lead_id, conversacion_id, vence_en) VALUES ('llamar', ?, ?, ?, ?, ?)",
+        [`${S.SECUENCIAS[ins.secuencia].nombre}: la plantilla «${p.nombre}» pide un dato que no tenemos, escribir o llamar a mano a ${await quienEs(pool, ins, telefono)}`.slice(0, 200),
+          ins.paciente_id, ins.lead_id, conv.id, new Date(ahora.getTime() + 3600000)]);
+      await avanzar({ fallido: 'faltan datos' });
+      continue;
+    }
     // Última red: lo que ponen las variables de contenido (el tratamiento) tiene que pasar el filtro
     // de publicidad sanitaria. La plantilla ya lo pasó al aprobarla y el nombre del paciente no se
     // mira (a una Milagros no se le bloquea nada). Si no pasa, lo escribe una persona desde su
@@ -1541,4 +1817,5 @@ async function sinProximoPaso(q, ahora = new Date()) {
 module.exports = {
   textoHuecos, textoDia, procesarEntrante, procesarSeguimientos, avanzarSecuencias, inscribir, sinProximoPaso, enviar, historial,
   calendarioDesdeBd, cargarContexto, conversacionPara, datosCita, plantillasBd, enMinuscula, nombreTratamiento, permisoComercial,
+  huecosParaProponer, referenciaDe, fraseTratamiento, nombreParaSaludar, saludoSinNombre, esOpcionDe,
 };

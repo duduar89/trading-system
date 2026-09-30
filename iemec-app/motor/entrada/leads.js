@@ -153,6 +153,19 @@ function leerWebhookLeads(cuerpo) {
 // ── Tratamiento de interés ─────────────────────────────────────────────────────────────────
 const limpio = (t) => normalizar(t).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
+// Un agrupador del catálogo (Head Spa japonés, programa de acné, rejuvenecimiento vaginal…): no se
+// reserva (se reserva el nivel o la técnica concretos, o la valoración), pero es lo que nombran los
+// anuncios y lo que pregunta la gente. El importador del catálogo lo deja inactivo con esta nota
+// (scripts/importar-catalogo.js); lo retirado del catálogo también queda inactivo, pero sin ella.
+const NOTA_AGRUPADOR = 'No se reserva: agrupa varias técnicas';
+
+function esAgrupador(t) {
+  if (!t) return false;
+  if (t.agrupador != null) return Boolean(Number(t.agrupador));
+  const activo = t.activo == null || Boolean(Number(t.activo));
+  return !activo && String(t.notas || '').startsWith(NOTA_AGRUPADOR);
+}
+
 // Formas de nombrar un tratamiento: su nombre, el nombre sin lo que va entre paréntesis, cada
 // alternativa separada por «/» y sus alias.
 function formas(t) {
@@ -171,56 +184,97 @@ const contiene = (texto_, frase) => ` ${texto_} `.includes(` ${frase} `);
 
 // El tratamiento del catálogo que nombra un texto. Gana el nombre exacto; si no, la forma más
 // larga que aparece entera en el texto; si el texto es corto («HIFU»), el único tratamiento que lo
-// contiene. Si hay empate entre dos tratamientos, ninguno: mejor sin tratamiento que con otro.
+// contiene. Si hay empate entre dos tratamientos, ninguno: mejor sin tratamiento que con otro. Solo
+// si entre los empatados hay un agrupador (y uno solo), ese: «Head Spa» es el Head Spa japonés, que
+// agrupa los niveles, y la conversación le preguntará cuál.
 function buscarEnCatalogo(valor, tratamientos) {
-  const t = limpio(valor || '');
-  if (t.length < 3) return null;
-  let mejor = null;
-  let empate = false;
-  for (const tr of tratamientos) {
+  return completos(limpio(valor || ''), tratamientos).id;
+}
+
+function completos(t, tratamientos) {
+  if (t.length < 3) return { hay: false, id: null };
+  return elegirMejor(tratamientos.map((tr) => {
     let puntos = 0;
     for (const f of formas(tr)) {
       if (f === t) puntos = Math.max(puntos, 1000 + f.length);
       else if (contiene(t, f)) puntos = Math.max(puntos, f.length);
       else if (t.length >= 4 && contiene(f, t)) puntos = Math.max(puntos, t.length - 0.5);
     }
-    if (!puntos) continue;
-    if (!mejor || puntos > mejor.puntos) { mejor = { id: tr.id, puntos }; empate = false; } else if (puntos === mejor.puntos && tr.id !== mejor.id) empate = true;
-  }
-  return mejor && !empate ? mejor.id : null;
+    return { tr, puntos };
+  }));
+}
+
+// El que más puntos tiene; si empatan, el agrupador (si es uno solo); si no, ninguno. hay: si alguno
+// tenía puntos (aunque empataran).
+function elegirMejor(puntuados) {
+  const max = Math.max(0, ...puntuados.map((x) => x.puntos));
+  if (!max) return { hay: false, id: null };
+  const mejores = [...new Map(puntuados.filter((x) => x.puntos === max).map((x) => [x.tr.id, x.tr])).values()];
+  if (mejores.length === 1) return { hay: true, id: mejores[0].id };
+  const agrupadores = mejores.filter(esAgrupador);
+  return { hay: true, id: agrupadores.length === 1 ? agrupadores[0].id : null };
+}
+
+const VACIAS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'con', 'para', 'por', 'en', 'y', 'o', 'a', 'al', 'sin', 'un', 'una']);
+
+// El tratamiento que nombra un mensaje del paciente («¿qué precio tiene la limpieza facial?»). Como
+// buscarEnCatalogo; y si ninguno aparece entero, el principio de su nombre (no de los alias, que los
+// hay muy generales: «valoración médica capilar»), de al menos dos palabras y sin acabar en «de»: «la
+// limpieza facial» es la «Limpieza facial profunda»; «head spa», el Head Spa japonés. Si empatan
+// dos, ninguno: mejor preguntar que adivinar.
+function buscarEnMensaje(valor, tratamientos) {
+  const t = limpio(valor || '');
+  const entero = completos(t, tratamientos);
+  if (entero.hay) return entero.id;
+  const texto = ` ${t} `;
+  return elegirMejor(tratamientos.map((tr) => {
+    let puntos = 0;
+    for (const f of formas({ nombre: tr.nombre })) {
+      const p = f.split(' ');
+      for (let k = p.length - 1; k >= 2; k--) {
+        const trozo = p.slice(0, k);
+        if (VACIAS.has(trozo.at(-1)) || !trozo.some((x) => x.length >= 4 && !VACIAS.has(x))) continue;
+        if (texto.includes(` ${trozo.join(' ')} `)) { puntos = Math.max(puntos, trozo.join(' ').length); break; }
+      }
+    }
+    return { tr, puntos };
+  })).id;
 }
 
 /**
  * Qué tratamiento le interesa. Por orden: el identificador exacto; lo que respondió en el
  * formulario (primero el mapeo, luego el catálogo); el mapeo de campaña, conjunto, anuncio,
  * formulario o código de la web (claves, en orden de prioridad); y el catálogo en los nombres del
- * anuncio o la campaña (textos).
- * @param {object} p { tratamientos: [{ id, nombre, alias, activo }], mapeo: [{ clave, tratamiento_id }],
+ * anuncio o la campaña (textos). Valen los que se reservan y los agrupadores (esAgrupador): de esos,
+ * la conversación le pregunta el nivel o la técnica, o lo pasa a recepción. Lo retirado, no.
+ * @param {object} p { tratamientos: [{ id, nombre, alias, activo, notas }], mapeo: [{ clave, tratamiento_id }],
  *                     id, respuesta, claves: [], textos: [] }
- * @returns {{ id: string, via: 'id'|'formulario'|'mapeo'|'catalogo' } | null}
+ * @returns {{ id: string, via: 'id'|'formulario'|'mapeo'|'catalogo', agrupador?: true } | null}
  */
 function resolverTratamiento({ tratamientos = [], mapeo = [], id = null, respuesta = null, claves = [], textos = [] }) {
-  const activos = tratamientos.filter((t) => t.activo == null || Boolean(t.activo));
-  const existe = new Set(activos.map((t) => t.id));
-  if (id && existe.has(String(id).trim())) return { id: String(id).trim(), via: 'id' };
+  const validos = tratamientos.filter((t) => t.activo == null || Boolean(Number(t.activo)) || esAgrupador(t));
+  const existe = new Set(validos.map((t) => t.id));
+  const agrupadores = new Set(validos.filter(esAgrupador).map((t) => t.id));
+  const salida = (tid, via) => (agrupadores.has(tid) ? { id: tid, via, agrupador: true } : { id: tid, via });
+  if (id && existe.has(String(id).trim())) return salida(String(id).trim(), 'id');
   const reglas = new Map(mapeo.filter((m) => existe.has(m.tratamiento_id)).map((m) => [limpio(m.clave), m.tratamiento_id]));
   const regla = (v) => (v ? reglas.get(limpio(v)) || null : null);
   if (respuesta) {
-    const r = regla(respuesta) || buscarEnCatalogo(respuesta, activos);
-    if (r) return { id: r, via: 'formulario' };
+    const r = regla(respuesta) || buscarEnCatalogo(respuesta, validos);
+    if (r) return salida(r, 'formulario');
   }
   for (const c of claves) {
     const r = regla(c);
-    if (r) return { id: r, via: 'mapeo' };
+    if (r) return salida(r, 'mapeo');
   }
   for (const t of textos) {
-    const r = buscarEnCatalogo(t, activos);
-    if (r) return { id: r, via: 'catalogo' };
+    const r = buscarEnCatalogo(t, validos);
+    if (r) return salida(r, 'catalogo');
   }
   return null;
 }
 
 module.exports = {
   ORIGENES, normalizarTelefono, telefonoLegible, esFijoEspanol, normalizarEmail, limpiarNombre, nombrePila, datosFormulario,
-  leerLeadApi, leerWebhookLeads, buscarEnCatalogo, resolverTratamiento,
+  leerLeadApi, leerWebhookLeads, buscarEnCatalogo, buscarEnMensaje, resolverTratamiento, esAgrupador, NOTA_AGRUPADOR,
 };

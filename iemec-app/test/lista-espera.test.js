@@ -655,7 +655,7 @@ test('lista de espera: lo que contesta a la oferta', async (t) => {
       const eva = await solo('Eva', '+34611000845', '2026-10-26', { tratamiento: 'toxina' });
       assert.equal((await liberar(pool, deps, { fecha: '2026-10-26', hora: '12:00', tratamiento: 'toxina', telefono: '+34611000855', ahora: mas(lunes, 30) })).ofrecidas, 1);
       const m = whatsapp.enviados.at(-1);
-      assert.deepEqual(m.variables.slice(0, 2), ['Eva', 'tu medicina estética facial']);
+      assert.deepEqual(m.variables.slice(0, 2), ['Eva', 'tu tratamiento de medicina estética facial']);
       const r = await R.procesarEntrante(deps, { telefono: '+34611000845', texto: '¿Y el martes a las 12:00?', ahora: mas(lunes, 33) });
       assert.match(r.respuesta, /Una persona del equipo te propone otro día por aquí enseguida\.$/);
       const [[conv]] = await pool.query('SELECT estado FROM conversaciones WHERE id = ?', [r.conversacionId]);

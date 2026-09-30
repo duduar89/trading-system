@@ -34,12 +34,44 @@ async function marcarReprogramada(con, vieja, nuevaId, { ahora, actor = 'pacient
   await registrar(con, { tipo: 'cita_reprogramada', entidad: 'cita', entidadId: vieja.id, actor, datos: { de: vieja.estado, a: nuevaId } });
 }
 
-// Con cita, se acaban sus secuencias de captación y los seguimientos de repesca.
-async function terminarSecuencias(con, { pacienteId, leadId = null }) {
+// Con cita, se acaban sus secuencias de captación y los seguimientos de repesca. La de «toca repetir»,
+// solo la de ese tratamiento (la de otro que también le toca repetir sigue); una sin cita de la que
+// saber el tratamiento, también. Y ya no hace falta llamarle para recuperar otra cita. Devuelve las
+// tareas que se han cerrado.
+async function terminarSecuencias(con, { pacienteId, leadId = null, tratamientoId = null, citaId = null, ahora = new Date() }) {
   await con.query(
-    `UPDATE inscripciones SET estado = 'terminada', motivo_fin = 'cita' WHERE estado IN ('activa','pausada')
-        AND secuencia IN ('lead','cancelacion','toca_repetir','dormido','vale_regalo')
-        AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?))`, [pacienteId, leadId || null]);
+    `UPDATE inscripciones i LEFT JOIN citas c ON c.id = i.cita_id SET i.estado = 'terminada', i.motivo_fin = 'cita'
+      WHERE i.estado IN ('activa','pausada') AND i.secuencia IN ('lead','cancelacion','toca_repetir','dormido','vale_regalo')
+        AND (i.secuencia <> 'toca_repetir' OR c.tratamiento_id IS NULL OR c.tratamiento_id = ?)
+        AND ((i.paciente_id IS NOT NULL AND i.paciente_id = ?) OR (i.lead_id IS NOT NULL AND i.lead_id = ?))`, [tratamientoId, pacienteId, leadId || null]);
+  return cerrarRecuperacion(con, { pacienteId, citaId, ahora });
+}
+
+// Las tareas para recuperar una cita quedan en el hecho de esa cita (efectos.recuperar.tarea): la de
+// llamarle por un «no vino» (servidor/estados-cita.js), por una cancelación por WhatsApp sin permiso
+// para mensajes comerciales o por un paso de la secuencia «cancelación» sin plantilla aprobada
+// (servidor/repesca/motor.js).
+const HECHOS_RECUPERACION = ['cita_no_presentada', 'cita_cancelada', 'cita_recuperacion'];
+
+async function tareasDeRecuperacion(q, citaIds) {
+  if (!citaIds.length) return [];
+  const [hechos] = await q.query('SELECT datos FROM eventos WHERE entidad = ? AND entidad_id IN (?) AND tipo IN (?)',
+    ['cita', citaIds.map(String), HECHOS_RECUPERACION]);
+  const ids = hechos.map((h) => Number((typeof h.datos === 'string' ? JSON.parse(h.datos) : h.datos)?.efectos?.recuperar?.tarea))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  return [...new Set(ids)];
+}
+
+// Tiene cita nueva: las tareas abiertas de llamarle para recuperar otra, hechas.
+async function cerrarRecuperacion(con, { pacienteId, citaId = null, ahora = new Date() }) {
+  const [perdidas] = await con.query("SELECT id FROM citas WHERE paciente_id = ? AND id <> ? AND estado IN ('no_presentada','cancelada')", [pacienteId, citaId || 0]);
+  const tareas = await tareasDeRecuperacion(con, perdidas.map((c) => c.id));
+  if (!tareas.length) return [];
+  const [abiertas] = await con.query("SELECT id FROM tareas WHERE id IN (?) AND estado = 'abierta'", [tareas]);
+  if (!abiertas.length) return [];
+  const ids = abiertas.map((t) => t.id);
+  await con.query("UPDATE tareas SET estado = 'hecha', resultado = 'Ya tiene cita nueva', hecha_en = ? WHERE id IN (?) AND estado = 'abierta'", [ahora, ids]);
+  return ids;
 }
 
 async function cargarTratamiento(con, id) {
@@ -185,8 +217,11 @@ async function reservar(pool, p) {
     if (p.leadId) await con.query("UPDATE leads SET etapa = 'cita', cita_id = ? WHERE id = ?", [r.insertId, p.leadId]);
     // Un hueco que solo se le guarda (la lista de espera) aún no es una cita: sus secuencias siguen
     // hasta que diga que sí (confirmarRetenida).
-    if (!p.retener) await terminarSecuencias(con, { pacienteId: p.pacienteId, leadId: p.leadId });
-    await registrar(con, { tipo: p.retener ? 'cita_retenida' : 'cita_reservada', entidad: 'cita', entidadId: r.insertId, actor: p.actor, datos: { fecha: p.fecha, hora: p.hora, tratamiento: t.fila.id, profesional: hueco.profesionalId, sala: hueco.salaId, reprograma: vieja?.id } });
+    const tareasCerradas = p.retener ? [] : await terminarSecuencias(con, { pacienteId: p.pacienteId, leadId: p.leadId, tratamientoId: t.fila.id, citaId: r.insertId, ahora });
+    await registrar(con, { tipo: p.retener ? 'cita_retenida' : 'cita_reservada', entidad: 'cita', entidadId: r.insertId, actor: p.actor, datos: {
+      fecha: p.fecha, hora: p.hora, tratamiento: t.fila.id, profesional: hueco.profesionalId, sala: hueco.salaId, reprograma: vieja?.id,
+      ...(tareasCerradas.length ? { tareasCerradas } : {}),
+    } });
     await con.commit();
     return { id: r.insertId, token, estado: p.retener ? 'retenida' : 'confirmada', retenidaHasta, reprograma: vieja ? vieja.id : null, ...inst, profesionalId: hueco.profesionalId, salaId: hueco.salaId, equipoId: hueco.equipoId };
   } catch (err) {
@@ -310,7 +345,8 @@ async function confirmarRetenida(pool, { id, reprograma = null, actor = 'pacient
         reprogramada = vieja.id;
       }
     }
-    await terminarSecuencias(con, { pacienteId: cita.paciente_id });
+    const tareasCerradas = await terminarSecuencias(con, { pacienteId: cita.paciente_id, tratamientoId: cita.tratamiento_id, citaId: cita.id, ahora });
+    if (tareasCerradas.length) await registrar(con, { tipo: 'cita_tareas_cerradas', entidad: 'cita', entidadId: cita.id, actor, datos: { tareasCerradas } });
     await con.commit();
     return { ...cita, estado: 'confirmada', confirmada_en: ahora, retenida_hasta: null, reprograma: reprogramada };
   } catch (err) {
@@ -331,5 +367,5 @@ async function caducarRetenciones(pool, ahora = new Date()) {
 
 module.exports = {
   huecos, proximosHuecos, reservar, cambiarEstado, deshacerEstado, ultimoCambio, confirmar, cancelar, confirmarRetenida,
-  caducarRetenciones, cargarDia, sigueEnPie, ErrorAgenda,
+  caducarRetenciones, cargarDia, sigueEnPie, tareasDeRecuperacion, ErrorAgenda,
 };
