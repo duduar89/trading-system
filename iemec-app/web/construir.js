@@ -390,7 +390,9 @@ if (require.main === module) {
   const o = argumentos(process.argv.slice(2));
   const inf = construir(o);
   if (!o.silencio) {
-    const donde = path.relative(process.cwd(), inf.salida) || '.';
+    // Relativa si cae dentro de la carpeta actual; si no, entera (--salida en otra parte).
+    const ruta = (p) => { const r = path.relative(process.cwd(), p); return r.startsWith('..') ? p : r || '.'; };
+    const donde = ruta(inf.salida);
     if (o.publicar && inf.errores.length) {
       console.error(explicarImprescindibles(inf).join('\n'));
       const otros = inf.errores.filter((e) => e.tipo !== 'imprescindible');
@@ -406,9 +408,11 @@ if (require.main === module) {
       if (inf.avisos_generador.length) console.log(`Avisos del generador:\n  ${inf.avisos_generador.join('\n  ')}`);
       if (!o.publicar) {
         const a = inf.lanzamiento.imprescindibles.length;
-        console.log(`Lanzamiento: ${a ? `faltan ${a} imprescindibles (${inf.lanzamiento.imprescindibles.map((i) => i.dato).join(', ')})` : 'no falta nada imprescindible'}; «node web/construir.js --publicar» hace la versión para subir.`);
+        const lista = inf.lanzamiento.imprescindibles.map((i) => i.dato).join(', ');
+        const falta = a === 1 ? `falta 1 imprescindible (${lista})` : `faltan ${a} imprescindibles (${lista})`;
+        console.log(`Lanzamiento: ${a ? falta : 'no falta nada imprescindible'}; «node web/construir.js --publicar» hace la versión para subir.`);
       }
-      if (inf.zip) console.log(`Zip para subir: ${path.relative(process.cwd(), inf.zip.archivo)} (${inf.zip.archivos} archivos, ${(inf.zip.bytes / 1024 / 1024).toFixed(1)} MB, con el .htaccess y sin informe.json).`);
+      if (inf.zip) console.log(`Zip para subir: ${ruta(inf.zip.archivo)} (${inf.zip.archivos} archivos, ${(inf.zip.bytes / 1024 / 1024).toFixed(1)} MB, con el .htaccess y sin informe.json).`);
       if (inf.errores.length) {
         console.error(`ERRORES (${inf.errores.length}):`);
         for (const e of inf.errores.slice(0, 40)) console.error(`  ${JSON.stringify(e)}`);
