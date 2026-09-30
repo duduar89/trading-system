@@ -187,6 +187,33 @@ test('repesca de punta a punta', async (t) => {
   }
 });
 
+test('«muy caro» de algo con publicidad restringida (régimen sin confirmar, oferta sin confirmar): ni bono ni promoción', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const deps = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
+  try {
+    await sembrar(pool);
+    // Como los deja el catálogo consolidado: la mesoterapia puede llevar un fármaco y la
+    // criolipólisis la clínica no ha confirmado que la ofrezca; los dos van restringidos.
+    await pool.query(`INSERT INTO tratamientos (id, nombre, familia, duracion_min, holgura_despues_min, precio_eur, rol_profesional, sala_tipo, regimen_legal, publicidad_restringida, reservable_ia) VALUES
+      ('mesoterapia-facial', 'Mesoterapia facial', 'facial', 30, 10, 90, 'medico', 'consulta_medica', 'desconocido', TRUE, FALSE),
+      ('criolipolisis', 'Criolipólisis', 'facial', 60, 15, 90, 'esteticista', 'cabina_estetica', 'aparatologia', TRUE, FALSE)`);
+    for (const [i, tratamiento] of ['mesoterapia-facial', 'criolipolisis'].entries()) {
+      const telefono = `+3461100002${i}`;
+      const leadId = await nuevoLead(pool, { telefono, nombre: 'Lidia', tratamiento });
+      await R.inscribir(pool, { secuencia: 'lead', leadId, inicio: new Date('2026-09-29T10:00:00Z') });
+      await R.avanzarSecuencias(deps, { ahora: new Date('2026-09-29T10:00:00Z') });
+      const r = await R.procesarEntrante(deps, { telefono, texto: 'Me parece muy caro', ahora: new Date('2026-09-29T11:00:00Z') });
+      assert.notEqual(r.decision.acciones.find((a) => a.tipo === 'ofrecer')?.ofertaTipo, 'bono', tratamiento);
+      assert.doesNotMatch(r.respuesta, /bono/, tratamiento);
+    }
+    const [hechas] = await pool.query("SELECT o.tipo FROM ofertas_hechas h JOIN ofertas o ON o.id = h.oferta_id WHERE o.tipo IN ('bono','promocion','descuento','regalo')");
+    assert.deepEqual(hechas, []);
+  } finally {
+    await pool.end();
+  }
+});
+
 test('los huecos se proponen agrupados por día', () => {
   assert.equal(R.textoHuecos([{ fecha: '2026-10-06', hora: '11:00' }, { fecha: '2026-10-06', hora: '17:30' }, { fecha: '2026-10-07', hora: '12:00' }]),
     'el martes 6 de octubre a las 11:00 o a las 17:30, o el miércoles 7 de octubre a las 12:00');

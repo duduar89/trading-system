@@ -26,12 +26,13 @@ function enlaceWhatsApp(telefono, texto) {
 
 /**
  * Ideas de publicación para un mes. Nunca propone tratamientos con publicidad restringida
- * (medicamentos con receta o productos sanitarios).
+ * (medicamentos con receta, productos sanitarios, oferta sin confirmar) ni los que no se reservan
+ * o se han retirado (activo a 0 o false, como llega de la base o del catálogo).
  * @param {object} p { mes 1-12, tratamientos (filas del catálogo), telefono, n }
  */
 function ideasDelMes({ mes, tratamientos = [], telefono = '34722833285', n = 4 }) {
   const t = TEMPORADA[mes];
-  const aptos = tratamientos.filter((x) => t.familias.includes(x.familia) && !x.publicidad_restringida && x.activo !== false);
+  const aptos = tratamientos.filter((x) => t.familias.includes(x.familia) && !x.publicidad_restringida && (x.activo == null || Boolean(x.activo)));
   const ideas = [{
     tipo: 'novedad',
     titulo: t.tema,

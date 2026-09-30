@@ -89,3 +89,15 @@ test('publicaciones de Google: por temporada, sin tratamientos con publicidad re
   assert.ok(ideas.every((i) => i.boton.url.startsWith('https://wa.me/34722833285?text=') && i.boton.url.includes(encodeURIComponent(i.codigo))));
   assert.ok(ideas.every((i) => i.texto.length <= 1500));
 });
+
+test('publicaciones de Google: nada que no se reserve o se haya retirado, llegue activo como llegue', () => {
+  const { ideasDelMes } = require('./publicaciones');
+  // Como sale de MariaDB (0/1) y como sale del catálogo (true/false).
+  const tratamientos = [
+    { id: 'dermapen-capilar-con-exosomas', nombre: 'Dermapen capilar con exosomas', familia: 'medicina_capilar', publicidad_restringida: false, activo: 0 },
+    { id: 'plan-capilar', nombre: 'Plan capilar', familia: 'medicina_capilar', publicidad_restringida: false, activo: false },
+    { id: 'diagnostico-capilar', nombre: 'Diagnóstico capilar', familia: 'medicina_capilar', publicidad_restringida: false, activo: 1 },
+    { id: 'oxigenoterapia-capilar', nombre: 'Oxigenoterapia capilar', familia: 'medicina_capilar', publicidad_restringida: false },
+  ];
+  assert.deepEqual(ideasDelMes({ mes: 10, tratamientos }).map((i) => i.tratamientoId).filter(Boolean), ['diagnostico-capilar', 'oxigenoterapia-capilar']);
+});

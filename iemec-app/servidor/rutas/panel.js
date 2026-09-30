@@ -222,7 +222,8 @@ function rutasPanel({ pool, deps = null }) {
   r.get('/resenas', envolver(async (req, res) => {
     const [resenas] = await p().query('SELECT * FROM resenas ORDER BY publicada_en DESC LIMIT 200');
     const [peticiones] = await p().query('SELECT enviada_en, pulsada_en, resena_id FROM peticiones_resena WHERE enviada_en IS NOT NULL');
-    const [trats] = await p().query('SELECT id, nombre, familia, descripcion, publicidad_restringida, activo FROM tratamientos');
+    // Ideas para la ficha de Google: solo lo que se reserva (ni agrupadores ni retirados).
+    const [trats] = await p().query('SELECT id, nombre, familia, descripcion, publicidad_restringida, activo FROM tratamientos WHERE activo = TRUE ORDER BY id');
     const mes = Number(T.fechaMadrid(req.ahora || new Date()).slice(5, 7));
     res.json({
       metricas: R.metricas({ resenas, peticiones }),

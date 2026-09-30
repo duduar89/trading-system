@@ -83,6 +83,26 @@ test('relleno (producto sanitario): sin rebajas salvo visto bueno del abogado', 
   assert.equal(r.validas.length, 1);
 });
 
+test('régimen sin confirmar o publicidad restringida (mesoterapia, carboxiterapia…): como un producto sanitario', () => {
+  const casos = [
+    { id: 'mesoterapia-corporal', familia: 'facial', regimen_legal: 'desconocido', publicidad_restringida: true },
+    { id: 'carboxiterapia', familia: 'facial', regimen_legal: 'desconocido' },
+    { id: 'criolipolisis', familia: 'facial', regimen_legal: 'aparatologia', publicidad_restringida: true }, // oferta sin confirmar
+  ];
+  for (const t of casos) {
+    const { validas, descartes } = ofertasPosibles({ tratamiento: t, ofertas: OFERTAS, hechas: [], importe: 90, hoy: '2026-09-29' });
+    assert.deepEqual(validas.map((o) => o.tipo), ['valoracion'], t.id);
+    assert.match(descartes.find((x) => x.id === 4).motivo, /restringida|sin confirmar/, t.id);
+    const d = decidir(interpretar('Me parece muy caro'), ctx({ tratamiento: t }));
+    assert.notEqual(d.acciones.find((a) => a.tipo === 'ofrecer')?.ofertaTipo, 'bono', t.id);
+    // Con el visto bueno del abogado sanitario en la oferta, sí.
+    assert.equal(ofertasPosibles({ tratamiento: t, ofertas: [{ ...OFERTAS[3], permitidaProductoSanitario: true }], hechas: [], importe: 90, hoy: '2026-09-29' }).validas.length, 1);
+  }
+  // Sin tratamiento conocido no cambia nada: el régimen «desconocido» es solo que no se sabe cuál es.
+  const r = ofertasPosibles({ tratamiento: { id: null, familia: 'facial', regimen_legal: 'desconocido' }, ofertas: OFERTAS, hechas: [], importe: 90, hoy: '2026-09-29' });
+  assert.ok(r.validas.some((o) => o.tipo === 'bono'));
+});
+
 test('no se repite una oferta ya hecha y, si la rechaza, se cierra con motivo precio', () => {
   const hechas = [{ ofertaId: 4, fecha: '2026-09-20' }];
   const d = decidir(interpretar('Sigue siendo caro'), ctx({ hechas }));

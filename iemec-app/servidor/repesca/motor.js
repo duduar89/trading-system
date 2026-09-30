@@ -120,7 +120,9 @@ async function cargarContexto(q, conv, ahora) {
     calendario, paciente, tratamiento, importe, ofertas, hechas, respuestas,
     ctx: {
       hoy: p.fecha, ahoraMin: p.minutos, calendario,
-      tratamiento: tratamiento ? { id: tratamiento.id, familia: tratamiento.familia, regimen_legal: tratamiento.regimen_legal } : { id: null, familia: null, regimen_legal: 'desconocido' },
+      tratamiento: tratamiento
+        ? { id: tratamiento.id, familia: tratamiento.familia, regimen_legal: tratamiento.regimen_legal, publicidad_restringida: Boolean(tratamiento.publicidad_restringida) }
+        : { id: null, familia: null, regimen_legal: 'desconocido' },
       importe, ofertas, hechas,
       ofertasRechazadas: hechas.filter((h) => h.estado === 'rechazada').length,
       yaPreguntoCuando: Boolean(conv.ya_pregunto_cuando),

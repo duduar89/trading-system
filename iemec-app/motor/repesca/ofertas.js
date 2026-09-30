@@ -8,6 +8,9 @@
 //     valoración, que no rebajan el medicamento.
 //   · A un producto sanitario (rellenos, hilos, balón…) tampoco, salvo que el abogado sanitario lo
 //     haya revisado y la oferta lo diga (permitidaProductoSanitario).
+//   · Lo que el catálogo marca con publicidad restringida (y el régimen sin confirmar de un
+//     tratamiento conocido: mesoterapias, carboxiterapia… pueden llevar un fármaco o un producto
+//     sanitario) se trata como producto sanitario.
 const TIPOS_CON_REBAJA = new Set(['promocion', 'descuento', 'bono', 'regalo']);
 
 function vigente(o, hoy) {
@@ -29,6 +32,9 @@ function permitidaPorLey(o, t) {
   }
   if (t.regimen_legal === 'producto_sanitario' && !o.permitidaProductoSanitario) {
     return { ok: false, motivo: 'producto sanitario: la rebaja necesita el visto bueno del abogado sanitario' };
+  }
+  if ((t.publicidad_restringida || (t.id && t.regimen_legal === 'desconocido')) && !o.permitidaProductoSanitario) {
+    return { ok: false, motivo: 'publicidad restringida o régimen sin confirmar: sin rebajas hasta que el abogado sanitario lo revise' };
   }
   return { ok: true };
 }

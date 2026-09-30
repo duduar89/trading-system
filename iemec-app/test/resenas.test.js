@@ -65,3 +65,31 @@ test('reseñas con la base', async (t) => {
     await pool.end();
   }
 });
+
+test('las publicaciones del panel: solo lo que se reserva, con las filas tal como salen de la base', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const express = require('express');
+  const { rutasPanel } = require('../servidor/rutas/panel');
+  const app = express();
+  app.use((req, _res, next) => { req.ahora = new Date('2026-07-15T10:00:00Z'); next(); }); // julio: head spa
+  app.use('/api/panel', rutasPanel({ pool }));
+  const servidor = app.listen(0);
+  await new Promise((r) => servidor.once('listening', r));
+  try {
+    // Un agrupador que no se reserva y un tratamiento retirado del catálogo (activo = 0, sin
+    // publicidad restringida), junto a uno que sí se reserva.
+    await pool.query("INSERT INTO familias (codigo, nombre) VALUES ('head_spa', 'Head Spa')");
+    await pool.query(`INSERT INTO tratamientos (id, nombre, familia, duracion_min, regimen_legal, publicidad_restringida, activo) VALUES
+      ('head-spa-japones', 'Head Spa japonés', 'head_spa', 0, 'cosmetico', FALSE, FALSE),
+      ('head-spa-retirado', 'Head Spa de antes', 'head_spa', 45, 'cosmetico', FALSE, FALSE),
+      ('head-spa-detox', 'Head Spa Detox', 'head_spa', 45, 'cosmetico', FALSE, TRUE)`);
+    const r = await fetch(`http://127.0.0.1:${servidor.address().port}/api/panel/resenas`);
+    assert.equal(r.status, 200);
+    const { publicaciones } = await r.json();
+    assert.deepEqual(publicaciones.map((i) => i.tratamientoId).filter(Boolean), ['head-spa-detox']);
+  } finally {
+    servidor.close();
+    await pool.end();
+  }
+});
