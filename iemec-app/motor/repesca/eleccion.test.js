@@ -45,12 +45,15 @@ for (const [frase, esperado] of ELEGIDOS) {
   });
 }
 
-test('con un solo hueco, «vale» o «sí» lo reservan', () => {
+test('con un solo hueco, «vale» o «sí» lo reservan (sin haberlo nombrado: porAcepta)', () => {
   for (const f of ['Vale', 'sí', 'Perfecto!!', 'ok', 'Genial, reservámelo', 'de acuerdo']) {
     const r = elige(f, [OFRECIDOS[2]]);
     assert.equal(r?.tipo, 'elegido', f);
     assert.equal(clave(r.hueco), '2026-10-07 11:00');
+    assert.equal(r.porAcepta, true, f);
   }
+  // Nombrándolo, no es un «sí» a secas.
+  for (const f of ['El miércoles', 'Sí, a las 11', 'la primera']) assert.equal(elige(f, [OFRECIDOS[2]]).porAcepta, undefined, f);
 });
 
 test('dudoso: hay más de uno que encaja, se le pregunta cuál', () => {
@@ -87,6 +90,10 @@ test('pide algo que no se le ofreció: se mira en la agenda', () => {
   assert.deepEqual(elige('ninguno, mejor el jueves'), { tipo: 'pide', fecha: '2026-10-01', hora: null, franja: null });
   // «por la mañana» es una franja, no «mañana».
   assert.equal(elige('el lunes por la mañana').fecha, '2026-10-05');
+  // «el jueves 8» es el jueves día 8 (no el próximo jueves).
+  assert.equal(elige('el jueves 8').fecha, '2026-10-08');
+  assert.equal(elige('el viernes 16 a las 5').hora, '17:00');
+  assert.equal(elige('el viernes 16 a las 5').fecha, '2026-10-16');
 });
 
 test('lo que no habla de los huecos sigue la repesca normal', () => {
