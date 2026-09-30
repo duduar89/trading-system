@@ -12,6 +12,7 @@ const agenda = require('./agenda');
 const repesca = require('./repesca/motor');
 const resenas = require('./resenas');
 const avisos = require('./avisos-cita');
+const acceso = require('./acceso');
 const { crearIa } = require('./integraciones/ia');
 const { crearWhatsApp } = require('./integraciones/whatsapp');
 const T = require('../motor/tiempo');
@@ -30,6 +31,8 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
     avisosCita: (await avisos.enviarPendientes(d, { ahora })).length,
     peticionesResena: (await resenas.enviarPeticionesPendientes(d, { ahora })).length,
     cola: await cola.procesar(pool, {}, { ahora }),
+    // Retos de passkey y ventanas del límite de intentos ya caducados.
+    accesoCaducado: await acceso.purgar(pool, ahora),
   }), { ahora });
   Object.assign(informe, r.ejecutado ? r.resultado : { saltado: 'otro cron en marcha' });
 

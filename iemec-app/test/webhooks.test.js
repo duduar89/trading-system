@@ -68,6 +68,8 @@ const avisoLead = (leadgenId, extra = {}) => ({
 
 async function sembrar(pool) {
   await pool.query("INSERT INTO clinica (id, nombre, nombre_corto, direccion, municipio) VALUES (1, 'Instituto Europeo de Medicina Estética y Capilar', 'IEMEC', 'Av. Siglo XXI 13, local 35', 'Boadilla del Monte')");
+  // La persona de recepción de la cookie del panel (la sesión se comprueba en la base).
+  await pool.query("INSERT INTO usuarios (id, email, nombre, rol) VALUES (1, 'recepcion@ejemplo.com', 'Recepción', 'recepcion')");
   for (const d of [1, 2, 3, 4, 5, 6]) await pool.query("INSERT INTO horario_clinica (dia_semana, abre, cierra) VALUES (?, '10:00', '20:00')", [d]);
   await pool.query("INSERT INTO salas (id, codigo, nombre, tipo) VALUES (1, 'cabina-facial', 'Cabina facial', 'cabina_estetica')");
   await pool.query("INSERT INTO profesionales (id, codigo, nombre, rol) VALUES (20, 'estetica-1', 'Estética 1', 'esteticista')");

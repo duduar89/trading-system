@@ -1,7 +1,8 @@
 'use strict';
 // API del panel de la clínica. Todo detrás de sesión (servidor/sesion.js). Devuelve lo justo para
 // cada pantalla: hoy, agenda por cabina, bandeja de conversaciones, seguimientos, repesca,
-// plantillas, reseñas y ajustes (qué tratamiento se hace en qué sala).
+// plantillas, reseñas y ajustes (qué tratamiento se hace en qué sala). Lo que no es de todo el
+// personal lleva su permiso (servidor/permisos.js).
 const express = require('express');
 const T = require('../../motor/tiempo');
 const { descifrar } = require('../cripto');
@@ -13,6 +14,7 @@ const repesca = require('../repesca/motor');
 const resenasSrv = require('../resenas');
 const { registrar } = require('../eventos');
 const estados = require('../estados-cita');
+const { exige } = require('../permisos');
 
 const madrid = (d) => (d ? T.partesMadrid(new Date(d)) : null);
 const envolver = (fn) => (req, res, next) => fn(req, res).catch(next);
@@ -316,7 +318,7 @@ function rutasPanel({ pool, deps = null }) {
     });
   }));
 
-  r.post('/resenas/:id/publicar', envolver(async (req, res) => {
+  r.post('/resenas/:id/publicar', exige('resenas.aprobar'), envolver(async (req, res) => {
     if (!deps?.google) return res.status(503).json({ error: 'Google no configurado' });
     try {
       await resenasSrv.aprobarYPublicar(p(), deps.google, { resenaId: Number(req.params.id), texto: req.body?.texto || null, aprobadaPor: req.usuario?.email || 'panel' });
@@ -342,7 +344,7 @@ function rutasPanel({ pool, deps = null }) {
     });
   }));
 
-  r.put('/ajustes/salas-tratamientos/:tratamiento', envolver(async (req, res) => {
+  r.put('/ajustes/salas-tratamientos/:tratamiento', exige('salas.editar'), envolver(async (req, res) => {
     const id = req.params.tratamiento;
     const salas = (req.body?.salas || []).map(Number).filter(Number.isInteger);
     const con = await p().getConnection();
