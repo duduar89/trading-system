@@ -14,6 +14,18 @@ const PROMO = /(\d+ ?%|descuento|oferta|promo|promocion|rebaja|gratis|regalo|2x1
 const PROMESAS = /(garantizad|sin riesgo|sin ningun riesgo|sin efectos secundarios|resultados? (permanentes|definitiv|inmediatos garantizados)|100 ?% (seguro|eficaz|natural)|milagr|infalible|para siempre|el mejor (tratamiento|medico|resultado))/;
 const URGENCIA_FALSA = /(solo (por )?hoy|ultimas? (horas|plazas)|corre|no te lo pierdas|antes de que se acabe)/;
 
+// Lo que dice algo íntimo de la salud de quien lo recibe (art. 9 RGPD): en un mensaje que sale sin
+// que el paciente pregunte (y que se lee en la pantalla bloqueada del móvil) no se nombran ni el
+// tratamiento ni su familia. Por defecto, estas familias; la clínica marca o desmarca cada
+// tratamiento en tratamientos.sensible (NULL: lo que diga su familia).
+const FAMILIAS_SENSIBLES = ['ginecoestetica', 'sexualidad_masculina', 'perdida_peso'];
+
+function esSensible(tratamiento) {
+  if (!tratamiento) return false;
+  if (tratamiento.sensible != null) return Boolean(tratamiento.sensible);
+  return FAMILIAS_SENSIBLES.includes(tratamiento.familia);
+}
+
 function contiene(t, lista) {
   return lista.filter((p) => new RegExp(`\\b${normalizar(p)}\\b`).test(t));
 }
@@ -49,4 +61,4 @@ function revisar(texto, { tipo = 'marketing', tieneBaja = false } = {}) {
   return { ok: errores.length === 0, errores, avisos };
 }
 
-module.exports = { revisar, MEDICAMENTOS, MARCAS_SANITARIAS };
+module.exports = { revisar, esSensible, MEDICAMENTOS, MARCAS_SANITARIAS, FAMILIAS_SENSIBLES };

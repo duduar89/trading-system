@@ -11,6 +11,8 @@
 const T = require('../tiempo');
 
 // esperaMin: minutos desde que empieza la secuencia. accion: plantilla (uso) o tarea para una persona.
+// usoSegunCita: la plantilla cambia según cómo acabó la cita de la inscripción (a quien no vino no se
+// le dice que canceló).
 const SECUENCIAS = {
   lead: {
     nombre: 'Lead nuevo sin cita',
@@ -25,11 +27,11 @@ const SECUENCIAS = {
     terminaCon: ['cita'],
   },
   cancelacion: {
-    nombre: 'Cancelación sin nueva cita',
+    nombre: 'Cita cancelada o «No vino» sin nueva cita',
     prioridad: 90,
     pasos: [
-      { esperaMin: 48 * 60, accion: 'plantilla', uso: 'cancelacion_recuperar' },
-      { esperaMin: 7 * 1440, accion: 'plantilla', uso: 'cancelacion_recuperar' },
+      { esperaMin: 48 * 60, accion: 'plantilla', uso: 'cancelacion_recuperar', usoSegunCita: { no_presentada: 'no_vino_recuperar' } },
+      { esperaMin: 7 * 1440, accion: 'plantilla', uso: 'cancelacion_recuperar', usoSegunCita: { no_presentada: 'no_vino_recuperar' } },
     ],
     terminaCon: ['cita'],
   },
@@ -89,6 +91,11 @@ function ajustarAHorario(instante, calendario, limites = LIMITES) {
   const fr = calendario.franjas(fecha);
   if (fr.length && min < fr[0].desde) min = fr[0].desde;
   return T.desdeMadrid(fecha, T.hhmm(min));
+}
+
+// La plantilla de un paso para una cita que acabó en `estadoCita` (si el paso no distingue, la de siempre).
+function usoDelPaso(paso, estadoCita = null) {
+  return paso.usoSegunCita?.[estadoCita] || paso.uso;
 }
 
 // Cuándo toca el paso n de una inscripción (o null si no quedan pasos).
@@ -151,4 +158,4 @@ function alOcurrir(evento, inscripciones) {
   });
 }
 
-module.exports = { SECUENCIAS, LIMITES, ajustarAHorario, momentoDelPaso, momentoDelSiguiente, puedeEnviarComercial, laQueManda, alOcurrir };
+module.exports = { SECUENCIAS, LIMITES, ajustarAHorario, momentoDelPaso, momentoDelSiguiente, usoDelPaso, puedeEnviarComercial, laQueManda, alOcurrir };

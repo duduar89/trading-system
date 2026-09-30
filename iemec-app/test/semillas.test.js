@@ -10,6 +10,7 @@ const { registrar } = require('../servidor/eventos');
 const { MEDICAMENTOS } = require('../motor/repesca/filtro-legal');
 const { normalizar } = require('../motor/repesca/interpretar');
 const agenda = require('../servidor/agenda');
+const { BIBLIOTECA } = require('../motor/repesca/plantillas');
 
 // El catálogo consolidado de la F0, tal como lo deja scripts/importar-catalogo.js. Si llega una
 // versión revisada y se vuelve a importar, los recuentos se ponen al día aquí.
@@ -79,7 +80,7 @@ test('las semillas de la clínica cargan y se pueden repetir sin duplicar', asyn
       (SELECT COUNT(*) FROM tratamientos WHERE publicidad_restringida) AS restringidos, (SELECT COUNT(*) FROM equipos) AS aparatos,
       (SELECT COUNT(*) FROM respuestas_aprobadas) AS preguntas, (SELECT COUNT(*) FROM respuestas_aprobadas WHERE aprobada) AS aprobadas`);
     assert.deepEqual({ ...n }, {
-      salas: 7, profs: 10, plantillas: 17, ofertas_activas: 0, familias: FAMILIAS.length, tratamientos: RECUENTO.tratamientos, se_reservan: RECUENTO.seReservan,
+      salas: 7, profs: 10, plantillas: BIBLIOTECA.length, ofertas_activas: 0, familias: FAMILIAS.length, tratamientos: RECUENTO.tratamientos, se_reservan: RECUENTO.seReservan,
       reserva_la_ia: RECUENTO.reservaLaIa, restringidos: RECUENTO.restringidos, aparatos: RECUENTO.aparatos, preguntas: RECUENTO.preguntas, aprobadas: 0,
     }, 'las ofertas llegan desactivadas y ninguna plantilla ni respuesta se da por aprobada');
     const [[pl]] = await pool.query("SELECT COUNT(*) AS n FROM plantillas WHERE estado <> 'borrador'");

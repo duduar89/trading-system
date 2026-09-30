@@ -44,6 +44,12 @@ const BIBLIOTECA = [
   { uso: 'cancelacion_recuperar', categoria: 'marketing', nombre: 'iemec_cancelacion_nuevo_hueco',
     cuerpo: `Hola {{1}}, vimos que tuviste que cancelar tu cita de {{2}}. ¿Te buscamos otro momento que te venga mejor? ${BAJA}`,
     ejemplos: ['Laura', 'limpieza facial'], botones: BOTONES_REPESCA },
+  // Los dos que salen solos tras una cita («No vino» y «toca repetir») le llegan también a quien solo
+  // es cliente, sin consentimiento expreso: no nombran el tratamiento (es un dato de salud y se lee en
+  // la pantalla bloqueada). La conversación ya sabe de qué cita va si contesta.
+  { uso: 'no_vino_recuperar', categoria: 'marketing', nombre: 'iemec_no_vino_nuevo_hueco',
+    cuerpo: `Hola {{1}}, te echamos de menos en tu última cita en IEMEC. ¿Te buscamos otro momento que te venga mejor? ${BAJA}`,
+    ejemplos: ['Laura'], botones: BOTONES_REPESCA },
   { uso: 'presupuesto_2d', categoria: 'marketing', nombre: 'iemec_presupuesto_dudas',
     cuerpo: `Hola {{1}}, ¿pudiste revisar el plan de tratamiento de {{2}} que te preparamos? Si te surge cualquier duda, te la resolvemos por aquí. ${BAJA}`,
     ejemplos: ['Laura', 'medicina capilar'],
@@ -58,17 +64,20 @@ const BIBLIOTECA = [
   { uso: 'como_quedamos', categoria: 'marketing', nombre: 'iemec_como_quedamos',
     cuerpo: `Hola {{1}}, como quedamos, te escribo para buscarte hueco para {{2}}. ¿Te viene bien esta semana o la que viene? ${BAJA}`,
     ejemplos: ['Laura', 'tu tratamiento facial'], botones: BOTONES_REPESCA },
+  // Como la de «No vino», sin nombrar el tratamiento; y sin decir cuánto ha pasado: los hay que se
+  // repiten cada mes y los hay que cada año.
   { uso: 'toca_repetir', categoria: 'marketing', nombre: 'iemec_toca_repetir',
-    cuerpo: `Hola {{1}}, ya han pasado unos meses desde tu último tratamiento de {{2}} en IEMEC. ¿Te buscamos hueco para la revisión? ${BAJA}`,
-    ejemplos: ['Laura', 'rejuvenecimiento facial'], botones: BOTONES_REPESCA },
+    cuerpo: `Hola {{1}}, ya se acerca el momento de repetir tu tratamiento en IEMEC. ¿Te buscamos hueco? ${BAJA}`,
+    ejemplos: ['Laura'], botones: BOTONES_REPESCA },
   { uso: 'paciente_dormido', categoria: 'marketing', nombre: 'iemec_te_echamos_de_menos',
     cuerpo: `Hola {{1}}, hace tiempo que no te vemos por IEMEC. Si quieres, te hacemos una valoración para ver cómo estás y qué te conviene ahora. ${BAJA}`,
     ejemplos: ['Laura'], botones: BOTONES_REPESCA },
   { uso: 'vale_regalo', categoria: 'marketing', nombre: 'iemec_vale_sin_canjear',
     cuerpo: `Hola {{1}}, tienes una tarjeta regalo de IEMEC de {{2}} esperando. ¿Te buscamos hueco para disfrutarla? ${BAJA}`,
     ejemplos: ['Laura', '70 €'], botones: BOTONES_REPESCA },
+  // Sale 2 horas después de la cita o, si ya es tarde, al día siguiente: el texto no dice «hoy».
   { uso: 'resena', categoria: 'utilidad', nombre: 'iemec_opinion_visita',
-    cuerpo: 'Hola {{1}}, gracias por venir hoy a IEMEC. ¿Nos cuentas qué tal tu experiencia? Tu opinión en Google nos ayuda mucho.',
+    cuerpo: 'Hola {{1}}, gracias por tu visita a IEMEC. ¿Nos cuentas qué tal tu experiencia? Tu opinión en Google nos ayuda mucho.',
     ejemplos: ['Laura'],
     botones: [{ tipo: 'url', texto: 'Dejar mi opinión', url: 'https://agenda.iemec-clinic.com/r/{{1}}', ejemplo: 'Xy12abc' }] },
 ];

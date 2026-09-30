@@ -11,23 +11,50 @@ const T = require('../tiempo');
 const { normalizar } = require('../repesca/interpretar');
 const { revisar } = require('../repesca/filtro-legal');
 
-const REGLAS = { horasTrasCita: 2, diasEntrePeticiones: 120, horaDesde: '10:30', horaHasta: '20:00' };
+const REGLAS = { horasTrasCita: 2, diasEntrePeticiones: 120, horaDesde: '10:30', horaHasta: '20:00', diasMaxTrasCita: 2 };
+
+// Dos citas completadas el mismo día: sale una sola petición (la que ya estaba en camino).
+const OTRA_EN_CAMINO = 'ya tiene otra petición de reseña programada';
+
+/**
+ * ¿Hay algo que impida pedirle la reseña? Se mira al programarla y otra vez justo antes de enviarla:
+ * entre medias puede darse de baja, quejarse, dejar la reseña o recibir otra petición.
+ * @param {object} p { cita: { estado, fin }, paciente: { baja_comercial_en }, ultimaPeticion: Date|null
+ *                     (la última que se le envió), otraEnCamino: bool (otra suya ya programada),
+ *                     yaResenoEnGoogle: bool, conversacionAbiertaConQueja: bool }
+ * @param {object} o { referencia: desde dónde se cuentan los días desde la última petición (el fin de
+ *                     la cita al programarla; al enviarla, ahora) }
+ * @returns {string|null} el motivo para no pedirla, o null si se puede
+ */
+function motivoParaNoPedir(p, { referencia = p.cita.fin, reglas = REGLAS } = {}) {
+  if (p.cita.estado !== 'completada') return 'la cita no se ha completado';
+  if (p.paciente?.baja_comercial_en) return 'se dio de baja de los mensajes';
+  if (p.yaResenoEnGoogle) return 'ya dejó una reseña';
+  if (p.conversacionAbiertaConQueja) return 'tiene una queja abierta: primero se atiende';
+  if (p.otraEnCamino) return OTRA_EN_CAMINO;
+  if (p.ultimaPeticion && (new Date(referencia) - new Date(p.ultimaPeticion)) / 86400000 < reglas.diasEntrePeticiones) {
+    return 'ya se le pidió hace poco';
+  }
+  return null;
+}
 
 /**
  * ¿Se le pide la reseña a este paciente tras esta cita? ¿Cuándo?
- * @param {object} p { cita: { estado, fin }, paciente: { baja_comercial_en }, ultimaPeticion: Date|null,
- *                     yaResenoEnGoogle: bool, conversacionAbiertaConQueja: bool }
+ * @param {object} p lo de motivoParaNoPedir y noAntesDe: Date|null (no sale antes: mientras
+ *                   recepción aún puede deshacer)
  */
 function pedirResena(p, calendario, reglas = REGLAS) {
-  if (p.cita.estado !== 'completada') return { pedir: false, motivo: 'la cita no se ha completado' };
-  if (p.paciente?.baja_comercial_en) return { pedir: false, motivo: 'se dio de baja de los mensajes' };
-  if (p.yaResenoEnGoogle) return { pedir: false, motivo: 'ya dejó una reseña' };
-  if (p.conversacionAbiertaConQueja) return { pedir: false, motivo: 'tiene una queja abierta: primero se atiende' };
-  if (p.ultimaPeticion && (new Date(p.cita.fin) - new Date(p.ultimaPeticion)) / 86400000 < reglas.diasEntrePeticiones) {
-    return { pedir: false, motivo: 'ya se le pidió hace poco' };
+  const motivo = motivoParaNoPedir(p, { reglas });
+  if (motivo) return { pedir: false, motivo };
+  // Si la cita se marca completada días después, ya no se pide: la opinión de una visita de hace días
+  // que nadie cerró a tiempo llega tarde. El texto no dice «hoy»: una cita de tarde se pide al día
+  // siguiente.
+  if (p.noAntesDe && (new Date(p.noAntesDe) - new Date(p.cita.fin)) / 86400000 > reglas.diasMaxTrasCita) {
+    return { pedir: false, motivo: 'la cita se marcó como completada días después' };
   }
-  // Dos horas después de acabar, dentro del horario de envío; si no, el siguiente día que abre.
-  let cuando = new Date(new Date(p.cita.fin).getTime() + reglas.horasTrasCita * 3600000);
+  // Dos horas después de acabar (y no antes de noAntesDe), dentro del horario de envío; si no, el
+  // siguiente día que abre.
+  let cuando = new Date(Math.max(new Date(p.cita.fin).getTime() + reglas.horasTrasCita * 3600000, p.noAntesDe ? new Date(p.noAntesDe).getTime() : 0));
   const parte = T.partesMadrid(cuando);
   const desde = T.minutosDe(reglas.horaDesde);
   const hasta = T.minutosDe(reglas.horaHasta);
@@ -131,4 +158,4 @@ function metricas({ resenas = [], peticiones = [], desde, hasta }) {
   };
 }
 
-module.exports = { pedirResena, enlaceResena, analizar, borradorRespuesta, metricas, REGLAS };
+module.exports = { pedirResena, motivoParaNoPedir, enlaceResena, analizar, borradorRespuesta, metricas, REGLAS, OTRA_EN_CAMINO };

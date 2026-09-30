@@ -16,8 +16,19 @@ const madrid = (d) => { const p = T.partesMadrid(d); return `${p.fecha} ${p.hora
 test('cada paso de plantilla usa una plantilla que existe en la biblioteca', () => {
   const usos = new Set(BIBLIOTECA.map((p) => p.uso));
   for (const [nombre, sec] of Object.entries(S.SECUENCIAS)) {
-    for (const p of sec.pasos.filter((x) => x.accion === 'plantilla')) assert.ok(usos.has(p.uso), `${nombre}: ${p.uso}`);
+    for (const p of sec.pasos.filter((x) => x.accion === 'plantilla')) {
+      for (const uso of [p.uso, ...Object.values(p.usoSegunCita || {})]) assert.ok(usos.has(uso), `${nombre}: ${uso}`);
+    }
   }
+});
+
+test('recuperar una cita: a quien no vino no se le dice que canceló', () => {
+  for (const paso of S.SECUENCIAS.cancelacion.pasos) {
+    assert.equal(S.usoDelPaso(paso, 'no_presentada'), 'no_vino_recuperar');
+    assert.equal(S.usoDelPaso(paso, 'cancelada'), 'cancelacion_recuperar');
+    assert.equal(S.usoDelPaso(paso), 'cancelacion_recuperar', 'sin cita, la de siempre');
+  }
+  assert.equal(S.usoDelPaso(S.SECUENCIAS.lead.pasos[0], 'no_presentada'), 'lead_primer_contacto', 'los demás pasos no cambian');
 });
 
 test('lead que entra el viernes 2-oct a las 22:10: el primer mensaje sale el sábado a las 10:00, no de noche', () => {

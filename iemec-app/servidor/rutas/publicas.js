@@ -46,7 +46,23 @@ function textoFechaHora(inicio) {
   return `${DIAS[p.diaSemana]} ${Number(p.fecha.slice(8))} de ${MESES[Number(p.fecha.slice(5, 7))]}, a las ${p.hora}`;
 }
 
-function paginaCita(cita, clinica, mensaje = '') {
+// Una cita que ya ha empezado (o que se hizo, o que se marcó «No vino») no se cancela ni se añade
+// al calendario desde aquí: la página dice lo que toca.
+const sigueEnPie = (cita, ahora) => ['retenida', 'confirmada'].includes(cita.estado) && new Date(cita.inicio) > ahora;
+
+function trasLaCita(cita, whatsapp) {
+  if (['llegada', 'en_curso', 'completada'].includes(cita.estado)) return '<div class="aviso">¡Gracias por venir! Te esperamos en tu próxima visita.</div>';
+  const escribir = (texto) => `https://wa.me/${whatsapp}?text=${encodeURIComponent(texto)}`;
+  if (cita.estado === 'no_presentada') {
+    return `<div class="aviso">Te echamos de menos en esta cita. Si quieres, te buscamos otro momento.</div>
+<a class="btn lleno" href="${esc(escribir(`Hola, no pude ir a mi cita del ${textoFechaHora(cita.inicio)}. ¿Me buscáis otro hueco?`))}">Buscar otro hueco por WhatsApp</a>`;
+  }
+  if (!['retenida', 'confirmada'].includes(cita.estado)) return '';
+  return `<div class="aviso">Esta cita ya ha empezado. Si no has podido venir o necesitas algo, escríbenos.</div>
+<a class="btn" href="${esc(escribir(`Hola, os escribo por mi cita del ${textoFechaHora(cita.inicio)}`))}">Escribir por WhatsApp</a>`;
+}
+
+function paginaCita(cita, clinica, mensaje = '', ahora = new Date()) {
   const ev = eventoDe(cita, clinica);
   const cancelada = cita.estado === 'cancelada';
   const whatsapp = String(clinica.whatsapp || '34722833285').replace(/\D/g, '');
@@ -74,13 +90,13 @@ ${mensaje ? `<div class="aviso">${esc(mensaje)}</div>` : ''}
 <div class="dato"><span>Tratamiento</span><span>${esc(cita.tratamiento)}</span></div>
 ${cita.profesional ? `<div class="dato"><span>Con</span><span>${esc(cita.profesional)}</span></div>` : ''}
 <div class="dato"><span>Dónde</span><span>${esc(ev.lugar)}</span></div>
-${cancelada ? '' : `
+${cancelada ? '' : !sigueEnPie(cita, ahora) ? trasLaCita(cita, whatsapp) : `
 ${cita.estado === 'retenida' ? `<form method="post" action="/c/${esc(cita.token)}/confirmar"><button class="btn lleno" type="submit">Confirmar mi cita</button></form>` : ''}
 <a class="btn lleno" href="/c/${esc(cita.token)}.ics">Añadir a mi calendario</a>
 <div class="fila"><a class="btn" href="${esc(enlaceGoogle(ev))}" rel="noopener">Google</a><a class="btn" href="${esc(enlaceOutlook(ev))}" rel="noopener">Outlook</a></div>
 <a class="btn" href="${esc(cambiar)}">Cambiarla por WhatsApp</a>
 <form method="post" action="/c/${esc(cita.token)}/cancelar"><button class="btn" type="submit">Cancelar la cita</button></form>`}
-<p class="pie">En iPhone, «Añadir a mi calendario» abre el calendario del teléfono. Si algo cambia, te avisamos por WhatsApp.</p>
+${!cancelada && sigueEnPie(cita, ahora) ? '<p class="pie">En iPhone, «Añadir a mi calendario» abre el calendario del teléfono. Si algo cambia, te avisamos por WhatsApp.</p>' : ''}
 </section></main></body></html>`;
 }
 
@@ -102,21 +118,24 @@ function rutasPublicas({ pool }) {
     const cita = await citaPorToken(p(), req.params.token);
     if (!cita) return res.status(404).send('No encontramos esa cita');
     res.set('Cache-Control', 'no-store');
-    res.send(paginaCita(cita, await datosClinica(p())));
+    res.send(paginaCita(cita, await datosClinica(p()), '', req.ahora || new Date()));
   });
 
   const accion = (nombre) => async (req, res) => {
     const token = req.params.token;
+    const ahora = req.ahora || new Date();
     let mensaje;
     try {
-      if (nombre === 'confirmar') { await agenda.confirmar(p(), { token, actor: 'paciente' }); mensaje = 'Cita confirmada. ¡Te esperamos!'; }
-      else { await agenda.cancelar(p(), { token, por: 'paciente', motivo: 'cancelada desde la página de la cita', actor: 'paciente' }); mensaje = 'Cita cancelada. Cuando quieras, te buscamos otro hueco por WhatsApp.'; }
+      if (nombre === 'confirmar') { await agenda.confirmar(p(), { token, actor: 'paciente', ahora }); mensaje = 'Cita confirmada. ¡Te esperamos!'; }
+      else { await agenda.cancelar(p(), { token, por: 'paciente', motivo: 'cancelada desde la página de la cita', actor: 'paciente', ahora }); mensaje = 'Cita cancelada. Cuando quieras, te buscamos otro hueco por WhatsApp.'; }
     } catch (err) {
-      mensaje = err.codigo === 'RETENCION_CADUCADA' ? 'El hueco se ha liberado. Escríbenos por WhatsApp y te buscamos otro.' : 'No se ha podido hacer el cambio. Escríbenos por WhatsApp.';
+      mensaje = err.codigo === 'RETENCION_CADUCADA' ? 'El hueco se ha liberado. Escríbenos por WhatsApp y te buscamos otro.'
+        : err.codigo === 'FUERA_DE_HORA' ? 'La cita ya ha empezado: desde aquí ya no se puede cancelar. Si necesitas algo, escríbenos por WhatsApp.'
+          : 'No se ha podido hacer el cambio. Escríbenos por WhatsApp.';
     }
     const cita = await citaPorToken(p(), token);
     if (!cita) return res.status(404).send('No encontramos esa cita');
-    res.send(paginaCita(cita, await datosClinica(p()), mensaje));
+    res.send(paginaCita(cita, await datosClinica(p()), mensaje, ahora));
   };
   r.post('/c/:token/confirmar', accion('confirmar'));
   r.post('/c/:token/cancelar', accion('cancelar'));
