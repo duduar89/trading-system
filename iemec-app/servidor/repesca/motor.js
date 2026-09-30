@@ -707,7 +707,15 @@ async function procesarSeguimientos(deps, { ahora = new Date(), limite = 20 } = 
 
 async function nombreTratamiento(q, conv) {
   const datos = await cargarContexto(q, conv, new Date());
-  return datos.tratamiento ? enMinuscula(datos.tratamiento.nombre) : 'tu tratamiento';
+  const t = datos.tratamiento;
+  if (!t) return 'tu tratamiento';
+  // Un medicamento con receta o un producto sanitario no se nombra en un mensaje que puede ser
+  // comercial (las plantillas de las secuencias, «como quedamos»): se dice su familia.
+  if (t.publicidad_restringida) {
+    const [[f]] = await q.query('SELECT nombre FROM familias WHERE codigo = ?', [t.familia]);
+    return f ? enMinuscula(f.nombre) : 'tu consulta';
+  }
+  return enMinuscula(t.nombre);
 }
 
 // Mete a alguien en una secuencia (lead nuevo, cancelación, presupuesto, toca repetir…).
