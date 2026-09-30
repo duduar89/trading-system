@@ -158,9 +158,10 @@ function aMetricas(d = {}) {
   return filas;
 }
 
+const numeroONulo = (v) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
 const aPalabra = (x = {}) => ({
   palabra: String(x.searchKeyword || '').slice(0, 160),
-  impresiones: x.insightsValue?.value != null ? Number(x.insightsValue.value) : null,
+  impresiones: numeroONulo(x.insightsValue?.value),
   umbral: x.insightsValue?.threshold != null ? String(x.insightsValue.threshold).slice(0, 20) : null,
 });
 
