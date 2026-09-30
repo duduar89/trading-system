@@ -15,6 +15,8 @@ const CARPETA = path.join(__dirname, '..', 'sql');
 const PASOS = [
   // 010: los tokens de «Tu cita» que aún estén en claro se cifran con CLAVE_CIFRADO.
   { tras: '010-privacidad-cita.sql', hacer: (con, { log }) => require('./agenda').cifrarTokensAntiguos(con, { log }) },
+  // 017: lo que pidieron en la web (página, referencia, tratamiento, interés), de claro a cifrado.
+  { tras: '017-verificar-formulario-web.sql', hacer: (con, { log }) => require('./retencion').cifrarSolicitudesAntiguas(con, { log }) },
 ];
 
 function listar(carpeta = CARPETA) {

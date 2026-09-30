@@ -1,6 +1,7 @@
 'use strict';
 // Piezas comunes de todas las páginas: documento, cabecera, menú, pie, barra de abajo, WhatsApp,
 // formulario «Te llamamos» y datos estructurados.
+const crypto = require('crypto');
 const { html, crudo, texto, pendiente, attr, escapar } = require('./html');
 const { icono, sprite, empezarPagina } = require('./iconos');
 
@@ -169,12 +170,37 @@ function opcionesInteres(ctx, seleccion) {
   return [...extra, ...grupos].map((g) => html`<option value="${g.valor}"${seleccion && g.valor === seleccion.valor ? crudo(' selected') : ''}>${g.texto}</option>`);
 }
 
+// Lo que se acepta en el formulario (la primera capa de protección de datos y las dos casillas), tal y
+// como se lee. Su versión (version_textos) es la fecha que fija el DPD (sitio.json → formulario) y una
+// huella de estos textos: si cambia una coma, cambia la versión. construir.js guarda cada versión con
+// sus textos para la app (semillas/iemec/textos-formulario.json): la prueba de cada consentimiento dice
+// qué texto se aceptó, y la app no da por buena una versión que no conoce.
+function textosFormulario(ctx) {
+  const s = ctx.sitio;
+  return {
+    capa: [
+      ['Responsable', `${s.titular.razon_social} (IEMEC).`],
+      ['Finalidad', 'Contestar a tu solicitud y darte cita por el medio que elijas. Si marcas la segunda casilla, enviarte comunicaciones comerciales.'],
+      ['Legitimación', 'Tu solicitud, y tu consentimiento explícito para el dato de salud que pueda revelar el tratamiento que te interesa. Para las comunicaciones comerciales, tu consentimiento.'],
+      ['Destinatarios', 'El proveedor de la app de gestión de la clínica, como encargado del tratamiento, y WhatsApp (Meta) si eliges que te escribamos por WhatsApp, con posible transferencia a EE. UU. amparada en el Marco de Privacidad de Datos UE-EE. UU. No se ceden a nadie más salvo obligación legal.'],
+      ['Derechos', `Acceder, rectificar y suprimir tus datos, oponerte, limitar su uso, portarlos y retirar tu consentimiento escribiendo a ${s.correo || '[PENDIENTE: correo]'}. Puedes reclamar ante la AEPD.`],
+      ['Más información', 'En la Política de privacidad.'],
+    ],
+    privacidad: 'He leído la información básica sobre protección de datos. Consiento que IEMEC trate mis datos, incluido el tratamiento que me interesa si revela algo de mi salud, para contestar a mi solicitud por el medio que he elegido.',
+    comercial: 'Quiero recibir comunicaciones comerciales de IEMEC (novedades y propuestas sobre los tratamientos que me interesan) por WhatsApp o correo electrónico. Puedo darme de baja cuando quiera respondiendo «BAJA». (Opcional)',
+  };
+}
+const versionTextos = (ctx) => `${ctx.sitio.formulario.version_textos}.${crypto.createHash('sha256').update(JSON.stringify(textosFormulario(ctx))).digest('hex').slice(0, 8)}`;
+
 function formulario(ctx, { id = 'f', pagina, ref, seleccion = null, titulo = null }) {
   const s = ctx.sitio;
   const accion = `${s.api.base}${s.api.contacto}`;
   const campo = (n) => `${id}-${n}`;
   const err = (n) => html`<p class="error" id="${campo(n)}-error" data-error-de="${n}" hidden></p>`;
-  const correo = s.correo || null;
+  const t = textosFormulario(ctx);
+  // La capa, de los textos de arriba (la prueba de la web comprueba que lo que se ve es eso).
+  const fila = ([cabecera, valor]) => html`<tr><th scope="row">${cabecera}</th><td>${cabecera === 'Más información' ? html`En la <a href="/privacidad/">Política de privacidad</a>.` : texto(valor)}</td></tr>`;
+  const [textoComercial, opcional] = t.comercial.split(' (Opcional)');
   // Sin «novalidate» en el HTML: sin JavaScript valida el navegador; con él, web.js lo desactiva y
   // pinta sus propios mensajes.
   return html`<form class="formulario" action="${accion}" method="post" data-formulario>
@@ -197,21 +223,17 @@ ${titulo ? html`<h3>${titulo}</h3>` : ''}
 <div class="capa-privacidad">
 <h3>Información básica sobre protección de datos</h3>
 <table><tbody>
-<tr><th scope="row">Responsable</th><td>${s.titular.razon_social} (IEMEC).</td></tr>
-<tr><th scope="row">Finalidad</th><td>Contestar a tu solicitud y darte cita por el medio que elijas. Si marcas la segunda casilla, enviarte comunicaciones comerciales.</td></tr>
-<tr><th scope="row">Legitimación</th><td>Tu solicitud, y tu consentimiento explícito para el dato de salud que pueda revelar el tratamiento que te interesa. Para las comunicaciones comerciales, tu consentimiento.</td></tr>
-<tr><th scope="row">Destinatarios</th><td>El proveedor de la app de gestión de la clínica, como encargado del tratamiento, y WhatsApp (Meta) si eliges que te escribamos por WhatsApp, con posible transferencia a EE. UU. amparada en el Marco de Privacidad de Datos UE-EE. UU. No se ceden a nadie más salvo obligación legal.</td></tr>
-<tr><th scope="row">Derechos</th><td>Acceder, rectificar y suprimir tus datos, oponerte, limitar su uso, portarlos y retirar tu consentimiento escribiendo a ${correo || pendiente('correo')}. Puedes reclamar ante la AEPD.</td></tr>
-<tr><th scope="row">Más información</th><td>En la <a href="/privacidad/">Política de privacidad</a>.</td></tr>
+${t.capa.map(fila)}
 </tbody></table>
 </div>
-<div class="casilla"><input type="checkbox" id="${campo('privacidad')}" name="privacidad" value="si" required aria-describedby="${campo('privacidad')}-error"><label for="${campo('privacidad')}">He leído la información básica sobre protección de datos. Consiento que IEMEC trate mis datos, incluido el tratamiento que me interesa si revela algo de mi salud, para contestar a mi solicitud por el medio que he elegido.</label>${err('privacidad')}</div>
-<div class="casilla"><input type="checkbox" id="${campo('comercial')}" name="comercial" value="si"><label for="${campo('comercial')}">Quiero recibir comunicaciones comerciales de IEMEC (novedades y propuestas sobre los tratamientos que me interesan) por WhatsApp o correo electrónico. Puedo darme de baja cuando quiera respondiendo «BAJA». <em>(Opcional)</em></label></div>
+<div class="casilla"><input type="checkbox" id="${campo('privacidad')}" name="privacidad" value="si" required aria-describedby="${campo('privacidad')}-error"><label for="${campo('privacidad')}">${t.privacidad}</label>${err('privacidad')}</div>
+<div class="casilla"><input type="checkbox" id="${campo('comercial')}" name="comercial" value="si"><label for="${campo('comercial')}">${textoComercial}${opcional === undefined ? '' : html` <em>(Opcional)</em>`}</label></div>
 <input type="hidden" name="pagina" value="${pagina}">
 <input type="hidden" name="ref" value="${ref}">
 ${['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].map((n) => html`<input type="hidden" name="${n}" value="">`)}
 <input type="hidden" name="t" value="">
-<input type="hidden" name="version_textos" value="${s.formulario.version_textos}">
+<input type="hidden" name="envio" value="">
+<input type="hidden" name="version_textos" value="${versionTextos(ctx)}">
 <div class="trampa" aria-hidden="true"><label for="${campo('web')}">No rellenes este campo</label><input id="${campo('web')}" name="web" tabindex="-1" autocomplete="off"></div>
 <button class="boton boton-oscuro" type="submit">Enviar solicitud</button>
 <p class="nota-form">Te contestamos en horario de la clínica. <strong>Este formulario no es para urgencias: si es urgente, llama al 112.</strong></p>
@@ -318,5 +340,5 @@ ${cuerpo}
 
 module.exports = {
   documento, urlWhatsapp, textoWhatsapp, telHref, imagen, marca, formulario, preguntas, migas, horario, horarioCorto, direccion,
-  clinicaLd, INTERES_GENERAL, empezarPagina, gruposInteres,
+  clinicaLd, INTERES_GENERAL, empezarPagina, gruposInteres, textosFormulario, versionTextos,
 };

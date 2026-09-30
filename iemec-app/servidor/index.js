@@ -15,7 +15,7 @@ const { rutasAcceso } = require('./rutas/acceso');
 const { rutasEquipo } = require('./rutas/equipo');
 const { rutasSesion, exigirSesion } = require('./sesion');
 const { avisosDeArranque } = require('./acceso');
-const { cabeceras, mismoOrigen, CSP_PANEL } = require('./seguridad');
+const { cabeceras, mismoOrigen, CSP_PANEL, confiarEnProxyLocal } = require('./seguridad');
 const { crearIa } = require('./integraciones/ia');
 const { crearWhatsApp } = require('./integraciones/whatsapp');
 const { crearGoogle } = require('./integraciones/google');
@@ -34,7 +34,8 @@ function crearApp({ pool = db.pool, deps = null, reloj, publico = path.join(__di
   };
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', 1);
+  // Solo el proxy de la propia máquina dice la IP del visitante (servidor/seguridad.js).
+  app.set('trust proxy', confiarEnProxyLocal);
   app.use(cabeceras());
   // Webhooks de WhatsApp y Meta y alta de leads: antes del lector de JSON, porque la firma se
   // comprueba sobre el cuerpo tal cual llega.

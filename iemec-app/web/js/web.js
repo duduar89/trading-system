@@ -226,11 +226,22 @@
     });
     return primero;
   }
+  // Un identificador al azar para cada formulario: si la red falla y se vuelve a enviar, la app sabe que
+  // es el mismo envío y no lo duplica. Sin él (navegador muy antiguo), la app usa lo enviado y el minuto.
+  function idEnvio() {
+    try {
+      if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+      var b = new Uint8Array(16);
+      window.crypto.getRandomValues(b);
+      return Array.prototype.map.call(b, function (x) { return (x + 256).toString(16).slice(1); }).join('');
+    } catch (e) { return ''; }
+  }
   Array.prototype.forEach.call(d.querySelectorAll('form[data-formulario]'), function (form) {
     // Con JavaScript, los mensajes los pinta esta página; sin él, valida el navegador.
     form.noValidate = true;
     var estado = form.querySelector('.form-estado');
     var cargada = Date.now();
+    if (form.elements.envio && !form.elements.envio.value) form.elements.envio.value = idEnvio();
     var enviando = false;
     var set = function (n, v) { var el = form.elements[n]; if (el && !el.value) el.value = v; };
     CAMPOS.forEach(function (c) { if (campana[c]) set(c, campana[c]); });
@@ -282,7 +293,19 @@
           var fuerte = d.createElement('strong');
           fuerte.textContent = 'Gracias' + (nombre ? ', ' + nombre : '') + '. Hemos recibido tu solicitud.';
           gracias.appendChild(fuerte);
-          gracias.appendChild(d.createTextNode(' Te contactaremos por ' + medio + ' en horario de la clínica. Si nos escribes por WhatsApp, verás nuestro número: +34 722 83 32 85.'));
+          if (medio === 'WhatsApp') {
+            // La app escribe antes para confirmar que el teléfono es suyo (el formulario es anónimo); si
+            // prefiere no esperar, nos escribe él desde el WhatsApp de esta página.
+            gracias.appendChild(d.createTextNode(' Te escribiremos por WhatsApp desde el +34 722 83 32 85 para confirmar que la solicitud es tuya: contesta «Sí, fui yo» y seguimos por ahí. Si lo prefieres, '));
+            var wa = d.querySelector('a[href^="https://wa.me/"]');
+            var enlace = d.createElement(wa ? 'a' : 'span');
+            if (wa) enlace.href = wa.href;
+            enlace.textContent = 'escríbenos tú ahora por WhatsApp';
+            gracias.appendChild(enlace);
+            gracias.appendChild(d.createTextNode('.'));
+          } else {
+            gracias.appendChild(d.createTextNode(' Te contactaremos por ' + medio + ' en horario de la clínica. Si nos escribes por WhatsApp, verás nuestro número: +34 722 83 32 85.'));
+          }
           form.replaceWith(gracias);
           gracias.focus();
           return;

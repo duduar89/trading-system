@@ -55,13 +55,13 @@ hablaremos en consulta.
 
 | Finalidad | Base jurídica | Cuánto tiempo los guardamos |
 |---|---|---|
-| **Contestar a tu solicitud** de información o cita, por el medio que elijas, y hacer el seguimiento de esa misma solicitud hasta darte cita o hasta que nos digas que no te interesa. | Aplicar, a petición tuya, medidas previas a un contrato (RGPD, art. 6.1.b). Para el dato de salud que nos indiques, tu **consentimiento explícito** (RGPD, art. 9.2.a), que puedes retirar cuando quieras. | Mientras gestionamos tu solicitud y, si no llegas a tener cita, `[PENDIENTE: 12 meses recomendados]` desde el último contacto. Después se borran. |
+| **Contestar a tu solicitud** de información o cita, por el medio que elijas, y hacer el seguimiento de esa misma solicitud hasta darte cita o hasta que nos digas que no te interesa. Si eliges WhatsApp, antes te escribimos una vez para confirmar que la solicitud es tuya (el formulario lo puede rellenar cualquiera con un número ajeno): si nos dices que no, borramos lo que se escribió con tu número. | Aplicar, a petición tuya, medidas previas a un contrato (RGPD, art. 6.1.b). Para el dato de salud que nos indiques, tu **consentimiento explícito** (RGPD, art. 9.2.a), que puedes retirar cuando quieras. | Mientras gestionamos tu solicitud y, si no llegas a tener cita, `[PENDIENTE: 12 meses recomendados]` desde el último contacto. Después se borran. |
 | **Darte cita y gestionarla:** reservar, confirmar, enviarte la página «Tu cita», recordatorios la víspera y dos horas antes, cambios, cancelaciones y lista de espera. | Contrato o medidas precontractuales (RGPD, art. 6.1.b) y asistencia sanitaria (RGPD, art. 9.2.h; Ley 41/2002). | Mientras seas paciente y, después, lo que exija la documentación clínica (como mínimo 5 años desde el alta de cada proceso, Ley 41/2002, art. 17) `[PENDIENTE: plazo que fije la clínica]`. |
 | **Atenderte como paciente** (historia clínica, consentimientos, facturación). | Asistencia sanitaria (RGPD, art. 9.2.h), obligaciones legales (RGPD, art. 6.1.c; Ley 41/2002) y contrato. | Según la cláusula para pacientes y los plazos legales de documentación clínica, mercantil y fiscal. |
 | **Pedirte tu opinión** sobre la atención después de la cita, con un enlace a nuestra ficha de Google. | Interés legítimo en conocer la calidad de nuestra atención (RGPD, art. 6.1.f). Puedes oponerte en cualquier momento y no volveremos a pedírtela. `[PENDIENTE: validar la base con el DPD]` | Lo que dure la gestión de tu cita. Si publicas tu opinión en Google, lo haces tú, con las condiciones de Google. |
 | **Enviarte comunicaciones comerciales** (novedades y propuestas) por WhatsApp o correo, adaptadas a los tratamientos que te interesan. | Solo si marcas la casilla: tu consentimiento (RGPD, arts. 6.1.a y 9.2.a; LSSI, art. 21). Nunca enviamos publicidad de medicamentos de receta. | Hasta que te des de baja. La prueba de tu consentimiento y de tu baja se guarda bloqueada hasta 3 años (plazo de prescripción de la LSSI, art. 45). |
 | **Saber de qué campaña llega cada solicitud**, para medir nuestros anuncios sin seguirte por otras webs. | Interés legítimo (RGPD, art. 6.1.f): es un dato de la campaña, no del tratamiento, y no se cede a nadie. `[PENDIENTE: validar la base con el DPD]` | Lo mismo que la solicitud. |
-| **Seguridad de la web** y prevención del abuso de los formularios (límite de envíos por dirección IP y por teléfono). | Interés legítimo (RGPD, art. 6.1.f). | `[PENDIENTE: p. ej. 90 días para los registros del servidor]`; el contador de envíos, unas horas. |
+| **Seguridad de la web** y prevención del abuso de los formularios (límite de envíos por dirección IP y por teléfono). | Interés legítimo (RGPD, art. 6.1.f). | `[PENDIENTE: p. ej. 90 días para los registros del servidor]`; el contador de envíos, un día como mucho (sin guardar la dirección IP ni el teléfono, solo una huella que no se puede deshacer). |
 | **Cumplir obligaciones legales** y defendernos de reclamaciones. | Obligación legal (RGPD, art. 6.1.c) e interés legítimo (RGPD, art. 6.1.f). | Bloqueados durante los plazos de prescripción (LOPDGDD, art. 32). |
 
 `[PENDIENTE: solo si se mantiene la venta online de tarjetas regalo: finalidad «gestionar tu
@@ -162,7 +162,10 @@ también por el medio que usemos contigo.
    en cada mensaje) si el DPD lo valida.
 3. **Registro de consentimientos.** Guardar por cada envío: fecha y hora, versión de la cláusula,
    texto de cada casilla y su estado, página de origen y canal elegido (RGPD, art. 7.1). La IP, solo
-   si el DPD lo considera necesario.
+   si el DPD lo considera necesario. *Hecho en la app:* `solicitudes_web` (la página y lo pedido,
+   cifrados) y `semillas/iemec/textos-formulario.json` (el texto de cada versión); la casilla
+   comercial solo cuenta verificada (el «Sí, fui yo» del WhatsApp de confirmación) y pasa a la ficha.
+   La IP no se guarda.
 4. **Contrato de encargo** (RGPD, art. 28) entre la clínica y el proveedor de la app, con la lista
    de subencargados (alojamiento, Meta o su proveedor, correo, IA) y aviso de brechas.
 5. **Registro de actividades** (RGPD, art. 30) y valoración de si hace falta una evaluación de

@@ -1,9 +1,10 @@
 # Formulario de contacto y cita · textos exactos
 
 > **Borrador para revisión** (DPD) · 30-09-2026. Textos listos para copiar en el formulario de la
-> web nueva. El formulario manda los datos al servidor de la web y este a la app de la clínica
-> (`POST /api/leads`, con la clave en el servidor, nunca en la página). Encargado del tratamiento:
-> el proveedor de la app. Si el paciente elige WhatsApp, le escribimos por WhatsApp Business (Meta).
+> web nueva. El formulario manda los datos desde el navegador directamente a la app de la clínica
+> (`POST /web/contacto`, sin clave: es anónimo, y por eso el WhatsApp de confirmación del apartado 6).
+> Encargado del tratamiento: el proveedor de la app. Si el paciente elige WhatsApp, le escribimos por
+> WhatsApp Business (Meta).
 > Normas: RGPD, arts. 5.1.c, 6, 7, 9 y 13; LOPDGDD, arts. 6, 7 y 11; LSSI, arts. 20 y 21;
 > [modelo de información por capas de la AEPD](https://www.aepd.es/guias/guia-modelo-clausula-informativa.pdf).
 
@@ -94,9 +95,25 @@ su texto; la segunda no condiciona el envío (LOPDGDD, art. 6.3).
 
 ## 6. Confirmación
 
-«**Gracias, [nombre]. Hemos recibido tu solicitud.** Te contactaremos por [WhatsApp / teléfono /
-correo] en horario de la clínica. Si nos escribes por WhatsApp, verás nuestro número: +34 722 83 32
-85.»
+Si ha elegido llamada o correo: «**Gracias, [nombre]. Hemos recibido tu solicitud.** Te contactaremos
+por [teléfono / correo] en horario de la clínica. Si nos escribes por WhatsApp, verás nuestro número:
++34 722 83 32 85.»
+
+Si ha elegido WhatsApp: «**Gracias, [nombre]. Hemos recibido tu solicitud.** Te escribiremos por
+WhatsApp desde el +34 722 83 32 85 para confirmar que la solicitud es tuya: contesta «Sí, fui yo» y
+seguimos por ahí. Si lo prefieres, escríbenos tú ahora por WhatsApp.» (con el enlace al WhatsApp de la
+página). Sin JavaScript, `/gracias/` dice lo mismo para los dos casos y lleva el botón de WhatsApp.
+
+**Por qué ese WhatsApp de confirmación.** El formulario es anónimo: cualquiera puede escribir el
+teléfono de otra persona. Antes de escribirle con lo que se puso (su nombre, el tratamiento), la app
+le manda uno neutro, de utilidad, sin nombre ni tratamiento (`iemec_solicitud_web`, a aprobar en Meta):
+
+> Hola, hemos recibido en la web de IEMEC una solicitud de información con este número de teléfono.
+> ¿Has sido tú? Si es así, te atendemos por aquí; si no, pulsa «No fui yo» y no volveremos a
+> escribirte por ella. *[Sí, fui yo] [No fui yo]*
+
+Con «Sí, fui yo», la solicitud queda verificada y la conversación le contesta a lo que pidió. Con «No
+fui yo», se borra lo que escribió el otro y no se le vuelve a escribir por ella.
 
 La página de confirmación no repite el tratamiento elegido si es de salud íntima o de peso, por si
 otra persona ve la pantalla.
@@ -114,19 +131,31 @@ demostrar el consentimiento):
 | `canal_preferido` | `whatsapp` · `llamada` · `correo` |
 | `consentimiento_datos` | `true` (sin él no se envía) |
 | `consentimiento_comercial` | `true` / `false` |
-| `version_clausula` | `2026-10-01` `[PENDIENTE]` |
+| `version_clausula` | la fecha que fije el DPD y una huella de los textos exactos de la primera capa y de las dos casillas: `2026-09-30.ab7f30d1` (cambia sola si cambia una coma) |
 | `fecha_consentimiento` | fecha y hora del envío |
 | `id_externo` | identificador único del envío (para no duplicar si se reintenta) |
 
-`[PENDIENTE para Eduardo]` Hoy `POST /api/leads` no recibe los consentimientos. Hace falta
-añadirlos y que la secuencia «lead» sea solo de **seguimiento de la solicitud** (hasta dar cita o
-recibir un «no») cuando `consentimiento_comercial` es `false`; las plantillas comerciales, solo con
-`true` (LSSI, art. 21.1).
+**Hecho en la app** (`POST /web/contacto`, `solicitudes_web`; ver `docs/WHATSAPP-Y-LEADS.md`):
+
+- La prueba guarda, por separado, cada casilla, la fecha, la preferencia y la versión. Lo que pidió (la
+  página, el tratamiento, el interés, el mensaje) va **cifrado**: puede revelar un dato de salud.
+- Cada versión de los textos, con sus textos exactos, queda en `semillas/iemec/textos-formulario.json`
+  (lo genera la web): la app sabe qué se aceptó y no da por buena una versión que no conoce.
+- La casilla comercial solo cuenta **verificada** (con el «Sí, fui yo» del WhatsApp de confirmación o
+  si recepción lo confirma al llamarle), porque cualquiera podría marcarla con el teléfono de otro.
+  Verificada, pasa a su ficha (`consentimientos`, fuente «web», con la prueba y la versión) cuando la
+  tiene o al reservar, y el panel la enseña.
+- Sin la casilla, lo que se le manda es solo el **seguimiento de su solicitud** (hasta darle cita o
+  recibir un «no»); las plantillas comerciales, solo con ella (LSSI, art. 21.1).
+- Plazos: la solicitud que no acaba en cita se borra a los 12 meses del último contacto; de la prueba
+  del consentimiento comercial queda lo justo (sin lo pedido), bloqueada 3 años.
 
 ## 8. WhatsApp prellenado (botones de la web)
 
-- Texto: «Hola, vengo de la web de IEMEC y quiero información sobre [grupo neutro]. (Ref. [código
-  de la página])». El código lleva el identificador del catálogo para que la app sepa la sala.
+- Texto: «Hola, vengo de la web y me interesa: [tratamiento o grupo neutro]. (ref. [código de la
+  página])». Con el código, la app sabe de qué página viene (y el tratamiento) y lo entiende como una
+  petición de información. En lo íntimo y el peso, el código es el de la especialidad, el mismo en
+  todas sus páginas: el de cada página se podría buscar, porque la tabla de códigos va con la app.
 - **Nunca** el nombre de un medicamento, de una marca ni de un tratamiento íntimo o de peso en el
   texto: lo escribe la clínica y cuenta como publicidad; además queda en el móvil del paciente.
   Para lo íntimo o el peso, el grupo («Salud íntima femenina», «Control de peso») o solo «una
@@ -143,5 +172,8 @@ recibir un «no») cuando `consentimiento_comercial` es `false`; las plantillas 
   3.3.2 y 4.1.3).
 - Casillas y botones de 24 × 24 px como mínimo (criterio 2.5.8).
 - Sin CAPTCHA de terceros: campo trampa oculto, tiempo mínimo de rellenado y límite de envíos por
-  IP y teléfono en el propio servidor (sin cookies ni datos a terceros).
+  IP y teléfono en el propio servidor (sin cookies ni datos a terceros). Eso solo para a los robots
+  torpes: lo que de verdad protege a la persona cuyo teléfono se escribe es el WhatsApp de
+  confirmación (apartado 6), que ningún envío automático salga con lo que puso quien lo envió y un
+  tope de lo que el formulario pone en marcha por hora.
 - No borrar lo escrito si falla el envío (criterio 3.3.7, entrada redundante).

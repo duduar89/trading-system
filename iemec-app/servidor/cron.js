@@ -16,6 +16,7 @@ const avisos = require('./avisos-cita');
 const espera = require('./avisos-espera');
 const fichaGoogle = require('./ficha-google');
 const posiciones = require('./posiciones');
+const retencion = require('./retencion');
 const { crearIa } = require('./integraciones/ia');
 const { crearWhatsApp } = require('./integraciones/whatsapp');
 const T = require('../motor/tiempo');
@@ -91,6 +92,9 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
       informe.sinProximoPaso = huerfanas.length;
       // Los cuerpos de los webhooks, vacíos a los 30 días (lo que hacía falta ya está en su sitio).
       informe.webhooksVaciados = await entrada.purgarWebhooks(pool, ahora);
+      // Lo que llegó pidiendo información y no acabó en nada, borrado en su plazo (la política de
+      // privacidad de la web): servidor/retencion.js.
+      informe.retencion = await retencion.purgarCadaDia(pool, ahora);
       await pool.query("DELETE FROM candados WHERE nombre LIKE 'diario-%' AND hasta < ?", [ahora]);
     });
   }

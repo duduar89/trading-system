@@ -465,6 +465,50 @@ test('formularios: campos, casillas sin marcar, trampa, versión y envío a la A
   for (const [, html] of PAGINAS) for (const m of html.matchAll(/<label for="([^"]+)"/g)) assert.match(html, new RegExp(`id="${m[1]}"`));
 });
 
+test('formulario: la versión de los textos es la fecha del DPD y la huella de lo que se lee; la app tiene cada versión con sus textos', () => {
+  const B = require('../lib/base');
+  const form = /<form class="formulario"[\s\S]*?<\/form>/.exec(PAGINAS.get('/pedir-cita/'))[0];
+  const version = /name="version_textos" value="([^"]+)"/.exec(form)[1];
+  assert.match(version, new RegExp(`^${SITIO.formulario.version_textos}\\.[0-9a-f]{8}$`));
+  assert.equal(INFORME.textos.actual, version);
+  const t = INFORME.textos.versiones[version];
+  // Lo que se lee en el formulario es exactamente eso: la primera capa y las dos casillas.
+  const limpio = (h) => R.textoVisible(`<body>${h}</body>`).replace(/\s+([.,;:])/g, '$1');
+  assert.equal(limpio(/<div class="capa-privacidad">[\s\S]*?<\/div>/.exec(form)[0]),
+    limpio(`Información básica sobre protección de datos ${t.capa.map(([c, v]) => `${c} ${v}`).join(' ')}`));
+  const casillas = [...form.matchAll(/<div class="casilla">[\s\S]*?<label[^>]*>([\s\S]*?)<\/label>/g)].map((m) => limpio(m[1]));
+  assert.deepEqual(casillas, [t.privacidad, t.comercial]);
+  // Si cambia una coma de lo que se acepta, cambia la versión.
+  assert.equal(B.versionTextos({ sitio: SITIO }), version);
+  assert.notEqual(B.versionTextos({ sitio: { ...SITIO, titular: { ...SITIO.titular, razon_social: 'Otra Razón Social, S.L.' } } }), version);
+  assert.notEqual(B.versionTextos({ sitio: { ...SITIO, correo: 'hola@iemec-clinic.com' } }), version);
+  // Cada formulario, con su identificador de envío (lo pone web.js): un reintento no se duplica.
+  assert.match(form, /<input type="hidden" name="envio" value="">/);
+  assert.match(fs.readFileSync(path.join(SALIDA, INFORME.recursos.js), 'utf8'), /randomUUID/);
+});
+
+test('lo íntimo: el WhatsApp de cada página lleva la referencia de su especialidad (la misma en todas); el formulario, la suya', () => {
+  for (const esp of ['/estetica-intima-femenina/', '/estetica-intima-masculina/']) {
+    const refEsp = /\(ref\. (web-intima-[fm]-[0-9a-z]+)\)/.exec(R.whatsapps(PAGINAS.get(esp))[0].texto)[1];
+    const paginas = [...PAGINAS.keys()].filter((r) => r.startsWith(esp) && r !== esp);
+    assert.ok(paginas.length >= 1, esp);
+    for (const ruta of paginas) {
+      const h = PAGINAS.get(ruta);
+      for (const w of R.whatsapps(h)) assert.ok(w.texto.endsWith(`(ref. ${refEsp})`), `${ruta}: ${w.texto}`);
+      // El formulario va directo a la app (junto a la página): ahí sí, la de la página.
+      assert.notEqual(/name="ref" value="([^"]+)"/.exec(h)[1], refEsp, ruta);
+    }
+  }
+});
+
+test('/gracias/ y la confirmación del formulario: llega un WhatsApp para confirmar que la solicitud es suya, y puede escribirnos ya', () => {
+  const g = PAGINAS.get('/gracias/');
+  assert.match(R.textoVisible(g), /te escribiremos desde el \+34 722 83 32 85 para confirmar que la solicitud es tuya: contesta «Sí, fui yo»/);
+  assert.ok(R.whatsapps(g).some((w) => w.texto.endsWith('(ref. web-gracias)')));
+  const js = fs.readFileSync(path.join(SALIDA, INFORME.recursos.js), 'utf8');
+  assert.match(js, /para confirmar que la solicitud es tuya: contesta «Sí, fui yo»/);
+});
+
 test('CSP: sin scripts en línea (salvo datos) ni estilos en línea; recursos con huella y dentro de su tamaño', () => {
   for (const [ruta, h] of PAGINAS) {
     for (const m of h.matchAll(/<script([^>]*)>/g)) {

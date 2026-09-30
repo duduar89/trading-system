@@ -58,6 +58,8 @@ function argumentos(argv) {
   if (i !== -1) o.salida = path.resolve(argv[i + 1]);
   const j = argv.indexOf('--referencias');
   if (j !== -1) o.referencias = path.resolve(argv[j + 1]);
+  const k = argv.indexOf('--textos');
+  if (k !== -1) o.textos = path.resolve(argv[k + 1]);
   return o;
 }
 
@@ -79,6 +81,8 @@ function construir(opciones = {}) {
   const salida = opciones.salida || path.join(WEB, borradores ? 'dist-borradores' : 'dist');
   // Las referencias van con la app (semillas/, que se despliega; web/ no): las usa POST /web/contacto.
   const rutaReferencias = opciones.referencias !== undefined ? opciones.referencias : (opciones.salida || borradores ? null : path.join(RAIZ, 'semillas', 'iemec', 'referencias-web.json'));
+  // Y los textos del formulario, con su versión (la usa la prueba de cada consentimiento en la app).
+  const rutaTextos = opciones.textos !== undefined ? opciones.textos : (opciones.salida || borradores ? null : path.join(RAIZ, 'semillas', 'iemec', 'textos-formulario.json'));
   const datos = cargarDatos({ borradores });
   if (opciones.ajustarDatos) opciones.ajustarDatos(datos); // solo para las pruebas
   const modelo = construirModelo(datos);
@@ -301,7 +305,13 @@ function construir(opciones = {}) {
   escribir('informe.json', `${JSON.stringify(informe, null, 1)}\n`);
   const grupos = Object.fromEntries(B.gruposInteres(ctx).map((g) => [g.valor, g.texto]));
   if (rutaReferencias) fs.writeFileSync(rutaReferencias, `${JSON.stringify({ _nota: 'Generado por web/construir.js (no se edita a mano): la app traduce la «ref. web-…» de cada WhatsApp y de cada formulario a su tratamiento (id del catálogo), su página y su especialidad. Las páginas de lo íntimo y del peso llevan un código en vez del slug. «grupos»: los valores del «¿Qué te interesa?» del formulario y su texto neutro.', referencias: refsOrdenadas, grupos }, null, 1)}\n`);
-  return { ...informe, salida, archivos: escritos.sort(), referencias: refsOrdenadas, grupos };
+  // Los textos del formulario de esta versión, con las anteriores (nunca se quitan: la prueba de cada
+  // consentimiento guardado dice cuál se aceptó).
+  const version = B.versionTextos(ctx);
+  const previas = rutaTextos && fs.existsSync(rutaTextos) ? JSON.parse(fs.readFileSync(rutaTextos, 'utf8')).versiones || {} : {};
+  const textos = { actual: version, versiones: { ...previas, [version]: { fecha: sitio.formulario.version_textos, ...B.textosFormulario(ctx) } } };
+  if (rutaTextos) fs.writeFileSync(rutaTextos, `${JSON.stringify({ _nota: 'Generado por web/construir.js (no se edita a mano): cada versión de los textos del formulario «Te llamamos» (la primera capa de protección de datos y las dos casillas) con sus textos exactos. La versión es la fecha que fija el DPD y una huella de los textos. La app guarda en cada solicitud la versión que aceptó y no da por buena una que no esté aquí.', ...textos }, null, 1)}\n`);
+  return { ...informe, salida, archivos: escritos.sort(), referencias: refsOrdenadas, grupos, textos };
 }
 
 if (require.main === module) {

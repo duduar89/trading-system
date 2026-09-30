@@ -125,10 +125,11 @@ async function alCompletar(con, cita, ahora) {
   }
 
   // Su lead vino: el de esta cita y los suyos (por ficha o por teléfono) que preguntaban por este
-  // tratamiento o por ninguno en concreto. Si preguntó por otro, esa consulta sigue abierta.
+  // tratamiento o por ninguno en concreto. Si preguntó por otro, esa consulta sigue abierta. Una
+  // solicitud de la web sin verificar con su teléfono no es suya hasta que lo confirme.
   const [leads] = await con.query(
     `SELECT id, etapa FROM leads WHERE etapa IN ('nuevo','contactado','conversando','cita')
-        AND (cita_id = ? OR ((paciente_id = ? OR (paciente_id IS NULL AND telefono = ?))
+        AND (cita_id = ? OR ((paciente_id = ? OR (paciente_id IS NULL AND telefono = ? AND sin_verificar = FALSE))
              AND (tratamiento_interes_id IS NULL OR tratamiento_interes_id = ?)))`,
     [cita.id, cita.paciente_id, paciente?.telefono || null, cita.tratamiento_id]);
   if (leads.length) {
