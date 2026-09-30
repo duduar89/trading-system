@@ -87,13 +87,22 @@ function enlaceCaducado(cita, ahora = new Date()) {
   return hasta <= ahora;
 }
 
-// El UID del .ics. Las citas que no se dieron con reservar() (importadas, pruebas) lo reciben la
-// primera vez que hace falta.
-async function uidIcs(q, cita) {
-  if (cita.uid_ics) return cita.uid_ics;
-  await q.query('UPDATE citas SET uid_ics = ? WHERE id = ? AND uid_ics IS NULL', [crypto.randomUUID(), cita.id]);
-  const [[c]] = await q.query('SELECT uid_ics FROM citas WHERE id = ?', [cita.id]);
-  return c.uid_ics;
+// El UID del .ics (cita: su fila, o lo que devuelve la página, con su token): el que se le dio al
+// reservarla, un UUID aleatorio (o, en las de antes de la 010, el que ya tenían los calendarios). Una
+// cita que no se dio con reservar() (importada, insertada a mano) no lo tiene guardado: el suyo sale de
+// la huella de su enlace (UUID v5), siempre el mismo y sin escribir nada, porque los GET no escriben
+// (las vistas previas de enlaces los abren solos). De la huella no se vuelve al token, y del UID
+// tampoco a la huella.
+const ESPACIO_UID = Buffer.from('4789c18606de46e5bd2b88f7aed74ced', 'hex');
+function uidIcs(cita) {
+  if (cita?.uid_ics) return cita.uid_ics;
+  const huella = cita?.token_hash || (tokenValido(cita?.token) ? huellaToken(cita.token) : null);
+  if (!huella) return null;
+  const h = crypto.createHash('sha1').update(ESPACIO_UID).update(Buffer.from(huella)).digest();
+  h[6] = (h[6] & 0x0f) | 0x50; // versión 5
+  h[8] = (h[8] & 0x3f) | 0x80; // variante RFC 4122
+  const x = h.subarray(0, 16).toString('hex');
+  return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}`;
 }
 
 // Los tokens de antes de la migración 010, que estaban en claro: se cifran y se borran (su huella
@@ -452,8 +461,8 @@ async function caducarRetenciones(pool, ahora = new Date()) {
 }
 
 module.exports = {
-  huecos, proximosHuecos, reservar, cambiarEstado, deshacerEstado, ultimoCambio, confirmar, cancelar, confirmarRetenida,
-  caducarRetenciones, cargarDia, sigueEnPie, ErrorAgenda,
   DIAS_ENLACE, tokenValido, huellaToken, nuevoToken, tokenDe, tokenParaEnviar, caducidadEnlace, enlaceCaducado, uidIcs,
   cifrarTokensAntiguos, sedeDe,
+  huecos, proximosHuecos, reservar, cambiarEstado, deshacerEstado, ultimoCambio, confirmar, cancelar, confirmarRetenida,
+  caducarRetenciones, cargarDia, sigueEnPie, ErrorAgenda,
 };

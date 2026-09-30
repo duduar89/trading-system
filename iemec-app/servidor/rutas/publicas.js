@@ -7,7 +7,8 @@
 //   GET  /cal/:token          «Añadir al calendario» con un toque (el botón de WhatsApp): iPhone, iPad
 //                             y Mac → el .ics; Android → Google Calendar; lo demás, o si la cita no
 //                             está confirmada o ya pasó → la página
-//   POST /c/:token/confirmar  y /c/:token/cancelar
+//   POST /c/:token/confirmar  y /c/:token/cancelar: después, a la página (303, ?hecho=…), así
+//                             recargarla no los repite; y si ya estaba así (un doble toque), lo mismo
 //   GET  /r/:token            el enlace corto de la reseña
 //
 // El token (32 bytes aleatorios) se busca por su huella y caduca 30 días después de la cita
@@ -56,18 +57,20 @@ async function citaPorToken(q, token) {
   return { ...c, token, sede: await agenda.sedeDe(q, c.sala_id) };
 }
 
-// La cita a la que se cambió (siguiendo los cambios, si la movió más de una vez), con su enlace.
-async function citaNueva(q, cita) {
+// La cita a la que se cambió (siguiendo los cambios, si la movió más de una vez), con su enlace y cómo
+// está ahora: si después se canceló, la página vieja no puede darla por buena.
+async function citaNueva(q, cita, ahora) {
   let id = cita.reprograma_a_id;
   let nueva = null;
   for (let i = 0; id && i < 5; i++) {
-    const [[n]] = await q.query('SELECT id, estado, inicio, reprograma_a_id, token_cifrado, token_iv, token_tag FROM citas WHERE id = ?', [id]);
+    // SELECT *: su token puede seguir en claro (token_antiguo, de antes de la 010), y tokenDe lo lee.
+    const [[n]] = await q.query('SELECT * FROM citas WHERE id = ?', [id]);
     if (!n) break;
     nueva = n;
     if (n.estado !== 'reprogramada') break;
     id = n.reprograma_a_id;
   }
-  return nueva && { id: nueva.id, estado: nueva.estado, inicio: nueva.inicio, token: agenda.tokenDe(nueva) };
+  return nueva && { id: nueva.id, estado: nueva.estado, inicio: nueva.inicio, token: agenda.tokenDe(nueva), vista: vistaDe(nueva, ahora) };
 }
 
 // El hueco que se le guarda de la lista de espera (si esta cita retenida es eso).
@@ -76,10 +79,22 @@ async function ofertaDe(q, citaId) {
   return o ? listaEspera.ofertaPorId(q, o.id) : null;
 }
 
+// ¿Sigue en la lista de espera quien no quiso este hueco? (si ya no, no se le dice que se le avisará)
+async function sigueEnLista(q, citaId) {
+  const [[le]] = await q.query(
+    'SELECT le.estado FROM lista_espera_ofertas o JOIN lista_espera le ON le.id = o.lista_espera_id WHERE o.cita_id = ? ORDER BY o.id DESC LIMIT 1', [citaId]);
+  return ['esperando', 'ofrecido'].includes(le?.estado);
+}
+
 // Cómo se ve la cita ahora.
 function vistaDe(cita, ahora) {
   if (cita.estado === 'reprogramada') return 'reprogramada';
-  if (cita.estado === 'cancelada') return !cita.confirmada_en && cita.cancelada_por === 'sistema' ? 'hueco_liberado' : 'cancelada';
+  // Un hueco que se le guardaba y no llegó a confirmar nunca fue su cita (ni tuvo con qué añadirla a su
+  // calendario): o dijo que no le venía bien, o se liberó (caducó, o lo soltó la clínica).
+  if (cita.estado === 'cancelada') {
+    if (cita.confirmada_en) return 'cancelada';
+    return cita.cancelada_por === 'paciente' ? 'hueco_rechazado' : 'hueco_liberado';
+  }
   if (['llegada', 'en_curso', 'completada'].includes(cita.estado)) return 'vino';
   if (cita.estado === 'no_presentada') return 'no_vino';
   if (cita.estado === 'retenida') {
@@ -90,20 +105,29 @@ function vistaDe(cita, ahora) {
   return 'confirmada';
 }
 
+// Lo que puede haber pasado con la cita a la que se cambió: sigue en pie (se le lleva a ella), ya no
+// existe (se canceló después: no se le da por buena) o ya pasó (su página dice cómo fue).
+const NUEVA_EN_PIE = new Set(['confirmada', 'retenida']);
+const NUEVA_ANULADA = new Set(['cancelada', 'hueco_liberado', 'hueco_rechazado']);
+// Lo que solo se le guardaba (o se le guardó) y no llegó a confirmar: nada que añadir al calendario.
+const SOLO_HUECO = new Set(['retenida', 'hueco_liberado', 'hueco_rechazado']);
+
 const urlCita = (token) => `${config.urlPublica}/c/${token}`;
 
 // El evento para el calendario: «Cita en IEMEC», en la sede de la sala, con el enlace a «Tu cita».
-// Ni el tratamiento ni la cabina.
-function eventoDe(cita, { marca, uid, nueva = null }) {
+// Ni el tratamiento ni la cabina. nueva: la cita a la que se cambió (citaNueva).
+function eventoDe(cita, { marca, nueva = null }) {
   const url = urlCita(cita.token);
   let descripcion = `Tu cita en ${marca}. Para verla, cambiarla o cancelarla: ${url}`;
   if (cita.estado === 'reprogramada') {
-    descripcion = nueva?.token ? `Esta cita se ha cambiado. Tu nueva cita: ${urlCita(nueva.token)}` : `Esta cita se ha cambiado. Más información: ${url}`;
+    if (NUEVA_ANULADA.has(nueva?.vista)) descripcion = `Esta cita se ha cambiado y la nueva también está cancelada. Más información: ${url}`;
+    else if (nueva?.token && NUEVA_EN_PIE.has(nueva.vista)) descripcion = `Esta cita se ha cambiado. Tu nueva cita: ${urlCita(nueva.token)}`;
+    else descripcion = `Esta cita se ha cambiado. Más información: ${nueva?.token ? urlCita(nueva.token) : url}`;
   } else if (cita.estado === 'cancelada') {
     descripcion = `Esta cita está cancelada. Más información: ${url}`;
   }
   return {
-    uid, inicio: cita.inicio, fin: cita.fin, titulo: `Cita en ${marca}`, descripcion,
+    uid: agenda.uidIcs(cita), inicio: cita.inicio, fin: cita.fin, titulo: `Cita en ${marca}`, descripcion,
     lugar: lugarDe(cita.sede), lat: cita.sede?.lat, lng: cita.sede?.lng, url,
     secuencia: cita.secuencia_ics, cancelada: ['cancelada', 'reprogramada'].includes(cita.estado),
   };
@@ -177,16 +201,17 @@ ${principal ? boton(opciones[principal[0]].href, principal[1], { lleno: true, ex
 
 /**
  * La página según el estado de la cita.
- * @param {object} d { cita, marca, whatsapp, nueva?, oferta?, disp, ahora, mensaje? }
+ * @param {object} d { cita, marca, whatsapp, nueva? (citaNueva), oferta?, enLista? (quien no quiso el
+ *   hueco sigue en la lista de espera), disp, ahora, mensaje? }
  */
-function paginaCita({ cita, marca, whatsapp, nueva = null, oferta = null, disp = 'otro', ahora = new Date(), mensaje = '' }) {
+function paginaCita({ cita, marca, whatsapp, nueva = null, oferta = null, enLista = false, disp = 'otro', ahora = new Date(), mensaje = '' }) {
   const cuando = textoFechaHora(cita.inicio);
   const wa = (texto) => escribir(whatsapp, texto);
   const pedirOtra = boton(wa('Hola, me gustaría pedir una cita'), 'Pedir otra cita por WhatsApp');
   const vista = vistaDe(cita, ahora);
 
   if (vista === 'confirmada') {
-    const ev = eventoDe(cita, { marca, uid: cita.uid_ics });
+    const ev = eventoDe(cita, { marca });
     return documento({ titulo: 'Tu cita', cuando, cuerpo: `${aviso(mensaje)}
 ${dato('Tratamiento', esc(cita.tratamiento))}
 ${dato('Con', esc(cita.profesional))}
@@ -211,12 +236,23 @@ ${boton(wa(`Hola, os escribo por el hueco del ${cuando}`), 'Escribir por WhatsAp
 <p class="pie">Cuando la confirmes, podrás añadirla a tu calendario.</p>` });
   }
   if (vista === 'reprogramada') {
-    const cuerpo = nueva
-      ? `${aviso(mensaje || `Tu cita ha cambiado: ahora es el ${textoFechaHora(nueva.inicio)}.`)}
-${nueva.token ? boton(`/c/${nueva.token}`, 'Ver mi nueva cita', { lleno: true }) : ''}
-<p class="pie">Si tenías esta en tu calendario, bórrala y añade la nueva desde su página.</p>`
-      : `${aviso(mensaje || 'Esta cita se ha cambiado a otro día.')}${pedirOtra}`;
-    return documento({ titulo: 'Cita cambiada', cuando: `Antes: ${cuando}`, cuerpo });
+    const antes = `Antes: ${cuando}`;
+    if (!nueva) return documento({ titulo: 'Cita cambiada', cuando: antes, cuerpo: `${aviso(mensaje || 'Esta cita se ha cambiado a otro día.')}${pedirOtra}` });
+    const cuandoNueva = textoFechaHora(nueva.inicio);
+    const verla = nueva.token ? boton(`/c/${nueva.token}`, 'Ver mi nueva cita', { lleno: true }) : '';
+    // La cambió y después se canceló la nueva: no tiene cita (ni una ni otra).
+    if (NUEVA_ANULADA.has(nueva.vista)) {
+      return documento({ titulo: 'Cita cancelada', cuando: antes, cuerpo: `${aviso(mensaje || `Esta cita se cambió al ${cuandoNueva}, y esa también está cancelada.`)}
+<p class="pie">Si tenías alguna de las dos en tu calendario, bórrala.</p>
+${boton(wa('Hola, me gustaría pedir una cita'), 'Pedir otra cita por WhatsApp', { lleno: true })}` });
+    }
+    if (NUEVA_EN_PIE.has(nueva.vista)) {
+      return documento({ titulo: 'Cita cambiada', cuando: antes, cuerpo: `${aviso(mensaje || `Tu cita ha cambiado: ahora es el ${cuandoNueva}.`)}
+${verla}
+<p class="pie">Si tenías esta en tu calendario, bórrala y añade la nueva desde su página.</p>` });
+    }
+    // La nueva ya ha empezado o pasado: su página dice cómo fue.
+    return documento({ titulo: 'Cita cambiada', cuando: antes, cuerpo: `${aviso(mensaje || `Esta cita se cambió al ${cuandoNueva}.`)}${verla}` });
   }
   if (vista === 'cancelada') {
     return documento({ titulo: 'Cita cancelada', cuando, cuerpo: `${aviso(mensaje || 'Esta cita está cancelada.')}
@@ -226,6 +262,12 @@ ${pedirOtra}` });
   if (vista === 'hueco_liberado') {
     return documento({ titulo: 'Hueco liberado', cuando, cuerpo: `${aviso(mensaje || 'Este hueco ya no está guardado. Escríbenos y te buscamos otro.')}
 ${boton(wa(`Hola, se me pasó confirmar el hueco del ${cuando}. ¿Me buscáis otro?`), 'Buscar otro hueco por WhatsApp', { lleno: true })}` });
+  }
+  // Un hueco de la lista de espera que no quiso: nunca fue su cita (ni la pudo añadir a su calendario).
+  if (vista === 'hueco_rechazado') {
+    const lista = enLista ? ' Sigues en la lista de espera: si se libera otro, te avisamos.' : '';
+    return documento({ titulo: 'Hueco liberado', cuando, cuerpo: `${aviso(`${mensaje || 'No reservaste este hueco: ha quedado libre para otra persona.'}${lista}`)}
+${boton(wa('Hola, os escribo por la lista de espera'), 'Escribir por WhatsApp')}` });
   }
   if (vista === 'vino') {
     return documento({ titulo: 'Tu cita', cuando, cuerpo: `${aviso(mensaje || '¡Gracias por venir! Te esperamos en tu próxima visita.')}${pedirOtra}` });
@@ -258,6 +300,38 @@ function enviarPagina(res, status, html) {
   res.status(status).type('html').send(html);
 }
 
+// ── Los botones de la página ──────────────────────────────────────────────────────────────────
+// Confirmar, cancelar o «No me viene bien» (un hueco de la lista de espera) llevan después a la página
+// (303, ?hecho=…), que dice lo que se acaba de hacer: recargarla no vuelve a mandar el formulario. El
+// aviso solo sale si la cita está así de verdad: una pestaña que se recarga días después no dice «Cita
+// confirmada» de una cita que la clínica canceló luego.
+const HECHOS = {
+  confirmada: { vista: 'confirmada', mensaje: 'Cita confirmada. ¡Te esperamos!' },
+  cancelada: { vista: 'cancelada', mensaje: 'Cita cancelada. Cuando quieras, te buscamos otro hueco por WhatsApp.' },
+  rechazada: { vista: 'hueco_rechazado', mensaje: 'De acuerdo: el hueco queda libre para otra persona.' },
+};
+
+function mensajeHecho(hecho, cita, ahora) {
+  const h = typeof hecho === 'string' && Object.hasOwn(HECHOS, hecho) ? HECHOS[hecho] : null;
+  return h && vistaDe(cita, ahora) === h.vista ? h.mensaje : '';
+}
+
+// ¿Ya está como se pide? Un doble toque o un formulario que se reenvía: es como si se acabara de hacer
+// (y no «No se ha podido hacer el cambio» encima de «Cita cancelada»). Si el hueco ya se había
+// liberado, no quererlo tampoco tiene nada que hacer: a la página, que lo dice. (Uno que caducó y aún
+// sigue retenido, sí: su «no» cuenta como respuesta en la lista de espera.)
+function yaHecho(accion, cita, ahora) {
+  const vista = vistaDe(cita, ahora);
+  if (accion === 'confirmar') return vista === 'confirmada' ? 'confirmada' : null;
+  if (cita.estado !== 'cancelada') return null;
+  return { cancelada: 'cancelada', hueco_rechazado: 'rechazada', hueco_liberado: 'liberado' }[vista] || null;
+}
+
+const ERRORES = {
+  RETENCION_CADUCADA: 'El hueco se ha liberado. Escríbenos por WhatsApp y te buscamos otro.',
+  FUERA_DE_HORA: 'La cita ya ha empezado: desde aquí ya no se puede cancelar. Si necesitas algo, escríbenos por WhatsApp.',
+};
+
 // ── Rutas ─────────────────────────────────────────────────────────────────────────────────────
 
 function rutasPublicas({ pool }) {
@@ -283,10 +357,13 @@ function rutasPublicas({ pool }) {
   async function mostrar(req, res, d, { mensaje = '', status = 200 } = {}) {
     const q = p();
     const { cita } = d;
+    const ahora = reloj(req);
+    const vista = vistaDe(cita, ahora);
     enviarPagina(res, status, paginaCita({
-      ...d, ahora: reloj(req), mensaje, disp: dispositivo(req.get('user-agent')),
-      nueva: cita.estado === 'reprogramada' ? await citaNueva(q, cita) : null,
-      oferta: cita.estado === 'retenida' ? await ofertaConCita(q, cita.id) : null,
+      ...d, ahora, mensaje, disp: dispositivo(req.get('user-agent')),
+      nueva: vista === 'reprogramada' ? await citaNueva(q, cita, ahora) : null,
+      oferta: vista === 'retenida' ? await ofertaConCita(q, cita.id) : null,
+      enLista: vista === 'hueco_rechazado' ? await sigueEnLista(q, cita.id) : false,
     }));
   }
 
@@ -307,10 +384,11 @@ function rutasPublicas({ pool }) {
     if (agenda.enlaceCaducado(cita, ahora) || new Date(cita.inicio) <= ahora) {
       return res.status(410).type('text/plain').send('Esta cita ya ha pasado: no hay nada que añadir al calendario');
     }
-    // Un hueco que solo se le guarda aún no es una cita: primero, confirmarla.
-    if (cita.estado === 'retenida') return res.redirect(303, `/c/${cita.token}`);
+    // Un hueco que solo se le guarda (o se le guardó y no confirmó) no es una cita: nada que añadir a su
+    // calendario, ni que borrar. Primero, confirmarla.
+    if (SOLO_HUECO.has(vistaDe(cita, ahora))) return res.redirect(303, `/c/${cita.token}`);
     const { marca } = await datosClinica(q);
-    const ev = eventoDe(cita, { marca, uid: await agenda.uidIcs(q, cita), nueva: cita.estado === 'reprogramada' ? await citaNueva(q, cita) : null });
+    const ev = eventoDe(cita, { marca, nueva: cita.estado === 'reprogramada' ? await citaNueva(q, cita, ahora) : null });
     res.set('Content-Type', 'text/calendar; charset=utf-8; method=PUBLISH');
     res.set('Content-Disposition', `inline; filename="cita-iemec-${T.fechaMadrid(new Date(cita.inicio))}.ics"`);
     res.send(generarIcs(ev, { ahora }));
@@ -326,12 +404,12 @@ function rutasPublicas({ pool }) {
     const disp = dispositivo(req.get('user-agent'));
     if (vistaDe(cita, reloj(req)) !== 'confirmada' || disp === 'otro') return res.redirect(302, `/c/${cita.token}`);
     if (disp === 'apple') return res.redirect(302, `/c/${cita.token}.ics`);
-    return res.redirect(302, enlaceGoogle(eventoDe(cita, { marca: d.marca, uid: cita.uid_ics })));
+    return res.redirect(302, enlaceGoogle(eventoDe(cita, { marca: d.marca })));
   });
 
   r.get('/c/:token', async (req, res) => {
     const d = await laCita(req, res);
-    if (d) await mostrar(req, res, d);
+    if (d) await mostrar(req, res, d, { mensaje: mensajeHecho(req.query.hecho, d.cita, reloj(req)) });
   });
 
   const accion = (nombre) => async (req, res) => {
@@ -339,39 +417,41 @@ function rutasPublicas({ pool }) {
     if (!d) return;
     const q = p();
     const ahora = reloj(req);
-    let { cita } = d;
-    let mensaje;
-    // Si es un hueco de la lista de espera, se acepta o se rechaza como tal: si sustituye a otra cita,
-    // esa queda cambiada a esta; si no lo quiere, pasa al siguiente de la lista.
-    const oferta = cita.estado === 'retenida' ? await ofertaDe(q, cita.id) : null;
-    try {
-      if (nombre === 'confirmar') {
-        if (oferta) {
-          const hecho = await listaEspera.aceptar(q, oferta, { ahora, actor: 'paciente' });
-          if (hecho.ocupado) throw Object.assign(new Error('ocupado'), { codigo: 'RETENCION_CADUCADA' });
-          if (hecho.citaId !== cita.id) {
-            const token = await agenda.tokenParaEnviar(q, hecho.citaId);
-            cita = (token && await citaPorToken(q, token)) || cita;
+    const { cita } = d;
+    let token = cita.token;
+    let hecho = yaHecho(nombre, cita, ahora);
+    if (!hecho) {
+      // Si es un hueco de la lista de espera, se acepta o se rechaza como tal: si sustituye a otra cita,
+      // esa queda cambiada a esta; si no lo quiere, pasa al siguiente de la lista.
+      const oferta = cita.estado === 'retenida' ? await ofertaDe(q, cita.id) : null;
+      try {
+        if (nombre === 'confirmar') {
+          if (oferta) {
+            const aceptada = await listaEspera.aceptar(q, oferta, { ahora, actor: 'paciente' });
+            if (aceptada.ocupado) throw Object.assign(new Error('ocupado'), { codigo: 'RETENCION_CADUCADA' });
+            // Se le pasó la media hora y el hueco seguía libre: se le reservó otra cita, la suya ahora.
+            if (aceptada.citaId !== cita.id) token = (await agenda.tokenParaEnviar(q, aceptada.citaId)) || token;
+          } else {
+            await agenda.confirmar(q, { id: cita.id, actor: 'paciente', ahora });
           }
+          hecho = 'confirmada';
+        } else if (oferta) {
+          await listaEspera.rechazar(q, oferta, { ahora, actor: 'paciente' });
+          hecho = 'rechazada';
         } else {
-          await agenda.confirmar(q, { id: cita.id, actor: 'paciente', ahora });
+          await agenda.cancelar(q, { id: cita.id, por: 'paciente', motivo: 'cancelada desde la página de la cita', actor: 'paciente', ahora });
+          hecho = cita.estado === 'retenida' ? 'rechazada' : 'cancelada';
         }
-        mensaje = 'Cita confirmada. ¡Te esperamos!';
-      } else if (oferta) {
-        await listaEspera.rechazar(q, oferta, { ahora, actor: 'paciente' });
-        mensaje = 'De acuerdo: el hueco queda libre para otra persona. Sigues en la lista de espera: si se libera otro, te avisamos.';
-      } else {
-        await agenda.cancelar(q, { id: cita.id, por: 'paciente', motivo: 'cancelada desde la página de la cita', actor: 'paciente', ahora });
-        mensaje = 'Cita cancelada. Cuando quieras, te buscamos otro hueco por WhatsApp.';
+      } catch (err) {
+        if (!err.codigo) throw err;
+        // Otro toque se ha adelantado: si ya está como se pedía, vale igual. Si no, se le dice por qué no.
+        const fresca = (await citaPorToken(q, cita.token)) || cita;
+        hecho = yaHecho(nombre, fresca, ahora);
+        if (!hecho) return mostrar(req, res, { ...d, cita: fresca }, { mensaje: ERRORES[err.codigo] || 'No se ha podido hacer el cambio. Escríbenos por WhatsApp.' });
       }
-    } catch (err) {
-      if (!err.codigo) throw err;
-      mensaje = err.codigo === 'RETENCION_CADUCADA' ? 'El hueco se ha liberado. Escríbenos por WhatsApp y te buscamos otro.'
-        : err.codigo === 'FUERA_DE_HORA' ? 'La cita ya ha empezado: desde aquí ya no se puede cancelar. Si necesitas algo, escríbenos por WhatsApp.'
-          : 'No se ha podido hacer el cambio. Escríbenos por WhatsApp.';
     }
-    const fresca = await citaPorToken(q, cita.token);
-    await mostrar(req, res, { ...d, cita: fresca }, { mensaje });
+    privado(res);
+    res.redirect(303, `/c/${token}${HECHOS[hecho] ? `?hecho=${hecho}` : ''}`);
   };
   r.post('/c/:token/confirmar', accion('confirmar'));
   r.post('/c/:token/cancelar', accion('cancelar'));

@@ -75,6 +75,8 @@ test('la página, sin base: una retenida sin hora de caducidad no inventa una; n
   assert.equal(vistaDe({ ...cita, estado: 'confirmada' }, new Date('2026-10-06T15:50:00Z')), 'pasada');
   assert.equal(vistaDe(cita, new Date('2026-10-06T15:10:00Z')), 'hueco_liberado', 'una retenida que ya empezó no se confirma');
   assert.equal(vistaDe({ ...cita, estado: 'cancelada', confirmada_en: null, cancelada_por: 'sistema' }, new Date()), 'hueco_liberado');
+  assert.equal(vistaDe({ ...cita, estado: 'cancelada', confirmada_en: null, cancelada_por: 'clinica' }, new Date()), 'hueco_liberado');
+  assert.equal(vistaDe({ ...cita, estado: 'cancelada', confirmada_en: null, cancelada_por: 'paciente' }, new Date()), 'hueco_rechazado', 'no quiso el hueco: nunca fue su cita');
   assert.equal(vistaDe({ ...cita, estado: 'cancelada', confirmada_en: new Date(), cancelada_por: 'paciente' }, new Date()), 'cancelada');
 });
 
@@ -94,6 +96,12 @@ test('«Tu cita»: la página según el estado, el .ics y «Añadir al calendari
     await conServidor(app, async (base) => {
       const pedir = (ruta, { ua = UA.ordenador, ...o } = {}) => fetch(`${base}${ruta}`, { redirect: 'manual', ...o, headers: { 'User-Agent': ua, ...(o.headers || {}) } });
       const pagina = async (ruta, o) => (await pedir(ruta, o)).text();
+      // Un botón de la página (un formulario POST) y, como el navegador, la página a la que lleva.
+      const tocar = async (ruta, { ua = UA.ordenador } = {}) => {
+        const r = await pedir(ruta, { method: 'POST', ua });
+        const destino = r.status === 303 ? r.headers.get('location') : null;
+        return { r, destino, html: destino ? await pagina(destino, { ua }) : await r.text() };
+      };
       const cabecerasPrivadas = (r) => {
         assert.equal(r.headers.get('cache-control'), 'no-store');
         assert.equal(r.headers.get('referrer-policy'), 'no-referrer');
@@ -209,10 +217,18 @@ test('«Tu cita»: la página según el estado, el .ics y «Añadir al calendari
         assert.equal(ics.status, 303);
         assert.equal(ics.headers.get('location'), `/c/${ret.token}`);
 
-        const conf = await (await pedir(`/c/${ret.token}/confirmar`, { method: 'POST', ua: UA.iphone })).text();
-        assert.match(conf, /Cita confirmada\. ¡Te esperamos!/);
-        assert.match(conf, /Añadir a mi calendario/);
+        // Después del POST, a su página (303): recargarla no vuelve a mandar el formulario.
+        const conf = await tocar(`/c/${ret.token}/confirmar`, { ua: UA.iphone });
+        assert.equal(conf.r.status, 303);
+        cabecerasPrivadas(conf.r);
+        assert.equal(conf.destino, `/c/${ret.token}?hecho=confirmada`);
+        assert.match(conf.html, /Cita confirmada\. ¡Te esperamos!/);
+        assert.match(conf.html, /Añadir a mi calendario/);
         assert.equal((await pedir(`/cal/${ret.token}`, { ua: UA.iphone })).headers.get('location'), `/c/${ret.token}.ics`);
+        // Un doble toque (o el formulario reenviado): ya estaba confirmada, así que lo mismo y sin error.
+        const otraVez = await tocar(`/c/${ret.token}/confirmar`, { ua: UA.iphone });
+        assert.equal(otraVez.destino, `/c/${ret.token}?hecho=confirmada`);
+        assert.doesNotMatch(otraVez.html, /No se ha podido/);
       });
 
       await t.test('un hueco retenido que caducó: «Hueco liberado», sin confirmar', async () => {
@@ -226,12 +242,13 @@ test('«Tu cita»: la página según el estado, el .ics y «Añadir al calendari
         assert.match(await pagina(`/c/${ret.token}`), /<h1>Hueco liberado<\/h1>/, 'también cuando el cron la cancela');
       });
 
-      await t.test('cancelar: «Cita cancelada», bórrala de tu calendario; el .ics sale anulado', async () => {
+      await t.test('cancelar: «Cita cancelada», bórrala de tu calendario; el .ics sale anulado; dos toques no dan error', async () => {
         const c = await reservar('2026-10-13', '17:00');
-        const canc = await pedir(`/c/${c.token}/cancelar`, { method: 'POST', ua: UA.iphone });
-        assert.equal(canc.status, 200);
-        cabecerasPrivadas(canc);
-        const html = await canc.text();
+        const canc = await tocar(`/c/${c.token}/cancelar`, { ua: UA.iphone });
+        assert.equal(canc.r.status, 303);
+        cabecerasPrivadas(canc.r);
+        assert.equal(canc.destino, `/c/${c.token}?hecho=cancelada`);
+        const { html } = canc;
         assert.match(html, /<h1>Cita cancelada<\/h1>/);
         assert.match(html, /Cita cancelada\. Cuando quieras, te buscamos otro hueco por WhatsApp\./);
         assert.match(html, /Si la añadiste a tu calendario, bórrala\./);
@@ -243,6 +260,17 @@ test('«Tu cita»: la página según el estado, el .ics y «Añadir al calendari
         assert.equal(ev.getFirstPropertyValue('status'), 'CANCELLED');
         assert.deepEqual(ev.getAllSubcomponents('valarm'), []);
         assert.equal((await pedir(`/cal/${c.token}`, { ua: UA.iphone })).headers.get('location'), `/c/${c.token}`, 'no se añade');
+
+        // El segundo toque (o la pestaña que se recarga y reenvía): ya estaba cancelada, así que lo mismo.
+        const otraVez = await tocar(`/c/${c.token}/cancelar`, { ua: UA.iphone });
+        assert.equal(otraVez.destino, `/c/${c.token}?hecho=cancelada`);
+        assert.match(otraVez.html, /Cita cancelada\. Cuando quieras, te buscamos otro hueco por WhatsApp\./);
+        assert.doesNotMatch(otraVez.html, /No se ha podido/);
+        const [[una]] = await pool.query("SELECT COUNT(*) AS n FROM eventos WHERE tipo = 'cita_cancelada' AND entidad_id = ?", [String(c.id)]);
+        assert.equal(una.n, 1, 'se cancela una vez');
+        // «hecho» solo cuenta lo que de verdad ha pasado: en una cita que sigue en pie, nada.
+        assert.doesNotMatch(await pagina(`/c/${cita.token}?hecho=cancelada`), /Cita cancelada/);
+        assert.doesNotMatch(await pagina(`/c/${c.token}?hecho=confirmada`), /Cita confirmada/);
       });
 
       await t.test('reprogramada: «Cita cambiada» con el enlace a la última; la vieja, anulada con su UID; la nueva, con otro', async () => {
@@ -265,6 +293,55 @@ test('«Tu cita»: la página según el estado, el .ics y «Añadir al calendari
         assert.equal(despues.ev.getFirstPropertyValue('status'), 'CONFIRMED');
         assert.equal(despues.evento.sequence, 0);
         assert.notEqual(despues.evento.uid, antes.evento.uid, 'otro evento: Apple no actualiza uno importado');
+      });
+
+      await t.test('cambiada y después cancelada: el enlace viejo no da por buena una cita que ya no existe (ni su .ics)', async () => {
+        const vieja = await reservar('2026-10-27', '17:00');
+        const nueva = await reservar('2026-10-28', '17:00', { reprograma: vieja.id, ahora: new Date('2026-10-01T07:00:00Z') });
+        await agenda.cancelar(pool, { id: nueva.id, por: 'paciente', ahora: new Date('2026-10-01T07:30:00Z') });
+        const html = await pagina(`/c/${vieja.token}`);
+        assert.match(html, /<h1>Cita cancelada<\/h1>/);
+        assert.match(html, /Antes: martes 27 de octubre, a las 17:00/);
+        assert.match(html, /Esta cita se cambió al miércoles 28 de octubre, a las 17:00, y esa también está cancelada\./);
+        assert.match(html, /Si tenías alguna de las dos en tu calendario, bórrala\./);
+        assert.match(html, /Pedir otra cita por WhatsApp/);
+        assert.doesNotMatch(html, /ahora es el|Ver mi nueva cita|Añadir a|Cancelar la cita/);
+        const { ev, evento } = leerIcs(await pagina(`/c/${vieja.token}.ics`));
+        assert.equal(ev.getFirstPropertyValue('status'), 'CANCELLED');
+        assert.equal(evento.description, `Esta cita se ha cambiado y la nueva también está cancelada. Más información: ${config.urlPublica}/c/${vieja.token}`);
+      });
+
+      await t.test('cambiada a una cita con el token aún en claro (la 010 lanzada sin CLAVE_CIFRADO): «Ver mi nueva cita» y su enlace en el .ics viejo', async () => {
+        const vieja = await reservar('2026-10-29', '17:00');
+        const nueva = await reservar('2026-10-30', '17:00', { reprograma: vieja.id, ahora: new Date('2026-10-01T07:00:00Z') });
+        await pool.query('UPDATE citas SET token_antiguo = ?, token_cifrado = NULL, token_iv = NULL, token_tag = NULL WHERE id = ?', [nueva.token, nueva.id]);
+        const html = await pagina(`/c/${vieja.token}`);
+        assert.match(html, /Tu cita ha cambiado: ahora es el viernes 30 de octubre, a las 17:00\./);
+        assert.match(html, new RegExp(`<a class="btn lleno" href="/c/${nueva.token}">Ver mi nueva cita</a>`));
+        const { evento } = leerIcs(await pagina(`/c/${vieja.token}.ics`));
+        assert.equal(evento.description, `Esta cita se ha cambiado. Tu nueva cita: ${config.urlPublica}/c/${nueva.token}`);
+        const [[sigue]] = await pool.query('SELECT token_antiguo, token_cifrado FROM citas WHERE id = ?', [nueva.id]);
+        assert.deepEqual([sigue.token_antiguo, sigue.token_cifrado], [nueva.token, null], 'abrir la página no escribe nada');
+      });
+
+      await t.test('una cita que no dio la agenda (importada, sin UID guardado): su .ics lleva siempre el mismo UID y abrirlo no escribe nada', async () => {
+        const { token, columnas } = agenda.nuevoToken();
+        const [inicio, fin] = [en('2026-11-02', '17:00'), en('2026-11-02', '17:45')];
+        const [ins] = await pool.query('INSERT INTO citas SET ?', [{
+          paciente_id: pacienteId, tratamiento_id: 'valoracion-facial', sala_id: 1, inicio, fin, sala_desde: inicio, sala_hasta: fin, prof_desde: inicio, prof_hasta: fin,
+          estado: 'confirmada', origen: 'importacion', confirmada_en: RESERVADA, ...columnas, token_caduca_en: agenda.caducidadEnlace(fin),
+        }]);
+        const uid = leerIcs(await pagina(`/c/${token}.ics`)).evento.uid;
+        assert.match(uid, /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/, 'un UUID (v5, de la huella del enlace)');
+        assert.equal(leerIcs(await pagina(`/c/${token}.ics`)).evento.uid, uid, 'el mismo cada vez');
+        const [[fila]] = await pool.query('SELECT uid_ics FROM citas WHERE id = ?', [ins.insertId]);
+        assert.equal(fila.uid_ics, null, 'el GET no escribe nada (las vistas previas de enlaces lo abren solas)');
+        // Si se anula, el .ics anulado casa con el evento que importó.
+        await agenda.cancelar(pool, { id: ins.insertId, por: 'clinica', ahora: reloj.ahora });
+        const anulado = leerIcs(await pagina(`/c/${token}.ics`));
+        assert.deepEqual([anulado.evento.uid, anulado.ev.getFirstPropertyValue('status'), anulado.evento.sequence], [uid, 'CANCELLED', 1]);
+        const otra = agenda.nuevoToken();
+        assert.notEqual(agenda.uidIcs({ token: otra.token }), uid, 'cada cita, el suyo');
       });
 
       await t.test('empezada: ni cancelar ni calendario; después, recepción la marca y la página lo dice', async () => {
