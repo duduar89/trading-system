@@ -9,13 +9,16 @@ function saludo(ahora = new Date()) {
   return 'Buenas noches';
 }
 
+// «1 tarea vencida», «3 tareas vencidas».
+const n = (cuantas, una, varias) => `${cuantas} ${cuantas === 1 ? una : varias}`;
+
 // Qué ha pasado con las citas de hoy (los «no vino», a la vista).
 function detalleCitas(c) {
   return [
-    `${c.confirmadas} confirmadas`,
+    n(c.confirmadas, 'confirmada', 'confirmadas'),
     c.llegadas > 0 && `${c.llegadas} en la clínica`,
-    c.completadas > 0 && `${c.completadas} ${c.completadas === 1 ? 'completada' : 'completadas'}`,
-    c.noPresentadas > 0 && `${c.noPresentadas} ${c.noPresentadas === 1 ? 'no vino' : 'no vinieron'}`,
+    c.completadas > 0 && n(c.completadas, 'completada', 'completadas'),
+    c.noPresentadas > 0 && n(c.noPresentadas, 'no vino', 'no vinieron'),
   ].filter(Boolean).join(' · ');
 }
 
@@ -23,8 +26,6 @@ export default function Hoy() {
   const { datos: d, error } = useDatos('/panel/hoy', { cadaMs: 30000 });
   if (error) return <Error texto={error} />;
   if (!d) return null;
-  // «1 tarea vencida», «3 tareas vencidas».
-  const n = (cuantas, una, varias) => `${cuantas} ${cuantas === 1 ? una : varias}`;
   const pendientes = [
     d.conversaciones.urgentes && { texto: `${n(d.conversaciones.urgentes, 'conversación urgente espera', 'conversaciones urgentes esperan')} a una persona`, ir: '#conversaciones', alerta: true },
     d.conversaciones.esperaPersona && { texto: `${n(d.conversaciones.esperaPersona, 'conversación espera', 'conversaciones esperan')} a una persona`, ir: '#conversaciones' },
@@ -40,7 +41,7 @@ export default function Hoy() {
         <Cifra etiqueta="Citas hoy" valor={d.citas.total} detalle={detalleCitas(d.citas)} />
         <Cifra etiqueta="La IA atiende" valor={d.conversaciones.conIa} detalle="conversaciones abiertas" />
         <Cifra etiqueta="Seguimientos hoy" valor={d.seguimientosHoy} detalle="con la fecha que pidió cada paciente" />
-        <Cifra etiqueta="Recuperado este mes" valor={euros(d.recuperadoMes.euros)} detalle={`${d.recuperadoMes.citas} citas cerradas por WhatsApp`} tono="oro" />
+        <Cifra etiqueta="Recuperado este mes" valor={euros(d.recuperadoMes.euros)} detalle={`${n(d.recuperadoMes.citas, 'cita cerrada', 'citas cerradas')} por WhatsApp`} tono="oro" />
       </section>
       <section className="mt-8">
         <h2 className="etiqueta mb-3">Lo que necesita a una persona</h2>

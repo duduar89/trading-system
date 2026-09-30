@@ -70,7 +70,9 @@ export default function Bandeja() {
             </li>
           ))}
         </ul>
-        {sel ? <Detalle id={sel} alCambiar={lista.recargar} /> : <Vacio titulo="Elige una conversación">Verás el chat, la ficha del paciente, el próximo paso y qué ha decidido la IA.</Vacio>}
+        {/* Con su key, cada conversación empieza de cero: lo que se estaba escribiendo o la plantilla
+            elegida para otra persona no pasan a esta. */}
+        {sel ? <Detalle key={sel} id={sel} alCambiar={lista.recargar} /> : <Vacio titulo="Elige una conversación">Verás el chat, la ficha del paciente, el próximo paso y qué ha decidido la IA.</Vacio>}
       </div>
     </>
   );
@@ -83,25 +85,36 @@ function Detalle({ id, alCambiar }) {
   const [plantilla, setPlantilla] = useState('');
   const [valores, setValores] = useState([]);
   const [aviso, setAviso] = useState('');
+  const [enviando, setEnviando] = useState(false);
   if (error) return <Error texto={error} />;
   if (!d) return null;
   const c = d.conversacion;
   const ventana = c.ventanaHasta && new Date(c.ventanaHasta) > new Date();
-  // Con la ventana cerrada, solo plantillas aprobadas; las que llevan el enlace de una cita o de una
-  // reseña las manda la app sola. Cada variable lleva su valor ({{1}}, el nombre con que se le saluda).
-  const aMano = (plantillas.datos || []).filter((p) => p.estado === 'aprobada' && p.aMano);
+  // Con la ventana cerrada, solo plantillas aprobadas, y no las que manda la app sola (las del enlace de
+  // una cita o de una reseña, la del hueco de la lista de espera). Las comerciales, solo si se le puede
+  // mandar algo comercial (sin baja y con consentimiento). Cada variable lleva su valor ({{1}}, el
+  // nombre con que se le saluda).
+  const comercial = d.comercial || { puede: true };
+  const aMano = (plantillas.datos || []).filter((p) => p.estado === 'aprobada' && p.aMano && (comercial.puede || p.categoria !== 'marketing'));
   const elegida = aMano.find((p) => String(p.id) === plantilla);
   const campos = elegida ? variables(elegida.cuerpo) : [];
   const completa = Boolean(elegida) && campos.every((n) => valores[n - 1]?.trim());
   const elegir = (id) => { setPlantilla(id); setValores([d.saludo || '']); };
   const accion = async (a) => { await api(`/panel/conversaciones/${id}/${a}`, { metodo: 'POST', cuerpo: {} }); recargar(); alCambiar(); };
+  // Mientras sale, ni «Enviar» ni «Enviar plantilla»: un doble clic no le manda el mensaje dos veces.
   const enviar = async (e) => {
     e.preventDefault();
+    if (enviando) return;
+    setEnviando(true);
     setAviso('');
     try {
       await api(`/panel/conversaciones/${id}/enviar`, { metodo: 'POST', cuerpo: ventana ? { texto } : { plantillaId: Number(plantilla), variables: campos.map((n) => valores[n - 1].trim()) } });
       setTexto(''); setPlantilla(''); setValores([]); recargar(); alCambiar();
-    } catch (err) { setAviso(err.message); }
+    } catch (err) {
+      setAviso(err.message);
+    } finally {
+      setEnviando(false);
+    }
   };
   return (
     <section className="grid gap-4 xl:grid-cols-[1fr_300px] min-w-0">
@@ -120,7 +133,7 @@ function Detalle({ id, alCambiar }) {
         <ol className="flex-1 space-y-3 overflow-y-auto px-5 py-5">
           {d.mensajes.map((m) => (
             <li key={m.id} className={`flex ${m.direccion === 'entrante' ? 'justify-start' : 'justify-end'}`}>
-              <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${m.direccion === 'entrante' ? 'bg-[var(--superficie-2)]' : m.autor === 'ia' ? 'bg-aqua text-terciopelo-900' : 'bg-terciopelo-800 text-white'}`}>
+              <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${m.direccion === 'entrante' ? 'bg-[var(--superficie-2)]' : m.autor === 'ia' ? 'burbuja-aqua bg-aqua text-terciopelo-900' : 'burbuja-terciopelo bg-terciopelo-800 text-white'}`}>
                 <div className="whitespace-pre-wrap break-words"><ConEnlaces texto={m.texto} /></div>
                 <div className={`mt-1 text-[10px] ${m.direccion === 'entrante' ? '' : 'opacity-70'}`} style={m.direccion === 'entrante' ? { color: 'var(--texto-suave)' } : undefined}>
                   {m.tipo === 'plantilla' ? 'Plantilla aprobada · ' : ''}{AUTOR[m.autor]} · {fechaHora(m.en)}{m.intencion && m.direccion === 'entrante' ? ` · entendido: ${(INTENCION[m.intencion] || m.intencion.replaceAll('_', ' ')).toLowerCase()}` : ''}{entrega(m)}
@@ -135,7 +148,7 @@ function Detalle({ id, alCambiar }) {
               <label htmlFor="texto" className="sr-only">Mensaje</label>
               <textarea id="texto" rows={2} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Escribe como equipo IEMEC…"
                 className="flex-1 resize-none rounded-xl border border-[var(--borde)] bg-transparent px-3 py-2 text-sm outline-none focus:border-oro" />
-              <Boton variante="lleno" type="submit" disabled={!texto.trim()}>Enviar</Boton>
+              <Boton variante="lleno" type="submit" disabled={enviando || !texto.trim()}>{enviando ? 'Enviando…' : 'Enviar'}</Boton>
             </div>
           ) : (
             <div className="grid gap-3">
@@ -147,6 +160,8 @@ function Detalle({ id, alCambiar }) {
                   {aMano.map((p) => <option key={p.id} value={p.id}>{p.uso.replaceAll('_', ' ')}</option>)}
                 </select>
               </div>
+              {!comercial.puede && <p className="text-xs text-rosa">Solo plantillas de servicio: {comercial.motivo}.</p>}
+              {elegida?.categoria === 'marketing' && comercial.aviso && <p className="text-xs text-rosa">Ojo: {comercial.aviso}.</p>}
               {elegida && campos.map((n) => (
                 <label key={n} className="grid min-w-0 gap-1 text-sm">
                   <span className="etiqueta">Dato {n}</span>
@@ -161,7 +176,7 @@ function Detalle({ id, alCambiar }) {
                   <p className="mt-1 whitespace-pre-wrap break-words">{rellenar(elegida.cuerpo, valores)}</p>
                 </div>
               )}
-              <div><Boton variante="lleno" type="submit" disabled={!completa}>Enviar plantilla</Boton></div>
+              <div><Boton variante="lleno" type="submit" disabled={enviando || !completa}>{enviando ? 'Enviando…' : 'Enviar plantilla'}</Boton></div>
             </div>
           )}
           {aviso && <p role="alert" className="mt-2 text-sm text-rosa">{aviso}</p>}
@@ -183,7 +198,6 @@ function Detalle({ id, alCambiar }) {
           {d.paciente ? (
             <ul className="mt-2 space-y-1 text-sm">
               <li>{d.paciente.es_cliente ? 'Paciente de la clínica' : d.citas.length ? 'Primera visita' : 'Aún no es paciente'}</li>
-              {d.paciente.baja_comercial_en && <li className="text-rosa">Baja de mensajes comerciales</li>}
               {d.citas.map((ci) => <li key={ci.inicio} style={{ color: 'var(--texto-suave)' }}>{fechaHora(ci.inicio)} · {ci.tratamiento} · {ci.estado}</li>)}
             </ul>
           ) : d.lead ? (
@@ -194,6 +208,8 @@ function Detalle({ id, alCambiar }) {
               {(d.lead.respuestas || []).map((r) => <li key={r.pregunta} style={{ color: 'var(--texto-suave)' }}>{r.pregunta}: {r.valor}</li>)}
             </ul>
           ) : <p className="mt-2 text-sm" style={{ color: 'var(--texto-suave)' }}>Contacto sin ficha todavía.</p>}
+          {/* La baja, sea paciente, lead o contacto sin ficha (la de su ficha o la de la lista de bajas). */}
+          {comercial.baja && <p className="mt-2 text-sm text-rosa">Baja de mensajes comerciales</p>}
         </div>
         <div className="tarjeta p-5">
           <div className="etiqueta">Qué ha decidido la IA</div>

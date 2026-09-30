@@ -81,4 +81,8 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font-family: va
 /* Filas de una lista que recorta su contenido (la bandeja): por fuera, el contorno lo cortaría la
    lista y lo taparía la fila de al lado. Va por dentro. */
 .foco-dentro:focus-visible { outline-offset: -3px; }
+/* Las burbujas del chat van en su color en los dos temas (la nuestra, terciopelo; la de la IA, aqua):
+   el foco de sus enlaces («Tu cita»…), en el tono que se ve sobre cada una (3:1 o más). */
+.burbuja-terciopelo { --foco: var(--color-champan); }
+.burbuja-aqua { --foco: #7a5a1f; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

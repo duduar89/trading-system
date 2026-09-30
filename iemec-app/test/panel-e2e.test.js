@@ -1,15 +1,17 @@
 'use strict';
 // El panel de punta a punta en un Chromium de verdad (criterio de salida de la F5): recepción recorre
-// cada pantalla con la demostración (scripts/demo.js) cargada en su propia base (la de las pruebas con
-// «_panel» al final) y a una hora fija, el martes 6 de octubre de 2026 a las 12:05 de Madrid: la del
-// servidor (req.ahora), la del navegador (su reloj) y la de la base (SET timestamp). El servidor va con
-// MODO_DEMO=1 en un puerto libre, con WhatsApp, la IA y Google simulados, y sirve el panel compilado (se
-// compila si falta). Nada sale a internet: lo de fuera (Google…) se contesta en el propio navegador.
+// cada pantalla con la demostración (scripts/demo.js) cargada en la base de pruebas y a una hora fija,
+// el martes 6 de octubre de 2026 a las 12:05 de Madrid: la del servidor (req.ahora), la del navegador
+// (su reloj) y la de la base (SET timestamp). El servidor va con MODO_DEMO=1 en un puerto libre, con
+// WhatsApp, la IA y Google simulados, y sirve el panel compilado (se compila si falta). Nada sale a
+// internet: lo de fuera (Google…) se contesta en el propio navegador. La página «Tu cita» se abre
+// también como la abre el paciente: en su móvil.
 //
 // Además de cada flujo, en cada pantalla (y con el detalle de una cita, una conversación o un
 // formulario abiertos): a 390 px nada desborda a lo ancho, el texto se lee en oscuro y en claro, cada
 // control tiene nombre accesible y el foco se ve. Y ni un error en la consola.
 // Se salta sola si no hay navegador (en CI no se instala: npx playwright install chromium) o MariaDB.
+// Si el panel no llega a pintarse, para enseguida y dice por qué (el error de la página).
 /* global document -- lo que va dentro de pagina.evaluate corre en el navegador */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -34,6 +36,13 @@ const TITULOS = {
 };
 const ANCHO = { width: 1280, height: 900 };
 const MOVIL = { width: 390, height: 844 };
+// El móvil del paciente, un iPhone con Safari: ahí «Añadir a mi calendario» es el .ics.
+const IPHONE = {
+  userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+  viewport: MOVIL, isMobile: true, hasTouch: true,
+};
+// Lo que se compara de un WhatsApp simulado: a quién y qué (el resto depende de la plantilla).
+const lleva = (envio, campos) => Object.fromEntries(campos.map((k) => [k, envio?.[k]]));
 const euros = (n) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
 const soloCifras = (s) => String(s).replace(/\D/g, '');
 const escapar = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -42,10 +51,11 @@ const cuantas = (n, una, varias) => `${n} ${Number(n) === 1 ? una : varias}`;
 // El foco de cada clase de control se mira una vez por tema en toda la prueba.
 const FOCO_VISTO = { dark: new Set(), light: new Set() };
 
-// Lo que se mira siempre, con la pantalla como esté: en claro y en oscuro a lo ancho (contraste,
+// Lo que se mira siempre, con la pantalla como esté: en claro y en oscuro a su tamaño (contraste,
 // nombres, foco y desbordes) y a 390 px en oscuro (desbordes y contraste). Lo que falla se apunta.
 async function revisar(pagina, donde, problemas) {
   await pagina.evaluate(() => document.fonts.ready);
+  const tamano = pagina.viewportSize();
   try {
     for (const [tema, nombre] of [['dark', 'oscuro'], ['light', 'claro']]) {
       await pagina.emulateMedia({ colorScheme: tema });
@@ -57,8 +67,8 @@ async function revisar(pagina, donde, problemas) {
     for (const m of await pagina.evaluate(desbordes)) problemas.push(`${donde} · 390 px · desborda: ${m}`);
     for (const m of await contrastes(pagina)) problemas.push(`${donde} · 390 px oscuro · contraste: ${m}`);
   } finally {
-    // Pase lo que pase, la página vuelve a como estaba: a lo ancho y en claro.
-    await pagina.setViewportSize(ANCHO);
+    // Pase lo que pase, la página vuelve a como estaba: a su tamaño y en claro.
+    await pagina.setViewportSize(tamano);
     await pagina.emulateMedia({ colorScheme: 'light' });
   }
 }
@@ -77,14 +87,17 @@ async function hasta(fn, { ms = 5000 } = {}) {
 test('el panel de punta a punta en Chromium, con la demostración a una hora fija', { timeout: 300000 }, async (t) => {
   const navegador = await lanzarNavegador();
   if (!navegador) { t.skip('sin Chromium para Playwright'); return; }
-  const pool = await prepararBdDePrueba(t, { sufijo: '_panel' });
-  if (!pool) { await navegador.close(); return; }
   const modoDemo = process.env.MODO_DEMO;
-  let servidor;
+  let pool = null;
+  let servidor = null;
+  // Pase lo que pase (también si la base no se deja crear), el navegador se cierra: si no, el proceso
+  // no termina y npm test se queda colgado.
   try {
+    pool = await prepararBdDePrueba(t);
+    if (!pool) return;
     // La base también vive a esa hora: lo que se guarda con CURRENT_TIMESTAMP.
     pool.on('connection', (c) => c.query('SET timestamp = ?', [AHORA.getTime() / 1000]));
-    await cargarDemo({ pool, bd: { ...BD_PRUEBAS, database: `${BD_PRUEBAS.database}_panel` }, ahora: AHORA, log: () => {} });
+    await cargarDemo({ pool, bd: BD_PRUEBAS, ahora: AHORA, log: () => {} });
     compilarPanelSiHaceFalta();
 
     const whatsapp = crearWhatsApp('simulado');
@@ -97,47 +110,63 @@ test('el panel de punta a punta en Chromium, con la demostración a una hora fij
     await new Promise((ok) => servidor.once('listening', ok));
     const base = `http://127.0.0.1:${servidor.address().port}`;
 
-    const contexto = await navegador.newContext({ serviceWorkers: 'block', locale: 'es-ES', timezoneId: 'Europe/Madrid', reducedMotion: 'reduce', viewport: ANCHO });
-    await contexto.clock.setFixedTime(AHORA);
+    // Cada navegador (el de recepción y el móvil del paciente), a la misma hora, sin salir a internet
+    // y con sus errores de consola apuntados.
     const fuera = [];
     const FUERA = '<!doctype html><html lang="es"><title>Fuera</title><p>Fuera de la clínica</p></html>';
-    await contexto.route('**/*', async (ruta) => {
-      const url = ruta.request().url();
-      if (!url.startsWith(`${base}/`)) {
-        fuera.push(url);
-        return ruta.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: FUERA });
-      }
-      // Una redirección fuera (el enlace de la reseña lleva a Google) no se sigue: se apunta adónde iba.
-      if (new URL(url).pathname.startsWith('/r/')) {
-        const r = await ruta.fetch({ maxRedirects: 0 });
-        const destino = r.headers().location;
-        if (r.status() >= 300 && r.status() < 400 && destino && !destino.startsWith(base)) {
-          fuera.push(destino);
-          return ruta.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: FUERA });
-        }
-        return ruta.fulfill({ response: r });
-      }
-      return ruta.continue();
-    });
     const errores = [];
     let caida = false;
-    contexto.on('page', (p) => {
-      p.on('console', (m) => { if (m.type() === 'error') errores.push(`${p.url()} · ${m.text()}`); });
-      p.on('pageerror', (e) => errores.push(`${p.url()} · ${e.message}`));
-      p.on('crash', () => { caida = true; errores.push(`${p.url()} · la pestaña se ha caído (crash)`); });
-    });
+    const nuevoContexto = async (opciones) => {
+      const ctx = await navegador.newContext({ serviceWorkers: 'block', locale: 'es-ES', timezoneId: 'Europe/Madrid', reducedMotion: 'reduce', ...opciones });
+      await ctx.clock.setFixedTime(AHORA);
+      await ctx.route('**/*', async (ruta) => {
+        const url = ruta.request().url();
+        if (!url.startsWith(`${base}/`)) {
+          fuera.push(url);
+          return ruta.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: FUERA });
+        }
+        // Una redirección fuera (el enlace de la reseña lleva a Google) no se sigue: se apunta adónde iba.
+        if (new URL(url).pathname.startsWith('/r/')) {
+          const r = await ruta.fetch({ maxRedirects: 0 });
+          const destino = r.headers().location;
+          if (r.status() >= 300 && r.status() < 400 && destino && !destino.startsWith(base)) {
+            fuera.push(destino);
+            return ruta.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: FUERA });
+          }
+          return ruta.fulfill({ response: r });
+        }
+        return ruta.continue();
+      });
+      ctx.on('page', (p) => {
+        p.on('console', (m) => { if (m.type() === 'error') errores.push(`${p.url()} · ${m.text()}`); });
+        p.on('pageerror', (e) => errores.push(`${p.url()} · ${e.message}`));
+        p.on('crash', () => { caida = true; errores.push(`${p.url()} · la pestaña se ha caído (crash)`); });
+      });
+      return ctx;
+    };
+    const contexto = await nuevoContexto({ viewport: ANCHO });
     let pagina = await contexto.newPage();
     // Cada vez, el panel recién abierto en esa sección (con otra dirección: si solo cambiara el #, la
     // pantalla que ya estaba abierta seguiría como estaba). Si la pestaña se cayó, falla la prueba en
-    // la que pasó (queda en los errores) y las siguientes siguen en otra.
+    // la que pasó (queda en los errores) y las siguientes siguen en otra. Si no llega a pintarse (un
+    // error de JavaScript al montar el panel…), falla enseguida y con el error de la página.
     let visitas = 0;
     const ir = async (seccion) => {
       if (caida) { caida = false; await pagina.close().catch(() => {}); pagina = await contexto.newPage(); }
       await pagina.goto(`${base}/?visita=${++visitas}#${seccion}`);
-      await pagina.getByRole('heading', { level: 1, name: TITULOS[seccion], exact: true }).waitFor();
+      try {
+        await pagina.getByRole('heading', { level: 1, name: TITULOS[seccion], exact: true }).waitFor({ timeout: 15000 });
+      } catch (err) {
+        throw new Error(`El panel no abre «${seccion}»: ${errores.length ? errores.join(' | ') : err.message}`, { cause: err });
+      }
     };
+    // Antes de los flujos, que el panel arranca: si no, se para aquí (y no cada flujo a su plazo).
+    await ir('hoy');
     const q = async (sql, args = []) => (await pool.query(sql, args))[0];
-    const cifra = async (etiqueta) => pagina.locator('.tarjeta', { has: pagina.getByText(etiqueta, { exact: true }) }).locator('.cifras').first().innerText();
+    const cifraDe = (etiqueta) => pagina.locator('.tarjeta', { has: pagina.getByText(etiqueta, { exact: true }) });
+    const cifra = async (etiqueta) => cifraDe(etiqueta).locator('.cifras').first().innerText();
+    // Lo que va debajo de la cifra («12 confirmadas · 1 completada»).
+    const detalle = async (etiqueta) => cifraDe(etiqueta).locator('span.text-sm').first().innerText();
     const sinErrores = () => assert.deepEqual(errores.splice(0), [], 'ningún error en la consola');
     const [hoy0, manana0] = [T.desdeMadrid(HOY, '00:00'), T.desdeMadrid(MANANA, '00:00')];
     const citasDelDia = async (desde, hasta) => (await q("SELECT COUNT(*) AS n FROM citas WHERE inicio >= ? AND inicio < ? AND estado NOT IN ('cancelada','reprogramada')", [desde, hasta]))[0].n;
@@ -146,24 +175,29 @@ test('el panel de punta a punta en Chromium, con la demostración a una hora fij
       name: new RegExp(`^${escapar(`${cita.nombre} ${cita.apellidos[0]}., ${cita.hora}, ${cita.tratamiento}: ${estado}.`)} Abrir la cita$`),
     });
     const citaDe = async (sql, args) => {
-      const [c] = await q(`SELECT c.id, c.inicio, c.token, p.nombre, p.apellidos, t.nombre AS tratamiento FROM citas c JOIN pacientes p ON p.id = c.paciente_id
+      const [c] = await q(`SELECT c.id, c.inicio, p.nombre, p.apellidos, t.nombre AS tratamiento FROM citas c JOIN pacientes p ON p.id = c.paciente_id
         JOIN tratamientos t ON t.id = c.tratamiento_id WHERE ${sql} ORDER BY c.inicio, c.id LIMIT 1`, args);
       return c && { ...c, hora: T.partesMadrid(c.inicio).hora };
     };
+    // Los mensajes que le hemos mandado a una conversación (los que guarda la base).
+    const salientes = async (conversacionId) => (await q("SELECT COUNT(*) AS n FROM mensajes WHERE conversacion_id = ? AND direccion = 'saliente'", [conversacionId]))[0].n;
 
     await t.test('Hoy: las cifras del día y lo que necesita a una persona', async () => {
       const problemas = [];
       await ir('hoy');
       const [ia] = await q("SELECT COUNT(*) AS n FROM conversaciones WHERE estado IN ('ia_activa','esperando_paciente')");
       const [seg] = await q("SELECT COUNT(*) AS n FROM seguimientos WHERE estado = 'pendiente' AND programado_para >= ? AND programado_para < ?", [hoy0, manana0]);
-      const [rec] = await q(`SELECT COALESCE(SUM(t.precio_eur), 0) AS euros FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id
+      const [rec] = await q(`SELECT COUNT(*) AS n, COALESCE(SUM(t.precio_eur), 0) AS euros FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id
         WHERE c.creado_en >= ? AND c.origen = 'ia_whatsapp' AND c.estado NOT IN ('cancelada','reprogramada','retenida','no_presentada')`, [T.desdeMadrid('2026-10-01', '00:00')]);
       const citas = await citasDelDia(hoy0, manana0);
       assert.ok(citas >= 5, 'la demo pone citas hoy');
       assert.equal(await cifra('Citas hoy'), String(citas));
+      const [{ confirmadas }] = await q("SELECT COUNT(*) AS confirmadas FROM citas WHERE estado = 'confirmada' AND inicio >= ? AND inicio < ?", [hoy0, manana0]);
+      assert.match(await detalle('Citas hoy'), new RegExp(`^${cuantas(confirmadas, 'confirmada', 'confirmadas')}( · |$)`));
       assert.equal(await cifra('La IA atiende'), String(ia.n));
       assert.equal(await cifra('Seguimientos hoy'), String(seg.n));
       assert.equal(soloCifras(await cifra('Recuperado este mes')), soloCifras(euros(Number(rec.euros))));
+      assert.equal(await detalle('Recuperado este mes'), `${cuantas(rec.n, 'cita cerrada', 'citas cerradas')} por WhatsApp`);
       const [espera] = await q("SELECT COUNT(*) AS n FROM conversaciones WHERE estado = 'espera_persona'");
       const [tareas] = await q("SELECT COUNT(*) AS n FROM tareas WHERE estado = 'abierta' AND vence_en < ?", [AHORA]);
       await pagina.getByRole('link', { name: `${cuantas(espera.n, 'conversación espera', 'conversaciones esperan')} a una persona` }).waitFor();
@@ -307,40 +341,94 @@ test('el panel de punta a punta en Chromium, con la demostración a una hora fij
       assert.equal(await estado(), 'ia_activa');
       assert.equal((await q('SELECT estado FROM tareas WHERE id = ?', [tarea.id]))[0].estado, 'hecha', 'su tarea de contestar queda hecha');
 
-      const texto = 'Hola, soy Marta, de recepción: te llamo en un rato y lo vemos con calma.';
+      // Lo que sale de la bandeja: cuántas veces se pide y cuántas llega a WhatsApp. Con un doble clic en
+      // «Enviar» o en «Enviar plantilla» sale una vez (el botón se desactiva mientras tanto).
+      const envios = [];
+      const apuntar = (r) => { if (r.method() === 'POST' && /\/enviar$/.test(new URL(r.url()).pathname)) envios.push(r.url()); };
+      pagina.on('request', apuntar);
+      // Con la ventana abierta, texto libre. Lleva un enlace: su foco también se ve en nuestra burbuja.
+      const texto = 'Hola, soy Marta, de recepción: te llamo en un rato y lo vemos con calma. Mientras, aquí tienes la clínica: https://iemec-clinic.com';
       const chat = pagina.locator('ol');
       await pagina.getByRole('textbox', { name: 'Mensaje' }).fill(texto);
-      await pagina.getByRole('button', { name: 'Enviar', exact: true }).click();
-      await chat.getByText(texto, { exact: true }).waitFor();
+      const antes = whatsapp.enviados.length;
+      await pagina.getByRole('button', { name: 'Enviar', exact: true }).dblclick();
+      await chat.getByText(texto, { exact: true }).first().waitFor();
+      assert.equal(envios.length, 1, 'un doble clic no lo manda dos veces');
+      await chat.getByRole('link', { name: 'https://iemec-clinic.com' }).waitFor();
       assert.equal(await pagina.getByRole('textbox', { name: 'Mensaje' }).inputValue(), '', 'el cuadro se vacía');
       assert.equal(await pagina.getByRole('alert').count(), 0);
-      assert.deepEqual({ ...whatsapp.enviados.at(-1), waId: null }, { waId: null, telefono: conv.telefono, tipo: 'texto', texto });
+      assert.equal(whatsapp.enviados.length, antes + 1);
+      assert.deepEqual(lleva(whatsapp.enviados.at(-1), ['telefono', 'tipo', 'texto']), { telefono: conv.telefono, tipo: 'texto', texto });
       assert.equal(await estado(), 'persona', 'si escribe una persona, la lleva ella');
+      await revisar(pagina, 'Conversaciones · nuestro mensaje con un enlace', problemas);
 
       // Con la ventana de 24 h cerrada (le escribimos, pero no ha contestado): solo plantilla.
       const [cerrada] = await q(`SELECT c.id, c.telefono, p.nombre, p.apellidos FROM conversaciones c JOIN pacientes p ON p.id = c.paciente_id
         WHERE (c.ventana_hasta IS NULL OR c.ventana_hasta <= ?) AND c.estado <> 'cerrada' ORDER BY c.id LIMIT 1`, [AHORA]);
       assert.ok(cerrada, 'la demo tiene una conversación con la ventana cerrada');
-      await pagina.getByRole('button', { name: new RegExp(`^${escapar(`${cerrada.nombre} ${cerrada.apellidos}`)}`) }).click();
+      const abrir = async (nombre) => {
+        await pagina.getByRole('button', { name: new RegExp(`^${escapar(nombre)}`) }).click();
+        await pagina.locator('.titulo', { hasText: nombre }).waitFor();
+      };
+      await abrir(`${cerrada.nombre} ${cerrada.apellidos}`);
       await pagina.getByText('Pasaron 24 h desde su último mensaje: solo con plantilla aprobada.').waitFor();
       assert.equal(await pagina.getByRole('textbox', { name: 'Mensaje' }).count(), 0);
       const plantilla = pagina.getByRole('combobox', { name: 'Plantilla' });
-      const opciones = await plantilla.locator('option').allTextContents();
-      assert.ok(opciones.includes('como quedamos'));
-      assert.ok(!opciones.includes('cita confirmacion') && !opciones.includes('resena'), 'lo que lleva el enlace de una cita o una reseña sale solo');
+      const opciones = async () => plantilla.locator('option').allTextContents();
+      assert.ok((await opciones()).includes('como quedamos'));
+      // Lo que manda la app sola no se ofrece: lo que lleva el enlace de una cita o de una reseña, y el
+      // hueco de la lista de espera (su «Sí, guárdamelo» se liga a una oferta que aquí no habría).
+      for (const sola of ['cita confirmacion', 'resena', 'hueco liberado']) assert.ok(!(await opciones()).includes(sola), `«${sola}» la manda la app sola`);
+      const dato = (n) => pagina.getByRole('textbox', { name: `Dato ${n}` });
       await plantilla.selectOption({ label: 'como quedamos' });
-      assert.equal(await pagina.getByRole('textbox', { name: 'Dato 1' }).inputValue(), cerrada.nombre, 'el nombre con que se le saluda, ya puesto');
+      assert.equal(await dato(1).inputValue(), cerrada.nombre, 'el nombre con que se le saluda, ya puesto');
       const enviarPlantilla = pagina.getByRole('button', { name: 'Enviar plantilla' });
       assert.equal(await enviarPlantilla.isDisabled(), true, 'sin rellenar {{2}} no se puede mandar');
-      await pagina.getByRole('textbox', { name: 'Dato 2' }).fill('tu depilación láser');
+      await dato(2).fill('tu limpieza facial');
+
+      // A medias, recepción pasa a la conversación de Pablo, que pidió la baja: pasadas 24 h, su
+      // ventana también está cerrada. Ni la plantilla ni lo escrito para la otra persona pasan a la suya,
+      // y a él no se le ofrece nada comercial: solo las plantillas de servicio.
+      const [baja] = await q("SELECT c.id, l.nombre FROM conversaciones c JOIN leads l ON l.id = c.lead_id WHERE c.motivo_cierre = 'baja' ORDER BY c.id LIMIT 1");
+      await q('UPDATE conversaciones SET ventana_hasta = ? WHERE id = ?', [new Date(AHORA.getTime() - 3600000), baja.id]);
+      await pagina.getByRole('button', { name: 'Todas', exact: true }).click();
+      await abrir(baja.nombre);
+      await pagina.getByText('Solo plantillas de servicio: pidió la baja de los mensajes comerciales.').waitFor();
+      assert.equal(await plantilla.inputValue(), '', 'la plantilla elegida para otra persona no pasa a esta');
+      assert.equal(await dato(1).count(), 0);
+      const comerciales = (await q("SELECT uso FROM plantillas WHERE categoria = 'marketing'")).map((p) => p.uso.replaceAll('_', ' '));
+      assert.ok(comerciales.includes('como quedamos'));
+      assert.deepEqual((await opciones()).filter((o) => comerciales.includes(o)), [], 'nada comercial a quien pidió la baja');
+      assert.ok((await opciones()).includes('cita recordatorio 24h'), 'las de servicio, sí');
+      await pagina.getByText('Baja de mensajes comerciales', { exact: true }).waitFor();
+      await revisar(pagina, 'Conversaciones · con la baja y la ventana cerrada', problemas);
+
+      // De vuelta a la primera, el formulario empieza de cero.
+      await abrir(`${cerrada.nombre} ${cerrada.apellidos}`);
+      assert.equal(await plantilla.inputValue(), '');
+      assert.equal(await dato(2).count(), 0);
+      await plantilla.selectOption({ label: 'como quedamos' });
+      assert.equal(await dato(1).inputValue(), cerrada.nombre);
+      await dato(2).fill('tu depilación láser');
       const final = `Hola ${cerrada.nombre}, como quedamos, te escribo para buscarte hueco para tu depilación láser. ¿Te viene bien esta semana o la que viene? Si no quieres recibir más mensajes como este, responde BAJA.`;
       await pagina.getByText(final, { exact: true }).waitFor();
       await revisar(pagina, 'Conversaciones · plantilla con la ventana cerrada', problemas);
-      await enviarPlantilla.click();
-      await chat.getByText(final, { exact: true }).waitFor();
+      const [enviados, guardados] = [whatsapp.enviados.length, await salientes(cerrada.id)];
+      envios.length = 0;
+      await enviarPlantilla.dblclick();
+      await chat.getByText(final, { exact: true }).first().waitFor();
+      assert.equal(envios.length, 1, 'un doble clic no la manda dos veces');
       await chat.getByText(/^Plantilla aprobada · Equipo/).waitFor();
-      const ultimo = whatsapp.enviados.at(-1);
-      assert.deepEqual({ ...ultimo, waId: null }, { waId: null, telefono: cerrada.telefono, tipo: 'plantilla', nombre: 'iemec_como_quedamos', idioma: 'es', variables: [cerrada.nombre, 'tu depilación láser'], botonUrl: null });
+      assert.deepEqual([whatsapp.enviados.length, await salientes(cerrada.id)], [enviados + 1, guardados + 1]);
+      assert.deepEqual(lleva(whatsapp.enviados.at(-1), ['telefono', 'tipo', 'nombre', 'variables']),
+        { telefono: cerrada.telefono, tipo: 'plantilla', nombre: 'iemec_como_quedamos', variables: [cerrada.nombre, 'tu depilación láser'] });
+      pagina.off('request', apuntar);
+
+      // La de Alba, ya cerrada con su cita: la IA le mandó el enlace de «Tu cita» en su burbuja (aqua).
+      const [alba] = await q("SELECT c.id, p.nombre FROM conversaciones c JOIN pacientes p ON p.id = c.paciente_id WHERE c.motivo_cierre = 'cita' ORDER BY c.id LIMIT 1");
+      await abrir(alba.nombre);
+      await chat.getByRole('link', { name: /\/c\// }).first().waitFor();
+      await revisar(pagina, 'Conversaciones · la IA le mandó su cita', problemas);
       assert.deepEqual(problemas, []);
       sinErrores();
     });
@@ -420,24 +508,27 @@ test('el panel de punta a punta en Chromium, con la demostración a una hora fij
       const problemas = [];
       await ir('resenas');
       const resenas = await q("SELECT id, google_id, autor, borrador_respuesta FROM resenas WHERE estado = 'borrador' ORDER BY publicada_en DESC");
-      assert.equal(await cifra('Sin responder'), String(resenas.length));
+      assert.ok(resenas.length >= 2, 'la demo deja reseñas con su respuesta preparada');
+      // Cada una con su respuesta propuesta, que aprueba una persona: tantas por aprobar como en la base.
+      const tarjetaDe = (r) => pagina.getByRole('listitem').filter({ hasText: r.autor });
+      const aprobar = (donde) => donde.getByRole('button', { name: 'Aprobar y publicar' });
+      for (const r of resenas) await aprobar(tarjetaDe(r)).waitFor();
+      assert.equal(await aprobar(pagina).count(), resenas.length);
       await revisar(pagina, 'Reseñas', problemas);
       const [una, otra] = resenas;
-      const tarjetaDe = (r) => pagina.getByRole('listitem').filter({ hasText: r.autor });
       const respuesta = `${una.borrador_respuesta} ¡Hasta pronto!`;
       await tarjetaDe(una).getByRole('textbox').fill(respuesta);
-      await tarjetaDe(una).getByRole('button', { name: 'Aprobar y publicar' }).click();
-      await tarjetaDe(una).getByText('Respuesta publicada').waitFor();
+      await aprobar(tarjetaDe(una)).click();
       await tarjetaDe(una).getByText(respuesta).waitFor();
-      assert.equal(await tarjetaDe(una).getByRole('button', { name: 'Aprobar y publicar' }).count(), 0);
+      await aprobar(tarjetaDe(una)).waitFor({ state: 'detached' });
       assert.deepEqual(google.publicadas, [{ googleId: una.google_id, texto: respuesta }]);
       const [r1] = await q('SELECT estado, aprobada_por FROM resenas WHERE id = ?', [una.id]);
       assert.deepEqual([r1.estado, r1.aprobada_por], ['publicada', 'demo@iemec']);
-      assert.equal(await hasta(async () => (await cifra('Sin responder')) === String(resenas.length - 1)), true, 'una menos sin responder');
+      assert.equal(await aprobar(pagina).count(), resenas.length - 1, 'una menos por aprobar');
 
       // Una reseña es pública: si la respuesta nombra un tratamiento, no se publica.
       await tarjetaDe(otra).getByRole('textbox').fill('Gracias por confiar en nosotros para tu tratamiento de toxina, te esperamos.');
-      await tarjetaDe(otra).getByRole('button', { name: 'Aprobar y publicar' }).click();
+      await aprobar(tarjetaDe(otra)).click();
       await pagina.getByRole('alert').filter({ hasText: 'La respuesta nombra un tratamiento' }).waitFor();
       assert.equal(google.publicadas.length, 1);
       assert.equal((await q('SELECT estado FROM resenas WHERE id = ?', [otra.id]))[0].estado, 'borrador');
@@ -527,29 +618,44 @@ test('el panel de punta a punta en Chromium, con la demostración a una hora fij
       const cita = await citaDe("c.estado = 'confirmada' AND c.inicio > ? AND c.inicio < ?", [AHORA, manana0]);
       await tarjeta(cita).click();
       const dialogo = pagina.getByRole('dialog', { name: `${cita.nombre} ${cita.apellidos}` });
-      const [tuCita] = await Promise.all([contexto.waitForEvent('page'), dialogo.getByRole('link', { name: 'Su página «Tu cita» (se abre en otra pestaña)' }).click()]);
+      // Su enlace (el que le llega por WhatsApp) se abre desde la cita, en otra pestaña.
+      const enlace = dialogo.getByRole('link', { name: 'Su página «Tu cita» (se abre en otra pestaña)' });
+      const href = await enlace.getAttribute('href');
+      assert.match(href, /^\/c\/[\w-]{20,}$/);
+      const [tuCita] = await Promise.all([contexto.waitForEvent('page'), enlace.click()]);
       await tuCita.getByRole('heading', { level: 1, name: 'Tu cita' }).waitFor();
-      assert.equal(new URL(tuCita.url()).pathname, `/c/${cita.token}`);
+      assert.equal(tuCita.url(), `${base}${href}`);
       await tuCita.getByText(`martes 6 de octubre, a las ${cita.hora}`).waitFor();
-
-      const [descarga] = await Promise.all([tuCita.waitForEvent('download'), tuCita.getByRole('link', { name: 'Añadir a mi calendario' }).click()]);
-      const ics = fs.readFileSync(await descarga.path(), 'utf8');
-      const utc = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-      assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
-      assert.match(ics, new RegExp(`DTSTART:${utc(cita.inicio)}\r\n`));
-      assert.match(ics, /STATUS:CONFIRMED/);
-      const google = await tuCita.getByRole('link', { name: 'Google' }).getAttribute('href');
-      assert.match(google, new RegExp(`^https://calendar\\.google\\.com/calendar/render\\?action=TEMPLATE&.*dates=${utc(cita.inicio)}%2F`));
       await revisar(tuCita, '«Tu cita»', problemas);
-
-      await tuCita.getByRole('button', { name: 'Cancelar la cita' }).click();
-      await tuCita.getByRole('heading', { level: 1, name: 'Cita cancelada' }).waitFor();
-      await tuCita.getByText('Cita cancelada. Cuando quieras, te buscamos otro hueco por WhatsApp.').waitFor();
-      assert.equal(await tuCita.getByRole('link', { name: 'Añadir a mi calendario' }).count(), 0);
-      const [c] = await q('SELECT estado, cancelada_por FROM citas WHERE id = ?', [cita.id]);
-      assert.deepEqual([c.estado, c.cancelada_por], ['cancelada', 'paciente']);
-      await revisar(tuCita, '«Tu cita» cancelada', problemas);
       await tuCita.close();
+
+      // El paciente la abre en su móvil: «Añadir a mi calendario» le da el .ics, y también está Google.
+      // Después la cancela.
+      const movil = await nuevoContexto(IPHONE);
+      try {
+        const tel = await movil.newPage();
+        await tel.goto(`${base}${href}`);
+        await tel.getByRole('heading', { level: 1, name: 'Tu cita' }).waitFor();
+        const [descarga] = await Promise.all([tel.waitForEvent('download'), tel.getByRole('link', { name: 'Añadir a mi calendario' }).click()]);
+        const ics = fs.readFileSync(await descarga.path(), 'utf8');
+        const utc = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+        assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
+        assert.match(ics, new RegExp(`DTSTART:${utc(cita.inicio)}\r\n`));
+        assert.match(ics, /STATUS:CONFIRMED/);
+        const enGoogle = await tel.getByRole('link', { name: /^Google/ }).getAttribute('href');
+        assert.match(enGoogle, new RegExp(`^https://calendar\\.google\\.com/calendar/render\\?action=TEMPLATE&.*dates=${utc(cita.inicio)}%2F`));
+        await revisar(tel, '«Tu cita» en el móvil', problemas);
+
+        await tel.getByRole('button', { name: 'Cancelar la cita' }).click();
+        await tel.getByRole('heading', { level: 1, name: 'Cita cancelada' }).waitFor();
+        await tel.getByText('Cita cancelada. Cuando quieras, te buscamos otro hueco por WhatsApp.').waitFor();
+        assert.equal(await tel.getByRole('link', { name: 'Añadir a mi calendario' }).count(), 0);
+        const [c] = await q('SELECT estado, cancelada_por FROM citas WHERE id = ?', [cita.id]);
+        assert.deepEqual([c.estado, c.cancelada_por], ['cancelada', 'paciente']);
+        await revisar(tel, '«Tu cita» cancelada', problemas);
+      } finally {
+        await movil.close();
+      }
 
       // En la agenda ya no está.
       await ir('agenda');
@@ -608,10 +714,26 @@ test('el panel de punta a punta en Chromium, con la demostración a una hora fij
       assert.deepEqual(problemas, []);
       sinErrores();
     });
+
+    // La última: deja una sola cita confirmada hoy y una sola recuperada por WhatsApp este mes (lo que
+    // se toca de la demo ya no lo mira ninguna otra).
+    await t.test('Hoy: con una sola, en singular', async () => {
+      const confirmadas = await q("SELECT id FROM citas WHERE estado = 'confirmada' AND inicio >= ? AND inicio < ? ORDER BY inicio, id", [hoy0, manana0]);
+      assert.ok(confirmadas.length > 1);
+      await q("UPDATE citas SET estado = 'cancelada' WHERE id IN (?)", [confirmadas.slice(1).map((c) => c.id)]);
+      const recuperadas = await q(`SELECT id FROM citas WHERE creado_en >= ? AND origen = 'ia_whatsapp'
+        AND estado NOT IN ('cancelada','reprogramada','retenida','no_presentada') ORDER BY id`, [T.desdeMadrid('2026-10-01', '00:00')]);
+      assert.ok(recuperadas.length > 1);
+      await q("UPDATE citas SET origen = 'recepcion' WHERE id IN (?)", [recuperadas.slice(1).map((c) => c.id)]);
+      await ir('hoy');
+      assert.match(await detalle('Citas hoy'), /^1 confirmada( · |$)/);
+      assert.equal(await detalle('Recuperado este mes'), '1 cita cerrada por WhatsApp');
+      sinErrores();
+    });
   } finally {
     if (modoDemo === undefined) delete process.env.MODO_DEMO; else process.env.MODO_DEMO = modoDemo;
     await navegador.close();
     if (servidor) servidor.close();
-    await pool.end();
+    if (pool) await pool.end();
   }
 });
