@@ -19,7 +19,7 @@ test('cron de cada minuto', async (t) => {
       assert.equal(i.sinProximoPaso, undefined);
       assert.equal(i.seguimientos, 0);
       assert.equal(i.secuencias, 0);
-      assert.deepEqual(i.cola, { hechos: 0, reintentos: 0, fallidos: 0 });
+      assert.deepEqual(i.cola, { hechos: 0, reintentos: 0, fallidos: 0, aplazados: 0 });
     });
     await t.test('con los datos de la clínica cargados tampoco', async () => {
       await semillar(pool);

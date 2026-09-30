@@ -31,6 +31,29 @@ test('cola y candados', async (t) => {
       assert.equal(f.estado, 'fallido');
       assert.match(f.ultimo_error, /caído/);
     });
+    await t.test('aplazar: vuelve a la cola sin gastar intento, aunque se aplace muchas veces', async () => {
+      const id = await cola.encolar(pool, 'espera', {}, { maxIntentos: 1 });
+      let listo = false;
+      const man = { espera: async () => (listo ? 'hecho' : cola.aplazar({ minutos: 1 })) };
+      const ahora = new Date('2026-10-06T10:00:00Z');
+      for (let i = 0; i < 3; i++) assert.deepEqual(await cola.procesar(pool, man, { ahora: new Date(ahora.getTime() + i * 60000) }), { hechos: 0, reintentos: 0, fallidos: 0, aplazados: 1 });
+      const [[f]] = await pool.query('SELECT estado, intentos, ejecutar_en FROM cola WHERE id = ?', [id]);
+      assert.deepEqual([f.estado, f.intentos], ['pendiente', 0]);
+      assert.equal(f.ejecutar_en.getTime(), ahora.getTime() + 3 * 60000, 'dentro de un minuto');
+      assert.equal((await cola.procesar(pool, man, { ahora: new Date(ahora.getTime() + 2 * 60000) })).aplazados, 0, 'antes de su hora no se coge');
+      listo = true;
+      assert.equal((await cola.procesar(pool, man, { ahora: new Date(ahora.getTime() + 3 * 60000) })).hechos, 1);
+    });
+    await t.test('con el tiempo de la vuelta agotado, lo que queda vuelve a la cola para la siguiente', async () => {
+      for (let i = 0; i < 3; i++) await cola.encolar(pool, 'lento', { i });
+      const hechos = [];
+      const man = { lento: async (c) => { hechos.push(c.i); } };
+      const r = await cola.procesar(pool, man, { cortarEn: Date.now() - 1 });
+      assert.deepEqual([r.hechos, r.aplazados, hechos.length], [0, 3, 0]);
+      const [filas] = await pool.query("SELECT estado, intentos FROM cola WHERE tipo = 'lento'");
+      assert.ok(filas.every((f) => f.estado === 'pendiente' && f.intentos === 0));
+      assert.equal((await cola.procesar(pool, man)).hechos, 3, 'y el siguiente cron los hace');
+    });
     await t.test('candado: dos a la vez, solo uno ejecuta', async () => {
       const r = await Promise.all([1, 2].map((n) => cola.conCandado(pool, 'cron-minuto', 55000, async () => { await new Promise((ok) => setTimeout(ok, 50)); return n; })));
       assert.equal(r.filter((x) => x.ejecutado).length, 1);

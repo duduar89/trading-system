@@ -2,6 +2,12 @@
 // Cola de trabajos en MariaDB. La vacía el cron cada minuto: cada trabajador coge los suyos con
 // SELECT … FOR UPDATE SKIP LOCKED, así dos cron a la vez nunca hacen el mismo trabajo dos veces.
 // Si un trabajo falla, se reintenta con espera creciente (1, 2, 4, 8… minutos) hasta max_intentos.
+// Un trabajo que todavía no puede hacerse (p. ej., espera a otro del mismo paciente) se aplaza: vuelve
+// a la cola sin gastar intento. Y una vuelta con tiempo tasado (cortarEn) deja lo que no le da tiempo
+// para la siguiente, también sin gastar intento.
+const APLAZADO = Symbol('aplazado');
+const aplazar = ({ minutos = 1 } = {}) => ({ [APLAZADO]: true, minutos });
+
 async function encolar(con, tipo, carga = {}, { ejecutarEn = new Date(), claveUnica = null, maxIntentos = 5 } = {}) {
   const [r] = await con.query(
     `INSERT INTO cola (tipo, carga, ejecutar_en, clave_unica, max_intentos) VALUES (?, ?, ?, ?, ?)
@@ -33,12 +39,28 @@ async function tomar(pool, { limite = 10, ahora = new Date(), tipos = null } = {
   }
 }
 
-async function procesar(pool, manejadores, { limite = 10, ahora = new Date() } = {}) {
+async function devolver(pool, t, { ahora, minutos = 0 }) {
+  await pool.query("UPDATE cola SET estado = 'pendiente', intentos = GREATEST(intentos - 1, 0), ejecutar_en = ?, bloqueado_hasta = NULL WHERE id = ?",
+    [new Date(ahora.getTime() + minutos * 60000), t.id]);
+}
+
+// cortarEn: instante (Date.now()) a partir del cual no se empieza ningún trabajo más.
+async function procesar(pool, manejadores, { limite = 10, ahora = new Date(), cortarEn = null } = {}) {
   const trabajos = await tomar(pool, { limite, ahora, tipos: Object.keys(manejadores) });
-  const resumen = { hechos: 0, reintentos: 0, fallidos: 0 };
+  const resumen = { hechos: 0, reintentos: 0, fallidos: 0, aplazados: 0 };
   for (const t of trabajos) {
+    if (cortarEn != null && Date.now() >= cortarEn) {
+      await devolver(pool, t, { ahora });
+      resumen.aplazados++;
+      continue;
+    }
     try {
-      await manejadores[t.tipo](t.carga, { trabajo: t, ahora });
+      const r = await manejadores[t.tipo](t.carga, { trabajo: t, ahora });
+      if (r?.[APLAZADO]) {
+        await devolver(pool, t, { ahora, minutos: r.minutos });
+        resumen.aplazados++;
+        continue;
+      }
       await pool.query("UPDATE cola SET estado = 'hecho', terminado_en = ?, ultimo_error = NULL WHERE id = ?", [ahora, t.id]);
       resumen.hechos++;
     } catch (err) {
@@ -80,4 +102,4 @@ async function unaVez(pool, clave, hasta, fn) {
   return { ejecutado: true, resultado: await fn() };
 }
 
-module.exports = { encolar, tomar, procesar, rescatarAtascados, conCandado, unaVez };
+module.exports = { encolar, tomar, procesar, aplazar, rescatarAtascados, conCandado, unaVez };
