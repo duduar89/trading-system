@@ -1415,10 +1415,11 @@ function enlaceDelBoton(plantilla, valor) {
   return boton?.url ? boton.url.replace('{{1}}', valor) : `${config.urlPublica}/c/${valor}`;
 }
 
-// «Valoración HIFU» → «valoración HIFU» (para ponerlo en mitad de una frase sin romper las siglas).
+// «Valoración HIFU» → «valoración HIFU» (para ponerlo en mitad de una frase sin romper las siglas). Un
+// nombre propio escrito como tal («Head Spa Detox Purificante») se queda como está.
 function enMinuscula(nombre) {
   const t = String(nombre || '');
-  return /^[A-ZÁÉÍÓÚÑ]{2,}\b/.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1);
+  return /^[A-ZÁÉÍÓÚÑ]{2,}\b/.test(t) || /^\S+\s+[A-ZÁÉÍÓÚÑ]/.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1);
 }
 
 async function plantillasBd(q) {
