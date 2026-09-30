@@ -247,32 +247,45 @@ const POSITIVO = /(genial|excelente|perfect|encantad|recomiendo|maravill|estupen
 
 // Lo que dice una reseña de una posible complicación o de una reclamación: dirección médica. Con sus
 // formas corrientes («se me infectaron», «me quemé», «poner una demanda», «lo llevaré a juicio», «una
-// reclamación en Consumo»). Las de contexto (cicatriz, hematoma, inflamación, parálisis) también salen
-// en reseñas contentas («me han mejorado mucho las cicatrices»): solo cuentan si la reseña no lo es.
+// reclamación en Consumo», «tuve que ir de urgencia») y también en francés y en inglés (el injerto
+// capilar tiene pacientes de Francia: «infection», «brûlure», «urgences», «porter plainte», «avocat»;
+// «burn», «lawyer», «lawsuit»). Las de contexto (cicatriz, hematoma, inflamación, parálisis, urgencia,
+// antibióticos, fiebre, «burn») también salen en reseñas contentas («me han mejorado mucho las
+// cicatrices», «cita de urgencia», «burn fat»): solo cuentan si la reseña no lo es. «Demanda» suelta
+// cuenta, salvo la de «mucha demanda» (no se consigue cita).
 const ALERTAS_CLINICAS = [
   ['infección', /\binfec\w*/],
-  ['quemadura', /\b(quemaduras?|quemad[oa]s?|quem[eo]|quemaron|quemazon)\b/],
-  ['complicación', /\bcomplicacion(es)?\b/],
-  ['necrosis', /\b(necrosis|necrosad[oa]s?)\b/],
-  ['urgencias', /\b(urgencias|hospital(izad[oa]s?|izacion)?|ingresad[oa]s?|ambulancia)\b/],
-  ['reacción grave', /\b(reaccion alergica|anafila\w*|hemorragia|embolia|trombosis|ceguera|perdida de (vision|vista))\b/],
-  ['denuncia', new RegExp(['\\b(denunci\\w*|juzgados?|negligencia|mala praxis|reclamacion(es)?|reclamare(mos)?|demandar\\w*|demandad[oa]s?',
-    '(poner|puesto|pondre|pondremos|interponer|interpuesto|presentar|presentado|presentare) (una )?demanda|demanda judicial',
-    'a juicio|en (el |un )?juicio|juicio (contra|por)|oficina de consumo|(en|a) consumo|omic)\\b'].join('|'))],
-  ['abogado', /\b(abogad[oa]s?|bufete|via judicial|tribunales)\b/],
-  ['cicatriz', /\bcicatri(z|ces)\b/, { contexto: true }],
-  ['hematoma', /\bhematomas?\b/, { contexto: true }],
+  ['quemadura', /\b(quemaduras?|quemad[oa]s?|quem[eo]|quemaron|quemazon|brul(ure|ures|e|ee|es|ees))\b/],
+  ['complicación', /\b(complicacion(es)?|complications?)\b/],
+  ['necrosis', /\bnecro[st]\w*/],
+  ['urgencias', /\b(urgencias|urgences|emergency room|the er|hospital(es|izad[oa]s?|izacion|i[sz]ed|i[sz]ation|ise|isee|ises|isees)?|hopital(aux)?|ingresad[oa]s?|ambulancias?|ambulances?)\b/],
+  ['reacción grave', new RegExp(['\\b(reaccion alergica|reaction allergique|allergic reaction|anafila\\w*|anaphyla\\w*|hemorragi\\w*|ha?emorrhag\\w*',
+    'embolia|embolie|embolism|trombosis|thrombos\\w*|ceguera|cecite|blindness|perdida de (vision|vista)|absceso|abces|abscess(es)?|pus|granulomas?)\\b'].join('|'))],
+  ['denuncia', new RegExp(['\\b(denunci\\w*|juzgados?|neglig\\w*|mala praxis|malpractice|reclamacion(es)?|reclamare(mos)?|reclamations?',
+    'demandar\\w*|demandad[oa]s?|(?<!\\b(?:mucha|tanta|alta|gran|poca|bastante|mayor|menor|de) )demandas?',
+    'a juicio|en (el |un )?juicio|juicio (contra|por)|oficina de consumo|(en|a) consumo|omic',
+    'plaintes?|proces|en justice|(will|gonna|to|ll) sue|su(ed|ing)|(to|in) court|formal complaint)\\b'].join('|'))],
+  ['abogado', /\b(abogad[oa]s?|bufete|via judicial|tribunal(es)?|avocat(e|s|es)?|lawyers?|attorneys?|lawsuits?|legal action)\b/],
+  ['quemadura', /\bburn(s|ed|t|ing)?\b/, { contexto: true }],
+  ['cicatriz', /\b(cicatri(z|ces|ce)|scar(s|ring|red)?)\b/, { contexto: true }],
+  ['hematoma', /\b(hematomas?|hematomes?|bruis(e|es|ed|ing))\b/, { contexto: true }],
   ['inflamación', /\binflam\w*/, { contexto: true }],
-  ['parálisis', /\b(paralisis|paraliz\w*)\b/, { contexto: true }],
+  ['parálisis', /\b(paralisis|paraliz\w*|paralys\w*|paralyz\w*)\b/, { contexto: true }],
+  ['urgencias', /\b(urgencia|urgence|emergency)\b/, { contexto: true }],
+  ['antibióticos', /\bantibiotic\w*/, { contexto: true }],
+  ['fiebre', /\b(fiebre|fievre|fever)\b/, { contexto: true }],
 ].map(([nombre, rx, o = {}]) => [nombre, new RegExp(rx.source, 'g'), o]);
 
 // «Sin ninguna complicación», «cero complicaciones», «no tuve ninguna infección», «me explicaron las
-// posibles complicaciones»: el término no cuenta si una de las cuatro palabras de antes, en la misma
-// frase, lo niega o lo deja en el aire. La frase se corta en la puntuación y en «pero», «aunque»…: en
-// «sin dolor, pero con una quemadura», la quemadura cuenta.
+// posibles complicaciones» (y «sans complication», «no complications», «without any infection»): el
+// término no cuenta si una de las cuatro palabras de antes, en la misma frase, lo niega o lo deja en el
+// aire. La frase se corta en la puntuación y en «pero», «aunque», «but», «mais»…: en «sin dolor, pero
+// con una quemadura», la quemadura cuenta.
 const NIEGAN = new Set(['sin', 'ningun', 'ninguna', 'ninguno', 'ningunas', 'ningunos', 'cero', 'ni', 'no', 'nada', 'nunca', 'jamas',
-  'posible', 'posibles', 'riesgo', 'riesgos', 'evitar', 'prevenir']);
-const CORTA_LA_FRASE = /[.,;:!?()\n]|\b(?:pero|aunque|sino|salvo|excepto)\b/;
+  'posible', 'posibles', 'riesgo', 'riesgos', 'evitar', 'prevenir',
+  'sans', 'aucun', 'aucune', 'pas', 'jamais', 'rien', 'risque', 'risques', 'eviter',
+  'without', 'never', 'not', 'any', 'zero', 'didn', 'wasn', 'weren', 'hasn', 'haven', 'hadn', 'isn', 'risk', 'risks', 'possibly', 'avoid', 'prevent']);
+const CORTA_LA_FRASE = /[.,;:!?()\n]|\b(?:pero|aunque|sino|salvo|excepto|but|although|however|mais|sauf|pourtant)\b/;
 
 function negado(t, desde) {
   const frase = t.slice(0, desde).split(CORTA_LA_FRASE).at(-1) || '';
@@ -281,9 +294,9 @@ function negado(t, desde) {
 
 // Las alertas de un texto ya normalizado: cada término cuenta si aparece al menos una vez sin negar.
 function alertasDe(t, { contento = false } = {}) {
-  return ALERTAS_CLINICAS
+  return [...new Set(ALERTAS_CLINICAS
     .filter(([, rx, o]) => !(o.contexto && contento) && [...t.matchAll(rx)].some((m) => !negado(t, m.index)))
-    .map(([nombre]) => nombre);
+    .map(([nombre]) => nombre))];
 }
 
 function sentimientoPorNota(nota) {
@@ -462,17 +475,68 @@ function borradorRespuesta(resena, { indice = 0, telefono = TELEFONO, recientes 
 }
 
 const FECHAS = /\b(lunes|martes|miercoles|jueves|viernes|sabado|domingo|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|ayer|anteayer|semana pasada|mes pasado)\b|\b\d{1,2}[/.-]\d{1,2}([/.-]\d{2,4})?\b/;
-const CONFIRMA_PACIENTE = /\b(pacientes?|tus? (proxim[ao]s? |ultim[ao]s? |primer[ao]? )?(cita|citas|sesion|sesiones|consulta|visita|visitas|intervencion|operacion|diagnostico|historial|historia clinica|revision)|te (atendimos|atendio|atendieron|tratamos|operamos|pinchamos|hicimos)|cuando (viniste|estuviste))\b/;
-const LO_DICE_QUIEN_ESCRIBE = /\b(mi (cita|tratamiento|sesion|consulta|visita|operacion|intervencion|revision|primera)|fui|vine|he ido|he venido|acudi|me (atendio|atendieron|hicieron|hice|trataron|pusieron|opere|operaron|realice|realizaron)|estuve (en|alli|ahi))\b/;
+// Lo que da a entender que quien escribe ha venido (y a qué): «tu próxima cita», «la siguiente
+// revisión», «cuando vuelvas», «verte de nuevo», «gracias por tu confianza», «la zona tratada»…
+const CONFIRMA_PACIENTE = new RegExp(`\\b(${[
+  'pacientes?',
+  'tus? (proxim[ao]s? |ultim[ao]s? |primer[ao]? |siguientes? |nuev[ao]s? |otr[ao]s? )?(cita|citas|sesion|sesiones|consulta|consultas|visita|visitas|intervencion|operacion|diagnostico'
+    + '|historial|historia clinica|revision|revisiones|resultados?|evolucion|recuperacion|postoperatorio)',
+  '(la|una|otra|su|vuestra|nuestra) (proxim[ao]|siguiente|nueva|otra|segunda|ultima) (cita|sesion|consulta|visita|revision|vez que (vengas|vuelvas|nos visites))',
+  'te (atendimos|atendio|atendieron|tratamos|operamos|pinchamos|hicimos)',
+  'cuando (viniste|estuviste|vuelvas|vengas|regreses)',
+  '(verte|vernos|tenerte) (de nuevo|otra vez)',
+  'te esperamos (de nuevo|otra vez|en tu|en la proxima|en la siguiente)',
+  '(volver|vuelvas|vuelves|regresar|regreses) a (vernos|visitarnos)',
+  '(gracias|agradecemos) por (tu |la |vuestra )?(visita|confianza)',
+  'por (confiar|haber confiado) en nosotros|por (elegirnos|habernos elegido|venir|haber venido)',
+  'zona (tratada|a tratar)',
+].join('|')})\\b`);
+const LO_DICE_QUIEN_ESCRIBE = /\b(mi (cita|tratamiento|sesion|consulta|visita|operacion|intervencion|revision|primera)|fui|vine|he ido|he venido|acudi|me (atendio|atendieron|hicieron|hice|trataron|pusieron|opere|operaron|realice|realizaron)|estuve (en|alli|ahi)|volvere|repetire|primera vez|soy (paciente|clienta|cliente))\b/;
 const TRATAMIENTOS_GENERICOS = [
   'tratamiento', 'tratamientos', 'sesion', 'sesiones', 'intervencion', 'operacion', 'cirugia', 'toxina', 'botox', 'relleno', 'rellenos',
   'acido hialuronico', 'hialuronico', 'injerto', 'laser', 'hifu', 'peeling', 'mesoterapia', 'depilacion', 'liposuccion', 'lipo',
   'micropigmentacion', 'labios', 'ojeras', 'arrugas', 'papada', 'calvicie', 'alopecia', 'caida del pelo', 'caida del cabello',
   'celulitis', 'flacidez', 'manchas', 'acne',
 ];
-const SALUD = /\b(infeccion|quemadura|complicacion|necrosis|cicatriz|inflamacion|hematoma|efectos? secundarios?|reaccion|alergia|diagnostico|medicacion|embarazo|dolor)\b/;
+const SALUD = /\b(infeccion(es)?|quemaduras?|complicacion(es)?|necrosis|cicatri(z|ces)|inflamacion(es)?|hematomas?|efectos? secundarios?|reaccion(es)?|alergias?|diagnosticos?|medicacion|embarazo|dolor(es)?)\b/;
+// El cuerpo, el peso y lo íntimo (hay ginecología estética, sexualidad masculina y pérdida de peso en el
+// catálogo): decir en público «tu nariz», «esos kilos de menos» o «la incontinencia» es decir a qué vino.
+// «Con los brazos abiertos» no es el cuerpo.
+const CUERPO = new RegExp(`\\b(${[
+  'nariz', 'pechos?', 'senos', 'busto', 'abdomen', 'barriga', 'tripa', 'vientre', 'gluteos?', 'nalgas?', 'caderas?', 'muslos?', 'piernas?', 'brazos?(?! abiertos)',
+  'axilas?', 'cuello', 'escote', 'rostro', 'tu cara', 'tu cuerpo', 'tu figura', 'pomulos?', 'menton', 'mandibula', 'parpados?', 'cejas?', 'pestanas?', 'orejas?',
+  'ombligo', 'piel', 'cutis', 'poros', 'pelo', 'cabellos?', 'cuero cabelludo', 'coronilla', 'calva', 'barba', 'zona intima',
+  'kilos?', 'kg', 'peso', 'adelgaz\\w*', 'engord\\w*', 'sobrepeso', 'obesidad', 'grasa', 'michelines', 'dieta', 'apetito',
+  'vagina\\w*', 'vulva\\w*', 'intim[oa]s?', 'genital\\w*', 'perine\\w*', 'clitoris', 'pene', 'ereccion(es)?', 'erectil', 'sexual\\w*', 'incontinencia',
+  'urinari[oa]s?', 'prolapsos?', 'suelo pelvico', 'menopausia', 'ginecolog\\w*', 'condilomas?', 'verrugas?', 'varices', 'estrias', 'sudor', 'hiperhidrosis',
+  'hinchaz\\w*', 'moratones?', 'heridas?', 'puntos de sutura', 'postoperatorio', 'recuperacion', 'antibioticos?', 'fiebre', 'pastillas?', 'medicamentos?', 'receta',
+].join('|')})\\b`);
 const ENLACES = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|es|net|org|info)\b|@)/;
-const PROMOCION = /(\d+ ?%|descuento|oferta|promo|promocion|rebaja|gratis|regalo|2x1|3x2|precio especial|sorteo|cupon|\bbono\b|\b\d+ ?(€|eur|euros)\b)/;
+const PROMOCION = /(\d+ ?%|descuento|oferta|promo|promocion|rebaja|gratis|gratuit[oa]s?|regalo|2x1|3x2|precio especial|sorteo|cupon|\bbono\b|\b\d+ ?(€|eur|euros)\b)/;
+
+// Las palabras sueltas de los nombres del catálogo dicen qué tratamiento es («rinomodelación»,
+// «glúteos», «vaginal», «exosomas»), aunque no esté el nombre entero: cuentan las de cinco letras o
+// más, menos las de uso corriente que también salen en esos nombres («consulta», «equipo médico»,
+// «precio», «limpieza», «valoración»…). El nombre de la clínica («… Estética y Capilar») no cuenta.
+const PALABRAS_CORRIENTES = new Set([
+  'valoracion', 'aumento', 'localizada', 'medico', 'medica', 'medicos', 'protocolo', 'eliminacion', 'eliminar', 'contra', 'regalo', 'diagnostico', 'consulta',
+  'remodelacion', 'mujer', 'hombre', 'tarjeta', 'codigo', 'barras', 'minutos', 'perdida', 'reduccion', 'reducir', 'japones', 'gratuita', 'gratuito', 'efecto',
+  'correccion', 'pulsada', 'intensa', 'promocional', 'cuerpo', 'tecnologia', 'relajante', 'perder', 'esfuerzo', 'apertura', 'suelo', 'recuperacion', 'premium',
+  'personalizada', 'personalizado', 'superior', 'perfect', 'programa', 'higiene', 'zonas', 'precio', 'precios', 'manual', 'definitiva', 'definitivo',
+  'completo', 'completa', 'azules', 'reparacion', 'inclusive', 'pacientes', 'paciente', 'francia', 'frances', 'linea', 'frontal', 'express', 'pareja',
+  'encuesta', 'satisfaccion', 'primera', 'visita', 'generico', 'general', 'definicion', 'limpieza', 'profunda', 'suave', 'cabina', 'venta', 'original',
+  'acumulada', 'brazos', 'excesiva', 'integral', 'control', 'ayuda', 'coaching', 'asesoramiento', 'menores', 'cierre', 'cirujano', 'plastico', 'estudio',
+  'avanzado', 'meses', 'mercado', 'restauracion', 'online', 'fisico', 'packaging', 'exclusivo', 'tratamiento', 'tratamientos', 'sesion', 'sesiones',
+  'equipo', 'clinica',
+]);
+const NOMBRE_CLINICA = /\b(instituto europeo de )?medicina estetica y capilar\b/g;
+function palabrasDeTratamientos(tratamientos = []) {
+  const palabras = new Set();
+  for (const nombre of tratamientos) {
+    for (const w of normalizar(nombre).split(/[^a-z0-9]+/)) if (w.length >= 5 && !/\d/.test(w) && !PALABRAS_CORRIENTES.has(w)) palabras.add(w);
+  }
+  return palabras;
+}
 const CON_GENERO = /\b(atendid[oa]s?|content[oa]s?|encantad[oa]s?|satisfech[oa]s?|bienvenid[oa]s?|acompanad[oa]s?|tranquil[oa]s?)\b/;
 
 const escapar = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -505,13 +569,17 @@ function revisarRespuesta(texto, { resena = {}, tratamientos = [], profesionales
   if (Buffer.byteLength(bruto, 'utf8') > 4096) errores.push('Es demasiado larga para Google (4.096 bytes como mucho).');
   else if (bruto.length > 700) avisos.push('Mejor más breve: unas pocas frases.');
 
-  const nombres = [...new Set([...TRATAMIENTOS_GENERICOS, ...MEDICAMENTOS, ...MARCAS_SANITARIAS, ...tratamientos].map((x) => normalizar(x)).filter((x) => x.length >= 3))];
-  const tratamiento = nombres.find((x) => new RegExp(`\\b${escapar(x)}\\b`).test(t));
-  if (tratamiento) errores.push(`La respuesta nombra un tratamiento («${comoEnElTexto(bruto, tratamiento)}»): una reseña es pública y no puede llevar datos de salud.`);
-  const salud = SALUD.exec(t);
-  if (salud) errores.push(`Habla de salud («${comoEnElTexto(bruto, salud[1])}»): en público, ni un detalle; se habla en privado.`);
-
   const quien = normalizar(primerNombre(resena.autor));
+  // El nombre completo de la clínica («… Estética y Capilar») no nombra ningún tratamiento.
+  const sinClinica = t.replace(NOMBRE_CLINICA, ' ');
+  const nombres = [...new Set([...TRATAMIENTOS_GENERICOS, ...MEDICAMENTOS, ...MARCAS_SANITARIAS, ...tratamientos].map((x) => normalizar(x)).filter((x) => x.length >= 3))];
+  const sueltas = palabrasDeTratamientos(tratamientos);
+  const tratamiento = nombres.find((x) => new RegExp(`\\b${escapar(x)}\\b`).test(sinClinica))
+    || sinClinica.split(/[^a-z0-9]+/).find((w) => w && w !== quien && sueltas.has(w));
+  if (tratamiento) errores.push(`La respuesta nombra un tratamiento («${comoEnElTexto(bruto, tratamiento)}»): una reseña es pública y no puede llevar datos de salud.`);
+  const salud = SALUD.exec(t) || CUERPO.exec(sinClinica);
+  if (salud && salud[1] !== tratamiento) errores.push(`Habla de salud o del cuerpo («${comoEnElTexto(bruto, salud[1])}»): en público, ni un detalle; se habla en privado.`);
+
   const equipo = nombresDelEquipo(profesionales);
   const nombrado = t.split(/[^a-z]+/).find((w) => w && w !== quien && equipo.has(w));
   if (TITULOS_EQUIPO.test(t) || nombrado) errores.push(`Nombra a alguien del equipo${nombrado ? ` («${comoEnElTexto(bruto, nombrado)}»)` : ''}: en una respuesta pública no se nombra a nadie.`);

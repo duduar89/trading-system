@@ -302,6 +302,13 @@ async function tareaAlerta(q, resena, { urgente, ahora }) {
   return t.insertId;
 }
 
+// El updateTime de Google trae milisegundos («…T15:00:00.387Z») y actualizada_en es un DATETIME sin
+// fracción (MariaDB la trunca; MySQL la redondea): se guarda ya al segundo y se compara al segundo. Si
+// no, cada lectura de una reseña sin cambios la daría por editada y volvería a guardar su texto y su
+// autor (el plazo de los 29 días no acabaría nunca).
+const alSegundo = (d) => (d ? new Date(Math.floor(new Date(d).getTime() / 1000) * 1000) : null);
+const posterior = (a, b) => alSegundo(a).getTime() > alSegundo(b).getTime();
+
 async function insertarNueva(pool, r, ctx, ahora, salida) {
   const a = R.analizar(r);
   const antigua = r.publicadaEn < new Date(ahora.getTime() - DIAS_HISTORIAL * DIA);
@@ -315,7 +322,7 @@ async function insertarNueva(pool, r, ctx, ahora, salida) {
                           historial, alerta_clinica, borrador_respuesta, respuesta, estado, respondida_en, primera_respuesta_en, respuesta_estado,
                           respuesta_motivo_rechazo, respuesta_revisada_en, respuestas_rechazadas)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [r.googleId, r.autor, r.nota, r.texto, Boolean(r.texto), r.publicadaEn, r.actualizadaEn, ahora, JSON.stringify(a.temas), a.sentimiento, a.prioridad,
+    [r.googleId, r.autor, r.nota, r.texto, Boolean(r.texto), r.publicadaEn, alSegundo(r.actualizadaEn), ahora, JSON.stringify(a.temas), a.sentimiento, a.prioridad,
       historial, a.alertaClinica, estado === 'borrador' ? redactar(r, ctx) : null, r.respuesta, estado, r.respuesta ? r.respondidaEn : null,
       r.respuesta ? r.respondidaEn : null, r.estadoRespuesta, r.motivoRechazo, r.estadoRespuesta ? ahora : null, r.estadoRespuesta === 'rechazada' ? 1 : 0]);
   salida.nuevas++;
@@ -332,9 +339,9 @@ const mismoTexto = (a, b) => String(a ?? '').replace(/\s+/g, ' ').trim() === Str
 async function actualizarExistente(pool, ex, r, ctx, ahora, salida) {
   // Estaba retirada y Google la vuelve a dar: vuelve como estaba.
   if (ex.retirada_en) await pool.query('UPDATE resenas SET retirada_en = NULL WHERE id = ?', [ex.id]);
-  // La persona ha editado su reseña (su updateTime es posterior): es contenido nuevo, y su plazo para
-  // borrarlo vuelve a empezar.
-  const editada = r.actualizadaEn && ex.actualizada_en && r.actualizadaEn > new Date(ex.actualizada_en);
+  // La persona ha editado su reseña (su updateTime es posterior, al segundo): es contenido nuevo, y su
+  // plazo para borrarlo vuelve a empezar.
+  const editada = Boolean(r.actualizadaEn && ex.actualizada_en && posterior(r.actualizadaEn, ex.actualizada_en));
   let estado = ex.estado;
   let reabierta = false;
   if (editada) {
@@ -343,14 +350,16 @@ async function actualizarExistente(pool, ex, r, ctx, ahora, salida) {
     await pool.query(
       `UPDATE resenas SET autor = ?, nota = ?, texto = ?, con_texto = ?, actualizada_en = ?, contenido_leido_en = ?, contenido_borrado_en = NULL,
               temas = ?, sentimiento = ?, prioridad = ?, alerta_clinica = alerta_clinica OR ? WHERE id = ?`,
-      [r.autor, r.nota, r.texto, Boolean(r.texto), r.actualizadaEn, ahora, JSON.stringify(a.temas), a.sentimiento, a.prioridad, a.alertaClinica, ex.id]);
+      [r.autor, r.nota, r.texto, Boolean(r.texto), alSegundo(r.actualizadaEn), ahora, JSON.stringify(a.temas), a.sentimiento, a.prioridad, a.alertaClinica, ex.id]);
     salida.editadas++;
     // Sin contestar: un borrador nuevo con lo que dice ahora (y si era del historial, ya no lo es: es
-    // contenido nuevo). Ya contestada (o aprobada en la cola) y ha cambiado la nota, el tono o aparece
-    // una alerta: vuelve a la bandeja con un borrador nuevo; nuestra respuesta de antes sigue en Google
-    // hasta que se apruebe la nueva, que la sustituye. Si no cambia nada de eso, se queda como está.
+    // contenido nuevo). Aprobada en la cola y aún sin salir: vuelve siempre a la bandeja con un borrador
+    // nuevo (lo aprobado era para lo que decía antes; si ahora hay una alerta clínica, la contesta
+    // dirección médica). Ya publicada y ha cambiado la nota, el tono o aparece una alerta: vuelve a la
+    // bandeja con un borrador nuevo; nuestra respuesta de antes sigue en Google hasta que se apruebe la
+    // nueva, que la sustituye. Si no cambia nada de eso, se queda como está.
     const cambia = r.nota !== Number(ex.nota) || a.sentimiento !== ex.sentimiento || alertaNueva;
-    reabierta = ['publicada', 'aprobada'].includes(ex.estado) && cambia;
+    reabierta = ex.estado === 'aprobada' || (ex.estado === 'publicada' && cambia);
     if (['nueva', 'borrador', 'historial'].includes(ex.estado) || reabierta) {
       const noSalio = ex.estado === 'aprobada' ? ', respuesta = NULL, publicar_en = NULL' : '';
       await pool.query(`UPDATE resenas SET estado = 'borrador', historial = FALSE, borrador_respuesta = ?, error_publicar = NULL${noSalio} WHERE id = ?`,
@@ -363,7 +372,7 @@ async function actualizarExistente(pool, ex, r, ctx, ahora, salida) {
       salida.alertas++;
     }
   } else if (r.actualizadaEn && !ex.actualizada_en) {
-    await pool.query('UPDATE resenas SET actualizada_en = ? WHERE id = ?', [r.actualizadaEn, ex.id]);
+    await pool.query('UPDATE resenas SET actualizada_en = ? WHERE id = ?', [alSegundo(r.actualizadaEn), ex.id]);
   }
   // Lo que Google tiene como nuestra respuesta, si no la ha rechazado y no es la que ya conocíamos:
   //  · la reseña estaba sin contestar (o esperaba otra respuesta desde antes de esta lectura): alguien

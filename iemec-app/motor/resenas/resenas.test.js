@@ -11,6 +11,8 @@ const calendario = crearCalendario({ horario, festivos: ['2026-10-05', '2026-10-
 const madrid = (d) => { const p = T.partesMadrid(d); return `${p.fecha} ${p.hora}`; };
 // El equipo tal y como está en la web de la clínica (datos públicos, semillas/iemec/equipo.json).
 const EQUIPO = require('../../semillas/iemec/equipo.json').profesionales.map((p) => p.nombre);
+// Los nombres y alias del catálogo consolidado, como los pasa el servidor al revisar una respuesta.
+const CATALOGO = require('../../semillas/iemec/tratamientos.json').tratamientos.flatMap((t) => [t.nombre, ...(t.alias || [])]);
 
 test('se pide a todos tras la cita, dos horas después y en horario', () => {
   const r = R.pedirResena({ cita: { estado: 'completada', fin: T.desdeMadrid('2026-10-06', '12:00') }, paciente: {} }, calendario);
@@ -213,6 +215,30 @@ test('temas, sentimiento, el tema nuevo «seguimiento» y la alerta clínica', (
     assert.deepEqual([r.alertaClinica, r.alertas], [false, []], texto);
     assert.notEqual(r.prioridad, 'alta', texto);
   }
+  // Más formas corrientes: la demanda suelta, «de urgencia», los antibióticos, la fiebre.
+  for (const [texto, alerta] of [
+    ['Os voy a poner una demanda', 'denuncia'], ['Una demanda es lo que os merecéis', 'denuncia'], ['Tuve que ir al médico de urgencia', 'urgencias'],
+    ['Tuve que tomar antibióticos dos semanas', 'antibióticos'], ['Me ha quedado una cicatriz horrible', 'cicatriz'], ['Estuve con fiebre tres días', 'fiebre'],
+    ['Me salió un absceso', 'reacción grave'],
+  ]) {
+    assert.ok(R.analizar({ nota: 1, texto }).alertas.includes(alerta), `${texto} → ${R.analizar({ nota: 1, texto }).alertas}`);
+  }
+  // En francés y en inglés (el injerto capilar tiene pacientes de Francia).
+  for (const [texto, alerta] of [
+    ["J'ai eu une infection après la greffe, je vais porter plainte avec mon avocat", 'infección'],
+    ["J'ai eu une infection après la greffe, je vais porter plainte avec mon avocat", 'denuncia'],
+    ["J'ai eu une infection après la greffe, je vais porter plainte avec mon avocat", 'abogado'],
+    ['Complication grave… je suis allé aux urgences', 'complicación'], ['Complication grave… je suis allé aux urgences', 'urgencias'],
+    ['Brûlure au visage après le laser', 'quemadura'], ['Nécrose après injection', 'necrosis'], ["J'ai été hospitalisée", 'urgencias'],
+    ['I got an infection and a burn, my lawyer will contact you', 'abogado'], ['I got an infection and a burn, my lawyer will contact you', 'quemadura'],
+    ['I ended up in hospital, I will sue you', 'denuncia'], ['Terrible experience, I had to go to the ER', 'urgencias'], ['Awful scarring after the procedure', 'cicatriz'],
+  ]) {
+    assert.ok(R.analizar({ nota: 1, texto }).alertas.includes(alerta), `${texto} → ${R.analizar({ nota: 1, texto }).alertas}`);
+  }
+  for (const texto of ['Sans aucune complication, parfait', 'No complications at all, great team', 'It helped me burn fat, amazing', 'Sue at reception was lovely',
+    'Me dieron cita de urgencia y todo genial', 'Tienen tanta demanda que hay que reservar con tiempo', 'Hospitalité parfaite, merci']) {
+    assert.deepEqual(R.analizar({ nota: 5, texto }).alertas, [], texto);
+  }
   // Lo de contexto (cicatriz, hematoma…) cuenta si la reseña no es de las contentas.
   assert.deepEqual(R.analizar({ nota: 2, texto: 'Me quedó una cicatriz' }).alertas, ['cicatriz']);
   assert.deepEqual(R.analizar({ nota: 5, texto: 'Me quedó una cicatriz pequeña, todo genial' }).alertas, []);
@@ -334,6 +360,47 @@ test('revisar una respuesta antes de publicarla: lo que no puede salir', () => {
   const neutro = R.revisarRespuesta('¡Gracias, Laura! Nos alegra que te hayas sentido tan bien atendida.', c);
   assert.equal(neutro.ok, true);
   assert.match(neutro.avisos.join(' '), /neutro/);
+});
+
+test('revisar una respuesta con el catálogo de verdad: ni el cuerpo, ni el peso, ni lo íntimo, ni «tu próxima revisión»', () => {
+  // La reseña no dice que viniera ni a qué.
+  const c = { resena: { nota: 5, autor: 'Laura G.', texto: 'Todo genial, muy amables' }, tratamientos: CATALOGO, profesionales: EQUIPO };
+  const errores = (texto) => R.revisarRespuesta(`¡Gracias, Laura! ${texto}`, c).errores.join(' | ');
+  for (const [texto, motivo] of [
+    ['Te esperamos en la próxima revisión.', /paciente/], ['Nos vemos en la siguiente cita.', /paciente/], ['Te esperamos de nuevo muy pronto.', /paciente/],
+    ['Gracias por tu confianza.', /paciente/], ['Esperamos que la zona tratada evolucione bien.', /paciente/],
+    ['Nos alegra que tu nariz haya quedado como esperabas.', /nariz/], ['¡Enhorabuena por esos kilos de menos!', /kilos/],
+    ['Nos alegra que el pecho haya quedado natural.', /pecho/], ['Nos alegra que las cicatrices hayan mejorado.', /cicatrices/],
+    ['Nos alegra que la incontinencia haya mejorado.', /incontinencia/], ['Qué bien que te gustara la rinomodelación.', /rinomodelación/],
+    ['Nos alegra que los glúteos hayan quedado así.', /glúteos/], ['Los exosomas hacen maravillas.', /exosomas/], ['Tu piel está radiante.', /piel/],
+    ['Tu primera consulta gratuita te espera.', /promociones|paciente/],
+  ]) {
+    assert.match(errores(texto), motivo, texto);
+  }
+  // Lo corriente sí se puede decir, aunque salga en algún nombre del catálogo, y el nombre de la clínica también.
+  for (const texto of ['Para cualquier consulta, aquí nos tienes.', 'Cuidamos mucho la limpieza de cada rincón.', 'Todo el equipo médico te lo agradece.',
+    'Te recibimos siempre con los brazos abiertos.', 'Un saludo del Instituto Europeo de Medicina Estética y Capilar.', 'Gracias por tu valoración.']) {
+    assert.equal(errores(texto), '', texto);
+  }
+});
+
+test('todas nuestras respuestas, en todas sus combinaciones, pasan la revisión con el catálogo y el equipo de verdad', () => {
+  const clases = [
+    [5, 'Muy buen trato'], [5, 'Muy profesionales'], [5, 'Resultados naturales'], [5, 'Instalaciones preciosas'], [5, 'Todo muy cómodo'],
+    [5, 'Te contestan enseguida por WhatsApp'], [5, 'Un seguimiento de diez'], [5, ''], [5, 'Genial todo'],
+    [4, 'Bien, pero una hora de retraso'], [4, 'Bien, aunque algo caro'], [3, 'No contestan al teléfono'], [3, 'Regular'],
+    [1, 'Muy mal'], [2, 'Me hicieron esperar muchísimo, fatal'], [1, 'Me quemaron, voy a denunciar'],
+  ];
+  for (const [nota, texto] of clases) {
+    const resena = { nota, autor: 'Ana', texto };
+    const n = R.variedad(resena);
+    for (let i = 0; i < n; i++) {
+      const b = R.borradorRespuesta(resena, { indice: i });
+      const r = R.revisarRespuesta(b.texto, { resena, tratamientos: CATALOGO, profesionales: EQUIPO });
+      assert.ok(r.ok, `${nota} ★ «${texto}»: ${b.texto} → ${r.errores.join(' | ')}`);
+      assert.deepEqual(r.avisos, [], b.texto);
+    }
+  }
 });
 
 test('lo que llega de Google: con los nombres del adaptador o con los de la API, y la moderación de nuestra respuesta', () => {
