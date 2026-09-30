@@ -11,12 +11,13 @@ const T = require('../tiempo');
 const { normalizar } = require('../repesca/interpretar');
 const { revisar } = require('../repesca/filtro-legal');
 
-const REGLAS = { horasTrasCita: 2, diasEntrePeticiones: 120, horaDesde: '10:30', horaHasta: '20:00' };
+const REGLAS = { horasTrasCita: 2, diasEntrePeticiones: 120, horaDesde: '10:30', horaHasta: '20:00', diasMaxTrasCita: 2 };
 
 /**
  * ¿Se le pide la reseña a este paciente tras esta cita? ¿Cuándo?
  * @param {object} p { cita: { estado, fin }, paciente: { baja_comercial_en }, ultimaPeticion: Date|null,
- *                     yaResenoEnGoogle: bool, conversacionAbiertaConQueja: bool }
+ *                     yaResenoEnGoogle: bool, conversacionAbiertaConQueja: bool,
+ *                     noAntesDe: Date|null (no sale antes: mientras recepción aún puede deshacer) }
  */
 function pedirResena(p, calendario, reglas = REGLAS) {
   if (p.cita.estado !== 'completada') return { pedir: false, motivo: 'la cita no se ha completado' };
@@ -26,8 +27,13 @@ function pedirResena(p, calendario, reglas = REGLAS) {
   if (p.ultimaPeticion && (new Date(p.cita.fin) - new Date(p.ultimaPeticion)) / 86400000 < reglas.diasEntrePeticiones) {
     return { pedir: false, motivo: 'ya se le pidió hace poco' };
   }
-  // Dos horas después de acabar, dentro del horario de envío; si no, el siguiente día que abre.
-  let cuando = new Date(new Date(p.cita.fin).getTime() + reglas.horasTrasCita * 3600000);
+  // Si la cita se marca completada días después, ya no se pide: el mensaje da las gracias «por venir hoy».
+  if (p.noAntesDe && (new Date(p.noAntesDe) - new Date(p.cita.fin)) / 86400000 > reglas.diasMaxTrasCita) {
+    return { pedir: false, motivo: 'la cita se marcó como completada días después' };
+  }
+  // Dos horas después de acabar (y no antes de noAntesDe), dentro del horario de envío; si no, el
+  // siguiente día que abre.
+  let cuando = new Date(Math.max(new Date(p.cita.fin).getTime() + reglas.horasTrasCita * 3600000, p.noAntesDe ? new Date(p.noAntesDe).getTime() : 0));
   const parte = T.partesMadrid(cuando);
   const desde = T.minutosDe(reglas.horaDesde);
   const hasta = T.minutosDe(reglas.horaHasta);

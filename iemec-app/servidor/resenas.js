@@ -8,7 +8,9 @@ const { elegirPlantilla } = require('../motor/repesca/plantillas');
 const { calendarioDesdeBd, enviar } = require('./repesca/motor');
 const { registrar } = require('./eventos');
 
-async function programarPeticion(pool, citaId) {
+// `pool` puede ser también la conexión de una transacción (al completar la cita desde el panel).
+// noAntesDe: la petición no sale antes (mientras recepción aún puede deshacer «Completada»).
+async function programarPeticion(pool, citaId, { noAntesDe = null } = {}) {
   const [[cita]] = await pool.query('SELECT * FROM citas WHERE id = ?', [citaId]);
   if (!cita) throw new Error('No existe la cita');
   const [[paciente]] = await pool.query('SELECT * FROM pacientes WHERE id = ?', [cita.paciente_id]);
@@ -16,12 +18,20 @@ async function programarPeticion(pool, citaId) {
   const [[resenada]] = await pool.query('SELECT COUNT(*) AS n FROM resenas WHERE paciente_id = ?', [cita.paciente_id]);
   const [[queja]] = await pool.query("SELECT COUNT(*) AS n FROM conversaciones WHERE paciente_id = ? AND estado IN ('espera_persona','persona')", [cita.paciente_id]);
   const calendario = await calendarioDesdeBd(pool);
-  const d = R.pedirResena({ cita, paciente, ultimaPeticion: ultima?.en || null, yaResenoEnGoogle: resenada.n > 0, conversacionAbiertaConQueja: queja.n > 0 }, calendario);
+  const d = R.pedirResena({ cita, paciente, ultimaPeticion: ultima?.en || null, yaResenoEnGoogle: resenada.n > 0, conversacionAbiertaConQueja: queja.n > 0, noAntesDe }, calendario);
   const token = crypto.randomBytes(16).toString('base64url').slice(0, 22);
   await pool.query(
     'INSERT INTO peticiones_resena (cita_id, paciente_id, token, programada_para, estado, motivo) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = id',
     [cita.id, cita.paciente_id, token, d.pedir ? d.cuando : new Date(cita.fin), d.pedir ? 'programada' : 'omitida', d.pedir ? null : d.motivo]);
   return d;
+}
+
+// Se deshizo «Completada»: la petición que aún no ha salido se borra (si se vuelve a completar, se
+// programa otra). La que ya salió no se puede recoger: se dice.
+async function anularPeticion(q, citaId) {
+  const [r] = await q.query("DELETE FROM peticiones_resena WHERE cita_id = ? AND estado <> 'enviada'", [citaId]);
+  const [[enviada]] = await q.query("SELECT COUNT(*) AS n FROM peticiones_resena WHERE cita_id = ? AND estado = 'enviada'", [citaId]);
+  return { anuladas: r.affectedRows, yaEnviada: enviada.n > 0 };
 }
 
 async function enviarPeticionesPendientes(deps, { ahora = new Date() } = {}) {
@@ -86,4 +96,4 @@ async function aprobarYPublicar(pool, google, { resenaId, texto = null, aprobada
   await registrar(pool, { tipo: 'resena_respondida', entidad: 'resena', entidadId: resenaId, actor: aprobadaPor });
 }
 
-module.exports = { programarPeticion, enviarPeticionesPendientes, abrirEnlace, importarResenas, aprobarYPublicar };
+module.exports = { programarPeticion, anularPeticion, enviarPeticionesPendientes, abrirEnlace, importarResenas, aprobarYPublicar };

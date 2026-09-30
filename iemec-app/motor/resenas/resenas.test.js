@@ -29,6 +29,18 @@ test('no se pide si no vino, si se dio de baja, si ya reseñó, si hay queja o s
   assert.equal(R.pedirResena({ ...base, ultimaPeticion: new Date('2026-08-01T10:00:00Z') }, calendario).pedir, false);
 });
 
+test('si recepción la marca tarde, sale cuando ya no se puede deshacer; días después, ya no se pide', () => {
+  const cita = { estado: 'completada', fin: T.desdeMadrid('2026-10-06', '12:00') };
+  // Marcada a las 12:10: sale a las 14:00 como siempre.
+  assert.equal(madrid(R.pedirResena({ cita, paciente: {}, noAntesDe: T.desdeMadrid('2026-10-06', '12:40') }, calendario).cuando), '2026-10-06 14:00');
+  // Marcada a las 17:00: no sale hasta las 17:30 (hasta entonces se puede deshacer).
+  assert.equal(madrid(R.pedirResena({ cita, paciente: {}, noAntesDe: T.desdeMadrid('2026-10-06', '17:30') }, calendario).cuando), '2026-10-06 17:30');
+  // Marcada a las 19:45: las 20:15 ya es tarde → el día siguiente a las 10:30.
+  assert.equal(madrid(R.pedirResena({ cita, paciente: {}, noAntesDe: T.desdeMadrid('2026-10-06', '20:15') }, calendario).cuando), '2026-10-07 10:30');
+  const viejo = R.pedirResena({ cita, paciente: {}, noAntesDe: T.desdeMadrid('2026-10-09', '10:30') }, calendario);
+  assert.deepEqual(viejo, { pedir: false, motivo: 'la cita se marcó como completada días después' });
+});
+
 test('el enlace lleva directo a escribir la reseña en la ficha', () => {
   assert.equal(R.enlaceResena('ChIJ123'), 'https://search.google.com/local/writereview?placeid=ChIJ123');
 });

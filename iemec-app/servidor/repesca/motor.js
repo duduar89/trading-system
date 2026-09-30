@@ -92,6 +92,11 @@ async function cargarContexto(q, conv, ahora) {
     const [[linea]] = await q.query('SELECT tratamiento_id FROM presupuesto_lineas WHERE presupuesto_id = ? AND tratamiento_id IS NOT NULL ORDER BY importe_eur DESC LIMIT 1', [conv.contexto_id]);
     if (linea) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [linea.tratamiento_id]);
   }
+  // Si la conversación va de una cita suya (recuperar un «no vino», repetir un tratamiento), manda esa.
+  if (!tratamiento && ['cancelacion', 'toca_repetir', 'cita'].includes(conv.contexto) && conv.contexto_id && conv.paciente_id) {
+    const [[c]] = await q.query('SELECT tratamiento_id FROM citas WHERE id = ? AND paciente_id = ?', [conv.contexto_id, conv.paciente_id]);
+    if (c) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [c.tratamiento_id]);
+  }
   if (!tratamiento && conv.lead_id) {
     const [[lead]] = await q.query('SELECT tratamiento_interes_id FROM leads WHERE id = ?', [conv.lead_id]);
     if (lead?.tratamiento_interes_id) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [lead.tratamiento_interes_id]);
@@ -705,9 +710,17 @@ async function procesarSeguimientos(deps, { ahora = new Date(), limite = 20 } = 
   return resultados;
 }
 
+// Cómo se nombra su tratamiento en los mensajes que salen sin que el paciente pregunte. Los de
+// publicidad restringida (medicamentos con receta, productos sanitarios) no se nombran: se habla de
+// su familia («medicina estética facial»).
 async function nombreTratamiento(q, conv) {
-  const datos = await cargarContexto(q, conv, new Date());
-  return datos.tratamiento ? enMinuscula(datos.tratamiento.nombre) : 'tu tratamiento';
+  const t = (await cargarContexto(q, conv, new Date())).tratamiento;
+  if (!t) return 'tu tratamiento';
+  if (t.publicidad_restringida || t.regimen_legal === 'medicamento_receta') {
+    const [[f]] = await q.query('SELECT nombre FROM familias WHERE codigo = ?', [t.familia]);
+    return f ? enMinuscula(f.nombre) : 'tu tratamiento';
+  }
+  return enMinuscula(t.nombre);
 }
 
 // Mete a alguien en una secuencia (lead nuevo, cancelación, presupuesto, toca repetir…).
@@ -793,6 +806,13 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
     }
     const nombre = await nombreDe(pool, ins);
     const variables = [nombre, await nombreTratamiento(pool, conv)].slice(0, (p.cuerpo.match(/\{\{\d+\}\}/g) || []).length);
+    // Última red: un mensaje comercial no sale si, ya relleno, no pasa el filtro de publicidad sanitaria.
+    if (comercial && !revisar(rellenar(p, variables), { tipo: 'marketing' }).ok) {
+      await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, vence_en) VALUES ('revisar_ia', ?, ?, ?)",
+        [`El mensaje «${paso.uso}» no pasa el filtro de publicidad sanitaria: escribir a mano`, ins.paciente_id, new Date(ahora.getTime() + 3600000)]);
+      await avanzar({ bloqueado: 'filtro legal' });
+      continue;
+    }
     const envio = await enviar(deps, conv, { plantilla: p, variables, ahora });
     await avanzar({ envio: envio.estado, plantilla: p.nombre });
   }

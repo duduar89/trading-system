@@ -9,6 +9,7 @@ const { comprobarPlantilla } = require('../../motor/repesca/plantillas');
 const R = require('../../motor/resenas/resenas');
 const { ideasDelMes } = require('../../motor/resenas/publicaciones');
 const agenda = require('../agenda');
+const estados = require('../estados-cita');
 const repesca = require('../repesca/motor');
 const resenasSrv = require('../resenas');
 const { registrar } = require('../eventos');
@@ -27,7 +28,10 @@ function rutasPanel({ pool, deps = null }) {
     const desde = T.desdeMadrid(hoy, '00:00');
     const hasta = T.desdeMadrid(T.sumarDias(hoy, 1), '00:00');
     const q = async (sql, a) => (await p().query(sql, a))[0];
-    const [citas] = await q("SELECT COUNT(*) AS n, SUM(estado = 'confirmada') AS confirmadas FROM citas WHERE inicio >= ? AND inicio < ? AND estado NOT IN ('cancelada','reprogramada')", [desde, hasta]);
+    const [citas] = await q(
+      `SELECT COUNT(*) AS n, SUM(estado = 'confirmada') AS confirmadas, SUM(estado IN ('llegada','en_curso')) AS llegadas,
+              SUM(estado = 'completada') AS completadas, SUM(estado = 'no_presentada') AS no_presentadas
+         FROM citas WHERE inicio >= ? AND inicio < ? AND estado NOT IN ('cancelada','reprogramada')`, [desde, hasta]);
     const [espera] = await q("SELECT COUNT(*) AS n, SUM(urgente) AS urgentes FROM conversaciones WHERE estado = 'espera_persona'");
     const [ia] = await q("SELECT COUNT(*) AS n FROM conversaciones WHERE estado IN ('ia_activa','esperando_paciente')");
     const [seg] = await q("SELECT COUNT(*) AS n FROM seguimientos WHERE estado = 'pendiente' AND programado_para >= ? AND programado_para < ?", [desde, hasta]);
@@ -36,11 +40,14 @@ function rutasPanel({ pool, deps = null }) {
     const inicioMes = T.desdeMadrid(`${hoy.slice(0, 8)}01`, '00:00');
     const [recuperadas] = await q(
       `SELECT COUNT(*) AS n, COALESCE(SUM(t.precio_eur), 0) AS euros FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id
-        WHERE c.creado_en >= ? AND c.origen = 'ia_whatsapp' AND c.estado NOT IN ('cancelada')`, [inicioMes]);
+        WHERE c.creado_en >= ? AND c.origen = 'ia_whatsapp' AND c.estado NOT IN ('cancelada','no_presentada')`, [inicioMes]);
     const sinPaso = await repesca.sinProximoPaso(p(), ahora);
     res.json({
       fecha: hoy,
-      citas: { total: Number(citas.n), confirmadas: Number(citas.confirmadas || 0) },
+      citas: {
+        total: Number(citas.n), confirmadas: Number(citas.confirmadas || 0), llegadas: Number(citas.llegadas || 0),
+        completadas: Number(citas.completadas || 0), noPresentadas: Number(citas.no_presentadas || 0),
+      },
       conversaciones: { esperaPersona: Number(espera.n), urgentes: Number(espera.urgentes || 0), conIa: Number(ia.n) },
       seguimientosHoy: Number(seg.n),
       tareas: { abiertas: Number(tareas.n), vencidas: Number(tareas.vencidas || 0) },
@@ -90,6 +97,32 @@ function rutasPanel({ pool, deps = null }) {
       if (err.codigo) return res.status(409).json({ error: err.message, codigo: err.codigo });
       throw err;
     }
+  }));
+
+  // ── La cita que abre recepción: detalle y estado (ha llegado, completada, no vino, deshacer) ─
+  r.get('/citas/:id', envolver(async (req, res) => {
+    const d = await estados.detalle(p(), Number(req.params.id), { ahora: req.ahora || new Date() });
+    if (!d) return res.status(404).json({ error: 'No existe esa cita' });
+    res.json(d);
+  }));
+
+  // Cuerpo: { estado: 'llegada' | 'completada' | 'no_presentada' } o { deshacer: true }.
+  r.post('/citas/:id/estado', envolver(async (req, res) => {
+    const id = Number(req.params.id);
+    const ahora = req.ahora || new Date();
+    const actor = req.usuario?.email || 'panel';
+    let cita;
+    try {
+      cita = req.body?.deshacer
+        ? await estados.deshacer(p(), { id, actor, ahora })
+        : await estados.marcar(p(), { id, estado: String(req.body?.estado || ''), actor, ahora });
+    } catch (err) {
+      if (err.codigo === 'CITA_DESCONOCIDA') return res.status(404).json({ error: err.message, codigo: err.codigo });
+      if (err.codigo === 'ESTADO_DESCONOCIDO') return res.status(400).json({ error: err.message, codigo: err.codigo });
+      if (err.codigo) return res.status(409).json({ error: err.message, codigo: err.codigo });
+      throw err;
+    }
+    res.json({ ...(await estados.detalle(p(), id, { ahora })), efectos: cita.efectos || null, anulado: cita.anulado || null });
   }));
 
   // ── Bandeja de conversaciones ────────────────────────────────────────────────────────────
