@@ -11,6 +11,7 @@ async function encolar(con, tipo, carga = {}, { ejecutarEn = new Date(), claveUn
 }
 
 async function tomar(pool, { limite = 10, ahora = new Date(), tipos = null } = {}) {
+  if (Array.isArray(tipos) && tipos.length === 0) return [];
   const con = await pool.getConnection();
   try {
     await con.beginTransaction();
@@ -72,4 +73,11 @@ async function conCandado(pool, nombre, ms, fn, { ahora = new Date(), dueno = `$
   }
 }
 
-module.exports = { encolar, tomar, procesar, rescatarAtascados, conCandado };
+// Trabajo que se hace una sola vez por clave (p. ej. la revisión diaria): la marca no se libera.
+async function unaVez(pool, clave, hasta, fn) {
+  const [r] = await pool.query('INSERT IGNORE INTO candados (nombre, dueno, hasta) VALUES (?, ?, ?)', [clave, 'hecho', hasta]);
+  if (r.affectedRows !== 1) return { ejecutado: false };
+  return { ejecutado: true, resultado: await fn() };
+}
+
+module.exports = { encolar, tomar, procesar, rescatarAtascados, conCandado, unaVez };

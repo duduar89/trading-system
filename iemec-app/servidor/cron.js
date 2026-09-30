@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 // Lo que se hace cada minuto. En cPanel: Cron Jobs → «* * * * *» →
-//   cd ~/iemec-app && /home/USUARIO/nodevenv/iemec-app/22/bin/node servidor/cron.js >> ~/logs/iemec-cron.log 2>&1
+//   . ~/nodevenv/iemec-app/22/bin/activate && cd ~/iemec-app && node servidor/cron.js >> ~/logs/iemec-cron.log 2>&1
 // Nada de temporizadores dentro de la app: si el proceso web se duerme, esto sigue funcionando.
 // Candado en la base: si un cron tarda más de un minuto, el siguiente no pisa su trabajo.
 const config = require('./config');
@@ -29,13 +29,14 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
   // Una vez al día, a partir de las 8:00 de Madrid: conversaciones sin próximo paso → tarea.
   const p = T.partesMadrid(ahora);
   if (p.minutos >= 8 * 60) {
-    await cola.conCandado(pool, `diario-${p.fecha}`, 24 * 3600000, async () => {
+    await cola.unaVez(pool, `diario-${p.fecha}`, new Date(ahora.getTime() + 2 * 86400000), async () => {
       const huerfanas = await repesca.sinProximoPaso(pool, ahora);
       for (const c of huerfanas) {
         await pool.query("INSERT INTO tareas (tipo, titulo, conversacion_id, vence_en) VALUES ('atender_conversacion', 'Conversación sin próximo paso', ?, ?)", [c.id, new Date(ahora.getTime() + 2 * 3600000)]);
       }
       informe.sinProximoPaso = huerfanas.length;
-    }, { ahora, dueno: `diario-${p.fecha}` });
+      await pool.query("DELETE FROM candados WHERE nombre LIKE 'diario-%' AND hasta < ?", [ahora]);
+    });
   }
   return informe;
 }
