@@ -381,7 +381,7 @@ function rutasPanel({ pool, deps = null }) {
     if (!deps?.google) return res.status(503).json({ error: 'Google no configurado' });
     try {
       const hecho = await resenasSrv.aprobarYPublicar(p(), deps.google, {
-        resenaId: Number(req.params.id), texto: req.body?.texto || null, aprobadaPor: req.usuario?.email || 'panel', ahora: req.ahora || new Date(),
+        resenaId: Number(req.params.id), texto: req.body?.texto || null, aprobadaPor: req.usuario?.email || 'panel', rol: req.usuario?.rol || null, ahora: req.ahora || new Date(),
       });
       res.json({ ok: true, ...hecho });
     } catch (err) {

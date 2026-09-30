@@ -423,17 +423,24 @@ async function publicar(pool, google, r, texto, { aprobadaPor = null, ahora = ne
   await registrar(pool, { tipo: 'resena_respondida', entidad: 'resena', entidadId: r.id, actor: aprobadaPor || 'sistema' });
 }
 
+// Quién contesta una reseña con alerta clínica: dirección médica (no marketing ni recepción).
+const ROLES_ALERTA = ['direccion', 'medico', 'admin'];
+
 /**
  * Una persona aprueba la respuesta (la del borrador o la que ha escrito). Se revisa antes: sin datos
  * de salud, ni del equipo, ni fechas, sin confirmar que es paciente, sin promociones ni enlaces y sin
  * repetir otra. Las reseñas recientes se contestan ya; las del historial salen por la cola, poco a
- * poco.
+ * poco. rol: el de quien aprueba (el panel lo pasa siempre); una alerta clínica solo la contesta
+ * dirección médica.
  * @returns {{ estado: 'publicada'|'aprobada', publicarEn?, avisos }}
  */
-async function aprobarYPublicar(pool, google, { resenaId, texto = null, aprobadaPor, ahora = new Date() }) {
+async function aprobarYPublicar(pool, google, { resenaId, texto = null, aprobadaPor, rol = null, ahora = new Date() }) {
   const [[r]] = await pool.query('SELECT * FROM resenas WHERE id = ?', [resenaId]);
   if (!r) throw new Error('No existe la reseña');
   if (r.estado === 'publicada') throw new Error('Esta reseña ya tiene su respuesta publicada');
+  if (r.alerta_clinica && rol && !ROLES_ALERTA.includes(rol)) {
+    throw new Error('Esta reseña tiene una alerta clínica: la contesta dirección médica');
+  }
   const final = String(texto ?? r.borrador_respuesta ?? '').trim();
   if (!final) throw new Error('No hay texto para responder');
   const revision = R.revisarRespuesta(final, { ...(await contextoRespuesta(pool, r)), resena: { nota: r.nota, autor: r.autor, texto: r.texto } });

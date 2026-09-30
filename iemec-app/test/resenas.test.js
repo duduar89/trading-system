@@ -13,7 +13,6 @@ const S = require('../servidor/resenas');
 const R = require('../motor/resenas/resenas');
 const { rutasPanel } = require('../servidor/rutas/panel');
 const { crearApp } = require('../servidor/index');
-const { crearGoogle } = require('../servidor/integraciones/google');
 const { crearWhatsApp } = require('../servidor/integraciones/whatsapp');
 const { crearIa } = require('../servidor/integraciones/ia');
 const { apuntarBaja } = require('../servidor/bajas');
@@ -72,13 +71,18 @@ async function textos(pool, telefono) {
 }
 const resena = async (pool, googleId) => (await pool.query('SELECT * FROM resenas WHERE google_id = ?', [googleId]))[0][0];
 
-// El adaptador de Google (simulado) con lo que dará el real: el estado de moderación al responder y,
-// si se pide, la ficha con su enlace oficial para reseñar.
+// Un adaptador de Google falso con la interfaz del de servidor/integraciones/google.js (listarResenas
+// y responderResena) y lo que dará el real: el estado de moderación al responder y, si se pide, la
+// ficha con su enlace oficial para reseñar (obtenerFicha). No sale nada a internet.
 function googleFalso({ resenas = [], ficha = null, estado = 'PENDING' } = {}) {
-  const g = crearGoogle('simulado', { resenas });
-  g.responderResena = async (googleId, texto) => { g.publicadas.push({ googleId, texto }); return { ok: true, estado }; };
-  if (ficha) g.obtenerFicha = async () => ficha;
-  return g;
+  const publicadas = [];
+  return {
+    modo: 'simulado',
+    publicadas,
+    async listarResenas() { return resenas; },
+    async responderResena(googleId, texto) { publicadas.push({ googleId, texto }); return { ok: true, estado }; },
+    ...(ficha ? { async obtenerFicha() { return ficha; } } : {}),
+  };
 }
 
 test('pedir la reseña: a todos y a su hora, con el enlace y su token; una queja no la para, la baja (también por teléfono) sí', async (t) => {
@@ -271,7 +275,7 @@ test('el enlace corto lleva al enlace oficial de la ficha (newReviewUri) si se h
     const { token } = await peticion(pool, c);
     // Sin la ficha leída: el formato writereview con el place_id de la clínica (la reserva).
     assert.equal(await S.abrirEnlace(pool, 'noexiste00000000000000', null), 'https://search.google.com/local/writereview?placeid=ChIJiemec');
-    assert.deepEqual(await S.actualizarFicha(pool, crearGoogle('simulado')), { leida: false }, 'si el adaptador aún no tiene obtenerFicha');
+    assert.deepEqual(await S.actualizarFicha(pool, googleFalso()), { leida: false }, 'si el adaptador aún no tiene obtenerFicha');
 
     const oficial = 'https://g.page/r/CEjemploResena/review';
     assert.deepEqual(await S.actualizarFicha(pool, googleFalso({ ficha: { placeId: 'ChIJotro0000000', newReviewUri: oficial } }), { ahora: en('2026-10-06', '08:00') }),
@@ -403,7 +407,8 @@ test('reseñas de Google: análisis y alerta clínica, respuestas sin datos pers
     await t.test('la pantalla «Reseñas»: KPI, las alertas lo primero, el historial y la ficha', async () => {
       const app = express();
       app.use(express.json());
-      app.use((req, _res, next) => { req.ahora = new Date(ahora.getTime() + 3 * 3600000); next(); });
+      // La sesión, como la pondría el panel: el rol de quien aprueba (cabecera de la prueba).
+      app.use((req, _res, next) => { req.ahora = new Date(ahora.getTime() + 3 * 3600000); req.usuario = { email: 'prueba@ejemplo.invalid', rol: req.get('x-rol') || 'direccion' }; next(); });
       app.use('/api/panel', rutasPanel({ pool, deps: { pool, google } }));
       const s = app.listen(0);
       await new Promise((r) => s.once('listening', r));
@@ -424,6 +429,10 @@ test('reseñas de Google: análisis y alerta clínica, respuestas sin datos pers
         const mal = await fetch(`${base}/${g3.id}/publicar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: 'Sentimos lo de la infección' }) });
         assert.equal(mal.status, 400);
         assert.match((await mal.json()).error, /salud/);
+        // La alerta clínica la contesta dirección médica, no marketing.
+        const marketing = await fetch(`${base}/${g3.id}/publicar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-rol': 'marketing' }, body: JSON.stringify({}) });
+        assert.equal(marketing.status, 400);
+        assert.match((await marketing.json()).error, /alerta clínica: la contesta dirección médica/);
         const bien = await fetch(`${base}/${g3.id}/publicar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
         assert.deepEqual(await bien.json(), { ok: true, estado: 'publicada', avisos: [] });
       } finally {
