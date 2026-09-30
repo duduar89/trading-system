@@ -101,8 +101,8 @@ function crearSimulada() {
 function crearCliente(env) {
   const { betaRefusalFallbackMiddleware } = require('@anthropic-ai/sdk');
   // Si el modelo principal se niega, se reintenta con el de respaldo (en Vertex no hay respaldo en
-  // el servidor: lo hace el SDK en el cliente).
-  const middleware = [betaRefusalFallbackMiddleware([{ model: env.IA_MODELO_RESPALDO || 'claude-opus-4-8' }])];
+  // el servidor: lo hace el SDK en el cliente). Los modelos se eligen en la configuración, no aquí.
+  const middleware = env.IA_MODELO_RESPALDO ? [betaRefusalFallbackMiddleware([{ model: env.IA_MODELO_RESPALDO }])] : [];
   const proveedor = env.IA_PROVEEDOR || 'vertex';
   if (proveedor === 'vertex') {
     const { AnthropicVertex } = require('@anthropic-ai/vertex-sdk');
@@ -132,8 +132,10 @@ function historialComoTexto(historial = []) {
 }
 
 function crearReal(env = process.env) {
+  // Puerta ⛔: el modelo lo fija la configuración (IA_MODELO), con su respaldo (IA_MODELO_RESPALDO).
+  if (!env.IA_MODELO) throw new Error('IA real: falta IA_MODELO en la configuración');
   const cliente = crearCliente(env);
-  const modelo = env.IA_MODELO || 'claude-opus-5-5';
+  const modelo = env.IA_MODELO;
   return {
     modo: 'real',
     async interpretar({ texto, historial, contexto = {} }) {

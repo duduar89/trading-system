@@ -57,6 +57,7 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
    | `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (o `WHATSAPP_WEBHOOK_CLAVE`), `WHATSAPP_NUMERO_ID` | webhook de WhatsApp: ver [`WHATSAPP-Y-LEADS.md`](WHATSAPP-Y-LEADS.md) |
    | `META_VERIFY_TOKEN`, `META_APP_SECRET`, `META_TOKEN_PAGINA`, `META_PAGINA_ID` | leads de los formularios de Meta: ídem |
    | `LEADS_CLAVE` | alta de leads de la web y GHL (`POST /api/leads`), 16 caracteres o más |
+   | `IA_PROVEEDOR`, `IA_PROYECTO_GCP`, `IA_REGION`, `IA_MODELO`, `IA_MODELO_RESPALDO` | IA real: Claude por Google Vertex en la UE (`vertex`, el proyecto, `eu`, el modelo elegido y el de respaldo si el principal se niega) |
 
    **Mejor todo en el `.env`:** el cron (paso 4) es otro proceso, lanzado desde la terminal, y no ve
    las variables de «Setup Node.js App»; solo lee el `.env` (`servidor/config.js`). Es el cron el que
