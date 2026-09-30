@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const { prepararBdDePrueba } = require('./ayuda-bd');
 const { crearApp } = require('../servidor/index');
 const { rutasWeb } = require('../servidor/rutas/web');
-const { leerFormularioWeb, MINIMO_MS } = require('../motor/entrada/web');
+const { leerFormularioWeb, referenciaDeWhatsapp, MINIMO_MS } = require('../motor/entrada/web');
 
 const martes = new Date('2026-10-06T10:00:00Z'); // martes 12:00 en Madrid
 const WEB = 'https://iemec-clinic.com';
@@ -68,6 +68,15 @@ test('leerFormularioWeb: valida como la web y traduce la referencia (sin base de
   assert.equal(leerFormularioWeb(envio({ web: 'http://spam' }), o).robot, true);
   assert.equal(leerFormularioWeb(envio({ t: String(MINIMO_MS - 1) }), o).robot, true);
   assert.equal(leerFormularioWeb(envio({ t: '' }), o).robot, false);
+});
+
+test('referenciaDeWhatsapp: la «(ref. …)» del primer mensaje de los botones de la web', () => {
+  assert.deepEqual(referenciaDeWhatsapp('Hola, vengo de la web y me interesa: Lipoláser. (ref. web-lipolaser)'), { ref: 'web-lipolaser', campana: null });
+  assert.deepEqual(referenciaDeWhatsapp('Hola, vengo de la web y me interesa: Salud íntima femenina. (ref. web-intima-f-6mlx46 · c-1x2y3z)'),
+    { ref: 'web-intima-f-6mlx46', campana: 'c-1x2y3z' });
+  for (const t of ['Hola, ¿tenéis cita?', '(ref. lipolaser)', '(ref. web-LIPOLASER)', '(ref. web-lipolaser · otono-lipo)', null, 42]) {
+    assert.equal(referenciaDeWhatsapp(t), null, String(t));
+  }
 });
 
 test('POST /web/contacto', async (t) => {

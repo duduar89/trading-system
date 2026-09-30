@@ -11,6 +11,7 @@ cron de cada minuto ◀───────────────────
    ├─ texto, botón de plantilla, interactivo → la repesca (procesarEntrante), que contesta
    ├─ audio, foto, vídeo, documento, ubicación, sticker… → a una persona, con tarea
    ├─ clic en un anuncio que abre WhatsApp (referral) → lead «meta_ctwa» y luego la repesca
+   ├─ primer mensaje de un botón de la web, con «(ref. web-…)» → lead «web_whatsapp» y la repesca
    ├─ estados (enviado, entregado, leído, fallido) → el mensaje en la bandeja, con su motivo
    └─ lead de un formulario → se pide a Meta → alta → secuencia «lead» (primer mensaje ya);
       si Meta no deja leerlo → tarea para recepción
@@ -246,6 +247,21 @@ INSERT INTO mapeo_tratamientos (clave, tratamiento_id, notas) VALUES
   ('Tratamientos capilares', 'diagnostico-capilar-gratuito', 'respuesta del formulario de captación'),
   ('OTO26-FAC', 'higiene-facial-triacidos', 'código de la landing de otoño');
 ```
+
+## Botones de WhatsApp de la web pública
+
+Cada botón de WhatsApp de la web (`web/`) abre el chat con el primer mensaje escrito y la referencia
+de la página al final: «Hola, vengo de la web y me interesa: Lipoláser. (ref. web-lipolaser)». Si la
+visita llegó por una campaña (`?utm_campaign=…`), va también la huella corta de la campaña, nunca su
+nombre: «(ref. web-lipolaser · c-1x2y3z)». En lo íntimo el texto es neutro («Salud íntima femenina»)
+y la referencia es un código (`web-intima-f-…`).
+
+Cuando llega un texto con esa referencia, antes de pasarlo a la repesca, `servidor/entrada.js` da de
+alta un lead `web_whatsapp` («Web (botón WhatsApp)» en el panel) con `codigo_web` = la referencia, el
+tratamiento que le toca según `semillas/iemec/referencias-web.json` (la genera `npm run web`) y la
+huella de la campaña en `utm.clave_campana`, y la conversación pasa a ser la del lead, como con los
+anuncios. Sin secuencia: ya está hablando con la IA. Si ya tenía un lead en marcha, no se duplica.
+Una referencia que no está en el archivo (una página que ya no existe) da el lead sin tratamiento.
 
 ## POST /web/contacto (el formulario de la web pública)
 

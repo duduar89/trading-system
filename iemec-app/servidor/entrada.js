@@ -10,6 +10,8 @@
 //                                               ha tenido un tratamiento médico hace poco, urgente)
 //   referral (anuncio que abre WhatsApp)      → lead «meta_ctwa» ANTES de procesar el mensaje, para
 //                                               que la repesca lo trate como lead
+//   «(ref. web-…)» (botón de WhatsApp de la   → lead «web_whatsapp» con su referencia y su
+//   web pública)                                tratamiento, también antes del mensaje
 //   estados (enviado, entregado, leído,        → mensajes.estado y el error, por wa_id; el 131050 (ha
 //   fallido)                                     dejado de recibir marketing) es una baja comercial
 //   leadgen (formulario de Meta)              → se pide el lead a Meta → alta → secuencia «lead»; si
@@ -28,6 +30,8 @@ const { registrar } = require('./eventos');
 const W = require('../motor/entrada/whatsapp');
 const E = require('../motor/entrada/leads');
 const { interpretar } = require('../motor/repesca/interpretar');
+const { referenciaDeWhatsapp } = require('../motor/entrada/web');
+const { cargarReferencias, entradaDe } = require('./referencias-web');
 
 // Los avisos que solo traen estados (enviado, entregado, leído) van en su propio trabajo: son muchos
 // cuando salen las secuencias y no pueden hacer esperar a lo que escribe un paciente.
@@ -204,6 +208,7 @@ async function atenderMensaje(deps, m, { ahora }) {
   const recibidoEn = horaDe(m, ahora);
   if (m.tipo === 'reaccion') return registrarReaccion(pool, m, { recibidoEn });
   if (m.referral) await leadDesdeAnuncio(pool, m, { ahora });
+  else if (m.tipo === 'texto' && referenciaDeWhatsapp(m.texto)) await leadDesdeWeb(deps, m, { ahora });
   const nombre = await nombreParaSaludo(pool, m);
 
   // Una foto o un documento con una baja o algo de salud en la leyenda va también por la repesca: la
@@ -290,15 +295,38 @@ async function leadDesdeAnuncio(pool, m, { ahora }) {
     utm: Object.keys(utm).length ? utm : null,
     tratamiento: { claves: [ref.fuenteId, ref.titular], textos: [ref.titular, m.texto] },
   }, { inscribir: false, ahora });
+  await enlazarConversacion(pool, m.telefono, leadId, { ahora });
+  return leadId;
+}
+
+// Botón de WhatsApp de la web pública: el primer mensaje trae «(ref. web-…)» y, si llegó por una
+// campaña, su huella («· c-…»). Lead «web_whatsapp» con la referencia (codigo_web) y el tratamiento
+// que le corresponde (semillas/iemec/referencias-web.json; en lo íntimo, la referencia es un código
+// y el texto del mensaje no nombra nada) y la conversación enlazada a él, como con los anuncios.
+// Quien ya estaba en marcha no se duplica. Una referencia que no está en el archivo (una página que
+// ya no existe) da igual el lead, sin tratamiento.
+async function leadDesdeWeb(deps, m, { ahora }) {
+  const { ref, campana } = referenciaDeWhatsapp(m.texto);
+  const { referencias } = (deps.referenciasWeb || cargarReferencias)();
+  const destino = entradaDe(referencias, ref);
+  const { leadId } = await altaLead(deps.pool, {
+    origen: 'web_whatsapp', telefono: m.telefono, nombre: m.perfil, codigoWeb: ref, utm: campana ? { clave_campana: campana } : null,
+    tratamiento: { id: destino?.catalogo || null, claves: [ref], textos: [] },
+  }, { inscribir: false, ahora });
+  await enlazarConversacion(deps.pool, m.telefono, leadId, { ahora });
+  return leadId;
+}
+
+// La conversación de ese teléfono queda con el lead (contexto «lead»): una abierta sin lead (o con
+// uno ya cerrado) pasa a ser la de este. El orden del SET importa: contexto_id mira el contexto de
+// antes.
+async function enlazarConversacion(pool, telefono, leadId, { ahora }) {
   await enTransaccion(pool, async (con) => {
-    const conv = await R.conversacionPara(con, { telefono: m.telefono, leadId, contexto: 'lead', contextoId: leadId, ahora });
-    // Una conversación abierta sin lead (o con uno ya cerrado) pasa a ser la de este lead. El orden
-    // del SET importa: contexto_id mira el contexto de antes.
+    const conv = await R.conversacionPara(con, { telefono, leadId, contexto: 'lead', contextoId: leadId, ahora });
     await con.query(
       `UPDATE conversaciones SET lead_id = ?, contexto_id = IF(contexto = 'general', ?, contexto_id), contexto = IF(contexto = 'general', 'lead', contexto)
         WHERE id = ? AND (lead_id IS NULL OR lead_id IN (SELECT id FROM leads WHERE etapa IN ('perdido','vendido')))`, [leadId, leadId, conv.id]);
   });
-  return leadId;
 }
 
 async function nombreDeConversacion(pool, conv) {

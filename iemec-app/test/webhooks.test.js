@@ -322,6 +322,30 @@ test('entrada de WhatsApp y de leads', async (t) => {
         assert.equal((await uno("SELECT COUNT(*) AS n FROM eventos WHERE tipo = 'lead_repetido' AND entidad_id = ?", [String(lead.id)])).n, 1);
       });
 
+      await t.test('botón de WhatsApp de la web: «(ref. web-…)» → lead «web_whatsapp» con su referencia y su tratamiento', async () => {
+        // La referencia se traduce con semillas/iemec/referencias-web.json (la genera «npm run web»).
+        const m = texto('34611000561', 'Hola, vengo de la web y me interesa: Medicina capilar. (ref. web-caida-del-cabello · c-1x2y3z)');
+        await postWhatsApp(aviso({ de: '34611000561', perfil: 'ana PRUEBA', mensajes: [m] }));
+        await procesar(mas(martes, 32));
+        const lead = await uno("SELECT * FROM leads WHERE telefono = '+34611000561'");
+        assert.deepEqual([lead.origen, lead.codigo_web, lead.tratamiento_interes_id, lead.nombre, lead.campana],
+          ['web_whatsapp', 'web-caida-del-cabello', 'mesoterapia-capilar', 'Ana Prueba', null]);
+        assert.deepEqual(json(lead.utm), { clave_campana: 'c-1x2y3z' }, 'la huella de la campaña, nunca su nombre');
+        assert.equal((await uno('SELECT COUNT(*) AS n FROM inscripciones WHERE lead_id = ?', [lead.id])).n, 0, 'ya está hablando con la IA: sin secuencia');
+        const conv = await conversacionDe('+34611000561');
+        assert.deepEqual([conv.lead_id, conv.contexto, conv.contexto_id], [lead.id, 'lead', lead.id]);
+        assert.equal((await mensajesDe(conv.id)).at(-1).autor, 'ia');
+
+        // Una referencia que ya no está en el archivo: el lead igual, sin tratamiento. Un mensaje sin
+        // referencia no da lead.
+        await postWhatsApp(aviso({ de: '34611000562', mensajes: [texto('34611000562', 'Hola (ref. web-pagina-que-ya-no-existe)')] }));
+        await postWhatsApp(aviso({ de: '34611000563', mensajes: [texto('34611000563', 'Hola, ¿tenéis cita el jueves? (ref. mía)')] }));
+        await procesar(mas(martes, 32));
+        const sin = await uno("SELECT * FROM leads WHERE telefono = '+34611000562'");
+        assert.deepEqual([sin.origen, sin.codigo_web, sin.tratamiento_interes_id, sin.utm], ['web_whatsapp', 'web-pagina-que-ya-no-existe', null, null]);
+        assert.equal((await uno("SELECT COUNT(*) AS n FROM leads WHERE telefono = '+34611000563'")).n, 0);
+      });
+
       await t.test('reacción: queda en la conversación del mensaje, sin tarea ni respuesta', async () => {
         const conv = await conversacionDe('+34611000506');
         const antes = await mensajesDe(conv.id);

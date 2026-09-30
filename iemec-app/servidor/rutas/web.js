@@ -7,31 +7,18 @@
 // separado, con la fecha y la versión de los textos (solicitudes_web). Límite de envíos por IP y
 // por teléfono en MariaDB (sin cookies ni CAPTCHA de terceros). Un robot (la trampa rellena o un
 // envío instantáneo) recibe «recibido» y no se guarda nada.
-const fs = require('fs');
-const path = require('path');
 const express = require('express');
 const config = require('../config');
 const { altaLead } = require('../leads');
 const { leerFormularioWeb } = require('../../motor/entrada/web');
 const { LIMITES, sumarIntento, claveLimite, huellaIp } = require('../seguridad');
+const { cargarReferencias } = require('../referencias-web');
 
 // (La app no se despliega con web/: su propio escape.)
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 const escapar = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
 
 const envolver = (fn) => (req, res, next) => fn(req, res).catch(next);
-const RUTA_REFERENCIAS = path.join(__dirname, '..', '..', 'semillas', 'iemec', 'referencias-web.json');
-
-// Las referencias de la web («web-lipolaser» → su tratamiento) y los grupos del «¿Qué te interesa?».
-// Las genera web/construir.js en cada «npm run web».
-function cargarReferencias(ruta = RUTA_REFERENCIAS) {
-  try {
-    const j = JSON.parse(fs.readFileSync(ruta, 'utf8'));
-    return { referencias: j.referencias || {}, grupos: j.grupos || {} };
-  } catch {
-    return { referencias: {}, grupos: {} };
-  }
-}
 
 const dominioWeb = () => (process.env.WEB_DOMINIO || config.web.dominio).replace(/\/+$/, '');
 function origenesWeb() {

@@ -109,4 +109,13 @@ function leerFormularioWeb(cuerpo, { referencias = {}, grupos = {}, ahora = new 
   };
 }
 
-module.exports = { leerFormularioWeb, MENSAJES, PREFERENCIAS, MINIMO_MS };
+// Los botones de WhatsApp de la web escriben el primer mensaje con su referencia al final:
+// «Hola, vengo de la web y me interesa: Lipoláser. (ref. web-lipolaser)», y con campaña,
+// «(ref. web-lipolaser · c-1x2y3z)» (la huella de la campaña, nunca su nombre: web/js/web.js).
+const RE_REF_WHATSAPP = /\(ref\. (web-[a-z0-9-]{1,36})(?: · (c-[0-9a-z]{1,8}))?\)/;
+function referenciaDeWhatsapp(texto) {
+  const m = typeof texto === 'string' ? texto.match(RE_REF_WHATSAPP) : null;
+  return m ? { ref: m[1], campana: m[2] || null } : null;
+}
+
+module.exports = { leerFormularioWeb, referenciaDeWhatsapp, MENSAJES, PREFERENCIAS, MINIMO_MS };

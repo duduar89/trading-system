@@ -47,8 +47,9 @@
 
   // WhatsApp: «(ref. web-…)» pasa a «(ref. web-… · c-…)». Va una clave corta de la campaña (su huella),
   // nunca su nombre: el mensaje pasa por Meta y queda en el móvil, y una campaña puede nombrar un
-  // tratamiento íntimo. La app la reconoce calculando la misma huella de sus campañas. El texto se
-  // codifica como el del generador (%20, no «+»), que es lo que espera wa.me.
+  // tratamiento íntimo. La app la guarda con el lead (utm.clave_campana); de qué campaña es se sabe
+  // calculando la misma huella de su nombre. El texto se codifica como el del generador (%20, no «+»),
+  // que es lo que espera wa.me.
   if (codigoCampana) {
     var clave = 'c-' + huella(codigoCampana);
     Array.prototype.forEach.call(d.querySelectorAll('a[href^="https://wa.me/"]'), function (a) {
