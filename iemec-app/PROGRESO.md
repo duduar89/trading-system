@@ -1,49 +1,67 @@
 # PROGRESO — app de IEMEC
 
-**Estado:** F0 en marcha (investigación) · F1 y F2 adelantadas mientras tanto
-**Última actualización:** 29-sep-2026
+**Estado:** todas las fases con su núcleo hecho y probado en demostración. Falta conectar las
+cuentas reales (WhatsApp, Google, IA) y los datos de la clínica, que esperan las puertas ⛔.
+**Última actualización:** 30-sep-2026 · **280 pruebas en verde** · ESLint limpio
 
 El encargo completo está en [`docs/ENCARGO.md`](docs/ENCARGO.md). Este fichero dice dónde estamos:
 se lee al empezar cada vuelta del loop y se actualiza al terminarla.
 
 ## Fases
 
-| Fase | Estado | Notas |
-|---|---|---|
-| F0 · Investigación y propuesta | en marcha | Catálogo, directorios, marca, SEO, búsqueda local, calendario y Google, con verificación. Los informes comerciales se entregan a Eduardo como ficheros, no se suben (repo público) |
-| F1 · Esqueleto y base de datos | en marcha | Servidor, configuración, migraciones idempotentes, `/api/version` y `/api/salud` hechos. Faltan las semillas del catálogo (esperan a F0) y el CI |
-| F2 · Agenda y cita | adelantada | Motor de huecos, día desde la base, reserva sin dobles, retención, cancelación y `.ics` + enlaces hechos. Falta la página «Tu cita» y las rutas |
-| F3 · Repesca | pendiente | |
-| F4 · Reseñas + Google | pendiente | |
-| F5 · Panel | pendiente | |
-| F6 · Despliegue | pendiente | |
+| Fase | Estado | Hecho | Falta |
+|---|---|---|---|
+| F0 · Investigación y propuesta | casi | Directorios, Google, Treatwell, Multiestetica y Doctoralia; posiciones en Maps desde 7 puntos; competencia. **Propuesta para la clínica entregada a Eduardo** (HTML con la estética de la marca + PDF A4), fuera del repo | Catálogo consolidado e informes de SEO, búsqueda local, calendario y Google (en curso); informe de APIs para Eduardo |
+| F1 · Esqueleto y base de datos | hecha | Servidor, migraciones 001-005 con huella, semillas (clínica, festivos 2026 de Madrid y Boadilla, 7 salas, 10 profesionales, 211 tratamientos provisionales con su sala, 11 aparatos, plantillas, ofertas), CI en GitHub Actions | Sustituir el catálogo provisional por el consolidado de la F0 |
+| F2 · Agenda y cita | hecha | Huecos por sala, profesional y aparato; limpiezas, crema anestésica, comidas fijas y flotantes, festivos, cambio de hora; reserva sin dobles; `.ics` y página «Tu cita» (Google, Outlook, Apple, confirmar, cancelar); **el paciente elige hueco por WhatsApp y le llega su cita**; avisos de confirmación, víspera y 2 horas | Reprogramar la cita por WhatsApp sin pasar por una persona; lista de espera |
+| F3 · Repesca | hecha | Intérprete de excusas (130 frases), política con próximo paso siempre, plazos calculados, catálogo de ofertas con límites legales, filtro de publicidad sanitaria, secuencias que se paran al contestar, seguimientos «como quedamos», plantillas con reserva, IA real (Claude por Vertex UE) con respaldo | Webhook de WhatsApp real; entrada de leads de Meta y GHL; batería contra la IA real |
+| F4 · Reseñas + Google | hecha (simulada) | Petición a todos tras la cita, enlace corto, importación, temas y sentimiento, respuestas sin datos de salud con aprobación, ideas de publicación con código de origen | Programar la petición al completar la cita; API real de Business Profile (acceso de gestor) |
+| F5 · Panel | hecha | Hoy, agenda por cabina y por profesional, bandeja con «Cita reservada», seguimientos, repesca, plantillas, reseñas, salas × tratamientos; PWA; modo oscuro; fuentes servidas desde la app | Passkeys (F5.2); pruebas de flujo con Playwright |
+| F6 · Despliegue | hecha | Workflows comprobar y desplegar (probar/subir), script de despliegue con copia previa, recuperación de `node_modules` y comprobación del commit; copias cifradas y prueba de restauración; guía del portátil | Que el workflow esté en la rama por defecto; secretos reales |
 
 ## Pruebas
 
-`npm test` con MariaDB local (10.11): 49 pruebas en verde.
+`npm test` con MariaDB local (10.11): **280 pruebas en verde**. Lo más importante:
 
-- Hora de Madrid: verano, invierno, el retraso del 25-oct-2026 y el adelanto del 29-mar-2026.
-- Huecos: limpieza de sala, crema anestésica que ocupa sala y no médico, comida fija, comida
-  flotante garantizada, ausencias, aparato fijo en una cabina, aparato móvil con dos unidades,
-  jornada partida, antelación mínima, agenda compacta y propuesta de tres huecos repartidos.
-- Días reales: el 5-oct-2026 es fiesta local en Boadilla (Virgen del Rosario) y la clínica no
-  abre; el domingo no abre; el sábado abre a las 10:00; citas del lunes después del cambio de hora.
-- Base de datos: diez reservas simultáneas del mismo hueco → entra una; retención que caduca y
-  libera el hueco; cancelación que sube la versión del `.ics`; registro de hechos.
-- `.ics`: CRLF, plegado a 75 octetos sin romper tildes, escapes, UID estable, SEQUENCE, anulación.
+- **Agenda:** hora de Madrid (cambios de hora de 2026), huecos con limpieza, crema anestésica,
+  comidas fijas y flotantes, aparatos fijos y móviles, festivos de Boadilla, diez reservas
+  simultáneas del mismo hueco → entra una, horas redondas al proponer.
+- **Cita al paciente:** elige «la segunda» → reservada, confirmada con su enlace, lead a «cita» y
+  ficha creada; «vale» con tres huecos → pregunta cuál; hueco ocupado mientras contesta → otros;
+  «ninguno me viene bien» → otros más adelante; «¿y el jueves a las 12?» → se comprueba y se
+  ofrece; tratamiento con valoración → tarea para recepción; «gracias», «confirmo» y «necesito
+  cambiarla»; avisos de confirmación, víspera y 2 horas, una sola vez, de día y sin Treatwell.
+- **Repesca:** batería de 130 frases (fechas y bajas sin fallo), «el mes que viene» con el lunes
+  festivo, precio con oferta del catálogo, baja, salud urgente, dos cron a la vez sin dobles, la
+  regresión de las bajas sin ficha.
+- **Elección de hueco:** 55 frases («el martes a las 11», «la 1ª», «mejor el miércoles»,
+  «ninguno, mejor el jueves»…).
+- **Resto:** `.ics`, página «Tu cita», reseñas, cola, cron, semillas, migraciones.
 
 ## Puertas ⛔ (no bloquean: se sigue con el valor recomendado)
 
-1. **Repositorio privado.** `trading-system` es público. Recomendado mover `iemec-app/` a un repo
-   privado antes de meter secretos de despliegue (se hace en un minuto con `git subtree split`).
-2. **Salas, aparatos y equipo reales de la clínica.** Se cargan los inferidos de la web marcados
-   como «sin confirmar» hasta tener la lista de la clínica.
-3. **Calendario laboral 2027** de la Comunidad de Madrid y de Boadilla: se carga cuando salga en
-   el BOCM.
+1. **Repositorio privado.** `trading-system` es público: mover `iemec-app/` a un repo privado
+   antes de meter secretos (y el workflow de desplegar tiene que estar en la rama por defecto).
+2. **Salas, aparatos, equipo, horarios** y qué tratamiento va en cada sala: hoy, borrador sacado
+   de la web («sin confirmar»).
+3. **Horario del sábado:** Google 11-20, Treatwell 10-20.
+4. **Calendario laboral 2027** de Madrid y Boadilla: cuando salga en el BOCM.
+5. **WhatsApp:** dónde está hoy el 722 83 32 85 y con qué proveedor (coexistencia).
+6. **Acceso de gestor** a la ficha de Google; Search Console y Analytics a través de Uebea.
+7. **Ofertas permitidas**, **20-30 conversaciones reales**, **respuestas del equipo médico** y
+   **plantillas de hoy**.
+8. **Copia de Flowww**, fecha de renovación y contrato de eternis.
+9. **Revisión del abogado sanitario** antes de activar nada.
+10. **Facturación:** fuera de la app; decidir cómo pasa la cita a la facturación (exportación o a
+    mano).
 
 ## Registro de vueltas
 
-- **29-sep · vuelta 1.** Encargo, reglas y fases escritas. MariaDB local. Esqueleto (config,
-  conexión en UTC, migraciones con huella, servidor con versión y salud). Migraciones 001 (base) y
-  002 (agenda). Motor de hora de Madrid, de huecos y del día; reserva con bloqueo de recursos;
-  `.ics` y enlaces de calendario. Investigación de la F0 lanzada en segundo plano.
+- **29-sep · vuelta 1.** Encargo, reglas y fases. MariaDB local. Esqueleto, migraciones 001-002,
+  motor de hora, de huecos y del día; reserva con bloqueo; `.ics`. Investigación de la F0 lanzada.
+- **29-sep · vueltas 2-6.** Repesca (003), reseñas (004), semillas, panel con la estética de la
+  clínica, rutas públicas, cron con cola y candados, demo, despliegue probado contra un servidor
+  simulado por SSH, copias cifradas. Cada tratamiento con su sala concreta.
+- **30-sep · vuelta 7.** El paciente elige hueco por WhatsApp y le llega su cita (005); avisos de
+  cita; «último» ya no es una queja; horas redondas; fuentes servidas desde la app; saludo según la
+  hora. **Propuesta para la clínica** (HTML + PDF) entregada a Eduardo.

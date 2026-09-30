@@ -4,8 +4,9 @@ App para IEMEC (Instituto Europeo de Medicina Estética y Capilar, Boadilla del 
 
 - **Agenda por cabina** con profesionales, aparatos, limpiezas y comidas garantizadas. Cada
   tratamiento, en su sala.
-- **La cita llega al paciente** por WhatsApp con su página «Tu cita» para añadirla al calendario
-  (Google, Apple, Outlook), confirmarla, cambiarla o cancelarla.
+- **La cita llega al paciente:** elige hueco por WhatsApp («la primera me va genial»), queda
+  reservada y le llega su página «Tu cita» para añadirla al calendario (Google, Apple, Outlook),
+  confirmarla o cancelarla. Recordatorios la víspera y 2 horas antes.
 - **Repesca** de leads, cancelaciones y presupuestos: la IA entiende las excusas, la fecha la pone el
   código y ninguna conversación se queda sin próximo paso.
 - **Plantillas de WhatsApp** con filtro de publicidad sanitaria.

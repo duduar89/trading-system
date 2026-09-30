@@ -24,7 +24,7 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
    ```bash
    npm install
    npm run preparar-bd        # migraciones + datos públicos de la clínica
-   npm test                   # 230+ pruebas; las de base de datos usan iemec_test
+   npm test                   # 280 pruebas; las de base de datos usan iemec_test
    ```
 4. **Verla funcionando con datos de ejemplo:**
 
