@@ -107,7 +107,7 @@ function ListaPasskeys() {
           Cerrar la sesión en los demás dispositivos
         </Boton>
       </div>
-      <p role="status" className="mt-3 text-sm empty:hidden">{aviso}</p>
+      <p role="status" className={aviso ? 'mt-3 text-sm' : 'sr-only'}>{aviso}</p>
       {fallo && <p role="alert" className="mt-3 text-sm text-rosa">{fallo}</p>}
     </>
   );
@@ -118,16 +118,22 @@ function ElEquipo() {
   const { datos, error, recargar } = useDatos('/panel/equipo');
   const [enlace, setEnlace] = useState(null);
   const [fallo, setFallo] = useState('');
+  const [aviso, setAviso] = useState('');
   // Administración gestiona el equipo, pero a quien es de dirección (y ese rol) solo lo toca dirección.
   const deDireccion = useSesion()?.rol === 'direccion';
   if (error) return <Error texto={error} />;
   if (!datos) return null;
   const asignables = deDireccion ? datos.roles : datos.roles.filter((r) => r.id !== 'direccion');
-  // Cada acción: el error, si lo hay, arriba; y la lista, siempre recargada (un rol que no se pudo
-  // cambiar vuelve a su sitio).
-  const hacer = async (fn) => {
+  // Cada acción: lo que ha pasado se anuncia (role="status", también al lector de pantalla), el error va
+  // arriba y la lista se recarga siempre (un rol que no se pudo cambiar vuelve a su sitio).
+  const hacer = async (fn, hecho = '') => {
     setFallo('');
-    try { return await fn(); } catch (err) { setFallo(err.message); return null; } finally { recargar(); }
+    setAviso('');
+    try {
+      const r = await fn();
+      setAviso(hecho);
+      return r;
+    } catch (err) { setFallo(err.message); return null; } finally { recargar(); }
   };
   return (
     <>
@@ -136,6 +142,7 @@ function ElEquipo() {
       <AltaPersona roles={asignables} alCrear={(r) => { setEnlace({ para: r.usuario.nombre, enlace: r.enlace, caduca: r.caduca }); recargar(); }} />
       {enlace && <EnlaceNuevo {...enlace} alCerrar={() => setEnlace(null)} />}
       {fallo && <Error texto={fallo} />}
+      <p role="status" className={aviso ? 'tarjeta px-4 py-3 text-sm' : 'sr-only'}>{aviso}</p>
       <ul className="space-y-3">
         {datos.usuarios.map((u) => (
           <Persona key={u.id} u={u} yo={datos.yo} roles={deDireccion || u.rol === 'direccion' ? datos.roles : asignables} tocable={deDireccion || u.rol !== 'direccion'}
@@ -220,27 +227,49 @@ function EnlaceNuevo({ para, enlace, caduca, alCerrar }) {
 
 function Persona({ u, yo, roles, tocable, hacer, alEnlace }) {
   const soyYo = u.id === yo;
+  // El rol que se elige en el desplegable no se aplica hasta pulsar «Cambiar rol» y confirmarlo: con el
+  // teclado, las flechas cambian la opción sin abrir la lista (Chrome en Windows y Linux, los lectores de
+  // pantalla), y cada una sería un cambio de rol de verdad.
+  const [rol, setRol] = useState(u.rol);
+  useEffect(() => { setRol(u.rol); }, [u.rol]);
+  const nombreRol = (id) => roles.find((r) => r.id === id)?.nombre || id;
   const [texto, clase] = !u.activo ? ['Desactivada', 'bg-[var(--superficie-2)] text-[var(--texto-suave)]']
     : u.invitacionHasta ? [`Enlace pendiente hasta ${fechaHora(u.invitacionHasta)}`, 'bg-oro/20 text-[#7a5a1f] dark:text-champan']
       : !u.passkeys.length ? ['Sin passkey', 'bg-rosa/20 text-rosa'] : ['Activa', 'bg-aqua text-terciopelo-800'];
-  const cambiar = (cuerpo) => hacer(async () => {
+  const cambiar = (cuerpo, hecho) => hacer(async () => {
     await api(`/panel/equipo/${u.id}`, { metodo: 'PATCH', cuerpo });
     if (soyYo) recargarSesion();
-  });
+  }, hecho);
+  // Pasar a dirección es poder con todo el equipo: se enseñan sus passkeys antes (alguna la pudo crear otra
+  // persona con un enlace) y los enlaces pendientes que no dio dirección dejan de valer.
+  const cambiarRol = () => {
+    if (rol === u.rol) return;
+    const avisos = [`¿Cambiar el rol de ${u.nombre} de ${nombreRol(u.rol)} a ${nombreRol(rol)}?`];
+    if (rol === 'direccion') {
+      avisos.push('Podrá gestionar a todo el equipo, y solo dirección podrá quitarle el rol.');
+      avisos.push(u.passkeys.length
+        ? `Sus passkeys: ${u.passkeys.map((p) => `«${p.dispositivo}» (alta ${fechaHora(p.alta)})`).join(', ')}. Si alguna no es suya (la pudo crear otra persona con un enlace), bórrala.`
+        : 'Todavía no tiene passkey.');
+      if (u.invitacionHasta) avisos.push('Si su enlace pendiente se lo dio administración, deja de valer: mándale uno nuevo.');
+    } else if (rol === 'admin') avisos.push('Podrá gestionar el equipo, salvo a dirección.');
+    if (soyYo) avisos.push('Es tu propio rol: dejarás de poder hacer lo que solo permite el de ahora.');
+    if (!window.confirm(avisos.join('\n\n'))) { setRol(u.rol); return; }
+    cambiar({ rol }, `${u.nombre} tiene ahora el rol de ${nombreRol(rol)}.`);
+  };
   const enlaceNuevo = async () => {
     const r = await hacer(() => api(`/panel/equipo/${u.id}/invitacion`, { metodo: 'POST' }));
     if (r) alEnlace(r);
   };
   const desactivar = () => {
     if (u.activo && !window.confirm(`¿Desactivar a ${u.nombre}? Sus sesiones se cierran ahora mismo y no podrá entrar hasta que se reactive.`)) return;
-    cambiar({ activo: !u.activo });
+    cambiar({ activo: !u.activo }, u.activo ? `Se ha desactivado a ${u.nombre}: sus sesiones se han cerrado.` : `Se ha reactivado a ${u.nombre}.`);
   };
   const borrar = (p) => {
     if (!window.confirm(`¿Borrar la passkey «${p.dispositivo}» de ${u.nombre}? Las sesiones abiertas con ella se cierran ahora mismo.`)) return;
     hacer(async () => {
       const r = await api(`/panel/equipo/${u.id}/passkeys/${p.id}`, { metodo: 'DELETE' });
       if (r.sesionCerrada) window.dispatchEvent(new Event('iemec:sin-sesion'));
-    });
+    }, `Passkey «${p.dispositivo}» de ${u.nombre} borrada.`);
   };
   return (
     <li className={`tarjeta p-5 ${u.activo ? '' : 'opacity-75'}`}>
@@ -253,12 +282,15 @@ function Persona({ u, yo, roles, tocable, hacer, alEnlace }) {
             <span style={suave}>{u.ultimoAcceso ? `Último acceso ${fechaHora(u.ultimoAcceso)}` : 'Aún no ha entrado'}</span>
           </div>
         </div>
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           <label htmlFor={`rol-${u.id}`} className="sr-only">Rol de {u.nombre}</label>
-          <select id={`rol-${u.id}`} value={u.rol} disabled={!u.activo || !tocable} onChange={(e) => cambiar({ rol: e.target.value })}
+          <select id={`rol-${u.id}`} value={rol} disabled={!u.activo || !tocable} onChange={(e) => setRol(e.target.value)}
             className="rounded-full border border-[var(--borde)] bg-[var(--superficie)] px-3 py-1.5 text-sm disabled:opacity-50">
             {roles.map((r) => <option key={r.id} value={r.id}>{mayuscula(r.nombre)}</option>)}
           </select>
+          {u.activo && tocable && (
+            <Boton onClick={cambiarRol} disabled={rol === u.rol} aria-label={`Cambiar el rol de ${u.nombre}`}>Cambiar rol</Boton>
+          )}
         </div>
       </div>
       {u.passkeys.length > 0 && (
@@ -281,7 +313,7 @@ function Persona({ u, yo, roles, tocable, hacer, alEnlace }) {
       {tocable ? (
         <div className="mt-4 flex flex-wrap gap-2">
           {u.activo && <Boton onClick={enlaceNuevo}>{u.passkeys.length ? 'Enlace para otra passkey' : 'Enlace nuevo'}</Boton>}
-          {u.activo && !soyYo && <Boton onClick={() => hacer(() => api(`/panel/equipo/${u.id}/cerrar-sesiones`, { metodo: 'POST' }))}>Cerrar sus sesiones</Boton>}
+          {u.activo && !soyYo && <Boton onClick={() => hacer(() => api(`/panel/equipo/${u.id}/cerrar-sesiones`, { metodo: 'POST' }), `Sesiones de ${u.nombre} cerradas.`)}>Cerrar sus sesiones</Boton>}
           {!soyYo && <Boton onClick={desactivar}>{u.activo ? 'Desactivar' : 'Reactivar'}</Boton>}
         </div>
       ) : <p className="mt-3 text-xs" style={suave}>A las personas de dirección solo las gestiona dirección.</p>}

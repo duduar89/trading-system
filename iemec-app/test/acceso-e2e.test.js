@@ -40,9 +40,11 @@ async function contextoConAutenticador(navegador) {
   const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
     options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
   });
-  pagina.on('dialog', (d) => d.accept());
+  // Los avisos de confirmar (window.confirm) se aceptan y se guardan para mirar qué decían.
+  const dialogos = [];
+  pagina.on('dialog', (d) => { dialogos.push(d.message()); d.accept(); });
   const credenciales = async () => (await cdp.send('WebAuthn.getCredentials', { authenticatorId })).credentials;
-  return { contexto, pagina, credenciales };
+  return { contexto, pagina, credenciales, dialogos };
 }
 
 test('passkeys de punta a punta en Chromium', { timeout: 180000 }, async (t) => {
@@ -128,6 +130,44 @@ test('passkeys de punta a punta en Chromium', { timeout: 180000 }, async (t) => 
       await enlaceDeLaSeccion(r, 'Mis passkeys').click();
       await r.getByRole('heading', { name: 'Tus passkeys' }).waitFor();
       await r.getByText('con esta has entrado').waitFor();
+    });
+
+    // Con el teclado, las flechas cambian la opción de un desplegable cerrado (Chrome en Windows y Linux, y
+    // los lectores de pantalla al recorrer las opciones): eso no puede cambiar el rol de nadie. Se cambia
+    // con «Cambiar rol», confirmándolo (al pasar a dirección, viendo sus passkeys), y se anuncia.
+    await t.test('el rol no cambia con las flechas del teclado: hace falta «Cambiar rol» y confirmarlo', async () => {
+      const cambios = [];
+      const apuntar = (r) => { if (r.method() === 'PATCH') cambios.push(r.postData()); };
+      p.on('request', apuntar);
+      const rolDe = async () => (await pool.query("SELECT rol FROM usuarios WHERE email = 'recepcion@ejemplo.com'"))[0][0].rol;
+      try {
+        await p.reload();
+        const selector = p.getByLabel('Rol de Recepción Prueba', { exact: true });
+        await selector.focus();
+        await p.keyboard.press('ArrowUp');
+        assert.equal(await selector.inputValue(), 'direccion', 'el desplegable enseña la opción de arriba');
+        const aplicar = p.locator('button[aria-label="Cambiar el rol de Recepción Prueba"]:enabled');
+        await aplicar.waitFor();
+        assert.deepEqual(cambios, [], 'pero no se ha mandado nada');
+        assert.equal(await rolDe(), 'recepcion');
+
+        dir.dialogos.length = 0;
+        await aplicar.click();
+        await p.getByRole('status').filter({ hasText: 'Recepción Prueba tiene ahora el rol de dirección.' }).waitFor();
+        assert.deepEqual(cambios, ['{"rol":"direccion"}']);
+        assert.equal(await rolDe(), 'direccion');
+        const [aviso] = dir.dialogos;
+        assert.match(aviso, /^¿Cambiar el rol de Recepción Prueba de recepción a dirección\?/);
+        assert.match(aviso, /Sus passkeys: «[^»]+» \(alta [^)]+\)\. Si alguna no es suya/, 'enseña sus passkeys antes de darle dirección');
+
+        // Y vuelve a recepción igual: eligiendo y confirmando.
+        await p.getByLabel('Rol de Recepción Prueba', { exact: true }).selectOption('recepcion');
+        assert.equal(await rolDe(), 'direccion', 'elegir no basta');
+        await p.getByRole('button', { name: 'Cambiar el rol de Recepción Prueba' }).click();
+        await p.getByRole('status').filter({ hasText: 'Recepción Prueba tiene ahora el rol de recepción.' }).waitFor();
+        assert.equal(await rolDe(), 'recepcion');
+        assert.equal(cambios.length, 2);
+      } finally { p.off('request', apuntar); }
     });
 
     await t.test('dirección la desactiva y recepción se queda fuera', async () => {
