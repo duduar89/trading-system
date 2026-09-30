@@ -9,7 +9,8 @@ const QUINCE_MIN = 15 * 60000;
 
 // Con `node --test` nunca se crea un adaptador real a partir del entorno: una prueba no puede llamar a
 // un servicio de verdad aunque el .env del portátil tenga claves (las pruebas pasan el suyo, con un
-// fetch falso).
+// fetch falso). Aquí el cron ni lo intenta (no está en real); además, un adaptador real sin el fetch
+// de la prueba no sale a internet (llamadas.fetchDe), lo cree quien lo cree.
 const bajoPruebas = (env) => env === process.env && Boolean(process.env.NODE_TEST_CONTEXT);
 
 /**

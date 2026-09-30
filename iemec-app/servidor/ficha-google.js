@@ -13,6 +13,10 @@
 //   aviso), las métricas de los últimos 30 días y la ficha (el place ID, quién la controla, los cambios
 //   de Google y el aviso de reseñas sospechosas de Places). Una vez por semana: todas las reseñas y las
 //   búsquedas con las que salió la ficha el mes pasado.
+//   Esta es la única que lee las reseñas de Google y la única que cambia el place ID de la clínica (si
+//   Google lo cambia, lo pone y una persona lo sabe). Lo de la pieza de reseñas que llama a Google (el
+//   enlace oficial de la ficha y las respuestas aprobadas del historial: resenas.vueltaGoogle, cuando
+//   exista) va también aquí, con el mismo adaptador, dentro del mismo candado y con el mismo tiempo.
 //   Lo que viene de la Performance API se guarda como mucho 30 días (normas de la API: «no more than
 //   30 calendar days»): las métricas de hace más de 30 días y las búsquedas de meses anteriores al
 //   pasado se borran; si hacen falta, se vuelven a pedir.
@@ -37,6 +41,7 @@ const TAREAS = {
   duplicada: 'Google avisa de una ficha duplicada de la clínica: revisarlo en Business Profile',
   foto: 'Alguien ha subido una foto o un vídeo a la ficha de Google: revisarlo (puede salir un paciente)',
   sospechosas: 'Google muestra en la ficha un aviso de reseñas sospechosas: revisarlo en Business Profile',
+  placeId: 'Google ha cambiado el place ID de la ficha y la app ya usa el nuevo: cambiarlo en GOOGLE_PLACE_ID (.env), en la web y en los QR o enlaces para reseñar que lo lleven',
 };
 
 const mesAnterior = (fecha) => T.sumarMeses(T.primerDiaDelMes(fecha), -1).slice(0, 7);
@@ -71,8 +76,9 @@ async function atenderAviso(deps, aviso, { ahora, webhookId }) {
         throw err;
       }
       if (!r) return { sinNota: true };
-      // La importación de siempre, con esta reseña sola (el adaptador, con su lista de una).
-      return { tipo: aviso.tipo, ...(await resenas.importarResenas(pool, { ...google, listarResenas: async () => [r] })) };
+      // La importación de siempre, con esta reseña sola (el adaptador, con su lista de una) y la hora
+      // del cron.
+      return { tipo: aviso.tipo, ...(await resenas.importarResenas(pool, { ...google, listarResenas: async () => [r] }, { ahora })) };
     }
     case 'GOOGLE_UPDATE': return { tareaId: await tareaUnica(pool, { titulo: TAREAS.cambiosDeGoogle, ahora }) };
     case 'VOICE_OF_MERCHANT_UPDATED': return { tareaId: await tareaUnica(pool, { titulo: TAREAS.control, urgente: true, ahora }) };
@@ -102,10 +108,12 @@ async function procesarAviso(deps, webhookId, { ahora = new Date() } = {}) {
 
 // ── Reseñas, métricas, búsquedas y ficha ───────────────────────────────────────────────────
 
-// Las reseñas tocadas desde «desde» (o todas), por la importación de siempre.
-async function sincronizarResenas(deps, { desde = null } = {}) {
+// Las reseñas tocadas desde «desde» (o todas), por la importación de siempre, con la hora del cron.
+// Sin «desde» es la lista completa de la ficha (completa: lo que ya no viene lo quitó Google o quien
+// la escribió).
+async function sincronizarResenas(deps, { desde = null, ahora = new Date() } = {}) {
   const { google } = deps;
-  return resenas.importarResenas(deps.pool, { ...google, listarResenas: () => google.listarResenas({ desde }) });
+  return resenas.importarResenas(deps.pool, { ...google, listarResenas: () => google.listarResenas({ desde }) }, { ahora, completa: !desde });
 }
 
 // Las métricas diarias de los últimos 30 días (las de los últimos días cambian: se vuelven a pedir).
@@ -147,7 +155,9 @@ async function guardarPalabras(deps, { mes }) {
 }
 
 // La ficha: el place ID al día (Google lo puede cambiar), quién la controla, los cambios que propone
-// Google y, con Places, el aviso de reseñas sospechosas. Lo que hay que mirar, a una persona.
+// Google y, con Places, el aviso de reseñas sospechosas. Lo que hay que mirar, a una persona. El place
+// ID es de la ficha y se puede guardar (también el de Places); si cambia, la app usa el nuevo (el
+// enlace para reseñar, reconocer a la clínica en la malla) y una persona cambia lo que la app no ve.
 async function revisarFicha(deps, { ahora = new Date() } = {}) {
   const { pool, google } = deps;
   const f = await google.obtenerFicha({ refrescar: true });
@@ -157,6 +167,8 @@ async function revisarFicha(deps, { ahora = new Date() } = {}) {
     await pool.query('UPDATE clinica SET google_place_id = ? WHERE id = 1', [f.placeId]);
     await registrar(pool, { tipo: 'google_place_id', entidad: 'clinica', entidadId: 1, actor: 'google', datos: { antes: cl.google_place_id, ahora: f.placeId } });
     r.placeIdCambiado = true;
+    // Si no había ninguno, solo se completa; si cambia, que lo sepa una persona.
+    if (cl.google_place_id) r.tareas.push(await tareaUnica(pool, { titulo: TAREAS.placeId, ahora }));
   }
   if (f.conVoz === false) r.tareas.push(await tareaUnica(pool, { titulo: TAREAS.sinControl, urgente: true, ahora }));
   if (f.googleHaCambiado === true) r.tareas.push(await tareaUnica(pool, { titulo: TAREAS.cambiosDeGoogle, ahora }));
@@ -233,7 +245,8 @@ async function programar(pool, google, { ahora = new Date() } = {}) {
 
 /**
  * Una vuelta del cron (dentro de su candado): programa lo del día y de la semana y hace lo que haya en
- * la cola, con tiempo tasado. null si Google no está en real.
+ * la cola, con tiempo tasado; después, lo de la pieza de reseñas que llama a Google (si lo tiene), con
+ * el mismo adaptador y el tiempo que quede. null si Google no está en real.
  */
 async function vuelta(deps, { ahora = new Date(), env = process.env, presupuestoMs = 20000 } = {}) {
   const google = adaptador(deps, env); // queda en deps.google
@@ -241,15 +254,25 @@ async function vuelta(deps, { ahora = new Date(), env = process.env, presupuesto
   const { pool } = deps;
   const programados = await programar(pool, google, { ahora });
   const cortarEn = Date.now() + presupuestoMs;
-  const aviso = (que, fn) => conAviso(pool, ahora, `Google: no se ha podido ${que}`, fn);
+  // El título de la tarea para una persona, entero: «no se han podido traer las reseñas».
+  const aviso = (titulo, fn) => conAviso(pool, ahora, `Google: ${titulo}`, fn);
   const r = await cola.procesar(pool, {
-    [TRABAJOS.aviso]: aviso('atender un aviso de la ficha', (c) => procesarAviso(deps, c.webhookId, { ahora })),
-    [TRABAJOS.resenas]: aviso('traer las reseñas', (c) => sincronizarResenas(deps, { desde: c.desde || null })),
-    [TRABAJOS.metricas]: aviso('traer las métricas', () => guardarMetricas(deps, { ahora })),
-    [TRABAJOS.palabras]: aviso('traer las búsquedas del mes', (c) => guardarPalabras(deps, { mes: c.mes })),
-    [TRABAJOS.ficha]: aviso('revisar la ficha', () => revisarFicha(deps, { ahora })),
+    [TRABAJOS.aviso]: aviso('no se ha podido atender un aviso de la ficha', (c) => procesarAviso(deps, c.webhookId, { ahora })),
+    [TRABAJOS.resenas]: aviso('no se han podido traer las reseñas', (c) => sincronizarResenas(deps, { desde: c.desde || null, ahora })),
+    [TRABAJOS.metricas]: aviso('no se han podido traer las métricas', () => guardarMetricas(deps, { ahora })),
+    [TRABAJOS.palabras]: aviso('no se han podido traer las búsquedas del mes', (c) => guardarPalabras(deps, { mes: c.mes })),
+    [TRABAJOS.ficha]: aviso('no se ha podido revisar la ficha', () => revisarFicha(deps, { ahora })),
   }, { ahora, limite: 10, cortarEn });
-  return programados.length ? { programados, ...r } : r;
+  const informe = programados.length ? { programados, ...r } : r;
+  if (typeof resenas.vueltaGoogle === 'function') {
+    try {
+      const x = await resenas.vueltaGoogle(deps, { ahora, cortarEn });
+      if (x) informe.resenas = x;
+    } catch (err) {
+      informe.resenas = { error: String(err.message).slice(0, 300) };
+    }
+  }
+  return informe;
 }
 
 module.exports = {

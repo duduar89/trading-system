@@ -173,7 +173,9 @@ test('avisos de Google por Pub/Sub: token, guardado cifrado, cola y la reseña q
       const [w3] = await guardar({ type: 'NEW_REVIEW', review_name: `accounts/${CUENTA}/locations/${UBICACION}/reviews/AbFvOqBorrada` }, '23');
       const [w4] = await guardar({ type: 'VOICE_OF_MERCHANT_UPDATED', location_name: `locations/${UBICACION}` }, '24');
       const [w5] = await guardar({ type: 'GOOGLE_UPDATE', location_name: `locations/${UBICACION}` }, '25');
-      assert.deepEqual(await fichaGoogle.procesarAviso(deps, w1.insertId, { ahora }), { tipo: 'UPDATED_REVIEW', leidas: 1, nuevas: 0 });
+      // Lo que devuelve la importación lo decide la pieza de reseñas: aquí, solo lo de esta pieza.
+      const x = await fichaGoogle.procesarAviso(deps, w1.insertId, { ahora });
+      assert.deepEqual([x.tipo, x.leidas, x.nuevas], ['UPDATED_REVIEW', 1, 0]);
       const [[f]] = await pool.query('SELECT nota, texto FROM resenas');
       assert.deepEqual([f.nota, f.texto], [3, 'Bien, aunque esperé un rato']);
       const antes = falso.api().length;
@@ -325,9 +327,12 @@ test('lo del día y de la semana de Google, por la cola: solo en real y con cred
       const [hechos] = await pool.query("SELECT tipo, clave_unica FROM cola WHERE estado = 'hecho' ORDER BY id");
       assert.deepEqual(hechos.map((x) => x.clave_unica), ['google-resenas-2026-10-05', 'google-metricas-2026-10-05', 'google-ficha-2026-10-05', 'google-resenas-todas-2026-10-05', 'google-palabras-2026-10-05']);
 
-      // Reseñas: la de la semana y, con la lista completa, también la antigua.
+      // Reseñas: la de la semana y, con la lista completa, también la antigua. En qué estado queda cada
+      // una lo decide la pieza de reseñas (la antigua sin contestar puede ir al historial).
       const [rs] = await pool.query('SELECT google_id, nota, estado FROM resenas ORDER BY google_id');
-      assert.deepEqual(rs.map((x) => [x.google_id, x.nota, x.estado]), [['AbFvOqL1', 5, 'borrador'], ['AbFvOqL2', 4, 'publicada'], ['AbFvOqL3', 2, 'borrador']]);
+      assert.deepEqual(rs.map((x) => [x.google_id, x.nota]), [['AbFvOqL1', 5], ['AbFvOqL2', 4], ['AbFvOqL3', 2]]);
+      assert.deepEqual(rs.slice(0, 2).map((x) => x.estado), ['borrador', 'publicada'], 'la reciente sin contestar, al borrador; la contestada en Google, publicada');
+      assert.ok(['borrador', 'historial'].includes(rs[2].estado), rs[2].estado);
       // Métricas de los últimos 30 días (hasta ayer), con su nombre en la app; el día sin valor es 0.
       const m = falso.api().find((p) => p.url.pathname.endsWith(':fetchMultiDailyMetricsTimeSeries')).url.searchParams;
       assert.deepEqual(['year', 'month', 'day'].map((k) => m.get(`dailyRange.start_date.${k}`)), ['2026', '9', '5']);
@@ -340,13 +345,16 @@ test('lo del día y de la semana de Google, por la cola: solo en real y con cred
       assert.equal(falso.api().find((p) => p.url.pathname.endsWith('/monthly')).url.searchParams.get('monthlyRange.start_month.month'), '9');
       const [busquedas] = await pool.query('SELECT mes, palabra, impresiones, umbral FROM busquedas_gbp ORDER BY palabra');
       assert.deepEqual(busquedas.map((x) => [x.mes, x.palabra, x.impresiones, x.umbral]), [['2026-09', 'clinica estetica boadilla', 427, null], ['2026-09', 'hifu facial', null, '15']]);
-      // La ficha: el place ID nuevo pasa a la clínica, y lo que hay que mirar, a una persona.
+      // La ficha: el place ID nuevo pasa a la clínica (y una persona lo sabe: puede estar en el .env, la
+      // web o un QR), y lo que hay que mirar, a una persona.
       const [[cl]] = await pool.query('SELECT google_place_id FROM clinica');
       assert.equal(cl.google_place_id, 'ChIJPruebaNuevoPlaceId000002');
       const [[ev]] = await pool.query("SELECT datos FROM eventos WHERE tipo = 'google_place_id'");
       assert.deepEqual(typeof ev.datos === 'string' ? JSON.parse(ev.datos) : ev.datos, { antes: PLACE_ID, ahora: 'ChIJPruebaNuevoPlaceId000002' });
       const [tareas] = await pool.query("SELECT titulo, urgente FROM tareas ORDER BY id");
-      assert.deepEqual(tareas.map((x) => [x.titulo, Boolean(x.urgente)]), [[fichaGoogle.TAREAS.sinControl, true], [fichaGoogle.TAREAS.cambiosDeGoogle, false]]);
+      assert.deepEqual(tareas.map((x) => [x.titulo, Boolean(x.urgente)]), [
+        [fichaGoogle.TAREAS.placeId, false], [fichaGoogle.TAREAS.sinControl, true], [fichaGoogle.TAREAS.cambiosDeGoogle, false],
+      ]);
       assert.equal(falso.api().filter((p) => p.metodo !== 'GET').length, 0, 'solo se lee');
     });
 
@@ -391,8 +399,8 @@ test('lo del día y de la semana de Google, por la cola: solo en real y con cred
       const revocado = crearGoogle('real', { env: ENV_GOOGLE, esperar: async () => {}, fetch: async () => json(400, { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' }) });
       const r = await fichaGoogle.vuelta({ pool, google: revocado }, { ahora: new Date('2026-10-08T06:00:00Z') });
       assert.deepEqual([r.hechos, r.reintentos], [0, 3]);
-      const [tareas] = await pool.query("SELECT titulo FROM tareas WHERE titulo LIKE 'Google: no se ha podido%' ORDER BY id");
-      assert.deepEqual(tareas.map((x) => x.titulo.replace(/ \(.*$/, '')), ['Google: no se ha podido traer las reseñas', 'Google: no se ha podido traer las métricas', 'Google: no se ha podido revisar la ficha']);
+      const [tareas] = await pool.query("SELECT titulo FROM tareas WHERE titulo LIKE 'Google: no se ha%podido%' ORDER BY id");
+      assert.deepEqual(tareas.map((x) => x.titulo.replace(/ \(.*$/, '')), ['Google: no se han podido traer las reseñas', 'Google: no se han podido traer las métricas', 'Google: no se ha podido revisar la ficha']);
       assert.ok(tareas.every((x) => /token de refresco ha caducado o se ha revocado/.test(x.titulo)));
       const [[c]] = await pool.query("SELECT estado, intentos FROM cola WHERE clave_unica = 'google-resenas-2026-10-08'");
       assert.deepEqual([c.estado, c.intentos], ['pendiente', 1]);
@@ -408,6 +416,84 @@ test('lo del día y de la semana de Google, por la cola: solo en real y con cred
       assert.deepEqual(await fichaGoogle.programar(pool, google, { ahora: min(ahora, 1) }), ['google_resenas', 'google_metricas', 'google_ficha']);
     });
   } finally {
+    await pool.end();
+  }
+});
+
+test('reseñas anónimas o sin nombre: el borrador no saluda a «null» y el autor queda vacío', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  try {
+    await sembrar(pool);
+    const sinNombre = (id, reviewer, opciones) => ({ ...resenaDeGoogle(id, { creada: '2026-10-05T10:00:00Z', ...opciones }), reviewer });
+    const anonimo = { displayName: 'Un usuario de Google', isAnonymous: true };
+    const falso = falsoGoogle((p) => (p.url.pathname === `${RUTA}/reviews` ? json(200, {
+      reviews: [
+        sinNombre('AbFvOqN1', anonimo, { comentario: 'Genial, muy contenta con el trato' }),
+        sinNombre('AbFvOqN2', anonimo, { estrellas: 'ONE', comentario: 'No contestan al teléfono' }),
+        sinNombre('AbFvOqN3', {}, { estrellas: 'FOUR', comentario: 'Muy bien' }),
+      ],
+      totalReviewCount: 3,
+    }) : null));
+    await fichaGoogle.sincronizarResenas({ pool, google: googleReal(falso) }, { ahora: new Date('2026-10-06T08:00:00Z') });
+    const [rs] = await pool.query('SELECT google_id, autor, borrador_respuesta FROM resenas ORDER BY google_id');
+    assert.equal(rs.length, 3);
+    for (const r of rs) {
+      assert.equal(r.autor, null, r.google_id);
+      assert.ok(r.borrador_respuesta, r.google_id);
+      assert.doesNotMatch(r.borrador_respuesta, /null|undefined/i, `${r.google_id}: ${r.borrador_respuesta}`);
+    }
+  } finally {
+    await pool.end();
+  }
+});
+
+test('la vuelta de Google lleva también lo de la pieza de reseñas que llama a Google (mismo adaptador, candado y tiempo)', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const resenas = require('../servidor/resenas');
+  const tenia = Object.hasOwn(resenas, 'vueltaGoogle');
+  const antes = { vueltaGoogle: resenas.vueltaGoogle, importarResenas: resenas.importarResenas };
+  try {
+    await sembrar(pool);
+    const ahora = new Date('2026-10-06T08:00:00Z'); // martes, 10:00 en Madrid
+    const importaciones = [];
+    resenas.importarResenas = async (_pool, google, opciones) => {
+      importaciones.push({ resenas: (await google.listarResenas()).length, ...opciones });
+      return { leidas: 0, nuevas: 0 };
+    };
+    // Las reseñas, una; lo demás (métricas, ficha), vacío.
+    const falso = falsoGoogle((p) => json(200, p.url.pathname === `${RUTA}/reviews` ? { reviews: [resenaDeGoogle('AbFvOqV1')] } : {}));
+    const google = googleReal(falso);
+    await fichaGoogle.sincronizarResenas({ pool, google }, { ahora });
+    await fichaGoogle.sincronizarResenas({ pool, google }, { desde: '2026-09-28T08:00:00Z', ahora });
+    assert.deepEqual(importaciones, [{ resenas: 1, ahora, completa: true }, { resenas: 1, ahora, completa: false }], 'la hora del cron, y si es la lista entera');
+
+    const llamadas = [];
+    resenas.vueltaGoogle = async (deps, o) => {
+      const [[candado]] = await pool.query("SELECT hasta FROM candados WHERE nombre = 'cron-google'");
+      llamadas.push({ adaptador: deps.google === google, ahora: o.ahora, cortarEn: Number.isFinite(o.cortarEn), dentroDelCandado: Boolean(candado && new Date(candado.hasta) > o.ahora) });
+      return { hechos: 1 };
+    };
+    const base = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
+    const i = await cron.vuelta({ pool, deps: { ...base, google }, ahora });
+    assert.deepEqual(llamadas, [{ adaptador: true, ahora, cortarEn: true, dentroDelCandado: true }]);
+    assert.deepEqual(i.google.resenas, { hechos: 1 });
+    const [estados] = await pool.query("SELECT estado, COUNT(*) AS n FROM cola WHERE tipo LIKE 'google_%' GROUP BY estado");
+    assert.deepEqual(estados.map((x) => [x.estado, Number(x.n)]), [['hecho', 5]], 'lo del día y lo de la semana de esta pieza, hecho antes');
+    // Si falla, lo dice el informe y lo de Google sigue.
+    resenas.vueltaGoogle = async () => { throw new Error('reseñas rotas de prueba'); };
+    const r = await fichaGoogle.vuelta({ pool, google }, { ahora: min(ahora, 1) });
+    assert.deepEqual(r.resenas, { error: 'reseñas rotas de prueba' });
+    assert.deepEqual([r.reintentos, r.fallidos], [0, 0]);
+    // En simulado no se llama.
+    llamadas.length = 0;
+    resenas.vueltaGoogle = async () => { llamadas.push('simulado'); };
+    assert.equal(await fichaGoogle.vuelta({ pool, google: crearGoogle('simulado') }, { ahora }), null);
+    assert.deepEqual(llamadas, []);
+  } finally {
+    resenas.importarResenas = antes.importarResenas;
+    if (tenia) resenas.vueltaGoogle = antes.vueltaGoogle; else delete resenas.vueltaGoogle;
     await pool.end();
   }
 });
@@ -446,12 +532,16 @@ test('publicaciones de la ficha: solo lo que aprueba una persona, y solo novedad
 const sobre = (tareas, { status_code = 20000, status_message = 'Ok.' } = {}) => ({ version: '0.1.20260901', status_code, status_message, time: '0.1 sec.', cost: 0, tasks_count: tareas.length, tasks_error: 0, tasks: tareas });
 
 // DataForSEO de mentira: crea las tareas, dice cuáles están listas y entrega sus resultados. La clínica
-// sale 1.ª en su punto, 2.ª en los 8 de alrededor y en ningún otro sitio.
+// sale 1.ª en su punto, 2.ª en los 8 de alrededor y en ningún otro sitio. Se le puede pedir que:
+//   · estado.perder: las próximas N llamadas a task_post crean (y cobran) las tareas, pero la respuesta
+//     no llega (tiempo agotado);
+//   · estado.tarea(id, t): conteste por su cuenta a una tarea (p. ej., 40102 o 50000), o null;
+//   · estado.items(t, items): cambie los resultados; estado.placeIdClinica: con qué place ID sale.
 function falsoDataForSeo() {
   const tareas = new Map();
   const pedidas = [];
   let n = 0;
-  const estado = { listas: () => true };
+  const estado = { listas: () => true, perder: 0, tarea: () => null, items: (t, items) => items, placeIdClinica: PLACE_ID, creadas: 0 };
   const ficha = (puesto, titulo, placeId) => ({
     type: 'maps_search', rank_group: puesto, rank_absolute: puesto, title: titulo, place_id: placeId, cid: String(1000 + puesto),
     rating: { rating_type: 'Max5', value: 4.9, votes_count: 197, rating_max: null }, category: 'Clínica de medicina estética', additional_categories: ['Centro de estética'],
@@ -466,11 +556,17 @@ function falsoDataForSeo() {
     const cuerpo = o.body ? JSON.parse(o.body) : null;
     pedidas.push({ metodo: o.method || 'GET', url: u, cuerpo });
     if (u.pathname === '/v3/serp/google/maps/task_post') {
-      return json(200, sobre(cuerpo.map((t) => {
+      const respuesta = json(200, sobre(cuerpo.map((t) => {
         const id = `10051015-1535-0139-0000-${String(++n).padStart(12, '0')}`;
         tareas.set(id, t);
+        estado.creadas++;
         return { id, status_code: 20100, status_message: 'Task Created.', cost: 0.0006, result_count: 0, data: { api: 'serp', function: 'task_post', se: 'google', se_type: 'maps', ...t }, result: null };
       })));
+      if (estado.perder > 0) {
+        estado.perder--;
+        throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+      }
+      return respuesta;
     }
     if (u.pathname === '/v3/serp/google/maps/tasks_ready') {
       const listas = [...tareas].filter(([id]) => estado.listas(id));
@@ -481,12 +577,18 @@ function falsoDataForSeo() {
       const t = tareas.get(m[1]);
       if (!t) return json(200, sobre([{ id: m[1], status_code: 40401, status_message: 'Task Not Found.', result: null }]));
       if (!estado.listas(m[1])) return json(200, sobre([{ id: m[1], status_code: 40602, status_message: 'Task In Queue.', result: null }]));
+      const propia = estado.tarea(m[1], t);
+      if (propia) {
+        if ([20000, 40102].includes(propia.status_code)) tareas.delete(m[1]);
+        return json(200, sobre([{ id: m[1], cost: 0, result_count: 0, result: null, ...propia }]));
+      }
       tareas.delete(m[1]);
       const p = puestoDe(t.tag);
       const otras = ['Clínica Uno de Prueba', 'Clínica Dos de Prueba', 'Clínica Tres de Prueba', 'Clínica Cuatro de Prueba', 'Clínica Cinco de Prueba'];
       const items = [];
-      for (let puesto = 1; puesto <= 5; puesto++) items.push(puesto === p ? ficha(puesto, 'Clínica de Prueba', PLACE_ID) : ficha(puesto, otras.shift(), `ChIJOtra${puesto}`));
-      return json(200, sobre([{ id: m[1], status_code: 20000, status_message: 'Ok.', result: [{ keyword: t.keyword, type: 'maps', items_count: items.length, items }] }]));
+      for (let puesto = 1; puesto <= 5; puesto++) items.push(puesto === p ? ficha(puesto, 'Clínica de Prueba', estado.placeIdClinica) : ficha(puesto, otras.shift(), `ChIJOtra${puesto}`));
+      const finales = estado.items(t, items);
+      return json(200, sobre([{ id: m[1], status_code: 20000, status_message: 'Ok.', result: [{ keyword: t.keyword, type: 'maps', items_count: finales.length, items: finales }] }]));
     }
     return json(418, { status_code: 41800, status_message: `petición inesperada: ${url}` });
   };
@@ -618,6 +720,101 @@ test('posiciones en Google Maps con DataForSEO: tope de gasto, lo que se guarda 
   }
 });
 
+test('posiciones: sin resultados cuenta, una tarea que falla no para a las demás, vale el place ID nuevo y nada se paga dos veces', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  try {
+    await sembrar(pool);
+    const falso = falsoDataForSeo();
+    const credenciales = { DATAFORSEO_LOGIN: 'cuenta@prueba.example', DATAFORSEO_CLAVE: 'clave-de-pruebas' };
+    const deps = { pool, dataforseo: crearDataForSeo('real', { env: credenciales, fetch: falso.fetch, esperar: async () => {} }) };
+    // Una malla de 3 × 3 sin municipios: 9 puntos por búsqueda, 18 tareas por pasada (0,0108 $).
+    const env = { POSICIONES_PALABRAS: 'botox, búsqueda de nicho', POSICIONES_MALLA: '3', POSICIONES_MUNICIPIOS: '0', POSICIONES_TOPE_MES_USD: '1' };
+    const posts = () => falso.pedidas.filter((p) => p.url.pathname.endsWith('/task_post')).length;
+    const idDe = (palabra, punto) => [...falso.tareas].find(([, x]) => x.keyword === palabra && x.tag.split('|')[2] === punto)?.[0];
+
+    await t.test('una búsqueda sin resultados (40102) cuenta como «no sale»; un 1.º sin reseñas, nota NULL; la que falla sola no para a las demás', async () => {
+      assert.equal((await posiciones.enviarPasada(deps, { pasada: '2026-10-05', ahora: new Date('2026-10-05T05:30:00Z'), env })).enviadas, 18);
+      const atascada = idDe('botox', 'f+1c-1'); // la primera que se recoge
+      falso.estado.tarea = (id, x) => (x.keyword === 'búsqueda de nicho' ? { status_code: 40102, status_message: 'No Search Results.', cost: 0.0006 }
+        : id === atascada ? { status_code: 50000, status_message: 'Internal Error.' } : null);
+      falso.estado.items = (x, items) => (x.tag.split('|')[2] === 'f+1c+1' ? items.map((i) => (i.rank_group === 1 ? { ...i, rating: null } : i)) : items);
+      const r = await posiciones.recogerPendientes(deps, { ahora: new Date('2026-10-05T05:40:00Z'), env });
+      assert.deepEqual(r, { recogidas: 17, caducadas: 0, fallidas: 0, quedan: 1 });
+      const [nicho] = await pool.query("SELECT puesto, resultados, primero FROM posiciones_maps WHERE palabra = 'búsqueda de nicho'");
+      assert.equal(nicho.length, 9, 'los 9 puntos cuentan');
+      assert.ok(nicho.every((f) => f.puesto === null && f.resultados === 0 && f.primero === null));
+      const [[p]] = await pool.query("SELECT primero, primero_nota, primero_resenas FROM posiciones_maps WHERE palabra = 'botox' AND punto = 'f+1c+1'");
+      assert.deepEqual([p.primero, p.primero_nota, p.primero_resenas], ['Clínica Uno de Prueba', null, null]);
+      const [[a]] = await pool.query('SELECT estado, intentos, error FROM posiciones_tareas WHERE id = ?', [atascada]);
+      assert.deepEqual([a.estado, a.intentos], ['enviada', 1]);
+      assert.match(a.error, /50000 Internal Error/);
+      const res = await posiciones.resumen(pool, { env });
+      assert.deepEqual(res.palabras.map((x) => [x.palabra, x.puntos, x.conPuesto, x.puestoMedioTotal, x.top3]), [['botox', 8, 8, 1.9, 100], ['búsqueda de nicho', 9, 0, 21, 0]]);
+    });
+
+    await t.test('la que falla sola se vuelve a pedir, la última; a la tercera, fallida', async () => {
+      assert.deepEqual(await posiciones.recogerPendientes(deps, { ahora: new Date('2026-10-05T05:45:00Z'), env }), { recogidas: 0, caducadas: 0, fallidas: 0, quedan: 1 });
+      assert.deepEqual(await posiciones.recogerPendientes(deps, { ahora: new Date('2026-10-05T05:50:00Z'), env }), { recogidas: 0, caducadas: 0, fallidas: 1, quedan: 0 });
+      const [[a]] = await pool.query("SELECT estado, intentos FROM posiciones_tareas WHERE palabra = 'botox' AND punto = 'f+1c-1'");
+      assert.deepEqual([a.estado, a.intentos], ['fallida', 3]);
+    });
+
+    await t.test('si DataForSEO no contesta al enviar, no se vuelve a enviar ni a pagar: se cuadra por la etiqueta', async () => {
+      falso.estado.tarea = () => null;
+      falso.estado.items = (x, items) => items;
+      falso.estado.listas = () => false; // aún en cola
+      falso.estado.perder = 1;
+      const creadas = falso.estado.creadas;
+      const antes = posts();
+      const ahora = new Date('2026-10-12T05:30:00Z');
+      await assert.rejects(posiciones.enviarPasada(deps, { pasada: '2026-10-12', ahora, env }), (err) => err.incierto === true);
+      assert.equal(falso.estado.creadas - creadas, 18, 'DataForSEO las ha creado (y cobrado)');
+      const [[q]] = await pool.query("SELECT COUNT(*) AS n, SUM(coste_usd) AS usd FROM posiciones_tareas WHERE pasada = '2026-10-12' AND estado = 'incierta'");
+      assert.deepEqual([Number(q.n), Number(q.usd)], [18, 0.0108], 'apuntadas con lo que costarían: cuentan para el tope');
+      const [[ev]] = await pool.query("SELECT datos FROM eventos WHERE tipo = 'posiciones_inciertas'");
+      assert.equal((typeof ev.datos === 'string' ? JSON.parse(ev.datos) : ev.datos).inciertas, 18);
+      // La cola repite el envío: no sale nada más.
+      assert.equal((await posiciones.enviarPasada(deps, { pasada: '2026-10-12', ahora: min(ahora, 1), env })).enviadas, 0);
+      assert.equal(posts() - antes, 1, 'un solo envío');
+      assert.equal(await posiciones.asegurarRecogida(pool, ahora), true, 'mientras tanto, hay un trabajo de recoger');
+      assert.deepEqual(await posiciones.recogerPendientes(deps, { ahora: min(ahora, 5), env }), { recogidas: 0, caducadas: 0, fallidas: 0, quedan: 18 });
+      // DataForSEO las termina: salen en tasks_ready con su etiqueta, se les pone su id y se recogen.
+      falso.estado.listas = () => true;
+      assert.deepEqual(await posiciones.recogerPendientes(deps, { ahora: min(ahora, 10), env }), { recogidas: 18, caducadas: 0, fallidas: 0, quedan: 0, cuadradas: 18 });
+      const [[g]] = await pool.query("SELECT COUNT(*) AS n, SUM(coste_usd) AS usd FROM posiciones_tareas WHERE pasada = '2026-10-12' AND estado = 'recogida' AND id NOT LIKE 'incierta-%'");
+      assert.deepEqual([Number(g.n), Number(g.usd)], [18, 0.0108]);
+      const [[m]] = await pool.query("SELECT COUNT(*) AS n FROM posiciones_maps WHERE pasada = '2026-10-12'");
+      assert.equal(m.n, 18);
+      assert.equal(await posiciones.gastoDelMes(pool, '2026-10-31'), 0.0216, 'dos pasadas de 18 búsquedas: lo pagado, una vez');
+    });
+
+    await t.test('Google cambia el place ID: vale el de la base aunque GOOGLE_PLACE_ID siga con el de antes', async () => {
+      const NUEVO = 'ChIJPruebaNuevoPlaceId000002';
+      await pool.query('UPDATE clinica SET google_place_id = ?', [NUEVO]); // lo que hace la revisión diaria de la ficha
+      falso.estado.placeIdClinica = NUEVO;
+      const conElDeAntes = { ...env, GOOGLE_PLACE_ID: PLACE_ID };
+      await posiciones.enviarPasada(deps, { pasada: '2026-10-19', ahora: new Date('2026-10-19T05:30:00Z'), env: conElDeAntes });
+      await posiciones.recogerPendientes(deps, { ahora: new Date('2026-10-19T05:40:00Z'), env: conElDeAntes });
+      const [filas] = await pool.query("SELECT punto, puesto FROM posiciones_maps WHERE pasada = '2026-10-19' AND palabra = 'botox'");
+      assert.equal(filas.length, 9);
+      assert.equal(filas.find((f) => f.punto === 'f0c0').puesto, 1);
+      assert.ok(filas.every((f) => f.puesto != null), 'se la reconoce en los 9 puntos');
+    });
+
+    await t.test('si falla la llamada entera (DataForSEO caído), la recogida se para, no da nada por fallido y la repite la cola', async () => {
+      await posiciones.enviarPasada(deps, { pasada: '2026-10-26', ahora: new Date('2026-10-26T05:30:00Z'), env });
+      const caido = crearDataForSeo('real', { env: credenciales, esperar: async () => {}, fetch: async (url, o) => (String(url).includes('/task_get/')
+        ? json(503, { status_code: 50301, status_message: 'Service Temporarily Unavailable.' }) : falso.fetch(url, o)) });
+      await assert.rejects(posiciones.recogerPendientes({ pool, dataforseo: caido }, { ahora: new Date('2026-10-26T05:40:00Z'), env }), /DataForSEO 50301/);
+      const [[q]] = await pool.query("SELECT COUNT(*) AS n FROM posiciones_tareas WHERE pasada = '2026-10-26' AND estado = 'enviada' AND intentos = 0");
+      assert.equal(q.n, 18);
+    });
+  } finally {
+    await pool.end();
+  }
+});
+
 test('el cron: lo de Google y DataForSEO va aparte, con su candado, y solo en real', async (t) => {
   const pool = await prepararBdDePrueba(t);
   if (!pool) return;
@@ -633,7 +830,7 @@ test('el cron: lo de Google y DataForSEO va aparte, con su candado, y solo en re
     const google = googleReal(falsoGoogle(() => null));
     const dataforseo = crearDataForSeo('real', { env: { DATAFORSEO_LOGIN: 'x', DATAFORSEO_CLAVE: 'y' }, fetch: falsoDataForSeo().fetch, esperar: async () => {} });
     i = await cron.vuelta({ pool, deps: { ...base, google, dataforseo }, ahora: min(ahora, 2) });
-    assert.deepEqual(i.google, { hechos: 0, reintentos: 0, fallidos: 0, aplazados: 0 });
+    assert.deepEqual([i.google.hechos, i.google.reintentos, i.google.fallidos, i.google.aplazados], [0, 0, 0, 0]);
     assert.deepEqual(i.posiciones, { cola: { hechos: 0, reintentos: 0, fallidos: 0, aplazados: 0 } });
     assert.ok('cola' in i && 'entrada' in i, 'lo de cada minuto, como siempre');
 

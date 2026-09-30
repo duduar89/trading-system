@@ -70,9 +70,11 @@ function costeTarea({ profundidad = 20, precioPagina = 0.0006, porPagina = 20 } 
   return Math.ceil(profundidad / porPagina) * precioPagina;
 }
 
-// El puesto de la clínica entre los resultados (por su place ID o su CID); null si no sale.
-function puestoDe(items = [], { placeId = null, cid = null } = {}) {
-  const x = items.find((i) => (placeId && i.placeId === placeId) || (cid && i.cid != null && String(i.cid) === String(cid)));
+// El puesto de la clínica entre los resultados (por su place ID, cualquiera de los que se le conocen,
+// o su CID); null si no sale. Google puede cambiar el place ID de una ficha: por eso pueden ser varios.
+function puestoDe(items = [], { placeId = null, placeIds = [], cid = null } = {}) {
+  const ids = new Set([placeId, ...placeIds].filter(Boolean));
+  const x = items.find((i) => (i.placeId && ids.has(i.placeId)) || (cid && i.cid != null && String(i.cid) === String(cid)));
   return x ? x.puesto : null;
 }
 

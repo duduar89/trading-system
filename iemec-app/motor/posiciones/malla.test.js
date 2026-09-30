@@ -45,6 +45,10 @@ test('el puesto de la clínica por su place ID o su CID; si no sale, null', () =
   assert.equal(M.puestoDe(items, { placeId: 'ChIJotra', cid: '999' }), null);
   assert.equal(M.puestoDe([], { placeId: 'ChIJclinica' }), null);
   assert.equal(M.puestoDe(items, {}), null);
+  // Google ha cambiado el place ID: vale el nuevo (el de la base) aunque el .env tenga el de antes.
+  assert.equal(M.puestoDe(items, { placeIds: ['ChIJclinica', 'ChIJdeAntes'] }), 2);
+  assert.equal(M.puestoDe(items, { placeIds: ['ChIJdeAntes', 'ChIJclinica'] }), 2);
+  assert.equal(M.puestoDe([{ puesto: 1, placeId: null, cid: null }], { placeIds: [null, ''] }), null, 'un resultado sin place ID nunca es la clínica');
 });
 
 test('las cifras de una pasada: dónde sale, su puesto medio, el top 3 y quién gana donde no gana ella', () => {

@@ -7,12 +7,17 @@
 //   desde las 7:00 de Madrid, «posiciones_enviar»: una búsqueda por palabra y punto (la malla y los 4
 //   municipios de alrededor), solo las palabras que caben enteras en el tope del mes. Van en bloques
 //   de 100 y cada bloque se apunta en «posiciones_tareas», con su coste, en cuanto DataForSEO lo acepta:
-//   si algo falla a medias, al reintentar no se paga dos veces.
+//   si algo falla a medias, al reintentar no se paga dos veces. Si DataForSEO no contesta al enviar un
+//   bloque (tiempo agotado, conexión cortada, 5xx), no se sabe si lo ha creado y cobrado: el bloque
+//   queda «incierta», con lo que costaría (cuenta para el tope), y no se vuelve a enviar; si DataForSEO
+//   lo tenía, la recogida lo encuentra por su etiqueta en tasks_ready y lo recoge.
 //   Mientras quede algo por recoger, «posiciones_recoger» cada 5 minutos: lo que DataForSEO ya tiene
-//   listo → «posiciones_maps» (el puesto de la clínica, o NULL si no sale, y quién sale 1.º). Lo que no
-//   llega en 24 horas queda caducado.
+//   listo → «posiciones_maps» (el puesto de la clínica, o NULL si no sale o no sale nadie, y quién sale
+//   1.º). Una tarea que falla ella sola no para a las demás (a la tercera vez, fallida). Lo que no llega
+//   en 24 horas queda caducado.
 // Places API no se usa para nada de esto: en el EEE su contenido no puede servir para mirar a la
 // competencia (quién sale 1.º lo da DataForSEO).
+const crypto = require('crypto');
 const cola = require('./cola');
 const T = require('../motor/tiempo');
 const M = require('../motor/posiciones/malla');
@@ -24,7 +29,11 @@ const TRABAJOS = { enviar: 'posiciones_enviar', recoger: 'posiciones_recoger' };
 const HORA_DESDE = 7 * 60;
 const CADUCA_MS = 24 * 3600 * 1000;
 const RECOGER_CADA_MIN = 5;
+// Un bloque, una llamada a task_post (DataForSEO admite 100 tareas por llamada).
 const POR_BLOQUE = 100;
+// Una tarea que falla ella sola (un 50000 de DataForSEO en esa tarea) se vuelve a pedir en las
+// recogidas siguientes; a la tercera, fallida.
+const MAX_INTENTOS_TAREA = 3;
 // Precio de la cola estándar de Google Maps por página de resultados (30-09-2026). Sirve para prever:
 // lo que cuenta para el tope es lo que DataForSEO dice que ha costado cada tarea.
 const PRECIO_PAGINA = 0.0006;
@@ -72,18 +81,26 @@ const MODO = { clave: 'dataforseo', variable: 'MODO_DATAFORSEO', crear: (env) =>
 const adaptador = (deps, env = process.env) => adaptadorReal(deps, MODO, env);
 const activo = (deps, env = process.env) => enReal(deps, MODO, env);
 
-// Cómo reconocer a la clínica en los resultados: su place ID (el de la base o GOOGLE_PLACE_ID) y, si
-// se sabe, su CID (GOOGLE_CID).
+// Cómo reconocer a la clínica en los resultados: su place ID y, si se sabe, su CID (GOOGLE_CID). Del
+// place ID valen los dos que puede haber: el de la base, que la revisión diaria de la ficha tiene al día
+// (Google lo puede cambiar), y el de GOOGLE_PLACE_ID, que puede haberse quedado en el de antes.
 async function laClinica(pool, env = process.env) {
   const [[cl]] = await pool.query('SELECT google_place_id, lat, lng FROM clinica WHERE id = 1');
   return {
-    placeId: env.GOOGLE_PLACE_ID || cl?.google_place_id || null,
+    placeIds: [...new Set([cl?.google_place_id, env.GOOGLE_PLACE_ID].filter(Boolean))],
     cid: env.GOOGLE_CID || null,
     centro: cl?.lat != null && cl?.lng != null ? { lat: Number(cl.lat), lng: Number(cl.lng) } : null,
   };
 }
 
 const fechaDe = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10));
+// La etiqueta de cada búsqueda en DataForSEO (tag): con ella se cuadra lo enviado sin respuesta.
+const etiquetaDe = (pasada, punto, palabra) => `iemec|${pasada}|${punto}|${palabra}`.slice(0, 255);
+// Lo que aún está en camino: enviado y sin recoger, o enviado sin saber si llegó.
+async function enCamino(pool) {
+  const [[q]] = await pool.query("SELECT COUNT(*) AS n FROM posiciones_tareas WHERE estado IN ('enviada','incierta')");
+  return Number(q.n);
+}
 
 // Lo gastado en las pasadas del mes (de la fecha dada), en dólares.
 async function gastoDelMes(pool, fecha) {
@@ -103,7 +120,7 @@ async function enviarPasada(deps, { pasada, ahora = new Date(), env = process.en
   const a = ajustes(env);
   const clinica = await laClinica(pool, env);
   // Sin saber cuál es la clínica, los resultados no dicen nada: no se gasta.
-  if (!clinica.placeId && !clinica.cid) throw Object.assign(new Error('Falta el place ID de la clínica (clinica.google_place_id o GOOGLE_PLACE_ID)'), { permanente: true });
+  if (!clinica.placeIds.length && !clinica.cid) throw Object.assign(new Error('Falta el place ID de la clínica (clinica.google_place_id o GOOGLE_PLACE_ID)'), { permanente: true });
   const puntos = [...M.malla({ centro: a.centro || clinica.centro || M.CENTRO_CLINICA, lado: a.lado, pasoKm: a.pasoKm }), ...(a.municipios ? M.MUNICIPIOS : [])];
   const [ya] = await pool.query('SELECT palabra, punto FROM posiciones_tareas WHERE pasada = ?', [pasada]);
   const hechas = new Set(ya.map((f) => `${sinTildes(f.palabra)}|${f.punto}`));
@@ -125,27 +142,40 @@ async function enviarPasada(deps, { pasada, ahora = new Date(), env = process.en
   }
 
   let enviadas = 0;
+  let inciertas = 0;
+  let fallo = null;
   const errores = [];
-  for (let i = 0; i < envio.length; i += POR_BLOQUE) {
+  for (let i = 0; i < envio.length && !fallo; i += POR_BLOQUE) {
     const bloque = envio.slice(i, i + POR_BLOQUE);
     // Lo pagado de verdad manda: si el precio ha subido, se para antes de pasarse.
     if (gastado + bloque.length * coste > a.topeMesUsd + 1e-9) {
       fuera.push(...new Set(envio.slice(i).map((x) => x.palabra)));
       break;
     }
-    const r = await dfs.enviarTareas(bloque.map((x) => ({
-      palabra: x.palabra, coordenada: M.coordenada(x.punto, a.zoom), profundidad: a.profundidad, etiqueta: `iemec|${pasada}|${x.punto.id}|${x.palabra}`.slice(0, 255),
-    })));
+    let r;
+    try {
+      r = await dfs.enviarTareas(bloque.map((x) => ({
+        palabra: x.palabra, coordenada: M.coordenada(x.punto, a.zoom), profundidad: a.profundidad, etiqueta: etiquetaDe(pasada, x.punto.id, x.palabra),
+      })));
+    } catch (err) {
+      fallo = err;
+      r = err.hechas || [];
+    }
     const filas = [];
-    r.forEach((t, k) => {
-      const x = bloque[k];
-      if (t?.id) filas.push([t.id, pasada, x.palabra, x.punto.id, x.punto.lat, x.punto.lng, a.zoom, a.profundidad, usd(t.coste || 0), ahora]);
-      else errores.push(t?.error || 'sin respuesta');
+    bloque.forEach((x, k) => {
+      const t = r[k];
+      const apuntar = (id, estado, costeUsd) => filas.push([id, estado, pasada, x.palabra, x.punto.id, x.punto.lat, x.punto.lng, a.zoom, a.profundidad, usd(costeUsd), ahora]);
+      if (t?.id) apuntar(t.id, 'enviada', t.coste || 0);
+      else if (t) errores.push(t.error || 'sin respuesta');
+      // Sin respuesta de DataForSEO: puede que la haya creado y cobrado. Se apunta con lo que costaría y
+      // no se vuelve a enviar (la recogida la cuadra por su etiqueta). Si seguro que no llegó, nada.
+      else if (fallo?.incierto) apuntar(`incierta-${crypto.randomUUID()}`, 'incierta', coste);
     });
     if (filas.length) {
-      await pool.query('INSERT INTO posiciones_tareas (id, pasada, palabra, punto, lat, lng, zoom, profundidad, coste_usd, enviada_en) VALUES ?', [filas]);
-      gastado += filas.reduce((s, f) => s + f[8], 0);
-      enviadas += filas.length;
+      await pool.query('INSERT INTO posiciones_tareas (id, estado, pasada, palabra, punto, lat, lng, zoom, profundidad, coste_usd, enviada_en) VALUES ?', [filas]);
+      gastado += filas.reduce((s, f) => s + f[9], 0);
+      enviadas += filas.filter((f) => f[1] === 'enviada').length;
+      inciertas += filas.filter((f) => f[1] === 'incierta').length;
     }
   }
   if (fuera.length) {
@@ -154,39 +184,74 @@ async function enviarPasada(deps, { pasada, ahora = new Date(), env = process.en
   if (errores.length) {
     await registrar(pool, { tipo: 'posiciones_errores', entidad: 'pasada', entidadId: pasada, actor: 'dataforseo', datos: { errores: errores.length, ejemplo: errores[0] } });
   }
+  if (inciertas) {
+    await registrar(pool, { tipo: 'posiciones_inciertas', entidad: 'pasada', entidadId: pasada, actor: 'dataforseo', datos: { inciertas, error: String(fallo?.message || '').slice(0, 200) } });
+  }
+  // Lo que queda por enviar, en el reintento de la cola (lo apuntado no se vuelve a enviar).
+  if (fallo) throw fallo;
   return { pasada, enviadas, errores: errores.length, fuera: [...new Set(fuera)], gastadoMesUsd: usd(gastado) };
+}
+
+// Lo enviado sin respuesta («incierta») que DataForSEO sí tenía: sale en tasks_ready con su etiqueta
+// cuando termina. Se le pone su id y se recoge como las demás.
+async function cuadrarInciertas(pool, listas) {
+  const [inciertas] = await pool.query("SELECT id, pasada, palabra, punto FROM posiciones_tareas WHERE estado = 'incierta'");
+  if (!inciertas.length) return 0;
+  const porEtiqueta = new Map(inciertas.map((f) => [etiquetaDe(fechaDe(f.pasada), f.punto, f.palabra), f.id]));
+  let n = 0;
+  for (const t of listas) {
+    const provisional = t.etiqueta ? porEtiqueta.get(t.etiqueta) : null;
+    if (!provisional) continue;
+    porEtiqueta.delete(t.etiqueta);
+    const [u] = await pool.query("UPDATE posiciones_tareas SET id = ?, estado = 'enviada' WHERE id = ? AND estado = 'incierta'", [t.id, provisional]);
+    n += u.affectedRows;
+  }
+  return n;
 }
 
 /**
  * Recoge lo que DataForSEO ya tiene listo, de cualquier pasada, con tiempo tasado. Si queda algo en
  * camino, se aplaza (vuelve dentro de 5 minutos sin gastar intento).
+ * @returns {{ recogidas, caducadas, fallidas, quedan, cuadradas? }} cuadradas: las inciertas que
+ *          DataForSEO sí tenía (solo si hay alguna)
  */
 async function recogerPendientes(deps, { ahora = new Date(), env = process.env, cortarEn = null } = {}) {
   const { pool } = deps;
   const dfs = deps.dataforseo || adaptador(deps, env);
   if (!dfs) throw new Error('DataForSEO no está configurado');
   const hecho = { recogidas: 0, caducadas: 0, fallidas: 0 };
-  const [c] = await pool.query("UPDATE posiciones_tareas SET estado = 'caducada' WHERE estado = 'enviada' AND enviada_en < ?", [new Date(ahora.getTime() - CADUCA_MS)]);
+  const [c] = await pool.query("UPDATE posiciones_tareas SET estado = 'caducada' WHERE estado IN ('enviada','incierta') AND enviada_en < ?", [new Date(ahora.getTime() - CADUCA_MS)]);
   hecho.caducadas = c.affectedRows;
-  const [pendientes] = await pool.query("SELECT id, pasada, palabra, punto FROM posiciones_tareas WHERE estado = 'enviada' ORDER BY enviada_en, id");
-  if (pendientes.length) {
-    const listas = new Set((await dfs.tareasListas()).map((t) => t.id));
+  if (await enCamino(pool)) {
+    const listas = await dfs.tareasListas();
+    const cuadradas = await cuadrarInciertas(pool, listas);
+    if (cuadradas) hecho.cuadradas = cuadradas;
+    const ids = new Set(listas.map((t) => t.id));
+    // Las que ya han fallado alguna vez, al final: una que falla siempre no gasta el tiempo de las demás.
+    const [pendientes] = await pool.query("SELECT id, pasada, palabra, punto, intentos FROM posiciones_tareas WHERE estado = 'enviada' ORDER BY intentos, enviada_en, id");
     const clinica = await laClinica(pool, env);
-    for (const t of pendientes.filter((x) => listas.has(x.id))) {
+    for (const t of pendientes.filter((x) => ids.has(x.id))) {
       if (cortarEn != null && Date.now() >= cortarEn) break;
       let r;
       try {
         r = await dfs.resultado(t.id);
       } catch (err) {
-        if (!err.permanente) throw err;
-        await pool.query("UPDATE posiciones_tareas SET estado = 'fallida', error = ? WHERE id = ?", [String(err.message).slice(0, 300), t.id]);
-        hecho.fallidas++;
+        // Si falla la llamada (DataForSEO caído, el límite de llamadas, las credenciales), se para aquí
+        // y la cola lo repite. Si falla solo esta tarea, se apunta y se sigue con las demás: sin
+        // arreglo (ya no existe), fallida; si se puede reintentar, en la recogida siguiente, y a la
+        // tercera, fallida.
+        if (!err.deTarea) throw err;
+        const fallida = Boolean(err.permanente) || Number(t.intentos) + 1 >= MAX_INTENTOS_TAREA;
+        await pool.query('UPDATE posiciones_tareas SET estado = ?, error = ?, intentos = intentos + 1 WHERE id = ?',
+          [fallida ? 'fallida' : 'enviada', String(err.message).slice(0, 300), t.id]);
+        if (fallida) hecho.fallidas++;
         continue;
       }
       if (!r.listo) continue;
       const puesto = M.puestoDe(r.items, clinica);
       const primero = r.items.find((x) => x.puesto === 1) || null;
-      const nota = Number(primero?.nota);
+      // Un 1.º sin reseñas no tiene nota (null): se guarda NULL, no 0.
+      const nota = primero?.nota == null ? null : Number(primero.nota);
       await pool.query(
         `INSERT INTO posiciones_maps (pasada, palabra, punto, puesto, resultados, primero, primero_categoria, primero_nota, primero_resenas)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -199,14 +264,13 @@ async function recogerPendientes(deps, { ahora = new Date(), env = process.env, 
       hecho.recogidas++;
     }
   }
-  const [[q]] = await pool.query("SELECT COUNT(*) AS n FROM posiciones_tareas WHERE estado = 'enviada'");
-  return { ...hecho, quedan: Number(q.n) };
+  return { ...hecho, quedan: await enCamino(pool) };
 }
 
-// Mientras quede algo en camino, hay un trabajo de recoger en la cola (uno solo).
+// Mientras quede algo en camino (también lo incierto, por si DataForSEO lo tenía), hay un trabajo de
+// recoger en la cola (uno solo).
 async function asegurarRecogida(pool, ahora) {
-  const [[q]] = await pool.query("SELECT COUNT(*) AS n FROM posiciones_tareas WHERE estado = 'enviada'");
-  if (!Number(q.n)) return false;
+  if (!(await enCamino(pool))) return false;
   const [[ya]] = await pool.query("SELECT id FROM cola WHERE tipo = ? AND estado IN ('pendiente','en_curso') LIMIT 1", [TRABAJOS.recoger]);
   if (ya) return false;
   await cola.encolar(pool, TRABAJOS.recoger, {}, { ejecutarEn: new Date(ahora.getTime() + RECOGER_CADA_MIN * 60000), maxIntentos: 10 });

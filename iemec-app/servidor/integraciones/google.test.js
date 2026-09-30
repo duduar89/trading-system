@@ -5,7 +5,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
-const { crearGoogle, crearVerificadorPubSub, leerAvisoPubSub, TIPOS_AVISO } = require('./google');
+const { crearGoogle, crearVerificadorPubSub, leerAvisoPubSub, aResena, TIPOS_AVISO } = require('./google');
 
 const CUENTA = '104756819302548861234';
 const UBICACION = '4178325690123456789';
@@ -120,6 +120,33 @@ test('real: sin credenciales no arranca, y con OAuth a medias dice qué falta', 
   assert.deepEqual(crearGoogle('real', { env: ENV }).capacidades, { perfil: true, ficha: true, places: false });
 });
 
+test('real: con node --test y sin el fetch de la prueba, no sale a internet (ni con el .env en real y las claves)', async () => {
+  assert.ok(process.env.NODE_TEST_CONTEXT);
+  const antes = {};
+  for (const [k, v] of Object.entries({ ...ENV, MODO_GOOGLE: 'real' })) { antes[k] = process.env[k]; process.env[k] = v; }
+  const original = globalThis.fetch;
+  const salidas = [];
+  globalThis.fetch = async (url) => { salidas.push(String(url)); throw new Error('sin red en esta prueba'); };
+  try {
+    // El .env del portátil con MODO_GOOGLE=real y las claves: el adaptador se crea (la app se puede
+    // montar en una prueba), pero cada llamada falla al momento, sin reintentos ni esperas.
+    const esperas = [];
+    const g = crearGoogle('real', { esperar: async (ms) => { esperas.push(ms); } });
+    assert.equal(g.modo, 'real');
+    await assert.rejects(g.listarResenas(), (err) => /Google real: con node --test no se sale a internet/.test(err.message) && err.permanente === true);
+    await assert.rejects(g.responderResena('AbFvOq0001', 'Gracias'), /no se sale a internet/);
+    assert.deepEqual(esperas, []);
+    // El verificador de Pub/Sub sin fetch tampoco pide las claves de Google: 503 (sin «motivo»).
+    const verificar = crearVerificadorPubSub();
+    const token = ['{"alg":"RS256","kid":"k1"}', '{"aud":"a"}'].map((x) => Buffer.from(x).toString('base64url')).join('.');
+    await assert.rejects(verificar(`${token}.firma`, { audiencia: 'a', email: 'e' }), (err) => /no se sale a internet/.test(err.message) && !err.motivo);
+  } finally {
+    globalThis.fetch = original;
+    for (const [k, v] of Object.entries(antes)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+  assert.deepEqual(salidas, [], 'nada sale a internet');
+});
+
 test('real: el token se pide con el de refresco, se reutiliza y se renueva un minuto antes de caducar', async () => {
   const falso = falsoGoogle();
   const tiempo = relojFalso();
@@ -200,7 +227,7 @@ test('real: reseñas en páginas de 50, de la última tocada hacia atrás, con l
     respuesta: '¡Gracias por tu opinión, Laura!', respondidaEn: '2026-09-30T19:00:00.000Z',
     estadoRespuesta: 'aprobada', motivoRechazo: null, motivoRechazoTexto: null,
   });
-  assert.equal(lista[1].autor, null, 'anónima');
+  assert.equal(lista[1].autor, undefined, 'anónima: sin autor (undefined, no null: el borrador no saluda a «null»)');
   assert.equal(lista[1].nota, 1);
   assert.equal(lista[1].estadoRespuesta, 'rechazada');
   assert.equal(lista[1].motivoRechazo, 'PERSONAL_INFO');
@@ -208,6 +235,16 @@ test('real: reseñas en páginas de 50, de la última tocada hacia atrás, con l
   assert.ok(!JSON.stringify(lista).includes('lh3.googleusercontent.com'), 'ni la foto de quien escribe ni sus fotos');
   const p1 = await g.paginaResenas();
   assert.deepEqual([p1.notaMedia, p1.total, p1.siguiente], [4.9, 102, 'pagina-2']);
+});
+
+test('una reseña sin nombre (anónima, sin displayName o en blanco) no lleva autor: nunca null', () => {
+  const base = { name: `accounts/${CUENTA}/locations/${UBICACION}/reviews/AbFvOq0001`, starRating: 'FIVE', createTime: '2026-10-05T10:00:00Z' };
+  for (const reviewer of [{ displayName: 'Un usuario de Google', isAnonymous: true }, {}, { displayName: '   ' }, undefined]) {
+    const r = aResena({ ...base, reviewer });
+    assert.equal(r.autor, undefined, JSON.stringify(reviewer));
+    assert.equal(r.googleId, 'AbFvOq0001');
+  }
+  assert.equal(aResena({ ...base, reviewer: { displayName: ' Laura Prueba ' } }).autor, 'Laura Prueba');
 });
 
 test('real: con «desde» deja de pedir páginas al llegar a lo ya visto', async () => {
@@ -388,9 +425,11 @@ test('real: Places (New) solo para nuestra ficha: no se le puede pedir otro luga
   const f = await g.obtenerFicha();
   assert.equal(f.origen, 'places');
   assert.equal(f.placeId, PLACE_ID);
-  assert.equal(f.newReviewUri, lugar.googleMapsLinks.writeAReviewUri);
+  // De Places solo se puede guardar el place ID, y quien recibe la ficha la guarda: sin sus enlaces.
+  assert.deepEqual([f.newReviewUri, f.mapsUri], [null, null]);
   const p = await g.fichaPlaces('ChIJOtraClinicaDeLaCompetencia');
-  assert.deepEqual([p.nota, p.total, p.avisoConsumidor], [4.9, 533, true]);
+  assert.deepEqual([p.nota, p.total, p.avisoConsumidor, p.newReviewUri], [4.9, 533, true, null]);
+  assert.ok(!JSON.stringify([f, p]).includes('google.com/maps'), 'ningún enlace de Places');
   const pedidas = falso.api();
   assert.equal(pedidas.length, 2);
   for (const x of pedidas) {
@@ -399,11 +438,32 @@ test('real: Places (New) solo para nuestra ficha: no se le puede pedir otro luga
     assert.equal(x.url.searchParams.get('languageCode'), 'es');
     assert.equal(x.url.searchParams.get('regionCode'), 'ES');
   }
-  assert.equal(pedidas[0].cabeceras.get('x-goog-fieldmask'), 'id,googleMapsLinks');
-  assert.equal(pedidas[1].cabeceras.get('x-goog-fieldmask'), 'id,rating,userRatingCount,googleMapsLinks,consumerAlert');
+  assert.equal(pedidas[0].cabeceras.get('x-goog-fieldmask'), 'id', 'la ficha: solo el place ID (gratis)');
+  assert.equal(pedidas[1].cabeceras.get('x-goog-fieldmask'), 'id,rating,userRatingCount,consumerAlert');
   assert.equal(falso.tokens, 0, 'Places va con su clave, sin OAuth');
   await assert.rejects(g.listarResenas(), /falta el acceso a la API de Business Profile/);
   assert.equal(falso.pedidas.length, 2);
+});
+
+test('real: Places usa el place ID que da la propia ficha (Google lo puede cambiar), no el de antes del .env', async () => {
+  const NUEVO = 'ChIJPruebaNuevoPlaceId000002';
+  const deVuelta = (p) => json(200, { id: p.url.pathname.split('/').pop() });
+  // Con Business Profile: la ficha trae el nuevo y GOOGLE_PLACE_ID sigue con el de antes.
+  const falso = falsoGoogle();
+  falso.cuando(es(`/v1/locations/${UBICACION}`), json(200, { name: `locations/${UBICACION}`, metadata: { placeId: NUEVO } }))
+    .cuando((p) => p.url.host === 'places.googleapis.com', deVuelta, { siempre: true });
+  const g = real(falso, { env: { ...ENV, GOOGLE_PLACES_CLAVE: 'clave-places-de-pruebas', GOOGLE_PLACE_ID: PLACE_ID } });
+  await g.fichaPlaces(); // aún sin leer la ficha: el de la configuración
+  assert.equal((await g.obtenerFicha({ refrescar: true })).placeId, NUEVO);
+  await g.fichaPlaces();
+  assert.deepEqual(falso.api().filter((p) => p.url.host === 'places.googleapis.com').map((p) => p.url.pathname), [`/v1/places/${PLACE_ID}`, `/v1/places/${NUEVO}`]);
+  // Solo con Places: la ficha (solo el id, gratis) refresca el place ID, y lo siguiente va con el nuevo.
+  const soloPlaces = falsoGoogle();
+  soloPlaces.cuando((p) => p.url.host === 'places.googleapis.com', () => json(200, { id: NUEVO }), { siempre: true });
+  const h = real(soloPlaces, { env: { GOOGLE_PLACES_CLAVE: 'clave-places-de-pruebas', GOOGLE_PLACE_ID: PLACE_ID } });
+  assert.equal((await h.obtenerFicha()).placeId, NUEVO);
+  await h.fichaPlaces();
+  assert.deepEqual(soloPlaces.api().map((p) => p.url.pathname), [`/v1/places/${PLACE_ID}`, `/v1/places/${NUEVO}`]);
 });
 
 test('real: métricas diarias (Performance API) y búsquedas del mes, en páginas', async () => {
@@ -467,6 +527,49 @@ test('real: publicaciones solo aprobadas por una persona y sin publicidad de med
   const r = await g.publicarNovedad({ texto, botonUrl: boton, aprobadaPor: 'recepcion@iemec' });
   assert.deepEqual(r, { googleId: `accounts/${CUENTA}/locations/${UBICACION}/localPosts/9876543210`, estado: 'en_revision', url: 'https://local.google.com/place?id=1&use=posts&lpsid=9876543210' });
   assert.deepEqual(JSON.parse(falso.api()[0].cuerpo), { languageCode: 'es', topicType: 'STANDARD', summary: texto, callToAction: { actionType: 'BOOK', url: boton } });
+});
+
+test('real: una publicación nunca sale dos veces: si no se sabe si Google la ha creado, se mira en la ficha', async () => {
+  const texto = 'En otoño aumenta la caída del cabello: diagnóstico capilar en IEMEC y opciones con el equipo médico.';
+  const post = (p) => p.metodo === 'POST' && p.url.pathname === `${RUTA}/localPosts`;
+  const lista = (p) => p.metodo === 'GET' && p.url.pathname === `${RUTA}/localPosts`;
+  const creada = (summary, createTime, id = '111') => ({
+    name: `accounts/${CUENTA}/locations/${UBICACION}/localPosts/${id}`, languageCode: 'es', summary, state: 'LIVE', createTime, topicType: 'STANDARD',
+    searchUrl: `https://local.google.com/place?id=1&use=posts&lpsid=${id}`,
+  });
+  const tiempoAgotado = () => Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+  const aprobar = (falso, tiempo = relojFalso()) => real(falso, { tiempo }).publicarNovedad({ texto, aprobadaPor: 'recepcion@iemec' });
+
+  // Google la crea, pero la respuesta no llega: un solo POST y se da por publicada la que está en la ficha.
+  let falso = falsoGoogle();
+  falso.cuando(post, tiempoAgotado())
+    .cuando(lista, json(200, { localPosts: [creada(texto, '2026-10-06T10:00:01Z'), creada('Otra novedad', '2026-09-20T10:00:00Z', '100')] }));
+  assert.deepEqual(await aprobar(falso), { googleId: `accounts/${CUENTA}/locations/${UBICACION}/localPosts/111`, estado: 'publicada', url: 'https://local.google.com/place?id=1&use=posts&lpsid=111' });
+  assert.equal(falso.api().filter(post).length, 1, 'un solo POST');
+  assert.equal(falso.api().find(lista).url.searchParams.get('pageSize'), '100');
+
+  // Una pasarela da 502 y no está en la ficha (la igual de hace un mes no cuenta): se dice, sin repetirla.
+  falso = falsoGoogle();
+  falso.cuando(post, errorGoogle(502, 'UNAVAILABLE', 'Bad Gateway')).cuando(lista, json(200, { localPosts: [creada(texto, '2026-09-06T10:00:00Z')] }));
+  await assert.rejects(aprobar(falso), (err) => /Google 502/.test(err.message) && /No está entre las publicaciones de la ficha: se puede volver a aprobar/.test(err.message) && !err.incierto);
+  assert.equal(falso.api().filter(post).length, 1);
+
+  // Ni contesta ni se puede mirar la ficha: sigue siendo incierto (lo comprueba una persona).
+  falso = falsoGoogle();
+  falso.cuando(post, tiempoAgotado()).cuando(lista, () => errorGoogle(503, 'UNAVAILABLE', 'The service is currently unavailable.'), { siempre: true });
+  await assert.rejects(aprobar(falso), (err) => err.incierto === true && /comprobarlo en Business Profile/.test(err.message));
+  assert.equal(falso.api().filter(post).length, 1);
+
+  // Un 429 (Google no la ha hecho) o sin conexión (no ha salido): se espera y se repite.
+  falso = falsoGoogle();
+  const tiempo = relojFalso();
+  falso.cuando(post, errorGoogle(429, 'RESOURCE_EXHAUSTED', 'Quota exceeded', { 'Retry-After': '2' }))
+    .cuando(post, Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('connect ECONNREFUSED 142.250.184.10:443'), { code: 'ECONNREFUSED' }) }))
+    .cuando(post, (p) => json(200, creada(JSON.parse(p.cuerpo).summary, '2026-10-06T10:00:05Z')));
+  assert.equal((await aprobar(falso, tiempo)).estado, 'publicada');
+  assert.equal(falso.api().filter(post).length, 3);
+  assert.deepEqual(tiempo.esperas, [2000, 2000]);
+  assert.equal(falso.api().filter(lista).length, 0, 'sin dudas, no hace falta mirar');
 });
 
 test('real: para dar de alta la app, cuentas, fichas y el ajuste de avisos de Pub/Sub', async () => {

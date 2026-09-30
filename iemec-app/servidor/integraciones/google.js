@@ -16,20 +16,23 @@
 //   responderResena(googleId, texto)  crea o cambia nuestra respuesta → { ok, estado, actualizadaEn }
 //   borrarRespuesta(googleId)         quita nuestra respuesta (la reseña no se puede borrar por API)
 //   obtenerFicha({ refrescar })       { placeId, newReviewUri, … } de Business Information (o, sin
-//                                     ella, de Places); se guarda unas horas en memoria
+//                                     ella, solo el place ID de Places: newReviewUri null); se guarda
+//                                     unas horas en memoria
 //   metricasDiarias({ desde, hasta }) Performance API → [{ fecha, metrica, valor }]
 //   palabrasDelMes('AAAA-MM')         las búsquedas con las que salió la ficha → [{ palabra,
 //                                     impresiones, umbral }] (umbral: Google solo da «menos de N»)
 //   publicarNovedad({ texto, botonUrl, aprobadaPor })  un post de la ficha, solo si lo aprueba una
 //                                     persona y pasa el filtro de publicidad sanitaria
-//   fichaPlaces()                     Places, SIEMPRE nuestra ficha: nota, total, enlace para reseñar y
-//                                     el aviso de reseñas sospechosas. No admite otro lugar
+//   fichaPlaces()                     Places, SIEMPRE nuestra ficha: nota, total y el aviso de reseñas
+//                                     sospechosas, para usarlos al momento (no se guardan). No admite
+//                                     otro lugar
 // Una reseña, en la app: { googleId, autor, nota 1-5, texto, publicadaEn, actualizadaEn, respuesta,
 // respondidaEn, estadoRespuesta ('pendiente' | 'aprobada' | 'rechazada' | null), motivoRechazo }. Ni la
-// foto de quien la escribe ni sus fotos o vídeos: no hacen falta.
+// foto de quien la escribe ni sus fotos o vídeos: no hacen falta. El autor es un texto o no viene
+// (undefined, nunca null): anónima o sin nombre, el borrador saluda sin nombre.
 const crypto = require('crypto');
 const { revisar } = require('../../motor/repesca/filtro-legal');
-const { conReintentos, crearCuota, errorExterno, leerJson, esperarDeVerdad } = require('./llamadas');
+const { conReintentos, crearCuota, errorExterno, leerJson, esperarDeVerdad, fetchDe } = require('./llamadas');
 
 const URL_TOKEN = 'https://oauth2.googleapis.com/token';
 const V4 = 'https://mybusiness.googleapis.com/v4';
@@ -45,7 +48,9 @@ const CUOTAS = { porMinuto: 250, escriturasPorMinuto: 10 };
 const MAX_BYTES_RESPUESTA = 4096;
 const MAX_TEXTO_POST = 1500;
 const LECTURA_FICHA = 'name,title,categories,regularHours,latlng,metadata,phoneNumbers,websiteUri';
-const CAMPOS_PLACES = ['id', 'rating', 'userRatingCount', 'googleMapsLinks', 'consumerAlert'];
+// Places: el id y el aviso de reseñas sospechosas van en el SKU gratuito (Essentials, solo IDs); la
+// nota y el total, en Enterprise (1.000 gratis al mes; la app hace unas 30).
+const CAMPOS_PLACES = ['id', 'rating', 'userRatingCount', 'consumerAlert'];
 // Los avisos que interesan (los de preguntas y respuestas están cerrados desde 2025).
 const TIPOS_AVISO = ['NEW_REVIEW', 'UPDATED_REVIEW', 'GOOGLE_UPDATE', 'NEW_CUSTOMER_MEDIA', 'DUPLICATE_LOCATION', 'VOICE_OF_MERCHANT_UPDATED'];
 
@@ -90,9 +95,13 @@ function isoDe(valor) {
 function aResena(g = {}) {
   const r = g.reviewReply || null;
   const motivo = r?.policyViolation && r.policyViolation !== 'POLICY_VIOLATION_UNSPECIFIED' ? String(r.policyViolation) : null;
+  // Sin nombre, undefined: la importación de reseñas de siempre hace String(autor) con su valor por
+  // defecto (primerNombre(autor = '')) y un null saldría como «null» en el borrador («Hola null…»).
+  // En la base queda NULL igual.
+  const nombre = g.reviewer?.isAnonymous ? '' : String(g.reviewer?.displayName ?? '').trim();
   return {
     googleId: g.reviewId || String(g.name || '').split('/').pop() || null,
-    autor: g.reviewer?.isAnonymous ? null : (g.reviewer?.displayName || null),
+    autor: nombre || undefined,
     nota: ESTRELLAS[g.starRating] || null,
     texto: g.comment || null,
     publicadaEn: isoDe(g.createTime),
@@ -130,13 +139,14 @@ function aFicha(l = {}) {
   };
 }
 
+// De Places, el place ID (lo único que se puede guardar en el EEE) y, para usarlos al momento, la nota
+// y el aviso de reseñas sospechosas. Sus enlaces (writeAReviewUri, placeUri) no se piden: quien recibe
+// la ficha la guarda. Sin Business Profile, el enlace para reseñar sale del place ID.
 function aFichaPlaces(p = {}) {
   return {
     ...FICHA_VACIA,
     origen: 'places',
     placeId: p.id || null,
-    newReviewUri: p.googleMapsLinks?.writeAReviewUri || null,
-    mapsUri: p.googleMapsLinks?.placeUri || null,
     nota: p.rating ?? null,
     total: p.userRatingCount ?? null,
     avisoConsumidor: Boolean(p.consumerAlert),
@@ -242,18 +252,20 @@ function leerAvisoPubSub(cuerpo) {
  * suscripción (con el correo verificado). Las claves se guardan en memoria lo que diga Cache-Control;
  * una clave desconocida vuelve a pedirlas (Google las rota), como mucho una vez por minuto. Se
  * descargan una sola vez aunque lleguen varios avisos a la vez; si Google no las da, las de antes
- * siguen valiendo y se vuelve a probar a los 30 s; sin ninguna, el error no es del token (503).
+ * siguen valiendo y se vuelve a probar a los 30 s; sin ninguna, el error no es del token (503). Con
+ * node --test y sin el fetch de la prueba, no pide nada (llamadas.js).
  */
-function crearVerificadorPubSub({ fetch = globalThis.fetch, reloj = () => new Date(), url = CERTIFICADOS, margenS = 300 } = {}) {
+function crearVerificadorPubSub({ fetch = null, reloj = () => new Date(), url = CERTIFICADOS, margenS = 300 } = {}) {
   let claves = new Map();
   let caducan = 0;
   let ultimaCarga = -Infinity;
   let ultimoError = null;
   let cargando = null;
+  const pedir = fetchDe({ fetch }, 'Las claves públicas de Google');
   const fallo = (motivo) => Object.assign(new Error(`Token de Google no válido: ${motivo}`), { motivo });
 
   async function descargar() {
-    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const r = await pedir(url, { signal: AbortSignal.timeout(10000) });
     if (!r.ok) throw new Error(`No se pudieron leer las claves públicas de Google (${r.status})`);
     const d = await r.json();
     const nuevas = new Map();
@@ -365,7 +377,7 @@ function crearSimulado({ resenas = [], ficha = {}, placeId = null, newReviewUri 
       return { googleId, estado: 'en_revision', url: null };
     },
     async fichaPlaces() {
-      return { ...FICHA_VACIA, origen: 'simulado', placeId: laFicha.placeId, newReviewUri: laFicha.newReviewUri, nota: null, total: null, avisoConsumidor: false, ...(places || {}) };
+      return { ...FICHA_VACIA, origen: 'simulado', placeId: laFicha.placeId, nota: null, total: null, avisoConsumidor: false, ...(places || {}) };
     },
     async listarCuentas() { return []; },
     async listarUbicaciones() { return []; },
@@ -409,20 +421,24 @@ const PISTAS = {
   429: 'cuota agotada; si no se pasa nunca, Google aún no ha aprobado el acceso (0 consultas por minuto)',
 };
 
-// Un error de Google, claro y sin datos: el estado, el mensaje de Google (recortado) y qué mirar.
-function errorDeGoogle(r, d, servicio = 'Google') {
+// Un error de Google, claro y sin datos: el estado, el mensaje de Google (recortado) y qué mirar. Un
+// 5xx de lo que no se puede repetir (un POST) es «incierto»: puede que Google lo haya hecho.
+function errorDeGoogle(r, d, servicio = 'Google', { idempotente = true } = {}) {
   const e = d?.error && typeof d.error === 'object' ? d.error : {};
   const detalle = [e.status, e.message].filter(Boolean).join(': ').slice(0, 200);
   const reintentable = r.status === 429 || r.status >= 500;
-  const pista = PISTAS[r.status] || (r.status >= 500 ? 'falla en Google: se reintenta' : null);
-  return errorExterno(`${servicio} ${r.status}${detalle ? ` ${detalle}` : ''}${pista ? ` (${pista})` : ''}`, { estado: r.status, permanente: !reintentable, reintentable });
+  const incierto = !idempotente && r.status >= 500;
+  const pista = PISTAS[r.status] || (incierto ? 'falla en Google y puede que lo haya hecho: no se repite sin comprobarlo'
+    : r.status >= 500 ? 'falla en Google: se reintenta' : null);
+  return errorExterno(`${servicio} ${r.status}${detalle ? ` ${detalle}` : ''}${pista ? ` (${pista})` : ''}`, { estado: r.status, permanente: !reintentable, reintentable, incierto });
 }
 
-function crearReal(env = process.env, {
-  fetch = globalThis.fetch, esperar = esperarDeVerdad, reloj = () => new Date(), azar = Math.random,
-  cuotas = {}, horasFicha = 12, reintentos = 3,
-} = {}) {
+function crearReal(env = process.env, opciones = {}) {
   const c = credenciales(env);
+  const { esperar = esperarDeVerdad, reloj = () => new Date(), azar = Math.random, cuotas = {}, horasFicha = 12, reintentos = 3 } = opciones;
+  // Con node --test y sin el fetch de la prueba, no sale a internet (llamadas.js): una prueba nunca
+  // llama a Google, aunque el .env tenga MODO_GOOGLE=real y las claves.
+  const fetch = fetchDe(opciones, 'Google real');
   const limites = { ...CUOTAS, ...cuotas };
   const reintentar = { reintentos, esperar, azar, reloj, nombre: 'Google' };
   const porServicio = new Map();
@@ -462,12 +478,15 @@ function crearReal(env = process.env, {
   }
 
   // ── Una llamada a las APIs de la ficha: cuota, token, reintentos y, si Google dice 401 (el token ha
-  // caducado antes de tiempo o se ha revocado), un token nuevo y otra vez.
+  // caducado antes de tiempo o se ha revocado), un token nuevo y otra vez. Un POST crea algo (una
+  // publicación): solo se repite si seguro que Google no lo ha hecho (429, 401 o sin conexión); si no
+  // se sabe, el error sale «incierto» (llamadas.js).
   const sinPerfil = () => errorExterno('Google: falta el acceso a la API de Business Profile (GOOGLE_CLIENTE_ID, GOOGLE_CLIENTE_SECRETO y GOOGLE_REFRESH_TOKEN): puerta ⛔ 6', { permanente: true });
   async function api(metodo, url, { cuerpo = null, escritura = false } = {}) {
     if (!c.oauth) throw sinPerfil();
     await cuotaDe(url)();
     if (escritura) await cuotaEscrituras();
+    const idempotente = metodo !== 'POST';
     for (let renovado = false; ; renovado = true) {
       const acceso = await tokenDeAcceso();
       const r = await conReintentos(() => fetch(url, {
@@ -475,14 +494,14 @@ function crearReal(env = process.env, {
         headers: { Authorization: `Bearer ${acceso}`, Accept: 'application/json', ...(cuerpo ? { 'Content-Type': 'application/json' } : {}) },
         body: cuerpo ? JSON.stringify(cuerpo) : undefined,
         signal: AbortSignal.timeout(20000),
-      }), reintentar);
+      }), { ...reintentar, idempotente });
       if (r.status === 401 && !renovado) {
         token = null;
         continue;
       }
       const d = await leerJson(r);
       if (r.ok) return d;
-      throw errorDeGoogle(r, d);
+      throw errorDeGoogle(r, d, 'Google', { idempotente });
     }
   }
 
@@ -495,12 +514,13 @@ function crearReal(env = process.env, {
   const ubicacionFicha = () => rutaFicha() && c.ubicacion;
   const consulta = (q) => new URLSearchParams(q).toString().replace(/\+/g, '%20');
 
-  // ── Places (New), solo la ficha propia: el place ID es el de la configuración (o el que da la
-  // propia ficha); no hay forma de pedir otro lugar.
+  // ── Places (New), solo la ficha propia: el place ID es el que da la propia ficha la última vez que
+  // se leyó (Google lo puede cambiar) o, si aún no se ha leído, el de la configuración; no hay forma de
+  // pedir otro lugar.
   let fichaGuardada = null;
   async function places(campos) {
     if (!c.placesClave) throw errorExterno('Google: falta GOOGLE_PLACES_CLAVE para Places', { permanente: true });
-    const placeId = c.placeId || fichaGuardada?.valor?.placeId;
+    const placeId = fichaGuardada?.valor?.placeId || c.placeId;
     if (!placeId) throw errorExterno('Google: falta GOOGLE_PLACE_ID (el place ID de la ficha de la clínica)', { permanente: true });
     const url = `${PLACES}/places/${encodeURIComponent(placeId)}?${consulta({ languageCode: 'es', regionCode: 'ES' })}`;
     await cuotaDe(url)();
@@ -522,6 +542,13 @@ function crearReal(env = process.env, {
       notaMedia: d.averageRating ?? null,
       total: d.totalReviewCount ?? null,
     };
+  }
+
+  // La publicación con este texto creada desde «desde» (10 minutos de margen por los relojes), o null.
+  // Para cuando no se sabe si un POST ha llegado. La ficha tiene pocas: basta la primera página.
+  async function novedadReciente(ruta, texto, desde) {
+    const d = await api('GET', `${ruta}?${consulta({ pageSize: '100' })}`);
+    return (d.localPosts || []).find((x) => x?.summary === texto && new Date(x.createTime).getTime() >= desde - 10 * 60000) || null;
   }
 
   const partesFecha = (f) => {
@@ -574,9 +601,10 @@ function crearReal(env = process.env, {
       const ahora = reloj().getTime();
       if (!refrescar && fichaGuardada && fichaGuardada.hasta > ahora) return { ...fichaGuardada.valor };
       try {
+        // Sin Business Profile, de Places solo el place ID (gratis y lo único que se puede guardar).
         const valor = c.oauth && c.cuenta && c.ubicacion
           ? aFicha(await api('GET', `${INFORMACION}/locations/${ubicacionFicha()}?${consulta({ readMask: LECTURA_FICHA })}`))
-          : aFichaPlaces(await places(['id', 'googleMapsLinks']));
+          : { ...FICHA_VACIA, origen: 'places', placeId: (await places(['id'])).id || null };
         fichaGuardada = { valor, hasta: reloj().getTime() + horasFicha * 3600000 };
         return { ...valor };
       } catch (err) {
@@ -620,7 +648,24 @@ function crearReal(env = process.env, {
     async publicarNovedad(p) {
       const texto = comprobarNovedad(p);
       const cuerpo = { languageCode: 'es', topicType: 'STANDARD', summary: texto, ...(p.botonUrl ? { callToAction: { actionType: 'BOOK', url: p.botonUrl } } : {}) };
-      const d = await api('POST', `${V4}/${rutaFicha()}/localPosts`, { cuerpo, escritura: true });
+      const ruta = `${V4}/${rutaFicha()}/localPosts`;
+      const desde = reloj().getTime();
+      let d;
+      try {
+        d = await api('POST', ruta, { cuerpo, escritura: true });
+      } catch (err) {
+        if (!err.incierto) throw err;
+        // Google no ha contestado y puede que la haya creado: se mira en la ficha. Nunca se repite sola
+        // (saldría dos veces en la ficha pública).
+        let hecha;
+        try {
+          hecha = await novedadReciente(ruta, texto, desde);
+        } catch {
+          throw errorExterno(`${err.message}. Tampoco se ha podido mirar en la ficha: comprobarlo en Business Profile antes de volver a aprobarla`, { estado: err.estado, reintentable: true, incierto: true });
+        }
+        if (!hecha) throw errorExterno(`${err.message}. No está entre las publicaciones de la ficha: se puede volver a aprobar`, { estado: err.estado, reintentable: true });
+        d = hecha;
+      }
       return { googleId: d.name || null, estado: ESTADOS_POST[d.state] || 'en_revision', url: d.searchUrl || null };
     },
 

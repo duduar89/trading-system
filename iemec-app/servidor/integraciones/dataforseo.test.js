@@ -54,6 +54,23 @@ test('real: sin usuario y clave no arranca (puerta)', () => {
   assert.throws(() => crearDataForSeo('real', { env: {} }), /DATAFORSEO_LOGIN y DATAFORSEO_CLAVE/);
 });
 
+test('real: con node --test y sin el fetch de la prueba, no sale a internet ni paga', async () => {
+  assert.ok(process.env.NODE_TEST_CONTEXT);
+  const original = globalThis.fetch;
+  const salidas = [];
+  globalThis.fetch = async (url) => { salidas.push(String(url)); throw new Error('sin red en esta prueba'); };
+  try {
+    const esperas = [];
+    const d = crearDataForSeo('real', { env: ENV, esperar: async (ms) => { esperas.push(ms); } });
+    await assert.rejects(d.enviarTareas([tarea(1)]), (err) => /DataForSEO real: con node --test no se sale a internet/.test(err.message) && err.permanente === true && !err.incierto);
+    await assert.rejects(d.tareasListas(), /no se sale a internet/);
+    assert.deepEqual(esperas, [], 'sin reintentos ni esperas');
+  } finally {
+    globalThis.fetch = original;
+  }
+  assert.deepEqual(salidas, [], 'nada sale a internet');
+});
+
 test('real: envía las tareas en bloques de 100 con HTTP Basic y el cuerpo de la documentación', async () => {
   const f = falso();
   f.luego((p) => creadas(p)).luego((p) => creadas(p, { fallan: { 3: 'Invalid Field: \'location_coordinate\'.' } }));
@@ -75,6 +92,41 @@ test('real: envía las tareas en bloques de 100 con HTTP Basic y el cuerpo de la
   assert.deepEqual(r[0], { etiqueta: 'iemec|2026-10-05|p0|medicina estética', id: idTarea(1), coste: 0.0006 });
   assert.deepEqual(r[103], { etiqueta: 'iemec|2026-10-05|p103|medicina estética', error: '40501 Invalid Field: \'location_coordinate\'.' });
   assert.equal(r.filter((x) => x.id).length, 149);
+});
+
+test('real: task_post se paga: no se repite si no se sabe si ha llegado (solo tras un 429 o sin conexión)', async () => {
+  const tiempoAgotado = () => Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+  const sinRed = (code, mensaje) => Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error(mensaje), { code }) });
+  const lista = [tarea(1), tarea(2)];
+  // Tiempo agotado: DataForSEO puede haberlas creado (y cobrado). Una sola llamada y error «incierto».
+  let esperas = [];
+  let f = falso().luego(() => { throw tiempoAgotado(); }).luego((p) => creadas(p));
+  await assert.rejects(real(f, esperas).enviarTareas(lista), (err) => err.incierto === true && err.reintentable === true && /tiempo agotado/.test(err.message) && /no se repite sin comprobarlo/.test(err.message) && err.hechas.length === 0);
+  assert.equal(f.pedidas.length, 1);
+  assert.deepEqual(esperas, []);
+  // Un 502 de una pasarela o la conexión cortada a medias: igual.
+  f = falso().luego(json(502, { status_code: 50200, status_message: 'Bad Gateway.' })).luego((p) => creadas(p));
+  await assert.rejects(real(f).enviarTareas(lista), (err) => err.incierto === true && /50200/.test(err.message));
+  assert.equal(f.pedidas.length, 1);
+  f = falso().luego(() => { throw sinRed('ECONNRESET', 'read ECONNRESET'); }).luego((p) => creadas(p));
+  await assert.rejects(real(f).enviarTareas(lista), (err) => err.incierto === true && /fallo de red/.test(err.message));
+  assert.equal(f.pedidas.length, 1);
+  // Un 429 (no se ha hecho) o sin conexión (no ha salido): se espera y se repite.
+  esperas = [];
+  f = falso().luego(json(429, { status_code: 42900, status_message: 'Too Many Requests.' }))
+    .luego(() => { throw sinRed('ECONNREFUSED', 'connect ECONNREFUSED 104.26.0.1:443'); })
+    .luego((p) => creadas(p));
+  assert.equal((await real(f, esperas).enviarTareas(lista)).filter((x) => x.id).length, 2);
+  assert.equal(f.pedidas.length, 3);
+  assert.deepEqual(esperas, [1000, 2000]);
+  // En dos bloques, si el segundo no contesta, el error lleva lo del primero (hecho y pagado).
+  f = falso().luego((p) => creadas(p)).luego(() => { throw tiempoAgotado(); });
+  await assert.rejects(real(f).enviarTareas(Array.from({ length: 150 }, (_, i) => tarea(i))), (err) => err.incierto && err.hechas.length === 100 && err.hechas.every((x) => x.id));
+  // Leer (GET) sí se repite tras un tiempo agotado: no crea ni cobra nada.
+  esperas = [];
+  f = falso().luego(() => { throw tiempoAgotado(); }).luego(json(200, sobre([{ id: 'x', status_code: 20000, result: [] }])));
+  assert.deepEqual(await real(f, esperas).tareasListas(), []);
+  assert.deepEqual(esperas, [1000]);
 });
 
 test('real: errores de DataForSEO: usuario o clave, sin saldo, límite de llamadas y caídas', async () => {
@@ -133,10 +185,29 @@ test('real: lo que está listo y su resultado (solo las fichas), en cola o perdi
   f.luego(json(200, sobre([{ id: idTarea(2), status_code: 40602, status_message: 'Task In Queue.', cost: 0, result_count: 0, result: null }])));
   assert.deepEqual(await d.resultado(idTarea(2)), { listo: false });
   f.luego(json(200, sobre([{ id: idTarea(3), status_code: 40401, status_message: 'Task Not Found.', cost: 0, result_count: 0, result: null }])));
-  await assert.rejects(d.resultado(idTarea(3)), (err) => err.permanente === true && /40401/.test(err.message));
+  await assert.rejects(d.resultado(idTarea(3)), (err) => err.permanente === true && err.deTarea === true && /40401/.test(err.message));
   const antes = f.pedidas.length;
-  await assert.rejects(d.resultado('../../appendix/user_data'), /no válido/);
+  await assert.rejects(d.resultado('../../appendix/user_data'), (err) => /no válido/.test(err.message) && err.deTarea === true);
   assert.equal(f.pedidas.length, antes);
+});
+
+test('real: «No Search Results.» (40102) es una búsqueda hecha y sin nadie, no un fallo', async () => {
+  const f = falso().luego(json(200, sobre([{
+    id: idTarea(1), status_code: 40102, status_message: 'No Search Results.', time: '2.1 sec.', cost: 0.0006, result_count: 0,
+    path: ['v3', 'serp', 'google', 'maps', 'task_get', 'advanced', idTarea(1)], data: { api: 'serp', function: 'task_get', se: 'google', se_type: 'maps' }, result: null,
+  }])));
+  assert.deepEqual(await real(f).resultado(idTarea(1)), { listo: true, items: [] });
+});
+
+test('real: un fallo de una tarea (no de la llamada) lo dice, para que la recogida siga con las demás', async () => {
+  let f = falso().luego(json(200, sobre([{ id: idTarea(1), status_code: 50000, status_message: 'Internal Error.', cost: 0, result_count: 0, result: null }])));
+  await assert.rejects(real(f).resultado(idTarea(1)), (err) => err.deTarea === true && err.reintentable === true && !err.permanente);
+  // Si falla la llamada entera (500 tras los reintentos, o el límite de llamadas), no es de la tarea.
+  const quinientos = () => json(500, { status_code: 50000, status_message: 'Internal Error.' });
+  f = falso().luego(quinientos()).luego(quinientos()).luego(quinientos()).luego(quinientos());
+  await assert.rejects(real(f).resultado(idTarea(2)), (err) => !err.deTarea && err.reintentable === true);
+  f = falso().luego(json(200, sobre([], { status_code: 40202, status_message: 'Rate limit per minute exceeded.' })));
+  await assert.rejects(real(f).resultado(idTarea(3)), (err) => !err.deTarea && err.reintentable === true);
 });
 
 test('real: saldo de la cuenta', async () => {

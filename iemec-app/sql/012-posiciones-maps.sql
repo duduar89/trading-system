@@ -4,6 +4,10 @@
 -- Las métricas y las palabras de la ficha van en metricas_gbp y busquedas_gbp (004).
 
 -- Una búsqueda (palabra y punto) de una pasada semanal. El id es el de la tarea en DataForSEO.
+-- «incierta»: DataForSEO no contestó al enviarla (tiempo agotado, conexión cortada, 5xx) y puede que
+-- la haya creado y cobrado. Lleva un id provisional y lo que costaría (cuenta para el tope); no se
+-- vuelve a enviar y, si DataForSEO la tenía, la recogida le pone su id por la etiqueta.
+-- intentos: las veces que ha fallado ella sola al recogerla (a la tercera, fallida).
 CREATE TABLE IF NOT EXISTS posiciones_tareas (
   id VARCHAR(64) NOT NULL PRIMARY KEY,
   pasada DATE NOT NULL,
@@ -14,7 +18,8 @@ CREATE TABLE IF NOT EXISTS posiciones_tareas (
   zoom TINYINT UNSIGNED NOT NULL,
   profundidad TINYINT UNSIGNED NOT NULL,
   coste_usd DECIMAL(10,6) NOT NULL DEFAULT 0,
-  estado ENUM('enviada','recogida','fallida','caducada') NOT NULL DEFAULT 'enviada',
+  estado ENUM('enviada','incierta','recogida','fallida','caducada') NOT NULL DEFAULT 'enviada',
+  intentos TINYINT UNSIGNED NOT NULL DEFAULT 0,
   error VARCHAR(300) NULL,
   enviada_en DATETIME NOT NULL,
   recogida_en DATETIME NULL,
@@ -22,8 +27,9 @@ CREATE TABLE IF NOT EXISTS posiciones_tareas (
   KEY posicion_tarea_estado (estado, enviada_en)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dónde sale la clínica: puesto NULL si no sale entre los «profundidad» primeros. Del 1.º solo lo
--- público de su ficha (nombre, categoría, nota y número de reseñas); nada de sus reseñas.
+-- Dónde sale la clínica: puesto NULL si no sale entre los «profundidad» primeros (o si no sale nadie:
+-- resultados 0). Del 1.º solo lo público de su ficha (nombre, categoría, nota y número de reseñas; sin
+-- reseñas, nota NULL); nada de sus reseñas.
 CREATE TABLE IF NOT EXISTS posiciones_maps (
   pasada DATE NOT NULL,
   palabra VARCHAR(160) NOT NULL,
