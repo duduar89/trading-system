@@ -15,8 +15,9 @@ const agenda = require('../servidor/agenda');
 // versión revisada y se vuelve a importar, los recuentos se ponen al día aquí.
 const SEMILLAS = path.join(__dirname, '..', 'semillas', 'iemec');
 const CATALOGO = JSON.parse(fs.readFileSync(path.join(SEMILLAS, 'tratamientos.json'), 'utf8'));
-const RECUENTO = { tratamientos: 169, seReservan: 155, reservaLaIa: 67, restringidos: 54, quirofanoExterno: 17, aparatos: 26, preguntas: 327 };
+const RECUENTO = { tratamientos: 172, seReservan: 157, reservaLaIa: 67, restringidos: 71, sinConfirmar: 22, quirofanoExterno: 17, aparatos: 26, preguntas: 351 };
 const MARTES = { fecha: '2026-10-06', ahora: new Date('2026-09-29T08:00:00Z') };
+const alias = (x) => (typeof x.alias === 'string' ? JSON.parse(x.alias) : x.alias) || [];
 
 test('el fichero del catálogo: ids únicos, familias conocidas y un texto de WhatsApp para un solo tratamiento', () => {
   const ids = CATALOGO.tratamientos.map((t) => t.id);
@@ -27,6 +28,12 @@ test('el fichero del catálogo: ids únicos, familias conocidas y un texto de Wh
   assert.deepEqual(CATALOGO.tratamientos.filter((t) => !familias.has(t.familia)).map((t) => t.id), []);
   const textos = CATALOGO.tratamientos.map((t) => t.texto_whatsapp).filter(Boolean);
   assert.equal(new Set(textos.map(normalizar)).size, textos.length);
+  // El texto de WhatsApp es para que al llegar el mensaje se sepa qué quiere: el que comparten un
+  // agrupador y lo que se reserva, para lo que se reserva (el agrupador no está en la agenda).
+  const whatsapp = Object.fromEntries(CATALOGO.tratamientos.map((t) => [t.id, t.texto_whatsapp]));
+  assert.deepEqual([whatsapp['head-spa-japones'], whatsapp['tratamiento-acne']], [null, null]);
+  assert.match(whatsapp['head-spa-detox'], /Head Spa Japonés/);
+  assert.match(whatsapp['perfect-skin-acne'], /tratamiento acne/);
   const codigos = CATALOGO.aparatos.map((a) => a.codigo);
   assert.equal(new Set(codigos).size, RECUENTO.aparatos);
   assert.ok(codigos.every((c) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(c)), 'códigos de aparato en minúsculas con guiones');
@@ -34,11 +41,24 @@ test('el fichero del catálogo: ids únicos, familias conocidas y un texto de Wh
   assert.equal(new Set(preguntas).size, preguntas.length, 'sin preguntas repetidas en un mismo tratamiento');
   // Lo retirado del catálogo provisional no vuelve a entrar.
   assert.deepEqual(CATALOGO.retirados.tratamientos.filter((id) => ids.includes(id)), []);
-  // Solo datos públicos útiles: ni dudas para la clínica, ni reseñas, ni rastro de la investigación.
+  // Solo datos públicos útiles: ni dudas para la clínica, ni reseñas, ni rastro de la investigación
+  // (tampoco en la descripción, que sale en las publicaciones de Google, ni en las sesiones).
   assert.deepEqual(Object.keys(CATALOGO), ['_origen', 'tratamientos', 'aparatos', 'faqs', 'retirados']);
   const investigacion = /confirmar si|: confirmar|revisar|https?:|\.md\b|\.json\b|reseñ|opini[oó]n|repesca|trazabilidad/i;
-  assert.deepEqual(CATALOGO.tratamientos.filter((x) => investigacion.test(`${x.notas} ${x.motivo_restriccion} ${x.precio_texto}`)).map((x) => x.id), []);
+  const textoDe = (x) => [x.nombre, x.descripcion, x.sesiones, x.notas, x.motivo_restriccion, x.precio_texto].join(' ');
+  assert.deepEqual(CATALOGO.tratamientos.filter((x) => investigacion.test(textoDe(x))).map((x) => x.id), []);
   assert.deepEqual(CATALOGO.aparatos.filter((a) => investigacion.test(a.notas || '')).map((a) => a.codigo), []);
+  // Ni los valores del sector (otras clínicas, fabricantes, artículos) ni de dónde sale cada dato.
+  const sector = /\bsector\b|cl[ií]nicas? [A-Z]|scielo|aedv|fabricante|\((?:Treatwell|Multiestetica)\)|según (?:la web|el blog|Treatwell)|citad[oa]s? (?:como|en)|sin descripción|que el blog/i;
+  assert.deepEqual(CATALOGO.tratamientos.filter((x) => sector.test(`${x.descripcion} ${x.sesiones}`)).map((x) => x.id), []);
+  // Fuentes: la web de la clínica, sus fichas en directorios y las normas y fichas oficiales. Un
+  // dominio nuevo aquí es una decisión: ¿es de la clínica o una norma? Si es otra clínica, no pasa.
+  const DOMINIOS = new Set(['iemec-clinic.com', 'content.app-sources.com', 'treatwell.es', 'multiestetica.com',
+    'aemps.gob.es', 'cima.aemps.es', 'boe.es', 'eur-lex.europa.eu', 'seme.org', 'fotona.com', 'aesthisave.com', 'support.google.com']);
+  const fuentes = CATALOGO.tratamientos.flatMap((x) => x.fuentes.map((u) => [x.id, new URL(u).hostname.replace(/^www\./, '')]));
+  assert.deepEqual(fuentes.filter(([, dominio]) => !DOMINIOS.has(dominio)), []);
+  assert.ok(CATALOGO.faqs.every((f) => !f.url || new URL(f.url).hostname === 'iemec-clinic.com'));
+  assert.deepEqual(CATALOGO.faqs.filter((f) => /validar|unificar|\bposts?\b|la web dice|otra entrada/i.test(`${f.pregunta} ${f.respuesta}`)).map((f) => f.pregunta), []);
 });
 
 test('las semillas de la clínica cargan y se pueden repetir sin duplicar', async (t) => {
@@ -77,7 +97,7 @@ test('las semillas de la clínica cargan y se pueden repetir sin duplicar', asyn
     for (const d of [1, 2, 3, 4, 5]) {
       await pool.query("INSERT INTO profesional_horarios (profesional_id, dia_semana, inicio, fin) SELECT id, ?, '11:00', '20:00' FROM profesionales WHERE rol = 'esteticista'", [d]);
     }
-    const h = await agenda.huecos(pool, { fecha: '2026-10-06', tratamientoId: 'limpieza-facial-profunda', ahora: new Date('2026-09-29T08:00:00Z') });
+    const h = await agenda.huecos(pool, { ...MARTES, tratamientoId: 'limpieza-facial-profunda' });
     assert.ok(h.length > 0);
   } finally {
     await pool.end();
@@ -89,7 +109,7 @@ test('lo legal: restringidos marcados y fuera de la IA; el quirófano externo, v
   if (!pool) return;
   try {
     await semillar(pool);
-    const [trats] = await pool.query('SELECT id, nombre, alias, regimen_legal, publicidad_restringida, motivo_restriccion, reservable_ia, activo, sala_tipo, notas, subfamilia FROM tratamientos');
+    const [trats] = await pool.query('SELECT id, nombre, alias, regimen_legal, publicidad_restringida, motivo_restriccion, reservable_ia, activo, sala_tipo, notas, subfamilia, rol_profesional FROM tratamientos');
     // Medicamentos con receta, productos sanitarios y régimen sin confirmar: publicidad restringida,
     // con su motivo, y la IA no los reserva (sí las valoraciones).
     const restringibles = trats.filter((x) => ['medicamento_receta', 'producto_sanitario', 'desconocido'].includes(x.regimen_legal));
@@ -97,24 +117,43 @@ test('lo legal: restringidos marcados y fuera de la IA; el quirófano externo, v
     assert.deepEqual(restringibles.filter((x) => !x.publicidad_restringida || !x.motivo_restriccion).map((x) => x.id), []);
     assert.deepEqual(trats.filter((x) => x.publicidad_restringida && x.reservable_ia).map((x) => x.id), [], 'lo restringido lo reserva una persona');
     // Si el nombre dice un medicamento con receta, está restringido.
-    const nombraMedicamento = (x) => MEDICAMENTOS.some((m) => new RegExp(`\\b${normalizar(m)}\\b`).test(normalizar(`${x.nombre} ${JSON.stringify(x.alias)}`)));
+    const nombraMedicamento = (x) => MEDICAMENTOS.some((m) => new RegExp(`\\b${normalizar(m)}\\b`).test(normalizar(`${x.nombre} ${alias(x).join(' ')}`)));
     const conMedicamento = trats.filter(nombraMedicamento);
     assert.ok(conMedicamento.some((x) => x.id === 'toxina-botulinica-facial') && conMedicamento.some((x) => x.id === 'semaglutida'));
     assert.deepEqual(conMedicamento.filter((x) => !x.publicidad_restringida).map((x) => x.id), []);
+    // Lo que la clínica no ha confirmado que ofrezca (solo en el blog o en directorios) tampoco se
+    // anuncia: ni publicaciones de Google ni plantillas lo nombran, y la IA no lo reserva.
+    const sinConfirmar = trats.filter((x) => /Oferta sin confirmar/.test(`${x.notas} ${x.motivo_restriccion}`));
+    assert.equal(sinConfirmar.length, RECUENTO.sinConfirmar);
+    assert.ok(sinConfirmar.some((x) => x.id === 'criolipolisis') && sinConfirmar.some((x) => x.id === 'cirugia-bariatrica'));
+    assert.deepEqual(sinConfirmar.filter((x) => !x.publicidad_restringida || x.reservable_ia || !x.motivo_restriccion).map((x) => x.id), []);
     // Ninguna cirugía la reserva la IA.
     assert.deepEqual(trats.filter((x) => x.regimen_legal === 'cirugia' && x.reservable_ia).map((x) => x.id), []);
     // Las valoraciones sí.
     const valoraciones = trats.filter((x) => x.subfamilia === 'valoracion');
     assert.ok(valoraciones.length >= 5 && valoraciones.every((x) => x.activo && x.reservable_ia), 'las valoraciones las reserva la IA');
 
-    // Quirófano externo (se opera en el hospital): en IEMEC, la valoración en consulta, sin IA.
+    // Quirófano externo (se opera en el hospital): en IEMEC, la valoración en consulta, sin IA. Y
+    // se llama así, que es lo que lee el paciente en la confirmación, el .ics y «Tu cita»; el nombre
+    // de la cirugía queda como alias.
     const externos = trats.filter((x) => /fuera de IEMEC/.test(x.notas || ''));
     assert.equal(externos.length, RECUENTO.quirofanoExterno);
     assert.ok(externos.some((x) => x.id === 'aumento-pecho') && externos.some((x) => x.id === 'balon-gastrico'));
-    for (const x of externos) assert.deepEqual([x.id, x.sala_tipo, Boolean(x.reservable_ia), Boolean(x.activo)], [x.id, 'consulta_medica', false, true]);
+    for (const x of externos) {
+      assert.deepEqual([x.id, x.sala_tipo, Boolean(x.reservable_ia), Boolean(x.activo)], [x.id, 'consulta_medica', false, true]);
+      assert.match(x.nombre, /^Valoración de /, x.id);
+    }
+    const pecho = externos.find((x) => x.id === 'aumento-pecho');
+    assert.equal(pecho.nombre, 'Valoración de aumento de pecho (mamoplastia de aumento)');
+    assert.ok(alias(pecho).includes('Aumento de pecho (mamoplastia de aumento)'));
     const [salasExternos] = await pool.query(`SELECT DISTINCT s.codigo FROM tratamiento_salas ts JOIN salas s ON s.id = ts.sala_id WHERE ts.tratamiento_id IN (?) ORDER BY s.codigo`,
       [externos.map((x) => x.id)]);
     assert.deepEqual(salasExternos.map((s) => s.codigo), ['consulta-1', 'consulta-2']);
+
+    // Enfermería no está en el equipo de la agenda: lo que hace (el IPL) lo cubre un médico.
+    const ipl = trats.find((x) => x.id === 'ipl-facial');
+    assert.equal(ipl.rol_profesional, 'medico');
+    assert.match(ipl.notas, /Lo hace enfermería/);
 
     // Sala de procedimientos (cirugía menor): el tipo existe (migración 006) y el injerto va, de
     // momento, a la sala capilar.
@@ -157,7 +196,7 @@ test('cada tratamiento tiene su sala concreta y el motor solo ofrece esa', async
     const codigo = Object.fromEntries(salas.map((s) => [s.id, s.codigo]));
     const sinHueco = [];
     for (const x of trats) {
-      const h = await agenda.huecos(pool, { fecha: '2026-10-06', tratamientoId: x.id, ahora: new Date('2026-09-29T08:00:00Z') });
+      const h = await agenda.huecos(pool, { ...MARTES, tratamientoId: x.id });
       if (!h.length) { sinHueco.push(x.nombre); continue; }
       for (const hu of h) assert.ok(salasDe.get(x.id).includes(codigo[hu.salaId]), `${x.nombre} se ha ofrecido en ${codigo[hu.salaId]}`);
     }

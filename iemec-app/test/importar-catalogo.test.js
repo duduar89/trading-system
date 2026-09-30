@@ -17,9 +17,13 @@ const agenda = require('../servidor/agenda');
 const FIXTURE = path.join(__dirname, 'fixtures', 'catalogo-minimo.json');
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'importar-catalogo.js');
 const SEMILLAS = path.join(__dirname, '..', 'semillas', 'iemec');
+const EQUIPO = JSON.parse(fs.readFileSync(path.join(SEMILLAS, 'equipo.json'), 'utf8'));
 const leer = () => JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
 const porId = (datos) => Object.fromEntries(datos.tratamientos.map((t) => [t.id, t]));
 const carpetaTemporal = () => fs.mkdtempSync(path.join(os.tmpdir(), 'iemec-catalogo-'));
+// Lo que es de la investigación y no de la clínica: dudas, reseñas, enlaces, de dónde sale cada
+// dato y los valores del sector (otras clínicas, fabricantes).
+const INVESTIGACION = /confirmar si|: confirmar|revisar|https?:|\.json|reseña|WhatsApp escribe|\bsector\b|cl[ií]nica ajena|fabricante|\((?:Treatwell|Multiestetica)\)|según la web|citad[oa]s?|sin descripción|validar|otra entrada/i;
 
 test('el importador pasa el catálogo al formato de las semillas', () => {
   const { datos, avisos } = convertir(leer());
@@ -44,11 +48,16 @@ test('el importador pasa el catálogo al formato de las semillas', () => {
   assert.equal(t['tarjeta-ejemplo'].sala_tipo, null);
   assert.equal(t['tarjeta-ejemplo'].rol_profesional, null);
 
-  // Quirófano externo: en IEMEC, la valoración en consulta, y la agenda una persona.
+  // Quirófano externo: en IEMEC, la valoración en consulta, y la agenda una persona. Su nombre
+  // (el que lee el paciente en la confirmación, el .ics y «Tu cita») es el de la valoración; el de
+  // la cirugía queda como alias.
   const externa = t['cirugia-externa-ejemplo'];
   assert.deepEqual([externa.sala_tipo, externa.rol_profesional, externa.duracion_min, externa.reservable_ia], ['consulta_medica', 'cirujano', 45, false]);
+  assert.equal(externa.nombre, 'Valoración de cirugía de ejemplo en hospital');
+  assert.deepEqual(externa.alias, ['Cirugía de ejemplo en hospital']);
   assert.match(externa.notas, /fuera de IEMEC/);
   assert.doesNotMatch(externa.notas, /Se supone/);
+  assert.equal(externa.descripcion, 'Intervención con anestesia general e ingreso.');
 
   // Sala de procedimientos, aparato fijo de otra sala y rol que se pierde, con su nota.
   const injerto = t['injerto-ejemplo'];
@@ -72,39 +81,60 @@ test('el importador pasa el catálogo al formato de las semillas', () => {
   const neuro = t['neuromodulador-ejemplo'];
   assert.deepEqual([neuro.publicidad_restringida, neuro.reservable_ia], [true, false]);
   assert.match(neuro.motivo_restriccion, /medicamento con receta/);
-  assert.equal(t['sin-confirmar-ejemplo'].reservable_ia, false);
-  assert.match(t['sin-confirmar-ejemplo'].notas, /Oferta sin confirmar/);
+  // Lo que la clínica no ha confirmado que ofrezca: ni la IA lo reserva ni se anuncia.
+  const sinConfirmar = t['sin-confirmar-ejemplo'];
+  assert.deepEqual([sinConfirmar.reservable_ia, sinConfirmar.publicidad_restringida], [false, true]);
+  assert.match(sinConfirmar.notas, /Oferta sin confirmar/);
+  assert.equal(sinConfirmar.motivo_restriccion, 'Oferta sin confirmar por la clínica: no se anuncia hasta que la confirme.');
 
-  // Datos públicos, limpios: sin último minuto de Treatwell, sin reseñas, sin fuentes en las sesiones,
-  // sin dudas ni enlaces en las notas, alias sin repetir el nombre.
+  // Valores del sector (otras clínicas, fabricantes): las sesiones con sus números y ni sus
+  // nombres ni sus enlaces en las fuentes; la norma oficial sí queda.
+  assert.equal(relleno.sesiones, '1 sesión');
+  assert.deepEqual([relleno.repetir_cada_dias, relleno.repetir_fuente], [240, 'sector']);
+  assert.deepEqual(relleno.fuentes, ['https://ejemplo.invalid/relleno', 'https://normas.invalid/producto-sanitario']);
+
+  // Un rol que nadie del equipo tiene (enfermería): lo cubre un médico, con nota.
+  const microagujas = t['microagujas-ejemplo'];
+  assert.equal(microagujas.rol_profesional, 'medico');
+  assert.match(microagujas.notas, /^Lo hace enfermería, que aún no está en el equipo de la agenda/);
+
+  // Datos públicos, limpios: sin último minuto de Treatwell, sin reseñas, sin fuentes en las
+  // sesiones ni en la descripción (es la que sale en las publicaciones de Google), sin dudas ni
+  // enlaces en las notas, alias sin repetir el nombre.
   const higiene = t['higiene-facial-ejemplo'];
   assert.equal(higiene.precio_texto, '50 € (Treatwell)');
   assert.equal(higiene.sesiones, '1 al mes');
+  assert.equal(higiene.descripcion, 'Limpieza de la piel con extracción y mascarilla.');
   assert.deepEqual([higiene.repetir_cada_dias, higiene.repetir_fuente], [30, 'blog']);
-  assert.ok(higiene.fuentes.includes('https://ejemplo.invalid/blog/cada-cuanto-una-higiene'));
+  assert.ok(higiene.fuentes.includes('https://iemec-clinic.com/blog/ejemplo-cada-cuanto-una-higiene'));
   assert.deepEqual(higiene.alias, ['Limpieza facial de ejemplo', 'Higiene de ejemplo']);
   assert.equal(higiene.notas, 'Incluye extracción y mascarilla.');
+  assert.equal(t['laser-intimo-ejemplo'].descripcion, 'Láser vaginal de ejemplo en consulta.');
+  assert.equal(microagujas.descripcion, 'Microagujas en el cuerpo combinables con la higiene facial.');
+  assert.equal(t['ritual-ejemplo'].descripcion, 'Ritual con diagnóstico, secado y bebida de bienvenida.');
+  assert.equal(sinConfirmar.descripcion, null, 'solo decía que un directorio lo lista sin descripción');
   assert.equal(t['valoracion-ejemplo'].precio_texto, 'Gratuita según un directorio');
   assert.equal(t['relleno-ejemplo'].precio_texto, null);
   assert.equal(t['plan-ejemplo'].nombre, 'Plan de ejemplo');
   assert.match(t['plan-ejemplo'].notas, /Se empieza por «Valoración médica de ejemplo»/);
-  assert.match(t['microagujas-ejemplo'].notas, /Usa además: Lámpara LED de ejemplo\./);
-  assert.match(t['microagujas-ejemplo'].notas, /con «Higiene facial de ejemplo» en la cara/);
+  assert.match(microagujas.notas, /Usa además: Lámpara LED de ejemplo\./);
+  assert.match(microagujas.notas, /con «Higiene facial de ejemplo» en la cara/);
   for (const x of datos.tratamientos) {
-    assert.doesNotMatch(x.notas || '', /confirmar si|: confirmar|https?:|\.json|reseña|WhatsApp escribe/i, x.id);
+    for (const k of ['nombre', 'descripcion', 'sesiones', 'notas', 'motivo_restriccion']) assert.doesNotMatch(x[k] || '', INVESTIGACION, `${x.id}.${k}`);
+    assert.deepEqual(x.fuentes.filter((u) => /clinica-ajena|fabricante/.test(u)), [], x.id);
     assert.ok(!x.notas || x.notas.length <= 600);
   }
 
   // WhatsApp: un texto, un tratamiento. El genérico y el del botón equivocado no se guardan; el
-  // compartido se queda en el más general.
+  // compartido se queda en uno que se reserve (el agrupador no está en la agenda).
   const textos = datos.tratamientos.map((x) => x.texto_whatsapp).filter(Boolean);
   assert.equal(new Set(textos).size, textos.length);
   assert.equal(t['valoracion-ejemplo'].texto_whatsapp, null);
   assert.equal(t['laser-intimo-ejemplo'].texto_whatsapp, null);
   assert.match(t['laser-intimo-ejemplo'].notas, /texto de otro tratamiento/);
-  assert.equal(t['ritual-agrupador-ejemplo'].texto_whatsapp, 'Hola, quiero una cita para el ritual de ejemplo');
-  assert.equal(t['ritual-ejemplo'].texto_whatsapp, null);
-  assert.match(t['ritual-ejemplo'].notas, /mismo texto que «Rituales capilares de ejemplo»/);
+  assert.equal(t['ritual-ejemplo'].texto_whatsapp, 'Hola, quiero una cita para el ritual de ejemplo');
+  assert.equal(t['ritual-agrupador-ejemplo'].texto_whatsapp, null);
+  assert.match(t['ritual-agrupador-ejemplo'].notas, /mismo texto que «Ritual capilar de ejemplo»/);
 
   // Aparatos con código en minúsculas; si el catálogo no dice si es portátil, queda en null.
   assert.deepEqual(datos.aparatos.map((a) => [a.codigo, a.nombre, a.movil, a.unidades]), [
@@ -112,10 +142,32 @@ test('el importador pasa el catálogo al formato de las semillas', () => {
     ['lampara-led', 'Lámpara LED de ejemplo', null, 1], ['puesto-head-spa', 'Puesto de ritual capilar de ejemplo', false, 1]]);
   assert.doesNotMatch(datos.aparatos[2].notas, /confirmar/);
 
-  // Preguntas: sin la repetida (mayúsculas aparte) ni las que el catálogo marca para validar.
-  assert.deepEqual(datos.faqs.map((f) => [f.tratamiento_id, f.pregunta]), [
-    ['higiene-facial-ejemplo', '¿Duele?'], ['valoracion-ejemplo', '¿Cuánto dura la valoración?'], ['relleno-ejemplo', '¿Duele?']]);
+  // Preguntas, todas sin aprobar: sin la repetida (mayúsculas y «(otra entrada)» aparte). La que
+  // el catálogo marca para validar entra también (la valida el equipo médico al aprobarla), sin
+  // las marcas de la investigación.
+  assert.deepEqual(datos.faqs.map((f) => [f.tratamiento_id, f.pregunta, f.respuesta]), [
+    ['higiene-facial-ejemplo', '¿Duele?', 'No, es muy suave.'], ['relleno-ejemplo', '¿Cuánto dura el efecto?', 'Entre 9 y 12 meses.'],
+    ['valoracion-ejemplo', '¿Cuánto dura la valoración?', 'Una media hora.'], ['relleno-ejemplo', '¿Duele?', 'Se nota un pinchazo; se puede aplicar crema anestésica.']]);
+  assert.ok(avisos.some((a) => /1 preguntas frecuentes que el catálogo marca para validar se cargan/.test(a)));
   assert.deepEqual(datos.retirados, { tratamientos: [], aparatos: [] });
+});
+
+test('el importador: precio de solo último minuto o de una reseña, sala concreta de la clínica', () => {
+  const c = leer();
+  const t = (d) => porId(d.datos);
+  // Si el texto de precio solo trae lo que no vale (último minuto de Treatwell, una reseña), no hay
+  // precio publicado (antes: TypeError y el importador se paraba; o '' en vez de null).
+  c.tratamientos[0].precio_texto = '«Último minuto» en Treatwell desde 26 €';
+  c.tratamientos[1].precio_texto = '(una reseña habla de 80 €)';
+  // La clínica escribe la sala concreta en la plantilla de salas: pasa tal cual a las semillas.
+  c.tratamientos[0].sala_id = 'cabina-corporal';
+  const d = t(convertir(c));
+  assert.equal(d['higiene-facial-ejemplo'].precio_texto, null);
+  assert.equal(d['valoracion-ejemplo'].precio_texto, null);
+  assert.deepEqual(d['higiene-facial-ejemplo'].salas, ['cabina-corporal']);
+  // Con enfermería en el equipo, el rol se queda.
+  const conEnfermeria = { ...EQUIPO, profesionales: [...EQUIPO.profesionales, { codigo: 'enfermeria-1', nombre: 'Enfermería 1', rol: 'enfermeria' }] };
+  assert.equal(t(convertir(leer(), { equipo: conEnfermeria }))['microagujas-ejemplo'].rol_profesional, 'enfermeria');
 });
 
 test('el importador es determinista y retira lo que ya no está en el catálogo', () => {
@@ -149,6 +201,12 @@ test('lo que no encaja en la app no pasa: el importador se para y dice qué falt
   assert.throws(con((c) => { c.tratamientos[0].duracion_min = null; }), /se reserva y no tiene duración/);
   assert.throws(con((c) => { c.faqs[0].tratamiento_id = 'otro-que-no-esta'; }), /no está en el catálogo/);
   assert.throws(con((c) => { c.tratamientos[0].regimen_legal = 'suplemento'; }), /Régimen legal desconocido/);
+  // Una sala que no está en la agenda (semillas/iemec/equipo.json) dejaría el tratamiento sin huecos.
+  assert.throws(con((c) => { c.tratamientos[5].sala_id = 'sala-procedimientos'; }),
+    (e) => e instanceof ErrorCatalogo && /«injerto-ejemplo» va a la sala «sala-procedimientos».*Salas: consulta-1, consulta-2, cabina-laser/.test(e.message));
+  // Un rol que nadie tiene y que no puede cubrir un médico, igual.
+  const sinEstetica = { ...EQUIPO, profesionales: EQUIPO.profesionales.filter((p) => p.rol !== 'esteticista') };
+  assert.throws(() => convertir(leer(), { equipo: sinEstetica }), /«higiene-facial-ejemplo» lo hace el rol «esteticista» y nadie del equipo lo tiene/);
 });
 
 test('lo importado carga en la base: cada tratamiento, en su sala y con huecos', async (t) => {
@@ -167,11 +225,12 @@ test('lo importado carga en la base: cada tratamiento, en su sala y con huecos',
     await pool.query("INSERT INTO equipos (codigo, nombre) VALUES ('aparato-viejo', 'Aparato viejo')");
 
     await semillar(pool, { carpeta: dir });
-    await semillar(pool, { carpeta: dir });
+    const { avisos } = await semillar(pool, { carpeta: dir });
+    assert.deepEqual(avisos, [], 'nada se queda sin huecos por sala, aparato o rol');
     const [[n]] = await pool.query(`SELECT (SELECT COUNT(*) FROM tratamientos WHERE id LIKE '%-ejemplo' AND id <> 'viejo-ejemplo') AS trats,
       (SELECT COUNT(*) FROM equipos WHERE activo) AS equipos, (SELECT COUNT(*) FROM respuestas_aprobadas) AS faqs,
       (SELECT COUNT(*) FROM respuestas_aprobadas WHERE aprobada) AS aprobadas`);
-    assert.deepEqual({ ...n }, { trats: 14, equipos: 4, faqs: 3, aprobadas: 0 });
+    assert.deepEqual({ ...n }, { trats: 14, equipos: 4, faqs: 4, aprobadas: 0 });
     const [viejos] = await pool.query("SELECT id, activo, reservable_ia FROM tratamientos WHERE id LIKE 'viejo%' ORDER BY id");
     assert.deepEqual(viejos.map((v) => [v.id, Boolean(v.activo), Boolean(v.reservable_ia)]), [['viejo-ejemplo', false, false], ['viejo-validado', true, true]],
       'se retira (y la IA deja de ofrecerlo), salvo lo validado');
@@ -213,7 +272,16 @@ test('lo importado carga en la base: cada tratamiento, en su sala y con huecos',
     await semillar(pool, { carpeta: dir });
     const [faqs] = await pool.query('SELECT tratamiento_id, respuesta FROM respuestas_aprobadas ORDER BY id');
     assert.deepEqual(faqs.map((f) => [f.tratamiento_id, /revisada/.test(f.respuesta)]),
-      [['higiene-facial-ejemplo', true], ['valoracion-ejemplo', false], ['relleno-ejemplo', true]]);
+      [['higiene-facial-ejemplo', true], ['relleno-ejemplo', true], ['valoracion-ejemplo', false], ['relleno-ejemplo', true]]);
+
+    // Una sala concreta que no está en la agenda (se cambió el equipo después de importar): la
+    // semilla no deja el tratamiento sin sala, usa la de por defecto y lo avisa.
+    datos.tratamientos.find((x) => x.id === 'higiene-facial-ejemplo').salas = ['cabina-2'];
+    fs.writeFileSync(path.join(dir, 'tratamientos.json'), JSON.stringify(datos));
+    const { avisos: conSalaRara } = await semillar(pool, { carpeta: dir });
+    assert.deepEqual(conSalaRara, ['«higiene-facial-ejemplo» va a una sala que no está en la agenda (cabina-2): se usa la sala por defecto']);
+    const [higiene] = await pool.query("SELECT s.codigo FROM tratamiento_salas ts JOIN salas s ON s.id = ts.sala_id WHERE ts.tratamiento_id = 'higiene-facial-ejemplo'");
+    assert.deepEqual(higiene.map((s) => s.codigo), ['cabina-facial']);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
     await pool.end();
