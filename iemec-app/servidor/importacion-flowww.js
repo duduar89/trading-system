@@ -5,21 +5,23 @@
 //
 //   ensayo    lee, casa y coloca todo sin escribir nada, y lo cuenta en un informe sin nombres ni
 //             teléfonos (filas del CSV y códigos)
-//   aplicar   lo mismo en una transacción, con cabinas, profesionales y aparatos bloqueados como en
-//             una reserva: entra todo o nada. Si algo no casa (un servicio, un profesional, un estado),
-//             no se aplica hasta que lo diga el mapa
+//   aplicar   lo mismo en una transacción: entra todo o nada. Para escribir se bloquean cabinas,
+//             profesionales y aparatos como en una reserva (y si mientras se planificaba alguien dio
+//             una cita, se vuelve a planificar). Si algo no casa (un servicio, un profesional, un
+//             estado), no se aplica hasta que lo diga el mapa
 //   deshacer  quita lo que metió una importación y nadie ha tocado desde entonces
 //
 // Pacientes: sin duplicar (por su código de Flowww, su teléfono o su email, y con un nombre que
 // cuadre), con su código guardado; a quien ya estaba en la app solo se le apunta el código (y el
-// teléfono si no tenía, para que le lleguen los recordatorios). Importar
-// no da consentimiento de marketing (ni le marca como cliente, que por la LSSI también lo daría): solo
-// se registra si una columna lo dice («sí» → otorgado; «no» → revocado y, en WhatsApp, baja comercial).
+// teléfono si no tenía, para que le lleguen los recordatorios). Importar no da consentimiento de
+// marketing (ni le marca como cliente, que por la LSSI también lo daría): solo se registra si una
+// columna lo dice («sí» → otorgado; «no» → revocado y, en WhatsApp, baja comercial).
 // Citas: las futuras, con origen «importacion», colocadas por el motor de agenda a su hora. Si no
-// caben, entran igual (lo que dio Flowww manda y nada se pisa), con el motivo en revisar_motivo y
-// una tarea en el panel. No se les manda la confirmación, pero sí los recordatorios de víspera y 2
-// horas, salvo --sin-recordatorios (servidor/avisos-cita.js). Datos de salud: las observaciones del
-// paciente van cifradas y el informe no lleva nombres, teléfonos ni emails.
+// caben (o, sin código, pueden ser una ya importada que se movió), entran igual (lo que dio Flowww
+// manda y nada se pisa), con el motivo en revisar_motivo y una tarea en el panel. No se les manda la
+// confirmación, pero sí los recordatorios de víspera y 2 horas, salvo --sin-recordatorios
+// (servidor/avisos-cita.js). Datos de salud: las observaciones del paciente van cifradas y el informe
+// no lleva nombres, teléfonos ni emails.
 const crypto = require('crypto');
 const T = require('../motor/tiempo');
 const { leerCsv, ErrorCsv } = require('../motor/importacion/csv');
@@ -28,7 +30,8 @@ const C = require('../motor/importacion/colocar');
 const { redactarInforme, redactarDeshacer } = require('../motor/importacion/informe');
 const { tratamientoParaMotor, huecoAInstantes, aMinutosDelDia, ESTADOS_QUE_OCUPAN } = require('../motor/agenda/dia');
 const agenda = require('./agenda');
-const { cifrar } = require('./cripto');
+const { apuntarBaja } = require('./bajas');
+const { cifrar, descifrar } = require('./cripto');
 const { registrar } = require('./eventos');
 
 const ACTOR = 'importacion-flowww';
@@ -68,7 +71,7 @@ async function cargarReferencias(con) {
       .filter((m) => tratamientos.some((t) => t.id === m.tratamiento_id)).map((m) => [m.clave.slice('flowww:'.length), m.tratamiento_id])),
     pacientes: { porFlowww: new Map(), porTelefono: new Map(), porEmail: new Map(), porNombre: new Map() },
     consentimientos: new Set((await q('SELECT DISTINCT paciente_id, tipo FROM consentimientos')).map((c) => `${c.paciente_id}:${c.tipo}`)),
-    citasImportadas: new Map((await q('SELECT id, flowww_id, inicio, estado FROM citas WHERE flowww_id IS NOT NULL')).map((c) => [c.flowww_id, c])),
+    citasImportadas: new Map((await q('SELECT id, flowww_id, paciente_id, tratamiento_id, inicio, estado FROM citas WHERE flowww_id IS NOT NULL')).map((c) => [c.flowww_id, c])),
   };
   // Los anonimizados (derecho de supresión) también: su código y su teléfono no se pueden repetir, y
   // a ellos no se les vuelve a traer.
@@ -186,12 +189,14 @@ function pacienteDeCita(ctx, c) {
     if (bd) return { bd, via: 'email' };
   }
   if (!c.nombre) return { falta: 'no se sabe de quién es' };
+  // Por el nombre, en el fichero y en la app, sin contar dos veces a quien está en los dos (el que se
+  // importó la vez anterior): si hay más de uno, no se sabe de quién es.
   const k = F.clave(`${c.nombre} ${c.apellidos || ''}`);
-  const homonimos = [...new Set((i.nombre.get(k) || []).filter(vale).map(raiz))];
-  const enBd = ref.pacientes.porNombre.get(k) || [];
-  if (homonimos.length + enBd.length > 1) return { falta: 'hay varios pacientes con ese nombre' };
-  if (homonimos.length) return { entrada: homonimos[0], via: 'nombre' };
-  if (enBd.length) return { bd: enBd[0], via: 'nombre' };
+  const quienes = new Map();
+  for (const e of (i.nombre.get(k) || []).filter(vale).map(raiz)) quienes.set(e.pacienteId ? `bd:${e.pacienteId}` : e, { entrada: e });
+  for (const p of ref.pacientes.porNombre.get(k) || []) if (!quienes.has(`bd:${p.id}`)) quienes.set(`bd:${p.id}`, { bd: p });
+  if (quienes.size > 1) return { falta: 'hay varios pacientes con ese nombre' };
+  if (quienes.size === 1) return { ...[...quienes.values()][0], via: 'nombre' };
   const e = {
     origen: 'citas', fila: c.fila, flowwwId: c.pacienteRef || F.huella('p', [c.nombre, c.apellidos, null, c.telefono, c.email]), sinCodigo: !c.pacienteRef,
     nombre: c.nombre, apellidos: c.apellidos, telefono: c.telefono, email: c.email, fechaNacimiento: null, notas: null,
@@ -230,12 +235,15 @@ async function diaDe(ctx, fecha) {
 // ese tratamiento), en otra de las del tratamiento. Si no cabe, entra igual donde la tenía Flowww.
 async function colocar(ctx, e) {
   const t = ctx.ref.tratamientos.get(e.tratamientoId);
+  // Si en la app ese tratamiento no pide a nadie en concreto pero Flowww lo tenía con alguien, se
+  // respeta: se queda con esa persona, que tiene que estar libre.
+  const tm = e.profesionalId && !t.motor.rol && !t.motor.profesionalesPermitidos.length ? { ...t.motor, profesionalesPermitidos: [e.profesionalId] } : t.motor;
   const { dia, ocupacion } = await diaDe(ctx, e.fecha);
   const minuto = T.minutosDe(e.hora);
-  const permitidas = C.salasDelTratamiento(dia, t.motor).map((s) => s.id);
+  const permitidas = C.salasDelTratamiento(dia, tm).map((s) => s.id);
   e.salaAjena = Boolean(e.salaId && !permitidas.includes(e.salaId));
-  let hueco = e.salaId && !e.salaAjena ? C.huecoExacto(dia, t.motor, minuto, { profesionalId: e.profesionalId, salaId: e.salaId }) : null;
-  hueco ||= C.huecoExacto(dia, t.motor, minuto, { profesionalId: e.profesionalId });
+  let hueco = e.salaId && !e.salaAjena ? C.huecoExacto(dia, tm, minuto, { profesionalId: e.profesionalId, salaId: e.salaId }) : null;
+  hueco ||= C.huecoExacto(dia, tm, minuto, { profesionalId: e.profesionalId });
   if (hueco) {
     e.colocacion = { cabe: true, salaId: hueco.salaId, profesionalId: hueco.profesionalId, equipoId: hueco.equipoId, otraSala: Boolean(e.salaId && hueco.salaId !== e.salaId) };
   } else {
@@ -244,13 +252,32 @@ async function colocar(ctx, e) {
     const abierta = (id) => id && dia.salas.some((s) => s.id === id);
     e.colocacion = {
       cabe: false,
-      motivo: C.porQueNoCabe(dia, t.motor, minuto, { profesionalId: e.profesionalId }, ocupacion, ctx.nombres),
+      motivo: C.porQueNoCabe(dia, tm, minuto, { profesionalId: e.profesionalId }, ocupacion, ctx.nombres),
       salaId: [e.salaId, ...permitidas, ctx.ref.salasActivas[0]?.id].find(abierta) || e.salaId || ctx.ref.salasActivas[0]?.id || null,
       profesionalId: e.profesionalId || null,
       equipoId: null,
     };
   }
-  C.ocupar(dia, ocupacion, t.motor, minuto, e.colocacion, `otra cita de las ${e.hora} (la fila ${e.fila} de las citas)`);
+  C.ocupar(dia, ocupacion, tm, minuto, e.colocacion, `otra cita de las ${e.hora} (la fila ${e.fila} de las citas)`);
+}
+
+// Sin código de cita, una que se ha movido en Flowww desde la importación anterior parece otra: si el
+// paciente ya tiene una importada sin código, de ese tratamiento y que no viene en este fichero,
+// puede ser la misma. Se trae igual, para revisar (y anular la que sobre).
+function posiblesMovidas(ctx, futuras) {
+  const { plan, ref } = ctx;
+  const enFichero = new Set(plan.citas.map((x) => x.flowwwId).filter(Boolean));
+  const sinCodigo = new Map();
+  for (const c of ref.citasImportadas.values()) {
+    if (c.flowww_id.startsWith('c:') && !enFichero.has(c.flowww_id) && c.estado === 'confirmada' && new Date(c.inicio) > plan.ahora) {
+      lista(sinCodigo, `${c.paciente_id}:${c.tratamiento_id}`).push(c);
+    }
+  }
+  for (const e of futuras.filter((x) => x.sinCodigo)) {
+    const pacienteId = e.paciente.entrada?.pacienteId || e.paciente.bd?.id;
+    const antes = pacienteId && sinCodigo.get(`${pacienteId}:${e.tratamientoId}`)?.[0];
+    if (antes) e.revisar = `puede ser la cita ${antes.id}, importada antes para el ${T.partesMadrid(new Date(antes.inicio)).fecha.split('-').reverse().join('/')} a las ${T.partesMadrid(new Date(antes.inicio)).hora} y movida en Flowww: anular la que sobre`;
+  }
 }
 
 // Cuenta las citas de cada servicio, profesional, cabina o estado de Flowww; lo de casarlo, una vez.
@@ -312,6 +339,7 @@ async function planificarCitas(ctx, fichero) {
   // Se colocan por orden de hora: si dos chocan, la primera se queda el sitio.
   const futuras = plan.citas.filter((e) => e.clase === 'futura').sort((a, b) => a.inicio - b.inicio || a.fila - b.fila);
   for (const e of futuras) await colocar(ctx, e);
+  posiblesMovidas(ctx, futuras);
 }
 
 // Lo que impide aplicar: columnas que faltan, un mapa mal hecho y, en las citas que se traen, un
@@ -372,14 +400,14 @@ async function planificar(con, { pacientes, citas, mapa, ahora, aplicar, sinReco
 }
 
 // ── Escribir ────────────────────────────────────────────────────────────────────────────────
-function tituloTarea(e, plan) {
+function tituloTarea(e, plan, motivo) {
   const d = T.partesMadrid(e.inicio);
-  return `Cita importada de Flowww que no cabe en la agenda (${d.fecha.slice(8)}/${d.fecha.slice(5, 7)} ${d.hora}, ${plan.nombres.tratamiento(e.tratamientoId)}): ${e.colocacion.motivo}. Revisarla`.slice(0, 200);
+  return `Cita importada de Flowww para revisar (${d.fecha.slice(8)}/${d.fecha.slice(5, 7)} ${d.hora}, ${plan.nombres.tratamiento(e.tratamientoId)}): ${motivo}`.slice(0, 200);
 }
 
 async function escribir(con, ctx, { ahora, actor, sinRecordatorios }) {
   const { plan, ref } = ctx;
-  const hecho = { pacientesNuevos: [], vinculados: [], telefonos: [], consentimientos: [], bajas: [], citas: [], revisar: [], tareas: [], inscripciones: [], mapeos: [] };
+  const hecho = { pacientesNuevos: [], vinculados: [], telefonos: [], consentimientos: [], bajas: [], listaBajas: [], citas: [], revisar: [], tareas: [], inscripciones: [], mapeos: [] };
   const segundo = aSegundos(ahora);
   for (const e of plan.pacientes) {
     if (e.accion === 'nuevo') {
@@ -397,8 +425,11 @@ async function escribir(con, ctx, { ahora, actor, sinRecordatorios }) {
       }
       if (e.completarTelefono) {
         const [r] = await con.query('UPDATE pacientes SET telefono = ? WHERE id = ? AND telefono IS NULL', [e.completarTelefono, e.pacienteId]);
-        // En el lote, su huella y no el número: los eventos no van cifrados.
-        if (r.affectedRows) hecho.telefonos.push({ id: e.pacienteId, huella: crypto.createHash('sha256').update(e.completarTelefono).digest('hex') });
+        if (r.affectedRows) {
+          // En el lote (para deshacerlo solo si sigue siendo ese), cifrado: los eventos van en claro.
+          const c = cifrar(e.completarTelefono);
+          hecho.telefonos.push({ id: e.pacienteId, cifrado: c.cifrado.toString('base64'), iv: c.iv.toString('base64'), tag: c.tag.toString('base64') });
+        }
       }
     }
   }
@@ -409,10 +440,17 @@ async function escribir(con, ctx, { ahora, actor, sinRecordatorios }) {
         [e.pacienteId, c.tipo, c.otorgado ? 'otorgado' : 'revocado', `Flowww, ${plan.ficheros.pacientes.nombre} fila ${e.fila}: «${c.columna}» = «${c.valor}»`.slice(0, 500), ahora, actor]);
       hecho.consentimientos.push(r.insertId);
       // Un «no» a los mensajes comerciales por WhatsApp es una baja comercial, como la que se pide
-      // por WhatsApp: ni secuencias ni la excepción de «cliente con servicio similar».
+      // por WhatsApp: ni secuencias ni la excepción de «cliente con servicio similar». En su ficha y,
+      // como todas las bajas, en la lista por teléfono (servidor/bajas.js). Lo que tuviera en marcha
+      // lo paran las comprobaciones de siempre (el permiso comercial) cuando vaya a salir.
       if (!c.otorgado && c.tipo === 'whatsapp_marketing') {
         const [b] = await con.query('UPDATE pacientes SET baja_comercial_en = ? WHERE id = ? AND baja_comercial_en IS NULL', [segundo, e.pacienteId]);
         if (b.affectedRows) hecho.bajas.push(e.pacienteId);
+        const [[p]] = await con.query('SELECT telefono, EXISTS (SELECT 1 FROM bajas_comerciales b WHERE b.telefono = pacientes.telefono) AS enLista FROM pacientes WHERE id = ?', [e.pacienteId]);
+        if (p.telefono && !Number(p.enLista)) {
+          await apuntarBaja(con, { telefono: p.telefono, fuente: 'flowww', pacienteId: e.pacienteId, ahora: segundo });
+          hecho.listaBajas.push(e.pacienteId);
+        }
       }
     }
   }
@@ -420,6 +458,7 @@ async function escribir(con, ctx, { ahora, actor, sinRecordatorios }) {
   for (const e of plan.citas.filter((x) => x.clase === 'futura')) {
     const t = ref.tratamientos.get(e.tratamientoId);
     const col = e.colocacion;
+    const revisar = col.cabe ? e.revisar || null : col.motivo;
     const pacienteId = e.paciente.entrada ? e.paciente.entrada.pacienteId : e.paciente.bd.id;
     const inst = huecoAInstantes(e.fecha, { inicio: T.minutosDe(e.hora) }, t.motor);
     const [r] = await con.query(
@@ -427,25 +466,30 @@ async function escribir(con, ctx, { ahora, actor, sinRecordatorios }) {
          estado, origen, flowww_id, revisar_motivo, recordatorios, token, notas, creada_por, confirmada_en, creado_en)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmada', 'importacion', ?, ?, ?, ?, ?, ?, ?, ?)`,
       [pacienteId, e.tratamientoId, col.profesionalId, col.salaId, col.equipoId, inst.inicio, inst.fin, inst.sala_desde, inst.sala_hasta,
-        inst.prof_desde, inst.prof_hasta, e.flowwwId, col.cabe ? null : col.motivo.slice(0, 255), !sinRecordatorios,
+        inst.prof_desde, inst.prof_hasta, e.flowwwId, revisar?.slice(0, 255) || null, !sinRecordatorios,
         crypto.randomBytes(32).toString('base64url'), e.notas ? `Flowww: ${e.notas}`.slice(0, 600) : null, actor, ahora, ahora]);
     e.citaId = r.insertId;
     hecho.citas.push(r.insertId);
     conCita.add(pacienteId);
     await registrar(con, {
       tipo: 'cita_importada', entidad: 'cita', entidadId: r.insertId, actor,
-      datos: { lote: plan.lote, fecha: e.fecha, hora: e.hora, tratamiento: e.tratamientoId, profesional: col.profesionalId, sala: col.salaId, ...(col.cabe ? {} : { revisar: col.motivo }) },
+      datos: { lote: plan.lote, fecha: e.fecha, hora: e.hora, tratamiento: e.tratamientoId, profesional: col.profesionalId, sala: col.salaId, ...(revisar ? { revisar } : {}) },
     });
-    if (!col.cabe) {
+    if (revisar) {
       hecho.revisar.push(r.insertId);
       const [tr] = await con.query("INSERT INTO tareas (tipo, titulo, paciente_id, urgente, vence_en) VALUES ('otro', ?, ?, ?, ?)",
-        [tituloTarea(e, plan), pacienteId, e.inicio - ahora < 48 * 3600000, new Date(Math.min(ahora.getTime() + 86400000, e.inicio.getTime()))]);
-      hecho.tareas.push(tr.insertId);
+        [tituloTarea(e, plan, revisar), pacienteId, e.inicio - ahora < 48 * 3600000, new Date(Math.min(ahora.getTime() + 86400000, e.inicio.getTime()))]);
+      hecho.tareas.push({ id: tr.insertId, cita: r.insertId });
     }
   }
-  // Con cita, se acaban sus secuencias de captación (como al reservar).
+  // Con cita, se acaban sus secuencias de captación, como al reservar: las suyas y las de los leads
+  // con su teléfono (una persona con cita no es un lead al que perseguir).
   for (const pacienteId of conCita) {
-    const [ins] = await con.query("SELECT id, estado FROM inscripciones WHERE paciente_id = ? AND estado IN ('activa','pausada') AND secuencia IN (?) FOR UPDATE", [pacienteId, SECUENCIAS_CAPTACION]);
+    const [ins] = await con.query(
+      `SELECT id, estado FROM inscripciones WHERE estado IN ('activa','pausada') AND secuencia IN (?)
+          AND (paciente_id = ? OR lead_id IN (SELECT l.id FROM leads l JOIN pacientes p ON p.id = ?
+                                               WHERE l.paciente_id = p.id OR (p.telefono IS NOT NULL AND l.telefono = p.telefono))) FOR UPDATE`,
+      [SECUENCIAS_CAPTACION, pacienteId, pacienteId]);
     if (!ins.length) continue;
     await con.query("UPDATE inscripciones SET estado = 'terminada', motivo_fin = 'cita' WHERE id IN (?)", [ins.map((i) => i.id)]);
     hecho.inscripciones.push(...ins.map((i) => ({ id: i.id, estado: i.estado, paciente: pacienteId })));
@@ -469,26 +513,41 @@ function nuevoLote(ahora) {
   return `flowww-${p.fecha}-${p.hora.replace(':', '')}-${crypto.randomBytes(2).toString('hex')}`;
 }
 
+// Cómo están las citas y los pacientes: si alguien da una cita (o un paciente) o cambia una, cambia.
+async function huellaAgenda(con) {
+  const [[r]] = await con.query(
+    `SELECT (SELECT CONCAT(COUNT(*), '|', COALESCE(MAX(id), 0), '|', COALESCE(MAX(actualizado_en), '')) FROM citas) AS citas,
+            (SELECT CONCAT(COUNT(*), '|', COALESCE(MAX(id), 0), '|', COALESCE(MAX(actualizado_en), '')) FROM pacientes) AS pacientes`);
+  return `${r.citas}/${r.pacientes}`;
+}
+
 /**
  * Importa (o ensaya) los ficheros de Flowww.
  * @param {object} o pacientes, citas: { nombre, contenido: Buffer } (al menos uno); mapa (el JSON ya
- *   leído, o null); aplicar; sinRecordatorios; ahora; actor
+ *   leído, o null); aplicar; sinRecordatorios; ahora; actor; trasPlanificar (para las pruebas: lo que
+ *   pasa en la app mientras se planifica)
  * @returns {{ plan, aplicado, lote, informe }}
  */
-async function importar(pool, { pacientes = null, citas = null, mapa = null, aplicar = false, sinRecordatorios = false, ahora = new Date(), actor = ACTOR } = {}) {
+async function importar(pool, { pacientes = null, citas = null, mapa = null, aplicar = false, sinRecordatorios = false, ahora = new Date(), actor = ACTOR, trasPlanificar = null } = {}) {
   if (!pacientes && !citas) throw new ErrorImportacion('Hace falta el fichero de pacientes, el de citas o los dos');
+  const datos = { pacientes, citas, mapa, ahora, aplicar, sinRecordatorios };
   const con = await pool.getConnection();
   try {
     await con.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
     await con.beginTransaction();
-    // Como una reserva (y en el mismo orden que agenda.reservar, para no interbloquearse): mientras se
-    // colocan estas citas, nadie puede dar otra en esas cabinas, con esos profesionales o aparatos.
-    if (aplicar) {
+    const antes = await huellaAgenda(con);
+    let ctx = await planificar(con, datos);
+    if (trasPlanificar) await trasPlanificar();
+    if (aplicar && !ctx.plan.bloqueos.length) {
+      // Planificar lleva su rato y se hace sin bloquear la agenda. Para escribir, sí: como una reserva (y
+      // en el mismo orden que agenda.reservar, para no interbloquearse), nadie puede dar otra cita en
+      // esas cabinas, con esos profesionales o aparatos. Si mientras se planificaba alguien ha dado o
+      // cambiado una cita (o un paciente), se vuelve a planificar, ya con todo bloqueado.
       await con.query('SELECT id FROM salas ORDER BY id FOR UPDATE');
       await con.query('SELECT id FROM profesionales ORDER BY id FOR UPDATE');
       await con.query('SELECT id FROM equipos ORDER BY id FOR UPDATE');
+      if (await huellaAgenda(con) !== antes) ctx = await planificar(con, datos);
     }
-    const ctx = await planificar(con, { pacientes, citas, mapa, ahora, aplicar, sinRecordatorios });
     const { plan } = ctx;
     if (!aplicar || plan.bloqueos.length) {
       await con.rollback();
@@ -518,11 +577,12 @@ async function tieneActividad(con, pacienteId) {
 
 /**
  * Quita lo que metió una importación (la última sin deshacer, o la del lote que se diga) y nadie ha
- * tocado: sus citas que siguen «confirmadas» (las que ya cambiaron de estado se quedan), sus tareas
- * abiertas, los consentimientos y bajas que registró, el código de Flowww y el teléfono que apuntó a
- * quien ya estaba, los pacientes nuevos que no tengan nada más en la app, lo que guardó del mapa y
- * las secuencias que paró (salvo a quien le quede una cita). Sin aplicar, lo hace en una transacción
- * que deshace al final: cuenta lo que haría sin cambiar nada.
+ * tocado: sus citas que siguen «confirmadas» sin que se le haya avisado al paciente (las que ya
+ * cambiaron de estado o tienen recordatorio se quedan) y sus tareas abiertas, los consentimientos y
+ * bajas que registró, el código de Flowww y el teléfono que apuntó a quien ya estaba, los pacientes
+ * nuevos que no tengan nada más en la app, lo que guardó del mapa y las secuencias que paró (salvo a
+ * quien tenga una cita por delante). Sin aplicar, lo hace en una transacción que deshace al final:
+ * cuenta lo que haría sin cambiar nada.
  */
 async function deshacer(pool, { lote = null, aplicar = false, ahora = new Date(), actor = ACTOR } = {}) {
   const con = await pool.getConnection();
@@ -534,28 +594,39 @@ async function deshacer(pool, { lote = null, aplicar = false, ahora = new Date()
     const ev = lote ? evs.find((x) => x.entidad_id === lote) : evs.find((x) => !deshechos.has(x.entidad_id));
     if (!ev) throw new ErrorImportacion(lote ? `No hay ninguna importación de Flowww «${lote}»` : 'No hay ninguna importación de Flowww que deshacer');
     if (deshechos.has(ev.entidad_id)) throw new ErrorImportacion(`La importación ${ev.entidad_id} ya se deshizo`);
-    const d = { pacientesNuevos: [], vinculados: [], telefonos: [], consentimientos: [], bajas: [], citas: [], tareas: [], inscripciones: [], mapeos: [], ...parsear(ev.datos) };
+    const d = { pacientesNuevos: [], vinculados: [], telefonos: [], consentimientos: [], bajas: [], listaBajas: [], citas: [], tareas: [], inscripciones: [], mapeos: [], ...parsear(ev.datos) };
     const r = {
       lote: ev.entidad_id, aplicado: aplicar, citasQuitadas: 0, citasQuedan: [], pacientesQuitados: 0, pacientesQuedan: [], vinculados: 0, telefonos: 0,
       consentimientos: 0, bajas: 0, tareas: 0, mapeos: 0, secuencias: 0,
     };
-    const [citas] = d.citas.length ? await con.query('SELECT id, estado, paciente_id FROM citas WHERE id IN (?) FOR UPDATE', [d.citas]) : [[]];
-    const quitar = citas.filter((c) => c.estado === 'confirmada').map((c) => c.id);
-    const quedan = citas.filter((c) => c.estado !== 'confirmada');
-    r.citasQuedan = quedan.map((c) => ({ id: c.id, estado: c.estado }));
+    // Se quedan las citas que ya han cambiado de estado y las que ya se le han avisado al paciente (va
+    // a venir): con su tarea, si tenían.
+    const [citas] = d.citas.length ? await con.query('SELECT id, estado, paciente_id, aviso_24h_en, aviso_2h_en FROM citas WHERE id IN (?) FOR UPDATE', [d.citas]) : [[]];
+    const avisada = (c) => Boolean(c.aviso_24h_en || c.aviso_2h_en);
+    const quitar = citas.filter((c) => c.estado === 'confirmada' && !avisada(c)).map((c) => c.id);
+    const quedan = citas.filter((c) => !quitar.includes(c.id));
+    r.citasQuedan = quedan.map((c) => ({ id: c.id, estado: c.estado === 'confirmada' ? 'avisada' : c.estado }));
     const hechas = async (sql, p) => (await con.query(sql, p))[0].affectedRows;
     if (quitar.length) r.citasQuitadas = await hechas('DELETE FROM citas WHERE id IN (?)', [quitar]);
-    if (d.tareas.length) r.tareas = await hechas("DELETE FROM tareas WHERE id IN (?) AND estado = 'abierta'", [d.tareas]);
-    // La secuencia que paró su cita vuelve, salvo que le quede una cita importada (ya tocada).
+    const tareas = d.tareas.filter((t) => quitar.includes(t.cita)).map((t) => t.id);
+    if (tareas.length) r.tareas = await hechas("DELETE FROM tareas WHERE id IN (?) AND estado = 'abierta'", [tareas]);
+    // La secuencia que paró su cita vuelve, salvo que el paciente tenga otra cita por delante o le quede
+    // una de las importadas.
     const conCita = new Set(quedan.map((c) => c.paciente_id));
     for (const i of d.inscripciones.filter((x) => !conCita.has(x.paciente))) {
+      const [[otra]] = await con.query("SELECT id FROM citas WHERE paciente_id = ? AND inicio > ? AND estado IN ('retenida','confirmada') LIMIT 1", [i.paciente, ahora]);
+      if (otra) continue;
       r.secuencias += await hechas("UPDATE inscripciones SET estado = ?, motivo_fin = NULL WHERE id = ? AND estado = 'terminada' AND motivo_fin = 'cita'", [i.estado, i.id]);
     }
     if (d.consentimientos.length) r.consentimientos = await hechas('DELETE FROM consentimientos WHERE id IN (?)', [d.consentimientos]);
     if (d.bajas.length) r.bajas = await hechas('UPDATE pacientes SET baja_comercial_en = NULL WHERE id IN (?) AND baja_comercial_en = ?', [d.bajas, new Date(d.ahora)]);
+    if (d.listaBajas.length) await hechas("DELETE FROM bajas_comerciales WHERE paciente_id IN (?) AND fuente = 'flowww'", [d.listaBajas]);
     for (const v of d.vinculados) r.vinculados += await hechas('UPDATE pacientes SET flowww_id = NULL WHERE id = ? AND flowww_id = ?', [v.id, v.flowwwId]);
     // El teléfono que se le puso, si sigue siendo ese.
-    for (const v of d.telefonos) r.telefonos += await hechas('UPDATE pacientes SET telefono = NULL WHERE id = ? AND SHA2(telefono, 256) = ?', [v.id, v.huella]);
+    for (const v of d.telefonos) {
+      const puesto = descifrar(...[v.cifrado, v.iv, v.tag].map((x) => Buffer.from(x, 'base64')));
+      r.telefonos += await hechas('UPDATE pacientes SET telefono = NULL WHERE id = ? AND telefono = ?', [v.id, puesto]);
+    }
     for (const id of d.pacientesNuevos) {
       let borrado = false;
       if (!(await tieneActividad(con, id))) {

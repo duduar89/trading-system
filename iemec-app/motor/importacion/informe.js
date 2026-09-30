@@ -127,7 +127,7 @@ function citas(t, plan) {
     const caben = futuras.filter((e) => e.colocacion.cabe);
     const otraSala = caben.filter((e) => e.colocacion.otraSala);
     const noCaben = futuras.filter((e) => !e.colocacion.cabe);
-    t.linea(`${plural(caben.length - otraSala.length, 'cabe', 'caben')} en la agenda tal cual`, 2);
+    t.linea(`${plural(caben.filter((e) => !e.colocacion.otraSala && !e.revisar).length, 'cabe', 'caben')} en la agenda tal cual`, 2);
     if (otraSala.length) {
       t.linea(`${plural(otraSala.length, 'cabe', 'caben')} en otra cabina:`, 2);
       t.detalle(otraSala.map((e) => `${cita(e)}: en Flowww, «${e.sala}»${e.salaAjena ? ', que no es de este tratamiento' : ', ocupada'} → ${plan.nombres.sala(e.colocacion.salaId)}`));
@@ -135,6 +135,11 @@ function citas(t, plan) {
     if (noCaben.length) {
       t.linea(`${plural(noCaben.length, 'no cabe', 'no caben')}: se ${noCaben.length === 1 ? 'trae' : 'traen'} igual, para revisar, con su tarea en el panel:`, 2);
       t.detalle(noCaben.map((e) => `${cita(e)}: ${e.colocacion.motivo}`));
+    }
+    const movidas = caben.filter((e) => e.revisar);
+    if (movidas.length) {
+      t.linea(`${plural(movidas.length, 'puede ser una ya importada', 'pueden ser ya importadas')} y movida${movidas.length === 1 ? '' : 's'} en Flowww (sin código de cita): se ${movidas.length === 1 ? 'trae' : 'traen'} para revisar, con su tarea:`, 2);
+      t.detalle(movidas.map((e) => `${cita(e)}: ${e.revisar}`));
     }
   }
   const fuera = [...de('error'), ...de('sin_paciente').filter((e) => e.falta !== 'es un bloqueo o una nota de agenda')];
@@ -265,7 +270,7 @@ function redactarDeshacer(r) {
   const t = nuevoTexto();
   t.linea(`Deshacer la importación ${r.lote} · ${r.aplicado ? 'HECHO' : 'ENSAYO: no se ha cambiado nada'}`);
   t.linea(`Citas: ${plural(r.citasQuitadas, 'se quita', 'se quitan')}${r.citasQuedan.length
-    ? `; ${plural(r.citasQuedan.length, 'se queda', 'se quedan')} porque ya ${r.citasQuedan.length === 1 ? 'ha' : 'han'} cambiado (${r.citasQuedan.map((c) => `cita ${c.id}: ${c.estado}`).join(', ')})` : ''}`, 1);
+    ? `; ${plural(r.citasQuedan.length, 'se queda', 'se quedan')} porque ya ${r.citasQuedan.length === 1 ? 'ha' : 'han'} cambiado o ya se avisó al paciente (${r.citasQuedan.map((c) => `cita ${c.id}: ${c.estado}`).join(', ')})` : ''}`, 1);
   t.linea(`Pacientes nuevos: ${plural(r.pacientesQuitados, 'se quita', 'se quitan')}${r.pacientesQuedan.length
     ? `; ${plural(r.pacientesQuedan.length, 'se queda', 'se quedan')} porque ya ${r.pacientesQuedan.length === 1 ? 'tiene' : 'tienen'} otras cosas en la app (${r.pacientesQuedan.map((id) => `paciente ${id}`).join(', ')})` : ''}`, 1);
   t.linea(`Pacientes que ya estaban: a ${r.vinculados} se les quita el código de Flowww${r.telefonos ? ` y a ${r.telefonos}, el teléfono que se les puso` : ''}`, 1);

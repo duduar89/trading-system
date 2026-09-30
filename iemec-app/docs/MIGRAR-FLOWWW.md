@@ -164,10 +164,12 @@ importación final (lo de `ignorar`, los profesionales y los estados no se guard
 node scripts/importar-flowww.js --pacientes clientes.csv --citas citas.csv --mapa mapa.json --aplicar
 ```
 
-Todo va en **una transacción**: o entra todo o nada. Mientras dura (unos segundos), las cabinas,
-profesionales y aparatos están bloqueados como en una reserva, así que nadie puede dar una cita a la
-vez (ni la IA por WhatsApp); mejor lanzarlo con la clínica cerrada. Si queda algo por decidir, no
-aplica nada y lo dice (y termina con código 1).
+Todo va en **una transacción**: o entra todo o nada. Primero lo planifica sin bloquear nada; para
+escribir, bloquea las cabinas, profesionales y aparatos como en una reserva (unos segundos: nadie puede
+dar una cita a la vez, ni la IA por WhatsApp, que espera) y, si mientras planificaba alguien ha dado o
+cambiado una cita, lo vuelve a planificar ya bloqueado: nunca deja dos citas en el mismo sitio sin
+avisar. Aun así, mejor lanzarlo con la clínica cerrada. Si queda algo por decidir, no aplica nada y lo
+dice (y termina con código 1).
 
 Qué queda en la app:
 
@@ -177,13 +179,17 @@ Qué queda en la app:
   la app.
 - Consentimientos de marketing solo de quien tenga un «sí» explícito (fuente `importacion`, con la
   fila y la columna como prueba). Un «no» explícito se registra como «revocado» y, si es a WhatsApp,
-  como **baja comercial**. Vacío, «pendiente» o «?» no registran nada. A quien ya estaba en la app y ya
-  tenía un consentimiento de ese tipo no se le toca.
+  como **baja comercial** (en su ficha y en la lista de bajas por teléfono, como las demás). Vacío,
+  «pendiente» o «?» no registran nada. A quien ya estaba en la app y ya tenía un consentimiento de ese
+  tipo no se le toca.
 - Citas con origen `importacion`, estado «confirmada» y su código en `flowww_id`. Las observaciones de
-  la cita, en sus notas. Si el paciente estaba en una secuencia de captación, se para (como al reservar).
+  la cita, en sus notas. Si el paciente (o un lead con su teléfono) estaba en una secuencia de
+  captación, se para, como al reservar.
 - Las que no cabían: en la agenda donde las tenía Flowww, con el motivo en `revisar_motivo` y una tarea
-  en **Tareas**: «Cita importada de Flowww que no cabe en la agenda (15/10 13:00, …): … Revisarla». Hay
-  que moverla o hablar con el paciente.
+  en **Tareas**: «Cita importada de Flowww para revisar (15/10 13:00, …): Cabina facial ocupada por…».
+  Hay que moverla o hablar con el paciente.
+- Si Flowww la tenía con alguien concreto, se queda con esa persona aunque en la app ese tratamiento
+  no pida a nadie en concreto (y esa persona tiene que estar libre).
 - Al final, el **lote** (`flowww-2026-10-13-1000-ab12`): con él se deshace.
 
 **Recordatorios.** Si Flowww sigue encendido unos días y manda sus propios recordatorios, se importa
@@ -200,7 +206,9 @@ Se puede lanzar las veces que haga falta: **lo ya importado no se duplica** (pac
 citas por el suyo). Lo normal es una importación de prueba unos días antes y, el día del apagado, una
 exportación nueva con el mismo mapa: solo entra lo nuevo. El informe avisa de las citas que en Flowww
 se han movido o anulado desde la importación anterior; esas **no se tocan solas** (en la app puede que
-ya se hayan cambiado): se revisan a mano.
+ya se hayan cambiado): se revisan a mano. Sin código de cita, una cita movida parece nueva: si el
+paciente ya tiene una importada de ese tratamiento que ya no viene en el fichero, la nueva se trae
+**para revisar**, con su tarea («puede ser la cita 45… anular la que sobre»).
 
 ## 7. Volver atrás
 
@@ -209,12 +217,14 @@ node scripts/importar-flowww.js --deshacer                       # qué quitarí
 node scripts/importar-flowww.js --deshacer flowww-… --aplicar    # y la quita
 ```
 
-Quita lo que metió ese lote **y nadie ha tocado**: sus citas que siguen «confirmadas», sus tareas
-abiertas, los consentimientos y bajas que registró, el código y el teléfono que apuntó a quien ya
-estaba, lo que guardó del mapa, las secuencias de captación que paró (salvo a quien le quede una de
-esas citas) y los pacientes nuevos **que no tengan nada más** en la app. Lo que ya ha cambiado se
-queda y el informe lo dice: una cita que ya se ha marcado (llegó, no vino, anulada, reprogramada) o un
-paciente que ya ha escrito por WhatsApp o ha recibido un recordatorio (su conversación se conserva).
+Quita lo que metió ese lote **y nadie ha tocado**: sus citas que siguen «confirmadas» y de las que
+no se ha avisado al paciente (con sus tareas), los consentimientos y bajas que registró, el código y
+el teléfono que apuntó a quien ya estaba, lo que guardó del mapa, las secuencias de captación que
+paró (salvo a quien tenga una cita por delante) y los pacientes nuevos **que no tengan nada más** en
+la app. Lo demás se queda y el informe lo dice: una cita que ya se ha marcado (llegó, no vino,
+anulada, reprogramada) o de la que ya le salió un recordatorio (el paciente va a venir: hay que
+resolverla con él), y un paciente que ya ha escrito por WhatsApp o ha recibido un aviso (su
+conversación se conserva).
 
 Si hay que volver a como estaba todo, está la copia del paso 2 (se pierde lo que se haya hecho en la
 app desde entonces): se restaura como en `scripts/probar-restauracion.sh` (que también sabe

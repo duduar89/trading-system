@@ -7,6 +7,7 @@
 // pero sí recordatorios (salvo que se pida lo contrario); y deshacer quita lo que nadie ha tocado.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -46,7 +47,8 @@ async function sembrar(pool) {
     ('limpieza-facial', 'Limpieza facial profunda', 'facial', 60, 10, 'esteticista', 'cabina_estetica', '["Higiene facial"]'),
     ('toxina-tercio', 'Toxina botulínica tercio superior', 'facial', 30, 10, 'medico', 'consulta_medica', '["Bótox tercio superior"]'),
     ('toxina-3-zonas', 'Toxina botulínica 3 zonas', 'facial', 45, 10, 'medico', 'consulta_medica', NULL),
-    ('presoterapia', 'Presoterapia', 'corporal', 45, 10, 'esteticista', 'cabina_estetica', NULL)`);
+    ('presoterapia', 'Presoterapia', 'corporal', 45, 10, 'esteticista', 'cabina_estetica', NULL),
+    ('ritual', 'Ritual relajante', 'corporal', 60, 10, NULL, 'cabina_estetica', NULL)`);
   // La limpieza facial solo en la cabina facial; la presoterapia, solo en la corporal.
   await pool.query("INSERT INTO tratamiento_salas (tratamiento_id, sala_id) VALUES ('limpieza-facial', 1), ('presoterapia', 3)");
   for (const p of BIBLIOTECA) {
@@ -59,8 +61,14 @@ async function sembrar(pool) {
   const [marta] = await pool.query("INSERT INTO pacientes (nombre, apellidos, email, origen) VALUES ('Marta', 'Vidal', 'marta.vidal@ejemplo.invalid', 'recepcion')");
   const [otra] = await pool.query("INSERT INTO pacientes (nombre, telefono) VALUES ('Otra', '+34611000199')");
   const cita = await agenda.reservar(pool, { pacienteId: otra.insertId, tratamientoId: 'limpieza-facial', fecha: '2026-10-15', hora: '12:30', profesionalId: 20, ahora: new Date('2026-10-12T08:00:00Z') });
-  const secuencia = async (nombre, pacienteId) => (await pool.query("INSERT INTO inscripciones (secuencia, paciente_id, inicio, siguiente_en) VALUES (?, ?, '2026-10-01 08:00:00', '2026-10-20 08:00:00')", [nombre, pacienteId]))[0].insertId;
-  return { laura: laura.insertId, marta: marta.insertId, citaOtra: cita.id, inscripcion: await secuencia('dormido', laura.insertId), inscripcionMarta: await secuencia('toca_repetir', marta.insertId) };
+  const secuencia = async (nombre, pacienteId, leadId = null) => (await pool.query(
+    "INSERT INTO inscripciones (secuencia, paciente_id, lead_id, inicio, siguiente_en) VALUES (?, ?, ?, '2026-10-01 08:00:00', '2026-10-20 08:00:00')", [nombre, pacienteId, leadId]))[0].insertId;
+  // Y Julia pidió información por un anuncio (es lead, aún sin ficha): su secuencia la persigue.
+  const [lead] = await pool.query("INSERT INTO leads (telefono, nombre, origen) VALUES ('+34611000701', 'Julia', 'meta_formulario')");
+  return {
+    laura: laura.insertId, marta: marta.insertId, citaOtra: cita.id, inscripcion: await secuencia('dormido', laura.insertId),
+    inscripcionMarta: await secuencia('toca_repetir', marta.insertId), inscripcionLead: await secuencia('lead', null, lead.insertId),
+  };
 }
 
 async function contar(pool) {
@@ -188,6 +196,8 @@ test('importación de Flowww: ensayo, aplicar, repetir, avisos y deshacer', asyn
       assert.match((await permiso((await p('1002')).id)).motivo, /sin consentimiento/, 'importar no da consentimiento');
       assert.match((await permiso(app.laura)).motivo, /baja/);
       assert.match((await permiso((await p('1011')).id)).motivo, /baja/);
+      const [lista] = await pool.query("SELECT telefono, fuente FROM bajas_comerciales ORDER BY telefono");
+      assert.deepEqual(lista.map((b) => ({ ...b })), [{ telefono: '+34611000121', fuente: 'flowww' }, { telefono: '+34611000301', fuente: 'flowww' }], 'y en la lista de bajas, como todas');
 
       // Citas: las futuras, por el motor de agenda; las que no caben, igual, para revisar y con tarea.
       const [citas] = await pool.query("SELECT * FROM citas WHERE origen = 'importacion' ORDER BY flowww_id");
@@ -213,7 +223,7 @@ test('importación de Flowww: ensayo, aplicar, repetir, avisos y deshacer', asyn
       assert.deepEqual([otra.estado, madrid(otra.inicio)], ['confirmada', '2026-10-15 12:30'], 'nada se pisa');
       const [tareas] = await pool.query("SELECT titulo, paciente_id, tipo, estado, vence_en FROM tareas WHERE titulo LIKE 'Cita importada de Flowww%' ORDER BY id");
       assert.equal(tareas.length, 4);
-      assert.equal(tareas[0].titulo, `Cita importada de Flowww que no cabe en la agenda (15/10 13:00, Limpieza facial profunda): ${cita['C-3'].revisar_motivo}. Revisarla`);
+      assert.equal(tareas[0].titulo, `Cita importada de Flowww para revisar (15/10 13:00, Limpieza facial profunda): ${cita['C-3'].revisar_motivo}`);
       assert.deepEqual([tareas[0].paciente_id, tareas[0].tipo, tareas[0].estado], [cita['C-3'].paciente_id, 'otro', 'abierta']);
       assert.equal(tareas[0].vence_en.toISOString(), '2026-10-14T08:00:00.000Z', 'para mañana: antes de la cita');
       // Ocupan la agenda como cualquier otra cita.
@@ -223,8 +233,8 @@ test('importación de Flowww: ensayo, aplicar, repetir, avisos y deshacer', asyn
 
       const [[mapeo]] = await pool.query("SELECT tratamiento_id FROM mapeo_tratamientos WHERE clave = 'flowww:botox 3 zonas'");
       assert.equal(mapeo.tratamiento_id, 'toxina-3-zonas', 'lo del mapa queda guardado para la próxima vez');
-      const [secuencias] = await pool.query('SELECT estado, motivo_fin FROM inscripciones WHERE id IN (?) ORDER BY id', [[app.inscripcion, app.inscripcionMarta]]);
-      assert.deepEqual(secuencias.map((s) => ({ ...s })), Array(2).fill({ estado: 'terminada', motivo_fin: 'cita' }), 'con cita, se acaban sus secuencias');
+      const [secuencias] = await pool.query('SELECT estado, motivo_fin FROM inscripciones WHERE id IN (?) ORDER BY id', [[app.inscripcion, app.inscripcionMarta, app.inscripcionLead]]);
+      assert.deepEqual(secuencias.map((s) => ({ ...s })), Array(3).fill({ estado: 'terminada', motivo_fin: 'cita' }), 'con cita, se acaban sus secuencias (también la del lead con su teléfono)');
       const [eventos] = await pool.query("SELECT datos FROM eventos WHERE tipo = 'importacion_flowww' AND entidad_id = ?", [lote]);
       assert.equal(eventos.length, 1);
       const datosLote = typeof eventos[0].datos === 'string' ? eventos[0].datos : JSON.stringify(eventos[0].datos);
@@ -240,22 +250,29 @@ test('importación de Flowww: ensayo, aplicar, repetir, avisos y deshacer', asyn
       assert.match(r.informe, /12 ya importadas antes: no se tocan/);
       assert.deepEqual(await contar(pool), antes);
 
+      // La exportación del día del apagado: lo nuevo, una cita solo con el nombre de un paciente que ya
+      // se importó (está en el fichero de pacientes y en la app: es uno, no dos) y lo que cambió.
       const nuevo = csv('citas-nuevas.csv', [
         'Nº cita;Cód. cliente;Cliente;Fecha;Hora;Servicio;Empleado;Cabina;Estado',
         'C-20;1006;Mora, Irene;27/10/2026;12:00;Botox 3 zonas;Dra. Médica;Consulta;Confirmada',
         'C-1;1001;Ruiz Soler, Carmen;15/10/2026;11:00;Limpieza facial profunda;Estética Uno;Cabina facial;Confirmada',
         'C-4;1005;Marín, Sergio;15/10/2026;16:00;Limpieza facial profunda;Estética Uno;Cabina facial;Anulada',
+        'C-21;;Marín, Sergio;28/10/2026;16:00;Limpieza facial profunda;Estética Uno;Cabina facial;Confirmada',
       ].join('\n'));
-      const e = await I.importar(pool, { citas: nuevo, ahora: AHORA });
+      const final = { pacientes: ficheros.pacientes, citas: nuevo };
+      const e = await I.importar(pool, { ...final, ahora: AHORA });
       assert.deepEqual(e.plan.bloqueos, []);
       assert.match(e.informe, /«Botox 3 zonas» → Toxina botulínica 3 zonas \(guardado en otra importación\)/);
       assert.match(e.informe, /fila 3 \(Flowww C-1\): en Flowww ha cambiado de hora \(ahora, jue 15\/10\/2026 11:00\); revisar la cita \d+ de la app/);
       assert.match(e.informe, /fila 4 \(Flowww C-4\): en Flowww está anulada; revisar la cita \d+ de la app/);
-      const a = await I.importar(pool, { citas: nuevo, aplicar: true, sinRecordatorios: true, ahora: AHORA });
+      assert.deepEqual(e.plan.citas.find((x) => x.flowwwId === 'C-21').paciente.via, 'nombre');
+      const a = await I.importar(pool, { ...final, aplicar: true, sinRecordatorios: true, ahora: AHORA });
       assert.equal(a.aplicado, true);
       assert.match(a.informe, /ni los recordatorios \(--sin-recordatorios\)/);
       const [[c20]] = await pool.query("SELECT recordatorios, tratamiento_id FROM citas WHERE flowww_id = 'C-20'");
       assert.deepEqual([c20.recordatorios, c20.tratamiento_id], [0, 'toxina-3-zonas']);
+      const [[c21]] = await pool.query("SELECT p.flowww_id FROM citas c JOIN pacientes p ON p.id = c.paciente_id WHERE c.flowww_id = 'C-21'");
+      assert.equal(c21.flowww_id, '1005', 'por el nombre, el Sergio que ya estaba');
       const [[c1]] = await pool.query("SELECT inicio FROM citas WHERE flowww_id = 'C-1'");
       assert.equal(madrid(c1.inicio), '2026-10-15 10:00', 'lo ya importado no se pisa');
     });
@@ -284,47 +301,51 @@ test('importación de Flowww: ensayo, aplicar, repetir, avisos y deshacer', asyn
       const lunes = new Date('2026-10-26T09:05:00Z');
       assert.ok(!(await avisos.pendientes(pool, lunes)).some((a) => a.id === id['C-20']));
       const ensayo = await I.cambiarRecordatorios(pool, { activar: true, ahora: AHORA });
-      assert.deepEqual([ensayo.citas, ensayo.aplicado], [1, false]);
-      assert.match(ensayo.informe, /^Ensayo: 1 cita futura importada de Flowww pasaría/);
+      assert.deepEqual([ensayo.citas, ensayo.aplicado], [2, false]);
+      assert.match(ensayo.informe, /^Ensayo: 2 citas futuras importadas de Flowww pasarían a tener recordatorios/);
       const hecho = await I.cambiarRecordatorios(pool, { activar: true, aplicar: true, ahora: AHORA });
-      assert.deepEqual([hecho.citas, hecho.aplicado], [1, true]);
+      assert.deepEqual([hecho.citas, hecho.aplicado], [2, true]);
       assert.ok((await avisos.pendientes(pool, lunes)).some((a) => a.id === id['C-20'] && a.tipo === 'vispera'));
     });
 
-    await t.test('deshacer quita lo importado que nadie ha tocado; lo tocado se queda', async () => {
+    await t.test('deshacer quita lo importado que nadie ha tocado; lo tocado y lo ya avisado se queda', async () => {
       const antes = await contar(pool);
       const ensayo = await I.deshacer(pool, { ahora: AHORA });
       assert.match(ensayo.informe, /ENSAYO: no se ha cambiado nada/);
-      assert.equal(ensayo.citasQuitadas, 1, 'la última importación: la de C-20');
+      assert.equal(ensayo.citasQuitadas, 2, 'la última importación: la de C-20 y C-21');
       assert.deepEqual(await contar(pool), antes);
       await I.deshacer(pool, { aplicar: true, ahora: AHORA });
-      assert.equal((await pool.query("SELECT id FROM citas WHERE flowww_id = 'C-20'"))[0].length, 0);
+      assert.equal((await pool.query("SELECT id FROM citas WHERE flowww_id IN ('C-20', 'C-21')"))[0].length, 0);
 
-      // Recepción ya ha anulado dos de las del primer lote: esas se quedan, y sus pacientes también. Y
-      // quien ya ha recibido la víspera tiene su conversación en la app: tampoco se borra.
+      // Del primer lote, recepción ya ha anulado dos, y a las del jueves ya les salió la víspera: esas
+      // se quedan (con su tarea, si tenían), y sus pacientes también. Quien ya ha recibido un aviso
+      // tiene su conversación en la app: tampoco se borra.
       await pool.query("UPDATE citas SET estado = 'cancelada' WHERE flowww_id IN ('C-4', 'C-6')");
       const [conConversacion] = await pool.query("SELECT DISTINCT p.flowww_id FROM conversaciones c JOIN pacientes p ON p.id = c.paciente_id WHERE p.origen = 'flowww' ORDER BY p.flowww_id");
       assert.deepEqual(conConversacion.map((x) => x.flowww_id), ['1001', '1005', '1010']);
       const d = await I.deshacer(pool, { lote, aplicar: true, ahora: AHORA });
-      assert.equal(d.citasQuitadas, 10);
-      assert.deepEqual(d.citasQuedan.map((c) => c.estado), ['cancelada', 'cancelada']);
-      assert.equal(d.pacientesQuitados, 6);
-      assert.deepEqual([d.vinculados, d.telefonos, d.consentimientos, d.bajas, d.tareas, d.mapeos, d.secuencias], [2, 1, 8, 2, 4, 1, 1]);
+      assert.equal(d.citasQuitadas, 6);
+      assert.deepEqual(d.citasQuedan.map((c) => c.estado).sort(), ['avisada', 'avisada', 'avisada', 'avisada', 'cancelada', 'cancelada']);
+      assert.equal(d.pacientesQuitados, 5);
+      assert.deepEqual([d.vinculados, d.telefonos, d.consentimientos, d.bajas, d.tareas, d.mapeos, d.secuencias], [2, 1, 8, 2, 2, 1, 1]);
+      assert.match(d.informe, /Citas: 6 se quitan; 6 se quedan porque ya han cambiado o ya se avisó al paciente \(cita \d+: avisada, /);
+      assert.match(d.informe, /Pacientes nuevos: 5 se quitan; 4 se quedan porque ya tienen otras cosas en la app/);
+      const [quedan] = await pool.query("SELECT flowww_id FROM pacientes WHERE origen = 'flowww' ORDER BY flowww_id");
+      assert.deepEqual(quedan.map((x) => x.flowww_id), ['1001', '1002', '1005', '1010']);
+      const [[revisar]] = await pool.query("SELECT COUNT(*) AS n FROM tareas WHERE titulo LIKE 'Cita importada de Flowww%' AND estado = 'abierta'");
+      assert.equal(revisar.n, 2, 'las tareas de las que se quedan, también');
       const [[marta]] = await pool.query('SELECT flowww_id, telefono FROM pacientes WHERE id = ?', [app.marta]);
       assert.deepEqual({ ...marta }, { flowww_id: null, telefono: null }, 'como estaba');
-      const [[insMarta]] = await pool.query('SELECT estado FROM inscripciones WHERE id = ?', [app.inscripcionMarta]);
-      assert.equal(insMarta.estado, 'terminada', 'le queda una cita importada: su secuencia no vuelve');
-      assert.match(d.informe, /Citas: 10 se quitan; 2 se quedan porque ya han cambiado \(cita \d+: cancelada, cita \d+: cancelada\)/);
-      assert.match(d.informe, /Pacientes nuevos: 6 se quitan; 3 se quedan porque ya tienen otras cosas en la app/);
-      const [quedan] = await pool.query("SELECT flowww_id FROM pacientes WHERE origen = 'flowww' ORDER BY flowww_id");
-      assert.deepEqual(quedan.map((x) => x.flowww_id), ['1001', '1005', '1010']);
-      assert.deepEqual(d.pacientesQuedan.length, 3);
       const [[laura]] = await pool.query('SELECT flowww_id, baja_comercial_en FROM pacientes WHERE id = ?', [app.laura]);
       assert.deepEqual({ ...laura }, { flowww_id: null, baja_comercial_en: null });
-      const [[ins]] = await pool.query('SELECT estado FROM inscripciones WHERE id = ?', [app.inscripcion]);
-      assert.equal(ins.estado, 'activa', 'su secuencia vuelve a como estaba');
+      assert.equal((await pool.query('SELECT COUNT(*) AS n FROM bajas_comerciales'))[0][0].n, 0);
+      // Las secuencias: vuelve la del lead de Julia (ya no tiene cita); la de Laura no (le queda la del
+      // jueves, ya avisada) y la de Marta tampoco (le queda una importada, aunque anulada).
+      const [secuencias] = await pool.query('SELECT id, estado FROM inscripciones WHERE id IN (?)', [[app.inscripcion, app.inscripcionMarta, app.inscripcionLead]]);
+      const estado = Object.fromEntries(secuencias.map((s) => [s.id, s.estado]));
+      assert.deepEqual([estado[app.inscripcionLead], estado[app.inscripcion], estado[app.inscripcionMarta]], ['activa', 'terminada', 'terminada']);
       const despues = await contar(pool);
-      assert.deepEqual([despues.consentimientos, despues.mapeos, despues.tareas], [0, 0, 0]);
+      assert.deepEqual([despues.consentimientos, despues.mapeos], [0, 0]);
       const [[otra]] = await pool.query('SELECT estado FROM citas WHERE id = ?', [app.citaOtra]);
       assert.equal(otra.estado, 'confirmada');
       await assert.rejects(I.deshacer(pool, { lote, aplicar: true, ahora: AHORA }), /ya se deshizo/);
@@ -357,6 +378,80 @@ test('un paciente anonimizado en la app (derecho de supresión) no vuelve a entr
     assert.deepEqual(nuevos.map((x) => x.flowww_id), ['2003']);
     const [importadas] = await pool.query("SELECT COUNT(*) AS n FROM citas WHERE origen = 'importacion'");
     assert.equal(importadas[0].n, 1);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('sin código de cita, una que se mueve en Flowww se trae para revisar (no se duplica callada) y la siguiente vez no se repite', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  try {
+    await sembrar(pool);
+    const cabecera = 'Cód. cliente;Cliente;Fecha;Hora;Servicio;Empleado;Cabina;Estado';
+    const antes = csv('citas.csv', `${cabecera}\n5001;Pinto, Rosa;22/10/2026;11:00;Limpieza facial profunda;Estética Uno;Cabina facial;Confirmada\n`);
+    assert.equal((await I.importar(pool, { citas: antes, aplicar: true, ahora: AHORA })).aplicado, true);
+    const [[primera]] = await pool.query("SELECT id, flowww_id FROM citas WHERE origen = 'importacion'");
+    assert.match(primera.flowww_id, /^c:[0-9a-f]{32}$/, 'sin código: una huella de la cita');
+
+    const movida = csv('citas.csv', `${cabecera}\n5001;Pinto, Rosa;23/10/2026;12:00;Limpieza facial profunda;Estética Uno;Cabina facial;Confirmada\n`);
+    const r = await I.importar(pool, { citas: movida, aplicar: true, ahora: AHORA });
+    assert.match(r.informe, /1 puede ser una ya importada y movida en Flowww \(sin código de cita\): se trae para revisar, con su tarea:/);
+    const [[nueva]] = await pool.query("SELECT id, revisar_motivo FROM citas WHERE origen = 'importacion' AND id <> ?", [primera.id]);
+    assert.equal(nueva.revisar_motivo, `puede ser la cita ${primera.id}, importada antes para el 22/10/2026 a las 11:00 y movida en Flowww: anular la que sobre`);
+    const [[tarea]] = await pool.query('SELECT titulo FROM tareas ORDER BY id DESC LIMIT 1');
+    assert.match(tarea.titulo, /^Cita importada de Flowww para revisar \(23\/10 12:00, Limpieza facial profunda\): puede ser la cita/);
+
+    const otraVez = await I.importar(pool, { citas: movida, aplicar: true, ahora: AHORA });
+    assert.equal(otraVez.lote, null, 'la tercera vez, nada nuevo');
+    const [[n]] = await pool.query("SELECT COUNT(*) AS n FROM citas WHERE origen = 'importacion'");
+    assert.equal(n.n, 2);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('un tratamiento que en la app no pide a nadie respeta el profesional de Flowww, que tiene que estar libre', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  try {
+    await sembrar(pool);
+    const citas = csv('citas.csv', [
+      'Nº cita;Cód. cliente;Cliente;Fecha;Hora;Servicio;Empleado;Cabina;Estado',
+      'R-1;4001;Pinto, Rosa;22/10/2026;11:00;Ritual relajante;Estética Dos;Cabina facial;Confirmada',
+      'R-2;4002;Sanz, Olga;22/10/2026;11:30;Ritual relajante;Estética Dos;Cabina corporal;Confirmada',
+    ].join('\n'));
+    const r = await I.importar(pool, { citas, aplicar: true, ahora: AHORA });
+    assert.equal(r.aplicado, true);
+    const [filas] = await pool.query("SELECT flowww_id, profesional_id, sala_id, revisar_motivo FROM citas WHERE origen = 'importacion' ORDER BY flowww_id");
+    assert.deepEqual(filas.map((x) => ({ ...x })), [
+      { flowww_id: 'R-1', profesional_id: 21, sala_id: 1, revisar_motivo: null },
+      { flowww_id: 'R-2', profesional_id: 21, sala_id: 3, revisar_motivo: 'Estética Dos ya tiene otra cita de las 11:00 (la fila 2 de las citas)' },
+    ]);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('si mientras se planifica alguien da una cita, al bloquear la agenda se vuelve a planificar: no hay dobles', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  try {
+    await sembrar(pool);
+    const citas = csv('citas.csv', 'Nº cita;Cód. cliente;Cliente;Fecha;Hora;Servicio;Empleado;Cabina;Estado\nP-1;6001;Pinto, Rosa;22/10/2026;11:00;Limpieza facial profunda;Estética Uno;Cabina facial;Confirmada\n');
+    // Mientras, recepción da la cabina facial de las 11:00 (jueves 22, 09:00 UTC) a otra paciente.
+    const recepcion = async () => {
+      const [[otra]] = await pool.query("SELECT id FROM pacientes WHERE nombre = 'Otra'");
+      const h = (hhmm) => new Date(`2026-10-22T${hhmm}:00Z`);
+      await pool.query(`INSERT INTO citas (paciente_id, tratamiento_id, profesional_id, sala_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, origen, token)
+        VALUES (?, 'limpieza-facial', 21, 1, ?, ?, ?, ?, ?, ?, 'confirmada', 'recepcion', ?)`,
+      [otra.id, h('09:00'), h('10:00'), h('09:00'), h('10:10'), h('09:00'), h('10:00'), crypto.randomBytes(32).toString('base64url')]);
+    };
+    const r = await I.importar(pool, { citas, aplicar: true, ahora: AHORA, trasPlanificar: recepcion });
+    assert.equal(r.aplicado, true);
+    const [[p1]] = await pool.query("SELECT sala_id, revisar_motivo FROM citas WHERE flowww_id = 'P-1'");
+    assert.equal(p1.sala_id, 1);
+    assert.match(p1.revisar_motivo, /^Cabina facial ocupada por otra cita de las 11:00 \(la cita \d+ de la app\)$/, 'se ve la de recepción y se marca para revisar');
   } finally {
     await pool.end();
   }
