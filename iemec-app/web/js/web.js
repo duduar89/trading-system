@@ -357,6 +357,13 @@
     });
     filtros.hidden = false;
     aplicar(false);
+    // Llegando con ?p=…, el chip elegido se ve aunque su fila se deslice de lado (en el móvil), sin
+    // mover la página.
+    var activo = filtros.querySelector('[data-p][aria-pressed="true"]');
+    var fila = activo && activo.closest('.chips');
+    if (fila && fila.scrollWidth > fila.clientWidth) {
+      fila.scrollLeft += activo.getBoundingClientRect().left - fila.getBoundingClientRect().left - 16;
+    }
   }
 
   // ── Aparición suave de las secciones que aún no se ven ──────────────────────────────────────
