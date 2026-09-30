@@ -5,7 +5,7 @@ import { euros } from '../api.js';
 const ETAPAS = ['nuevo', 'contactado', 'conversando', 'cita', 'asistio', 'vendido', 'perdido'];
 const ETAPA = { nuevo: 'Nuevos', contactado: 'Contactados', conversando: 'Conversando', cita: 'Con cita', asistio: 'Vinieron', vendido: 'Compraron', perdido: 'Perdidos' };
 const ORIGEN = { meta_formulario: 'Meta · formulario', meta_ctwa: 'Meta · clic a WhatsApp', web_whatsapp: 'Web (botón WhatsApp)', ghl: 'GHL', treatwell: 'Treatwell', telefono: 'Teléfono', recepcion: 'Recepción', google: 'Google', referido: 'Recomendación', otro: 'Otros' };
-const CIERRE = { precio: 'Precio', no_interesa: 'No le interesa', competencia: 'Se lo hizo en otro sitio', sin_respuesta: 'No contestó', baja: 'Pidió la baja' };
+const CIERRE = { precio: 'Precio', no_interesa: 'No le interesa', competencia: 'Se lo hizo en otro sitio', sin_respuesta: 'No contestó', baja: 'Pidió la baja', cancelada: 'Canceló su cita', lista_espera: 'En lista de espera' };
 
 export default function Repesca() {
   const { datos: d, error } = useDatos('/panel/repesca', { cadaMs: 60000 });

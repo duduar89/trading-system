@@ -10,6 +10,8 @@ const { semillar } = require('../servidor/semillas');
 const agenda = require('../servidor/agenda');
 const repesca = require('../servidor/repesca/motor');
 const resenas = require('../servidor/resenas');
+const LE = require('../servidor/lista-espera');
+const espera = require('../servidor/avisos-espera');
 const { crearIa } = require('../servidor/integraciones/ia');
 const { crearWhatsApp } = require('../servidor/integraciones/whatsapp');
 const { crearGoogle } = require('../servidor/integraciones/google');
@@ -108,6 +110,20 @@ async function main() {
   }
   await pool.query("INSERT INTO presupuestos (paciente_id, titulo, importe_eur, estado, entregado_en, aceptado_en) VALUES (?, 'Pure Glow Up, 3 sesiones (ejemplo)', 261, 'aceptado', ?, ?)", [pacientes[6], new Date(ahora.getTime() - 9 * 86400000), new Date(ahora.getTime() - 2 * 86400000)]);
   log('presupuestos');
+
+  // Lista de espera: tres pacientes esperan el mismo tratamiento; se cancela una cita y el cron le
+  // guarda el hueco a la primera que encaja (de día, le llega el WhatsApp).
+  const [[libre]] = await pool.query(
+    `SELECT c.id, c.tratamiento_id FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id
+      WHERE c.estado = 'confirmada' AND c.inicio >= ? AND t.reservable_ia ORDER BY c.inicio LIMIT 1`, [T.desdeMadrid(T.sumarDias(hoy, 1), '00:00')]);
+  if (libre) {
+    for (const [k, [pacienteId, franja]] of [[pacientes[4], null], [pacientes[9], 'tarde'], [pacientes[12], null]].entries()) {
+      await LE.apuntar(pool, { pacienteId, tratamientoId: libre.tratamiento_id, desdeFecha: hoy, franja, origen: k === 1 ? 'whatsapp' : 'panel', creadoPor: k === 1 ? 'ia' : 'demo@iemec', ahora: new Date(ahora.getTime() - (5 - k) * 86400000) });
+    }
+    await agenda.cancelar(pool, { id: libre.id, por: 'paciente', motivo: 'no puede venir (ejemplo)', ahora });
+    await espera.vuelta(deps, { ahora });
+  }
+  log('lista de espera');
 
   // Reseñas de ejemplo.
   const google = crearGoogle('simulado', { resenas: [
