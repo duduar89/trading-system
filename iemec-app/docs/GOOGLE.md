@@ -14,6 +14,7 @@ cron de cada minuto (con su propio candado «cron-google»)┘
    ├─ otros avisos (Google cambia la ficha, control de la ficha, foto de un usuario, duplicada) → tarea
    ├─ cada día desde las 7:00: reseñas de la última semana, métricas de 30 días, revisión de la ficha
    ├─ cada semana: todas las reseñas y las búsquedas del mes pasado
+   ├─ lo de la pieza de reseñas que llama a Google (enlace oficial, respuestas del historial)
    └─ cada semana (DataForSEO): 7 × 7 puntos + 4 municipios × 12 búsquedas → puesto en cada punto
 ```
 
@@ -80,6 +81,12 @@ trigger review replies… without the user's prior specific and express consent�
 la API, 30 días como mucho; los cambios que hace Google en la ficha no se deshacen solos (van a una
 tarea); y hay que avisar a la clínica de cualquier cambio que haga la herramienta en su ficha en 48 h.
 
+**Una publicación nunca sale dos veces.** Crear una publicación (`localPosts`) no se puede repetir sin
+más: solo se reintenta tras un 429 o si no se llegó a conectar. Si Google no contesta (tiempo agotado,
+conexión cortada, 5xx), puede que la haya creado: la app mira las publicaciones de la ficha y, si está,
+la da por publicada; si no está, lo dice («se puede volver a aprobar»); si tampoco puede mirarlo, pide
+comprobarlo en Business Profile antes de volver a aprobarla.
+
 ## 2. Avisos al momento (Pub/Sub)
 
 Sin avisos, las reseñas llegan igual con la revisión diaria; con ellos, en segundos.
@@ -117,12 +124,20 @@ y no se toca.
 
 ## 3. Places API (New): solo la ficha de la clínica
 
-Sirve para tener el enlace oficial para reseñar (`writeAReviewUri`) y el aviso de reseñas sospechosas
-(`consumerAlert`) **antes** de que Google apruebe Business Profile, y después para ese aviso. En el EEE,
-con facturación en España y proyecto creado después del 08-07-2025, el contenido de Places solo puede
-usarse para 9 usos permitidos, **ninguno para vigilar a la competencia**, y no puede mostrarse junto a
-un mapa. Por eso el adaptador no deja pedir otro lugar: siempre usa `GOOGLE_PLACE_ID`. La competencia
-se mira con DataForSEO. No se guarda nada de Places en la base.
+Sirve para tener al día el place ID y el aviso de reseñas sospechosas (`consumerAlert`) **antes** de que
+Google apruebe Business Profile, y después para ese aviso. En el EEE, con facturación en España y
+proyecto creado después del 08-07-2025, el contenido de Places solo puede usarse para 9 usos
+permitidos, **ninguno para vigilar a la competencia**, y no puede mostrarse junto a un mapa. Por eso el
+adaptador no deja pedir otro lugar: siempre la ficha de la clínica (el place ID que dio la ficha la
+última vez que se leyó o, si aún no se ha leído, `GOOGLE_PLACE_ID`). La competencia se mira con
+DataForSEO.
+
+**Lo que se guarda de Places: solo el place ID** (sus condiciones lo permiten sin plazo;
+`clinica.google_place_id`). Nada más: ni la nota, ni el aviso (solo crea una tarea), ni sus enlaces.
+Por eso el adaptador no pide `googleMapsLinks`: el `writeAReviewUri` de Places no se puede guardar, y el
+enlace corto de la petición de reseña lo guarda. Sin Business Profile, el enlace para reseñar se hace
+con el place ID; con él, es el `newReviewUri` de la ficha. Leer la ficha por Places pide solo el `id`
+(SKU gratuito, y es la forma que recomienda Google de refrescar un place ID).
 
 1. En el proyecto, habilitar Places API (New) y enlazar una cuenta de facturación (hace falta aunque
    salga gratis).
@@ -131,9 +146,9 @@ se mira con DataForSEO. No se guarda nada de Places en la base.
 3. `GOOGLE_PLACE_ID`: el de la ficha (la semilla trae `ChIJB6Pn5d2FQQ0ReZ4Qoqe8gtg`; con Business
    Profile, `node scripts/google.js ficha` lo confirma).
 
-Con solo Places (sin OAuth), `MODO_GOOGLE=real` ya funciona: `obtenerFicha()` da el place ID y el
-enlace para reseñar, y la revisión diaria mira el aviso de reseñas sospechosas. Lo demás dice que falta
-el acceso a Business Profile.
+Con solo Places (sin OAuth), `MODO_GOOGLE=real` ya funciona: `obtenerFicha()` da el place ID
+(`newReviewUri` es `null`) y la revisión diaria lo tiene al día y mira el aviso de reseñas
+sospechosas. Lo demás dice que falta el acceso a Business Profile.
 
 ## 4. DataForSEO: el puesto en Google Maps alrededor de la clínica
 
@@ -151,9 +166,23 @@ de búsqueda local; se revisan cada mes con las que da la Performance API (`busq
 cola estándar (0,0006 $) en bloques de 100, y cada bloque se apunta en `posiciones_tareas` con su coste
 en cuanto DataForSEO lo acepta: si algo falla a medias, el reintento no paga dos veces. Cada 5 minutos se
 recoge lo que está listo (`tasks_ready` y `task_get/advanced`) en `posiciones_maps`: el puesto de la
-clínica (por su place ID o `GOOGLE_CID`), o NULL si no sale entre los 20 primeros, y quién sale 1.º (su
-nombre, categoría, nota y número de reseñas; nada de reseñas ni de personas). Lo que no llega en 24 h
-queda caducado.
+clínica (por su place ID —vale el de la base y el de `GOOGLE_PLACE_ID`, por si Google lo ha cambiado— o
+por `GOOGLE_CID`), o NULL si no sale entre los 20 primeros o no sale nadie (40102 «No Search Results.»,
+que DataForSEO cobra: cuenta como «no sale»), y quién sale 1.º (su nombre, categoría, nota —NULL si no
+tiene reseñas— y número de reseñas; nada de reseñas ni de personas). Lo que no llega en 24 h queda
+caducado.
+
+**Nada se paga dos veces.** Enviar (`task_post`) se cobra: solo se repite tras un 429 o si no se llegó a
+conectar. Si DataForSEO no contesta (tiempo agotado, conexión cortada, 5xx), puede que haya creado y
+cobrado el bloque: queda en `posiciones_tareas` como `incierta`, con lo que costaría (cuenta para el
+tope), y no se vuelve a enviar (evento `posiciones_inciertas`). Si DataForSEO lo tenía, la recogida lo
+encuentra en `tasks_ready` por su etiqueta (`iemec|pasada|punto|palabra`), le pone su id y lo recoge; si
+no, caduca a las 24 h y esa parte de la semana queda sin medir.
+
+**Una tarea que falla sola no para a las demás.** Si falla una tarea (un 50000 en esa tarea) se apunta
+el error y se sigue; en las recogidas siguientes va la última y, a la tercera, queda `fallida`. Si falla
+la llamada entera (DataForSEO caído, el límite de llamadas, las credenciales), la recogida se para sin
+dar nada por fallido y la cola la repite.
 
 **El tope.** Antes de enviar se suma lo gastado en el mes y solo salen las búsquedas que caben
 **enteras** (todos sus puntos); lo que no cabe queda en un evento `posiciones_tope`. Entre bloque y
@@ -172,16 +201,30 @@ de uso no se han revisado (puerta).
 Todo va por la cola (`cola.encolar` con clave única y `cola.unaVez` para no repetir el día o la
 semana; si algo falla al programar, la marca se quita y la vuelta siguiente lo vuelve a intentar),
 dentro del candado `cron-google` (5 minutos como mucho; se suelta al terminar) y con 20 s por vuelta
-para cada parte, aparte de lo de cada minuto. **Solo en modo real y con credenciales**; con
-`node --test`, nunca se crea un adaptador real a partir del `.env` (una prueba no puede llamar a Google
-aunque el portátil tenga claves).
+para cada parte, aparte de lo de cada minuto. **Solo en modo real y con credenciales.**
+
+**Pruebas sin red.** Con `node --test`, un adaptador real de Google o DataForSEO sin el `fetch` de la
+prueba (respuestas grabadas) no sale a internet: cada llamada falla al momento, sin reintentos, con
+«… con node --test no se sale a internet». Lo mismo el verificador de Pub/Sub con las claves de Google.
+Así ninguna prueba llama a Google ni paga a DataForSEO aunque el `.env` del portátil tenga
+`MODO_GOOGLE=real` y las claves, y la app se puede montar igual en una prueba. El cron, además, con
+`node --test` no se pone en real a partir del `.env`.
+
+**Un solo dueño de lo que se lee de Google.** Las reseñas solo las lee este trabajo (avisos, la semana
+y cada día), con la hora del cron y, en la lectura semanal, avisando a la importación de que es la
+lista completa (`importarResenas(pool, google, { ahora, completa })`). El place ID de la clínica solo
+lo cambia la revisión de la ficha (si Google lo cambia, lo pone y queda una tarea para cambiarlo en
+`GOOGLE_PLACE_ID`, la web y los QR). Lo de la pieza de reseñas que llama a Google (el enlace oficial
+de la ficha y las respuestas aprobadas del historial: `resenas.vueltaGoogle`, cuando exista) va dentro
+de esta misma vuelta, con el mismo adaptador, el candado `cron-google` y el tiempo que quede; si
+falla, lo dice el informe (`google.resenas`) y lo demás sigue.
 
 | Cuándo | Trabajo | Qué hace |
 |---|---|---|
 | Al llegar un aviso | `webhook_google` | Reseña nueva o cambiada → se pide (`reviews.get`) → `importarResenas` (análisis y borrador). Cambios de Google, control de la ficha, foto de un usuario o ficha duplicada → tarea (una por asunto; la del control, urgente) |
 | Cada día desde las 7:00 | `google_resenas` | Las reseñas tocadas en los últimos 8 días (por si se perdió un aviso) |
 | | `google_metricas` | Métricas diarias de los últimos 30 días (hasta ayer): impresiones en Maps y en la Búsqueda (móvil y ordenador), llamadas, clics a la web, rutas, conversaciones y reservas de Google → `metricas_gbp` |
-| | `google_ficha` | La ficha: el place ID al día en `clinica.google_place_id` (evento `google_place_id` si cambia); si la clínica pierde el control o Google ha cambiado datos, tarea; con Places, el aviso de reseñas sospechosas |
+| | `google_ficha` | La ficha: el place ID al día en `clinica.google_place_id` (evento `google_place_id` y tarea si cambia); si la clínica pierde el control o Google ha cambiado datos, tarea; con Places, el aviso de reseñas sospechosas |
 | Cada semana (el primer día desde el lunes a las 7:00) | `google_resenas` | Todas las reseñas |
 | | `google_palabras` | Las búsquedas con las que salió la ficha el mes pasado → `busquedas_gbp` (la lista del mes se sustituye; dos iguales para la base, con y sin tilde, se suman) |
 | Cada semana (`POSICIONES_DIA`) | `posiciones_enviar` y `posiciones_recoger` | La malla de DataForSEO (sección 4) |
@@ -189,10 +232,13 @@ aunque el portátil tenga claves).
 
 Si un trabajo falla, la cola lo reintenta (1, 2, 4, 8… minutos). Si el error no tiene arreglo sin una
 persona (token revocado, permisos, falta de place ID, sin saldo) o es el último intento, queda al
-momento una tarea «Google: no se ha podido…» o «DataForSEO: …» con el error (una por asunto), y la cola
-sigue probando por si se arregla. Una variable de la malla que no vale (`POSICIONES_MALLA` par, un
-centro que no es una coordenada) también deja su tarea. El informe del cron (`~/logs/iemec-cron.log`)
-lleva `google` y `posiciones` cuando están en real; si falta una credencial, lo dice ahí.
+momento una tarea con el error (una por asunto): «Google: no se han podido traer las reseñas (…)», «…
+las métricas», «… las búsquedas del mes», «Google: no se ha podido revisar la ficha (…)», «… atender
+un aviso de la ficha», «DataForSEO: no se ha podido enviar la pasada de posiciones (…)» o «DataForSEO:
+no se han podido recoger las posiciones (…)»; y la cola sigue probando por si se arregla. Una variable
+de la malla que no vale (`POSICIONES_MALLA` par, un centro que no es una coordenada) también deja su
+tarea. El informe del cron (`~/logs/iemec-cron.log`) lleva `google` y `posiciones` cuando están en
+real (y `google.resenas`, lo de la pieza de reseñas); si falta una credencial, lo dice ahí.
 
 ## 6. Lo que se guarda y cuánto
 
@@ -202,12 +248,13 @@ lleva `google` y `posiciones` cuando están en real; si falta una credencial, lo
 | `resenas` | Lo decide la importación de reseñas (la otra pieza): el texto y el autor, 30 días | — |
 | `metricas_gbp` | Métricas diarias | Solo los últimos 30 días; lo anterior se vuelve a pedir a Google si hace falta |
 | `busquedas_gbp` | Búsquedas del mes | Solo el mes pasado |
+| `clinica.google_place_id` | El place ID de la ficha (de Business Profile o de Places: es lo único de Places que se puede guardar) | Sin plazo; la revisión diaria lo tiene al día |
 | `posiciones_tareas`, `posiciones_maps` | Lo de DataForSEO (no es contenido de las APIs de Google) | Sin plazo |
-| Memoria del proceso | El token de acceso de Google (1 hora) y la ficha (12 horas) | Nunca en la base ni en un log |
+| Memoria del proceso | El token de acceso de Google (1 hora) y la ficha (12 horas; de Places, solo el place ID) | Nunca en la base ni en un log |
 
-Del autor de una reseña solo llega su nombre (o nada si es anónima): ni su foto ni las fotos o vídeos
-de la reseña. Los errores dicen el estado y el mensaje de Google, nunca un token ni el texto de una
-reseña.
+Del autor de una reseña solo llega su nombre (o nada si es anónima o no lo tiene: el autor no viene y el
+borrador saluda sin nombre): ni su foto ni las fotos o vídeos de la reseña. Los errores dicen el estado
+y el mensaje de Google, nunca un token ni el texto de una reseña.
 
 ## 7. Variables
 
@@ -221,7 +268,7 @@ En el `.env` del servidor (el cron es otro proceso y solo lee el `.env`; ver
 | `GOOGLE_REFRESH_TOKEN` | El token de refresco de la cuenta gestora (paso 1.7). Van las tres o ninguna | — |
 | `GOOGLE_CUENTA`, `GOOGLE_UBICACION` | La cuenta y la ficha (`accounts/…` y `locations/…`, o solo el número): `node scripts/google.js cuentas` | — |
 | `GOOGLE_PLACES_CLAVE` | La clave de Places API (New), restringida | — |
-| `GOOGLE_PLACE_ID` | El place ID de la ficha, para Places (y para reconocer a la clínica en DataForSEO) | El de la base |
+| `GOOGLE_PLACE_ID` | El place ID de la ficha para Places hasta que se lea la ficha (después, el que da la ficha). En DataForSEO se reconoce a la clínica por este y por el de la base (que la revisión diaria tiene al día) | El de la base |
 | `GOOGLE_CID` | El CID de la ficha (el número de `maps?cid=`), opcional, para reconocerla en DataForSEO | — |
 | `GOOGLE_PUBSUB_EMAIL` | La cuenta de servicio que firma los avisos (paso 2.3). Sin ella, en producción no entra ningún aviso | — |
 | `GOOGLE_PUBSUB_AUDIENCIA` | La audiencia de la suscripción push | `URL_PUBLICA` + `/webhooks/google` |
@@ -245,6 +292,10 @@ En el `.env` del servidor (el cron es otro proceso y solo lee el `.env`; ver
 | Los avisos no llegan | Suscripción, audiencia o cuenta de servicio | En la consola de Pub/Sub, los errores de entrega de la suscripción: 401 (sin token: falta la autenticación en la suscripción), 403 (audiencia o `GOOGLE_PUBSUB_EMAIL` distintos), 503 (falta `GOOGLE_PUBSUB_EMAIL` o no llegan las claves de Google) |
 | `DataForSEO … usuario o clave no válidos` / `sin saldo` | Credenciales de la API / cuenta sin saldo | Panel de DataForSEO |
 | Evento `posiciones_tope` | La pasada no cabía entera en el tope del mes | Subir `POSICIONES_TOPE_MES_USD` o quitar búsquedas |
+| Evento `posiciones_inciertas` | DataForSEO no contestó al enviar un bloque: puede que lo cobrara | Nada: si lo tenía, se recoge solo; si no, caduca a las 24 h. Si pasa a menudo, mirar el estado de DataForSEO |
+| Tarea «Google ha cambiado el place ID de la ficha…» | Google ha dado otro place ID a la ficha; la app ya usa el nuevo | Cambiarlo en `GOOGLE_PLACE_ID`, en la web y en los QR o enlaces para reseñar que lleven el de antes |
+| Al aprobar una publicación: «…no se repite sin comprobarlo» | Google no contestó y puede que la haya creado | Si dice «No está entre las publicaciones de la ficha», volver a aprobarla; si pide comprobarlo, mirar la ficha antes |
+| `… con node --test no se sale a internet` en una prueba | La prueba usa un adaptador real sin pasarle su `fetch` | Pasarle un `fetch` con respuestas grabadas (como `test/google.test.js`) |
 
 ## 9. Lo que queda (puertas)
 
