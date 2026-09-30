@@ -406,7 +406,7 @@ async function sinRepesca(deps, conv, { texto, ahora, datos, hist, reglas, nombr
   }
   // 4. Está cambiando su cita y dice que al final la deja, o que mejor la cancela.
   const reprograma = ofrecidos.length && conv.reprograma_cita_id ? await citaEnPie(pool, conv.reprograma_cita_id, ahora) : null;
-  if (reprograma && (MANTENER.test(t) || (CANCELAR.test(t) && !CAMBIO.test(t)))) {
+  if (reprograma && (MANTENER.test(t) || (CANCELAR.test(t) && !CAMBIO.test(t) && !NO_CANCELAR.test(t)))) {
     await marcar('cita');
     return MANTENER.test(t) ? dejarComoEsta(deps, conv, reprograma, comun) : preguntarCancelar(deps, conv, reprograma, comun);
   }
@@ -633,15 +633,21 @@ const AGRADECE = /^((muchas|mil) )?gracias\b|^(genial|perfecto|estupendo|fenomen
 const CONFIRMA = /^(si,? )?(confirmo|confirmado|confirmada|(alli|ahi) estare|(alli|ahi) estaremos|cuenta conmigo|si,? (alli|ahi) estare)\b/;
 // Cambiarla (se le proponen huecos) o cancelarla (se le pregunta antes). «No puedo ir» es cambiarla:
 // se le ofrecen otros y se le recuerda que también puede cancelarla.
-const CAMBIO = /\b(cambiar(la|mela)?|cambia(la|mela)?|mover(la|mela)?|mueve(la|mela)?|aplazar(la|mela)?|aplaza(la|mela)?|retrasar(la|mela)?|retrasa(la|mela)?|adelantar(la|mela)?|adelanta(la|mela)?|reprogramar(la)?|pasarla|pasamela)\b|no (voy a poder|podre|puedo) (ir|venir|acudir)|me ha surgido/;
+const CAMBIO = new RegExp('\\b(cambiar(la|mela)?|cambia(la|mela|s|is)?|cambiarias|mover(la|mela)?|mueve(la|mela|s)?|moveis|aplazar(la|mela)?|aplaza(la|mela|s)?'
+  + '|retrasar(la|mela)?|retrasa(la|mela|s)?|adelantar(la|mela)?|adelanta(la|mela|s)?|reprogramar(la)?|pasarla|pasarmela|pasamela|me la pasas|me la puedes pasar)\\b'
+  + '|no (voy a poder|podre|puedo) (ir|venir|acudir)|me ha surgido');
 const CANCELAR = /\b(cancelar(la|lo|mela)?|cancela(la|lo|mela)?|cancelo|cancelad(la)?|anular(la|lo|mela)?|anula(la|lo|mela)?|anulo|anulad(la)?)\b/;
+// «No quiero cancelarla» no es cancelarla.
+const NO_CANCELAR = /\bno (la |lo )?(quiero |hace falta |hay que )?(cancelar|anular)/;
 const OTRO_MOMENTO = /\b(otro (dia|momento|hueco)|otra (fecha|hora)|buscame|busca(me)? (otro|hueco))\b/;
-const MANTENER = /\b(la dejo|la dejamos|dejala|dejarla|mejor (la )?dej(o|amos)|como (esta|estaba)|al final (si )?(puedo|podre|voy)|no hace falta|la mantengo|mantenla|mantenerla)\b/;
-// Respuestas cortas a una pregunta nuestra.
-const SI = /^(si|sii+|vale|ok|okey|okay|claro|venga|dale|de acuerdo|perfecto|genial|por favor|porfa|adelante|confirmo|hazlo|eso es|me parece bien)\b/;
-const NO = /^(no|nop|nope|mejor no|para nada|imposible|paso)\b/;
-// «¿No hay nada antes?» (y no «antes de las 12», que es una hora).
-const ANTES = /\b(nada|algo|ningun hueco|hueco|huecos|cita|libre) (mas )?antes\b(?! de (las|la|comer|trabajar))|\b(lo|la) (necesito|quiero|querria|necesitaria|preferiria) antes\b|\bmas (pronto|cerca)\b|\bantes no (hay|teneis|tienes)\b|\b(muy|demasiado) (tarde|lejos)\b|\bno puedo esperar/;
+const MANTENER = /\b(la dejo|la dejamos|dejala|dejarla|mejor (la )?dej(o|amos)|como (esta|estaba)|al final (si )?(puedo|podre|voy)|no hace falta|la mantengo|mantenla|mantenerla|no (la )?(quiero|necesito) (cambiar|mover)(la)?)\b/;
+// Respuestas cortas a una pregunta nuestra. «Sí» no es «si me la cambias…» ni «si puedes…».
+const SI = new RegExp('^(si|sii+)\\b(?!\\s+(me|te|se|le|les|lo|la|los|las|nos|os|no|puedes|puede|podeis|pudiera|pudieras|hay|es|fuera|quieres|tienes|teneis|necesito|al final)\\b)'
+  + '|^si,? me (gustaria|encantaria|va bien|viene bien|vendria bien|parece bien|apetece)\\b'
+  + '|^(vale|ok|okey|okay|claro|venga|dale|de acuerdo|perfecto|genial|por favor|porfa|adelante|confirmo|hazlo|eso es|me parece bien)\\b');
+const NO = /^(no|nop|nope|mejor no|para nada|imposible|paso)\b(?!\s+se\b)/;
+// «¿No hay nada antes?» (y no «antes de las 12», que es una hora; «muy tarde» suele ser la hora del día).
+const ANTES = /\b(nada|algo|ningun hueco|hueco|huecos|cita|libre) (mas )?antes\b(?! de (las|la|comer|trabajar))|\b(lo|la) (necesito|quiero|querria|necesitaria|preferiria) antes\b(?! de)|\bmas (pronto|cerca)\b|\bantes no (hay|teneis|tienes)\b|\bdemasiado lejos\b|\bno puedo esperar/;
 
 async function citaProxima(q, pacienteId, ahora) {
   // El hueco que se le está guardando de la lista de espera no es «su cita» (eso lo contesta la oferta).
@@ -657,7 +663,7 @@ async function atenderSobreCita(deps, conv, { texto, ahora, datos, nombre, hola 
   const { pool } = deps;
   const t = normalizar(texto);
   const cambiar = CAMBIO.test(t);
-  const cancela = !cambiar && CANCELAR.test(t);
+  const cancela = !cambiar && CANCELAR.test(t) && !NO_CANCELAR.test(t);
   const confirma = !cambiar && !cancela && CONFIRMA.test(t);
   const agradece = !cambiar && !cancela && !confirma && t.length <= 60 && !t.includes('?') && AGRADECE.test(t);
   if (!cambiar && !cancela && !confirma && !agradece) return null;
@@ -802,9 +808,12 @@ async function atenderPregunta(deps, conv, pregunta, { texto, ahora, datos, regl
   if (pregunta.tipo === 'cancelar_cita') {
     const c = await citaEnPie(pool, pregunta.citaId, ahora);
     if (!c) return null;
+    // «Mejor cámbiala» → huecos; «(No,) cancélala» → se cancela; «no», «no quiero cancelarla» o «la
+    // mantengo» → sigue en pie; un «sí» → se cancela.
     if (CAMBIO.test(t) || OTRO_MOMENTO.test(t)) return { ...(await atenderCambio(deps, conv, c, { texto, ahora, datos, nombre, hola })), sobreCita: 'cambiar' };
-    if (no || MANTENER.test(t)) return dejarComoEsta(deps, conv, c, { ahora, nombre, hola });
-    if (si || CANCELAR.test(t)) return cancelarPorWhatsapp(deps, conv, c, { ahora, nombre, hola });
+    if (CANCELAR.test(t) && !NO_CANCELAR.test(t)) return cancelarPorWhatsapp(deps, conv, c, { ahora, nombre, hola });
+    if (no || MANTENER.test(t) || NO_CANCELAR.test(t)) return dejarComoEsta(deps, conv, c, { ahora, nombre, hola });
+    if (si) return cancelarPorWhatsapp(deps, conv, c, { ahora, nombre, hola });
     return null;
   }
 
@@ -862,10 +871,15 @@ async function apuntarEnEspera(deps, conv, pregunta, { ahora, nombre, hola = '',
   const { pool } = deps;
   const n = nombre ? `, ${nombre}` : '';
   const pacienteId = await asegurarPaciente(pool, conv, { nombre });
-  await LE.apuntar(pool, {
-    pacienteId, tratamientoId: pregunta.tratamientoId, desdeFecha: pregunta.desde, hastaFecha: pregunta.hasta, franja: pregunta.franja,
-    origen: 'whatsapp', creadoPor: 'ia', conversacionId: conv.id, ahora,
-  });
+  try {
+    await LE.apuntar(pool, {
+      pacienteId, tratamientoId: pregunta.tratamientoId, desdeFecha: pregunta.desde, hastaFecha: pregunta.hasta, franja: pregunta.franja,
+      origen: 'whatsapp', creadoPor: 'ia', conversacionId: conv.id, ahora,
+    });
+  } catch (err) {
+    if (!err.codigo) throw err;
+    return null; // p. ej. el tratamiento ya no está activo: sigue la repesca normal
+  }
   if (pregunta.hasta && ofrecidos.length) {
     await anotar(pool, conv, 'lista_espera', [{ tipo: 'apuntar_lista_espera', hasta: pregunta.hasta }], 'espera_respuesta');
     return contestar(deps, conv, `${hola}¡Apuntado${n}! Si se libera un hueco antes del ${textoDia(T.sumarDias(pregunta.hasta, 1)).slice(3)}, te lo guardo y te aviso por aquí. `

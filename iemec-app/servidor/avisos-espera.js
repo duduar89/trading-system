@@ -41,6 +41,7 @@ async function ofrecer(deps, hueco, entrada, { ahora }) {
     // Su respuesta se busca por el paciente: que la conversación sepa quién es.
     if (!conv.paciente_id) await con.query('UPDATE conversaciones SET paciente_id = ? WHERE id = ?', [entrada.paciente_id, conv.id]);
     await con.query('UPDATE lista_espera_ofertas SET conversacion_id = ? WHERE id = ?', [conv.id, guardado.id]);
+    await con.query('UPDATE citas SET conversacion_id = ? WHERE id = ?', [conv.id, guardado.citaId]);
     await con.commit();
   } catch (err) {
     await con.rollback().catch(() => {});

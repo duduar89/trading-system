@@ -161,6 +161,34 @@ test('cambiar y cancelar la cita por WhatsApp', async (t) => {
       assert.equal((await cita(pool, c.id)).estado, 'confirmada');
     });
 
+    await t.test('frases que no se confunden: «si me la cambias…» no es un sí, «¿me la pasas al jueves?» es cambiarla, «No, cancélala» la cancela y «no quiero cancelarla» no', async () => {
+      const rosa = await conCita(pool, { telefono: '+34611000311', nombre: 'Rosa', fecha: '2026-10-23', hora: '12:00' });
+      await R.procesarEntrante(deps, { telefono: '+34611000311', texto: 'Quiero cancelar la cita', ahora: martes });
+      const r1 = await R.procesarEntrante(deps, { telefono: '+34611000311', texto: 'Si me la cambias mejor', ahora: mas(martes, 2) });
+      assert.equal(r1.sobreCita, 'cambiar');
+      assert.equal(r1.eleccion, 'propuesta');
+      assert.equal((await cita(pool, rosa.cita.id)).estado, 'confirmada');
+
+      await conCita(pool, { telefono: '+34611000312', nombre: 'Tere', fecha: '2026-10-26', hora: '12:00' });
+      const r2 = await R.procesarEntrante(deps, { telefono: '+34611000312', texto: '¿Me la pasas al jueves?', ahora: martes });
+      assert.equal(r2.sobreCita, 'cambiar');
+      assert.ok(r2.huecos.length >= 1 && r2.huecos.every((h) => h.fecha === '2026-10-08'), JSON.stringify(r2.huecos));
+      const [[nuevas]] = await pool.query("SELECT COUNT(*) AS n FROM citas c JOIN pacientes p ON p.id = c.paciente_id WHERE p.telefono = '+34611000312'");
+      assert.equal(nuevas.n, 1, 'no se le reserva una segunda cita');
+
+      const uxue = await conCita(pool, { telefono: '+34611000313', nombre: 'Uxue', fecha: '2026-10-27', hora: '12:00' });
+      await R.procesarEntrante(deps, { telefono: '+34611000313', texto: 'Cancela mi cita, por favor', ahora: martes });
+      const r3 = await R.procesarEntrante(deps, { telefono: '+34611000313', texto: 'No, cancélala', ahora: mas(martes, 2) });
+      assert.equal(r3.sobreCita, 'cancelada');
+      assert.equal((await cita(pool, uxue.cita.id)).estado, 'cancelada');
+
+      const vera = await conCita(pool, { telefono: '+34611000314', nombre: 'Vera', fecha: '2026-10-28', hora: '12:00' });
+      await R.procesarEntrante(deps, { telefono: '+34611000314', texto: 'Quiero anular la cita', ahora: martes });
+      const r4 = await R.procesarEntrante(deps, { telefono: '+34611000314', texto: 'No, no quiero cancelarla', ahora: mas(martes, 2) });
+      assert.equal(r4.sobreCita, 'mantiene');
+      assert.equal((await cita(pool, vera.cita.id)).estado, 'confirmada');
+    });
+
     await t.test('cambiándola, lo que no se entiende pasa a una persona y su cita sigue en pie', async () => {
       const { cita: c } = await conCita(pool, { telefono: '+34611000306', nombre: 'Marta', fecha: '2026-10-21', hora: '12:00' });
       await R.procesarEntrante(deps, { telefono: '+34611000306', texto: 'Necesito cambiarla', ahora: martes });
