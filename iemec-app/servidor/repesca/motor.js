@@ -746,6 +746,9 @@ const SI = new RegExp('^(si|sii+)\\b(?!\\s+(me|te|se|le|les|lo|la|los|las|nos|os
 const SI_CLARO = new RegExp('^(si|sii+)\\b(?!\\s+(me|te|se|le|les|lo|la|los|las|nos|os|no|puedes|puede|podeis|pudiera|pudieras|hay|es|fuera|quieres|tienes|teneis|necesito|al final)\\b)'
   + '|^(claro|adelante|hazlo|por favor|porfa|dale|venga)\\b');
 const NO = /^(no|nop|nope|mejor no|para nada|imposible|paso)\b(?!\s+se\b)/;
+// Un sí sin nada más (sin signos ni emojis): lo que contesta a «¿Nos confirmas que vienes?» y no hay
+// que leer.
+const SI_A_SECAS = /^(si( si)*|sii+|claro( que si)?|por supuesto|vale|ok|okey|okay|de acuerdo|perfecto|genial|estupendo|confirmo|confirmado|confirmada|cuenta conmigo|(si )?(alli|ahi) (estare|estaremos)|si (confirmo|claro|por supuesto|de acuerdo|perfecto|genial|vale|ok))( (muchas |mil )?gracias)?$/;
 // «¿No hay nada antes?» (y no «antes de las 12», que es una hora; «muy tarde» suele ser la hora del día).
 const ANTES = /\b(nada|algo|ningun hueco|hueco|huecos|cita|libre) (mas )?antes\b(?! de (las|la|comer|trabajar))|\b(lo|la) (necesito|quiero|querria|necesitaria|preferiria) antes\b(?! de)|\bmas (pronto|cerca)\b|\bantes no (hay|teneis|tienes)\b|\bdemasiado lejos\b|\bno puedo esperar/;
 
@@ -933,14 +936,24 @@ async function atenderPregunta(deps, conv, pregunta, { texto, ahora, datos, regl
   const no = NO.test(t);
 
   if (pregunta.tipo === 'confirmar_cita') {
-    // «¿Nos confirmas que vienes?» (la víspera). Lo que dice de su cita («Sí, allí estaré»,
-    // «necesito cambiarla», «cancélala») lo entiende atenderSobreCita; aquí, el «sí» y el «no» a secas.
+    // «¿Nos confirmas que vienes?» (la víspera). Cambiarla o cancelarla lo entiende atenderSobreCita.
+    // Un «sí» (o «Sí, allí estaré», el botón) confirma; si añade algo («sí, pero llegaré tarde», «sí,
+    // ¿se puede aparcar?»), confirma igual y lo lee una persona. Un «no», se le pregunta si la cancela.
     const c = await citaEnPie(pool, pregunta.citaId, ahora);
-    if (!c || CAMBIO.test(t) || CANCELAR.test(t) || CONFIRMA.test(t)) return null;
-    if (si) {
+    if (!c || CAMBIO.test(t) || CANCELAR.test(t)) return null;
+    if (si || CONFIRMA.test(t)) {
       await registrar(pool, { tipo: 'cita_confirmada_paciente', entidad: 'cita', entidadId: c.id, actor: 'paciente', datos: { por: 'whatsapp' } });
-      await pool.query("UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cita', proximo_paso = 'cita', proximo_paso_en = ? WHERE id = ?", [c.inicio, conv.id]);
-      return contestar(deps, conv, `¡Perfecto${n}! Queda confirmada: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`, ahora, { sobreCita: 'confirma' });
+      const confirmada = `¡Perfecto${n}! Queda confirmada: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`;
+      if (SI_A_SECAS.test(t.replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim())) {
+        await pool.query("UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cita', proximo_paso = 'cita', proximo_paso_en = ? WHERE id = ?", [c.inicio, conv.id]);
+        return contestar(deps, conv, confirmada, ahora, { sobreCita: 'confirma' });
+      }
+      const decision = { intencion: 'cita', acciones: [{ tipo: 'pasar_a_persona', motivo: `Confirma su cita del ${textoDia(c.fecha).slice(3)} a las ${c.hora} y añade algo: leer su mensaje` }], proximoPaso: 'persona' };
+      await enTransaccion(pool, async (con) => {
+        const [[fresca]] = await con.query('SELECT * FROM conversaciones WHERE id = ? FOR UPDATE', [conv.id]);
+        await aplicarDecision(con, fresca, decision, { ahora, texto, datos: null });
+      });
+      return contestar(deps, conv, `${confirmada} Una persona del equipo lee lo que nos cuentas y te contesta por aquí si hace falta.`, ahora, { sobreCita: 'confirma', decision });
     }
     if (no) return preguntarCancelar(deps, conv, c, { ahora, nombre, hola });
     return null;

@@ -14,7 +14,7 @@ const T = require('../motor/tiempo');
 const { prepararDia, huecoAInstantes, tratamientoParaMotor } = require('../motor/agenda/dia');
 const { buscarHuecos, proponer } = require('../motor/agenda/huecos');
 const E = require('../motor/agenda/estados');
-const { cifrar, descifrar } = require('./cripto');
+const { cifrar, descifrar, tieneClave } = require('./cripto');
 const { registrar } = require('./eventos');
 
 class ErrorAgenda extends Error {
@@ -40,9 +40,10 @@ function nuevoToken() {
   return { token, columnas: { token_hash: huellaToken(token), token_cifrado: c.cifrado, token_iv: c.iv, token_tag: c.tag } };
 }
 
-// El token de una cita (de su fila): null si no se puede descifrar (o no lo tiene).
+// El token de una cita (de su fila): null si no se puede descifrar (o no lo tiene). Una cita de antes
+// de la migración 010 que aún no se ha cifrado (ver cifrarTokensAntiguos) lo tiene en token_antiguo.
 function tokenDe(cita) {
-  if (!cita?.token_cifrado || !cita.token_iv || !cita.token_tag) return null;
+  if (!cita?.token_cifrado || !cita.token_iv || !cita.token_tag) return tokenValido(cita?.token_antiguo) ? cita.token_antiguo : null;
   try {
     const t = descifrar(cita.token_cifrado, cita.token_iv, cita.token_tag);
     return tokenValido(t) ? t : null;
@@ -51,20 +52,34 @@ function tokenDe(cita) {
   }
 }
 
-// El token para mandárselo (cita: su id o su fila con las columnas del token): el suyo. Una cita que
-// no se dio por aquí (importada, insertada a mano) no lo tiene guardado: recibe uno nuevo. Si lo tiene
-// pero no se puede descifrar (otra CLAVE_CIFRADO), null: su enlace sigue valiendo y no se toca.
+// El token para mandárselo (cita: su id o su fila con las columnas del token): el suyo. Si aún está
+// en claro (de antes de la 010), se cifra ahora con la clave de la app. Una cita que no se dio por aquí
+// (importada, insertada a mano) no lo tiene: recibe uno nuevo. Si lo tiene pero no se puede descifrar
+// (otra CLAVE_CIFRADO), null: su enlace sigue valiendo y no se toca.
 async function tokenParaEnviar(q, cita) {
-  const c = cita && typeof cita === 'object' && 'token_cifrado' in cita ? cita
-    : (await q.query('SELECT id, token_cifrado, token_iv, token_tag FROM citas WHERE id = ?', [cita?.id ?? cita]))[0][0];
+  const id = typeof cita === 'object' ? cita?.id : cita;
+  if (cita && typeof cita === 'object' && cita.token_cifrado) return tokenDe(cita);
+  // SELECT *: token_antiguo desaparecerá con una migración posterior.
+  const [[c]] = await q.query('SELECT * FROM citas WHERE id = ?', [id]);
   if (!c) return null;
   if (c.token_cifrado) return tokenDe(c);
+  if (tokenValido(c.token_antiguo)) {
+    await cifrarTokenAntiguo(q, c);
+    return c.token_antiguo;
+  }
   const { token, columnas } = nuevoToken();
   // Si otro envío se lo acaba de dar, vale el suyo (el enlace que ya ha salido).
   const [r] = await q.query('UPDATE citas SET ? WHERE id = ? AND token_cifrado IS NULL', [columnas, c.id]);
   if (r.affectedRows !== 1) return tokenParaEnviar(q, c.id);
   await registrar(q, { tipo: 'cita_enlace_nuevo', entidad: 'cita', entidadId: c.id });
   return token;
+}
+
+async function cifrarTokenAntiguo(q, fila) {
+  const c = cifrar(fila.token_antiguo);
+  await q.query(
+    'UPDATE citas SET token_hash = ?, token_cifrado = ?, token_iv = ?, token_tag = ?, token_antiguo = NULL WHERE id = ? AND token_antiguo = ?',
+    [huellaToken(fila.token_antiguo), c.cifrado, c.iv, c.tag, fila.id, fila.token_antiguo]);
 }
 
 function enlaceCaducado(cita, ahora = new Date()) {
@@ -82,20 +97,24 @@ async function uidIcs(q, cita) {
 }
 
 // Los tokens de antes de la migración 010, que estaban en claro: se cifran y se borran (su huella
-// ya la calculó la migración; se vuelve a poner por si acaso). Lo llama migrar() en cada pasada:
-// cuando ya no queda ninguno, solo es una consulta; y cuando una migración quite la columna
-// token_antiguo, ni eso. Devuelve cuántos ha cifrado.
-async function cifrarTokensAntiguos(q) {
+// ya la calculó la migración, así que sus enlaces valen desde el primer momento). Lo llama migrar() en
+// cada pasada: cuando ya no queda ninguno, solo es una consulta; y cuando una migración quite la
+// columna token_antiguo, ni eso. Devuelve cuántos ha cifrado.
+//
+// Nunca con la clave de desarrollo (salvo en las pruebas): si migrar se lanza sin CLAVE_CIFRADO (en
+// cPanel, la variable puesta solo en «Setup Node.js App» y no en el .env), la app, que sí la tiene,
+// no podría descifrarlos. Entonces se quedan como están, se avisa, y la app los cifra al usarlos.
+const enPruebas = () => process.env.NODE_ENV === 'test' || Boolean(process.env.NODE_TEST_CONTEXT);
+async function cifrarTokensAntiguos(q, { log = () => {}, claveDeDesarrollo = enPruebas() } = {}) {
   const [[columna]] = await q.query(
     "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'citas' AND COLUMN_NAME = 'token_antiguo'");
   if (!Number(columna.n)) return 0;
   const [filas] = await q.query('SELECT id, token_antiguo FROM citas WHERE token_antiguo IS NOT NULL');
-  for (const f of filas) {
-    const c = cifrar(f.token_antiguo);
-    await q.query(
-      'UPDATE citas SET token_hash = ?, token_cifrado = ?, token_iv = ?, token_tag = ?, token_antiguo = NULL WHERE id = ? AND token_antiguo = ?',
-      [huellaToken(f.token_antiguo), c.cifrado, c.iv, c.tag, f.id, f.token_antiguo]);
+  if (filas.length && !tieneClave() && !claveDeDesarrollo) {
+    log(`⚠ ${filas.length} enlaces de «Tu cita» de antes siguen sin cifrar: falta CLAVE_CIFRADO en este entorno. Ponla en el .env y vuelve a lanzar la migración (mientras, la app los cifra al usarlos).`);
+    return 0;
   }
+  for (const f of filas) await cifrarTokenAntiguo(q, f);
   return filas.length;
 }
 

@@ -206,6 +206,7 @@ ${dato('Tratamiento', esc(cita.tratamiento))}
 ${donde(cita.sede, disp)}
 ${cambia ? `<p class="pie">${esc(cambia)}</p>` : ''}
 ${formulario(`/c/${cita.token}/confirmar`, 'Confirmar mi cita', { lleno: true })}
+${formulario(`/c/${cita.token}/cancelar`, 'No me viene bien')}
 ${boton(wa(`Hola, os escribo por el hueco del ${cuando}`), 'Escribir por WhatsApp')}
 <p class="pie">Cuando la confirmes, podrás añadirla a tu calendario.</p>` });
   }
@@ -356,9 +357,11 @@ function rutasPublicas({ pool }) {
           await agenda.confirmar(q, { id: cita.id, actor: 'paciente', ahora });
         }
         mensaje = 'Cita confirmada. ¡Te esperamos!';
+      } else if (oferta) {
+        await listaEspera.rechazar(q, oferta, { ahora, actor: 'paciente' });
+        mensaje = 'De acuerdo: el hueco queda libre para otra persona. Sigues en la lista de espera: si se libera otro, te avisamos.';
       } else {
-        if (oferta) await listaEspera.rechazar(q, oferta, { ahora, actor: 'paciente' });
-        else await agenda.cancelar(q, { id: cita.id, por: 'paciente', motivo: 'cancelada desde la página de la cita', actor: 'paciente', ahora });
+        await agenda.cancelar(q, { id: cita.id, por: 'paciente', motivo: 'cancelada desde la página de la cita', actor: 'paciente', ahora });
         mensaje = 'Cita cancelada. Cuando quieras, te buscamos otro hueco por WhatsApp.';
       }
     } catch (err) {

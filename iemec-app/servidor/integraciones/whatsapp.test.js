@@ -3,7 +3,7 @@
 // tal cual lo pide la Cloud API de Meta. Sin red.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { crearWhatsApp, componentesPlantilla, botonesDe } = require('./whatsapp');
+const { crearWhatsApp, componentesPlantilla, parametrosBotones } = require('./whatsapp');
 
 const TOKEN = 'EJEMPLO-token-no-valido-EJEMPLO-token-nova1';
 const DIRECCION = 'Av. Siglo XXI, 13, local 35, 28660 Boadilla del Monte, Madrid';
@@ -32,6 +32,6 @@ test('simulado: guarda lo que se mandaría; botonUrl sigue valiendo (el primer b
     cabecera: { tipo: 'ubicacion', lat: 40.4066059, lng: -3.9001441, nombre: 'IEMEC', direccion: DIRECCION } });
   assert.equal(w.enviados[1].componentes[0].type, 'header');
   assert.match(w.enviados[1].waId, /^wamid\.SIM[0-9a-f]{16}$/);
-  assert.deepEqual(botonesDe({}), []);
+  assert.deepEqual(parametrosBotones({}), []);
   assert.throws(() => crearWhatsApp('real'), /puerta/);
 });

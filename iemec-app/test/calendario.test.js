@@ -181,6 +181,24 @@ test('los tokens de antes se migran: huella y cifrado, sin el claro, y su enlace
       assert.equal(ics.location, `IEMEC, ${DIRECCION}`);
     });
 
+    // Si migrar se lanza sin CLAVE_CIFRADO (fuera de las pruebas), no cifra con la de desarrollo: lo
+    // avisa y deja el token como está (su enlace vale por la huella); la app lo cifra al usarlo.
+    const otro = crypto.randomBytes(32).toString('base64url');
+    const [c2] = await pool.query(
+      `INSERT INTO citas (paciente_id, tratamiento_id, sala_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token_hash, token_antiguo)
+       VALUES (?, 'limpieza-facial', 1, '2026-10-07 15:00', '2026-10-07 16:00', '2026-10-07 15:00', '2026-10-07 16:10', '2026-10-07 15:00', '2026-10-07 16:00', 'confirmada', ?, ?)`,
+      [p.insertId, agenda.huellaToken(otro), otro]);
+    const mensajes = [];
+    assert.equal(await agenda.cifrarTokensAntiguos(pool, { log: (m) => mensajes.push(m), claveDeDesarrollo: false }), 0);
+    assert.match(mensajes.join(), /1 enlaces de «Tu cita» de antes siguen sin cifrar: falta CLAVE_CIFRADO/);
+    const [[sinCifrar]] = await pool.query('SELECT * FROM citas WHERE id = ?', [c2.insertId]);
+    assert.equal(agenda.tokenDe(sinCifrar), otro, 'mientras, el panel sigue teniendo su enlace');
+    assert.equal(await agenda.tokenParaEnviar(pool, c2.insertId), otro, 'al mandárselo, el mismo enlace…');
+    const [[cifrada]] = await pool.query('SELECT * FROM citas WHERE id = ?', [c2.insertId]);
+    assert.equal(cifrada.token_antiguo, null, '…ya cifrado con la clave de la app');
+    assert.equal(agenda.tokenDe(cifrada), otro);
+    assert.deepEqual(cifrada.token_hash, agenda.huellaToken(otro));
+
     // Cuando una migración de más adelante quite la columna del token en claro, el paso de migrar()
     // no se rompe: ya no hace nada.
     await pool.query('ALTER TABLE citas DROP COLUMN token_antiguo');
@@ -330,8 +348,9 @@ test('la víspera: sus dos respuestas rápidas llegan por el webhook y se entien
       const marta = await conVispera('Marta', '13:30');
       const nuria = await conVispera('Nuria', '15:00');
       const olga = await conVispera('Olga', '16:30');
+      const pilar = await conVispera('Pilar', '18:00');
       const r = await avisos.enviarPendientes(deps, { ahora: vispera });
-      assert.deepEqual(r.map((x) => x.tipo), ['vispera', 'vispera', 'vispera', 'vispera']);
+      assert.deepEqual(r.map((x) => x.tipo), ['vispera', 'vispera', 'vispera', 'vispera', 'vispera']);
       const v = whatsapp.enviados.at(-1);
       assert.equal(v.nombre, 'iemec_recordatorio_24h');
       assert.deepEqual(BIBLIOTECA.find((b) => b.nombre === v.nombre).botones.map((b) => b.texto), ['Sí, allí estaré', 'Necesito cambiarla']);
@@ -353,6 +372,15 @@ test('la víspera: sus dos respuestas rápidas llegan por el webhook y se entien
       assert.match(d.texto, /¿Cancelo tu cita del jueves 15 de octubre a las 16:30, Olga\? Si lo prefieres, te la cambio a otro día\./);
       const [[sigue]] = await pool.query('SELECT estado FROM citas WHERE id = ?', [olga.cita.id]);
       assert.equal(sigue.estado, 'confirmada', 'sin su «sí», no se cancela');
+
+      // «Sí, pero…»: confirmada, y lo que añade lo lee una persona (no se pierde).
+      const e = await llega(pilar.telefono, escribe('Sí, pero llegaré 15 minutos tarde'));
+      assert.equal(e.texto, '¡Perfecto, Pilar! Queda confirmada: te esperamos el jueves 15 de octubre a las 18:00. Una persona del equipo lee lo que nos cuentas y te contesta por aquí si hace falta.');
+      assert.equal(await confirmadas(pilar.cita.id), 1);
+      const [[cp]] = await pool.query('SELECT id, estado FROM conversaciones WHERE telefono = ?', [pilar.telefono]);
+      assert.equal(cp.estado, 'espera_persona');
+      const [[tarea]] = await pool.query("SELECT titulo FROM tareas WHERE conversacion_id = ? AND estado = 'abierta'", [cp.id]);
+      assert.equal(tarea.titulo, 'Confirma su cita del jueves 15 de octubre a las 18:00 y añade algo: leer su mensaje');
     });
   } finally {
     await pool.end();
@@ -408,6 +436,75 @@ test('un hueco de la lista de espera, confirmado desde «Tu cita»: acepta la of
     assert.equal(m.nombre, 'iemec_cita_cambiada');
     assert.deepEqual(m.variables, ['Berta', 'jueves 15 de octubre', '17:00', SEDE]);
     assert.deepEqual(m.botones.map((x) => x.valor), [token, token]);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('un aviso que no saldría bien (plantilla aprobada de otra versión, sede sin coordenadas) no sale: queda una tarea', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const whatsapp = crearWhatsApp('simulado');
+  const deps = { pool, ia: crearIa('simulado'), whatsapp };
+  try {
+    await sembrar(pool);
+    const dada = new Date('2026-10-12T08:00:00Z');
+    // La víspera que se aprobó con el texto de antes (dos datos: nombre y hora).
+    await pool.query("UPDATE plantillas SET cuerpo = 'Hola {{1}}, te esperamos mañana a las {{2}} en IEMEC. ¿Nos lo confirmas?' WHERE uso = 'cita_recordatorio_24h'");
+    const p = await paciente(pool, 'Sonia');
+    const c = await agenda.reservar(pool, { pacienteId: p.id, tratamientoId: 'laser-intimo', fecha: '2026-10-15', hora: '17:00', origen: 'recepcion', ahora: dada });
+    await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [dada, c.id]);
+    const r = await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-14T08:05:00Z') });
+    assert.deepEqual(r.map((x) => [x.tipo, x.fallido]), [['vispera', 'la plantilla aprobada lleva 2 datos y el aviso manda 4: es de otra versión']]);
+    assert.deepEqual(whatsapp.enviados.filter((m) => m.telefono === p.telefono), [], 'no le llega «mañana a las martes 6 de octubre»');
+    const [[t1]] = await pool.query("SELECT titulo FROM tareas WHERE paciente_id = ? AND estado = 'abierta'", [p.id]);
+    assert.match(t1.titulo, /^No sale el aviso de la cita \(la plantilla aprobada lleva 2 datos .+\): avisar a mano$/);
+
+    // Una sede sin coordenadas: la confirmación lleva el mapa, así que tampoco sale.
+    await pool.query('UPDATE sedes SET lat = NULL, lng = NULL');
+    const q = await paciente(pool, 'Tere');
+    await agenda.reservar(pool, { pacienteId: q.id, tratamientoId: 'laser-intimo', fecha: '2026-10-16', hora: '17:00', origen: 'recepcion', ahora: dada });
+    const r2 = await avisos.enviarPendientes(deps, { ahora: mas(dada, 3) });
+    assert.deepEqual(r2.map((x) => [x.tipo, x.fallido]), [['confirmacion', 'la sede no tiene coordenadas para el mapa']]);
+    assert.deepEqual(whatsapp.enviados.filter((m) => m.telefono === q.telefono), []);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('un hueco de la lista de espera, desde «Tu cita»: «No me viene bien» lo suelta para el siguiente', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const whatsapp = crearWhatsApp('simulado');
+  const deps = { pool, ia: crearIa('simulado'), whatsapp };
+  try {
+    await sembrar(pool);
+    const dada = new Date('2026-10-13T08:00:00Z');
+    const a = await paciente(pool, 'Carla');
+    const b = await paciente(pool, 'Diana');
+    const deA = await agenda.reservar(pool, { pacienteId: a.id, tratamientoId: 'laser-intimo', fecha: '2026-10-15', hora: '17:00', origen: 'recepcion', ahora: dada });
+    const { id: entradaB } = await LE.apuntar(pool, { pacienteId: b.id, tratamientoId: 'laser-intimo', origen: 'panel', creadoPor: 'recepcion@prueba', ahora: dada });
+    const ahora = new Date('2026-10-14T08:00:00Z');
+    await agenda.cancelar(pool, { id: deA.id, por: 'paciente', ahora });
+    await espera.vuelta(deps, { ahora: mas(ahora, 1) });
+    const [[oferta]] = await pool.query('SELECT * FROM lista_espera_ofertas');
+    const [[retenida]] = await pool.query('SELECT * FROM citas WHERE id = ?', [oferta.cita_id]);
+    const token = agenda.tokenDe(retenida);
+    const app = require('express')();
+    app.use((req, _res, next) => { req.ahora = mas(ahora, 5); next(); });
+    app.use(crearApp({ pool, deps }));
+    await conServidor(app, async (base) => {
+      const pag = await (await fetch(`${base}/c/${token}`)).text();
+      assert.match(pag, new RegExp(`action="/c/${token}/cancelar"><button class="btn" type="submit">No me viene bien</button>`));
+      const no = await (await fetch(`${base}/c/${token}/cancelar`, { method: 'POST' })).text();
+      assert.match(no, /De acuerdo: el hueco queda libre para otra persona\. Sigues en la lista de espera/);
+    });
+    const [[o]] = await pool.query('SELECT estado FROM lista_espera_ofertas WHERE id = ?', [oferta.id]);
+    assert.equal(o.estado, 'rechazada');
+    const [[le]] = await pool.query('SELECT estado FROM lista_espera WHERE id = ?', [entradaB]);
+    assert.equal(le.estado, 'esperando', 'sigue en la lista');
+    const [[suelta]] = await pool.query('SELECT estado FROM citas WHERE id = ?', [retenida.id]);
+    assert.equal(suelta.estado, 'cancelada', 'el hueco, libre para el siguiente');
   } finally {
     await pool.end();
   }

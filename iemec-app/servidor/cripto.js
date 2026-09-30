@@ -17,6 +17,9 @@ function clave() {
   return Buffer.from(CLAVE_DESARROLLO, 'hex');
 }
 
+// ¿Hay una CLAVE_CIFRADO de verdad (y no la de desarrollo)?
+const tieneClave = () => /^[0-9a-fA-F]{64}$/.test((process.env.CLAVE_CIFRADO || '').trim());
+
 function cifrar(texto) {
   if (texto == null) return { cifrado: null, iv: null, tag: null };
   const iv = crypto.randomBytes(12);
@@ -32,4 +35,4 @@ function descifrar(cifrado, iv, tag) {
   return Buffer.concat([d.update(Buffer.from(cifrado)), d.final()]).toString('utf8');
 }
 
-module.exports = { cifrar, descifrar };
+module.exports = { cifrar, descifrar, tieneClave };

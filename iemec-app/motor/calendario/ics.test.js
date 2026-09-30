@@ -135,6 +135,7 @@ test('«Añadir al calendario»: a qué calendario va según el dispositivo', ()
     macChrome: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
     iphoneChrome: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140.0.7339.101 Mobile/15E148 Safari/604.1',
     iphoneFirefox: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/142.0 Mobile/15E148 Safari/605.1.15',
+    ipadChromeEscritorio: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140.0.7339.101 Safari/604.1',
     androidChrome: 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36',
     samsung: 'Mozilla/5.0 (Linux; Android 14; SAMSUNG SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/28.0 Chrome/130.0.0.0 Mobile Safari/537.36',
     windows: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0',
@@ -144,7 +145,7 @@ test('«Añadir al calendario»: a qué calendario va según el dispositivo', ()
   const r = Object.fromEntries(Object.entries(UA).map(([k, ua]) => [k, dispositivo(ua)]));
   assert.deepEqual(r, {
     iphoneSafari: 'apple', ipad: 'apple', ipadComoMac: 'apple', macChrome: 'apple',
-    iphoneChrome: 'otro', iphoneFirefox: 'otro', // el .ics no llega a Calendario: a la página
+    iphoneChrome: 'otro', iphoneFirefox: 'otro', ipadChromeEscritorio: 'otro', // el .ics no llega a Calendario: a la página
     androidChrome: 'android', samsung: 'android',
     windows: 'otro', windowsPhone: 'otro', vistaPreviaWhatsApp: 'otro',
   });

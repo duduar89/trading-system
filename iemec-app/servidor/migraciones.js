@@ -14,7 +14,7 @@ const CARPETA = path.join(__dirname, '..', 'sql');
 // cuando ya no queda nada que hacer, no hace nada.
 const PASOS = [
   // 010: los tokens de «Tu cita» que aún estén en claro se cifran con CLAVE_CIFRADO.
-  { tras: '010-privacidad-cita.sql', hacer: (con) => require('./agenda').cifrarTokensAntiguos(con) },
+  { tras: '010-privacidad-cita.sql', hacer: (con, { log }) => require('./agenda').cifrarTokensAntiguos(con, { log }) },
 ];
 
 function listar(carpeta = CARPETA) {
@@ -52,7 +52,7 @@ async function migrar({ bd = config.bd, carpeta = CARPETA, log = console.log } =
       aplicadas.push(m.nombre);
     }
     for (const paso of PASOS) {
-      if (hechas.has(paso.tras) || aplicadas.includes(paso.tras)) await paso.hacer(conexion);
+      if (hechas.has(paso.tras) || aplicadas.includes(paso.tras)) await paso.hacer(conexion, { log });
     }
     return aplicadas;
   } finally {

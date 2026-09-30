@@ -16,7 +16,7 @@
 // su propia cita: se mandan aunque haya pedido la baja comercial. Lo llama el cron cada minuto; cada
 // aviso se marca antes de mandarlo, así nunca sale dos veces.
 const T = require('../motor/tiempo');
-const { elegirPlantilla } = require('../motor/repesca/plantillas');
+const { elegirPlantilla, variablesDe, botonesDe, cabeceraDe } = require('../motor/repesca/plantillas');
 const { direccionPostal } = require('../motor/calendario/ics');
 const { registrar } = require('./eventos');
 const R = require('./repesca/motor');
@@ -70,6 +70,18 @@ function mapaDe(sede) {
   return { tipo: 'ubicacion', lat: sede.lat, lng: sede.lng, nombre: sede.nombre, direccion: direccionPostal(sede) };
 }
 
+// Lo que la plantilla aprobada pide y no se le puede dar: Meta la rechazaría, o se leería mal (una
+// aprobada con otra versión del texto, un mapa sin coordenadas, un enlace que no se recupera). null si
+// está todo.
+function faltaEnPlantilla(plantilla, { variables, botones, cabecera }) {
+  const espera = new Set(variablesDe(plantilla.cuerpo)).size;
+  if (espera !== variables.length) return `la plantilla aprobada lleva ${espera} datos y el aviso manda ${variables.length}: es de otra versión`;
+  if (cabeceraDe(plantilla)?.tipo === 'ubicacion' && !cabecera) return 'la sede no tiene coordenadas para el mapa';
+  const conEnlace = botonesDe(plantilla).filter((b) => b.tipo === 'url' && /\{\{1\}\}/.test(b.url || '')).length;
+  if (conEnlace > botones.length) return 'no se ha podido recuperar el enlace de la cita';
+  return null;
+}
+
 // Las plantillas dicen «Hola {{1}}, …». Sin nombre, «Hola buenos días, …» (o «buenas tardes»).
 const saludoSinNombre = (ahora) => (T.minutosMadrid(ahora) < 14 * 60 ? 'buenos días' : 'buenas tardes');
 
@@ -114,16 +126,15 @@ async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
   } else {
     const plantillas = await R.plantillasBd(pool);
     plantilla = (cambiada && elegirPlantilla(USO_CAMBIADA, plantillas)) || elegirPlantilla(uso, plantillas);
-    if (!plantilla) {
+    const envioPlantilla = { variables: variablesPlantilla(tipo, c, nombre || saludoSinNombre(ahora)), botones: botonesPlantilla(tipo, c), cabecera: mapaDe(c.sede) };
+    const falta = plantilla ? faltaEnPlantilla(plantilla, envioPlantilla) : `falta la plantilla aprobada «${uso}»`;
+    if (falta) {
       await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, conversacion_id, vence_en) VALUES ('otro', ?, ?, ?, ?)",
-        [`Falta la plantilla aprobada «${uso}»: avisar a mano de la cita`, fila.paciente_id, conv.id, new Date(ahora.getTime() + HORA)]);
-      await registrar(pool, { tipo: 'aviso_cita_sin_plantilla', entidad: 'cita', entidadId: citaId, datos: { tipo, uso } });
-      return { citaId, tipo, fallido: 'sin plantilla' };
+        [`No sale el aviso de la cita (${falta}): avisar a mano`.slice(0, 200), fila.paciente_id, conv.id, new Date(ahora.getTime() + HORA)]);
+      await registrar(pool, { tipo: 'aviso_cita_sin_plantilla', entidad: 'cita', entidadId: citaId, datos: { tipo, uso: plantilla?.uso || uso, motivo: falta } });
+      return { citaId, tipo, fallido: plantilla ? falta : 'sin plantilla' };
     }
-    envio = await R.enviar(deps, conv, {
-      plantilla, variables: variablesPlantilla(tipo, c, nombre || saludoSinNombre(ahora)), autor: 'sistema', ahora,
-      botones: botonesPlantilla(tipo, c), cabecera: mapaDe(c.sede),
-    });
+    envio = await R.enviar(deps, conv, { plantilla, ...envioPlantilla, autor: 'sistema', ahora });
   }
   // Un aviso no deja trabajo en la bandeja: si la conversación no tiene nada más en marcha, se
   // cierra «con cita». Si contesta, se reabre (ver conversacionPara).

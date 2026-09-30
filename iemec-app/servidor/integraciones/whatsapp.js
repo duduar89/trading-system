@@ -12,7 +12,7 @@
 // `botonUrl` (el valor del primer botón de enlace) se sigue admitiendo.
 const crypto = require('crypto');
 
-function botonesDe({ botones = [], botonUrl = null }) {
+function parametrosBotones({ botones = [], botonUrl = null }) {
   if (botones?.length) return botones.map((b, i) => ({ tipo: b.tipo || 'url', indice: b.indice ?? i, valor: String(b.valor) }));
   return botonUrl == null ? [] : [{ tipo: 'url', indice: 0, valor: String(botonUrl) }];
 }
@@ -44,7 +44,7 @@ function crearSimulado() {
       return r;
     },
     async enviarPlantilla({ telefono, nombre, idioma = 'es', variables = [], botones = [], cabecera = null, botonUrl = null }) {
-      const lista = botonesDe({ botones, botonUrl });
+      const lista = parametrosBotones({ botones, botonUrl });
       const r = {
         waId: id(), telefono, tipo: 'plantilla', nombre, idioma, variables, botones: lista, cabecera,
         botonUrl: lista.find((b) => b.tipo === 'url')?.valor ?? null,
@@ -61,4 +61,4 @@ function crearWhatsApp(modo = 'simulado') {
   return crearSimulado();
 }
 
-module.exports = { crearWhatsApp, componentesPlantilla, botonesDe };
+module.exports = { crearWhatsApp, componentesPlantilla, parametrosBotones };

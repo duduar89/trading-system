@@ -168,17 +168,17 @@ function enlaceMapa(sede, dispositivo = 'otro') {
 
 // ¿A qué calendario va el botón «Añadir al calendario»? iPhone, iPad y Mac → el .ics (Safari se lo
 // pasa a Calendario, que enseña «Añadir»); Android → Google Calendar (la app de Google no importa
-// .ics). En un iPhone con otro navegador (Chrome, Firefox, la app de Google…) el .ics no llega a
-// Calendario: a la página, con todas las opciones. En lo demás (ordenador, WhatsApp de escritorio,
-// Windows Phone) no se sabe cuál usa: también a la página.
+// .ics). En un iPhone o un iPad con otro navegador (Chrome, Firefox, la app de Google…, también en
+// modo escritorio, cuando el iPad dice ser un Mac) el .ics no llega a Calendario: a la página, con todas
+// las opciones. En lo demás (ordenador, WhatsApp de escritorio, Windows Phone) no se sabe cuál usa:
+// también a la página.
 const IOS = /\b(iPhone|iPad|iPod)\b/;
 const IOS_OTRO_NAVEGADOR = /\b(CriOS|FxiOS|EdgiOS|OPiOS|OPT|GSA|YaBrowser|DuckDuckGo|Brave|FBAN|FBAV|Instagram|Line)\//;
 function dispositivo(userAgent = '') {
   const ua = String(userAgent || '');
   if (/Windows Phone|IEMobile/.test(ua)) return 'otro';
   if (/\bAndroid\b/.test(ua)) return 'android';
-  if (IOS.test(ua)) return IOS_OTRO_NAVEGADOR.test(ua) ? 'otro' : 'apple';
-  if (/\bMacintosh\b|\bMac OS X\b/.test(ua)) return 'apple';
+  if (IOS.test(ua) || /\bMacintosh\b|\bMac OS X\b/.test(ua)) return IOS_OTRO_NAVEGADOR.test(ua) ? 'otro' : 'apple';
   return 'otro';
 }
 
