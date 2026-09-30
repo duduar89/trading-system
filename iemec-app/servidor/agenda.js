@@ -6,16 +6,184 @@
 //
 // Cambiar una cita de día es reservar la nueva «reprogramando» la antigua, todo en la misma
 // transacción: la antigua no cuenta como ocupada (se puede mover a un hueco que la pise), queda
-// «reprogramada» apuntando a la nueva y su .ics sube de versión (sale anulado en el calendario).
+// «reprogramada» apuntando a la nueva y su .ics sube de versión (sale anulado en el calendario). La
+// nueva es otra cita, con su UID de calendario y su enlace: en el calendario, una se borra y la otra
+// se añade (Apple no actualiza un evento importado aunque llegue con el mismo UID).
 const crypto = require('crypto');
 const T = require('../motor/tiempo');
 const { prepararDia, huecoAInstantes, tratamientoParaMotor } = require('../motor/agenda/dia');
 const { buscarHuecos, proponer } = require('../motor/agenda/huecos');
 const E = require('../motor/agenda/estados');
+const { cifrar, descifrar, tieneClave } = require('./cripto');
 const { registrar } = require('./eventos');
 
 class ErrorAgenda extends Error {
   constructor(codigo, mensaje) { super(mensaje); this.codigo = codigo; }
+}
+
+// ── El enlace de «Tu cita» ────────────────────────────────────────────────────────────────────
+// El token son 32 bytes aleatorios en base64url (43 caracteres): no se puede adivinar ni recorrer.
+// En la base solo hay su huella (SHA-256), para encontrar la cita, y el token cifrado con
+// CLAVE_CIFRADO, para volver a mandar el enlace: una copia de la base no da enlaces con los que
+// cancelar citas. Caduca 30 días después de la cita.
+const DIAS_ENLACE = 30;
+const FORMATO_TOKEN = /^[A-Za-z0-9_-]{43}$/;
+
+const tokenValido = (token) => typeof token === 'string' && FORMATO_TOKEN.test(token);
+const huellaToken = (token) => crypto.createHash('sha256').update(String(token), 'utf8').digest();
+const caducidadEnlace = (fin) => new Date(new Date(fin).getTime() + DIAS_ENLACE * 86400000);
+
+// Un token nuevo y las columnas que lo guardan.
+function nuevoToken() {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const c = cifrar(token);
+  return { token, columnas: { token_hash: huellaToken(token), token_cifrado: c.cifrado, token_iv: c.iv, token_tag: c.tag } };
+}
+
+// El token de una cita (de su fila): null si no se puede descifrar (o no lo tiene). Una cita de antes
+// de la migración 010 que aún no se ha cifrado (ver cifrarTokensAntiguos) lo tiene en token_antiguo.
+function tokenDe(cita) {
+  if (!cita?.token_cifrado || !cita.token_iv || !cita.token_tag) return tokenValido(cita?.token_antiguo) ? cita.token_antiguo : null;
+  try {
+    const t = descifrar(cita.token_cifrado, cita.token_iv, cita.token_tag);
+    return tokenValido(t) ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+// El token para mandárselo (cita: su id o su fila con las columnas del token): el suyo. Si aún está
+// en claro (de antes de la 010), se cifra ahora con la clave de la app. Una cita que no se dio por aquí
+// (importada, insertada a mano) no lo tiene: recibe uno nuevo. Si lo tiene pero no se puede descifrar
+// (otra CLAVE_CIFRADO), null: su enlace sigue valiendo y no se toca.
+async function tokenParaEnviar(q, cita) {
+  const id = typeof cita === 'object' ? cita?.id : cita;
+  if (cita && typeof cita === 'object' && cita.token_cifrado) return tokenDe(cita);
+  // SELECT *: token_antiguo desaparecerá con una migración posterior.
+  const [[c]] = await q.query('SELECT * FROM citas WHERE id = ?', [id]);
+  if (!c) return null;
+  if (c.token_cifrado) return tokenDe(c);
+  if (tokenValido(c.token_antiguo)) {
+    await cifrarTokenAntiguo(q, c);
+    return c.token_antiguo;
+  }
+  const { token, columnas } = nuevoToken();
+  // Si otro envío se lo acaba de dar, vale el suyo (el enlace que ya ha salido).
+  const [r] = await q.query('UPDATE citas SET ? WHERE id = ? AND token_cifrado IS NULL', [columnas, c.id]);
+  if (r.affectedRows !== 1) return tokenParaEnviar(q, c.id);
+  await registrar(q, { tipo: 'cita_enlace_nuevo', entidad: 'cita', entidadId: c.id });
+  return token;
+}
+
+async function cifrarTokenAntiguo(q, fila) {
+  const c = cifrar(fila.token_antiguo);
+  await q.query(
+    'UPDATE citas SET token_hash = ?, token_cifrado = ?, token_iv = ?, token_tag = ?, token_antiguo = NULL WHERE id = ? AND token_antiguo = ?',
+    [huellaToken(fila.token_antiguo), c.cifrado, c.iv, c.tag, fila.id, fila.token_antiguo]);
+}
+
+function enlaceCaducado(cita, ahora = new Date()) {
+  const hasta = cita.token_caduca_en ? new Date(cita.token_caduca_en) : caducidadEnlace(cita.fin);
+  return hasta <= ahora;
+}
+
+// El UID del .ics (cita: su fila, o lo que devuelve la página, con su token): el que se le dio al
+// reservarla, un UUID aleatorio (o, en las de antes de la 010, el que ya tenían los calendarios). Una
+// cita que no se dio con reservar() (importada, insertada a mano) no lo tiene guardado: el suyo sale de
+// la huella de su enlace (UUID v5), siempre el mismo y sin escribir nada, porque los GET no escriben
+// (las vistas previas de enlaces los abren solos). De la huella no se vuelve al token, y del UID
+// tampoco a la huella.
+const ESPACIO_UID = Buffer.from('4789c18606de46e5bd2b88f7aed74ced', 'hex');
+function uidIcs(cita) {
+  if (cita?.uid_ics) return cita.uid_ics;
+  const huella = cita?.token_hash || (tokenValido(cita?.token) ? huellaToken(cita.token) : null);
+  if (!huella) return null;
+  const h = crypto.createHash('sha1').update(ESPACIO_UID).update(Buffer.from(huella)).digest();
+  h[6] = (h[6] & 0x0f) | 0x50; // versión 5
+  h[8] = (h[8] & 0x3f) | 0x80; // variante RFC 4122
+  const x = h.subarray(0, 16).toString('hex');
+  return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20)}`;
+}
+
+// Los tokens de antes de la migración 010, que estaban en claro: se cifran y se borran (su huella
+// ya la calculó la migración, así que sus enlaces valen desde el primer momento). Lo llama migrar() en
+// cada pasada: cuando ya no queda ninguno, solo es una consulta; y cuando una migración quite la
+// columna token_antiguo, ni eso. Devuelve cuántos ha cifrado.
+//
+// Nunca con la clave de desarrollo (salvo en las pruebas): si migrar se lanza sin CLAVE_CIFRADO (en
+// cPanel, la variable puesta solo en «Setup Node.js App» y no en el .env), la app, que sí la tiene,
+// no podría descifrarlos. Entonces se quedan como están, se avisa, y la app los cifra al usarlos.
+const enPruebas = () => process.env.NODE_ENV === 'test' || Boolean(process.env.NODE_TEST_CONTEXT);
+async function cifrarTokensAntiguos(q, { log = () => {}, claveDeDesarrollo = enPruebas() } = {}) {
+  const [[columna]] = await q.query(
+    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'citas' AND COLUMN_NAME = 'token_antiguo'");
+  if (!Number(columna.n)) return 0;
+  const [filas] = await q.query('SELECT id, token_antiguo FROM citas WHERE token_antiguo IS NOT NULL');
+  if (filas.length && !tieneClave() && !claveDeDesarrollo) {
+    log(`⚠ ${filas.length} enlaces de «Tu cita» de antes siguen sin cifrar: falta CLAVE_CIFRADO en este entorno. Ponla en el .env y vuelve a lanzar la migración (mientras, la app los cifra al usarlos).`);
+    return 0;
+  }
+  for (const f of filas) await cifrarTokenAntiguo(q, f);
+  return filas.length;
+}
+
+// Cambia el enlace de «Tu cita» cuando el paciente lo pide (ha perdido el móvil, ha cambiado de
+// teléfono, comparte su calendario): el que tenía deja de valer al momento, esté donde esté (WhatsApp,
+// su calendario, un reenvío). También el de las citas de la misma cadena de cambios (las que se
+// cambiaron a esta y a la que se cambió), porque la página de una lleva a la otra. El UID del .ics no
+// cambia: es el mismo evento. Devuelve la cita que está en pie (la última de la cadena) con su enlace
+// nuevo, y qué citas han cambiado.
+async function cambiarEnlace(pool, citaId, { actor = 'sistema' } = {}) {
+  const con = await pool.getConnection();
+  try {
+    await con.beginTransaction();
+    const [[pedida]] = await con.query('SELECT id FROM citas WHERE id = ? FOR UPDATE', [citaId]);
+    if (!pedida) throw new ErrorAgenda('CITA_DESCONOCIDA', 'No existe esa cita');
+    const ids = new Set([pedida.id]);
+    for (let nuevas = [pedida.id]; nuevas.length && ids.size < 50;) {
+      const [filas] = await con.query(
+        'SELECT id FROM citas WHERE reprograma_a_id IN (?) UNION SELECT reprograma_a_id FROM citas WHERE id IN (?) AND reprograma_a_id IS NOT NULL',
+        [nuevas, nuevas]);
+      nuevas = filas.map((f) => f.id).filter((id) => !ids.has(id));
+      for (const id of nuevas) ids.add(id);
+    }
+    // SELECT *: si aún tiene el token en claro de antes de la 010 (token_antiguo), también se borra; si
+    // no, cifrarTokensAntiguos lo volvería a dar por bueno.
+    const [cadena] = await con.query('SELECT * FROM citas WHERE id IN (?) ORDER BY id FOR UPDATE', [[...ids]]);
+    const tokens = new Map();
+    for (const c of cadena) {
+      const { token, columnas } = nuevoToken();
+      await con.query('UPDATE citas SET ? WHERE id = ?', [{ ...columnas, ...('token_antiguo' in c ? { token_antiguo: null } : {}) }, c.id]);
+      tokens.set(c.id, token);
+      await registrar(con, { tipo: 'cita_enlace_cambiado', entidad: 'cita', entidadId: c.id, actor, datos: { pedido: pedida.id } });
+    }
+    await con.commit();
+    const enPie = cadena.find((c) => c.estado !== 'reprogramada') || cadena.find((c) => c.id === pedida.id);
+    return { citaId: enPie.id, token: tokens.get(enPie.id), cambiadas: cadena.map((c) => c.id) };
+  } catch (err) {
+    await con.rollback().catch(() => {});
+    throw err;
+  } finally {
+    con.release();
+  }
+}
+
+// ── La sede de la cita ────────────────────────────────────────────────────────────────────────
+// Dónde es la cita: la sede de su sala o, si la sala no tiene (o la cita no tiene sala), la
+// principal. Sin sedes dadas de alta, lo que diga la ficha de la clínica. La cabina no sale de aquí:
+// puede cambiar y en el calendario del paciente se quedaría vieja (la página la enseña al día).
+async function sedeDe(q, salaId = null) {
+  const [[s]] = await q.query(
+    `SELECT id, codigo, nombre, direccion, cp, municipio, provincia, lat, lng, indicaciones FROM sedes
+      WHERE id = COALESCE((SELECT sede_id FROM salas WHERE id = ?), (SELECT id FROM sedes WHERE activa ORDER BY principal DESC, id LIMIT 1))`,
+    [salaId || 0]);
+  if (s) return { ...s, lat: s.lat == null ? null : Number(s.lat), lng: s.lng == null ? null : Number(s.lng) };
+  const [[cl]] = await q.query('SELECT nombre_corto, direccion, cp, municipio, provincia, lat, lng FROM clinica WHERE id = 1');
+  if (!cl) return null;
+  return {
+    id: null, codigo: null, nombre: cl.nombre_corto || 'IEMEC', direccion: cl.direccion, cp: cl.cp, municipio: cl.municipio, provincia: cl.provincia,
+    lat: cl.lat == null ? null : Number(cl.lat), lng: cl.lng == null ? null : Number(cl.lng), indicaciones: null,
+  };
 }
 
 // Una cita que todavía vale: confirmada o retenida a tiempo, y que no ha empezado.
@@ -168,19 +336,21 @@ async function reservar(pool, p) {
     const inst = huecoAInstantes(p.fecha, hueco, t.motor);
     const [[clinica]] = await con.query('SELECT retencion_hueco_min FROM clinica WHERE id = 1');
     const retenidaHasta = p.retener ? new Date(ahora.getTime() + (p.retenerMin || clinica?.retencion_hueco_min || 15) * 60000) : null;
-    const token = crypto.randomBytes(32).toString('base64url');
+    const { token, columnas } = nuevoToken();
+    const uid = crypto.randomUUID();
     // La cita cambiada conserva de dónde vino y si era primera visita (una reserva de recepción que
     // el paciente mueve por WhatsApp no es una cita nueva recuperada por la IA).
     const [r] = await con.query(
       `INSERT INTO citas (paciente_id, tratamiento_id, profesional_id, sala_id, equipo_id, inicio, fin,
          sala_desde, sala_hasta, prof_desde, prof_hasta, estado, retenida_hasta, origen, conversacion_id, primera_visita,
-         token, creada_por, confirmada_en, creado_en)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         token_hash, token_cifrado, token_iv, token_tag, token_caduca_en, uid_ics, creada_por, confirmada_en, creado_en)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [p.pacienteId, t.fila.id, hueco.profesionalId, hueco.salaId, hueco.equipoId, inst.inicio, inst.fin,
         inst.sala_desde, inst.sala_hasta, inst.prof_desde, inst.prof_hasta,
         p.retener ? 'retenida' : 'confirmada', retenidaHasta, vieja ? vieja.origen : p.origen || 'recepcion', p.conversacionId || null,
         vieja ? Boolean(vieja.primera_visita) : Boolean(p.primeraVisita),
-        token, p.actor || 'sistema', p.retener ? null : ahora, ahora]);
+        columnas.token_hash, columnas.token_cifrado, columnas.token_iv, columnas.token_tag, caducidadEnlace(inst.fin), uid,
+        p.actor || 'sistema', p.retener ? null : ahora, ahora]);
     if (vieja) await marcarReprogramada(con, vieja, r.insertId, { ahora, actor: p.actor || 'paciente' });
     if (p.leadId) await con.query("UPDATE leads SET etapa = 'cita', cita_id = ? WHERE id = ?", [r.insertId, p.leadId]);
     // Un hueco que solo se le guarda (la lista de espera) aún no es una cita: sus secuencias siguen
@@ -188,7 +358,7 @@ async function reservar(pool, p) {
     if (!p.retener) await terminarSecuencias(con, { pacienteId: p.pacienteId, leadId: p.leadId });
     await registrar(con, { tipo: p.retener ? 'cita_retenida' : 'cita_reservada', entidad: 'cita', entidadId: r.insertId, actor: p.actor, datos: { fecha: p.fecha, hora: p.hora, tratamiento: t.fila.id, profesional: hueco.profesionalId, sala: hueco.salaId, reprograma: vieja?.id } });
     await con.commit();
-    return { id: r.insertId, token, estado: p.retener ? 'retenida' : 'confirmada', retenidaHasta, reprograma: vieja ? vieja.id : null, ...inst, profesionalId: hueco.profesionalId, salaId: hueco.salaId, equipoId: hueco.equipoId };
+    return { id: r.insertId, token, uidIcs: uid, estado: p.retener ? 'retenida' : 'confirmada', retenidaHasta, reprograma: vieja ? vieja.id : null, ...inst, profesionalId: hueco.profesionalId, salaId: hueco.salaId, equipoId: hueco.equipoId };
   } catch (err) {
     await con.rollback().catch(() => {});
     throw err;
@@ -200,15 +370,17 @@ async function reservar(pool, p) {
 /**
  * Cambia el estado de una cita según la tabla de transiciones (motor/agenda/estados.js): bloquea la
  * fila, comprueba que el cambio vale (también por la hora), guarda cuándo pasó y lo anota en eventos.
- * @param {object} p id o token, a (estado nuevo), de? (restringe los estados de partida de la tabla),
- *   actor, motivo, por, ahora, alCambiar? (con, cita) → lo que ese cambio mueve en el resto de la app,
- *   en la misma transacción; lo que devuelve queda en el evento (servidor/estados-cita.js)
+ * @param {object} p id o token (el del enlace «Tu cita»: se busca por su huella), a (estado nuevo),
+ *   de? (restringe los estados de partida de la tabla), actor, motivo, por, ahora, alCambiar? (con,
+ *   cita) → lo que ese cambio mueve en el resto de la app, en la misma transacción; lo que devuelve
+ *   queda en el evento (servidor/estados-cita.js)
  */
 async function cambiarEstado(pool, { id, token, de = null, a, actor = 'sistema', motivo = null, por = null, ahora = new Date(), alCambiar = null }) {
+  if (!id && !tokenValido(token)) throw new ErrorAgenda('CITA_DESCONOCIDA', 'No existe esa cita');
   const con = await pool.getConnection();
   try {
     await con.beginTransaction();
-    const [[cita]] = await con.query(`SELECT * FROM citas WHERE ${id ? 'id = ?' : 'token = ?'} FOR UPDATE`, [id || token]);
+    const [[cita]] = await con.query(`SELECT * FROM citas WHERE ${id ? 'id = ?' : 'token_hash = ?'} FOR UPDATE`, [id || huellaToken(token)]);
     if (!cita) throw new ErrorAgenda('CITA_DESCONOCIDA', 'No existe esa cita');
     const vale = E.comprobarCambio(cita, a, ahora, { de });
     if (!vale.ok) throw new ErrorAgenda(vale.codigo, vale.mensaje);
@@ -330,6 +502,8 @@ async function caducarRetenciones(pool, ahora = new Date()) {
 }
 
 module.exports = {
+  DIAS_ENLACE, tokenValido, huellaToken, nuevoToken, tokenDe, tokenParaEnviar, caducidadEnlace, enlaceCaducado, uidIcs,
+  cifrarTokensAntiguos, cambiarEnlace, sedeDe,
   huecos, proximosHuecos, reservar, cambiarEstado, deshacerEstado, ultimoCambio, confirmar, cancelar, confirmarRetenida,
   caducarRetenciones, cargarDia, sigueEnPie, ErrorAgenda,
 };

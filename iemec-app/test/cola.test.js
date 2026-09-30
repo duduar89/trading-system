@@ -32,10 +32,11 @@ test('cola y candados', async (t) => {
       assert.match(f.ultimo_error, /caído/);
     });
     await t.test('aplazar: vuelve a la cola sin gastar intento, aunque se aplace muchas veces', async () => {
-      const id = await cola.encolar(pool, 'espera', {}, { maxIntentos: 1 });
+      const ahora = new Date('2026-10-06T10:00:00Z');
+      // Con su hora: sin ella, la del reloj de verdad, que desde el 6 de octubre ya no se coge a «ahora».
+      const id = await cola.encolar(pool, 'espera', {}, { maxIntentos: 1, ejecutarEn: ahora });
       let listo = false;
       const man = { espera: async () => (listo ? 'hecho' : cola.aplazar({ minutos: 1 })) };
-      const ahora = new Date('2026-10-06T10:00:00Z');
       for (let i = 0; i < 3; i++) assert.deepEqual(await cola.procesar(pool, man, { ahora: new Date(ahora.getTime() + i * 60000) }), { hechos: 0, reintentos: 0, fallidos: 0, aplazados: 1 });
       const [[f]] = await pool.query('SELECT estado, intentos, ejecutar_en FROM cola WHERE id = ?', [id]);
       assert.deepEqual([f.estado, f.intentos], ['pendiente', 0]);

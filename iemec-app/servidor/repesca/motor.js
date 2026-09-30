@@ -23,7 +23,8 @@ const { decidir } = require('../../motor/repesca/decidir');
 const { calcularSeguimiento } = require('../../motor/repesca/plazos');
 const { comprobarOfertaPropuesta } = require('../../motor/repesca/ofertas');
 const { revisar, esSensible } = require('../../motor/repesca/filtro-legal');
-const { elegirPlantilla, rellenar, BIBLIOTECA } = require('../../motor/repesca/plantillas');
+const { elegirPlantilla, rellenar, botonesDe, cabeceraDe, BIBLIOTECA } = require('../../motor/repesca/plantillas');
+const { textoSede } = require('../../motor/calendario/ics');
 const S = require('../../motor/repesca/secuencias');
 const { combinar, textoSimulado } = require('../integraciones/ia');
 const { cifrar, descifrar } = require('../cripto');
@@ -538,15 +539,32 @@ const mayuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 const ventanaDe = (hora) => ({ desde: T.minutosDe(hora) - 60, hasta: T.minutosDe(hora) + 61 });
 const FRANJA_TEXTO = { manana: 'mañana', tarde: 'tarde' };
 
+// Lo que los mensajes dicen de una cita: día, hora, la sede de su sala (donde: «IEMEC (Av. Siglo XXI,
+// 13, local 35, Boadilla del Monte)») y sus dos enlaces, «Tu cita» (url) y «Añadir al calendario»
+// (urlCalendario). El tratamiento viene para quien lo necesite (la IA, las tareas), pero los mensajes
+// que salen solos no lo nombran.
 async function datosCita(q, citaId) {
-  const [[c]] = await q.query(
-    `SELECT c.id, c.inicio, c.token, c.estado, c.retenida_hasta, c.origen, c.tratamiento_id, t.nombre AS tratamiento, t.reservable_ia,
-            cl.direccion, cl.municipio, cl.nombre_corto
+  const [[fila]] = await q.query(
+    `SELECT c.id, c.inicio, c.estado, c.retenida_hasta, c.origen, c.tratamiento_id, c.sala_id, c.token_cifrado, c.token_iv, c.token_tag,
+            t.nombre AS tratamiento, t.reservable_ia, cl.nombre_corto
        FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id LEFT JOIN clinica cl ON cl.id = 1 WHERE c.id = ?`, [citaId]);
-  if (!c) return null;
+  if (!fila) return null;
+  const token = await agenda.tokenParaEnviar(q, fila);
+  const c = { ...fila };
+  for (const k of ['token_cifrado', 'token_iv', 'token_tag']) delete c[k];
   const inicio = new Date(c.inicio);
-  return { ...c, fecha: T.fechaMadrid(inicio), hora: T.hhmm(T.minutosMadrid(inicio)), url: `${config.urlPublica}/c/${c.token}`,
-    donde: [c.direccion, c.municipio].filter(Boolean).join(', '), marca: c.nombre_corto || 'IEMEC' };
+  const sede = await agenda.sedeDe(q, c.sala_id);
+  return {
+    ...c, token, fecha: T.fechaMadrid(inicio), hora: T.hhmm(T.minutosMadrid(inicio)),
+    url: token ? `${config.urlPublica}/c/${token}` : null, urlCalendario: token ? `${config.urlPublica}/cal/${token}` : null,
+    sede, donde: textoSede(sede), marca: c.nombre_corto || 'IEMEC',
+  };
+}
+
+// Los dos enlaces de la cita, al final del mensaje: añadirla al calendario con un toque y su página.
+function enlacesCita(c) {
+  if (!c.url) return '';
+  return `\n\nAñádela a tu calendario con un toque: ${c.urlCalendario}\nPara verla, cambiarla o cancelarla: ${c.url}`;
 }
 
 // La cita, si todavía vale (confirmada o retenida a tiempo, y sin empezar).
@@ -555,12 +573,26 @@ async function citaEnPie(q, citaId, ahora) {
   return agenda.sigueEnPie(c, ahora) ? c : null;
 }
 
-// antes: la cita que esta sustituye (se le dice que queda anulada).
+// La cita que le acaba de quedar, con sus dos enlaces. No nombra el tratamiento: el mensaje se lee
+// en la pantalla bloqueada (su página sí lo dice). antes: la cita que esta sustituye (queda anulada;
+// en su calendario es otro evento, así que se le pide borrarla).
 function textoCitaReservada(c, { nombre, hola = '', antes = null }) {
-  return `${hola}¡Hecho${nombre ? `, ${nombre}` : ''}! ${antes ? 'Te he cambiado la cita: te' : 'Te'} esperamos ${textoDia(c.fecha)} a las ${c.hora} en ${c.marca}`
-    + `${c.donde ? ` (${c.donde})` : ''} para: ${c.tratamiento}.`
-    + `${antes ? ` La del ${textoDia(antes.fecha).slice(3)} a las ${antes.hora} queda anulada.` : ''}\n\n`
-    + `Aquí tienes tu cita para añadirla a tu calendario, y cambiarla o cancelarla si lo necesitas: ${c.url}`;
+  return `${hola}¡Hecho${nombre ? `, ${nombre}` : ''}! ${antes ? 'Te he cambiado la cita: te' : 'Te'} esperamos ${textoDia(c.fecha)} a las ${c.hora}`
+    + `${c.donde ? ` en ${c.donde}` : ''}.`
+    + `${antes ? ` La del ${textoDia(antes.fecha).slice(3)} a las ${antes.hora} queda anulada: si la tenías en tu calendario, bórrala.` : ''}`
+    + enlacesCita(c);
+}
+
+// Le manda la cita que le acaba de quedar (textoCitaReservada). Es su confirmación: el aviso de
+// confirmación ya no sale. Y, como tras cualquier aviso de su cita, su «sí» a secas (o su «no») contesta
+// a eso y no a la repesca, que le ofrecería huecos para otra cita.
+async function mandarCitaReservada(deps, conv, citaId, respuesta, ahora) {
+  const envio = await enviar(deps, conv, { texto: respuesta, autor: 'ia', ahora });
+  if (envio.estado === 'enviado') {
+    await deps.pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [ahora, citaId]);
+    await ponerPregunta(deps.pool, conv.id, { tipo: 'confirmar_cita', citaId, mensajeId: envio.mensajeId }, ahora);
+  }
+  return envio;
 }
 
 async function enTransaccion(pool, fn) {
@@ -599,8 +631,7 @@ async function reservarElegido(deps, conv, { fecha, hora, tratamientoId }, { aho
     await aplicarDecision(con, fresca, decision, { ahora, texto: frase, datos });
   });
   const respuesta = textoCitaReservada(await datosCita(pool, cita.id), { nombre: nombre || pac?.nombre, hola, antes: cita.reprograma ? reprograma : null });
-  const envio = await enviar(deps, conv, { texto: respuesta, autor: 'ia', ahora });
-  if (envio.estado === 'enviado') await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [ahora, cita.id]);
+  const envio = await mandarCitaReservada(deps, conv, cita.id, respuesta, ahora);
   return { conversacionId: conv.id, eleccion: 'reservada', cita, decision, respuesta, envio };
 }
 
@@ -726,6 +757,9 @@ const SI = new RegExp('^(si|sii+)\\b(?!\\s+(me|te|se|le|les|lo|la|los|las|nos|os
 const SI_CLARO = new RegExp('^(si|sii+)\\b(?!\\s+(me|te|se|le|les|lo|la|los|las|nos|os|no|puedes|puede|podeis|pudiera|pudieras|hay|es|fuera|quieres|tienes|teneis|necesito|al final)\\b)'
   + '|^(claro|adelante|hazlo|por favor|porfa|dale|venga)\\b');
 const NO = /^(no|nop|nope|mejor no|para nada|imposible|paso)\b(?!\s+se\b)/;
+// Un sí sin nada más (sin signos ni emojis): lo que contesta a «¿Nos confirmas que vienes?» y no hay
+// que leer.
+const SI_A_SECAS = /^(si( si)*|sii+|claro( que si)?|por supuesto|vale|ok|okey|okay|de acuerdo|perfecto|genial|estupendo|confirmo|confirmado|confirmada|cuenta conmigo|(si )?(alli|ahi) (estare|estaremos)|si (confirmo|claro|por supuesto|de acuerdo|perfecto|genial|vale|ok))( (muchas |mil )?gracias)?$/;
 // «¿No hay nada antes?» (y no «antes de las 12», que es una hora; «muy tarde» suele ser la hora del día).
 const ANTES = /\b(nada|algo|ningun hueco|hueco|huecos|cita|libre) (mas )?antes\b(?! de (las|la|comer|trabajar))|\b(lo|la) (necesito|quiero|querria|necesitaria|preferiria) antes\b(?! de)|\bmas (pronto|cerca)\b|\bantes no (hay|teneis|tienes)\b|\bdemasiado lejos\b|\bno puedo esperar/;
 
@@ -738,6 +772,19 @@ async function citasProximas(q, pacienteId, ahora) {
       ORDER BY inicio LIMIT 5`,
     [pacienteId, ahora, new Date(ahora.getTime() + 60 * 86400000)]);
   return filas.map((c) => ({ id: c.id, fecha: T.fechaMadrid(new Date(c.inicio)), hora: T.hhmm(T.minutosMadrid(new Date(c.inicio))) }));
+}
+
+// Lo que queda de la conversación es su cita: se cierra «con cita» (si vuelve a escribir, se reabre:
+// ver conversacionPara). Solo si no tiene nada más en marcha: con un seguimiento pendiente (el «como
+// quedamos» de un presupuesto) o una tarea abierta, se queda como está; cerrada, procesarSeguimientos
+// se saltaría ese seguimiento. Lo usan también los avisos de cita. Devuelve si la ha cerrado.
+async function cerrarConCita(q, conversacionId, inicio) {
+  const [r] = await q.query(
+    `UPDATE conversaciones c SET c.estado = 'cerrada', c.motivo_cierre = 'cita', c.proximo_paso = 'cita', c.proximo_paso_en = ?
+      WHERE c.id = ? AND c.estado IN ('ia_activa','esperando_paciente')
+        AND NOT EXISTS (SELECT 1 FROM seguimientos s WHERE s.conversacion_id = c.id AND s.estado = 'pendiente')
+        AND NOT EXISTS (SELECT 1 FROM tareas t WHERE t.conversacion_id = c.id AND t.estado = 'abierta')`, [inicio, conversacionId]);
+  return r.affectedRows === 1;
 }
 
 async function atenderSobreCita(deps, conv, { texto, ahora, datos, nombre, hola = '', hist }) {
@@ -766,7 +813,7 @@ async function atenderSobreCita(deps, conv, { texto, ahora, datos, nombre, hola 
   // Un «gracias» al «gracias» no hace falta: si ya le contestamos hace poco, no se repite.
   const ultimo = [...hist].reverse().find((m) => m.autor !== 'paciente');
   const reciente = ultimo && /^(¡A ti|¡Perfecto)/.test(ultimo.texto) && ahora - new Date(ultimo.en) < 30 * 60000;
-  await pool.query("UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cita', proximo_paso = 'cita', proximo_paso_en = ? WHERE id = ?", [c.inicio, conv.id]);
+  await cerrarConCita(pool, conv.id, c.inicio);
   if (reciente) return { conversacionId: conv.id, sobreCita: confirma ? 'confirma' : 'agradece', respuesta: null };
   const respuesta = confirma
     ? `¡Perfecto${n}! Queda confirmada: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`
@@ -850,7 +897,7 @@ async function cambioAPersona(deps, conv, c, { ahora, nombre, hola = '', texto =
   });
   const sigue = `mientras, tu cita ${textoDia(c.fecha)} a las ${c.hora} sigue en pie`;
   const respuesta = {
-    no_reservable: `${hola}Sin problema${n}. Una persona del equipo te ayuda ahora mismo a buscar otro momento. Si prefieres cancelarla, puedes hacerlo desde aquí: ${c.url}`,
+    no_reservable: `${hola}Sin problema${n}. Una persona del equipo te ayuda ahora mismo a buscar otro momento.${c.url ? ` Si prefieres cancelarla, puedes hacerlo desde aquí: ${c.url}` : ''}`,
     treatwell: `${hola}Sin problema${n}. Esa cita se reservó en Treatwell: una persona del equipo te ayuda ahora mismo a cambiarla o cancelarla y te lo confirma por aquí.`,
     sin_huecos: `${hola}Ahora mismo no veo huecos para eso${n}. Una persona del equipo te ayuda por aquí a buscar otro momento; ${sigue}.`,
     no_entendido: `${hola}Perdona${n}, no te he entendido bien. Una persona del equipo te ayuda ahora mismo a buscar otro momento; ${sigue}.`,
@@ -865,7 +912,9 @@ async function dejarComoEsta(deps, conv, c, { ahora, nombre, hola = '' }) {
   await pool.query(`UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cita', proximo_paso = 'cita', proximo_paso_en = ?,
                       reprograma_cita_id = NULL, huecos_ofrecidos = NULL, huecos_ofrecidos_en = NULL WHERE id = ?`, [c.inicio, conv.id]);
   await anotar(pool, conv, 'cita', [{ tipo: 'mantener_cita', citaId: c.id }], 'cita');
-  return contestar(deps, conv, `${hola}Perfecto${nombre ? `, ${nombre}` : ''}, la dejamos como está: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`, ahora, { sobreCita: 'mantiene' });
+  // Su «sí, gracias» a esto confirma la cita (como tras un aviso): no se lo lleva la repesca.
+  return preguntar(deps, conv, `${hola}Perfecto${nombre ? `, ${nombre}` : ''}, la dejamos como está: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`,
+    { tipo: 'confirmar_cita', citaId: c.id }, ahora, { sobreCita: 'mantiene' });
 }
 
 // «Cancela mi cita»: se le pregunta una vez antes de hacerlo (y se le ofrece cambiarla). Si contesta
@@ -899,7 +948,7 @@ async function cancelarPorWhatsapp(deps, conv, c, { ahora, nombre, hola = '' }) 
   await pool.query(`UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cancelada', proximo_paso = 'cerrada', proximo_paso_en = NULL,
                       reprograma_cita_id = NULL, huecos_ofrecidos = NULL, huecos_ofrecidos_en = NULL WHERE id = ?`, [conv.id]);
   await anotar(pool, conv, 'cita', [{ tipo: 'cancelar_cita', citaId: c.id }], 'cerrada');
-  return preguntar(deps, conv, `${hola}Hecho${nombre ? `, ${nombre}` : ''}: tu cita del ${textoDia(c.fecha).slice(3)} a las ${c.hora} queda cancelada. ¿Quieres que te busque otro momento más adelante?`,
+  return preguntar(deps, conv, `${hola}Hecho${nombre ? `, ${nombre}` : ''}: tu cita del ${textoDia(c.fecha).slice(3)} a las ${c.hora} queda cancelada. Si la tenías en tu calendario, bórrala. ¿Quieres que te busque otro momento más adelante?`,
     { tipo: 'buscar_otro', tratamientoId: c.tratamiento_id }, ahora, { sobreCita: 'cancelada' });
 }
 
@@ -911,6 +960,33 @@ async function atenderPregunta(deps, conv, pregunta, { texto, ahora, datos, regl
   const n = nombre ? `, ${nombre}` : '';
   const si = SI.test(t);
   const no = NO.test(t);
+
+  if (pregunta.tipo === 'confirmar_cita') {
+    // Lo último que le dijimos es su cita: «¿Nos confirmas que vienes?» (la víspera), cualquier otro aviso
+    // de la cita (la confirmación, el de 2 horas), la que le acaba de quedar o «la dejamos como está».
+    // Cambiarla o cancelarla lo entiende atenderSobreCita. Un «sí» (o «Sí, allí estaré», el botón)
+    // confirma; si añade algo («sí, pero llegaré tarde», «sí, ¿se puede aparcar?»), confirma igual y lo
+    // lee una persona. Un «no», se le pregunta si la cancela.
+    const c = await citaEnPie(pool, pregunta.citaId, ahora);
+    if (!c || CAMBIO.test(t) || CANCELAR.test(t)) return null;
+    if (si || CONFIRMA.test(t)) {
+      await registrar(pool, { tipo: 'cita_confirmada_paciente', entidad: 'cita', entidadId: c.id, actor: 'paciente', datos: { por: 'whatsapp' } });
+      const confirmada = `¡Perfecto${n}! Queda confirmada: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`;
+      if (SI_A_SECAS.test(t.replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim())) {
+        // La víspera puede haber entrado en una conversación con algo en marcha: entonces sigue abierta.
+        await cerrarConCita(pool, conv.id, c.inicio);
+        return contestar(deps, conv, confirmada, ahora, { sobreCita: 'confirma' });
+      }
+      const decision = { intencion: 'cita', acciones: [{ tipo: 'pasar_a_persona', motivo: `Confirma su cita del ${textoDia(c.fecha).slice(3)} a las ${c.hora} y añade algo: leer su mensaje` }], proximoPaso: 'persona' };
+      await enTransaccion(pool, async (con) => {
+        const [[fresca]] = await con.query('SELECT * FROM conversaciones WHERE id = ? FOR UPDATE', [conv.id]);
+        await aplicarDecision(con, fresca, decision, { ahora, texto, datos: null });
+      });
+      return contestar(deps, conv, `${confirmada} Una persona del equipo lee lo que nos cuentas y te contesta por aquí si hace falta.`, ahora, { sobreCita: 'confirma', decision });
+    }
+    if (no) return preguntarCancelar(deps, conv, c, { ahora, nombre, hola });
+    return null;
+  }
 
   if (pregunta.tipo === 'cancelar_cita') {
     const c = await citaEnPie(pool, pregunta.citaId, ahora);
@@ -1155,28 +1231,40 @@ async function aceptarOferta(deps, conv, oferta, { texto, ahora, datos, nombre, 
   });
   const antes = r.reprograma ? await datosCita(pool, r.reprograma) : null;
   const respuesta = textoCitaReservada(await datosCita(pool, r.citaId), { nombre, hola, antes });
-  const envio = await enviar(deps, conv, { texto: respuesta, autor: 'ia', ahora });
-  // La confirmación ya le ha llegado aquí: el aviso de confirmación no se repite.
-  if (envio.estado === 'enviado') await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [ahora, r.citaId]);
+  const envio = await mandarCitaReservada(deps, conv, r.citaId, respuesta, ahora);
   return { conversacionId: conv.id, listaEspera: 'aceptada', citaId: r.citaId, reprograma: r.reprograma, decision, respuesta, envio };
 }
 
-// Envía un texto libre (solo con la ventana de 24 h abierta) o una plantilla.
-async function enviar(deps, conv, { texto = null, plantilla = null, variables = [], botonUrl = null, autor = 'sistema', ahora = new Date() }) {
+/**
+ * Envía un texto libre (solo con la ventana de 24 h abierta) o una plantilla.
+ * Con plantilla: variables (del cuerpo), botones (el final de la URL de cada botón de enlace de la
+ * plantilla, por orden: el token de la cita en /cal/{{1}} y /c/{{1}}; botonUrl, el del primero) y
+ * cabecera ({ tipo: 'ubicacion', lat, lng, nombre, direccion }: solo sale si la plantilla la tiene).
+ */
+async function enviar(deps, conv, { texto = null, plantilla = null, variables = [], botones = null, botonUrl = null, cabecera = null, autor = 'sistema', ahora = new Date() }) {
   const { pool, whatsapp } = deps;
+  const conBotones = plantilla ? botonesDelEnvio(plantilla, botones ?? (botonUrl == null ? [] : [botonUrl])) : [];
+  const conCabecera = plantilla && cabecera && cabeceraDe(plantilla)?.tipo === cabecera.tipo ? cabecera : null;
   let r;
   let estado = 'enviado';
   let error = null;
   try {
     r = plantilla
-      ? await whatsapp.enviarPlantilla({ telefono: conv.telefono, nombre: plantilla.nombre, idioma: plantilla.idioma || 'es', variables, botonUrl })
+      ? await whatsapp.enviarPlantilla({
+        telefono: conv.telefono, nombre: plantilla.nombre, idioma: plantilla.idioma || 'es', variables,
+        botones: conBotones.map(({ indice, valor }) => ({ tipo: 'url', indice, valor })), cabecera: conCabecera,
+      })
       : await whatsapp.enviarTexto({ telefono: conv.telefono, texto });
   } catch (err) {
     estado = 'fallido';
     error = err.message;
   }
-  // En la conversación queda el texto tal y como lo lee el paciente (con el enlace del botón).
-  const cuerpo = plantilla ? `${rellenar(plantilla, variables)}${botonUrl ? `\n\n${enlaceDelBoton(plantilla, botonUrl)}` : ''}` : texto;
+  // En la conversación queda el texto tal y como lo lee el paciente, con el mapa y los enlaces de los
+  // botones: uno solo, a secas (como siempre); con dos, cada uno con lo que dice su botón.
+  const enlaces = conBotones.length === 1 ? conBotones[0].enlace : conBotones.map((b) => `${b.texto}: ${b.enlace}`).join('\n');
+  const cuerpo = plantilla
+    ? `${conCabecera ? `[Mapa: ${conCabecera.nombre} · ${conCabecera.direccion}]\n` : ''}${rellenar(plantilla, variables)}${enlaces ? `\n\n${enlaces}` : ''}`
+    : texto;
   const id = await guardarMensaje(pool, { conversacionId: conv.id, direccion: 'saliente', autor, tipo: plantilla ? 'plantilla' : 'texto', texto: cuerpo, waId: r?.waId, estado, plantillaId: plantilla?.id, creadoEn: ahora });
   // Lo que le preguntamos antes ya no es lo último que ha leído (un recordatorio, lo que escribe
   // recepción…): su próximo «sí» no puede contestar a aquello.
@@ -1188,9 +1276,18 @@ async function enviar(deps, conv, { texto = null, plantilla = null, variables = 
   return { mensajeId: id, estado, waId: r?.waId || null };
 }
 
-function enlaceDelBoton(plantilla, valor) {
-  const boton = (parseJson(plantilla.botones) || []).find((b) => b.tipo === 'url');
-  return boton?.url ? boton.url.replace('{{1}}', valor) : `${config.urlPublica}/c/${valor}`;
+// Los botones de enlace de la plantilla que llevan variable, cada uno con su valor (por orden) y su
+// índice entre todos los botones (el que pide Meta): [{ indice, valor, texto, enlace }].
+function botonesDelEnvio(plantilla, valores) {
+  const salida = [];
+  let i = 0;
+  botonesDe(plantilla).forEach((b, indice) => {
+    if (b.tipo !== 'url' || !/\{\{1\}\}/.test(b.url || '')) return;
+    const valor = valores[i++];
+    if (valor == null) return;
+    salida.push({ indice, valor: String(valor), texto: b.texto, enlace: b.url.replace('{{1}}', valor) });
+  });
+  return salida;
 }
 
 // «Valoración HIFU» → «valoración HIFU» (para ponerlo en mitad de una frase sin romper las siglas).
@@ -1539,6 +1636,7 @@ async function sinProximoPaso(q, ahora = new Date()) {
 }
 
 module.exports = {
+  ponerPregunta, textoCitaReservada, enlacesCita, cerrarConCita,
   textoHuecos, textoDia, procesarEntrante, procesarSeguimientos, avanzarSecuencias, inscribir, sinProximoPaso, enviar, historial,
   calendarioDesdeBd, cargarContexto, conversacionPara, datosCita, plantillasBd, enMinuscula, nombreTratamiento, permisoComercial,
 };

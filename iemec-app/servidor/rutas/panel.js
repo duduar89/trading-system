@@ -9,6 +9,7 @@ const { descifrar } = require('../cripto');
 const { comprobarPlantilla } = require('../../motor/repesca/plantillas');
 const R = require('../../motor/resenas/resenas');
 const { ideasDelMes } = require('../../motor/resenas/publicaciones');
+const avisos = require('../avisos-cita');
 const agenda = require('../agenda');
 const listaEspera = require('../lista-espera');
 const repesca = require('../repesca/motor');
@@ -159,6 +160,24 @@ function rutasPanel({ pool, deps = null }) {
     const d = idCita(req) && await estados.detalle(p(), idCita(req), { ahora: req.ahora || new Date() });
     if (!d) return res.status(404).json({ error: 'No existe esa cita' });
     res.json(d);
+  }));
+
+  // Cambiar el enlace de «Tu cita» (lo pide el paciente: ha perdido el móvil, ha cambiado de teléfono
+  // o comparte su calendario): el que tenía deja de valer al momento. Cuerpo: { reenviar: true } para
+  // mandarle el nuevo por WhatsApp (su confirmación, con el enlace nuevo), si la cita sigue en pie.
+  r.post('/citas/:id/enlace', envolver(async (req, res) => {
+    const id = idCita(req);
+    if (!id) return res.status(404).json({ error: 'No existe esa cita', codigo: 'CITA_DESCONOCIDA' });
+    const ahora = req.ahora || new Date();
+    let hecho;
+    try {
+      hecho = await agenda.cambiarEnlace(p(), id, { actor: req.usuario?.email || 'panel' });
+    } catch (err) {
+      if (err.codigo === 'CITA_DESCONOCIDA') return res.status(404).json({ error: err.message, codigo: err.codigo });
+      throw err;
+    }
+    const envio = req.body?.reenviar ? await avisos.reenviarEnlace({ ...deps, pool: p() }, hecho.citaId, { ahora }) : null;
+    res.json({ ...(await estados.detalle(p(), id, { ahora })), enlaceCambiado: { citaId: hecho.citaId, citas: hecho.cambiadas, envio } });
   }));
 
   // Cuerpo: { estado: 'llegada' | 'completada' | 'no_presentada' } o { deshacer: el estado que se ve }

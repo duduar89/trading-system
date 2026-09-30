@@ -272,8 +272,8 @@ test('recepción marca qué pasa con cada cita y eso mueve el resto de la app', 
 
     await t.test('deshacer devuelve el lead aunque viniera a otra cita antes de ser lead (y sigue siendo cliente)', async () => {
       const p = await paciente(pool, { nombre: 'Julia', cliente: true });
-      await pool.query(`INSERT INTO citas (paciente_id, tratamiento_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token)
-        VALUES (?, 'limpieza-facial', '2026-03-03 10:00', '2026-03-03 11:00', '2026-03-03 10:00', '2026-03-03 11:10', '2026-03-03 10:00', '2026-03-03 11:00', 'completada', REPEAT('j', 43))`, [p.id]);
+      await pool.query(`INSERT INTO citas (paciente_id, tratamiento_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token_hash)
+        VALUES (?, 'limpieza-facial', '2026-03-03 10:00', '2026-03-03 11:00', '2026-03-03 10:00', '2026-03-03 11:10', '2026-03-03 10:00', '2026-03-03 11:00', 'completada', UNHEX(SHA2(UUID(), 256)))`, [p.id]);
       const [l] = await pool.query("INSERT INTO leads (paciente_id, telefono, nombre, origen, tratamiento_interes_id, etapa, creado_en) VALUES (?, ?, 'Julia Ejemplo', 'meta_formulario', 'hidratacion-facial', 'conversando', '2026-09-01 10:00')", [p.id, p.telefono]);
       const c = await citaDe(pool, p.id, 'hidratacion-facial', '2026-10-09', '16:00');
       const r = await estados.marcar(pool, { id: c.id, estado: 'completada', ahora: en('2026-10-09', '17:05') });
@@ -540,9 +540,9 @@ async function conServidor(app, fn) {
 async function citaAhora(pool, pacienteId, inicio) {
   const fin = new Date(inicio.getTime() + 60 * 60000);
   const [r] = await pool.query(
-    `INSERT INTO citas (paciente_id, tratamiento_id, profesional_id, sala_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token)
+    `INSERT INTO citas (paciente_id, tratamiento_id, profesional_id, sala_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token_hash)
      VALUES (?, 'limpieza-facial', 20, 1, ?, ?, ?, ?, ?, ?, 'confirmada', ?)`,
-    [pacienteId, inicio, fin, inicio, fin, inicio, fin, crypto.randomBytes(32).toString('base64url')]);
+    [pacienteId, inicio, fin, inicio, fin, inicio, fin, crypto.randomBytes(32)]);
   return r.insertId;
 }
 

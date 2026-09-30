@@ -105,6 +105,34 @@ test('las semillas de la clínica cargan y se pueden repetir sin duplicar', asyn
   }
 });
 
+test('las plantillas aprobadas no se tocan al volver a sembrar, salvo en la demo (una base de demostración de antes se pone al día)', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const json = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
+  const de = async (uso) => (await pool.query('SELECT cuerpo, cabecera, botones, ejemplos, estado FROM plantillas WHERE uso = ?', [uso]))[0][0];
+  try {
+    // Una base de demostración sembrada antes de la vuelta del calendario: la víspera y el aviso de 2 horas
+    // con sus textos de entonces (dos datos, sin mapa ni botones), «aprobados».
+    await semillar(pool, { demo: true });
+    const antes = { cuerpo: 'Hola {{1}}, te esperamos mañana a las {{2}} en IEMEC. ¿Nos lo confirmas?', cabecera: null, botones: '[]', ejemplos: '["Laura","17:00"]' };
+    await pool.query("UPDATE plantillas SET ? WHERE uso IN ('cita_recordatorio_24h','cita_recordatorio_2h')", [antes]);
+    await semillar(pool, { demo: true });
+    for (const uso of ['cita_recordatorio_24h', 'cita_recordatorio_2h']) {
+      const b = BIBLIOTECA.find((x) => x.uso === uso);
+      const p = await de(uso);
+      assert.deepEqual([p.cuerpo, json(p.cabecera), json(p.botones), json(p.ejemplos), p.estado], [b.cuerpo, b.cabecera || null, b.botones, b.ejemplos, 'aprobada'], uso);
+    }
+
+    // Fuera de la demo, una aprobada es el texto que aprobó Meta: no se toca (si cambia, se vuelve a mandar).
+    await pool.query("UPDATE plantillas SET ? WHERE uso = 'cita_recordatorio_24h'", [antes]);
+    await semillar(pool);
+    const real = await de('cita_recordatorio_24h');
+    assert.deepEqual([real.cuerpo, json(real.botones), real.estado], [antes.cuerpo, [], 'aprobada']);
+  } finally {
+    await pool.end();
+  }
+});
+
 test('lo legal: restringidos marcados y fuera de la IA; el quirófano externo, valoración en consulta', async (t) => {
   const pool = await prepararBdDePrueba(t);
   if (!pool) return;

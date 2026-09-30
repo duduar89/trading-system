@@ -29,8 +29,8 @@ async function sembrar(pool) {
     ('limpieza-facial', 'Limpieza facial profunda', 'facial', 60, 10, 54, 'esteticista', 'cabina_estetica', 'cosmetico', TRUE),
     ('hilos-tensores', 'Hilos tensores', 'facial', 60, 10, 450, 'medico', 'consulta_medica', 'producto_sanitario', FALSE)`);
   for (const p of BIBLIOTECA) {
-    await pool.query("INSERT INTO plantillas (nombre, uso, categoria, cuerpo, botones, ejemplos, estado, calidad) VALUES (?, ?, ?, ?, ?, ?, 'aprobada', 'verde')",
-      [p.nombre, p.uso, p.categoria, p.cuerpo, JSON.stringify(p.botones), JSON.stringify(p.ejemplos)]);
+    await pool.query("INSERT INTO plantillas (nombre, uso, categoria, cabecera, cuerpo, botones, ejemplos, estado, calidad) VALUES (?, ?, ?, ?, ?, ?, ?, 'aprobada', 'verde')",
+      [p.nombre, p.uso, p.categoria, p.cabecera ? JSON.stringify(p.cabecera) : null, p.cuerpo, JSON.stringify(p.botones), JSON.stringify(p.ejemplos)]);
   }
 }
 
@@ -75,8 +75,11 @@ test('la cita llega al paciente', async (t) => {
       assert.ok(cita.aviso_confirmacion_en, 'la confirmación ya salió en la conversación');
 
       const texto = whatsapp.enviados.at(-1).texto;
-      assert.match(texto, /^¡Hecho, Alba! Te esperamos el \S+ \d+ de \S+ a las \d\d:\d\d en IEMEC \(Av\. Siglo XXI 13, local 35, Boadilla del Monte\) para: Limpieza facial profunda\./);
-      assert.ok(texto.includes(`/c/${cita.token}`), 'lleva el enlace para añadirla al calendario');
+      assert.match(texto, /^¡Hecho, Alba! Te esperamos el \S+ \d+ de \S+ a las \d\d:\d\d en IEMEC \(Av\. Siglo XXI, 13, local 35, Boadilla del Monte\)\.\n\n/);
+      assert.doesNotMatch(texto, /limpieza|facial/i, 'sin el tratamiento: se lee en la pantalla bloqueada');
+      const token = agenda.tokenDe(cita);
+      assert.ok(texto.includes(`Añádela a tu calendario con un toque: http://localhost:3004/cal/${token}\n`), 'un toque para el calendario');
+      assert.ok(texto.endsWith(`Para verla, cambiarla o cancelarla: http://localhost:3004/c/${token}`), 'y su página');
 
       const [[pac]] = await pool.query('SELECT * FROM pacientes WHERE id = ?', [cita.paciente_id]);
       assert.deepEqual([pac.nombre, pac.apellidos, pac.telefono], ['Alba', 'Ruiz', '+34611000101']);
@@ -188,9 +191,12 @@ test('avisos de cita: confirmación, víspera y 2 horas antes, una sola vez y a 
     assert.equal(conf.length, 1);
     assert.equal(conf[0].tipo, 'confirmacion');
     const m1 = whatsapp.enviados.at(-1);
+    const sede = 'IEMEC (Av. Siglo XXI, 13, local 35, Boadilla del Monte)';
     assert.equal(m1.nombre, 'iemec_cita_confirmada');
-    assert.deepEqual(m1.variables, ['Laura', 'jueves 15 de octubre', '17:00', 'limpieza facial profunda']);
-    assert.equal(m1.botonUrl, cita.token, 'el botón «Ver mi cita» lleva a su página con el calendario');
+    assert.deepEqual(m1.variables, ['Laura', 'jueves 15 de octubre', '17:00', sede], 'día, hora y sede; el tratamiento, no');
+    assert.deepEqual(m1.botones, [{ tipo: 'url', indice: 0, valor: cita.token }, { tipo: 'url', indice: 1, valor: cita.token }],
+      '«Añadir al calendario» (/cal/…) y «Ver mi cita» (/c/…)');
+    assert.deepEqual(m1.cabecera, { tipo: 'ubicacion', lat: 40.4066059, lng: -3.9001441, nombre: 'IEMEC', direccion: 'Av. Siglo XXI, 13, local 35, 28660 Boadilla del Monte, Madrid' });
     assert.deepEqual(await avisos.enviarPendientes(deps, { ahora: mas(dada, 4) }), [], 'no sale dos veces');
 
     // Víspera: miércoles desde las 10:00 (antes, nada).
@@ -198,7 +204,7 @@ test('avisos de cita: confirmación, víspera y 2 horas antes, una sola vez y a 
     const v = await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-14T08:05:00Z') });
     assert.deepEqual(v.map((a) => a.tipo), ['vispera']);
     assert.equal(whatsapp.enviados.at(-1).nombre, 'iemec_recordatorio_24h');
-    assert.deepEqual(whatsapp.enviados.at(-1).variables, ['Laura', '17:00']);
+    assert.deepEqual(whatsapp.enviados.at(-1).variables, ['Laura', 'jueves 15 de octubre', '17:00', sede]);
 
     // Contesta «Confirmo»: se registra y se le responde.
     const r = await R.procesarEntrante(deps, { telefono: '+34611000201', texto: 'Confirmo', ahora: new Date('2026-10-14T08:20:00Z') });
@@ -211,7 +217,11 @@ test('avisos de cita: confirmación, víspera y 2 horas antes, una sola vez y a 
     assert.deepEqual(await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-15T12:50:00Z') }), []);
     const d = await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-15T13:05:00Z') });
     assert.deepEqual(d.map((a) => a.tipo), ['dos_horas']);
-    assert.equal(whatsapp.enviados.at(-1).nombre, 'iemec_recordatorio_2h');
+    const m2 = whatsapp.enviados.at(-1);
+    assert.equal(m2.nombre, 'iemec_recordatorio_2h');
+    assert.deepEqual(m2.variables, ['Laura', '17:00', sede]);
+    assert.deepEqual(m2.botones, [{ tipo: 'url', indice: 0, valor: cita.token }], '«Ver mi cita»');
+    assert.equal(m2.cabecera.tipo, 'ubicacion', 'con el mapa de la sede');
     assert.deepEqual(await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-15T13:10:00Z') }), []);
 
     // Una cita que viene de Treatwell no recibe nuestros avisos.

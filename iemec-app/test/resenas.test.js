@@ -21,8 +21,8 @@ test('reseñas con la base', async (t) => {
     const r = BIBLIOTECA.find((p) => p.uso === 'resena');
     await pool.query("INSERT INTO plantillas (nombre, uso, categoria, cuerpo, estado, calidad) VALUES (?, 'resena', 'utilidad', ?, 'aprobada', 'verde')", [r.nombre, r.cuerpo]);
     const [p] = await pool.query("INSERT INTO pacientes (nombre, telefono) VALUES ('Laura', '+34611000100')");
-    const [c] = await pool.query(`INSERT INTO citas (paciente_id, tratamiento_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token)
-      VALUES (?, 'limpieza-facial', '2026-10-06 09:00', '2026-10-06 10:00', '2026-10-06 09:00', '2026-10-06 10:10', '2026-10-06 09:00', '2026-10-06 10:00', 'completada', REPEAT('b', 43))`, [p.insertId]);
+    const [c] = await pool.query(`INSERT INTO citas (paciente_id, tratamiento_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token_hash)
+      VALUES (?, 'limpieza-facial', '2026-10-06 09:00', '2026-10-06 10:00', '2026-10-06 09:00', '2026-10-06 10:10', '2026-10-06 09:00', '2026-10-06 10:00', 'completada', UNHEX(SHA2(UUID(), 256)))`, [p.insertId]);
 
     await t.test('tras la cita completada se programa la petición y sale a su hora, una sola vez', async () => {
       const d = await S.programarPeticion(pool, c.insertId);
