@@ -23,14 +23,6 @@
     "toxina-botulinica-cuello"
    ]
   },
-  "web-arrugas-del-labio-superior": {
-   "catalogo": "codigo-barras-ah",
-   "pagina": "/medicina-estetica-facial/arrugas-del-labio-superior/",
-   "especialidad": "medicina-estetica-facial",
-   "ids": [
-    "codigo-barras-ah"
-   ]
-  },
   "web-aumento-de-gluteos": {
    "catalogo": "aumento-gluteos-ah",
    "pagina": "/medicina-estetica-corporal/aumento-de-gluteos/",
@@ -39,22 +31,22 @@
     "aumento-gluteos-ah"
    ]
   },
+  "web-aumento-de-labios": {
+   "catalogo": "aumento-labios-ah",
+   "pagina": "/medicina-estetica-facial/aumento-de-labios/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "aumento-labios-ah",
+    "perfilado-labios-ah",
+    "hidratacion-labios-ah"
+   ]
+  },
   "web-aumento-de-pecho": {
    "catalogo": "aumento-pecho",
    "pagina": "/cirugia-estetica/aumento-de-pecho/",
    "especialidad": "cirugia-estetica",
    "ids": [
     "aumento-pecho"
-   ]
-  },
-  "web-aumento-y-perfilado-de-labios": {
-   "catalogo": "aumento-labios-ah",
-   "pagina": "/medicina-estetica-facial/aumento-y-perfilado-de-labios/",
-   "especialidad": "medicina-estetica-facial",
-   "ids": [
-    "aumento-labios-ah",
-    "perfilado-labios-ah",
-    "hidratacion-labios-ah"
    ]
   },
   "web-aviso-legal": {
@@ -83,7 +75,8 @@
    "pagina": "/medicina-estetica-facial/bioestimulacion-facial/",
    "especialidad": "medicina-estetica-facial",
    "ids": [
-    "inductor-colageno"
+    "inductor-colageno",
+    "redensificacion-facial"
    ]
   },
   "web-blefaroplastia": {
@@ -95,14 +88,14 @@
    ]
   },
   "web-caida-del-cabello": {
-   "catalogo": "prp-capilar",
+   "catalogo": "mesoterapia-capilar",
    "pagina": "/medicina-capilar/caida-del-cabello/",
    "especialidad": "medicina-capilar",
    "ids": [
-    "prp-capilar",
     "mesoterapia-capilar",
-    "recuperacion-capilar-sin-injerto",
-    "hair-filler"
+    "prp-capilar",
+    "hair-filler",
+    "recuperacion-capilar-sin-injerto"
    ]
   },
   "web-carboxiterapia": {
@@ -113,9 +106,9 @@
     "carboxiterapia"
    ]
   },
-  "web-cicatrices-del-cuero-cabelludo": {
+  "web-cicatrices-en-el-cuero-cabelludo": {
    "catalogo": "cicatrices-capilares",
-   "pagina": "/cirugia-capilar/cicatrices-del-cuero-cabelludo/",
+   "pagina": "/cirugia-capilar/cicatrices-en-el-cuero-cabelludo/",
    "especialidad": "cirugia-capilar",
    "ids": [
     "cicatrices-capilares"
@@ -136,9 +129,17 @@
    "pagina": "/clinica/",
    "especialidad": null
   },
-  "web-consulta-con-el-cirujano": {
+  "web-codigo-de-barras": {
+   "catalogo": "codigo-barras-ah",
+   "pagina": "/medicina-estetica-facial/codigo-de-barras/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "codigo-barras-ah"
+   ]
+  },
+  "web-consulta-de-cirugia-plastica": {
    "catalogo": "valoracion-cirugia-plastica",
-   "pagina": "/cirugia-estetica/consulta-con-el-cirujano/",
+   "pagina": "/cirugia-estetica/consulta-de-cirugia-plastica/",
    "especialidad": "cirugia-estetica",
    "ids": [
     "valoracion-cirugia-plastica"
@@ -149,9 +150,9 @@
    "pagina": "/cookies/",
    "especialidad": null
   },
-  "web-correccion-de-rellenos-previos": {
+  "web-correccion-de-rellenos": {
    "catalogo": "hialuronidasa",
-   "pagina": "/medicina-estetica-facial/correccion-de-rellenos-previos/",
+   "pagina": "/medicina-estetica-facial/correccion-de-rellenos/",
    "especialidad": "medicina-estetica-facial",
    "ids": [
     "hialuronidasa"
@@ -172,8 +173,7 @@
    "pagina": "/medicina-capilar/diagnostico-capilar/",
    "especialidad": "medicina-capilar",
    "ids": [
-    "diagnostico-capilar",
-    "trichotest"
+    "diagnostico-capilar"
    ]
   },
   "web-diagnostico-de-lipolaser": {
@@ -247,26 +247,26 @@
    "pagina": "/gracias/",
    "especialidad": null
   },
-  "web-head-spa": {
-   "catalogo": "head-spa-express",
-   "pagina": "/medicina-capilar/head-spa/",
+  "web-head-spa-japones": {
+   "catalogo": "head-spa-detox",
+   "pagina": "/medicina-capilar/head-spa-japones/",
    "especialidad": "medicina-capilar",
    "ids": [
-    "head-spa-express",
     "head-spa-detox",
+    "head-spa-express",
     "head-spa-synergie",
-    "head-spa-zen-premium"
+    "head-spa-zen-premium",
+    "head-spa-japones"
    ]
   },
-  "web-hidratacion-profunda-de-la-piel": {
+  "web-hidratacion-profunda": {
    "catalogo": "skinbooster-facial",
-   "pagina": "/medicina-estetica-facial/hidratacion-profunda-de-la-piel/",
+   "pagina": "/medicina-estetica-facial/hidratacion-profunda/",
    "especialidad": "medicina-estetica-facial",
    "ids": [
     "skinbooster-facial",
     "skinbooster-cuello-escote",
-    "profhilo",
-    "redensificacion-facial"
+    "profhilo"
    ]
   },
   "web-hifu-corporal": {
@@ -282,8 +282,7 @@
    "pagina": "/medicina-estetica-facial/hifu-facial/",
    "especialidad": "medicina-estetica-facial",
    "ids": [
-    "hifu-facial",
-    "valoracion-hifu"
+    "hifu-facial"
    ]
   },
   "web-hilos-tensores": {
@@ -307,12 +306,20 @@
     "injerto-capilar-fue"
    ]
   },
-  "web-intima-f-1voghip": {
-   "catalogo": "cirugia-capuchon-clitoris",
-   "pagina": "/ginecologia-estetica/cirugia-del-capuchon-del-clitoris/",
-   "especialidad": "ginecologia-estetica",
+  "web-injerto-de-barba": {
+   "catalogo": "microinjerto-barba",
+   "pagina": "/cirugia-capilar/injerto-de-barba/",
+   "especialidad": "cirugia-capilar",
    "ids": [
-    "cirugia-capuchon-clitoris"
+    "microinjerto-barba"
+   ]
+  },
+  "web-injerto-de-cejas": {
+   "catalogo": "microinjerto-cejas",
+   "pagina": "/cirugia-capilar/injerto-de-cejas/",
+   "especialidad": "cirugia-capilar",
+   "ids": [
+    "microinjerto-cejas"
    ]
   },
   "web-intima-f-6mlx46": {
@@ -320,7 +327,8 @@
    "pagina": "/ginecologia-estetica/labioplastia/",
    "especialidad": "ginecologia-estetica",
    "ids": [
-    "labioplastia"
+    "labioplastia",
+    "cirugia-capuchon-clitoris"
    ]
   },
   "web-intima-f-uugwi2": {
@@ -385,14 +393,7 @@
    "pagina": "/cirugia-estetica/liposuccion/",
    "especialidad": "cirugia-estetica",
    "ids": [
-    "liposuccion"
-   ]
-  },
-  "web-liposuccion-de-papada": {
-   "catalogo": "liposuccion-papada",
-   "pagina": "/cirugia-estetica/liposuccion-de-papada/",
-   "especialidad": "cirugia-estetica",
-   "ids": [
+    "liposuccion",
     "liposuccion-papada"
    ]
   },
@@ -456,6 +457,14 @@
     "masaje-anticelulitico-reductor-reafirmante"
    ]
   },
+  "web-masculinizacion-facial": {
+   "catalogo": "masculinizacion-facial",
+   "pagina": "/medicina-estetica-facial/masculinizacion-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "masculinizacion-facial"
+   ]
+  },
   "web-medicina-capilar": {
    "catalogo": null,
    "pagina": "/medicina-capilar/",
@@ -489,22 +498,6 @@
     "mesoterapia-papada"
    ]
   },
-  "web-microinjerto-de-barba": {
-   "catalogo": "microinjerto-barba",
-   "pagina": "/cirugia-capilar/microinjerto-de-barba/",
-   "especialidad": "cirugia-capilar",
-   "ids": [
-    "microinjerto-barba"
-   ]
-  },
-  "web-microinjerto-de-cejas": {
-   "catalogo": "microinjerto-cejas",
-   "pagina": "/cirugia-capilar/microinjerto-de-cejas/",
-   "especialidad": "cirugia-capilar",
-   "ids": [
-    "microinjerto-cejas"
-   ]
-  },
   "web-microneedling-capilar": {
    "catalogo": "dermapen-capilar",
    "pagina": "/medicina-capilar/microneedling-capilar/",
@@ -528,8 +521,7 @@
    "especialidad": "medicina-estetica-facial",
    "ids": [
     "dermapen-facial",
-    "microneedling-cuello-escote",
-    "exosomas-faciales"
+    "microneedling-cuello-escote"
    ]
   },
   "web-otoplastia": {
@@ -684,6 +676,16 @@
     "relleno-ojeras-ah"
    ]
   },
+  "web-relleno-de-pomulos": {
+   "catalogo": "relleno-pomulos-ah",
+   "pagina": "/medicina-estetica-facial/relleno-de-pomulos/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "relleno-pomulos-ah",
+    "relleno-menton-ah",
+    "marcacion-mandibular-ah"
+   ]
+  },
   "web-remodelacion-corporal": {
    "catalogo": "tecnologia-evo-corporal",
    "pagina": "/medicina-estetica-corporal/remodelacion-corporal/",
@@ -693,9 +695,9 @@
     "protocolo-evosculpt"
    ]
   },
-  "web-reparacion-de-injertos-previos": {
+  "web-reparacion-de-injertos-capilares": {
    "catalogo": "reparacion-trasplante-capilar",
-   "pagina": "/cirugia-capilar/reparacion-de-injertos-previos/",
+   "pagina": "/cirugia-capilar/reparacion-de-injertos-capilares/",
    "especialidad": "cirugia-capilar",
    "ids": [
     "reparacion-trasplante-capilar"
@@ -776,6 +778,14 @@
     "acne-xebor"
    ]
   },
+  "web-tratamiento-reafirmante-no-invasivo": {
+   "catalogo": "natulift",
+   "pagina": "/medicina-estetica-facial/tratamiento-reafirmante-no-invasivo/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "natulift"
+   ]
+  },
   "web-tratamientos": {
    "catalogo": null,
    "pagina": "/tratamientos/",
@@ -787,19 +797,6 @@
    "especialidad": "medicina-estetica-facial",
    "ids": [
     "valoracion-medica"
-   ]
-  },
-  "web-volumen-y-contorno-facial": {
-   "catalogo": "relleno-pomulos-ah",
-   "pagina": "/medicina-estetica-facial/volumen-y-contorno-facial/",
-   "especialidad": "medicina-estetica-facial",
-   "ids": [
-    "relleno-pomulos-ah",
-    "relleno-menton-ah",
-    "marcacion-mandibular-ah",
-    "surcos-nasogenianos-ah",
-    "rinomodelacion-ah",
-    "masculinizacion-facial"
    ]
   }
  }

@@ -1,0 +1,82 @@
+{
+ "grupo": "capilar",
+ "nota": "Borrador fuera de la web: el paquete de injerto para pacientes de Francia es hoy una oferta con precio en una landing en francés. Esta versión no publica precios ni ofertas, y la página necesita la decisión de la clínica sobre el mercado francés, su traducción y la revisión de la normativa francesa. Cuando se apruebe, se pasa a contenido/capilar.json y sus ids salen de sin_pagina.",
+ "paginas": [
+  {
+   "slug": "injerto-capilar-desde-francia",
+   "especialidad": "cirugia-capilar",
+   "catalogo": [
+    "pack-injerto-francia",
+    "valoracion-injerto-francia"
+   ],
+   "orden": 70,
+   "destacado": false,
+   "nombre": "Injerto capilar desde Francia",
+   "titulo": "Injerto capilar en Madrid para pacientes que vienen de Francia",
+   "titulo_seo": "Injerto capilar desde Francia en Boadilla · IEMEC",
+   "descripcion_seo": "Injerto capilar FUE en IEMEC, Boadilla del Monte (Madrid), para pacientes que vienen de Francia: acompañamiento en francés, valoración y seguimiento.",
+   "entradilla": "Si vives en Francia y te planteas un injerto capilar en Madrid, te acompañamos en francés desde la primera consulta hasta las revisiones del año siguiente.",
+   "para_quien": [
+    "Vives en Francia y te planteas un injerto capilar en Madrid.",
+    "Prefieres que te atiendan en francés durante todo el proceso.",
+    "Quieres saber cómo se organizan el viaje, la intervención y las revisiones."
+   ],
+   "texto": [
+    "Atendemos a pacientes que vienen desde Francia para hacerse un injerto capilar con técnica FUE en Madrid. Todo el proceso se acompaña en francés: la valoración previa, la intervención y las revisiones.",
+    "Empezamos con un contacto discreto para conocer tu caso. Si el injerto es adecuado para ti, te explicamos cómo se organiza la estancia: te ayudamos con el alojamiento y con los traslados entre el hotel y la clínica; el viaje desde Francia corre de tu cuenta.",
+    "El seguimiento dura un año, con revisiones al mes y a los 3, 6 y 12 meses, y puede hacerse en París, en una clínica colaboradora. Es una cirugía: requiere valoración médica previa, tiene riesgos que el cirujano te explica antes y el resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unas 8 horas, según las unidades",
+    "sesiones": "Una intervención y revisiones al mes y a los 3, 6 y 12 meses",
+    "anestesia": "Local",
+    "recuperacion": "Actividad ligera en 1 o 2 días; costras entre los 7 y los 10 días",
+    "profesional": "Cirujano"
+   },
+   "variantes": [],
+   "resultados": "El pelo implantado se cae entre el primer y el tercer mes, los primeros brotes llegan entre el cuarto y el sexto y el resultado final se valora entre los 12 y los 18 meses; varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Duele la intervención?",
+     "r": "Se hace con anestesia local. Puedes notar una molestia leve con los primeros pinchazos de la anestesia; después, la zona queda anestesiada durante el procedimiento. Los días siguientes suele haber molestias leves y bien toleradas."
+    },
+    {
+     "p": "¿Qué técnica se usa?",
+     "r": "La técnica FUE, extracción de unidades foliculares: se extraen una a una de la zona donante y se implantan en las zonas con menos pelo, con un diseño previo pensado para un aspecto natural."
+    },
+    {
+     "p": "¿Cuánto dura la convalecencia?",
+     "r": "Las actividades ligeras se retoman en uno o dos días y las costras de la zona implantada caen entre los 7 y los 10 días. Hay que seguir las pautas que te damos, como evitar el esfuerzo físico intenso las primeras semanas."
+    },
+    {
+     "p": "¿Qué incluye el acompañamiento?",
+     "r": "Te atendemos en francés durante toda la estancia, te ayudamos a organizar el alojamiento y los traslados en Madrid y hacemos el seguimiento durante el año siguiente, con la opción de revisarte en París. En la valoración te lo detallamos todo."
+    }
+   ],
+   "preocupaciones": [
+    "injerto",
+    "cirugia"
+   ],
+   "relacionados": [
+    "injerto-capilar-fue",
+    "diagnostico-capilar"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/recuperez-vos-cheveux-a-madrid",
+    "https://iemec-clinic.com/cirugia-capilar"
+   ],
+   "pendiente": [
+    "Borrador: no se publica hasta que la clínica decida sobre el mercado francés. La landing actual (/recuperez-vos-cheveux-a-madrid) anuncia un precio cerrado de 3.900 €, «greffons illimités», hotel de 4 estrellas con pensión completa, «consultation GRATUITE», «résultats… garantis», «plus de 2000 patients satisfaits» e intervención «indolore»: nada de eso puede publicarse (normas.md, apartados d, e y k, n.º 14).",
+    "Si va dirigida a Francia, se aplica también la normativa francesa de publicidad sanitaria y de cirugía estética: revisarla con un abogado en Francia antes de publicar, y traducir la página.",
+    "Alojamiento y traslados forman parte del paquete con precio: describirlos como ayuda para organizar la estancia, nunca como regalo o ventaja.",
+    "Confirmar la clínica colaboradora de París y qué revisiones hace.",
+    "Los formularios de la landing envían los datos a otro dominio (cliniquecapillaire-iemec.es): decidir si la URL antigua redirige allí o a la página del injerto FUE.",
+    "Quién opera: la web habla de «cirujanos» sin nombrarlos. Para publicar hacen falta nombre, especialidad oficial y número de colegiado del cirujano (normas.md, apartado j).",
+    "Dónde se opera: confirmar si es en la sala de procedimientos de IEMEC (cirugía menor ambulatoria, U.64) o en el quirófano de otro centro autorizado, y decirlo con claridad en la página (hoy dice «en un centro sanitario autorizado»)."
+   ]
+  }
+ ],
+ "sin_pagina": []
+}

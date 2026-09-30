@@ -50,22 +50,41 @@ test('el generador construye sin errores y el informe lo cuenta todo', () => {
   assert.equal(informe.paginas, PAGINAS.size);
 });
 
-test('todo tratamiento activo del catálogo tiene página (propia o provisional) o un motivo para no tenerla', () => {
-  const conPagina = new Set();
-  const provisionales = new Set(INFORME.provisionales.map((p) => p.ruta));
-  for (const ruta of PAGINAS.keys()) if (/^\/[^/]+\/[^/]+\/$/.test(ruta) && !ruta.startsWith('/tratamientos')) conPagina.add(ruta);
-  const sinPagina = new Map(INFORME.sin_pagina.map((s) => [s.catalogo, s]));
-  const refs = INFORME.referencias;
-  const idsEnPaginas = new Set(Object.values(refs).flatMap((r) => r.ids || []));
+function comprobarCobertura(informe) {
+  const sinPagina = new Map(informe.sin_pagina.map((s) => [s.catalogo, s]));
+  const idsEnPaginas = new Set(Object.values(informe.referencias).flatMap((r) => r.ids || []));
   for (const t of CATALOGO.tratamientos.filter((x) => x.activo)) {
     const motivo = sinPagina.get(t.id);
     assert.ok(idsEnPaginas.has(t.id) || (motivo && motivo.motivo && motivo.motivo.length > 10), `${t.id} no tiene página ni motivo`);
   }
-  assert.deepEqual(INFORME.cobertura.sin_cubrir, []);
-  // Las provisionales existen, son páginas de tratamiento y el informe las apunta.
-  for (const r of provisionales) assert.ok(conPagina.has(r), `provisional sin página: ${r}`);
-  assert.ok(INFORME.provisionales.length > 0);
-  for (const p of INFORME.provisionales) assert.match(PAGINAS.get(p.ruta), /página provisional/);
+  assert.deepEqual(informe.cobertura.sin_cubrir, []);
+}
+
+test('todo tratamiento activo del catálogo tiene página (propia o provisional) o un motivo para no tenerla', () => {
+  comprobarCobertura(INFORME);
+});
+
+test('sin el texto de un grupo, sus tratamientos salen como provisionales: nombre neutro, informe y normas', () => {
+  const c = temporal('provisionales');
+  const inf = construir({ salida: c, referencias: null, ajustarDatos: (datos) => { datos.contenidos = datos.contenidos.filter((f) => f.grupo !== 'capilar' && f.grupo !== 'facial-medica'); } });
+  assert.deepEqual(inf.errores, [], JSON.stringify(inf.errores.slice(0, 3)));
+  comprobarCobertura(inf);
+  assert.ok(inf.provisionales.length >= 10, `${inf.provisionales.length} provisionales`);
+  for (const p of inf.provisionales) {
+    const h = fs.readFileSync(path.join(c, p.ruta, 'index.html'), 'utf8');
+    assert.match(h, /página provisional/);
+    assert.deepEqual(R.revisarPagina(h, p.ruta, normas), [], p.ruta);
+    if (p.restringida) assert.match(R.textoVisible(h), /requiere valoración médica previa/);
+  }
+  // Los ids de medicamentos van a páginas con nombre neutro (anexo B de normas.md).
+  const arrugas = inf.provisionales.find((p) => p.catalogo.includes('toxina-botulinica-facial'));
+  assert.equal(arrugas.ruta, '/medicina-estetica-facial/arrugas-de-expresion/');
+  const caida = inf.provisionales.find((p) => p.catalogo.includes('prp-capilar'));
+  assert.equal(caida.ruta, '/medicina-capilar/caida-del-cabello/');
+  // Lo que el catálogo da por no confirmado no tiene provisional.
+  assert.ok(!inf.provisionales.some((p) => p.catalogo.includes('micropigmentacion')));
+  assert.ok(inf.sin_pagina.some((s) => s.catalogo === 'micropigmentacion'));
+  fs.rmSync(c, { recursive: true, force: true });
 });
 
 test('lo que la autorización no cubre, lo que no se confirma y lo pendiente no se publica ni se enlaza', () => {
@@ -222,9 +241,11 @@ test('.htaccess: un 301 por cada URL vieja, sin bucles, hacia páginas que exist
 
 test('las anclas de la web anterior se resuelven en la página que las recibe', () => {
   const mapa = (ruta) => JSON.parse((/<script type="application\/json" id="anclas-antiguas">([\s\S]*?)<\/script>/.exec(PAGINAS.get(ruta)) || [])[1] || '{}');
+  const paginaDe = (id) => Object.values(INFORME.referencias).find((r) => (r.ids || []).includes(id))?.pagina;
   const facial = mapa('/medicina-estetica-facial/');
-  assert.equal(facial[huellaCorta('luz-pulsada-intensa-ipl')], '/medicina-estetica-facial/luz-pulsada-intensa-ipl/');
-  assert.equal(facial[huellaCorta('aumento-de-labios-con-acido-hialuronico')], INFORME.referencias['web-aumento-y-perfilado-de-labios']?.pagina || facial[huellaCorta('aumento-de-labios-con-acido-hialuronico')]);
+  assert.equal(facial[huellaCorta('luz-pulsada-intensa-ipl')], paginaDe('ipl-facial'));
+  assert.equal(facial[huellaCorta('aumento-de-labios-con-acido-hialuronico')], paginaDe('aumento-labios-ah'));
+  assert.equal(mapa('/cirugia-estetica/')[huellaCorta('aumento-de-pecho')], paginaDe('aumento-pecho'));
   assert.equal(mapa('/clinica/')[huellaCorta('equipo')], '/equipo/');
   // El mapa no lleva el texto de las anclas viejas (algunas nombran medicamentos).
   for (const [ruta, h] of PAGINAS) assert.ok(!/semaglutida|plasma-rico/i.test(h), ruta);
@@ -379,7 +400,11 @@ test('una especialidad sin páginas publicadas no sale en menús ni en la portad
   const c = temporal('sin-esp');
   const inf = construir({
     salida: c, referencias: null,
-    ajustarDatos: (datos) => { datos.provisionales.paginas = datos.provisionales.paginas.filter((p) => p.especialidad !== 'salud-sexual-masculina'); datos.provisionales.sin_pagina.push({ catalogo: 'engrosamiento-pene-ah', motivo: 'Prueba: sin página.' }); },
+    ajustarDatos: (datos) => {
+      for (const f of datos.contenidos) f.paginas = f.paginas.filter((p) => p.especialidad !== 'salud-sexual-masculina');
+      datos.provisionales.paginas = datos.provisionales.paginas.filter((p) => p.especialidad !== 'salud-sexual-masculina');
+      datos.provisionales.sin_pagina.push({ catalogo: 'engrosamiento-pene-ah', motivo: 'Prueba: sin página.' });
+    },
   });
   assert.ok(inf.especialidades_sin_paginas.includes('salud-sexual-masculina'));
   const inicio = fs.readFileSync(path.join(c, 'index.html'), 'utf8');

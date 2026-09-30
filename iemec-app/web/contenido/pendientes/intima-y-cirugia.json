@@ -1,0 +1,491 @@
+{
+ "grupo": "intima-y-cirugia",
+ "nota": "Borradores fuera de la web: la autorización del centro (CS17886: U.46, U.47, U.48, U.64, U.84 y U.900) no incluye Ginecología (U.26), y normas.md deja la ginecología funcional (incontinencia, atrofia, laxitud, liquen, suelo pélvico, perineoplastias y el tratamiento médico que no se nombra) sin página hasta que la clínica confirme que la cubre o amplíe la autorización. Cuando se confirme, se pasan a contenido/intima-y-cirugia.json (especialidad ginecologia-estetica, orden 40 a 90) y sus ids salen de sin_pagina. El láser para condilomas no tiene borrador: su publicidad está prohibida (RD 1907/1996, art. 4.1).",
+ "paginas": [
+  {
+   "slug": "incontinencia-urinaria-de-esfuerzo",
+   "especialidad": "ginecologia-estetica",
+   "catalogo": [
+    "laser-incontinencia-urinaria"
+   ],
+   "orden": 40,
+   "destacado": false,
+   "nombre": "Incontinencia urinaria de esfuerzo",
+   "titulo": "Láser vaginal para la incontinencia urinaria de esfuerzo",
+   "titulo_seo": "Incontinencia de esfuerzo en Boadilla · IEMEC",
+   "descripcion_seo": "Láser vaginal para la incontinencia urinaria de esfuerzo leve o moderada en IEMEC Boadilla: sesiones ambulatorias, tras una valoración médica de tu caso.",
+   "entradilla": "Un tratamiento ambulatorio con láser vaginal que puede mejorar los escapes de orina al toser, reír o hacer ejercicio. La indicación la hace el médico tras valorarte.",
+   "para_quien": [
+    "Se te escapa la orina al toser, estornudar, reír o hacer ejercicio.",
+    "Tu incontinencia es leve o moderada y quieres conocer opciones sin cirugía.",
+    "Buscas una valoración médica para saber qué opciones tienes."
+   ],
+   "texto": [
+    "La incontinencia urinaria de esfuerzo es la pérdida de orina al toser, reír, correr o hacer fuerza. Es frecuente después de los partos y con la menopausia, y puede afectar a tu día a día.",
+    "El láser vaginal aplica calor controlado en la pared de la vagina para estimular la producción de colágeno y mejorar el soporte de la uretra. Puede reducir los escapes en la incontinencia de esfuerzo leve o moderada. Se hace en consulta, en sesiones de 20 a 30 minutos; suelen hacer falta entre 1 y 3.",
+    "Antes, el médico hace una valoración médica para confirmar el tipo de incontinencia y si el láser es adecuado para ti, y te explica los riesgos, las contraindicaciones y las alternativas. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Entre 20 y 30 minutos",
+    "sesiones": "Entre 1 y 3, según el grado",
+    "anestesia": null,
+    "recuperacion": "No requiere baja; puedes seguir con tu día",
+    "profesional": "Médico"
+   },
+   "variantes": [],
+   "resultados": "La mejora suele ser progresiva tras las sesiones y varía según cada persona; los efectos pueden mantenerse entre 12 y 18 meses y admiten mantenimiento.",
+   "preguntas": [
+    {
+     "p": "¿Qué tipo de incontinencia puede mejorar?",
+     "r": "Sobre todo la de esfuerzo leve o moderada, la que aparece al toser, reír o correr. Si tus síntomas son de otro tipo, el médico te orientará en la valoración sobre las opciones adecuadas para tu caso."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Entre 1 y 3, según el grado de incontinencia. Cada sesión dura entre 20 y 30 minutos y se hace en consulta. En la valoración te decimos cuántas te recomendamos y cada cuánto tiempo."
+    },
+    {
+     "p": "¿Necesito recuperación?",
+     "r": "No requiere baja. Puedes seguir con tu vida normal después de la sesión, aunque conviene evitar las relaciones sexuales durante unos días. El médico te dará las pautas concretas para tu caso."
+    },
+    {
+     "p": "¿Molesta?",
+     "r": "Suele tolerarse bien; durante la sesión puedes notar calor en la zona. Después puede haber un enrojecimiento leve o sensación de calor, que suele desaparecer en unas horas."
+    },
+    {
+     "p": "¿Cuánto dura el efecto?",
+     "r": "Los efectos pueden mantenerse entre 12 y 18 meses, según cada persona. Por eso a veces se recomienda una sesión de mantenimiento al año, que el médico valora contigo en las revisiones."
+    }
+   ],
+   "preocupaciones": [
+    "zona-intima"
+   ],
+   "relacionados": [
+    "sequedad-y-atrofia-vaginal",
+    "laxitud-vaginal",
+    "cirugia-del-suelo-pelvico"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#tratamiento-laser-de-la-incontinencia-urinaria-de-esfuerzo-iue.",
+    "https://iemec-clinic.com/blog/como-ayuda-el-laser-ginecologico-a-tratar-la-incontinencia-urinaria-sin-cirugia",
+    "https://iemec-clinic.com/blog/que-tratamientos-ginecologicos-se-pueden-realizar-con-laser-fotona"
+   ],
+   "pendiente": [
+    "Pendiente de autorización (U.26 Ginecología): la autorización del centro (CS17886) no la incluye y normas.md deja la ginecología funcional sin página hasta que la clínica confirme que la cubre o amplíe la autorización.",
+    "Sin marca del equipo ni del protocolo (la web actual dice «Incontilaser» y el catálogo, Fotona): solo «láser vaginal».",
+    "La web actual promete «la remisión de la IUE», «sin dolor, sin molestias» y «Dile adiós a la incontinencia», con porcentajes de prevalencia: no se traslada.",
+    "Duración del efecto (12 a 18 meses) y sesiones (1 a 3): datos del blog; confirmar.",
+    "Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo.",
+    "Vídeo del médico en Vimeo: pedir el original si se quiere usar.",
+    "WhatsApp: texto neutro («Salud íntima femenina» o «una consulta») y una referencia que no lleve el id del catálogo en claro, porque nombra el tratamiento (normas.md, regla 12; casillas-formulario.md, apdo. 8)."
+   ]
+  },
+  {
+   "slug": "sequedad-y-atrofia-vaginal",
+   "especialidad": "ginecologia-estetica",
+   "catalogo": [
+    "laser-atrofia-vaginal"
+   ],
+   "orden": 50,
+   "destacado": false,
+   "nombre": "Sequedad y atrofia vaginal",
+   "titulo": "Láser vaginal para la sequedad y la atrofia vaginal",
+   "titulo_seo": "Sequedad y atrofia vaginal en Boadilla · IEMEC",
+   "descripcion_seo": "Láser vaginal de erbio para la sequedad, el picor y las molestias de la atrofia vaginal en IEMEC Boadilla, en sesiones ambulatorias tras una valoración médica.",
+   "entradilla": "Con la menopausia, la mucosa vaginal puede volverse más fina y seca. El láser vaginal es una opción sin cirugía que puede aliviar la sequedad, el picor y las molestias.",
+   "para_quien": [
+    "Notas sequedad, picor, escozor o irritación en la zona vaginal.",
+    "Tienes molestias o dolor en las relaciones sexuales por la sequedad.",
+    "Las cremas y los lubricantes no te bastan.",
+    "Prefieres una opción sin hormonas o no las toleras."
+   ],
+   "texto": [
+    "La atrofia vaginal aparece sobre todo con la menopausia, cuando bajan los estrógenos: la mucosa se vuelve más fina, seca y frágil. Causa sequedad, picor, escozor y dolor en las relaciones sexuales, y con el tiempo puede estrechar la entrada de la vagina y favorecer las infecciones de orina.",
+    "El láser vaginal de erbio aplica calor controlado sobre la mucosa para estimular la producción de colágeno y mejorar su hidratación y su elasticidad. Es ambulatorio, se hace en consulta en sesiones de 15 a 30 minutos y suelen hacer falta 3 o 4. Es compatible con los tratamientos hormonales y puede ser una alternativa si no los toleras.",
+    "Antes, el médico hace una valoración médica y te explica los riesgos, las contraindicaciones y las alternativas. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Entre 15 y 30 minutos",
+    "sesiones": "3 o 4 sesiones",
+    "anestesia": null,
+    "recuperacion": "Puedes seguir con tu día; puede haber calor o rojez leve unas horas",
+    "profesional": "Médico"
+   },
+   "variantes": [],
+   "resultados": "El alivio de la sequedad y de las molestias suele ser progresivo a lo largo de las sesiones y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Normalmente 3 o 4 sesiones ambulatorias, según tu caso. En la valoración el médico te explica el intervalo entre ellas y si más adelante conviene hacer alguna sesión de mantenimiento."
+    },
+    {
+     "p": "¿Es compatible con los tratamientos hormonales?",
+     "r": "Sí. Puede combinarse con ellos y también puede ser una alternativa si no los toleras. El médico lo valora contigo teniendo en cuenta tus antecedentes y tus preferencias."
+    },
+    {
+     "p": "¿Tiene efectos adversos?",
+     "r": "Puede aparecer un enrojecimiento leve o sensación de calor, que suele desaparecer en unas horas. Antes de empezar, el médico revisa en la valoración si hay alguna contraindicación en tu caso y te explica los riesgos."
+    },
+    {
+     "p": "¿Cómo es una sesión?",
+     "r": "Dura entre 15 y 30 minutos y se hace en la consulta, en un sillón ginecológico. Es ambulatoria y, al terminar, puedes seguir con tu día con normalidad."
+    }
+   ],
+   "preocupaciones": [
+    "zona-intima"
+   ],
+   "relacionados": [
+    "incontinencia-urinaria-de-esfuerzo",
+    "liquen-escleroso-vulvar",
+    "laxitud-vaginal"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#tratamiento-laser-de-la-atrofia-vaginal.",
+    "https://iemec-clinic.com/blog/que-tratamientos-ginecologicos-se-pueden-realizar-con-laser-fotona"
+   ],
+   "pendiente": [
+    "Pendiente de autorización (U.26 Ginecología): la autorización del centro (CS17886) no la incluye y normas.md deja la ginecología funcional sin página hasta que la clínica confirme que la cubre o amplíe la autorización.",
+    "Sin marca del equipo ni del protocolo (la web actual dice láser Erbio de Fotona «RenovaLase»): solo «láser vaginal de erbio».",
+    "La web actual promete «la remisión de los síntomas», «recuperando la vida sexual normal» y sesiones «indoloras», con porcentajes: no se traslada.",
+    "Duración de la sesión: el catálogo da 30 minutos y el blog, de 15 a 30; confirmar.",
+    "Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo.",
+    "Vídeo del médico en Vimeo: pedir el original si se quiere usar.",
+    "WhatsApp: texto neutro («Salud íntima femenina» o «una consulta») y una referencia que no lleve el id del catálogo en claro, porque nombra el tratamiento (normas.md, regla 12; casillas-formulario.md, apdo. 8)."
+   ]
+  },
+  {
+   "slug": "laxitud-vaginal",
+   "especialidad": "ginecologia-estetica",
+   "catalogo": [
+    "laser-hiperlaxitud-vaginal",
+    "radiofrecuencia-intima"
+   ],
+   "orden": 60,
+   "destacado": false,
+   "nombre": "Laxitud vaginal",
+   "titulo": "Laxitud vaginal y prolapso leve: valoración y tratamiento",
+   "titulo_seo": "Laxitud vaginal en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Valoración médica de la laxitud vaginal y el prolapso leve tras los partos en IEMEC Boadilla, con láser vaginal ambulatorio si está indicado en tu caso.",
+   "entradilla": "Tras los partos, la vagina y el suelo pélvico pueden quedar más distendidos. El láser vaginal es una opción ambulatoria que puede mejorar el tono del tejido si el médico lo indica.",
+   "para_quien": [
+    "Notas la vagina más amplia o distendida después de los partos.",
+    "Tienes sensación de bulto o de peso en la zona vaginal.",
+    "Quieres saber si tu caso puede tratarse sin cirugía."
+   ],
+   "texto": [
+    "Durante el parto, la vagina se distiende y el suelo pélvico puede sufrir daños, incluso en un parto normal. Después, algunas mujeres notan la vagina más amplia, sensación de bulto o un prolapso leve, que es el descenso ligero de alguno de los órganos de la pelvis.",
+    "El láser vaginal aplica calor controlado en la pared de la vagina para estimular el colágeno y mejorar la firmeza y el tono del tejido, y puede reducir el prolapso leve. Es ambulatorio y se hace en consulta.",
+    "Todo empieza con una valoración médica: el médico explora el suelo pélvico, te explica los riesgos, las contraindicaciones y las alternativas, como la cirugía si el prolapso es mayor, y te propone un plan. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Entre 2 y 3 con láser, según el caso",
+    "anestesia": null,
+    "recuperacion": "Puedes seguir con tu día; puede haber calor o rojez leve unas horas",
+    "profesional": "Médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Láser vaginal",
+     "texto": "Calor controlado en la pared vaginal para estimular el colágeno y mejorar el tono del tejido. Se hace en consulta, en sesiones de unos 30 minutos.",
+     "catalogo": "laser-hiperlaxitud-vaginal"
+    },
+    {
+     "nombre": "Radiofrecuencia íntima",
+     "texto": "Calor controlado con radiofrecuencia en la zona vaginal para mejorar el tono y la hidratación del tejido. Suelen plantearse 3 o 4 sesiones, según el método.",
+     "catalogo": "radiofrecuencia-intima"
+    }
+   ],
+   "resultados": "La mejora del tono es progresiva a lo largo de las sesiones y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué es el prolapso leve?",
+     "r": "Es el descenso ligero de alguno de los órganos de la pelvis, como la vejiga o el útero, que puede dar sensación de bulto o de peso en la vagina. El médico valora su grado en la exploración y te explica qué tratamiento conviene."
+    },
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Con láser suelen recomendarse entre 2 y 3, según el caso. Cada sesión dura alrededor de media hora y se hace en consulta. En la valoración te proponemos el plan concreto y el intervalo entre sesiones."
+    },
+    {
+     "p": "¿Tiene efectos adversos?",
+     "r": "Tras la sesión puede notarse un enrojecimiento leve o sensación de calor, que suele desaparecer en unas horas. En la valoración el médico revisa si hay alguna contraindicación y te explica los riesgos antes de empezar."
+    },
+    {
+     "p": "¿Y si el láser no es suficiente?",
+     "r": "Si el prolapso es mayor o hay otras lesiones, puede estar indicada la cirugía del suelo pélvico o una perineoplastia. El médico te explica las opciones y sus riesgos para que decidas con toda la información."
+    }
+   ],
+   "preocupaciones": [
+    "zona-intima"
+   ],
+   "relacionados": [
+    "cirugia-del-suelo-pelvico",
+    "perineoplastia",
+    "incontinencia-urinaria-de-esfuerzo"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#tratamiento-laser-de-la-hiperlaxitud-y-prolapso-lev.",
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#rejuvenecimiento-vaginal",
+    "https://iemec-clinic.com/blog/que-tratamientos-ginecologicos-se-pueden-realizar-con-laser-fotona",
+    "https://iemec-clinic.com/blog/que-es-el-rejuvenecimiento-vaginal-y-que-tipos-existen"
+   ],
+   "pendiente": [
+    "Pendiente de autorización (U.26 Ginecología): la autorización del centro (CS17886) no la incluye y normas.md deja la ginecología funcional sin página hasta que la clínica confirme que la cubre o amplíe la autorización. Normas.md admite «tratamiento de la laxitud vaginal: valoración» solo si se confirma la autorización; sin «rejuvenecimiento vaginal» ni «estrechamiento vaginal».",
+    "Sin marca del equipo ni del protocolo (la web actual dice «Intimalaser»).",
+    "La web actual habla de «anorgasmia», «falta de fricción» y de recuperar «la sensibilidad en las relaciones sexuales en ambos cónyuges», con porcentajes: no se traslada (RD 1907/1996, art. 4.12).",
+    "Radiofrecuencia íntima (radiofrecuencia-intima): oferta sin confirmar, solo sale en el blog y el equipo no está publicado. Quitar la variante si la clínica no la ofrece.",
+    "Sesiones con láser: el catálogo no las da para este tratamiento; el blog dice de 2 a 3 para el láser ginecológico. Confirmar.",
+    "El bloque antiguo «Rejuvenecimiento vaginal» (id rejuvenecimiento-vaginal, inactivo en el catálogo) puede redirigir aquí cuando se publique.",
+    "Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo.",
+    "WhatsApp: texto neutro («Salud íntima femenina» o «una consulta») y una referencia que no lleve el id del catálogo en claro, porque nombra el tratamiento (normas.md, regla 12; casillas-formulario.md, apdo. 8)."
+   ]
+  },
+  {
+   "slug": "liquen-escleroso-vulvar",
+   "especialidad": "ginecologia-estetica",
+   "catalogo": [
+    "laser-liquen-escleroatrofico",
+    "prp-intimo"
+   ],
+   "orden": 70,
+   "destacado": false,
+   "nombre": "Liquen escleroso vulvar",
+   "titulo": "Liquen escleroso vulvar: valoración y tratamiento con láser",
+   "titulo_seo": "Liquen escleroso vulvar en Boadilla · IEMEC",
+   "descripcion_seo": "Liquen escleroso vulvar en IEMEC Boadilla: valoración médica y láser de erbio para aliviar el picor, el escozor y la irritación, con seguimiento médico.",
+   "entradilla": "El liquen escleroso es una enfermedad de la piel de la vulva que causa picor, escozor e irritación. El láser de erbio es una opción para aliviar los síntomas, siempre con seguimiento médico.",
+   "para_quien": [
+    "Tienes un diagnóstico de liquen escleroso y quieres conocer más opciones.",
+    "Notas picor, escozor, irritación o cambios en la piel de la vulva.",
+    "Los tratamientos que usas no te alivian lo suficiente.",
+    "Necesitas un seguimiento médico de la zona."
+   ],
+   "texto": [
+    "El liquen escleroso es una enfermedad de la piel de la vulva, de origen autoinmune. Produce picor, escozor e irritación y, con el tiempo, puede cambiar la forma de la vulva y estrechar la entrada de la vagina.",
+    "El láser de erbio actúa sobre el tejido para aliviar los síntomas y mejorar su elasticidad y su hidratación. Se hace en consulta, en varias sesiones, y puede combinarse con otros tratamientos médicos que el médico te explica en la valoración.",
+    "No sustituye al tratamiento habitual del liquen ni a las revisiones. Antes de empezar, el médico hace una valoración médica, te explica los riesgos, las contraindicaciones y las alternativas y adapta el plan a tu caso. La respuesta varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unos 45 minutos",
+    "sesiones": "Varias, según tu caso",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Médico"
+   },
+   "variantes": [],
+   "resultados": "El alivio de los síntomas suele ser progresivo y varía según cada persona; al tratarse de una enfermedad crónica, necesita seguimiento.",
+   "preguntas": [
+    {
+     "p": "¿El láser hace desaparecer el liquen?",
+     "r": "No. El liquen escleroso es una enfermedad crónica que necesita seguimiento médico. El láser puede aliviar el picor y el escozor y mejorar el estado del tejido, y se combina con el tratamiento que te indique el médico."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Depende de tu caso. En la valoración el médico te propone el número de sesiones y el intervalo entre ellas, y revisa tu evolución en cada visita para ajustar el plan."
+    },
+    {
+     "p": "¿Molesta?",
+     "r": "Suele tolerarse bien. Durante la sesión puedes notar calor y, después, un enrojecimiento leve que suele desaparecer en unas horas. El médico te explica qué sentirás y los cuidados posteriores."
+    },
+    {
+     "p": "¿Puede cerrarse la entrada de la vagina?",
+     "r": "Con el tiempo, el liquen puede estrecharla. Si ocurre y causa dolor, existe la perineoplastia de apertura, una cirugía que amplía la entrada de la vagina. El médico te explica si está indicada en tu caso."
+    }
+   ],
+   "preocupaciones": [
+    "zona-intima"
+   ],
+   "relacionados": [
+    "perineoplastia",
+    "sequedad-y-atrofia-vaginal"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#tratamiento-laser-del-liquen-esclero-atrofico.-enfermedad-.",
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#tratamientos-con-plasma-rico-en-plaquetas-prp-.",
+    "https://iemec-clinic.com/blog/en-que-consiste-el-rejuvenecimiento-intimo-con-prp-y-por-que-cada-vez-mas-mujeres-lo-eligen"
+   ],
+   "pendiente": [
+    "Pendiente de autorización (U.26 Ginecología): la autorización del centro (CS17886) no la incluye y normas.md deja la ginecología funcional sin página hasta que la clínica confirme que la cubre o amplíe la autorización.",
+    "Esta página cubre también prp-intimo, un medicamento de receta que no se anuncia (AEMPS, resolución de 23-05-2013; normas.md, apartado b) y cuyo uso hay que comunicar a la Comunidad de Madrid. Aquí solo aparece como «otros tratamientos médicos»: no nombrar el plasma, las plaquetas, los factores de crecimiento ni la sangre de la paciente en ningún texto ni en el WhatsApp. En la web actual se usaba también para cicatrices del parto, atrofia, cierre vulvar y antes de cirugías.",
+    "Sesiones e intervalo: el catálogo da 3 sesiones cada 14 días (dato del sector) y 45 minutos (estimado); confirmar antes de publicar cifras.",
+    "Sin marca del láser (Fotona): solo «láser de erbio».",
+    "La web actual promete «la remisión de síntomas» y «regenerar el tejido», y el bloque empieza a mitad de frase: no se traslada.",
+    "Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo.",
+    "Vídeo del médico en Vimeo: pedir el original si se quiere usar.",
+    "WhatsApp: texto neutro («Salud íntima femenina» o «una consulta») y una referencia que no lleve el id del catálogo en claro, porque nombra el tratamiento (normas.md, regla 12; casillas-formulario.md, apdo. 8)."
+   ]
+  },
+  {
+   "slug": "perineoplastia",
+   "especialidad": "ginecologia-estetica",
+   "catalogo": [
+    "perineoplastia-apertura",
+    "perineoplastia-cierre"
+   ],
+   "orden": 80,
+   "destacado": false,
+   "nombre": "Perineoplastia",
+   "titulo": "Perineoplastia de apertura y de cierre",
+   "titulo_seo": "Perineoplastia en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Perineoplastia en IEMEC Boadilla: cirugía para ampliar una entrada vaginal estrecha o reparar la cicatriz de un desgarro o de una episiotomía del parto.",
+   "entradilla": "Una cirugía de la entrada de la vagina y del periné. Puede ampliar una entrada demasiado estrecha o reparar la cicatriz de un desgarro o de una episiotomía.",
+   "para_quien": [
+    "La entrada de la vagina se ha estrechado y te causa dolor.",
+    "Tras un parto, la cicatriz de la episiotomía o de un desgarro te causa molestias.",
+    "Notas la entrada de la vagina demasiado amplia después de los partos.",
+    "Quieres una valoración médica antes de decidir."
+   ],
+   "texto": [
+    "El periné es la zona entre la entrada de la vagina y el ano. La perineoplastia es una cirugía de esta zona con dos objetivos distintos, según el problema: abrir una entrada vaginal demasiado estrecha o reparar una entrada que quedó demasiado amplia tras el parto.",
+    "La de apertura se plantea cuando el introito, la entrada de la vagina, se ha cerrado por el liquen, la atrofia, cicatrices o la propia anatomía, y causa dolor o dificulta la exploración ginecológica o las relaciones sexuales. La de cierre repara la cicatriz de una episiotomía o de un desgarro del parto y devuelve un calibre adecuado y la simetría de la zona.",
+    "Antes, el médico hace una valoración médica y te explica la técnica, la anestesia, los riesgos, las alternativas y cómo será la recuperación. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": null,
+    "sesiones": "Una intervención",
+    "anestesia": "Anestesia local o sedación, según el caso",
+    "recuperacion": "Ambulatoria; los plazos dependen de tu evolución",
+    "profesional": "Médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Perineoplastia de apertura",
+     "texto": "Amplía la entrada de la vagina cuando está cerrada o estrecha. Es ambulatoria, con anestesia local o sedación, y después suelen usarse dilatadores durante un tiempo.",
+     "catalogo": "perineoplastia-apertura"
+    },
+    {
+     "nombre": "Perineoplastia de cierre",
+     "texto": "Repara la cicatriz de una episiotomía o de un desgarro del parto que dejó la entrada vaginal demasiado amplia, y mejora la simetría de la zona.",
+     "catalogo": "perineoplastia-cierre"
+    }
+   ],
+   "resultados": "El resultado se aprecia a medida que cicatriza la zona, en las semanas siguientes, y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Duele la cirugía?",
+     "r": "Se hace con anestesia local o con sedación, según el caso. Las molestias del posoperatorio suelen ser leves y se controlan con analgésicos; el médico te explica los cuidados de cada día y te revisa durante la recuperación."
+    },
+    {
+     "p": "¿Se pierde sensibilidad?",
+     "r": "La técnica busca respetar la sensibilidad de la zona. Al retirar tejido cicatricial, algunas pacientes notan menos molestias que antes. En la valoración el médico te explica los posibles efectos y riesgos en tu caso."
+    },
+    {
+     "p": "¿Cuándo puedo retomar las relaciones sexuales?",
+     "r": "En general, tras 4 a 6 semanas, según tu evolución y la revisión médica. En la perineoplastia de apertura, además, el médico te indica cómo usar los dilatadores durante la recuperación."
+    },
+    {
+     "p": "¿Cuál necesito, apertura o cierre?",
+     "r": "Depende de lo que te ocurra: si la entrada de la vagina está estrecha y te causa dolor, se valora la de apertura; si quedó demasiado amplia tras un parto, la de cierre. Lo decide el médico tras explorarte."
+    }
+   ],
+   "preocupaciones": [
+    "zona-intima",
+    "cirugia"
+   ],
+   "relacionados": [
+    "liquen-escleroso-vulvar",
+    "laxitud-vaginal",
+    "cirugia-del-suelo-pelvico"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#cirugia-para-la-apertura-de-introito-vaginal-perineoplastia-de-apertura-.",
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#cirugia-para-reparar-el-desgarro-perineal.-perineoplastia-de-cierre-.",
+    "https://iemec-clinic.com/blog/que-es-la-perineoplastia-de-apertura-y-para-quien-esta-indicada"
+   ],
+   "pendiente": [
+    "Pendiente de autorización (U.26 Ginecología): la autorización del centro (CS17886) no la incluye y normas.md deja la ginecología funcional sin página hasta que la clínica confirme que la cubre o amplíe la autorización.",
+    "Dónde se hace: el catálogo la asigna a la sala de procedimientos de IEMEC (cirugía menor, U.64), pero el blog habla de «anestesia local o sedación»; la U.64 es con anestesia local. Confirmar dónde se hace con sedación y la duración (30 minutos, dato del sector).",
+    "Los datos de anestesia, molestias y plazos vienen del blog de la de apertura: confirmar que valen para la de cierre.",
+    "La web actual promete «una vida sexual placentera», relaciones «más placenteras para ambos» y habla de «anorgasmia»: no se traslada (RD 1907/1996, art. 4.12).",
+    "Los dos botones de WhatsApp actuales mandan el texto de otros servicios.",
+    "Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo.",
+    "WhatsApp: texto neutro («Salud íntima femenina» o «una consulta») y una referencia que no lleve el id del catálogo en claro, porque nombra el tratamiento (normas.md, regla 12; casillas-formulario.md, apdo. 8)."
+   ]
+  },
+  {
+   "slug": "cirugia-del-suelo-pelvico",
+   "especialidad": "ginecologia-estetica",
+   "catalogo": [
+    "cirugia-suelo-pelvico"
+   ],
+   "orden": 90,
+   "destacado": false,
+   "nombre": "Cirugía del suelo pélvico",
+   "titulo": "Cirugía del suelo pélvico para el prolapso genital",
+   "titulo_seo": "Cirugía del suelo pélvico en Boadilla · IEMEC",
+   "descripcion_seo": "Valoración en IEMEC Boadilla de la cirugía del suelo pélvico para el prolapso de vejiga, útero o recto, que se hace en un centro hospitalario autorizado.",
+   "entradilla": "Cuando la vejiga, el útero o el recto descienden por el debilitamiento del suelo pélvico, la cirugía puede recolocarlos. En IEMEC haces la valoración; la intervención es en un centro hospitalario.",
+   "para_quien": [
+    "Notas un bulto o sensación de peso en la vagina.",
+    "Un prolapso te causa dolor o molestias en el día a día.",
+    "El prolapso se acompaña de escapes de orina.",
+    "Quieres una valoración médica para conocer tus opciones."
+   ],
+   "texto": [
+    "El prolapso genital, o distopia, es el descenso de la uretra, la vejiga, el útero o el recto por el debilitamiento del suelo pélvico. Influyen los partos vaginales, la menopausia, el sobrepeso, la tos crónica o el estreñimiento. Produce sensación de bulto en la vagina, dolor y molestias en la vida diaria.",
+    "La cirugía recoloca los órganos descendidos y refuerza el suelo pélvico; en algunos casos también corrige la incontinencia de orina asociada. Se hace bajo anestesia en el quirófano de un centro hospitalario autorizado, y suele requerir un día de ingreso y unas dos semanas de reposo laboral.",
+    "En IEMEC haces la valoración médica: el médico explora el suelo pélvico y te explica la técnica, los riesgos, las alternativas y la recuperación. Antes de operarte firmas el consentimiento informado. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una intervención",
+    "anestesia": "Bajo anestesia, en quirófano; el tipo se decide en la valoración",
+    "recuperacion": "Un día de ingreso y unas dos semanas de reposo laboral",
+    "profesional": "Médico"
+   },
+   "variantes": [],
+   "resultados": "La mejora de los síntomas se aprecia tras la recuperación y varía según cada persona; mantenerla depende también de los hábitos.",
+   "preguntas": [
+    {
+     "p": "¿Es dolorosa?",
+     "r": "Se hace bajo anestesia. En el posoperatorio puede haber molestias leves, que se controlan con analgésicos. El equipo médico te explica los cuidados y te acompaña durante toda la recuperación."
+    },
+    {
+     "p": "¿Cuánto dura la recuperación?",
+     "r": "Suele requerir un día de ingreso y unas dos semanas de reposo laboral. Conviene evitar cargar peso durante el tiempo que te indique el médico, y las revisiones permiten comprobar tu evolución."
+    },
+    {
+     "p": "¿Puede volver a aparecer el prolapso?",
+     "r": "Puede ocurrir. Evitar cargas pesadas, mantener un peso saludable y tratar la tos crónica o el estreñimiento ayudan a conservar el resultado. En la valoración el médico te explica qué esperar en tu caso."
+    },
+    {
+     "p": "¿Hay alternativas sin cirugía?",
+     "r": "En el prolapso leve, el láser vaginal puede ser una opción para mejorar el tono del tejido. Si el prolapso es mayor, suele necesitarse cirugía. El médico te explica qué encaja con tu caso tras explorarte."
+    }
+   ],
+   "preocupaciones": [
+    "zona-intima",
+    "cirugia"
+   ],
+   "relacionados": [
+    "laxitud-vaginal",
+    "incontinencia-urinaria-de-esfuerzo",
+    "perineoplastia"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#cirugia-de-suelo-pelvico-prolapsos-o-distopias.",
+    "https://iemec-clinic.com/blog/que-es-la-cirugia-de-suelo-pelvico-y-como-trata-los-prolapsos-genitales"
+   ],
+   "pendiente": [
+    "Pendiente de autorización (U.26 Ginecología): la autorización del centro (CS17886) no la incluye y normas.md deja la ginecología funcional sin página hasta que la clínica confirme que la cubre o amplíe la autorización.",
+    "La intervención es fuera de IEMEC (hospital concertado, según el catálogo): confirmar el centro y el tipo de anestesia. El día de ingreso y las dos semanas de reposo vienen de la web actual; confirmar.",
+    "El blog dice que la cirugía es «definitiva» y «mínimamente invasiva», y la web, que permite «recuperar la vida sexual normal» y «curar la incontinencia»: no se traslada.",
+    "El botón de WhatsApp actual manda el texto de otro servicio («rejuvenecimiento vaginal»).",
+    "Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo.",
+    "WhatsApp: texto neutro («Salud íntima femenina» o «una consulta») y una referencia que no lleve el id del catálogo en claro, porque nombra el tratamiento (normas.md, regla 12; casillas-formulario.md, apdo. 8)."
+   ]
+  }
+ ],
+ "sin_pagina": []
+}

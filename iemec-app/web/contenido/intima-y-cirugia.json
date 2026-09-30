@@ -1,0 +1,1183 @@
+{
+ "grupo": "intima-y-cirugia",
+ "paginas": [
+  {
+   "slug": "consulta-de-cirugia-plastica",
+   "especialidad": "cirugia-estetica",
+   "catalogo": [
+    "valoracion-cirugia-plastica"
+   ],
+   "orden": 10,
+   "destacado": true,
+   "nombre": "Consulta con el cirujano plástico",
+   "titulo": "Consulta de valoración con el cirujano plástico",
+   "titulo_seo": "Consulta de cirugía plástica en Boadilla · IEMEC",
+   "descripcion_seo": "Consulta con el cirujano plástico en IEMEC, Boadilla del Monte: valoramos tu caso y te explicamos opciones, riesgos, recuperación y presupuesto.",
+   "entradilla": "Antes de cualquier cirugía estética, una consulta con el cirujano plástico para estudiar tu caso, resolver tus dudas y decidir con calma si la intervención es para ti.",
+   "para_quien": [
+    "Estás pensando en una cirugía estética y quieres saber si es adecuada para ti.",
+    "Quieres conocer la técnica, la recuperación y los riesgos antes de decidir.",
+    "Te han propuesto una intervención y buscas otra opinión.",
+    "Prefieres tener un presupuesto por escrito para valorarlo con tranquilidad."
+   ],
+   "texto": [
+    "La consulta de valoración es el primer paso de cualquier cirugía estética en IEMEC. La hace el cirujano plástico, que revisa tu historia de salud, explora la zona que te preocupa y escucha qué te gustaría conseguir.",
+    "Con esa información te explica si la cirugía es adecuada en tu caso, qué técnica propone, qué anestesia se usaría, dónde se haría la intervención y qué recuperación puedes esperar. También te habla de los riesgos, las contraindicaciones y las alternativas, incluidas las opciones sin cirugía cuando existen.",
+    "Sales con la información clara y un presupuesto por escrito, sin compromiso, para decidir con calma. Si sigues adelante, firmarás el consentimiento informado antes de la intervención. El resultado de cualquier cirugía varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unos 45 minutos",
+    "sesiones": "Una consulta",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Cirujano plástico"
+   },
+   "variantes": [],
+   "resultados": "Sales de la consulta sabiendo si la cirugía encaja contigo, qué implica y qué alternativas tienes.",
+   "preguntas": [
+    {
+     "p": "¿Qué pasa en la consulta?",
+     "r": "El cirujano te pregunta por tu salud, tus antecedentes y la medicación que tomas, explora la zona y escucha lo que buscas. Después te explica las opciones, la técnica, la recuperación, los riesgos y las alternativas, y resuelve tus dudas."
+    },
+    {
+     "p": "¿Me compromete a operarme?",
+     "r": "No. Es una valoración sin compromiso: sirve para que tengas información clara y un presupuesto por escrito. Puedes tomarte el tiempo que necesites para decidir y volver a consultarnos las dudas que te surjan después."
+    },
+    {
+     "p": "¿Dónde se hacen las intervenciones?",
+     "r": "La consulta es en IEMEC, en Boadilla del Monte. Las intervenciones se hacen en el quirófano de un centro hospitalario autorizado. En la valoración el cirujano te explica dónde se haría la tuya, con qué anestesia y si tendrías que pasar la noche en el centro."
+    },
+    {
+     "p": "¿Qué conviene llevar?",
+     "r": "Si los tienes, trae informes médicos, analíticas recientes y la lista de la medicación que tomas. También ayuda pensar antes qué te gustaría cambiar y apuntar tus dudas, para aprovechar bien la consulta."
+    },
+    {
+     "p": "¿Qué cirugías se valoran?",
+     "r": "Cirugía de pecho (aumento, elevación y reducción), liposucción, abdominoplastia, lipofilling de glúteos, lipotransferencia facial, cirugía de párpados y otoplastia. Si te interesa otra intervención, pregúntanos y te diremos si podemos ayudarte."
+    }
+   ],
+   "preocupaciones": [
+    "cirugia"
+   ],
+   "relacionados": [
+    "aumento-de-pecho",
+    "liposuccion",
+    "abdominoplastia",
+    "blefaroplastia"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cita-online",
+    "https://iemec-clinic.com/cirugia-corporal",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Es la cita que se reserva en IEMEC antes de cualquier cirugía (en la web actual, el botón genérico «Cirugía estética» de /cita-online).",
+    "Multiestetica publica un precio «desde» y la consulta como «gratuita»: en esta versión no se publican precios ni «gratis». Proponemos «primera valoración sin compromiso».",
+    "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j).",
+    "Multiestetica sitúa las intervenciones en el Hospital (Universitario) Moncloa: confirmar el centro para decirlo en cada página.",
+    "Duración de la consulta: 45 minutos, dato del sector; confirmar.",
+    "La última pregunta enumera las cirugías que se valoran: incluye la blefaroplastia y la liposucción de papada, que solo salen en Multiestetica. Ajustarla si la clínica no las confirma."
+   ]
+  },
+  {
+   "slug": "aumento-de-pecho",
+   "especialidad": "cirugia-estetica",
+   "catalogo": [
+    "aumento-pecho"
+   ],
+   "orden": 20,
+   "destacado": true,
+   "nombre": "Aumento de pecho",
+   "titulo": "Aumento de pecho (mamoplastia de aumento)",
+   "titulo_seo": "Aumento de pecho en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Aumento de pecho en IEMEC Boadilla: valoración con el cirujano plástico, intervención en un centro hospitalario autorizado y seguimiento posoperatorio.",
+   "entradilla": "Una cirugía para ganar volumen, mejorar la forma del pecho y corregir asimetrías. Empieza con una valoración con el cirujano plástico, que adapta la técnica a tu anatomía.",
+   "para_quien": [
+    "Te gustaría tener más volumen en el pecho.",
+    "Quieres mejorar la forma del pecho o su proporción con tu figura.",
+    "Notas una asimetría entre los dos pechos.",
+    "Prefieres decidirlo con toda la información, tras hablar con el cirujano."
+   ],
+   "texto": [
+    "El aumento de pecho, o mamoplastia de aumento, es una cirugía para ganar volumen mamario, mejorar la forma del pecho y corregir asimetrías. Se hace con implantes mamarios, que el cirujano plástico elige contigo según tu anatomía y el resultado que buscas.",
+    "Todo empieza con una consulta de valoración en IEMEC. El cirujano estudia tu caso, te explica la técnica y el tipo de implante que propone, y te habla con claridad de los riesgos, las contraindicaciones y las alternativas.",
+    "La intervención se hace en el quirófano de un centro hospitalario autorizado. Antes firmas el consentimiento informado y, después, te acompañamos en el seguimiento posoperatorio. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una intervención",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Cirujano plástico"
+   },
+   "variantes": [],
+   "resultados": "El aspecto final se aprecia de forma progresiva, cuando baja la inflamación de las primeras semanas, y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Dónde se hace la intervención?",
+     "r": "En el quirófano de un centro hospitalario autorizado, no en la clínica. En IEMEC haces la consulta de valoración con el cirujano plástico, que te explica dónde te operarías, qué anestesia se usa y si tendrías que pasar la noche en el centro."
+    },
+    {
+     "p": "¿Cómo se elige el implante?",
+     "r": "Depende de tu anatomía, de tus tejidos y del resultado que buscas. El cirujano te explica las opciones de forma, tamaño y colocación, y lo decidís juntos en la valoración, sin prisas y con toda la información."
+    },
+    {
+     "p": "¿Cuánto dura la recuperación?",
+     "r": "Depende de la técnica y de cada persona. En la valoración el cirujano te explica cuántos días de reposo necesitarás, cuándo podrás volver al trabajo y al ejercicio, y qué cuidados seguir durante el posoperatorio."
+    },
+    {
+     "p": "¿Qué riesgos tiene?",
+     "r": "Como toda cirugía, tiene riesgos, como los de la anestesia, la infección, el sangrado o las alteraciones de la cicatrización, además de los propios de los implantes. El cirujano te los explica en la consulta y se recogen en el consentimiento informado."
+    },
+    {
+     "p": "¿Necesitaré revisiones con los años?",
+     "r": "Sí. Después de la intervención tienes revisiones de seguimiento y, con el tiempo, conviene controlar el estado de los implantes. El cirujano te explica cada cuánto hacerlo y qué señales deben llevarte a consultar."
+    }
+   ],
+   "preocupaciones": [
+    "cirugia",
+    "volumen-y-contorno"
+   ],
+   "relacionados": [
+    "elevacion-de-pecho",
+    "reduccion-de-pecho",
+    "consulta-de-cirugia-plastica"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-corporal#aumento-de-pecho",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Dónde, anestesia e ingreso: la página solo dice «quirófano de un centro hospitalario autorizado». Normas.md pide decir con claridad dónde se opera: confirmar el centro, el tipo de anestesia y si hay ingreso. Multiestetica dice Hospital Moncloa con una noche de hospitalización.",
+    "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j).",
+    "Recuperación orientativa (días de reposo, vuelta al trabajo y al deporte): ni el catálogo ni la web la dan.",
+    "Multiestetica publica un precio «desde» y la consulta como «gratuita»: en esta versión no se publican precios ni «gratis».",
+    "El WhatsApp actual dice «aumento de senos»: usar el texto neutro con la referencia de esta página."
+   ]
+  },
+  {
+   "slug": "elevacion-de-pecho",
+   "especialidad": "cirugia-estetica",
+   "catalogo": [
+    "mastopexia"
+   ],
+   "orden": 30,
+   "destacado": false,
+   "nombre": "Elevación de pecho (mastopexia)",
+   "titulo": "Elevación de pecho (mastopexia)",
+   "titulo_seo": "Elevación de pecho (mastopexia) en Boadilla · IEMEC",
+   "descripcion_seo": "Elevación de pecho o mastopexia en IEMEC Boadilla: cirugía para elevar y remodelar el pecho caído, con o sin implantes, tras valorar tu caso con el cirujano.",
+   "entradilla": "Una cirugía que eleva y remodela el pecho caído y sube la areola y el pezón. Puede hacerse solo con tu tejido o combinarse con implantes si además buscas volumen.",
+   "para_quien": [
+    "Notas el pecho caído o con menos firmeza tras embarazos, lactancia o cambios de peso.",
+    "La areola y el pezón han quedado más bajos.",
+    "Te gustaría recuperar la forma del pecho, con más volumen o sin él."
+   ],
+   "texto": [
+    "La mastopexia, o elevación de pecho, es una cirugía para levantar y remodelar el pecho cuando ha caído. El cirujano retira el exceso de piel, recoloca el tejido mamario y, en muchos casos, sube la areola y el pezón a una posición más alta.",
+    "Puede hacerse solo con tu propio tejido o combinarse con implantes mamarios si, además, quieres más volumen. La técnica se decide en la consulta de valoración con el cirujano plástico, según tu anatomía y lo que buscas.",
+    "La intervención se hace en el quirófano de un centro hospitalario autorizado. En la valoración te explicamos la anestesia, los riesgos, las cicatrices, las alternativas y la recuperación, que suele llevar entre 2 y 4 semanas. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una intervención",
+    "anestesia": null,
+    "recuperacion": "Entre 2 y 4 semanas, según el caso y la técnica",
+    "profesional": "Cirujano plástico"
+   },
+   "variantes": [
+    {
+     "nombre": "Sin implantes",
+     "texto": "Eleva y remodela el pecho usando solo tu tejido mamario, cuando el volumen te parece adecuado.",
+     "catalogo": null
+    },
+    {
+     "nombre": "Con implantes",
+     "texto": "Combina la elevación con un aumento de volumen, si además quieres un pecho más lleno.",
+     "catalogo": null
+    }
+   ],
+   "resultados": "La forma se asienta de forma progresiva en los meses siguientes y las cicatrices mejoran con el tiempo; el resultado varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Quedan cicatrices?",
+     "r": "Sí. Toda mastopexia deja cicatrices, aunque con las técnicas actuales suelen ser discretas y mejoran con el tiempo. Dónde quedan depende de la técnica que necesites; el cirujano te lo explica y te dice cómo cuidarlas."
+    },
+    {
+     "p": "¿Cuánto dura la recuperación?",
+     "r": "Suele llevar entre 2 y 4 semanas, según el caso y la técnica, con implantes o sin ellos. El cirujano te indica cuándo volver al trabajo y al ejercicio y qué cuidados seguir durante el posoperatorio."
+    },
+    {
+     "p": "¿Necesito implantes?",
+     "r": "No siempre. Si el volumen de tu pecho te parece adecuado, la elevación puede hacerse solo con tu tejido. Si además quieres más volumen, se combina con implantes. Lo decides con el cirujano en la valoración."
+    },
+    {
+     "p": "¿Dónde se hace la intervención?",
+     "r": "En el quirófano de un centro hospitalario autorizado. En la consulta de IEMEC el cirujano te explica dónde se haría, qué anestesia se usa, si tendrías que pasar la noche en el centro y cómo serán las revisiones."
+    }
+   ],
+   "preocupaciones": [
+    "cirugia",
+    "flacidez"
+   ],
+   "relacionados": [
+    "aumento-de-pecho",
+    "reduccion-de-pecho",
+    "abdominoplastia"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-corporal#elevacion-de-pecho-mastopexia",
+    "https://iemec-clinic.com/blog/en-que-consiste-la-elevacion-de-pecho-mastopexia-y-cuando-se-recomienda",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Dónde, anestesia e ingreso: la página solo dice «quirófano de un centro hospitalario autorizado». Normas.md pide decir con claridad dónde se opera: confirmar el centro, el tipo de anestesia y si hay ingreso.",
+    "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j).",
+    "Recuperación de 2 a 4 semanas: dato del blog; confirmar que puede publicarse como orientación."
+   ]
+  },
+  {
+   "slug": "reduccion-de-pecho",
+   "especialidad": "cirugia-estetica",
+   "catalogo": [
+    "reduccion-pecho"
+   ],
+   "orden": 40,
+   "destacado": false,
+   "nombre": "Reducción de pecho",
+   "titulo": "Reducción de pecho (mamoplastia de reducción)",
+   "titulo_seo": "Reducción de pecho en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Reducción de pecho en IEMEC Boadilla: cirugía para disminuir y remodelar un pecho grande que causa molestias, con valoración previa del cirujano plástico.",
+   "entradilla": "Una cirugía que disminuye el volumen del pecho y lo remodela cuando su tamaño causa molestias o no guarda proporción con tu cuerpo. Tiene una parte estética y otra funcional.",
+   "para_quien": [
+    "El volumen del pecho te causa dolor de espalda, cuello u hombros.",
+    "Te resulta difícil encontrar ropa o hacer deporte con comodidad.",
+    "Quieres un pecho más proporcionado con tu cuerpo."
+   ],
+   "texto": [
+    "La reducción de pecho, o mamoplastia de reducción, es una cirugía para disminuir el volumen de un pecho grande y pesado. El cirujano retira grasa, tejido glandular y piel, recoloca el pezón y redefine la forma del pecho.",
+    "Es a la vez estética y funcional: muchas veces se plantea por dolor de espalda, cuello u hombros, o por problemas de postura, y puede ayudar a aliviarlos y a hacer más cómodas las actividades diarias.",
+    "Empieza con una consulta de valoración con el cirujano plástico en IEMEC, que te explica la técnica, la anestesia, las cicatrices, los riesgos y las alternativas. La intervención se hace en el quirófano de un centro hospitalario autorizado. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una intervención",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Cirujano plástico"
+   },
+   "variantes": [],
+   "resultados": "La nueva forma y el alivio de las molestias se aprecian de forma progresiva durante la recuperación; varían según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Es una cirugía estética o funcional?",
+     "r": "Las dos cosas. Muchas veces está indicada por dolores de espalda, cuello u hombros, o por problemas de postura, y además mejora la proporción del pecho con el cuerpo. En la valoración el cirujano estudia tu caso."
+    },
+    {
+     "p": "¿Hay que dejar de dar el pecho antes?",
+     "r": "Sí. Se recomienda esperar unos meses después del destete para operarse. Si estás pensando en un embarazo, coméntalo en la consulta: el cirujano te ayudará a elegir el momento más adecuado."
+    },
+    {
+     "p": "¿Qué se hace en la intervención?",
+     "r": "Se retira el exceso de grasa, tejido glandular y piel, se sube el pezón a una posición acorde con el nuevo volumen y se remodela el pecho. La técnica y la forma de las cicatrices dependen de tu caso."
+    },
+    {
+     "p": "¿Dónde se opera y con qué anestesia?",
+     "r": "La intervención se hace en el quirófano de un centro hospitalario autorizado. En la consulta de valoración el cirujano te explica el tipo de anestesia, si tendrías que pasar la noche en el centro y cómo será la recuperación."
+    }
+   ],
+   "preocupaciones": [
+    "cirugia",
+    "volumen-y-contorno"
+   ],
+   "relacionados": [
+    "elevacion-de-pecho",
+    "aumento-de-pecho",
+    "consulta-de-cirugia-plastica"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-corporal#reduccion-de-pecho-o-mamoplastia",
+    "https://iemec-clinic.com/blog/en-que-casos-se-recomienda-una-reduccion-de-pecho-mamoplastia-reductora",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Dónde, anestesia e ingreso: la página solo dice «quirófano de un centro hospitalario autorizado». Normas.md pide decir con claridad dónde se opera: confirmar el centro, el tipo de anestesia y si hay ingreso. Multiestetica dice anestesia general en el Hospital Universitario Moncloa.",
+    "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j).",
+    "Se dice «mamoplastia de reducción» y no «reductora» para no disparar el aviso de propiedades reductoras de normas.json.",
+    "Recuperación orientativa: ni el catálogo ni la web la dan."
+   ]
+  },
+  {
+   "slug": "liposuccion",
+   "especialidad": "cirugia-estetica",
+   "catalogo": [
+    "liposuccion",
+    "liposuccion-papada"
+   ],
+   "orden": 50,
+   "destacado": true,
+   "nombre": "Liposucción",
+   "titulo": "Liposucción y lipoescultura para la grasa localizada",
+   "titulo_seo": "Liposucción en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Liposucción en IEMEC Boadilla: cirugía para retirar grasa localizada de abdomen, flancos, muslos, brazos, espalda o papada, tras valorar tu caso.",
+   "entradilla": "Una cirugía que retira acumulaciones de grasa localizada y mejora el contorno de zonas concretas del cuerpo o de la papada. No es un tratamiento para bajar de peso.",
+   "para_quien": [
+    "Tienes acumulaciones de grasa que no cambian con dieta ni ejercicio.",
+    "Te preocupan zonas como abdomen, flancos, caderas, muslos, brazos, espalda o papada.",
+    "Estás en un peso estable y buscas mejorar el contorno, no bajar de peso."
+   ],
+   "texto": [
+    "La liposucción, también llamada lipoescultura, es una cirugía que retira de forma precisa acumulaciones de grasa localizada. Se usa en zonas como el abdomen, los flancos, las caderas, los muslos, los glúteos, los brazos o la espalda, y también en la papada, cuando la grasa no responde a la dieta ni al ejercicio.",
+    "No sustituye a una alimentación equilibrada ni al ejercicio, y no está pensada para bajar de peso: su objetivo es mejorar el contorno de zonas concretas. Puede combinarse con otras cirugías, como la abdominoplastia, si el cirujano lo considera adecuado.",
+    "Empieza con una consulta de valoración con el cirujano plástico en IEMEC, que te explica la técnica, la anestesia, los riesgos, las alternativas y la recuperación. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una intervención",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Cirujano plástico"
+   },
+   "variantes": [
+    {
+     "nombre": "Liposucción corporal",
+     "texto": "Para abdomen, flancos, caderas, muslos, glúteos, brazos o espalda. Se hace en el quirófano de un centro hospitalario autorizado, con seguimiento posoperatorio.",
+     "catalogo": "liposuccion"
+    },
+    {
+     "nombre": "Liposucción de papada",
+     "texto": "Para la grasa bajo el mentón, con el fin de definir mejor el cuello y el óvalo facial. Según la valoración, se hace con liposucción o con lipoláser, que además ayuda a tensar la piel.",
+     "catalogo": "liposuccion-papada"
+    }
+   ],
+   "resultados": "El nuevo contorno se aprecia de forma progresiva, a medida que baja la inflamación en los meses siguientes; varía según cada persona y se mantiene mejor con un peso estable.",
+   "preguntas": [
+    {
+     "p": "¿Sirve para bajar de peso?",
+     "r": "No. La liposucción está pensada para acumulaciones de grasa localizada que no responden a la dieta ni al ejercicio, en personas con un peso estable. Si lo que buscas es bajar de peso, en la consulta te orientamos sobre otras opciones."
+    },
+    {
+     "p": "¿Qué zonas se pueden tratar?",
+     "r": "Abdomen, flancos, caderas, muslos, glúteos, brazos, espalda y papada, entre otras. En la valoración el cirujano revisa cada zona, la calidad de tu piel y tus antecedentes, y te dice qué se puede conseguir en tu caso."
+    },
+    {
+     "p": "¿Se mantiene el resultado?",
+     "r": "Con un peso estable y hábitos saludables, el nuevo contorno suele mantenerse. Si se gana peso, la grasa puede volver a acumularse, también en otras zonas. El cirujano te explica qué esperar en tu caso."
+    },
+    {
+     "p": "¿Dónde se hace y con qué anestesia?",
+     "r": "La liposucción corporal se hace en el quirófano de un centro hospitalario autorizado. En la consulta de valoración el cirujano te explica el tipo de anestesia, si tendrías que pasar la noche en el centro y cómo se trataría la papada en tu caso."
+    }
+   ],
+   "preocupaciones": [
+    "cirugia",
+    "grasa-localizada"
+   ],
+   "relacionados": [
+    "abdominoplastia",
+    "lipofilling-de-gluteos",
+    "lipotransferencia-facial"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-corporal#liposuccion",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Dónde, anestesia e ingreso: la página solo dice «quirófano de un centro hospitalario autorizado». Normas.md pide decir con claridad dónde se opera: confirmar el centro, el tipo de anestesia y si hay ingreso. Multiestetica dice anestesia general en el Hospital Universitario Moncloa.",
+    "Liposucción de papada: solo sale en Multiestetica (con lipoláser o liposucción quirúrgica, según la valoración) y el catálogo la asigna a la sala de procedimientos de IEMEC. Confirmar que se ofrece, dónde se hace, con qué anestesia y quién la hace. El lipoláser tiene página propia en corporal-y-peso (slug lipolaser): enlazarla.",
+    "Multiestetica ofrece «hasta un 50 % de descuento» en la liposucción asociada a la abdominoplastia: no se publica (normas: sin descuentos).",
+    "La galería de Multiestetica etiqueta fotos como «Lipo Vaser», técnica que la clínica no describe: no se menciona.",
+    "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j)."
+   ]
+  },
+  {
+   "slug": "abdominoplastia",
+   "especialidad": "cirugia-estetica",
+   "catalogo": [
+    "abdominoplastia"
+   ],
+   "orden": 60,
+   "destacado": true,
+   "nombre": "Abdominoplastia",
+   "titulo": "Abdominoplastia: cirugía del exceso de piel y grasa del abdomen",
+   "titulo_seo": "Abdominoplastia en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Abdominoplastia en IEMEC Boadilla: cirugía que retira el exceso de piel y grasa del abdomen y repara la separación de los músculos, tras valorar tu caso.",
+   "entradilla": "Una cirugía que retira el exceso de piel y grasa del abdomen y, cuando hace falta, repara la separación de los músculos abdominales. Empieza con una valoración con el cirujano plástico.",
+   "para_quien": [
+    "Tienes exceso de piel o flacidez en el abdomen tras embarazos o un cambio de peso importante.",
+    "Los músculos del abdomen se han separado y el vientre sobresale.",
+    "La dieta y el ejercicio no mejoran la piel sobrante del abdomen."
+   ],
+   "texto": [
+    "La abdominoplastia es una cirugía que mejora el aspecto del abdomen. El cirujano retira el exceso de piel y grasa y, si existe, repara la diástasis: la separación de los músculos rectos del abdomen, que a veces queda después de un embarazo. Al retirar piel, también puede reducir las estrías de esa zona.",
+    "Si el cirujano lo considera adecuado, puede combinarse con una liposucción para mejorar el contorno. Durante la recuperación tienes revisiones y, si el cirujano lo indica, sesiones de drenaje linfático manual.",
+    "Empieza con una consulta de valoración en IEMEC, en la que el cirujano plástico te explica la técnica, la cicatriz, la anestesia, los riesgos y las alternativas. La intervención se hace en el quirófano de un centro hospitalario autorizado. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una intervención",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Cirujano plástico"
+   },
+   "variantes": [],
+   "resultados": "El nuevo contorno del abdomen se aprecia de forma progresiva, a medida que baja la inflamación; varía según cada persona y se mantiene mejor con un peso estable.",
+   "preguntas": [
+    {
+     "p": "¿En qué se diferencia de la liposucción?",
+     "r": "La liposucción retira grasa localizada, pero no piel. La abdominoplastia retira el exceso de piel y grasa y puede reparar la separación de los músculos. A veces se combinan: el cirujano te dice cuál necesitas tras explorarte."
+    },
+    {
+     "p": "¿Corrige la separación de los músculos?",
+     "r": "Sí, cuando existe. La diástasis de los rectos, frecuente tras los embarazos, se repara en la misma intervención. En la valoración el cirujano comprueba si la tienes y te explica cómo se trataría en tu caso."
+    },
+    {
+     "p": "¿Quedará cicatriz?",
+     "r": "Sí. La abdominoplastia deja una cicatriz en la parte baja del abdomen, cuya longitud depende de la piel que haya que retirar. Con los cuidados adecuados mejora con el tiempo; el cirujano te explica dónde quedaría en tu caso."
+    },
+    {
+     "p": "¿Qué cuidados hay después?",
+     "r": "Durante el posoperatorio tienes revisiones con el cirujano y, si lo indica, sesiones de drenaje linfático manual para ayudar a la recuperación. Te explicamos cuándo volver al trabajo y al ejercicio y qué cuidados seguir en cada fase."
+    },
+    {
+     "p": "¿Dónde se hace?",
+     "r": "En el quirófano de un centro hospitalario autorizado. En la consulta de valoración en IEMEC el cirujano te explica el centro, el tipo de anestesia, si tendrías que pasar la noche en él y cómo se organiza el seguimiento."
+    }
+   ],
+   "preocupaciones": [
+    "cirugia",
+    "flacidez",
+    "grasa-localizada"
+   ],
+   "relacionados": [
+    "liposuccion",
+    "elevacion-de-pecho",
+    "consulta-de-cirugia-plastica"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-corporal#abdominoplastia",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Dónde, anestesia e ingreso: la página solo dice «quirófano de un centro hospitalario autorizado». Normas.md pide decir con claridad dónde se opera: confirmar el centro, el tipo de anestesia y si hay ingreso. Multiestetica dice Hospital Moncloa, una noche de hospitalización y 6 sesiones de drenaje linfático posoperatorio incluidas.",
+    "Confirmar que el drenaje linfático posoperatorio forma parte del plan (aquí se cita sin número de sesiones). El drenaje linfático manual tiene página en corporal-y-peso (slug drenaje-linfatico).",
+    "Multiestetica publica un precio «desde» y la consulta como «gratuita»: en esta versión no se publican precios ni «gratis». Tampoco el «50 % de descuento» en la liposucción asociada.",
+    "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j)."
+   ]
+  },
+  {
+   "slug": "lipofilling-de-gluteos",
+   "especialidad": "cirugia-estetica",
+   "catalogo": [
+    "lipofilling-gluteos"
+   ],
+   "orden": 70,
+   "destacado": false,
+   "nombre": "Lipofilling de glúteos",
+   "titulo": "Lipofilling de glúteos: volumen con tu propia grasa",
+   "titulo_seo": "Lipofilling de glúteos en Boadilla · IEMEC",
+   "descripcion_seo": "Lipofilling de glúteos en IEMEC Boadilla: cirugía que usa tu propia grasa para dar volumen y forma a los glúteos, tras una valoración con el cirujano plástico.",
+   "entradilla": "Una cirugía que aprovecha tu propia grasa, obtenida de otra zona del cuerpo, para dar volumen y mejorar la forma de los glúteos. También se conoce como lipotransferencia.",
+   "para_quien": [
+    "Te gustaría más volumen o una forma más redondeada en los glúteos.",
+    "Tienes grasa localizada en otras zonas, como el abdomen o los flancos.",
+    "Prefieres que el volumen venga de tu propia grasa."
+   ],
+   "texto": [
+    "El lipofilling de glúteos, o lipotransferencia, es una cirugía que utiliza grasa de tu propio cuerpo para aumentar el volumen y mejorar la forma de los glúteos. Primero se obtiene la grasa con una liposucción de otra zona, como el abdomen o los flancos, y después se prepara y se injerta en los glúteos.",
+    "Así se trabajan dos zonas en la misma intervención. Parte de la grasa injertada se reabsorbe en los meses siguientes, por eso el volumen final se valora con el tiempo y depende de cada persona.",
+    "Empieza con una consulta de valoración con el cirujano plástico, que comprueba si tienes grasa suficiente y te explica la técnica, la anestesia, los riesgos, las alternativas y la recuperación. La intervención se hace en el quirófano de un centro hospitalario autorizado."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una intervención",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Cirujano plástico"
+   },
+   "variantes": [],
+   "resultados": "El volumen se estabiliza en los meses siguientes, cuando el cuerpo ha reabsorbido parte de la grasa; el resultado varía según cada persona y se mantiene mejor con un peso estable.",
+   "preguntas": [
+    {
+     "p": "¿De dónde se obtiene la grasa?",
+     "r": "De zonas donde tengas acumulaciones, como el abdomen, los flancos o los muslos, mediante una liposucción. En la valoración el cirujano comprueba si tienes grasa suficiente para el volumen que buscas y de qué zonas conviene obtenerla."
+    },
+    {
+     "p": "¿Se mantiene toda la grasa injertada?",
+     "r": "No toda. Una parte se reabsorbe durante los meses siguientes, y la cantidad varía según cada persona. Por eso el volumen final se valora con el tiempo; mantener un peso estable ayuda a conservar el resultado."
+    },
+    {
+     "p": "¿Quedan cicatrices?",
+     "r": "Se hacen pequeñas incisiones para obtener e injertar la grasa. El cirujano te explica dónde quedarían y cómo cuidarlas; con el tiempo suelen notarse poco, aunque cada piel cicatriza de forma distinta."
+    },
+    {
+     "p": "¿Dónde se hace?",
+     "r": "En el quirófano de un centro hospitalario autorizado. En la consulta de IEMEC el cirujano te explica el centro, la anestesia, si tendrías que pasar la noche en él y los cuidados de los primeros días."
+    }
+   ],
+   "preocupaciones": [
+    "cirugia",
+    "volumen-y-contorno"
+   ],
+   "relacionados": [
+    "liposuccion",
+    "lipotransferencia-facial",
+    "abdominoplastia"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-corporal#lipofilling-para-aumento-de-gluteos"
+   ],
+   "pendiente": [
+    "Dónde, anestesia e ingreso: la página solo dice «quirófano de un centro hospitalario autorizado». Normas.md pide decir con claridad dónde se opera: confirmar el centro, el tipo de anestesia y si hay ingreso.",
+    "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j).",
+    "La web actual promete «un tiempo de recuperación corto y sin cicatrices visibles» y glúteos «atractivos»: no se traslada.",
+    "Hay otra página de glúteos sin cirugía en corporal-y-peso (slug aumento-de-gluteos): enlazarlas entre sí para que el paciente distinga las dos opciones."
+   ]
+  },
+  {
+   "slug": "lipotransferencia-facial",
+   "especialidad": "cirugia-estetica",
+   "catalogo": [
+    "lipotransferencia-facial"
+   ],
+   "orden": 80,
+   "destacado": false,
+   "nombre": "Lipotransferencia facial",
+   "titulo": "Lipotransferencia facial: volumen con tu propia grasa",
+   "titulo_seo": "Lipotransferencia facial en Boadilla · IEMEC",
+   "descripcion_seo": "Lipotransferencia facial en IEMEC Boadilla: cirugía que injerta tu propia grasa para devolver volumen al rostro y suavizar pliegues, tras valorar tu caso.",
+   "entradilla": "Una cirugía que injerta grasa de tu propio cuerpo en el rostro para devolver el volumen perdido y redefinir sus contornos. También se llama lipofilling facial.",
+   "para_quien": [
+    "Has perdido volumen en el rostro con los años.",
+    "Notas surcos o pliegues más marcados.",
+    "Prefieres usar tu propia grasa en lugar de un producto de relleno."
+   ],
+   "texto": [
+    "La lipotransferencia facial, o lipofilling facial, es una cirugía que utiliza grasa de tu propio cuerpo para restaurar volumen en el rostro, redefinir sus contornos y suavizar arrugas y pliegues profundos.",
+    "La grasa se obtiene con una pequeña liposucción de otra zona, se prepara y se injerta con cánulas finas donde hace falta. Una parte de la grasa injertada se reabsorbe en los meses siguientes, por eso el resultado se valora con el tiempo.",
+    "Empieza con una consulta de valoración con el cirujano plástico, que estudia tu rostro y te explica la técnica, la anestesia, los riesgos, las alternativas, como los rellenos, y la recuperación. La intervención se hace en el quirófano de un centro hospitalario autorizado. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una intervención",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Cirujano plástico"
+   },
+   "variantes": [],
+   "resultados": "El volumen se asienta en los meses siguientes, cuando baja la inflamación y el cuerpo ha reabsorbido parte de la grasa; el resultado varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿En qué se diferencia de un relleno?",
+     "r": "El relleno se hace en consulta con un producto que el cuerpo reabsorbe con el tiempo. La lipotransferencia es una cirugía que usa tu propia grasa. El cirujano te explica qué opción encaja mejor con tu rostro y con lo que esperas."
+    },
+    {
+     "p": "¿Se mantiene toda la grasa?",
+     "r": "No toda. Una parte se reabsorbe durante los meses siguientes, y cuánto depende de cada persona. Por eso el resultado se valora con el tiempo y, en algunos casos, puede plantearse un retoque."
+    },
+    {
+     "p": "¿Cómo es la recuperación?",
+     "r": "Es habitual notar inflamación y algún hematoma en la cara y en la zona de donde se obtiene la grasa durante los primeros días. El cirujano te explica los cuidados y cuándo podrás retomar tu rutina."
+    },
+    {
+     "p": "¿Dónde se hace?",
+     "r": "En el quirófano de un centro hospitalario autorizado. En la consulta de IEMEC el cirujano te explica el centro, el tipo de anestesia y si podrías volver a casa el mismo día."
+    }
+   ],
+   "preocupaciones": [
+    "cirugia",
+    "volumen-y-contorno",
+    "arrugas"
+   ],
+   "relacionados": [
+    "lipofilling-de-gluteos",
+    "blefaroplastia",
+    "liposuccion"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial"
+   ],
+   "pendiente": [
+    "En la web actual aparece en /facial, sin ancla ni botón de reserva; la intervención se hace fuera de IEMEC (catálogo).",
+    "La web actual dice que la grasa es «rica en células madre y factores regenerativos» y que no tiene «riesgo de rechazo»: no se traslada (efectos sin respaldo como reclamo y promesa de seguridad).",
+    "Dónde, anestesia e ingreso: la página solo dice «quirófano de un centro hospitalario autorizado». Normas.md pide decir con claridad dónde se opera: confirmar el centro, el tipo de anestesia y si hay ingreso.",
+    "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j)."
+   ]
+  },
+  {
+   "slug": "blefaroplastia",
+   "especialidad": "cirugia-estetica",
+   "catalogo": [
+    "blefaroplastia-quirurgica"
+   ],
+   "orden": 90,
+   "destacado": false,
+   "nombre": "Blefaroplastia",
+   "titulo": "Blefaroplastia: cirugía de los párpados",
+   "titulo_seo": "Blefaroplastia en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Blefaroplastia en IEMEC Boadilla: cirugía de los párpados superiores, inferiores o completa para retirar el exceso de piel o las bolsas, tras valorar tu caso.",
+   "entradilla": "Una cirugía de los párpados que retira el exceso de piel o las bolsas de grasa para dar a la mirada un aspecto más descansado. Puede hacerse en los párpados superiores, en los inferiores o en ambos.",
+   "para_quien": [
+    "El exceso de piel en los párpados superiores te cansa la mirada.",
+    "Te preocupan las bolsas de los párpados inferiores.",
+    "Quieres saber si tu caso necesita cirugía o puede tratarse de otra forma."
+   ],
+   "texto": [
+    "La blefaroplastia es una cirugía de los párpados. El cirujano plástico retira el exceso de piel y, si hace falta, las bolsas de grasa, para dar a la mirada un aspecto más descansado.",
+    "Puede hacerse en los párpados superiores, en los inferiores o de forma completa, según lo que necesites. En la consulta de valoración el cirujano estudia tus párpados y te explica la técnica, las cicatrices, la anestesia, los riesgos, las alternativas y la recuperación.",
+    "La intervención se hace en el quirófano de un centro hospitalario autorizado. Antes firmas el consentimiento informado y, después, tienes revisiones de seguimiento. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una intervención",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Cirujano plástico"
+   },
+   "variantes": [
+    {
+     "nombre": "Párpados superiores",
+     "texto": "Retira el exceso de piel que cae sobre el párpado y hace que la mirada parezca cansada.",
+     "catalogo": null
+    },
+    {
+     "nombre": "Párpados inferiores",
+     "texto": "Trata las bolsas de grasa y el exceso de piel bajo los ojos.",
+     "catalogo": null
+    },
+    {
+     "nombre": "Blefaroplastia completa",
+     "texto": "Trata los párpados superiores e inferiores en la misma intervención, si la valoración lo aconseja.",
+     "catalogo": null
+    }
+   ],
+   "resultados": "La mirada se ve más descansada de forma progresiva, cuando bajan la inflamación y los hematomas de las primeras semanas; el resultado varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué párpados se pueden operar?",
+     "r": "Los superiores, los inferiores o ambos en la misma intervención. Depende de si te preocupa el exceso de piel, las bolsas o las dos cosas. En la valoración el cirujano te explica qué opción encaja con tu caso."
+    },
+    {
+     "p": "¿Quedan cicatrices?",
+     "r": "Sí, aunque la incisión se planifica para que quede en zonas poco visibles, como el pliegue natural del párpado. Cada piel cicatriza de forma distinta; el cirujano te explica dónde quedarían y cómo cuidarlas."
+    },
+    {
+     "p": "¿Es lo mismo que el tratamiento de párpados con plasma?",
+     "r": "No. El tratamiento con plasma actúa sobre la superficie de la piel, en consulta y sin bisturí. La blefaroplastia es una cirugía que retira piel y bolsas de grasa. En la valoración te decimos qué opción es adecuada para ti."
+    },
+    {
+     "p": "¿Dónde se hace y cuánto dura la recuperación?",
+     "r": "La intervención se hace en el quirófano de un centro hospitalario autorizado. La recuperación depende de la técnica y de cada persona: en la consulta el cirujano te explica la anestesia, los cuidados y cuándo podrás retomar tu rutina."
+    }
+   ],
+   "preocupaciones": [
+    "cirugia",
+    "mirada-y-ojeras"
+   ],
+   "relacionados": [
+    "otoplastia",
+    "lipotransferencia-facial",
+    "consulta-de-cirugia-plastica"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Solo sale en Multiestetica (párpados superiores, inferiores o completa; Hospital Moncloa y una noche de hospitalización; precio «desde»), no en la web actual. Confirmar que se ofrece y esos datos antes de publicar.",
+    "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j).",
+    "Enlazar con «Tratamiento de párpados con plasma» (slug parpados-con-plasma, grupo facial-aparatologia), que es la opción sin cirugía."
+   ]
+  },
+  {
+   "slug": "otoplastia",
+   "especialidad": "cirugia-estetica",
+   "catalogo": [
+    "otoplastia"
+   ],
+   "orden": 100,
+   "destacado": false,
+   "nombre": "Otoplastia",
+   "titulo": "Otoplastia: cirugía de la forma y la posición de las orejas",
+   "titulo_seo": "Otoplastia en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Otoplastia en IEMEC Boadilla: cirugía para corregir orejas separadas, asimétricas o con alteraciones del cartílago, en equilibrio con el resto del rostro.",
+   "entradilla": "Una cirugía que corrige la posición, la forma o el tamaño de las orejas para que se integren en equilibrio con el resto del rostro, respetando tus rasgos.",
+   "para_quien": [
+    "Tus orejas están muy separadas de la cabeza o son asimétricas.",
+    "Te preocupa la forma del cartílago o de los lóbulos.",
+    "Tienes secuelas de un traumatismo o de una cirugía previa en la oreja."
+   ],
+   "texto": [
+    "La otoplastia es una cirugía que corrige la posición, la forma o el tamaño de las orejas. Trata orejas prominentes o separadas, asimetrías, alteraciones del cartílago, lóbulos descolgados o deformados y secuelas de traumatismos o de cirugías previas.",
+    "El cirujano remodela el cartílago y recoloca la oreja con precisión. La cicatriz suele quedar escondida en la parte posterior de la oreja. Buscamos un resultado discreto y proporcionado, sin que las orejas queden demasiado pegadas.",
+    "Empieza con una consulta de valoración en la que el cirujano plástico estudia tu anatomía, escucha lo que esperas y te explica la técnica, la anestesia, los riesgos y las alternativas. La intervención se hace en el quirófano de un centro hospitalario autorizado. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una intervención",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Cirujano plástico"
+   },
+   "variantes": [],
+   "resultados": "La nueva posición de las orejas se asienta de forma progresiva durante la recuperación; el resultado varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué puede corregir una otoplastia?",
+     "r": "Orejas prominentes o separadas de la cabeza, asimetrías entre ambas orejas, alteraciones en la forma del cartílago, lóbulos descolgados o deformados y secuelas de traumatismos o de cirugías previas. Cada caso se estudia en una valoración personalizada."
+    },
+    {
+     "p": "¿Se nota la cicatriz?",
+     "r": "Suele quedar escondida en la parte posterior de la oreja, por lo que pasa bastante desapercibida una vez terminada la recuperación. Aun así, cada piel cicatriza de forma distinta; el cirujano te explica cómo cuidarla."
+    },
+    {
+     "p": "¿Quedarán las orejas demasiado pegadas?",
+     "r": "No es el objetivo. La nueva posición se planifica para que las orejas queden proporcionadas con tu rostro y con un aspecto natural. En la valoración hablas con el cirujano de lo que esperas y de lo que es posible en tu caso."
+    },
+    {
+     "p": "¿Dónde se hace y con qué anestesia?",
+     "r": "La intervención se hace en el quirófano de un centro hospitalario autorizado. En la consulta de valoración el cirujano te explica el tipo de anestesia, si tendrías que pasar la noche en el centro y los cuidados de los primeros días."
+    }
+   ],
+   "preocupaciones": [
+    "cirugia"
+   ],
+   "relacionados": [
+    "blefaroplastia",
+    "lipotransferencia-facial",
+    "consulta-de-cirugia-plastica"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/cirugia-corporal#otoplastia",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Edad: la web actual dice que puede hacerse «a partir de los 10 años». No se publica, porque la publicidad no puede dirigirse a menores; confirmar la política de la clínica con menores (normas.md, apartado j).",
+    "Dónde, anestesia e ingreso: la página solo dice «quirófano de un centro hospitalario autorizado». Normas.md pide decir con claridad dónde se opera: confirmar el centro, el tipo de anestesia y si hay ingreso. Multiestetica dice anestesia general, Hospital Universitario Moncloa y una noche de ingreso.",
+    "La web actual promete resultados «estables y duraderos… durante toda la vida», una intervención «sencilla y segura» y «la mejor otoplastia»: no se traslada.",
+    "En la web actual está en la página «Cirugía corporal» aunque es cirugía facial: la URL antigua (#otoplastia) debe redirigir aquí.",
+    "Cirujano: en /nosotros figura el Dr. Marco Vricella (Cirugía Plástica, Reparadora y Estética, título de Italia). Para nombrarlo hacen falta su número de colegiado y el reconocimiento en España del título de especialista (normas.md, apartado j)."
+   ]
+  },
+  {
+   "slug": "labioplastia",
+   "especialidad": "ginecologia-estetica",
+   "catalogo": [
+    "labioplastia",
+    "cirugia-capuchon-clitoris"
+   ],
+   "orden": 10,
+   "destacado": true,
+   "nombre": "Labioplastia",
+   "titulo": "Labioplastia y cirugía del capuchón del clítoris",
+   "titulo_seo": "Labioplastia en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Labioplastia en IEMEC Boadilla: cirugía menor de los labios menores o del capuchón del clítoris, por motivos funcionales o estéticos, con anestesia local.",
+   "entradilla": "Una cirugía menor para reducir o remodelar los labios menores, o el capuchón del clítoris, cuando causan molestias o no te sientes a gusto con su aspecto. Se hace con anestesia local.",
+   "para_quien": [
+    "Notas roces o molestias con la ropa ajustada, al hacer deporte o al montar en bicicleta.",
+    "Tus labios menores son alargados, asimétricos o de mayor tamaño y te incomodan.",
+    "El pliegue de piel que rodea el clítoris ha crecido y te causa molestias.",
+    "Quieres resolver tus dudas en una valoración médica discreta antes de decidir."
+   ],
+   "texto": [
+    "La labioplastia es una cirugía de los labios menores de la vulva. Reduce o remodela los que son alargados, asimétricos o de mayor tamaño, por motivos funcionales o estéticos: a menudo causan irritación con la ropa, molestias al hacer deporte o dolor en las relaciones sexuales.",
+    "Con una cirugía parecida se trata el capuchón del clítoris, el pliegue de piel que lo rodea, cuando ha crecido y provoca roces o incomodidad.",
+    "Es una cirugía menor ambulatoria: se hace en IEMEC, centro autorizado para cirugía menor, con anestesia local, y vuelves a casa el mismo día. Las molestias de los primeros días suelen controlarse con analgésicos, y la vida diaria suele retomarse en 3 a 5 días.",
+    "Antes, el médico hace una valoración médica con total discreción: explora la zona, escucha qué te molesta y te explica la técnica, los riesgos, los cuidados y las alternativas. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Entre media hora y una hora, según la técnica",
+    "sesiones": "Una intervención",
+    "anestesia": "Anestesia local",
+    "recuperacion": "Vida diaria en 3 a 5 días, según tu caso",
+    "profesional": "Médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Labios menores",
+     "texto": "Reducción o remodelación de los labios menores alargados, asimétricos o de mayor tamaño, cuando causan roces, irritación o molestias, o por motivos estéticos.",
+     "catalogo": "labioplastia"
+    },
+    {
+     "nombre": "Capuchón del clítoris",
+     "texto": "Cirugía ambulatoria del pliegue de piel que rodea el clítoris, cuando ha crecido y molesta con la ropa ceñida o al hacer deporte. La recuperación suele ser rápida.",
+     "catalogo": "cirugia-capuchon-clitoris"
+    }
+   ],
+   "resultados": "La inflamación cede en las semanas siguientes y el aspecto final se aprecia de forma progresiva; varía según cada persona y según cómo cicatrice.",
+   "preguntas": [
+    {
+     "p": "¿Duele?",
+     "r": "Se hace con anestesia local, así que durante la intervención las molestias son mínimas. Los primeros días puedes notar una molestia leve, que suele controlarse bien con analgésicos. El médico te indica cuáles tomar y cómo cuidar la zona."
+    },
+    {
+     "p": "¿Cuánto dura la recuperación?",
+     "r": "Sueles poder retomar tu vida diaria en 3 a 5 días. Para las relaciones sexuales conviene esperar entre 4 y 6 semanas, y el médico te dirá cuándo volver al deporte según tu evolución en las revisiones."
+    },
+    {
+     "p": "¿Cambia la sensibilidad?",
+     "r": "La técnica se planifica para respetar la sensibilidad de la zona. En la valoración el médico te explica este punto con detalle, junto con los demás riesgos de la intervención y lo que puedes esperar en tu caso."
+    },
+    {
+     "p": "¿Se hace por motivos estéticos o de salud?",
+     "r": "Por los dos. Hay mujeres que consultan por roces, irritación o molestias con la ropa o el deporte, y otras porque no se sienten a gusto con el aspecto de la zona. En la valoración vemos si la cirugía es adecuada para ti."
+    },
+    {
+     "p": "¿Es confidencial?",
+     "r": "Sí. Puedes contárnoslo con tranquilidad: la consulta es confidencial, tus datos de salud están protegidos y en los recordatorios que te enviamos no aparece el nombre del tratamiento."
+    }
+   ],
+   "preocupaciones": [
+    "zona-intima",
+    "cirugia"
+   ],
+   "relacionados": [
+    "aclarado-de-la-zona-intima",
+    "remodelacion-intima"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#labioplastia",
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#cirugia-del-capuchon-de-clitoris.",
+    "https://iemec-clinic.com/blog/que-es-la-labioplastia-y-cuando-es-recomendable-esta-cirugia-intima-femenina",
+    "https://iemec-clinic.com/nosotros"
+   ],
+   "pendiente": [
+    "Autorización: se publica como cirugía estética y menor ambulatoria (U.47 y U.64, autorizadas), no como ginecología (U.26, no autorizada). Confirmar con el abogado sanitario que el encaje vale también para el capuchón del clítoris.",
+    "Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo. En la web actual es quien hace la labioplastia.",
+    "Confirmar que se hace en la sala de procedimientos de IEMEC como cirugía menor con anestesia local (así lo dicen el vídeo de la web, «cirugía menor», y el blog) y la duración (catálogo: 60 y 30 minutos, datos del sector).",
+    "El capuchón del clítoris va como variante: en la web actual es un bloque aparte, cuyo botón manda el WhatsApp del blanqueamiento. Sus dos anclas antiguas (y la rota «labioplastia o cirugía de labios menores») deben redirigir aquí.",
+    "Confirmar que tampoco el personal nombra el tratamiento en los mensajes (la app ya no lo hace: sql/008-tratamientos-sensibles.sql).",
+    "WhatsApp: texto neutro («Salud íntima femenina» o «una consulta») y una referencia que no lleve el id del catálogo en claro, porque nombra el tratamiento (normas.md, regla 12; casillas-formulario.md, apdo. 8).",
+    "Vídeo del médico en Vimeo sobre la labioplastia: pedir el original si se quiere usar."
+   ]
+  },
+  {
+   "slug": "aclarado-de-la-zona-intima",
+   "especialidad": "ginecologia-estetica",
+   "catalogo": [
+    "blanqueamiento-intimo"
+   ],
+   "orden": 20,
+   "destacado": true,
+   "nombre": "Aclarado de la zona íntima",
+   "titulo": "Aclarado de la piel de la zona íntima externa",
+   "titulo_seo": "Aclarado de la zona íntima en Boadilla · IEMEC",
+   "descripcion_seo": "Aclarado de la piel de la zona íntima externa en IEMEC Boadilla: tratamiento médico por sesiones para unificar el tono, con valoración médica previa.",
+   "entradilla": "Un tratamiento médico por sesiones para unificar el tono de la piel de la zona íntima externa cuando se ha oscurecido. Lo pauta y lo sigue un médico, según tu tipo de piel.",
+   "para_quien": [
+    "Notas más oscura la piel de los labios mayores, las ingles o la zona perianal.",
+    "Te gustaría un tono más uniforme en la zona íntima externa.",
+    "Buscas un tratamiento pautado y supervisado por un médico."
+   ],
+   "texto": [
+    "La piel de la zona íntima externa, como los labios mayores, las ingles o la zona perianal, puede oscurecerse con el roce, la ropa ajustada, la depilación frecuente, el embarazo o los cambios hormonales. Es algo frecuente.",
+    "En IEMEC el tratamiento lo pauta y lo sigue un médico. Según tu tipo de piel y el grado de pigmentación, combina peelings despigmentantes en consulta, productos para casa y, en los casos más marcados, láser. Suelen hacer falta entre 3 y 5 sesiones.",
+    "Empieza con una valoración médica en la que revisamos la zona, tus antecedentes y las posibles contraindicaciones, y te explicamos los efectos adversos, como rojeces o escozor pasajeros. El efecto no se mantiene de forma indefinida: suele necesitar mantenimiento una o dos veces al año, y el resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Entre 3 y 5, según el grado de pigmentación",
+    "anestesia": null,
+    "recuperacion": "Rojeces leves que suelen pasar en horas o pocos días",
+    "profesional": "Médico"
+   },
+   "variantes": [],
+   "resultados": "El tono se unifica de forma progresiva a lo largo de las sesiones; el resultado varía según cada persona y necesita mantenimiento.",
+   "preguntas": [
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Generalmente entre 3 y 5, según el grado de pigmentación y tu tipo de piel. El médico te propone un plan en la valoración y revisa cómo evoluciona la zona entre una sesión y otra para ajustarlo."
+    },
+    {
+     "p": "¿Molesta?",
+     "r": "Puedes notar un leve escozor o calor pasajero durante la aplicación. Después pueden aparecer rojeces leves, que suelen desaparecer en unas horas o en pocos días. Si notas algo que te preocupe, llámanos."
+    },
+    {
+     "p": "¿Hay que preparar la piel?",
+     "r": "Sí. Antes de empezar, el médico suele indicarte productos despigmentantes para usar en casa. Durante el tratamiento conviene evitar la depilación agresiva de la zona, porque irrita la piel."
+    },
+    {
+     "p": "¿Qué cuidados hay después de cada sesión?",
+     "r": "Conviene evitar durante unos días la depilación agresiva y la ropa muy ajustada, y esperar entre 48 y 72 horas para tener relaciones sexuales. El médico te indica qué productos puedes usar en casa."
+    },
+    {
+     "p": "¿El resultado se mantiene?",
+     "r": "No de forma indefinida. La pigmentación puede volver con el roce o los cambios hormonales, por eso suele recomendarse un mantenimiento una o dos veces al año. En la valoración te explicamos qué esperar en tu caso."
+    },
+    {
+     "p": "¿A partir de qué edad se puede hacer?",
+     "r": "Solo a partir de los 18 años y siempre con indicación médica. En la valoración el médico revisa tu piel, tus antecedentes y si hay alguna contraindicación antes de proponerte el tratamiento."
+    }
+   ],
+   "preocupaciones": [
+    "zona-intima",
+    "manchas"
+   ],
+   "relacionados": [
+    "labioplastia",
+    "remodelacion-intima"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/ginecologia-estetica-y-regenerativa#blanqueamiento-vaginal",
+    "https://iemec-clinic.com/blog/como-funciona-el-blanqueamiento-genital-y-es-seguro-hacerlo",
+    "https://iemec-clinic.com/blog/el-blanqueamiento-vaginal-es-permanente-o-requiere-mantenimiento",
+    "https://iemec-clinic.com/blog/en-que-consiste-el-blanqueamiento-vaginal-y-es-seguro",
+    "https://iemec-clinic.com/nosotros"
+   ],
+   "pendiente": [
+    "Régimen legal sin confirmar (restringido por precaución en el catálogo): qué peelings, cremas y láser se usan. Si alguna crema es un medicamento de receta o una fórmula magistral (por ejemplo, con hidroquinona), no se nombra ni se usa como reclamo.",
+    "Nombre: la web actual lo llama «blanqueamiento vaginal»; normas.md pide «aclarado de la piel de la zona íntima externa» (la vagina es interna). Las URL antiguas y las tres entradas del blog deben redirigir aquí.",
+    "Duración de la sesión (30 minutos, dato del sector) y equipo láser: confirmar. Un post del blog habla de 2 a 5 sesiones y otro de 3 a 5: se publica «entre 3 y 5».",
+    "Autorización y profesional: se presenta como medicina estética (U.48). Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo. En /nosotros hace el «blanqueamiento de la zona íntima».",
+    "El blog lo vende como «sin dolor» y «seguro»: no se traslada.",
+    "WhatsApp: texto neutro («Salud íntima femenina» o «una consulta») y una referencia que no lleve el id del catálogo en claro, porque nombra el tratamiento (normas.md, regla 12; casillas-formulario.md, apdo. 8)."
+   ]
+  },
+  {
+   "slug": "remodelacion-intima",
+   "especialidad": "ginecologia-estetica",
+   "catalogo": [
+    "remodelacion-intima-ah"
+   ],
+   "orden": 30,
+   "destacado": false,
+   "nombre": "Remodelación íntima",
+   "titulo": "Remodelación íntima con relleno: valoración médica",
+   "titulo_seo": "Remodelación íntima en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Remodelación íntima femenina con relleno en IEMEC Boadilla: procedimiento médico sin cirugía, en consulta, siempre tras una valoración médica de tu caso.",
+   "entradilla": "Un procedimiento médico sin cirugía que aporta volumen o mejora el contorno de la zona íntima externa con un relleno reabsorbible. Empieza siempre con una valoración médica.",
+   "para_quien": [
+    "Has notado pérdida de volumen en la zona íntima externa y te gustaría mejorarla.",
+    "Prefieres una opción sin cirugía, en consulta.",
+    "Quieres saber qué se puede conseguir antes de decidir."
+   ],
+   "texto": [
+    "La remodelación íntima es un procedimiento médico sin cirugía para la zona íntima femenina. El médico aplica un gel de ácido hialurónico reabsorbible para aportar volumen o mejorar el contorno de la zona que te preocupa.",
+    "Se hace en consulta y la técnica se adapta a tu anatomía. Como el cuerpo reabsorbe el producto poco a poco, el efecto es temporal y puede repetirse si lo deseas, tras valorarlo de nuevo con el médico.",
+    "Antes, en la valoración médica, revisamos la zona, tu salud y lo que buscas, y te explicamos qué se puede conseguir, los riesgos, como inflamación o enrojecimiento pasajeros, las contraindicaciones y las alternativas, incluida la cirugía. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Se decide en la valoración",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Médico"
+   },
+   "variantes": [],
+   "resultados": "El resultado se valora cuando baja la inflamación de los primeros días; es temporal y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué se puede tratar?",
+     "r": "Depende de tu anatomía y de lo que te preocupe. En la valoración el médico te explica qué se puede mejorar con un relleno, qué puedes esperar y si otra opción, como la cirugía, encaja mejor contigo."
+    },
+    {
+     "p": "¿Cuánto dura el efecto?",
+     "r": "Es temporal, porque el ácido hialurónico se reabsorbe poco a poco. Cuánto se mantiene depende del producto, de la zona y de cada persona; en la valoración te damos una orientación para tu caso."
+    },
+    {
+     "p": "¿Necesito una valoración antes?",
+     "r": "Sí. Es un procedimiento médico con un producto sanitario, así que primero el médico revisa tu salud, tus antecedentes y la zona, y te explica la idoneidad, los riesgos y las alternativas. La primera valoración es sin compromiso."
+    },
+    {
+     "p": "¿Es confidencial?",
+     "r": "Sí. Lo que hables con el médico queda entre la consulta y tu historia clínica, que la ley protege. Los recordatorios que te enviamos no nombran el tratamiento, así que puedes preguntar con tranquilidad."
+    }
+   ],
+   "preocupaciones": [
+    "zona-intima",
+    "volumen-y-contorno"
+   ],
+   "relacionados": [
+    "labioplastia",
+    "aclarado-de-la-zona-intima"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/nosotros"
+   ],
+   "pendiente": [
+    "Oferta sin confirmar: en la web actual solo se cita en la ficha del médico de /nosotros («remodelación íntima con ácido hialurónico»), sin bloque ni botón. Confirmar que se ofrece antes de publicar; si no, pasa a sin_pagina.",
+    "Confirmar las zonas que se tratan (¿labios mayores?), la indicación, la anestesia, la duración (30 minutos, dato del sector) y el número de sesiones: la página no los concreta.",
+    "Producto sanitario de uso profesional: sin marca y sin usar el producto como reclamo; el ácido hialurónico solo aparece como dato en el cuerpo del texto.",
+    "Autorización y profesional: se presenta como medicina estética (U.48). Profesional: en /nosotros figura Alfonso Navarro Ramírez («Ginecología Funcional y Regenerativa»). Confirmar su titulación, especialidad oficial (Obstetricia y Ginecología) y número de colegiado antes de nombrarlo.",
+    "WhatsApp: texto neutro («Salud íntima femenina» o «una consulta») y una referencia que no lleve el id del catálogo en claro, porque nombra el tratamiento (normas.md, regla 12; casillas-formulario.md, apdo. 8)."
+   ]
+  },
+  {
+   "slug": "engrosamiento-del-pene",
+   "especialidad": "salud-sexual-masculina",
+   "catalogo": [
+    "engrosamiento-pene-ah"
+   ],
+   "orden": 10,
+   "destacado": true,
+   "nombre": "Engrosamiento del pene",
+   "titulo": "Engrosamiento del pene con relleno: valoración médica",
+   "titulo_seo": "Engrosamiento del pene en Boadilla · IEMEC",
+   "descripcion_seo": "Engrosamiento del pene con relleno en IEMEC Boadilla: procedimiento médico ambulatorio, con anestesia local, tras una valoración médica confidencial.",
+   "entradilla": "Un procedimiento médico ambulatorio, sin cirugía, para aumentar el grosor del pene con un relleno reabsorbible. Empieza con una valoración médica confidencial.",
+   "para_quien": [
+    "Te gustaría aumentar el grosor del pene por motivos estéticos.",
+    "Prefieres un procedimiento ambulatorio y sin cirugía.",
+    "Quieres resolver tus dudas con un médico, con discreción, antes de decidir."
+   ],
+   "texto": [
+    "El engrosamiento del pene es un procedimiento médico con finalidad estética. El médico infiltra un gel de ácido hialurónico reticulado, es decir, con una estructura más consistente, para aumentar el grosor del pene. No es una cirugía y no busca modificar su función.",
+    "Se hace en consulta, con anestesia local, y vuelves a casa al terminar. Puede haber inflamación o enrojecimiento pasajeros. El efecto es temporal y reversible: el cuerpo reabsorbe el producto poco a poco, y puede mantenerse con retoques.",
+    "Antes, en una valoración médica confidencial, el médico revisa tu salud y tus antecedentes, te explica los riesgos, las contraindicaciones y las alternativas, y acuerda contigo la cantidad adecuada. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": "Unos 45 minutos",
+    "sesiones": "Una sesión; puede retocarse",
+    "anestesia": "Anestesia local",
+    "recuperacion": "Vuelves a casa al terminar; el médico te indica los cuidados",
+    "profesional": "Médico"
+   },
+   "variantes": [],
+   "resultados": "El resultado se valora cuando baja la inflamación, en los días siguientes; el efecto suele durar entre 12 y 18 meses y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Duele?",
+     "r": "Se hace con anestesia local, así que las molestias durante el procedimiento son mínimas. Después puede haber inflamación o enrojecimiento pasajeros en la zona. El médico te explica los cuidados de los primeros días."
+    },
+    {
+     "p": "¿Afecta a la erección o a la sensibilidad?",
+     "r": "El procedimiento no actúa sobre los nervios ni sobre la erección. Aun así, como todo acto médico, tiene riesgos y contraindicaciones, que el médico te explica con detalle en la valoración antes de que decidas."
+    },
+    {
+     "p": "¿Cuánto dura el efecto?",
+     "r": "Suele durar entre 12 y 18 meses, según el producto y cada persona. El ácido hialurónico se reabsorbe poco a poco, así que el efecto es reversible y puede mantenerse con retoques, siempre tras valorarlo con el médico."
+    },
+    {
+     "p": "¿Qué cuidados hay después?",
+     "r": "Puedes volver a casa al terminar. Conviene esperar entre 5 y 7 días para retomar las relaciones sexuales y seguir las pautas que te indique el médico. Si notas algo que te preocupe, llámanos."
+    },
+    {
+     "p": "¿Es confidencial?",
+     "r": "Sí. Puedes preguntar con total tranquilidad: la valoración es privada, tu historia clínica está protegida y los recordatorios que te enviamos no nombran el tratamiento ni el motivo de la cita."
+    }
+   ],
+   "preocupaciones": [
+    "zona-intima"
+   ],
+   "relacionados": [],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/sexualidad-masculina",
+    "https://iemec-clinic.com/blog/como-se-realiza-el-engrosamiento-de-pene-y-cuales-son-sus-resultados",
+    "https://iemec-clinic.com/blog/que-debo-saber-antes-de-hacerme-un-engrosamiento-de-pene"
+   ],
+   "pendiente": [
+    "Producto sanitario de uso profesional: sin marca y sin usar el producto como reclamo; el ácido hialurónico solo aparece como dato en el cuerpo del texto. Confirmar el producto.",
+    "La web actual promete «placer sexual», «satisfacción sexual» y resultados «satisfactorios», y el blog, «resultados inmediatos», «no duele» y que no hay «riesgo de rechazo»: no se traslada (RD 1907/1996, art. 4.12; normas.md).",
+    "Quién lo hace (la web no lo dice) y la duración (45 minutos, dato del sector; primera visita, 75): confirmar.",
+    "La duración del efecto (12 a 18 meses) y la espera de 5 a 7 días vienen del blog: confirmar que pueden publicarse como orientación.",
+    "Sin relacionados: es la única página de salud sexual masculina y ningún tratamiento de este grupo es afín. Se deja vacío para no sugerir asociaciones (por ejemplo, con la liposucción).",
+    "Es la única página de su especialidad y va destacada; decidir si lo íntimo sale en el inicio.",
+    "WhatsApp: el texto actual nombra el tratamiento. Usar «una consulta» y una referencia que no lleve el id en claro."
+   ]
+  }
+ ],
+ "sin_pagina": [
+  {
+   "catalogo": "laser-incontinencia-urinaria",
+   "motivo": "Pendiente de autorización (U.26): ginecología funcional (incontinencia urinaria de esfuerzo), que la autorización del centro (CS17886) no incluye; normas.md la deja sin página hasta que la clínica lo confirme. Borrador en contenido/pendientes/intima-y-cirugia.json.",
+   "va_en": "incontinencia-urinaria-de-esfuerzo"
+  },
+  {
+   "catalogo": "laser-atrofia-vaginal",
+   "motivo": "Pendiente de autorización (U.26): ginecología funcional (atrofia vaginal); normas.md, apartado (a) y anexo B. Borrador en contenido/pendientes/intima-y-cirugia.json.",
+   "va_en": "sequedad-y-atrofia-vaginal"
+  },
+  {
+   "catalogo": "laser-hiperlaxitud-vaginal",
+   "motivo": "Pendiente de autorización (U.26): normas.md admite «tratamiento de la laxitud vaginal: valoración» solo si se confirma la autorización. Borrador en contenido/pendientes/intima-y-cirugia.json.",
+   "va_en": "laxitud-vaginal"
+  },
+  {
+   "catalogo": "laser-liquen-escleroatrofico",
+   "motivo": "Pendiente de autorización (U.26): tratamiento de una enfermedad ginecológica (liquen escleroso); normas.md, anexo B. Borrador en contenido/pendientes/intima-y-cirugia.json.",
+   "va_en": "liquen-escleroso-vulvar"
+  },
+  {
+   "catalogo": "prp-intimo",
+   "motivo": "Pendiente de autorización (U.26) y, además, medicamento de receta que no se anuncia (AEMPS, resolución de 2013; RDLeg 1/2015, art. 80.1). En el borrador del liquen solo aparece como «otros tratamientos médicos», sin nombrarlo. Borrador en contenido/pendientes/intima-y-cirugia.json.",
+   "va_en": "liquen-escleroso-vulvar"
+  },
+  {
+   "catalogo": "radiofrecuencia-intima",
+   "motivo": "Oferta sin confirmar (solo sale en el blog, sin equipo publicado) y, además, pendiente de autorización (U.26). En el borrador figura como variante de la laxitud vaginal, a falta de que la clínica confirme que la ofrece.",
+   "va_en": "laxitud-vaginal"
+  },
+  {
+   "catalogo": "perineoplastia-apertura",
+   "motivo": "Pendiente de autorización (U.26): cirugía ginecológica funcional (entrada vaginal cerrada por liquen, atrofia o anatomía). Borrador en contenido/pendientes/intima-y-cirugia.json.",
+   "va_en": "perineoplastia"
+  },
+  {
+   "catalogo": "perineoplastia-cierre",
+   "motivo": "Pendiente de autorización (U.26): reparación de desgarros y episiotomías del parto; normas.md trata el calibre vaginal como ginecología pendiente de confirmar. Borrador en contenido/pendientes/intima-y-cirugia.json.",
+   "va_en": "perineoplastia"
+  },
+  {
+   "catalogo": "cirugia-suelo-pelvico",
+   "motivo": "Pendiente de autorización (U.26): cirugía del prolapso genital, que además se hace fuera de IEMEC; normas.md, apartado (a) y anexo B. Borrador en contenido/pendientes/intima-y-cirugia.json.",
+   "va_en": "cirugia-del-suelo-pelvico"
+  },
+  {
+   "catalogo": "laser-condilomas",
+   "motivo": "No se publica: la publicidad de métodos para enfermedades de transmisión sexual está prohibida (RD 1907/1996, art. 4.1; normas.md, anexo B) y, además, sería ginecología (U.26). Sin página ni borrador.",
+   "va_en": null
+  },
+  {
+   "catalogo": "vaginoplastia",
+   "motivo": "Oferta sin confirmar: solo figura en la lista de Multiestetica («Cirugía íntima»), sin descripción. Es cirugía íntima fuera de IEMEC y dependería también de la autorización (U.26). No se anuncia hasta que la clínica la confirme.",
+   "va_en": null
+  },
+  {
+   "catalogo": "rinoplastia",
+   "motivo": "Oferta sin confirmar: solo figura en la lista de Multiestetica, sin descripción ni precio. No se anuncia hasta que la clínica la confirme; entonces tendría página propia en cirugía estética.",
+   "va_en": null
+  },
+  {
+   "catalogo": "ginecomastia",
+   "motivo": "Oferta sin confirmar: solo figura en la lista de Multiestetica, sin descripción ni precio. No se anuncia hasta que la clínica la confirme; entonces tendría página propia en cirugía estética.",
+   "va_en": null
+  },
+  {
+   "catalogo": "reconstruccion-mamaria",
+   "motivo": "Oferta sin confirmar: solo figura en la lista de Multiestetica, sin descripción ni precio. No se anuncia hasta que la clínica la confirme (sería cirugía reparadora, U.46).",
+   "va_en": null
+  },
+  {
+   "catalogo": "bichectomia",
+   "motivo": "Oferta sin confirmar: solo figura en la lista de Multiestetica, sin descripción ni precio. No se anuncia hasta que la clínica la confirme; entonces tendría página propia en cirugía estética.",
+   "va_en": null
+  }
+ ]
+}
