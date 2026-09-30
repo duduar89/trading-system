@@ -406,7 +406,7 @@ test('entrada de WhatsApp y de leads', async (t) => {
           ['meta_formulario', '+34611000521', 'Laura Formulario', 'laura.formulario@ejemplo.com', 'Otoño facial', 'Mujeres 30-55 Boadilla', 'Vídeo limpieza', '700000000000101', 'limpieza-facial', 'nuevo']);
         assert.deepEqual(json(lead.utm), { plataforma: 'ig', formulario_id: '800000000000101', campana_id: '100000000000101', conjunto_id: '600000000000101', organico: false });
         assert.deepEqual(JSON.parse(descifrar(lead.respuestas_cifradas, lead.respuestas_iv, lead.respuestas_tag)), [
-          { pregunta: '¿qué_tratamiento_te_interesa?', valor: 'Limpieza facial profunda' }, { pregunta: '¿cuándo_prefieres_que_te_llamemos?', valor: 'Por la tarde' },
+          { pregunta: '¿Qué tratamiento te interesa?', valor: 'Limpieza facial profunda' }, { pregunta: '¿Cuándo prefieres que te llamemos?', valor: 'Por la tarde' },
         ]);
         const ins = await uno('SELECT * FROM inscripciones WHERE lead_id = ?', [lead.id]);
         assert.deepEqual([ins.secuencia, ins.estado, ins.paso_actual], ['lead', 'activa', 0]);

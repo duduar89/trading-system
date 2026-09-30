@@ -59,11 +59,13 @@ test('formulario de Meta: contacto, tratamiento que le interesa y el resto de re
     { name: 'email', values: ['laura@ejemplo.com'] },
     { name: '¿qué_tratamiento_te_interesa?', values: ['Mesoterapia capilar'] },
     { name: '¿cuándo_prefieres_que_te_llamemos?', values: ['Por la tarde'] },
+    { name: 'city', values: ['Boadilla del Monte'] },
   ]);
   assert.deepEqual([f.nombre, f.telefono, f.email, f.tratamiento], ['Laura Prueba', '+34611000401', 'laura@ejemplo.com', 'Mesoterapia capilar']);
   assert.deepEqual(f.respuestas, [
-    { pregunta: '¿qué_tratamiento_te_interesa?', valor: 'Mesoterapia capilar' },
-    { pregunta: '¿cuándo_prefieres_que_te_llamemos?', valor: 'Por la tarde' },
+    { pregunta: '¿Qué tratamiento te interesa?', valor: 'Mesoterapia capilar' },
+    { pregunta: '¿Cuándo prefieres que te llamemos?', valor: 'Por la tarde' },
+    { pregunta: 'Ciudad', valor: 'Boadilla del Monte' },
   ]);
   const g = L.datosFormulario([{ name: 'first_name', values: ['Ana'] }, { name: 'last_name', values: ['Ejemplo'] }, { name: 'telefono', values: ['600 000 402'] }]);
   assert.deepEqual([g.nombre, g.telefono, g.email, g.tratamiento, g.respuestas], ['Ana Ejemplo', '600 000 402', null, null, []]);

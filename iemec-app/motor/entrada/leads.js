@@ -47,9 +47,16 @@ function nombrePila(valor) {
 
 const claveCampo = (nombre) => normalizar(nombre).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
+// Los campos estándar de Meta que no son de contacto, en castellano; las preguntas propias llegan
+// como «¿qué_tratamiento_te_interesa?» y se dejan legibles.
+const CAMPOS_META = { city: 'Ciudad', zip_code: 'Código postal', post_code: 'Código postal', date_of_birth: 'Fecha de nacimiento', gender: 'Sexo', job_title: 'Profesión', company_name: 'Empresa' };
+const legible = (nombre, clave) => CAMPOS_META[clave]
+  || String(nombre).replace(/_/g, ' ').replace(/\s+/g, ' ').trim().replace(/^(¿?)(\p{L})/u, (_, a, b) => a + b.toUpperCase());
+
 /**
  * Los campos de un formulario de Meta (field_data: [{ name, values: [] }]) → { nombre, telefono,
- * email, tratamiento (lo que respondió a «¿qué tratamiento te interesa?»), respuestas (el resto) }.
+ * email, tratamiento (lo que respondió a «¿qué tratamiento te interesa?»), respuestas (el resto,
+ * con la pregunta legible) }.
  */
 function datosFormulario(campos = []) {
   const valores = new Map();
@@ -57,7 +64,7 @@ function datosFormulario(campos = []) {
     const clave = claveCampo(c?.name);
     const lista = Array.isArray(c?.values) ? c.values : [c?.values];
     const valor = lista.filter((v) => v != null && String(v).trim()).map((v) => String(v).trim()).join(', ');
-    if (clave && valor && !valores.has(clave)) valores.set(clave, { pregunta: String(c.name).slice(0, 160), valor: valor.slice(0, 500) });
+    if (clave && valor && !valores.has(clave)) valores.set(clave, { pregunta: legible(c.name, clave).slice(0, 160), valor: valor.slice(0, 500) });
   }
   const usados = new Set();
   const tomar = (...claves) => {

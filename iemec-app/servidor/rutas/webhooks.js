@@ -98,11 +98,15 @@ function rutasWebhooks({ pool }) {
   }));
 
   // La web (desde su servidor, nunca desde el navegador: la clave no puede ir en la página) y GHL.
-  r.post('/api/leads', express.json({ limit: '100kb' }), express.urlencoded({ extended: false, limit: '100kb' }), envolver(async (req, res) => {
+  // La clave se mira antes de leer el cuerpo.
+  const conClave = (req, res, next) => {
     const clave = process.env.LEADS_CLAVE || '';
     if (clave.length < 16) return res.status(503).json({ error: 'La entrada de leads no está configurada (LEADS_CLAVE)' });
     const dada = req.get('x-clave');
     if (!dada || !igualesSeguro(dada, clave)) return res.status(401).json({ error: 'Clave no válida' });
+    next();
+  };
+  r.post('/api/leads', conClave, express.json({ limit: '100kb' }), express.urlencoded({ extended: false, limit: '100kb' }), envolver(async (req, res) => {
     const l = leerLeadApi(req.body);
     if (!l.ok) return res.status(400).json({ error: l.error });
     const a = await altaLead(p(), l.datos, { ahora: new Date() });
