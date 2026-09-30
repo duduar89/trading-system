@@ -3,9 +3,10 @@
 -- El token de «Tu cita» deja de guardarse en claro. En la base quedan su huella (SHA-256), para
 -- encontrar la cita, y el token cifrado con CLAVE_CIFRADO (AES-256-GCM), para volver a mandar el
 -- enlace. El enlace caduca 30 días después de la cita (token_caduca_en). Los tokens de antes pasan a
--- token_antiguo con su huella ya calculada: los cifra migrar() nada más aplicar esta migración (en
--- SQL no se puede: la clave solo la tiene la app) y deja token_antiguo vacío. Una migración
--- posterior podrá quitar la columna.
+-- token_antiguo con su huella ya calculada (sus enlaces siguen valiendo): los cifra migrar() nada más
+-- aplicar esta migración (en SQL no se puede: la clave solo la tiene la app) y deja token_antiguo
+-- vacío; si migrar se lanza sin CLAVE_CIFRADO, lo avisa y los cifra la app al usarlos. Una migración
+-- posterior podrá quitar la columna (y su uso en servidor/agenda.js).
 --
 -- El .ics lleva un UID aleatorio guardado en la cita (uid_ics, RFC 7986: sin datos del servidor ni
 -- del número de cita). Las citas de antes conservan el que ya tenían los calendarios
