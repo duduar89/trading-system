@@ -355,7 +355,16 @@ async function opcionesAlta(pool, { token, ahora = new Date() }) {
 // …y la respuesta del navegador: se guarda la passkey, se gasta el enlace y la persona queda dentro.
 async function completarAlta(pool, { token, respuesta, dispositivo, ahora = new Date() }) {
   const antes = await leerInvitacion(pool, token, ahora);
-  const { reto, invitacionId } = await gastarReto(pool, respuesta, { proposito: 'alta', ahora });
+  let gastado;
+  try {
+    gastado = await gastarReto(pool, respuesta, { proposito: 'alta', ahora });
+  } catch (err) {
+    // Si entre leer el enlace y gastar el reto le han mandado otro enlace o la han desactivado, su reto
+    // ya se ha borrado: se dice eso (enlace sustituido o anulado), no «esa respuesta ya se ha usado».
+    if (err.codigo === 'RETO_NO_VALE') await leerInvitacion(pool, token, ahora);
+    throw err;
+  }
+  const { reto, invitacionId } = gastado;
   if (invitacionId !== antes.id) throw fallo('RETO_NO_VALE');
   const info = await verificarRegistro(respuesta, reto);
   return enTransaccion(async (con) => {
