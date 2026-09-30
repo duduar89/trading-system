@@ -235,6 +235,13 @@ Por este orden:
 4. El catálogo: el nombre o un **alias** del tratamiento dentro del nombre del anuncio, del conjunto
    o de la campaña (o del titular del anuncio de WhatsApp). Si dos tratamientos empatan, ninguno.
 
+Valen los tratamientos que se reservan y los **agrupadores** (Head Spa japonés, programa de acné…:
+los que el importador deja inactivos con la nota «No se reserva: agrupa varias técnicas»); lo
+retirado del catálogo, no. Si un agrupador empata con sus técnicas, gana el agrupador. Con un
+agrupador, la conversación le pregunta qué nivel o técnica quiere (de 2 a 5 opciones de su familia y
+subfamilia, ninguna íntima ni de publicidad restringida) y le busca hueco para esa; si no, pasa a
+recepción.
+
 Para configurar una campaña:
 
 ```sql
@@ -291,8 +298,6 @@ vez (`repetido`), **400** faltan datos, **401** clave mala, **503** sin `LEADS_C
 ## Pendiente
 
 - Envío real (`servidor/integraciones/whatsapp.js` en modo `real`): hoy solo entra.
-- Una plantilla de bienvenida sin tratamiento: a un lead sin tratamiento identificado le llega
-  «Gracias por tu interés en tu tratamiento».
 - Sacar a alguien de la lista de bajas si vuelve a dar su consentimiento (hoy, a mano en la base).
 - Estados de las plantillas (`message_template_status_update`, calidad) y, con coexistencia, los
   mensajes que manda el equipo desde el móvil (`smb_message_echoes`): se guardan, pero aún no se
