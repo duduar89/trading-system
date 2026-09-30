@@ -10,6 +10,13 @@ const ACCION = {
   preguntar_cuando: 'preguntar cuándo', tarea_llamar: 'llamarle', responder: 'responder', ofrecer_valoracion: 'ofrecer valoración',
 };
 const proximo = (c) => (c.proximoPaso === 'cita' && c.proximoPasoEn ? `Cita ${fechaHora(c.proximoPasoEn)}` : PASO[c.proximoPaso]);
+// Lo que dice WhatsApp de cada mensaje nuestro; si no llegó, por qué (p. ej., el límite de marketing de Meta).
+const ENTREGA = { entregado: 'entregado', leido: 'leído' };
+const entrega = (m) => {
+  if (m.direccion !== 'saliente') return '';
+  if (m.estado === 'fallido') return ` · no entregado${m.error ? `: ${m.error.texto || ''}${m.error.codigo ? ` (${m.error.codigo})` : ''}` : ''}`;
+  return ENTREGA[m.estado] ? ` · ${ENTREGA[m.estado]}` : '';
+};
 
 // Los enlaces de los mensajes («Tu cita», reseñas) se pueden abrir desde el panel.
 function ConEnlaces({ texto }) {
@@ -52,6 +59,7 @@ export default function Bandeja() {
                   <span className="text-xs" style={{ color: 'var(--texto-suave)' }}>
                     {c.proximoSeguimiento ? `Le escribimos ${fechaHora(c.proximoSeguimiento)}` : proximo(c)}
                   </span>
+                  {c.noEntregado && <span className="text-xs text-rosa">· No le llegó el último mensaje</span>}
                 </div>
               </button>
             </li>
@@ -87,7 +95,7 @@ function Detalle({ id, alCambiar }) {
       <div className="tarjeta flex min-h-[560px] flex-col overflow-hidden min-w-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--borde)] px-5 py-4">
           <div className="min-w-0">
-            <div className="titulo text-xl truncate">{d.paciente ? `${d.paciente.nombre} ${d.paciente.apellidos || ''}` : d.lead?.nombre || 'Contacto nuevo'}</div>
+            <div className="titulo text-xl truncate">{d.paciente ? `${d.paciente.nombre} ${d.paciente.apellidos || ''}` : d.lead?.nombre || c.nombreWhatsapp || 'Contacto nuevo'}</div>
             <div className="mt-1"><EstadoConversacion estado={c.estado} urgente={c.urgente} motivoCierre={c.motivoCierre} /></div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -102,7 +110,7 @@ function Detalle({ id, alCambiar }) {
               <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${m.direccion === 'entrante' ? 'bg-[var(--superficie-2)]' : m.autor === 'ia' ? 'bg-aqua text-terciopelo-900' : 'bg-terciopelo-800 text-white'}`}>
                 <div className="whitespace-pre-wrap break-words"><ConEnlaces texto={m.texto} /></div>
                 <div className={`mt-1 text-[10px] ${m.direccion === 'entrante' ? '' : 'opacity-70'}`} style={m.direccion === 'entrante' ? { color: 'var(--texto-suave)' } : undefined}>
-                  {m.tipo === 'plantilla' ? 'Plantilla aprobada · ' : ''}{AUTOR[m.autor]} · {fechaHora(m.en)}{m.intencion && m.direccion === 'entrante' ? ` · entendido: ${(INTENCION[m.intencion] || m.intencion.replaceAll('_', ' ')).toLowerCase()}` : ''}{m.estado === 'fallido' ? ' · no entregado' : ''}
+                  {m.tipo === 'plantilla' ? 'Plantilla aprobada · ' : ''}{AUTOR[m.autor]} · {fechaHora(m.en)}{m.intencion && m.direccion === 'entrante' ? ` · entendido: ${(INTENCION[m.intencion] || m.intencion.replaceAll('_', ' ')).toLowerCase()}` : ''}{entrega(m)}
                 </div>
               </div>
             </li>
@@ -153,7 +161,8 @@ function Detalle({ id, alCambiar }) {
             <ul className="mt-2 space-y-1 text-sm">
               <li>Lead · {d.lead.etapa}</li>
               {d.lead.tratamiento && <li style={{ color: 'var(--texto-suave)' }}>Interés: {d.lead.tratamiento}</li>}
-              <li style={{ color: 'var(--texto-suave)' }}>Origen: {d.lead.origen?.replaceAll('_', ' ')}{d.lead.campana ? ` · ${d.lead.campana}` : ''}</li>
+              <li style={{ color: 'var(--texto-suave)' }}>Origen: {d.lead.origen?.replaceAll('_', ' ')}{d.lead.campana ? ` · ${d.lead.campana}` : ''}{d.lead.anuncio ? ` · ${d.lead.anuncio}` : ''}</li>
+              {(d.lead.respuestas || []).map((r) => <li key={r.pregunta} style={{ color: 'var(--texto-suave)' }}>{r.pregunta}: {r.valor}</li>)}
             </ul>
           ) : <p className="mt-2 text-sm" style={{ color: 'var(--texto-suave)' }}>Contacto sin ficha todavía.</p>}
         </div>

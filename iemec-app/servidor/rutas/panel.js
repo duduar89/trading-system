@@ -50,6 +50,45 @@ function rutasPanel({ pool, deps = null }) {
     });
   }));
 
+  // ── Tareas abiertas: qué hay que hacer, con quién y cómo contactarle ──────────────────────
+  // Un lead sin conversación (sin WhatsApp, un fijo, la baja comercial) solo se ve aquí.
+  r.get('/tareas', envolver(async (req, res) => {
+    const ahora = req.ahora || new Date();
+    const [filas] = await p().query(
+      `SELECT t.id, t.tipo, t.titulo, t.urgente, t.vence_en, t.creado_en, t.conversacion_id, COALESCE(t.lead_id, c.lead_id) AS lead_id,
+              l.nombre AS lead_nombre, l.telefono AS lead_telefono, l.email AS lead_email, l.origen, l.campana,
+              pa.nombre AS paciente_nombre, pa.apellidos, pa.telefono AS paciente_telefono, pa.email AS paciente_email, c.telefono AS conv_telefono
+         FROM tareas t
+         LEFT JOIN conversaciones c ON c.id = t.conversacion_id
+         LEFT JOIN leads l ON l.id = COALESCE(t.lead_id, c.lead_id)
+         LEFT JOIN pacientes pa ON pa.id = COALESCE(t.paciente_id, c.paciente_id)
+        WHERE t.estado = 'abierta' ORDER BY t.urgente DESC, t.vence_en, t.id LIMIT 300`);
+    // Avisos de WhatsApp o de Meta que se quedaron sin procesar después de todos los intentos.
+    const [[fallidos]] = await p().query("SELECT COUNT(*) AS n FROM cola WHERE tipo IN ('webhook_whatsapp','webhook_whatsapp_estados','webhook_meta') AND estado = 'fallido'");
+    res.json({
+      tareas: filas.map((x) => ({
+        id: x.id, tipo: x.tipo, titulo: x.titulo, urgente: Boolean(x.urgente), vence: x.vence_en, vencida: new Date(x.vence_en) < ahora,
+        creada: x.creado_en, conversacionId: x.conversacion_id,
+        quien: x.paciente_nombre ? [x.paciente_nombre, x.apellidos].filter(Boolean).join(' ') : x.lead_nombre || null,
+        telefono: x.paciente_telefono || x.lead_telefono || x.conv_telefono || null,
+        email: x.paciente_email || x.lead_email || null,
+        lead: x.lead_id ? { id: x.lead_id, origen: x.origen, campana: x.campana } : null,
+      })),
+      avisosFallidos: Number(fallidos.n),
+    });
+  }));
+
+  // Cuerpo: { estado: 'hecha' | 'cancelada', resultado }.
+  r.post('/tareas/:id', envolver(async (req, res) => {
+    const id = /^\d{1,10}$/.test(req.params.id) ? Number(req.params.id) : null;
+    const estado = req.body?.estado === 'cancelada' ? 'cancelada' : 'hecha';
+    const [hecho] = id ? await p().query("UPDATE tareas SET estado = ?, resultado = ?, hecha_en = ? WHERE id = ? AND estado = 'abierta'",
+      [estado, req.body?.resultado ? String(req.body.resultado).slice(0, 255) : null, req.ahora || new Date(), id]) : [{ affectedRows: 0 }];
+    if (!hecho.affectedRows) return res.status(404).json({ error: 'Esa tarea no existe o ya está cerrada' });
+    await registrar(p(), { tipo: `tarea_${estado}`, entidad: 'tarea', entidadId: id, actor: req.usuario?.email || 'panel' });
+    res.json({ ok: true, estado });
+  }));
+
   // ── Agenda por cabina ─────────────────────────────────────────────────────────────────────
   r.get('/agenda', envolver(async (req, res) => {
     const fecha = /^\d{4}-\d{2}-\d{2}$/.test(req.query.fecha || '') ? req.query.fecha : T.fechaMadrid(req.ahora || new Date());
@@ -97,17 +136,18 @@ function rutasPanel({ pool, deps = null }) {
     const [filas] = await p().query(
       `SELECT c.*, p.nombre, p.apellidos, l.nombre AS lead_nombre, l.origen AS lead_origen, l.campana,
               (SELECT COUNT(*) FROM seguimientos s WHERE s.conversacion_id = c.id AND s.estado = 'pendiente') AS seguimientos,
-              (SELECT MIN(s.programado_para) FROM seguimientos s WHERE s.conversacion_id = c.id AND s.estado = 'pendiente') AS proximo_seguimiento
+              (SELECT MIN(s.programado_para) FROM seguimientos s WHERE s.conversacion_id = c.id AND s.estado = 'pendiente') AS proximo_seguimiento,
+              (SELECT m.estado FROM mensajes m WHERE m.conversacion_id = c.id AND m.direccion = 'saliente' ORDER BY m.id DESC LIMIT 1) AS ultimo_saliente_estado
          FROM conversaciones c LEFT JOIN pacientes p ON p.id = c.paciente_id LEFT JOIN leads l ON l.id = c.lead_id
         WHERE c.estado <> 'cerrada' OR c.actualizado_en > ? ORDER BY c.urgente DESC, FIELD(c.estado, 'espera_persona', 'persona', 'ia_activa', 'esperando_paciente', 'pausada', 'cerrada'), c.actualizado_en DESC LIMIT 200`,
       [new Date((req.ahora || new Date()).getTime() - 7 * 86400000)]);
     res.json(filas.map((c) => ({
       id: c.id, estado: c.estado, urgente: Boolean(c.urgente), contexto: c.contexto,
-      nombre: c.nombre ? `${c.nombre}${c.apellidos ? ` ${c.apellidos}` : ''}` : c.lead_nombre || c.telefono,
+      nombre: c.nombre ? `${c.nombre}${c.apellidos ? ` ${c.apellidos}` : ''}` : c.lead_nombre || c.nombre_whatsapp || c.telefono,
       origen: c.lead_origen, campana: c.campana, telefonoFinal: String(c.telefono).slice(-3),
       ventanaAbierta: Boolean(c.ventana_hasta && new Date(c.ventana_hasta) > (req.ahora || new Date())),
       ventanaHasta: c.ventana_hasta, proximoPaso: c.proximo_paso, proximoPasoEn: c.proximo_paso_en, proximoSeguimiento: c.proximo_seguimiento,
-      motivoCierre: c.motivo_cierre, actualizado: c.actualizado_en,
+      motivoCierre: c.motivo_cierre, actualizado: c.actualizado_en, noEntregado: c.ultimo_saliente_estado === 'fallido',
     })));
   }));
 
@@ -115,16 +155,24 @@ function rutasPanel({ pool, deps = null }) {
     const id = Number(req.params.id);
     const [[c]] = await p().query('SELECT * FROM conversaciones WHERE id = ?', [id]);
     if (!c) return res.status(404).json({ error: 'No existe' });
-    const [msgs] = await p().query('SELECT id, direccion, autor, tipo, cuerpo_cifrado, iv, tag, estado, intencion, creado_en FROM mensajes WHERE conversacion_id = ? ORDER BY id', [id]);
+    const [msgs] = await p().query('SELECT id, direccion, autor, tipo, cuerpo_cifrado, iv, tag, estado, error_codigo, error_texto, intencion, creado_en FROM mensajes WHERE conversacion_id = ? ORDER BY id', [id]);
     const [segs] = await p().query('SELECT id, motivo, plazo_tipo, frase_cifrada, frase_iv, frase_tag, programado_para, estado, creado_por FROM seguimientos WHERE conversacion_id = ? ORDER BY programado_para', [id]);
     const [eventos] = await p().query("SELECT tipo, actor, datos, creado_en FROM eventos WHERE entidad = 'conversacion' AND entidad_id = ? ORDER BY id DESC LIMIT 20", [String(id)]);
     const [[paciente]] = c.paciente_id ? await p().query('SELECT id, nombre, apellidos, email, es_cliente, baja_comercial_en FROM pacientes WHERE id = ?', [c.paciente_id]) : [[null]];
-    const [[lead]] = c.lead_id ? await p().query('SELECT l.nombre, l.origen, l.campana, l.etapa, t.nombre AS tratamiento FROM leads l LEFT JOIN tratamientos t ON t.id = l.tratamiento_interes_id WHERE l.id = ?', [c.lead_id]) : [[null]];
+    const [[fila]] = c.lead_id ? await p().query('SELECT l.nombre, l.origen, l.campana, l.anuncio, l.etapa, l.respuestas_cifradas, l.respuestas_iv, l.respuestas_tag, t.nombre AS tratamiento FROM leads l LEFT JOIN tratamientos t ON t.id = l.tratamiento_interes_id WHERE l.id = ?', [c.lead_id]) : [[null]];
+    // Lo que escribió en el formulario (va cifrado, como los mensajes).
+    const lead = fila && {
+      nombre: fila.nombre, origen: fila.origen, campana: fila.campana, anuncio: fila.anuncio, etapa: fila.etapa, tratamiento: fila.tratamiento,
+      respuestas: fila.respuestas_cifradas ? JSON.parse(descifrar(fila.respuestas_cifradas, fila.respuestas_iv, fila.respuestas_tag)) : [],
+    };
     const [citas] = c.paciente_id ? await p().query('SELECT c.inicio, c.estado, t.nombre AS tratamiento FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id WHERE c.paciente_id = ? ORDER BY c.inicio DESC LIMIT 5', [c.paciente_id]) : [[]];
     res.json({
-      conversacion: { id: c.id, estado: c.estado, urgente: Boolean(c.urgente), contexto: c.contexto, proximoPaso: c.proximo_paso, proximoPasoEn: c.proximo_paso_en, ventanaHasta: c.ventana_hasta, motivoCierre: c.motivo_cierre },
+      conversacion: { id: c.id, estado: c.estado, urgente: Boolean(c.urgente), contexto: c.contexto, proximoPaso: c.proximo_paso, proximoPasoEn: c.proximo_paso_en, ventanaHasta: c.ventana_hasta, motivoCierre: c.motivo_cierre, nombreWhatsapp: c.nombre_whatsapp },
       paciente, lead, citas,
-      mensajes: msgs.map((m) => ({ id: m.id, direccion: m.direccion, autor: m.autor, tipo: m.tipo, texto: descifrar(m.cuerpo_cifrado, m.iv, m.tag), estado: m.estado, intencion: m.intencion, en: m.creado_en })),
+      mensajes: msgs.map((m) => ({
+        id: m.id, direccion: m.direccion, autor: m.autor, tipo: m.tipo, texto: descifrar(m.cuerpo_cifrado, m.iv, m.tag), estado: m.estado,
+        error: m.estado === 'fallido' && (m.error_codigo || m.error_texto) ? { codigo: m.error_codigo, texto: m.error_texto } : null, intencion: m.intencion, en: m.creado_en,
+      })),
       seguimientos: segs.map((s) => ({ id: s.id, motivo: s.motivo, plazo: s.plazo_tipo, frase: descifrar(s.frase_cifrada, s.frase_iv, s.frase_tag), programado: s.programado_para, estado: s.estado, creadoPor: s.creado_por })),
       decisiones: eventos.map((e) => ({ tipo: e.tipo, actor: e.actor, datos: typeof e.datos === 'string' ? JSON.parse(e.datos) : e.datos, en: e.creado_en })),
     });

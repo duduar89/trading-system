@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import Hoy from './pantallas/Hoy.jsx';
+import Tareas from './pantallas/Tareas.jsx';
 import Agenda from './pantallas/Agenda.jsx';
 import Bandeja from './pantallas/Bandeja.jsx';
 import Seguimientos from './pantallas/Seguimientos.jsx';
@@ -12,6 +13,7 @@ import Entrar from './pantallas/Entrar.jsx';
 
 const SECCIONES = [
   { id: 'hoy', nombre: 'Hoy', Pantalla: Hoy },
+  { id: 'tareas', nombre: 'Tareas', Pantalla: Tareas },
   { id: 'agenda', nombre: 'Agenda', Pantalla: Agenda },
   { id: 'conversaciones', nombre: 'Conversaciones', Pantalla: Bandeja },
   { id: 'seguimientos', nombre: 'Seguimientos', Pantalla: Seguimientos },

@@ -31,6 +31,8 @@ const INTENCIONES = [
   // El orden importa: la primera que encaja gana, y las de seguridad van primero.
   ['baja', /\b(baja|stop|no me (escribas|escribais|escriban|mandes|mandeis|envieis|envies|molestes|molesteis)|dej(a|ad|en|ar) de (escribir|mandar|enviar)(me)?|no quiero (recibir|mas mensajes|que me escrib)|borr(a|ad|ar|en) mis datos|elimin(a|ad|ar) mi (numero|telefono|contacto)|quita(me|dme) de (la lista|vuestra lista)|no vuelvas a escribir)/],
   ['salud_urgente', /(me ha salido (un|una)|bulto|muy hinchad|sigue hinchad|inflamad|se me ha puesto (morad|roj|blanc)|me duele (mucho|muchisimo|desde)|infeccion|fiebre|pus\b|no puedo (abrir|mover)|necrosis|reaccion alergica)/],
+  // Labio, nariz o la zona tratada morada, blanquecina o fría: puede ser una oclusión tras un relleno.
+  ['salud_urgente', /(labio|labios|nariz|frente|entrecejo|ojera|ojeras|zona|piel|mejilla|pomulo|menton|barbilla)[^.,;?]{0,25}\b(morad|amoratad|blanquecin|frio\b|fria\b)/],
   ['salud_personal', /(embarazad|lactancia|dando el pecho|dando pecho|anticoagul|sintrom|alergic|alergia|medicacion|me estoy medicando|tomo (pastillas|medicacion|antibiotico)|antibiotico|enfermedad|autoinmune|diabet|herpes|cancer|quimio|marcapasos|epilep|tiroides|operad[ao] hace|operacion|me operan|me opero|mi medic[oa] (me )?(ha dicho|dice)|estoy de baja medica)/],
   ['queja', /(queja|reclamacion|fatal|pesimo|muy mal servicio|mal atendid|indignad|estafa|vergüenza|verguenza|nadie me (contesta|coge)|no me cogeis|\btimo\b|enfadad)/],
   ['ya_hecho', /(ya me lo (he )?hecho|ya me lo hice|me lo hice en|ya me lo hicieron|ya lo tengo hecho|ya me (he )?(puesto|operado|tratado) en)/],
@@ -43,6 +45,16 @@ const INTENCIONES = [
   ['no_interesa', /(no me interesa|no,? gracias|ya no (me interesa|quiero|lo necesito)|he cambiado de opinion|no lo voy a hacer|lo dejo\b(?! para)|descartado|no es para mi)/],
   ['reservar', /(dame cita|quiero (una )?(cita|reservar|pedir cita)|me apunto|reservame|reservadme|cuando (teneis|tienes|hay) hueco|que huecos|teneis hueco|tienes hueco|si,? buscame|buscame (un )?hueco|agendame|me viene bien el|(perfecto|vale|genial),? (reserva|apuntame)|(?<!mas )(?<!para )\badelante\b(?! (en|con el tiempo))|pideme cita)/],
 ];
+
+// «Estoy de baja médica», «te mando la foto de la baja», «baja por maternidad»: es la baja del
+// trabajo, no la de los mensajes. Se quita antes de buscar la baja; «dame de baja», «quiero la baja»
+// o «BAJA» siguen siendo bajas.
+const BAJA_LABORAL = new RegExp([
+  'baja (medica|laboral|de maternidad|de paternidad|por (maternidad|paternidad|enfermedad|embarazo|accidente|incapacidad|depresion|ansiedad))',
+  '(estoy|esta|estas|estamos|estar|estaba|estuve|estare|sigo|sigue|seguir|continuo|he estado|ha estado|llevo) de baja',
+  '(parte|justificante|papel|papeles|foto|informe|certificado|alta|documento) de (la )?baja',
+  '(tengo|me (han|ha) dado|me dieron|cogerme|coger) la baja',
+].join('|'), 'g');
 
 function detectarFranja(t) {
   if (/(por|a|de) la tarde|\btardes\b|despues de (comer|trabajar)|a partir de las (1[5-9]|[3-8]\b)/.test(t)) return 'tarde';
@@ -122,7 +134,7 @@ function interpretar(texto) {
   const senales = [];
   let intencion = null;
   for (const [nombre, rx] of INTENCIONES) {
-    if (rx.test(t)) { intencion = nombre; break; }
+    if (rx.test(nombre === 'baja' ? t.replace(BAJA_LABORAL, ' ') : t)) { intencion = nombre; break; }
   }
   const plazo = detectarPlazo(t);
   const franja = detectarFranja(t);
