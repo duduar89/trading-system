@@ -3,7 +3,14 @@
 // decide su puesto con la estrategia (la misma función que el backtest), se
 // dimensiona con dimensionar() y la propuesta pasa por Riesgos y el Ejecutor.
 //
-//   capital de mesa = patrimonio · peso · multiplicador del comité · (0,5 si DEFENSIVO)
+//   capital de mesa = patrimonio · peso
+//   nocional = dimensionar(…).nocional · factor de tamaño
+//   factor = (0,5 si DEFENSIVO) · multiplicador de la mesa · reducción del Megáfono · caída
+//
+// El factor va sobre el nocional FINAL de dimensionar(), después de todos sus
+// topes: aplicado al capital, no llegaba cuando mandaba el riesgo por
+// operación o el tope por activo (con DEFENSIVO, 7 de 33 compras salían a ×1).
+// Lo aplica solo tamanoApertura(); Riesgos lo comprueba sin volver a multiplicar.
 //
 // En paralelo, el puesto sombra «sin comité» decide lo mismo con su propia
 // posición y su propia cartera, sin bróker (se llena en los libros al precio
@@ -34,7 +41,7 @@ const { dimensionar } = require('../../cuant/dimensionado');
 const universo = require('../../mercado/universo');
 const plantillas = require('../plantillas');
 const riesgos = require('./riesgos');
-const { normalizarDirectivas } = require('../../riesgo/limites');
+const limitesMod = require('../../riesgo/limites');
 const { directivasVigentes } = require('../megafono');
 const { valorEn, RETRASO_FG } = require('../../mercado/sentimiento');
 const calendario = require('../../mercado/calendario');
@@ -44,40 +51,51 @@ const { EPS, etiqueta, puestoId, puestoSombraId, agenteDePuesto, precioDe, isoCo
 const MARCOS = universo.MARCOS;
 const COMPROBAR_ACCIONES = 15 * MIN;
 const ESPERA_VELA = 10 * MIN;
-// Modo DEFENSIVO del comité: las mesas operan con la mitad de capital (§6.7).
-const FACTOR_DEFENSIVO = 0.5;
+// Modo DEFENSIVO del comité: posiciones nuevas a la mitad (§6.7).
+const FACTOR_DEFENSIVO = limitesMod.FACTOR_DEFENSIVO;
 
 function multiplicador(ctx, mesaId) {
   const m = ctx.estado.directivas.multiplicadores;
   return m && typeof m[mesaId] === 'number' ? m[mesaId] : 1;
 }
 
-// Recorte que se aplica DE VERDAD al tamaño de cada apertura nueva del fondo
-// real (§7, fondo.factorTamano): el DEFENSIVO del comité aquí, en el capital
-// de la mesa; la reducción del Megáfono y la caída, en limites.js sobre el
-// nocional. Se lee de las mismas fuentes que usan ellos, para que la interfaz
-// no lo recalcule (y no diga ×0,5 cuando es ×0,25). El multiplicador por mesa
-// del comité no entra: es de cada mesa.
+// Recorte del tamaño de cada apertura nueva del fondo real, para la
+// instantánea (§7, fondo.factorTamano): la misma función con la que
+// tamanoApertura() lo aplica (limites.factorTamano), para que la interfaz no
+// lo recalcule (y no diga ×0,5 cuando es ×0,25). El multiplicador por mesa
+// del comité no entra: es de cada mesa (mesas[].multiplicador).
 function factorTamano(ctx, ahora = ctx.reloj.ahora()) {
   const e = ctx.estado;
-  const comite = e.directivas.modo === 'DEFENSIVO' ? FACTOR_DEFENSIVO : 1;
-  const r = normalizarDirectivas(directivasVigentes(e.directivas, ahora), ahora).reduccion;
-  const megafono = r ? r.factor : 1;
-  const mc = e.fondo.multiplicadorCaida;
-  const caida = typeof mc === 'number' && mc > 0 && mc < 1 ? mc : 1;
-  return { total: comite * megafono * caida, comite, megafono, caida };
+  const r = limitesMod.factorTamano({ directivas: directivasVigentes(e.directivas, ahora), multiplicadorCaida: e.fondo.multiplicadorCaida, ahora });
+  return { total: r.total, comite: r.comite, megafono: r.megafono, caida: r.caida };
 }
 
-// Capital con el que dimensiona la mesa. Con multiplicador 0 se dimensiona
-// como si fuera 1 para que sea Riesgos quien vete con su motivo (el comité la
-// dejó a ×0) en vez de una propuesta vacía sin explicación.
-function capitalMesa(ctx, mesa, { sombra = false, paraProponer = false } = {}) {
+// Capital de la mesa: patrimonio · peso (el de la sombra con su patrimonio).
+// Lo que decide el comité ya no va aquí sino en el factor (tamanoApertura).
+function capitalMesa(ctx, mesa, { sombra = false } = {}) {
   const peso = mesa.peso || 0;
-  if (sombra) return (ctx.vivo.patrimonioSombra || 0) * peso;
-  let mult = multiplicador(ctx, mesa.id);
-  if (paraProponer && mult === 0) mult = 1;
-  const defensivo = ctx.estado.directivas.modo === 'DEFENSIVO' ? FACTOR_DEFENSIVO : 1;
-  return (ctx.vivo.patrimonio || 0) * peso * mult * defensivo;
+  return ((sombra ? ctx.vivo.patrimonioSombra : ctx.vivo.patrimonio) || 0) * peso;
+}
+
+// Tamaño de una apertura: dimensionar() con el capital de la mesa y, sobre su
+// nocional final (el menor de todos sus topes), el factor de tamaño. Es el
+// ÚNICO sitio que lo aplica; la propuesta lleva `factorTamano` y Riesgos lo
+// comprueba sin volver a multiplicar (limites.js). El fondo real: modo
+// DEFENSIVO × multiplicador de la mesa × Megáfono × su caída. La sombra «sin
+// comité»: su contexto de Riesgos (directivas sin las del comité y la caída
+// desde SU referencia), así que Megáfono y caída sí, comité no.
+// Con paraProponer, una mesa a ×0 se dimensiona como si fuera ×1 para que sea
+// Riesgos quien la vete con su motivo (el comité la dejó a ×0) en vez de una
+// propuesta vacía sin explicación.
+function tamanoApertura(ctx, mesa, { peso, precio, stop, volAnual }, { sombra = false, paraProponer = false } = {}) {
+  const cr = riesgos.contexto(ctx, { sombra });
+  const dim = dimensionar({
+    capitalMesa: capitalMesa(ctx, mesa, { sombra }), peso, precio, stop, volAnual, patrimonio: cr.patrimonio, limites: ctx.limites,
+  });
+  const factor = limitesMod.factorTamano({ directivas: cr.directivas, multiplicadorCaida: cr.multiplicadorCaida, mesaId: mesa.id, ahora: cr.ahora });
+  if (paraProponer && factor.mesa === 0) { factor.mesa = 1; factor.total = factor.comite * factor.megafono * factor.caida; }
+  const nocional = dim.nocional * factor.total;
+  return { nocional, cantidad: nocional / precio, limitadoPor: dim.limitadoPor, nocionalBase: dim.nocional, factor };
 }
 
 function paramsDe(mesa) {
@@ -221,24 +239,24 @@ async function proponerApertura(ctx, { mesa, simbolo, senal, cierre, tVela, vol 
     ctx.bus.publicar({ de: agente, canal: 'parque', tipo: 'estado', texto: `Sin precio de ${etiqueta(simbolo)}: no propongo nada.`, datos: { puestoId: pid } });
     return null;
   }
-  const dim = dimensionar({
-    capitalMesa: capitalMesa(ctx, mesa, { paraProponer: true }), peso: senal.peso, precio, stop: senal.stop, volAnual: vol,
-    patrimonio: ctx.vivo.patrimonio, limites: ctx.limites,
-  });
+  const dim = tamanoApertura(ctx, mesa, { peso: senal.peso, precio, stop: senal.stop, volAnual: vol }, { paraProponer: true });
   const propuesta = {
     puestoId: pid, mesaId: mesa.id, simbolo, clase: universo.esCripto(simbolo) ? 'cripto' : 'accion', lado: 'compra', tipo: 'apertura',
-    nocional: dim.nocional, cantidad: dim.cantidad, precio, precioT: q.t, stop: senal.stop, precioDecision: cierre,
+    nocional: dim.nocional, cantidad: dim.cantidad, precio, precioT: q.t, stop: senal.stop, precioDecision: cierre, factorTamano: dim.factor.total,
   };
   ctx.bus.publicar({
     de: agente, canal: 'parque', tipo: 'propuesta',
-    texto: plantillas.propuesta({ etiqueta: etiqueta(simbolo), lado: 'compra', nocional: dim.nocional, cantidad: dim.cantidad, precio, stop: senal.stop }),
-    datos: { ...propuesta, limitadoPor: dim.limitadoPor, capitalMesa: capitalMesa(ctx, mesa) }, importancia: 2,
+    texto: plantillas.propuesta({ etiqueta: etiqueta(simbolo), lado: 'compra', nocional: dim.nocional, cantidad: dim.cantidad, precio, stop: senal.stop, factor: dim.factor }),
+    datos: { ...propuesta, limitadoPor: dim.limitadoPor, nocionalBase: dim.nocionalBase, capitalMesa: capitalMesa(ctx, mesa) }, importancia: 2,
   });
   // Acciones con la bolsa cerrada (§6.7): la decisión queda pendiente y Riesgos
   // la mira a la apertura + 5 min, con el precio de entonces (si se ha movido
   // más del 2 % desde la decisión, la veta). Mirarla ahora la vetaría siempre.
+  // Salvo con el fondo parado (pausa, solo cerrar): entonces no se deja nada
+  // en cola para después de Reabrir, igual que la sombra (abrirSombra), y
+  // Riesgos la veta ya con su motivo.
   const cerrada = !universo.esCripto(simbolo) && !(ctx.vivo.mercadoAbierto && ctx.vivo.mercadoAbierto.accion);
-  const r = cerrada ? { decision: 'aprobar', nocional: dim.nocional } : riesgos.evaluar(ctx, propuesta);
+  const r = cerrada && ctx.estado.fondo.nivel === 'normal' ? { decision: 'aprobar', nocional: dim.nocional } : riesgos.evaluar(ctx, propuesta);
   if (r.decision === 'vetar') return null;
   // pesoSenal y volAnual viajan con la orden: una apertura que espera a la
   // bolsa se vuelve a dimensionar a la apertura con el capital de entonces
@@ -279,20 +297,19 @@ async function proponerCierre(ctx, { mesaId, simbolo, tipo = 'cierre', motivo = 
   return res;
 }
 
-// Nocional de una apertura de acciones que esperaba a la bolsa, con el capital
-// de ahora: el DEFENSIVO o el ×0,5 de los comités de la noche cuentan, y una
-// mesa que pasó al banquillo ya no abre (null). Se vuelve a dimensionar (no se
-// escala), porque el tope activo puede ser el del activo o el del riesgo. Con
-// paraProponer, un ×0 lo sigue vetando Riesgos con su motivo.
+// Tamaño de una apertura de acciones que esperaba a la bolsa, con el capital
+// y el factor de ahora: el DEFENSIVO o el ×0,5 de los comités de la noche
+// cuentan, y una mesa que pasó al banquillo ya no abre (null). Se vuelve a
+// dimensionar (no se escala), porque el tope activo puede ser el del activo o
+// el del riesgo. Una ×0 la sigue vetando Riesgos con su motivo.
+// → { nocional, factorTamano } (factorTamano null si la orden no traía el
+// peso de la señal: guardada antes, Riesgos le aplica el factor entero).
 function redimensionarPendiente(ctx, o, precio, { sombra = false } = {}) {
   const mesa = ctx.mesaPorId(o.mesaId);
   if (!mesa || mesa.estado === 'banquillo') return null;
-  if (!Number.isFinite(o.pesoSenal)) return o.nocional;           // guardada antes de llevar el peso
-  const patrimonio = sombra ? ctx.vivo.patrimonioSombra : ctx.vivo.patrimonio;
-  return dimensionar({
-    capitalMesa: capitalMesa(ctx, mesa, sombra ? { sombra: true } : { paraProponer: true }), peso: o.pesoSenal, precio,
-    stop: o.stop, volAnual: o.volAnual, patrimonio, limites: ctx.limites,
-  }).nocional;
+  if (!Number.isFinite(o.pesoSenal)) return { nocional: o.nocional, factorTamano: null };
+  const t = tamanoApertura(ctx, mesa, { peso: o.pesoSenal, precio, stop: o.stop, volAnual: o.volAnual }, { sombra, paraProponer: !sombra });
+  return { nocional: t.nocional, factorTamano: t.factor.total };
 }
 
 // ---------- Sombra «sin comité» ----------
@@ -324,6 +341,7 @@ function llenarAperturaSombra(ctx, o) {
   const propuesta = {
     puestoId: sid, mesaId: o.mesaId, simbolo: o.simbolo, clase: universo.esCripto(o.simbolo) ? 'cripto' : 'accion', lado: 'compra', tipo: 'apertura',
     nocional: o.nocional, cantidad: o.precio > 0 ? o.nocional / o.precio : 0, precio: o.precio, precioT: o.precioT, stop: o.stop, precioDecision: o.precioDecision,
+    factorTamano: Number.isFinite(o.factorTamano) ? o.factorTamano : undefined,
   };
   const r = riesgos.evaluar(ctx, propuesta, { sombra: true });
   if (r.decision === 'vetar') return null;
@@ -339,16 +357,18 @@ function llenarAperturaSombra(ctx, o) {
   return fill;
 }
 
+// Con el fondo parado (bloqueado, pausa, solo cerrar) la sombra no decide
+// aperturas, igual que el fondo (procesarMesa y proponerApertura): si no, una
+// de ETF decidida con la bolsa cerrada se quedaba en su cola y se compraba al
+// reabrir algo que el fondo nunca propuso.
 function abrirSombra(ctx, { mesa, simbolo, senal, cierre, tVela, vol }) {
+  if (ctx.estado.fondo.nivel !== 'normal') return null;
   const sid = puestoSombraId(mesa.id, simbolo);
   const q = ctx.vivo.precios[simbolo];
   if (!q || !(q.precio > 0)) return null;
-  const dim = dimensionar({
-    capitalMesa: capitalMesa(ctx, mesa, { sombra: true }), peso: senal.peso, precio: q.precio, stop: senal.stop, volAnual: vol,
-    patrimonio: ctx.vivo.patrimonioSombra, limites: ctx.limites,
-  });
+  const dim = tamanoApertura(ctx, mesa, { peso: senal.peso, precio: q.precio, stop: senal.stop, volAnual: vol }, { sombra: true });
   const orden = {
-    puestoId: sid, mesaId: mesa.id, simbolo, lado: 'compra', nocional: dim.nocional, stop: senal.stop, objetivoPrecio: senal.objetivoPrecio,
+    puestoId: sid, mesaId: mesa.id, simbolo, lado: 'compra', nocional: dim.nocional, factorTamano: dim.factor.total, stop: senal.stop, objetivoPrecio: senal.objetivoPrecio,
     precioDecision: cierre, tVela, regimen: ctx.estado.macro.regimen ? ctx.estado.macro.regimen.valor : null,
     pesoSenal: senal.peso, volAnual: Number.isFinite(vol) ? vol : null,
   };
@@ -385,8 +405,7 @@ function cerrarSombra(ctx, { puestoId: sid, motivo = 'señal', clave, precioEjec
 // fondo (el kill vacía su cola). Después, con el fondo bloqueado, Riesgos le
 // veta toda apertura hasta Reabrir (contexto de la sombra).
 function killSombra(ctx, preciosVenta = {}) {
-  const s = ctx.estado.sombra;
-  if (s && Array.isArray(s.pendientes)) s.pendientes = s.pendientes.filter(o => o.lado !== 'compra');
+  vaciarAperturasSombra(ctx);
   const ahora = ctx.reloj.ahora();
   let n = 0;
   for (const p of ctx.libros.listaPuestos({ sombra: true })) {
@@ -395,6 +414,15 @@ function killSombra(ctx, preciosVenta = {}) {
     if (cerrarSombra(ctx, { puestoId: p.puestoId, motivo: 'kill', clave: isoCompacto(ahora), precioEjecutado: px > 0 ? px : null })) n++;
   }
   return n;
+}
+
+// Las compras que la sombra tiene en cola se descartan (sus ventas siguen).
+function vaciarAperturasSombra(ctx) {
+  const s = ctx.estado.sombra;
+  if (!s || !Array.isArray(s.pendientes)) return 0;
+  const antes = s.pendientes.length;
+  s.pendientes = s.pendientes.filter(o => o.lado !== 'compra');
+  return antes - s.pendientes.length;
 }
 
 // Cola del sombra a la apertura + 5 min: primero las ventas (liberan efectivo)
@@ -417,9 +445,9 @@ function procesarPendientesSombra(ctx) {
     if (p && p.cantidad > EPS) continue;
     const q = ctx.vivo.precios[o.simbolo];
     if (!q || !(q.precio > 0)) continue;
-    const nocional = redimensionarPendiente(ctx, o, q.precio, { sombra: true });
-    if (!(nocional > 0)) continue;
-    if (llenarAperturaSombra(ctx, { ...o, nocional, precio: q.precio, precioT: q.t })) n++;
+    const t = redimensionarPendiente(ctx, o, q.precio, { sombra: true });
+    if (!t || !(t.nocional > 0)) continue;
+    if (llenarAperturaSombra(ctx, { ...o, nocional: t.nocional, factorTamano: t.factorTamano, precio: q.precio, precioT: q.t })) n++;
   }
   return n;
 }
@@ -499,9 +527,10 @@ async function procesarMesa(ctx, mesa, ahora) {
       ctx.bus.publicar({ de: agente, canal: 'parque', tipo: 'estado', texto: textoEstrategia(ctx, mesa, simbolo, real.senal, real.p), datos: { puestoId: pid, accion } });
     }
 
-    // Sombra: misma regla, su propia posición.
+    // Sombra: misma regla, su propia posición. Con el fondo parado no decide
+    // aperturas (abrirSombra), como el fondo.
     const sombra = decidirPuesto(ctx, { mesa, est, prep, simbolo, i, desde, tDecision, pid: sid });
-    if (sombra.senal.accion === 'abrir' && !(sombra.p.cantidad > EPS)) aperturasSombra.push({ mesa, simbolo, senal: sombra.senal, cierre, tVela, vol });
+    if (sombra.senal.accion === 'abrir' && !(sombra.p.cantidad > EPS) && e.fondo.nivel === 'normal') aperturasSombra.push({ mesa, simbolo, senal: sombra.senal, cierre, tVela, vol });
     else if (sombra.senal.accion === 'cerrar' && sombra.p.cantidad > EPS) cierresSombra.push({ puestoId: sid, clave: isoCompacto(tVela) });
   }
 
@@ -531,6 +560,6 @@ async function procesar(ctx) {
 }
 
 module.exports = {
-  procesar, procesarMesa, proponerApertura, proponerCierre, abrirSombra, cerrarSombra, killSombra, procesarPendientesSombra, redimensionarPendiente,
-  capitalMesa, multiplicador, factorTamano, FACTOR_DEFENSIVO, paramsDe, cargarVelas, desdeCalentamiento, contextoEstrategia, textoPuesto, textoNivel, textoEstrategia, refrescarTextos,
+  procesar, procesarMesa, proponerApertura, proponerCierre, abrirSombra, cerrarSombra, killSombra, vaciarAperturasSombra, procesarPendientesSombra, redimensionarPendiente,
+  capitalMesa, tamanoApertura, multiplicador, factorTamano, FACTOR_DEFENSIVO, paramsDe, cargarVelas, desdeCalentamiento, contextoEstrategia, textoPuesto, textoNivel, textoEstrategia, refrescarTextos,
 };

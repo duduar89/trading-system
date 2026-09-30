@@ -116,6 +116,17 @@
     return `${fechaCorta(t, zona)} ${hora(t, zona)}`;
   }
 
+  // Lo que va detrás de «hasta»: «las 21:55» si acaba hoy y «el 3 oct 21:55»
+  // si no (el formato de momento): una directiva de 72 h «hasta las 21:55»
+  // se leía como de hoy y parecía caducada. Sin `ahora`, solo la hora.
+  function hastaLas(t, ahora, zona) {
+    if (!valido(t)) return '—';
+    if (!valido(ahora) || dia(t, zona) === dia(ahora, zona)) return `las ${hora(t, zona)}`;
+    return `el ${momento(t, ahora, zona)}`;
+  }
+  // Lo mismo sin artículo, para las píldoras: «21:55» o «3 oct 21:55».
+  const cuando = (t, ahora) => (valido(ahora) ? momento(t, ahora) : hora(t));
+
   // «hace 3 min», «hace 2 h», «hace 4 d» (antigüedad en ms).
   function hace(ms) {
     if (!valido(ms)) return '—';
@@ -203,13 +214,17 @@
   const factorTexto = f => `×${agrupar(nf(0, 3).format(f))}`;
 
   // Tamaño real de las posiciones nuevas frente al normal. Se multiplican tres
-  // recortes del fondo entero: el modo DEFENSIVO del comité (×0,5 al capital de
-  // cada mesa, src/agentes/departamentos/mesas.js), la reducción del Megáfono y
-  // la de la caída desde el máximo (las dos en src/riesgo/limites.js, sobre el
-  // nocional ya recortado). Con DEFENSIVO y «reduce a la mitad» sale ×0,25.
-  // El multiplicador por mesa del comité no entra: es de cada mesa (su ficha).
+  // recortes del fondo entero: el modo DEFENSIVO del comité, la reducción del
+  // Megáfono y la de la caída desde el máximo. Van sobre el nocional FINAL de
+  // cada apertura, después de todos los topes de dimensionar()
+  // (mesas.tamanoApertura; Riesgos lo comprueba sin volver a multiplicar): así
+  // «×0,5 del tamaño normal» es ×0,5 aunque mande el riesgo por operación o el
+  // tope por activo. Con DEFENSIVO y «reduce a la mitad» sale ×0,25. El
+  // multiplicador por mesa del comité también multiplica, pero es de cada mesa
+  // (su ficha): aquí no entra. `ahora` (reloj de la mesa) pone la fecha al
+  // «hasta» del Megáfono si no es hoy.
   const FACTOR_DEFENSIVO = 0.5;
-  function tamanoEntradas(defensivo, reduccion, multiplicadorCaida) {
+  function tamanoEntradas(defensivo, reduccion, multiplicadorCaida, ahora) {
     const partes = [];
     if (defensivo) {
       partes.push({ origen: 'comité', rotulo: 'DEFENSIVO', factor: FACTOR_DEFENSIVO, hasta: null,
@@ -217,22 +232,22 @@
     }
     if (reduccion && valido(reduccion.factor) && reduccion.factor < 1) {
       partes.push({ origen: 'Megáfono', rotulo: 'MEGÁFONO', factor: reduccion.factor, hasta: valido(reduccion.hasta) ? reduccion.hasta : null,
-        texto: `reducción del Megáfono (${factorTexto(reduccion.factor)}${valido(reduccion.hasta) ? ` hasta las ${hora(reduccion.hasta)}` : ''})` });
+        texto: `reducción del Megáfono (${factorTexto(reduccion.factor)}${valido(reduccion.hasta) ? ` hasta ${hastaLas(reduccion.hasta, ahora)}` : ''})` });
     }
     if (valido(multiplicadorCaida) && multiplicadorCaida < 1) {
       partes.push({ origen: 'vigilante', rotulo: 'CAÍDA', factor: multiplicadorCaida, hasta: null,
         texto: `caída desde el máximo (${factorTexto(multiplicadorCaida)})` });
     }
     const factor = partes.reduce((f, p) => f * p.factor, 1);
-    return { factor, partes };
+    return { factor, partes, ahora: valido(ahora) ? ahora : null };
   }
 
   // El mismo recorte a partir del `fondo.factorTamano` del servidor (§7), que
   // es el que se aplica de verdad: manda él y la interfaz no lo recalcula.
   // `reduccion` (directivas) solo pone el «hasta» del Megáfono.
-  function tamanoDelServidor(ft, reduccion) {
+  function tamanoDelServidor(ft, reduccion, ahora) {
     const f = x => (valido(x) ? x : 1);
-    const t = tamanoEntradas(f(ft.comite) < 1, f(ft.megafono) < 1 ? { factor: f(ft.megafono), hasta: reduccion ? reduccion.hasta : null } : null, f(ft.caida));
+    const t = tamanoEntradas(f(ft.comite) < 1, f(ft.megafono) < 1 ? { factor: f(ft.megafono), hasta: reduccion ? reduccion.hasta : null } : null, f(ft.caida), ahora);
     const comite = t.partes.find(p => p.origen === 'comité');
     if (comite && f(ft.comite) !== FACTOR_DEFENSIVO) {
       comite.factor = f(ft.comite);
@@ -249,7 +264,7 @@
     if (!partes.length) return '';
     if (partes.length === 1) {
       const p = partes[0];
-      if (p.origen === 'Megáfono') return `RIESGO ${factorTexto(p.factor)}${valido(p.hasta) ? ` hasta ${hora(p.hasta)}` : ''} · Megáfono`;
+      if (p.origen === 'Megáfono') return `RIESGO ${factorTexto(p.factor)}${valido(p.hasta) ? ` hasta ${cuando(p.hasta, tam.ahora)}` : ''} · Megáfono`;
       return `${p.rotulo} ${factorTexto(p.factor)}`;
     }
     return `${partes.map(p => p.rotulo).join(' + ')} ${factorTexto(tam.factor)}`;
@@ -277,12 +292,12 @@
     const t = valido(ahora) ? ahora : i.ahora;
     const reduccion = d.reduccion && Number.isFinite(d.reduccion.factor) && vigente(d.reduccion.hasta, t) ? d.reduccion : null;
     const ft = fondo.factorTamano;
-    const tamano = ft && typeof ft === 'object' ? tamanoDelServidor(ft, reduccion) : tamanoEntradas(modo === 'DEFENSIVO', reduccion, fondo.multiplicadorCaida);
-    const base = { defensivo: modo === 'DEFENSIVO', reduccion, tamano };
+    const tamano = ft && typeof ft === 'object' ? tamanoDelServidor(ft, reduccion, t) : tamanoEntradas(modo === 'DEFENSIVO', reduccion, fondo.multiplicadorCaida, t);
+    const base = { defensivo: modo === 'DEFENSIVO', reduccion, tamano, ahora: valido(t) ? t : null };
     if (fondo.nivel && fondo.nivel !== 'normal') return Object.assign(base, { nivel: fondo.nivel, origen: 'fondo', motivo: fondo.motivo || null, hasta: null });
     if (modo === 'SOLO_CERRAR') return Object.assign(base, { nivel: 'solo_cerrar', origen: 'comité', motivo: 'Decisión del comité: solo cerrar.', hasta: null });
     if (valido(d.soloCerrarHasta) && vigente(d.soloCerrarHasta, t)) {
-      return Object.assign(base, { nivel: 'solo_cerrar', origen: 'Megáfono', motivo: `Directiva del Megáfono: solo cerrar hasta las ${hora(d.soloCerrarHasta)}.`, hasta: d.soloCerrarHasta });
+      return Object.assign(base, { nivel: 'solo_cerrar', origen: 'Megáfono', motivo: `Directiva del Megáfono: solo cerrar hasta ${hastaLas(d.soloCerrarHasta, t)}.`, hasta: d.soloCerrarHasta });
     }
     return Object.assign(base, { nivel: 'normal', origen: null, motivo: null, hasta: null });
   }
@@ -377,12 +392,17 @@
   // Rótulo de una fila de mesas en el parqué: «TENDENCIA SMA · 4H · INCUBACIÓN
   // · PAUSADA». `r` es el rótulo del plano (mapa.js) y `mesa` la de la instantánea.
   const MARCO_CORTO = { '1Hour': '1H', '4Hour': '4H', '1Day': '1D' };
-  // Con { compacto: true }, solo el nombre y lo que la bloquea (para cuando no cabe).
+  // Con { compacto: true }, solo el nombre y lo que la bloquea (para cuando no
+  // cabe); con { minimo: true }, además solo la primera palabra del nombre
+  // («RUPTURA»): el último recurso para que una mesa no se quede sin rótulo
+  // en el móvil (la ficha, al tocarlo, dice el nombre entero).
   function rotuloMesa(r, mesa, inst, opciones) {
     const m = mesa || {};
-    const compacto = Boolean(opciones && opciones.compacto);
+    const minimo = Boolean(opciones && opciones.minimo);
+    const compacto = minimo || Boolean(opciones && opciones.compacto);
     const estado = m.estado || r.estado;
-    const partes = [String(m.nombre || r.nombre || r.mesaId || '').toUpperCase()];
+    const nombre = String(m.nombre || r.nombre || r.mesaId || '').toUpperCase();
+    const partes = [minimo ? nombre.split(/\s+/)[0] : nombre];
     if (!compacto) partes.push(MARCO_CORTO[m.marco || r.marco] || '');
     if (!compacto && estado && estado !== 'titular') partes.push(estadoMesa(estado).toUpperCase());
     for (const b of bloqueosMesa(inst, r.mesaId, inst && inst.ahora)) partes.push(b.corto);
@@ -409,7 +429,7 @@
 
   return {
     rotuloMesa, datosParados, MARCO_CORTO,
-    usd, pct, precio, cantidad, numero, hora, dia, fechaCorta, momento, hace, cuentaAtras, claseSigno, suavizar, reducirMovimiento, animar, agrupar,
+    usd, pct, precio, cantidad, numero, hora, dia, fechaCorta, momento, hastaLas, cuando, hace, cuentaAtras, claseSigno, suavizar, reducirMovimiento, animar, agrupar,
     ZONA, ESTADO_MESA, MODO_COMITE, estadoMesa, modoComite, nivelEfectivo, bloqueosMesa, bloqueosPuesto, sinAsignar, medidaLimites, motivo503, precioViejo,
     FACTOR_DEFENSIVO, tamanoEntradas, rotuloTamano, explicacionTamano, factorTexto, ACCION_SENAL, accionSenal,
   };

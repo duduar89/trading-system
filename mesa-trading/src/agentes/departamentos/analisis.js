@@ -174,7 +174,7 @@ async function noticias(ctx) {
     // El titular es de la fuente, no del LLM: no lleva cifras inventadas.
     ctx.bus.publicar({
       de: `analista-${etiqueta(c.simbolo)}`, canal: 'analisis', tipo: 'alerta',
-      texto: plantillas.frase(`Noticia grave en ${etiqueta(c.simbolo)} (${c.categoria}): «${noticia.titular}». No se abre hasta las ${f.hora(hasta)}.`),
+      texto: plantillas.frase(`Noticia grave en ${etiqueta(c.simbolo)} (${c.categoria}): «${noticia.titular}». No se abre hasta ${f.hastaLas(hasta, ahora)}.`),
       datos: { simbolo: c.simbolo, categoria: c.categoria, hasta, noticiaId: c.id, url: noticia.url || null },
       importancia: 3, costeUsd: r.costeUsd,
     });

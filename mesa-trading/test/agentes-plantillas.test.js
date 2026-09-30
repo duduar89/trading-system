@@ -23,6 +23,7 @@ const CASOS = {
   propuesta: [
     { etiqueta: 'SOL', lado: 'compra', nocional: 1234.56, precio: 145.2, stop: 139.1 },
     { etiqueta: 'ETH', lado: 'venta', cantidad: 0.5, precio: 3120.45 },
+    { etiqueta: 'DOGE', lado: 'compra', nocional: 312.5, precio: 0.12345, stop: 0.1111, factor: { total: 0.0625, comite: 0.5, mesa: 0.5, megafono: 0.5, caida: 0.5 } },
   ],
   aprobacion: [
     { etiqueta: 'SOL', decision: 'aprobar', nocional: 1234.56 },
@@ -196,4 +197,11 @@ test('reabrir: con patrimonio y máximo histórico, dice cuánto le falta al fon
   assert.equal(p.reabrir({ quien: 'Eduardo', patrimonio: 109000, pico: 109000 }), 'Reabierto por Eduardo. El fondo está en su máximo histórico (109.000 $).');
   assert.equal(p.reabrir({ quien: 'Eduardo', patrimonio: 110000, pico: 109000 }), 'Reabierto por Eduardo. El fondo está en su máximo histórico (110.000 $).');
   assert.equal(p.reabrir({ quien: 'Eduardo' }), 'Reabierto por Eduardo. Conciliación limpia; vuelta a nivel normal.');
+});
+
+test('propuesta: si el tamaño va recortado, dice cuánto y por qué (DEFENSIVO, mesa, Megáfono, caída)', () => {
+  assert.equal(p.propuesta({ etiqueta: 'BTC', nocional: 2500, precio: 100000, stop: 90000, factor: { total: 0.25, comite: 0.5, mesa: 1, megafono: 0.5, caida: 1 } }),
+    'Propongo comprar 2.500 $ de BTC a 100.000, stop 90.000 (tamaño ×0,25: DEFENSIVO, Megáfono).');
+  assert.equal(p.propuesta({ etiqueta: 'BTC', nocional: 5000, precio: 100000, stop: 90000, factor: { total: 1, comite: 1, mesa: 1, megafono: 1, caida: 1 } }),
+    'Propongo comprar 5.000 $ de BTC a 100.000, stop 90.000.');
 });

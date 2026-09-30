@@ -39,15 +39,19 @@ function directivasSinComite(directivas, ahora) {
 // Contexto de evaluarPropuesta. La sombra «sin comité» (§5.5, §6.7) mide si
 // el comité aporta algo: sufre todo lo que no es el comité, igual que el
 // fondo. Usa su propia cartera (patrimonio, exposición y la caída desde SU
-// máximo, límites duros) y el nivel del fondo real (solo cerrar, pausa,
+// referencia, límites duros) y el nivel del fondo real (solo cerrar, pausa,
 // bloqueo), con las directivas sin las del comité (directivasSinComite). Sus
 // órdenes no van al bróker: no cuentan para el ritmo de órdenes.
+// La referencia de su caída es la de vigilancia tras un Reabrir humano
+// después de un kill (sombra.picoVigilancia, la pone el orquestador en el
+// mismo instante que la del fondo) y, si no, su máximo histórico.
 function contexto(ctx, { sombra = false } = {}) {
   const ahora = ctx.reloj.ahora();
   const v = ctx.vivo;
   if (sombra) {
     const s = ctx.estado.sombra;
-    const caida = s.pico > 0 ? v.patrimonioSombra / s.pico - 1 : 0;
+    const ref = s.picoVigilancia > 0 ? s.picoVigilancia : s.pico;
+    const caida = ref > 0 && v.patrimonioSombra > 0 ? v.patrimonioSombra / Math.max(ref, v.patrimonioSombra) - 1 : 0;
     return {
       ahora, patrimonio: v.patrimonioSombra, valoracion: v.valoracionSombra, nivel: ctx.estado.fondo.nivel,
       multiplicadorCaida: caida <= -ctx.limites.caidaReducir + 1e-9 ? FACTOR_CAIDA : 1,

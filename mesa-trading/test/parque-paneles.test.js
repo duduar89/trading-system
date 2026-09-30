@@ -256,3 +256,93 @@ test('ficha del puesto: la última señal con palabras, no con el id («nada»)'
   assert.equal(cifras.accionSenal('cerrar'), 'Vender');
   assert.equal(cifras.accionSenal('mantener'), 'Mantener');
 });
+
+test('píldora del «solo cerrar» y del RIESGO del Megáfono de más de un día: con fecha, no solo la hora', () => {
+  const i = nuevaInst();
+  const hasta = T0 + 72 * 3600000;                     // 3 oct 02:45 en Madrid
+  i.directivas.soloCerrarHasta = hasta;
+  instActual = i;
+  paneles.actualizarBarra(i, { ahoraServidor: T0 });
+  assert.equal($('p-nivel').textContent, `SOLO CERRAR hasta ${cifras.momento(hasta, T0)} · Megáfono`);
+  assert.match($('p-nivel').textContent, /hasta 3 oct 02:45/);
+  i.directivas.soloCerrarHasta = null;
+  i.directivas.reduccion = { factor: 0.5, hasta };
+  i.fondo.factorTamano = { total: 0.5, comite: 1, megafono: 0.5, caida: 1 };
+  paneles.actualizarBarra(i, { ahoraServidor: T0 });
+  assert.equal($('p-nivel').textContent, 'RIESGO ×0,5 hasta 3 oct 02:45 · Megáfono');
+  assert.equal($('avisos').children[0].textContent, 'Posiciones nuevas a ×0,5 del tamaño normal: reducción del Megáfono (×0,5 hasta el 3 oct 02:45).');
+});
+
+test('franja de conexión: «reintentando en N s» cuenta hacia atrás, y el lector de pantalla no la relee cada segundo', () => {
+  const t0 = 5_000_000;
+  const f = $('franja');
+  paneles.conexion(false, 16000, null, t0);
+  assert.equal(f.hidden, false);
+  assert.equal(f.textContent, 'Sin conexión con la mesa, reintentando en 16 s…');
+  paneles.refrescarFranja(t0 + 5000);
+  assert.equal(f.textContent, 'Sin conexión con la mesa, reintentando en 11 s…');
+  paneles.refrescarFranja(t0 + 15500);
+  assert.equal(f.textContent, 'Sin conexión con la mesa, reintentando en 1 s…');
+  paneles.refrescarFranja(t0 + 16000);
+  assert.equal(f.textContent, 'Sin conexión con la mesa, reintentando…');
+  // El número va aparte y oculto al lector (la franja es role=status): lo que
+  // se anuncia no cambia con cada segundo.
+  const cuenta = f.querySelector('.cuenta');
+  assert.equal(cuenta.getAttribute('aria-hidden'), 'true');
+  assert.equal(f.childNodes.filter(n => n !== cuenta).map(n => n.textContent).join(''), 'Sin conexión con la mesa, reintentando…');
+  // Con motivo, igual: «… Reintentando en 8 s…» → «… Reintentando en 3 s…».
+  paneles.conexion(false, 8000, 'lleno', t0);
+  paneles.refrescarFranja(t0 + 5000);
+  assert.equal(f.textContent, 'Hay demasiados paneles abiertos contra la mesa: cierra alguna pestaña. Reintentando en 3 s…');
+  paneles.conexion(true);
+  assert.equal(f.hidden, true);
+});
+
+test('ficha abierta con un toque en el lienzo (el foco estaba en <body>): al cerrarla, el foco vuelve al lienzo, no a <body>', () => {
+  const i = nuevaInst();
+  instActual = i;
+  const movil = globalThis.window.matchMedia;
+  globalThis.window.matchMedia = () => ({ matches: true });          // < 768 px
+  try {
+    DOC.activeElement = DOC.body;                    // el toque no enfoca el lienzo (preventDefault)
+    paneles.mostrarTarjeta({ tipo: 'puesto', id: i.puestos[0].id }, i, { origen: $('lienzo') });
+    assert.ok($('tarjeta').contains(DOC.activeElement), 'en el móvil el foco entra en la ficha');
+    $('tarjeta').querySelector('.cerrar').click();
+    assert.equal(DOC.activeElement, $('lienzo'));
+    // Sin decir quién la abrió y con el foco en <body>, también al lienzo.
+    DOC.activeElement = DOC.body;
+    paneles.mostrarTarjeta({ tipo: 'puesto', id: i.puestos[1].id }, i);
+    paneles.ocultarTarjeta();
+    assert.equal(DOC.activeElement, $('lienzo'));
+    // Abierta desde un botón con foco (teclado), vuelve a ese botón.
+    const boton = DOC.createElement('button');
+    DOC.body.appendChild(boton);
+    boton.focus();
+    paneles.mostrarTarjeta({ tipo: 'puesto', id: i.puestos[0].id }, i);
+    paneles.ocultarTarjeta();
+    assert.equal(DOC.activeElement, boton);
+    boton.remove();
+  } finally {
+    globalThis.window.matchMedia = movil;
+  }
+});
+
+test('barra: si la fila de píldoras no cabe (DEFENSIVO + MEGÁFONO ×0,25 a 1440 px), se compacta antes de cortar la última', () => {
+  const i = nuevaInst();
+  i.cabecera.miedoCodicia = { valor: 36, etiqueta: 'Miedo', sintetico: true };
+  instActual = i;
+  const pild = $('pildoras');
+  // Cabe: nada cambia.
+  pild.scrollWidth = 700; pild.clientWidth = 749;
+  paneles.actualizarBarra(i, { ahoraServidor: T0 });
+  assert.equal(pild.classList.contains('compacta'), false);
+  const pf = $('p-fg');
+  assert.equal(pf.textContent, 'F&G 36 · Miedo');
+  // La palabra del F&G va aparte (lo que se esconde al compactar) y el título la dice siempre.
+  assert.equal(pf.querySelector('.largo').textContent, ' · Miedo');
+  assert.match(pf.title, /36 · Miedo/);
+  // No cabe (772 px en 749, la medida de Chromium): se compacta.
+  pild.scrollWidth = 772;
+  paneles.marcarDesborde();
+  assert.equal(pild.classList.contains('compacta'), true);
+});

@@ -25,7 +25,9 @@
 // - Reabrir tras un kill NO borra el máximo histórico ni el inicio real del
 //   día: la cabecera y los informes siguen midiendo desde ahí. El vigilante
 //   mide desde una referencia aparte (picoVigilancia, inicioDiaVigilancia) que
-//   solo pone un REABRIR humano, para no volver a disparar al instante.
+//   solo pone un REABRIR humano, para no volver a disparar al instante. La
+//   sombra «sin comité» lleva la suya (sombra.picoVigilancia), que se pone en
+//   el mismo instante.
 //
 // Eventos: 'estado' (instantánea, como mucho una cada intervaloEstadoMs de
 // pantalla), 'mensaje' (Mensaje del bus), 'agente' ({id, estado, sala,
@@ -509,9 +511,15 @@ class Orquestador extends EventEmitter {
 
   revalorarSombra() {
     this.vivo.valoracionSombra = this.libros.valorar(this.vivo.precios, { sombra: true });
-    this.vivo.patrimonioSombra = this.estado.sombra.efectivo + this.vivo.valoracionSombra.valorTotal;
+    const p = this.vivo.patrimonioSombra = this.estado.sombra.efectivo + this.vivo.valoracionSombra.valorTotal;
     const s = this.estado.sombra;
-    if (!(s.pico >= this.vivo.patrimonioSombra)) s.pico = this.vivo.patrimonioSombra;
+    if (!(s.pico >= p)) s.pico = p;
+    // Su referencia de vigilancia (la pone un Reabrir tras un kill, como la del
+    // fondo) sube con su patrimonio y sobra al volver a su máximo histórico.
+    if (s.picoVigilancia > 0) {
+      if (p >= s.pico) s.picoVigilancia = null;
+      else if (p > s.picoVigilancia) s.picoVigilancia = p;
+    }
   }
 
   // Único sitio que escribe vivo.valoracion. La exposición (por activo,
@@ -706,8 +714,8 @@ class Orquestador extends EventEmitter {
     if (p && p.cantidad > EPS) return null;
     // Se vuelve a dimensionar con el capital de ahora (comités de la noche,
     // banquillo) y se evalúa contra los libros con lo ya ejecutado en este lote.
-    const nocional = mesasDep.redimensionarPendiente(this, o, q.precio);
-    if (nocional === null) {
+    const t = mesasDep.redimensionarPendiente(this, o, q.precio);
+    if (t === null) {
       this.bus.publicar({
         de: 'ejecutor', canal: 'ejecucion', tipo: 'nota',
         texto: plantillas.frase(`La mesa ${(this.mesaPorId(o.mesaId) || {}).nombre || o.mesaId} ya no opera (banquillo): se descarta la compra de ${etiqueta(o.simbolo)} que esperaba a la apertura.`),
@@ -718,7 +726,8 @@ class Orquestador extends EventEmitter {
     this.revalorarReal();
     const propuesta = {
       puestoId: o.puestoId, mesaId: o.mesaId, simbolo: o.simbolo, clase: 'accion', lado: 'compra', tipo: 'apertura',
-      nocional, precio: q.precio, precioT: q.t, stop: o.stop, precioDecision: o.precioReferencia,
+      nocional: t.nocional, precio: q.precio, precioT: q.t, stop: o.stop, precioDecision: o.precioReferencia,
+      ...(Number.isFinite(t.factorTamano) ? { factorTamano: t.factorTamano } : {}),
     };
     const r = riesgos.evaluar(this, propuesta);
     return r.decision === 'vetar' ? null : { ...o, nocional: r.nocional };
@@ -1078,8 +1087,8 @@ class Orquestador extends EventEmitter {
     if (fo.killReintento) avisos.push(`Tras el kill siguen posiciones en el bróker: se reintenta venderlas solo (próximo intento a las ${f.hora(fo.killReintento.proximo)}).`);
     if (fo.nivel !== 'bloqueado') {
       if (vigentes.modo === 'SOLO_CERRAR') avisos.push('El comité ha puesto SOLO CERRAR: no se abre nada nuevo hasta el próximo comité.');
-      else if (vigentes.soloCerrarHasta && vigentes.soloCerrarHasta > ahora) avisos.push(`Solo cerrar por el Megáfono hasta las ${f.hora(vigentes.soloCerrarHasta)}: no se abre nada nuevo.`);
-      else if (fo.nivel === 'normal') avisos.push(...this._avisosAperturas(vigentes));   // con el fondo parado sobran
+      else if (vigentes.soloCerrarHasta && vigentes.soloCerrarHasta > ahora) avisos.push(`Solo cerrar por el Megáfono hasta ${f.hastaLas(vigentes.soloCerrarHasta, ahora)}: no se abre nada nuevo.`);
+      else if (fo.nivel === 'normal') avisos.push(...this._avisosAperturas(vigentes, ahora));   // con el fondo parado sobran
     }
     // Reabrir no borra el máximo histórico: mientras la caída desde él supere
     // el límite del kill, se dice con cifras.
@@ -1104,10 +1113,11 @@ class Orquestador extends EventEmitter {
 
   // Lo que bloquea aperturas sin parar el fondo: activos vetados (Megáfono,
   // comité, noticias) y mesas sin abrir (pausa del Megáfono o ×0 del comité).
-  // Una línea por tipo, con quién lo puso y hasta cuándo.
-  _avisosAperturas(vigentes) {
+  // Una línea por tipo, con quién lo puso y hasta cuándo (con la fecha si no
+  // acaba hoy: una pausa de 72 h «hasta las 21:55» parecía caducada).
+  _avisosAperturas(vigentes, ahora) {
     const out = [];
-    const hasta = h => (Number.isFinite(h) ? `, hasta las ${f.hora(h)}` : '');
+    const hasta = h => (Number.isFinite(h) ? `, hasta ${f.hastaLas(h, ahora)}` : '');
     const quien = o => (o === 'comite' ? 'comité' : o === 'noticias' ? 'noticia grave' : 'Megáfono');
     const vetos = new Map();
     for (const v of vigentes.activosVetados || []) {
@@ -1133,7 +1143,7 @@ class Orquestador extends EventEmitter {
   _soloCerrarVigente(ahora) {
     const v = megafono.directivasVigentes(this.estado.directivas, ahora);
     if (v.modo === 'SOLO_CERRAR') return ' Sigue vigente el SOLO CERRAR del comité hasta el próximo comité: Reabrir no lo quita.';
-    if (v.soloCerrarHasta && v.soloCerrarHasta > ahora) return ` Sigue vigente el solo cerrar del Megáfono hasta las ${f.hora(v.soloCerrarHasta)}: Reabrir no lo quita.`;
+    if (v.soloCerrarHasta && v.soloCerrarHasta > ahora) return ` Sigue vigente el solo cerrar del Megáfono hasta ${f.hastaLas(v.soloCerrarHasta, ahora)}: Reabrir no lo quita.`;
     return '';
   }
 
@@ -1304,6 +1314,13 @@ class Orquestador extends EventEmitter {
         this.estado.picoVigilancia = patrimonio < this.estado.pico ? patrimonio : null;
         this.estado.inicioDiaVigilancia = patrimonio;
         this.estado.diaInicioVigilancia = diaUTC(ahora);
+        // La sombra «sin comité», igual y en el mismo instante (§5.5): si
+        // siguiera midiendo desde su máximo, abriría a ×0,5 mientras el fondo
+        // abre a ×1 y esa diferencia se le cargaría al comité. Su pico
+        // histórico tampoco se toca.
+        const s = this.estado.sombra;
+        const ps = this.vivo.patrimonioSombra;
+        s.picoVigilancia = ps > 0 && ps < s.pico ? ps : null;
       }
       this.estado.contadores.reaperturas = (this.estado.contadores.reaperturas || 0) + 1;
       this._anotarHumana('reabrir');

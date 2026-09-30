@@ -133,7 +133,7 @@
     manejadores: {},
     tarjeta: null,
     ultimoFoco: null,
-    conexion: { ok: true, texto: '' },
+    conexion: { ok: true, motivo: null, hasta: null, reintento: false },
     viejo: null,
   };
 
@@ -226,7 +226,15 @@
 
   // Filas que se deslizan sin barra (píldoras, botonera): si no caben, se
   // desvanecen por la derecha para que se vea que hay más.
+  // Si la fila de píldoras no cabe (a 1440 px, «DEFENSIVO + MEGÁFONO ×0,25»
+  // cortaba la última), primero se compacta: sin la palabra del F&G, que dice
+  // su título. Solo si aun así no cabe, se desliza con el borde desvanecido.
   function marcarDesborde() {
+    const pild = $('pildoras');
+    if (pild) {
+      pild.classList.remove('compacta');
+      if (pild.scrollWidth > pild.clientWidth + 1) pild.classList.add('compacta');
+    }
     for (const id of ['pildoras', 'acciones']) {
       const n = $(id);
       if (n) n.classList.toggle('desborda', n.scrollWidth > n.clientWidth + 1 && n.scrollLeft + n.clientWidth < n.scrollWidth - 1);
@@ -260,11 +268,14 @@
     const fg = cab.miedoCodicia;
     const pf = $('p-fg');
     if (fg && Number.isFinite(fg.valor)) {
-      pf.textContent = `F&G ${fg.valor} · ${fg.etiqueta}`;
+      // La palabra («· Miedo») va aparte: es lo que se esconde si la fila no
+      // cabe (marcarDesborde); el color y el título la siguen diciendo.
+      pf.textContent = '';
+      poner(pf, `F&G ${fg.valor}`, el('span', { class: 'largo', text: ` · ${fg.etiqueta}` }));
       const h = Math.round(Math.max(0, Math.min(100, fg.valor)) * 1.2);
       pf.style.setProperty('--tono', `hsl(${h} 70% 55%)`);
       pf.className = 'pildora fg';
-      pf.title = fg.sintetico ? 'Valor sintético (modo sin datos reales)' : 'Índice de miedo y codicia';
+      pf.title = `${fg.sintetico ? 'Valor sintético (modo sin datos reales)' : 'Índice de miedo y codicia'}: ${fg.valor} · ${fg.etiqueta}`;
     } else {
       pf.textContent = 'F&G —';
       pf.className = 'pildora gris';
@@ -279,7 +290,7 @@
     let textoNivel = '';
     if (n.nivel === 'bloqueado') textoNivel = 'BLOQUEADO';
     else if (n.nivel === 'pausado') textoNivel = 'PAUSADO';
-    else if (n.nivel === 'solo_cerrar') textoNivel = n.origen === 'Megáfono' ? `SOLO CERRAR hasta ${cifras.hora(n.hasta)} · Megáfono` : n.origen === 'comité' ? 'SOLO CERRAR · comité' : 'SOLO CERRAR';
+    else if (n.nivel === 'solo_cerrar') textoNivel = n.origen === 'Megáfono' ? `SOLO CERRAR hasta ${cifras.cuando(n.hasta, n.ahora)} · Megáfono` : n.origen === 'comité' ? 'SOLO CERRAR · comité' : 'SOLO CERRAR';
     else textoNivel = cifras.rotuloTamano(n.tamano);
     const tamano = n.nivel === 'normal' ? cifras.explicacionTamano(n.tamano) : '';
     pn.hidden = !textoNivel;
@@ -502,13 +513,20 @@
     }
   }
 
-  function mostrarTarjeta(sel, inst) {
+  // `opciones.origen`: lo que la abrió (el lienzo, con un toque o un clic):
+  // al cerrarla, el foco vuelve ahí. Un toque en el lienzo no lo enfoca
+  // (preventDefault, app.js) y el foco volvía a <body>: sin origen y con el
+  // foco en <body>, también al lienzo.
+  function mostrarTarjeta(sel, inst, opciones) {
     est.tarjeta = sel;
     const t = $('tarjeta');
     const primera = t.hidden;
     const focoDentro = !primera && t.contains(document.activeElement);
     t.hidden = false;
-    if (primera) est.ultimoFoco = document.activeElement;
+    if (primera) {
+      const activo = document.activeElement;
+      est.ultimoFoco = (opciones && opciones.origen) || (activo && activo !== document.body ? activo : $('lienzo'));
+    }
     rellenarTarjeta(sel, inst);
     if (focoDentro && !esMovil()) { const c = t.querySelector('.cerrar'); if (c) c.focus(); }
     ajustarModoTarjeta();
@@ -700,33 +718,68 @@
   // ---------- conexión, avisos, tostadas ----------
   // Franja de arriba: roja sin conexión (diciendo por qué, si se sabe) y ámbar
   // con conexión pero sin datos nuevos desde hace demasiado.
+  // Partes del texto sin conexión: `cuenta` es « en N s» (o '') y va aparte
+  // para poder contar hacia atrás sin rehacer lo demás. `reintento`: si se
+  // dice que se reintenta (con un motivo, solo si hay espera).
+  function partesConexion(motivo, reintento, segundos) {
+    const cuenta = segundos > 0 ? ` en ${cifras.numero(segundos)} s` : '';
+    if (motivo === 'token') return { antes: 'Falta el token del panel: abre la URL con ?token=… (el valor de PANEL_TOKEN).', cuenta: '', despues: '' };
+    if (motivo === 'token-malo') return { antes: 'El token del panel no vale: revisa el ?token=… de la URL (tiene que ser el de PANEL_TOKEN).', cuenta: '', despues: '' };
+    const conMotivo = motivo === 'lleno' ? 'Hay demasiados paneles abiertos contra la mesa: cierra alguna pestaña.'
+      : motivo === 'arrancando' ? 'La mesa está arrancando (histórico, órdenes a medias y conciliación).' : null;
+    if (conMotivo) return reintento ? { antes: `${conMotivo} Reintentando`, cuenta, despues: '…' } : { antes: conMotivo, cuenta: '', despues: '' };
+    return { antes: 'Sin conexión con la mesa, reintentando', cuenta, despues: '…' };
+  }
+  const segundosDe = ms => (ms > 0 ? Math.ceil(ms / 1000) : 0);
+
   function textoConexion(espera, motivo) {
-    const reintento = espera ? ` Reintentando en ${cifras.numero(Math.round(espera / 1000))} s…` : '';
-    if (motivo === 'token') return 'Falta el token del panel: abre la URL con ?token=… (el valor de PANEL_TOKEN).';
-    if (motivo === 'token-malo') return 'El token del panel no vale: revisa el ?token=… de la URL (tiene que ser el de PANEL_TOKEN).';
-    if (motivo === 'lleno') return `Hay demasiados paneles abiertos contra la mesa: cierra alguna pestaña.${reintento}`;
-    if (motivo === 'arrancando') return `La mesa está arrancando (histórico, órdenes a medias y conciliación).${reintento}`;
-    return `Sin conexión con la mesa, reintentando${espera ? ` en ${cifras.numero(Math.round(espera / 1000))} s` : ''}…`;
+    const p = partesConexion(motivo, Boolean(espera), segundosDe(espera));
+    return p.antes + p.cuenta + p.despues;
   }
 
-  function pintarFranja() {
+  // La cuenta atrás («reintentando en 16 s…» → 15 → … → «reintentando…») va
+  // en un <span aria-hidden> aparte: la franja es role=status y un lector de
+  // pantalla la releería cada segundo; así solo se anuncia el cambio de motivo.
+  // `ahoraMs`: reloj de PANTALLA (la reconexión es de verdad, no de la mesa).
+  function pintarFranja(ahoraMs) {
     const f = $('franja');
-    if (!est.conexion.ok) {
+    const c = est.conexion;
+    if (!c.ok) {
       f.hidden = false;
       f.className = 'franja';
-      f.textContent = est.conexion.texto;
+      const ahora = Number.isFinite(ahoraMs) ? ahoraMs : Date.now();
+      const p = partesConexion(c.motivo, c.reintento, segundosDe(c.hasta ? c.hasta - ahora : 0));
+      const base = `${p.antes}|${p.despues}`;
+      let cuenta = f.querySelector('.cuenta');
+      if (f.dataset.base !== base || !cuenta) {
+        f.dataset.base = base;
+        f.textContent = '';
+        cuenta = el('span', { class: 'cuenta', 'aria-hidden': 'true' });
+        poner(f, p.antes, cuenta, p.despues || null);
+      }
+      cuenta.textContent = p.cuenta;
     } else if (est.viejo) {
       f.hidden = false;
       f.className = 'franja ambar';
+      f.dataset.base = '';
       f.textContent = est.viejo;
     } else {
       f.hidden = true;
+      f.dataset.base = '';
     }
   }
 
-  function conexion(ok, espera, motivo) {
-    est.conexion = { ok: !!ok, texto: ok ? '' : textoConexion(espera, motivo) };
-    pintarFranja();
+  // `espera`: ms hasta el próximo intento (0 si se está intentando ya).
+  function conexion(ok, espera, motivo, ahoraMs) {
+    const ahora = Number.isFinite(ahoraMs) ? ahoraMs : Date.now();
+    est.conexion = ok ? { ok: true, motivo: null, hasta: null, reintento: false }
+      : { ok: false, motivo: motivo || null, hasta: espera > 0 ? ahora + espera : null, reintento: espera > 0 };
+    pintarFranja(ahora);
+  }
+
+  // Cada segundo (app.js): la cuenta atrás de la franja, si la hay.
+  function refrescarFranja(ahoraMs) {
+    if (!est.conexion.ok && est.conexion.hasta) pintarFranja(ahoraMs);
   }
 
   function datosViejos(texto) {
@@ -1053,8 +1106,8 @@
   };
 
   return {
-    iniciar, fijarDepartamentos, actualizarBarra, actualizarComite, anadirMensajes, repintarFeed, ultimoMensajeDe,
-    mostrarTarjeta, ocultarTarjeta, refrescarTarjeta, conexion, datosViejos, textoConexion, tostada, abrirModal, cerrarModal,
+    iniciar, fijarDepartamentos, actualizarBarra, actualizarComite, marcarDesborde, anadirMensajes, repintarFeed, ultimoMensajeDe,
+    mostrarTarjeta, ocultarTarjeta, refrescarTarjeta, conexion, refrescarFranja, datosViejos, textoConexion, tostada, abrirModal, cerrarModal,
     textoDirectiva, nombreMesa, frase, valorCriterio, capitalDe, iniciales, get tarjeta() { return est.tarjeta; }, _est: est,
   };
 });

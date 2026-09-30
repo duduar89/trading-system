@@ -6,17 +6,25 @@
 // - Reducciones, cierres y stops se aprueban siempre: bajan riesgo, y un
 //   precio viejo no es motivo para quedarse dentro.
 // - Aperturas y aumentos pasan por los vetos y luego se recortan: primero
-//   los multiplicadores (caída y Megáfono), después los topes, para que el
-//   nocional final quepa en los topes con exactitud. Además del contrato se
-//   comprueba el riesgo por operación con el stop (red de seguridad por si
-//   el tamaño no vino de dimensionar()).
+//   el factor de tamaño, después los topes, para que el nocional final quepa
+//   en los topes con exactitud. Además del contrato se comprueba el riesgo
+//   por operación con el stop (red de seguridad por si el tamaño no vino de
+//   dimensionar()).
+// - Factor de tamaño (§6.7): modo DEFENSIVO del comité × multiplicador de la
+//   mesa × reducción del Megáfono × caída desde el máximo. Lo aplica UN sitio,
+//   las mesas (mesas.tamanoApertura), sobre el nocional final de
+//   dimensionar(), después de todos sus topes: así ×0,5 es ×0,5 aunque mande
+//   el riesgo por operación o el tope por activo. La propuesta dice el que
+//   aplicó (`factorTamano`) y aquí solo se comprueba contra el que toca ahora,
+//   sin volver a multiplicar: si aplicó de menos, se recorta lo que falta; si
+//   no dice ninguno, se aplica entero (red de seguridad).
 //
 // Los límites llegan en ctx.limites (config.limites): aquí no se copia
 // ninguna cifra. Cada motivo lleva un texto con las cifras, que es lo que la
 // Jefa de riesgos dice en el chat.
 
 const universo = require('../mercado/universo');
-const { usd, pct, precio: fPrecio, numero, hora } = require('../util/formato');
+const { usd, pct, precio: fPrecio, numero, factor: fx, hastaLas } = require('../util/formato');
 
 const REDUCEN = new Set(['reduccion', 'cierre', 'stop']);
 const AUMENTAN = new Set(['apertura', 'aumento']);
@@ -40,7 +48,8 @@ function esCripto(propuesta) {
   return universo.esCripto(propuesta.simbolo);
 }
 
-const hastaTexto = hasta => (hasta === null || hasta === undefined ? 'nueva orden' : `las ${hora(hasta)}`);
+// «las 21:55» si acaba hoy y «el 3 oct 21:55» si no (una directiva de 72 h).
+const hastaTexto = (hasta, ahora) => (hasta === null || hasta === undefined ? 'nueva orden' : hastaLas(hasta, ahora));
 
 // Las directivas llegan de dos formas y se aceptan las dos:
 // - el resumen del estado (§7): { modo, multiplicadores, activosVetados: [{simbolo, hasta, motivo}],
@@ -93,6 +102,24 @@ function normalizarDirectivas(directivas, ahora) {
 }
 
 const NIVEL_TEXTO = { solo_cerrar: 'solo cerrar', pausado: 'pausa (solo cerrar hasta Reabrir)', bloqueado: 'bloqueo' };
+
+// Modo DEFENSIVO del comité: las posiciones nuevas, a la mitad (§6.7).
+const FACTOR_DEFENSIVO = 0.5;
+
+// Factor de tamaño de una apertura de la mesa `mesaId` (sin mesa: el del
+// fondo entero, el de la instantánea, §7). `directivas` en cualquiera de las
+// dos formas de normalizarDirectivas; las de la sombra «sin comité» llegan
+// sin modo ni multiplicadores (riesgos.directivasSinComite). Solo aprieta:
+// un multiplicador de más de 1 no afloja nada.
+function factorTamano({ directivas, multiplicadorCaida, mesaId = null, ahora } = {}) {
+  const dir = normalizarDirectivas(directivas, ahora);
+  const comite = dir.modo === 'DEFENSIVO' ? FACTOR_DEFENSIVO : 1;
+  const m = mesaId !== null && mesaId !== undefined ? dir.multiplicadores[mesaId] : undefined;
+  const mesa = typeof m === 'number' && Number.isFinite(m) ? Math.min(1, Math.max(0, m)) : 1;
+  const megafono = dir.reduccion ? dir.reduccion.factor : 1;
+  const caida = positivo(multiplicadorCaida) && multiplicadorCaida < 1 ? multiplicadorCaida : 1;
+  return { total: comite * mesa * megafono * caida, comite, mesa, megafono, caida };
+}
 
 function evaluarPropuesta(propuesta, ctx) {
   const lim = ctx && ctx.limites;
@@ -154,15 +181,15 @@ function evaluarPropuesta(propuesta, ctx) {
     vetos.push(motivo('nivel', nivel, 'normal', `Fondo en ${NIVEL_TEXTO[nivel] || nivel}: no se abren ni se aumentan posiciones.`));
   }
   if (dir.soloCerrar) {
-    vetos.push(motivo('soloCerrar', dir.soloCerrar.hasta, null, `Directiva de solo cerrar vigente hasta ${hastaTexto(dir.soloCerrar.hasta)}: ${e} no abre.`));
+    vetos.push(motivo('soloCerrar', dir.soloCerrar.hasta, null, `Directiva de solo cerrar vigente hasta ${hastaTexto(dir.soloCerrar.hasta, ahora)}: ${e} no abre.`));
   }
   const veto = dir.activosVetados.get(p.simbolo);
   if (veto) {
-    vetos.push(motivo('activoVetado', p.simbolo, null, `${e} vetado hasta ${hastaTexto(veto.hasta)}${veto.motivo ? ` (${veto.motivo})` : ''}.`));
+    vetos.push(motivo('activoVetado', p.simbolo, null, `${e} vetado hasta ${hastaTexto(veto.hasta, ahora)}${veto.motivo ? ` (${veto.motivo})` : ''}.`));
   }
   const pausa = dir.mesasPausadas.get(p.mesaId);
   if (pausa) {
-    vetos.push(motivo('mesaPausada', p.mesaId, null, `Mesa ${p.mesaId} en pausa hasta ${hastaTexto(pausa.hasta)}.`));
+    vetos.push(motivo('mesaPausada', p.mesaId, null, `Mesa ${p.mesaId} en pausa hasta ${hastaTexto(pausa.hasta, ahora)}.`));
   }
   if (dir.multiplicadores && dir.multiplicadores[p.mesaId] === 0) {
     vetos.push(motivo('multiplicadorComite', 0, null, `El comité ha dejado la mesa ${p.mesaId} a ×0: no abre.`));
@@ -218,21 +245,32 @@ function evaluarPropuesta(propuesta, ctx) {
 
   if (vetos.length) return vetar(vetos);
 
-  // ---- Recortes: primero multiplicadores, después topes.
+  // ---- Recortes: primero el factor de tamaño, después topes.
   const motivos = [];
   let n = nocional0;
 
-  const mult = ctx.multiplicadorCaida;
-  if (positivo(mult) && mult < 1) {
+  const req = factorTamano({ directivas: ctx.directivas, multiplicadorCaida: ctx.multiplicadorCaida, mesaId: p.mesaId, ahora });
+  const declarado = typeof p.factorTamano === 'number' && Number.isFinite(p.factorTamano) && p.factorTamano >= 0 ? p.factorTamano : null;
+  if (declarado === null) {
+    // El tamaño no vino de las mesas: se aplica aquí, parte a parte con su texto.
+    const parte = (limite, f, texto) => {
+      if (!(f < 1)) return;
+      const antes = n;
+      n *= f;
+      motivos.push(motivo(limite, f, 1, `${texto} (${usd(antes)} → ${usd(n)}).`));
+    };
+    parte('multiplicadorCaida', req.caida, `Fondo en caída desde el máximo: tamaño ×${numero(req.caida, 2)}`);
+    if (dir.reduccion) parte('reduccionMegafono', req.megafono, `Directiva de reducir riesgo ×${numero(req.megafono, 2)} hasta ${hastaTexto(dir.reduccion.hasta, ahora)}`);
+    parte('modoDefensivo', req.comite, `Modo DEFENSIVO del comité: tamaño ×${numero(req.comite, 2)}`);
+    parte('multiplicadorMesa', req.mesa, `El comité tiene la mesa ${p.mesaId} a ×${numero(req.mesa, 2)}`);
+  } else if (declarado > req.total * (1 + HOLGURA) + HOLGURA) {
+    // Aplicó menos recorte del que toca ahora (p. ej. el Megáfono llegó entre
+    // la decisión y la orden): se recorta lo que falta, sin volver a multiplicar lo aplicado.
     const antes = n;
-    n *= mult;
-    motivos.push(motivo('multiplicadorCaida', mult, 1, `Fondo en caída desde el máximo: tamaño ×${numero(mult, 2)} (${usd(antes)} → ${usd(n)}).`));
-  }
-  if (dir.reduccion) {
-    const antes = n;
-    n *= dir.reduccion.factor;
-    motivos.push(motivo('reduccionMegafono', dir.reduccion.factor, 1,
-      `Directiva de reducir riesgo ×${numero(dir.reduccion.factor, 2)} hasta ${hastaTexto(dir.reduccion.hasta)} (${usd(antes)} → ${usd(n)}).`));
+    n *= req.total / declarado;
+    const causas = [req.comite < 1 && 'DEFENSIVO del comité', req.mesa < 1 && `mesa ${fx(req.mesa)} del comité`, req.megafono < 1 && 'Megáfono', req.caida < 1 && 'caída'].filter(Boolean);
+    motivos.push(motivo('factorTamano', declarado, req.total,
+      `El tamaño llega a ${fx(declarado)} del normal y ahora toca ${fx(req.total)}${causas.length ? ` (${causas.join(', ')})` : ''}: se recorta (${usd(antes)} → ${usd(n)}).`));
   }
 
   const tope = (limite, actual, maximoFraccion, describir) => {
@@ -279,4 +317,4 @@ function evaluarPropuesta(propuesta, ctx) {
   };
 }
 
-module.exports = { evaluarPropuesta, normalizarDirectivas };
+module.exports = { evaluarPropuesta, normalizarDirectivas, factorTamano, FACTOR_DEFENSIVO };

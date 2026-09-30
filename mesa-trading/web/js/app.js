@@ -286,7 +286,10 @@
     // 'lleno' (el servidor ya tiene el máximo de paneles), 'arrancando' (la
     // API responde 503 mientras el orquestador arranca). Sin motivo: red.
     let motivo = null;
-    let esperaMostrada = 0;
+    let proximoIntento = 0;
+    // Lo que falta de verdad para el próximo intento (0 si ya se está intentando):
+    // la franja cuenta hacia atrás desde ahí, no desde la espera entera.
+    const falta = () => (temporizador ? Math.max(0, proximoIntento - Date.now()) : 0);
     let reintentando = false;
     let inicioConexion = 0;
     let avisoLento = null;
@@ -337,7 +340,7 @@
             const antes = motivo;
             if (r.status === 503) motivo = cifras.motivo503(j);
             else if (r.status === 401 || r.status === 403) motivo = TOKEN ? 'token-malo' : 'token';
-            if (motivo !== antes && !abierto) man.conexion(false, esperaMostrada, motivo);
+            if (motivo !== antes && !abierto) man.conexion(false, falta(), motivo);
           });
         })
         .catch(() => { /* sin red: ya lo dice la franja */ })
@@ -361,10 +364,10 @@
         .catch((e) => {
           if (e && (e.codigo === 401 || e.codigo === 403)) {
             motivo = TOKEN ? 'token-malo' : 'token';
-            man.conexion(false, esperaMostrada, motivo);
+            man.conexion(false, falta(), motivo);
           } else if (e && e.codigo === 503) {
             motivo = e.motivo;
-            man.conexion(false, esperaMostrada, motivo);
+            man.conexion(false, falta(), motivo);
           }
           if (!abierto) reintentar();
         });
@@ -401,9 +404,9 @@
       if (temporizador) return;
       const e = espera;
       espera = Math.min(30000, espera * 2);
-      esperaMostrada = e;
-      man.conexion(false, e, motivo);
+      proximoIntento = Date.now() + e;
       temporizador = setTimeout(conectar, e);
+      man.conexion(false, e, motivo);
     }
 
     // Sin ningún evento (ni ping) en 45 s: la conexión está muerta aunque no lo
@@ -654,8 +657,7 @@
       const estado = mesa.estado || r.estado;
       const a = camara.aPantalla(r.col, r.fila, r.z || 52);
       const f = !r.compartida && Number.isFinite(r.colFin) ? camara.aPantalla(r.colFin, r.fila, r.z || 52) : null;
-      const formas = [cifras.rotuloMesa(r, mesa, inst), cifras.rotuloMesa(r, mesa, inst, { compacto: true })]
-        .map(texto => ({ texto, w: Math.ceil(ctx.measureText(texto).width + 20) }));
+      const formas = dibujo.formasRotulo(r, mesa, inst, texto => ctx.measureText(texto).width);
       porId.set(r.mesaId, { mesa, estado });
       return {
         id: r.mesaId, formas, seleccionado: selMesa === r.mesaId,
@@ -802,13 +804,15 @@
       est.texturasSucias = true;
     }
     comprobarDatosParados();
+    paneles.refrescarFranja();          // «reintentando en N s…» cuenta hacia atrás
   }, 1000);
 
   // ---------- selección ----------
 
-  function seleccionar(sel) {
+  // `opciones.origen`: lo que abre la ficha (el lienzo), para devolverle el foco al cerrarla.
+  function seleccionar(sel, opciones) {
     est.seleccion = sel;
-    if (sel) paneles.mostrarTarjeta(sel, est.inst); else paneles.ocultarTarjeta();
+    if (sel) paneles.mostrarTarjeta(sel, est.inst, opciones); else paneles.ocultarTarjeta();
   }
   function deseleccionar() { est.seleccion = null; paneles.ocultarTarjeta(); }
 
@@ -901,7 +905,7 @@
     const p = posEvento(e);
     if (arrastre && !arrastre.movido && punteros.size === 1 && e.type === 'pointerup') {
       const sel = buscarEn(p.x, p.y);
-      if (sel) seleccionar(sel); else deseleccionar();
+      if (sel) seleccionar(sel, { origen: lienzo }); else deseleccionar();
     }
     punteros.delete(e.pointerId);
     if (punteros.size < 2) pellizco = null;

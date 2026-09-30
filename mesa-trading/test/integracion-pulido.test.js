@@ -33,26 +33,31 @@ test('factorTamano: la instantánea da el recorte que se aplica de verdad (DEFEN
   const { orquestador: o } = await crearOrquestador();
   assert.deepEqual(o.instantanea().fondo.factorTamano, { total: 1, comite: 1, megafono: 1, caida: 1 });
   const mesa = o.mesaPorId('ruptura');
-  const capitalNormal = mesasDep.capitalMesa(o, mesa);
-  const nocionalNormal = riesgos.evaluar(o, aperturaBTC(o)).nocional;
-  cerca(nocionalNormal, 1000);
+  const q = o.vivo.precios['BTC/USD'];
+  // Stop al 10 %: manda el riesgo por operación (el caso en que el recorte al
+  // capital no llegaba al nocional).
+  const tamano = () => mesasDep.tamanoApertura(o, mesa, { peso: 1, precio: q.precio, stop: q.precio * 0.9, volAnual: 0.3 });
+  const nocionalNormal = tamano().nocional;
+  assert.equal(tamano().limitadoPor, 'riesgo');
 
   // El caso del informe: DEFENSIVO del comité y «reduce el riesgo a la mitad 3 horas».
   o.estado.directivas.modo = 'DEFENSIVO';
   o.estado.directivas = megafono.aplicarDirectiva(o.estado.directivas, { tipo: 'reducir_riesgo', factor: 0.5, horas: 3 }, o.reloj.ahora());
   const ft = o.instantanea().fondo.factorTamano;
   assert.deepEqual(ft, { total: 0.25, comite: 0.5, megafono: 0.5, caida: 1 }, 'no «DEFENSIVO ×0,5»: es ×0,25');
-  cerca(mesasDep.capitalMesa(o, mesa) / capitalNormal, ft.comite);
-  cerca(riesgos.evaluar(o, aperturaBTC(o)).nocional / nocionalNormal, ft.megafono * ft.caida);
+  cerca(tamano().nocional / nocionalNormal, ft.total);
+  // Riesgos lo comprueba sin volver a multiplicar.
+  const t = tamano();
+  cerca(riesgos.evaluar(o, { ...aperturaBTC(o, t.nocional), stop: q.precio * 0.9, factorTamano: t.factor.total }).nocional, t.nocional);
   // La capital de la mesa en la instantánea también lleva el DEFENSIVO.
   const m = o.instantanea().mesas.find(x => x.id === 'ruptura');
-  cerca(m.capital, capitalNormal * 0.5);
+  cerca(m.capital, mesasDep.capitalMesa(o, mesa) * 0.5);
 
   // Con la caída desde el máximo (×0,5 del vigilante).
   o.estado.fondo.multiplicadorCaida = 0.5;
   const ft2 = o.instantanea().fondo.factorTamano;
   assert.deepEqual(ft2, { total: 0.125, comite: 0.5, megafono: 0.5, caida: 0.5 });
-  cerca(riesgos.evaluar(o, aperturaBTC(o)).nocional / nocionalNormal, ft2.megafono * ft2.caida);
+  cerca(tamano().nocional / nocionalNormal, ft2.total);
 
   // La reducción del Megáfono caduca: deja de contar a su hora.
   o.reloj.avanzar(3 * 3600_000 + PASO);

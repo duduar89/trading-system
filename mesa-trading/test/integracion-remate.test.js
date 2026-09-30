@@ -115,7 +115,8 @@ test('avisos: lo que bloquea aperturas sin parar el fondo (vetos y mesas sin abr
   const av = o.instantanea().avisos;
   const vetos = av.find(a => a.startsWith('No se abre en'));
   assert.match(vetos, /SOL \(Megáfono, hasta las \d\d:\d\d\)/);
-  assert.match(vetos, /DOGE \(noticia grave, hasta las \d\d:\d\d\)/);
+  // 24 h acaban otro día: con la fecha, como el feed (si no, parecía caducado).
+  assert.match(vetos, /DOGE \(noticia grave, hasta el \d{1,2} \S+ \d\d:\d\d\)/);
   const mesas = av.find(a => a.startsWith('Mesas sin abrir nada'));
   assert.match(mesas, /Ruptura Donchian \(Megáfono, hasta las \d\d:\d\d\)/);
   assert.match(mesas, /Reversión RSI \(comité ×0/);

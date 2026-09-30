@@ -77,6 +77,10 @@ button { cursor: pointer; }
 .pildoras::-webkit-scrollbar { display: none; }
 /* El estado del fondo, lo primero: si la fila no cabe, lo que se corta es el final. */
 #p-nivel { order: -2; }
+/* Si no cabe, primero se compacta (marcarDesborde): fuera la palabra del F&G.
+   En una píldora (inline-flex) el espacio del principio del trozo se perdía. */
+.pildora .largo { white-space: pre; }
+.pildoras.compacta .largo { display: none; }
 /* Una fila que se desliza (sin barra) se desvanece por la derecha: hay más. */
 .pildoras.desborda, .acciones.desborda { -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
 .pildora {
@@ -388,6 +392,14 @@ table.resultados .fila-sin-comite th { color: #fcd34d; }
 /* ---------- pantallas medianas ---------- */
 @media (max-width: 1480px) {
   .marca > span:not(.pildora) { display: none; }
+}
+/* Portátil (1440 px): con «DEFENSIVO + MEGÁFONO ×0,25» la fila de píldoras
+   pedía 772 px y tenía 749; con algo menos de aire caben las seis. */
+@media (min-width: 768px) and (max-width: 1480px) {
+  .barra { gap: 10px; padding: 0 12px; }
+  .cifras { gap: 12px; }
+  .pildoras { gap: 5px; }
+  .pildora { padding: 0 7px; }
 }
 @media (max-width: 1180px) {
   .cifra.secundaria { display: none; }

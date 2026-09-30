@@ -9,7 +9,7 @@
 //   estadoPuesto({ etiqueta, marco, posicion: {cantidad, entrada, stop, pnlAbiertoPct} | null, estadoEstrategia })
 //   notaAnalista({ etiqueta, precio, sesgo, sma50, rsi, volAnual, marco })
 //   regimen({ valor, puntos, anterior, detalle })
-//   propuesta({ etiqueta, lado, nocional, cantidad, precio, stop })
+//   propuesta({ etiqueta, lado, nocional, cantidad, precio, stop, factor? })
 //   aprobacion({ etiqueta, lado, decision, nocional, nocionalPedido, cantidad, motivos })
 //   veto({ etiqueta, motivos: [{ texto }] })
 //   ejecucion({ etiqueta, lado, cantidad, precio, nocional, comision })
@@ -131,11 +131,18 @@ function regimen({ valor, puntos, anterior, detalle } = {}) {
   return frase(d ? `${cabeza} ${d}` : cabeza);
 }
 
-function propuesta({ etiqueta, lado = 'compra', nocional, cantidad, precio, stop } = {}) {
+// `factor` (opcional): el factor de tamaño ya aplicado (mesas.tamanoApertura),
+// { total, comite, mesa, megafono, caida }; si recorta, se dice de dónde viene.
+function propuesta({ etiqueta, lado = 'compra', nocional, cantidad, precio, stop, factor } = {}) {
   const e = etq(etiqueta);
   if (lado === 'venta') return frase(`Propongo vender ${f.cantidad(cantidad)} ${e} a ${f.precio(precio)}.`);
   const s = fin(stop) ? `, stop ${f.precio(stop)}` : '';
-  return frase(`Propongo comprar ${f.usd(nocional)} de ${e} a ${f.precio(precio)}${s}.`);
+  let tam = '';
+  if (factor && fin(factor.total) && factor.total < 1) {
+    const causas = [factor.comite < 1 && 'DEFENSIVO', factor.mesa < 1 && `mesa ${f.factor(factor.mesa)}`, factor.megafono < 1 && 'Megáfono', factor.caida < 1 && 'caída'].filter(Boolean);
+    tam = ` (tamaño ${f.factor(factor.total)}${causas.length ? `: ${causas.join(', ')}` : ''})`;
+  }
+  return frase(`Propongo comprar ${f.usd(nocional)} de ${e} a ${f.precio(precio)}${s}${tam}.`);
 }
 
 function aprobacion({ etiqueta, lado = 'compra', decision = 'aprobar', nocional, nocionalPedido, cantidad, motivos } = {}) {

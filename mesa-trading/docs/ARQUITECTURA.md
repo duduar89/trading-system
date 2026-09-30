@@ -436,7 +436,11 @@ Mayor → grave. Posición en bróker sin puesto → huérfana. Puesto sin posic
 
 ```js
 evaluarPropuesta(propuesta, ctx) → { decision: 'aprobar'|'reducir'|'vetar', nocional, cantidad, motivos: [{ limite, valor, maximo, texto }] }
-propuesta = { puestoId, mesaId, simbolo, clase, lado, tipo: 'apertura'|'aumento'|'reduccion'|'cierre'|'stop'|'kill'|'prueba', nocional, cantidad, precio, precioT, stop, precioDecision }
+propuesta = { puestoId, mesaId, simbolo, clase, lado, tipo: 'apertura'|'aumento'|'reduccion'|'cierre'|'stop'|'kill'|'prueba', nocional, cantidad, precio, precioT, stop, precioDecision,
+              factorTamano? /* el factor de tamaño que ya lleva `nocional` (§6.7) */ }
+factorTamano({ directivas, multiplicadorCaida, mesaId?, ahora }) → { total, comite, mesa, megafono, caida }
+// total = comite (0,5 con el modo DEFENSIVO) × mesa (multiplicador del comité para esa mesa; sin mesaId, 1)
+//         × megafono (la reducción vigente más dura) × caida (multiplicadorCaida). Solo aprieta.
 ctx = { ahora, patrimonio, valoracion /* libros.valorar con, por símbolo, el máximo frente al bróker (exposicionConBroker) */,
         nivel: 'normal'|'solo_cerrar'|'bloqueado', multiplicadorCaida,
         directivas, ordenes: { ultimoMinuto, ultimaHoraPorMesa: {mesaId: n} }, mercadoAbierto: {accion: boolean}, limites }
@@ -446,10 +450,17 @@ ctx = { ahora, patrimonio, valoracion /* libros.valorar con, por símbolo, el m�
 - Aperturas y aumentos: vetar si nivel ≠ normal, activo vetado, mesa pausada,
   `soloCerrar`, mercado cerrado (acciones), precio más viejo que el límite,
   desvío > `desvioMaxPrecio` entre `precioDecision` y `precio`, posiciones ≥
-  máximo, órdenes por minuto o por mesa/hora agotadas. Reducir para caber en
-  `maxPesoPorActivo`, `maxExposicionBruta`, `maxExposicionCripto`, y aplicar
-  `multiplicadorCaida` y la reducción del Megáfono. Si tras reducir queda <
-  `minNocionalOrden` → vetar.
+  máximo, órdenes por minuto o por mesa/hora agotadas. Después, el factor de
+  tamaño y los topes: reducir para caber en `maxPesoPorActivo`,
+  `maxExposicionBruta`, `maxExposicionCripto` y el riesgo por operación. Si
+  tras reducir queda < `minNocionalOrden` → vetar.
+- Factor de tamaño: lo aplica UN sitio, las mesas, sobre el nocional final de
+  `dimensionar()` (§6.7). Aquí solo se comprueba, sin volver a multiplicar: si
+  la propuesta trae `factorTamano` ≤ el que toca ahora, nada; si trae más (el
+  Megáfono llegó entre la decisión y la orden), se recorta lo que falta
+  (motivo `factorTamano`); si no trae ninguno (el tamaño no vino de las
+  mesas), se aplica entero, parte a parte (`multiplicadorCaida`,
+  `reduccionMegafono`, `modoDefensivo`, `multiplicadorMesa`).
 - Cada motivo lleva texto con las cifras (lo lee la Jefa de riesgos en el chat).
 - `valoracion` es la de los libros, pero con la cantidad de cada símbolo
   llevada al máximo entre libros y bróker: una posición del bróker sin puesto
@@ -483,9 +494,19 @@ es el comité, igual que el fondo:
   cerrada esperan a la apertura en su propia cola (`estado.sombra.pendientes`).
 - Los límites duros de §5.3 sobre su propia cartera (peso por activo,
   exposiciones, posiciones, riesgo por operación, precio viejo, desvío,
-  mínimo por orden) y la caída desde SU máximo (×0,5 al −10 %).
+  mínimo por orden) y la caída desde SU máximo (×0,5 al −10 %). Tras un
+  Reabrir humano después de un kill, la caída se mide, como la del fondo,
+  desde la reapertura: el mismo Reabrir, en el mismo instante, le pone su
+  propia referencia de vigilancia (`sombra.picoVigilancia`, su patrimonio al
+  reabrir; sube con él y desaparece al volver a su máximo). Si siguiera
+  midiendo desde su máximo, abriría a ×0,5 mientras el fondo abre a ×1 y esa
+  diferencia se le cargaría al comité. Su máximo histórico (`sombra.pico`,
+  cabecera e informes) no se toca.
 - El nivel del fondo real: con `solo_cerrar` (pérdida del día), `pausado`
-  (botón o conciliación) o `bloqueado` no abre nada.
+  (botón o conciliación) o `bloqueado` no abre nada, y tampoco decide
+  aperturas: una de ETF decidida con la bolsa cerrada no se queda en su cola
+  para comprarse al reabrir (el fondo, igual: con el nivel ≠ normal no deja
+  nada en la cola del Ejecutor).
 - El kill switch, manual o del vigilante: en el mismo instante se cierran
   todas sus posiciones, cada símbolo al precio medio al que lo vendió el fondo
   en ese kill (si el fondo no lo tenía o no llegó a venderlo, al precio de
@@ -493,9 +514,10 @@ es el comité, igual que el fondo:
   apertura), y se descartan sus compras en cola. Luego no abre hasta Reabrir.
 - Las directivas del Megáfono (solo cerrar, pausa de activo o de mesa,
   reducción de riesgo) y los vetos por noticias graves (no los decide el comité).
+  Su factor de tamaño (§6.7) lleva el Megáfono y su caída, no el comité.
 
 Lo único que no le llega son las decisiones del comité: el modo DEFENSIVO
-(capital de mesa ×0,5) y SOLO_CERRAR, los multiplicadores por mesa
+(tamaño ×0,5) y SOLO_CERRAR, los multiplicadores por mesa
 ({0; 0,5; 1}) y sus vetos de 24 h (`origen: 'comite'`). Su patrimonio lo mide
 su efectivo (`estado.sombra.efectivo`, parte del capital inicial) más sus
 posiciones; su curva diaria (`sombras.curvas['sin-comite']`) se anota en el
@@ -691,13 +713,25 @@ guardadas antes de llevar `motivoSalida` lo toman de su operación
 ```
 cierre de vela del marco de la mesa
  → Operador del puesto: estrategia.decidir()          [bus: 'senal' / 'estado']
- → capital de mesa = patrimonio · peso · multiplicador de comité · (0,5 si modo DEFENSIVO)
- → dimensionar()                                       [bus: 'propuesta']
+ → capital de mesa = patrimonio · peso
+ → dimensionar() → nocional base (el menor de todos sus topes)
+ → nocional = nocional base · factor de tamaño         [bus: 'propuesta']
+   factor = (0,5 si modo DEFENSIVO) · multiplicador de la mesa · reducción del Megáfono · multiplicadorCaida
  → Jefa de riesgos: evaluarPropuesta()                 [bus: 'aprobacion' | 'veto']
  → Ejecutor: registro de INTENCIÓN en ordenes.jsonl → enviarOrden() → esperarEjecucion()   [bus: 'orden', 'ejecucion']
  → libros.aplicarEjecucion()                           [bus: 'cierre' si se cierra]
  → (en paralelo, el puesto sombra «sin comité» hace lo mismo sin bróker y sin las decisiones del comité: §5.5)
 ```
+- Factor de tamaño (`mesas.tamanoApertura`, con `limites.factorTamano`): va
+  sobre el nocional FINAL de `dimensionar()`, después de todos sus topes. Así
+  ×0,5 es ×0,5 aunque mande el riesgo por operación o el tope por activo; en
+  el capital de la mesa no llegaba (con DEFENSIVO, 7 de 33 compras salían a
+  ×1). Lo aplica ese único sitio y la propuesta lo dice (`factorTamano`);
+  Riesgos lo comprueba sin volver a multiplicar (§5.3). La sombra «sin
+  comité» usa su contexto de Riesgos: Megáfono y su caída sí, comité no. Una
+  mesa a ×0 se propone como ×1 para que Riesgos la vete con su motivo. Los
+  topes de exposición de Riesgos (con lo ya abierto) van después, así que una
+  compra ejecutada puede quedar por debajo del ×0,5 si no cabe.
 - `idCliente = mt-<sal>-<mesaId>-<CLAVE>-<velaISO compacta>-<accion>-<n>` (≤ 128).
   `sal` = `estado.creado` (instante en que se creó el estado.json de esa
   carpeta) en segundos y base 36: el contador `n` solo conoce el
@@ -726,11 +760,14 @@ cierre de vela del marco de la mesa
   en los libros un resto fantasma.
 - Acciones con el mercado cerrado: la decisión queda pendiente y se envía en
   la apertura + 5 min. Una apertura pendiente se vuelve a dimensionar con el
-  capital de ese momento (los comités de la noche, el DEFENSIVO, una mesa que
-  pasó al banquillo, que ya no abre) y pasa por Riesgos con el precio de
-  entonces (el desvío frente a la decisión la puede vetar). El puesto sombra
-  tiene su propia cola (`estado.sombra.pendientes`) con la misma regla: si no,
-  la sombra «sin comité» no tendría nunca ETF.
+  capital y el factor de ese momento (los comités de la noche, el DEFENSIVO,
+  una mesa que pasó al banquillo, que ya no abre) y pasa por Riesgos con el
+  precio de entonces (el desvío frente a la decisión la puede vetar). El
+  puesto sombra tiene su propia cola (`estado.sombra.pendientes`) con la misma
+  regla: si no, la sombra «sin comité» no tendría nunca ETF. Con el fondo en
+  un nivel ≠ normal ni el fondo ni la sombra dejan aperturas en cola (Riesgos
+  veta la del fondo en el acto; la sombra no la decide), y el kill vacía las
+  compras de las dos colas.
 - Stops: el vigilante los mira en cada latido con el último precio; si saltan,
   venta a mercado con `tipo: 'stop'`. Aviso permanente en pantalla: con el
   ordenador apagado no hay stops (en cripto no existen órdenes stop simples).
@@ -826,6 +863,9 @@ visual), próximas cadencias. Campos añadidos después del primer contrato:
 - `comisionesEstimadas`: `{ 'AAAA-MM-DD': usd }`, comisión cripto estimada por
   día para contrastarla con la CFEE de Alpaca (10 días).
 - `sombra.pendientes`: aperturas de acciones del puesto sombra que esperan a la apertura.
+- `sombra.picoVigilancia`: la referencia de la caída de la sombra tras un
+  REABRIR humano después de un kill (§5.5); `sombra.pico` sigue siendo su
+  máximo histórico.
 - `fondo.killReintento`: `{ n, proximo }` si tras el kill quedó algo en el bróker.
 - `macro.fgDias`: los últimos días de miedo y codicia (para `RETRASO_FG`).
 - `noticias.ultimaOk`: última clasificación de noticias que salió bien (las
@@ -910,11 +950,14 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
            factorTamano: { total, comite, megafono, caida } },
   // factorTamano: el recorte que se aplica DE VERDAD al tamaño de cada apertura nueva, para que la
   //   interfaz no lo recalcule. total = comite × megafono × caida. comite: 0,5 con el modo DEFENSIVO
-  //   del comité (al capital de cada mesa, mesas.js), 1 si no; megafono: el factor de la reducción del
-  //   Megáfono vigente (la más dura), 1 si no hay; caida: multiplicadorCaida del vigilante (limites.js
-  //   aplica estos dos al nocional). El multiplicador por mesa del comité no entra (es de cada mesa:
-  //   mesas[].multiplicador). No dice si se puede abrir: con nivel ≠ normal, SOLO_CERRAR del comité o
-  //   «solo cerrar» del Megáfono no se abre nada, y eso lo cuentan nivel, directivas y avisos.
+  //   del comité, 1 si no; megafono: el factor de la reducción del Megáfono vigente (la más dura), 1 si
+  //   no hay; caida: multiplicadorCaida del vigilante. Los tres multiplican el nocional FINAL de
+  //   dimensionar(), después de todos sus topes (mesas.tamanoApertura, §6.7; Riesgos lo comprueba sin
+  //   volver a multiplicar): «×0,5 del tamaño normal» es ×0,5 aunque mande el riesgo por operación o el
+  //   tope por activo. El multiplicador por mesa del comité también multiplica, pero es de cada mesa
+  //   (mesas[].multiplicador) y aquí no entra. No dice si se puede abrir: con nivel ≠ normal,
+  //   SOLO_CERRAR del comité o «solo cerrar» del Megáfono no se abre nada, y eso lo cuentan nivel,
+  //   directivas y avisos.
   cabecera: { patrimonio, pnlDia, pnlDiaPct, caida, exposicionBrutaPct, exposicionCriptoPct, posiciones,
               regimen: { valor, detalle }, miedoCodicia: { valor, etiqueta, sintetico } | null,
               proximoComite, modoComite: 'NORMAL'|'DEFENSIVO'|'SOLO_CERRAR',
@@ -932,6 +975,8 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
   departamentos: DEPARTAMENTOS,
   agentes: [{ id, nombre, departamento, rol, queDecide, usaLLM, sala, estado: 'trabajando'|'reunion'|'descanso'|'de_pie'|'banquillo',
               bocadillo: { texto, hasta } | null, mesaId, simbolo, etiqueta, puestoId }],
+  // capital: patrimonio · peso · multiplicador · (0,5 con DEFENSIVO), lo que la mesa opera de verdad
+  //   (el recorte va al nocional, §6.7); 0 en el banquillo.
   mesas: [{ id, nombre, familia, marco, estado, peso, capital, multiplicador, universo: [etiqueta], params,
             metricas: { operaciones, acierto, factorBeneficio, sharpe, sharpeAjustado, maxDD, adherencia, pnlTotal }, pnlDia,
             nota /* string | null: por qué está así (backtest de arranque, contratación, ascenso, despido) */ }],
@@ -955,7 +1000,9 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
   ejecuciones: [{ t, puestoId, simbolo, etiqueta, lado, cantidad, precio, nocional, comision, motivo }],   // últimas 30
   laboratorio: { ensayosTotales, hipotesis: [{ id, descripcion, estado: 'pendiente'|'evaluando'|'aprobada'|'rechazada', criterios, t }], proximaRevision },
   limites,
-  avisos: [texto]    // lo que bloquea o limita al fondo va delante (en el móvil se corta por el final): nivel
+  avisos: [texto]    // Un «hasta» que no es hoy lleva la fecha, como el feed («hasta el 3 oct 21:55»;
+                     // hoy, «hasta las 21:55»).
+                     // Lo que bloquea o limita al fondo va delante (en el móvil se corta por el final): nivel
                      // (bloqueado, pausa, solo cerrar), kill pendiente de reintento, solo cerrar del comité o del
                      // Megáfono; con el fondo en normal, los activos vetados (Megáfono, comité, noticia grave) y las
                      // mesas sin abrir (pausa del Megáfono o ×0 del comité), con quién y hasta cuándo; caída
@@ -976,7 +1023,10 @@ abra también desde `file://` en modo maqueta).
 
 - Barra superior: PATRIMONIO, RESULTADO HOY, CAÍDA, EXPOSICIÓN (bruta y
   cripto), POSICIONES, píldoras RÉGIMEN, F&G, «Comité en HH:MM», MODO (PAPEL
-  ALPACA ámbar / SIMULADO azul / SINTÉTICO lila), LLM gasto/tope.
+  ALPACA ámbar / SIMULADO azul / SINTÉTICO lila), LLM gasto/tope. Si la fila
+  de píldoras no cabe, primero se compacta (F&G se queda en el número; la
+  palabra, en su título) y solo después se desliza con el borde desvanecido;
+  la del estado del fondo va siempre la primera.
 - Panel lateral «Departamentos»: chips de filtro por departamento y feed de
   mensajes (avatar del color del departamento, nombre, hora, texto; lo último
   abajo; autoscroll salvo si el usuario ha subido; máx. 300 en el DOM).
@@ -994,13 +1044,19 @@ abra también desde `file://` en modo maqueta).
   día, operaciones, acierto, adherencia, factor, último mensaje, y la mesa del
   puesto con su estado (con tilde: titular, incubación, banquillo), su peso y
   su `nota`; para agentes no-puesto: rol, qué decide, si usa LLM, último mensaje.
+- Rótulos de mesa: nunca fuera del lienzo ni encima de lo pintado; con poco
+  sitio van por peso (una titular del 40 % antes que una incubada del 2 %) y,
+  de último recurso, con la primera palabra del nombre («RUPTURA»): así la de
+  más peso ocupa el hueco y desplaza a la de menos.
 - Clic en el rótulo de una mesa (encima de su fila) → ficha de la mesa: nota,
   lo que la bloquea (pausa del Megáfono, ×0 del comité, vetos), estado, peso,
   capital, multiplicador, P&L del día y total, operaciones, acierto, factor,
   Sharpe, Sharpe ajustado, caída y adherencia, y sus puestos.
 - Teclado sobre el lienzo: flechas para mover, + y − para el zoom, 0 para
   encuadrar; `n` / `p` (o AvPág / RePág) recorren puestos y agentes y `Intro`
-  (o espacio) abre la tarjeta del elegido; Escape cierra la tarjeta.
+  (o espacio) abre la tarjeta del elegido; Escape cierra la tarjeta. Al
+  cerrarla, el foco vuelve a lo que la abrió (el lienzo tras un toque o un
+  clic; un botón, si se abrió con él), nunca a <body>.
 - Botonera: Comité, Megáfono (modal con texto → propuesta → Aplicar),
   Resultados, Prueba, Pausar todo, Reabrir (escribir REABRIR), Kill switch
   (rojo, escribir KILL), Ajustes (modal). Controles de cámara y zoom; arrastrar
@@ -1025,7 +1081,9 @@ abra también desde `file://` en modo maqueta).
   mensajes falsos con `maqueta.js` para poder trabajar la interfaz sin backend.
 - Franja de arriba. Roja sin conexión, con el motivo si se sabe y reconexión
   SSE con espera creciente:
-  «Sin conexión con la mesa, reintentando en N s…» (red);
+  «Sin conexión con la mesa, reintentando en N s…» (red; N cuenta hacia
+  atrás cada segundo y va en un trozo aria-hidden, para que el lector de
+  pantalla no relea la franja, que es role=status);
   «Falta el token del panel: abre la URL con ?token=… (el valor de
   PANEL_TOKEN).» (401 sin token); «El token del panel no vale: revisa el
   ?token=… de la URL (tiene que ser el de PANEL_TOKEN).» (401 o 403 con token);

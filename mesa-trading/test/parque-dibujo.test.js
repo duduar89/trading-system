@@ -120,7 +120,7 @@ test('límites: con el fondo en su máximo y sin pérdida no sale «-0,00 %»', 
   const tex = lienzoFalso(480, 270);
   dibujo.pintarLimites(tex, i);
   assert.ok(!tex.hay(/^-0,00 %| -0,00 %/), tex.textos.map(x => x.texto).join(' | '));
-  assert.ok(tex.hay(/^0,00 % \/ −2,00 %$/));
+  assert.ok(tex.hay(/^0,00 % \/ -2,00 %$/));
   assert.ok(!tex.hay(/reapertura/));
 });
 
@@ -134,15 +134,15 @@ test('límites: las barras son lo que mide el vigilante (cabecera.vigilancia), n
   const tex = lienzoFalso(480, 270);
   dibujo.pintarLimites(tex, i);
   const todo = tex.textos.map(x => x.texto).join(' | ');
-  assert.ok(tex.hay(/^-0,50 % \/ −2,00 %$/), todo);
-  assert.ok(tex.hay(/^-1,00 % \/ −15 %$/), todo);
+  assert.ok(tex.hay(/^-0,50 % \/ -2,00 %$/), todo);
+  assert.ok(tex.hay(/^-1,00 % \/ -15 %$/), todo);
   assert.ok(!tex.hay(/-16|-3,00/), todo);
   assert.ok(tex.hay(/^medido desde la reapertura$/), todo);
   // Antes del cierre diario del día (sin referencia del día) no se inventa un 0.
   i.cabecera.vigilancia = { perdidaDiaPct: null, caidaPct: 0, desdeReapertura: false };
   const t2 = lienzoFalso(480, 270);
   dibujo.pintarLimites(t2, i);
-  assert.ok(t2.hay(/^— \/ −2,00 %$/), t2.textos.map(x => x.texto).join(' | '));
+  assert.ok(t2.hay(/^— \/ -2,00 %$/), t2.textos.map(x => x.texto).join(' | '));
 });
 
 test('relojes de pared con la hora de la MESA y fuera de la capa estática', () => {
@@ -286,4 +286,80 @@ test('rótulos: con poco sitio cede la mesa de menos peso, no la titular del 40 
   // La elegida se ve siempre, dentro del lienzo.
   const sel = dibujo.colocarRotulos([Object.assign({}, items[0], { seleccionado: true })].concat(items[1]), { ancho: 1440, alto: 900, h: 16, ocupado });
   assert.ok(sel.some(x => x.id === 'incubada' && x.x >= 4));
+});
+
+test('pantalla del parqué: el «solo cerrar» del Megáfono de más de un día dice la fecha', () => {
+  const cifras = require('../web/js/cifras.js');
+  const i = instBase();
+  i.directivas.soloCerrarHasta = T0 + 72 * 3600000;       // 11 oct 04:10 en Madrid
+  assert.equal(dibujo.textoNivel(cifras.nivelEfectivo(i, T0)), 'SOLO CERRAR HASTA 11 OCT 04:10 · MEGÁFONO');
+  i.directivas.soloCerrarHasta = T0 + 3600000;
+  assert.equal(dibujo.textoNivel(cifras.nivelEfectivo(i, T0)), 'SOLO CERRAR HASTA 05:10 · MEGÁFONO');
+});
+
+test('rótulos en el móvil con 7 mesas: la titular del 40 % (Ruptura) se ve y desplaza a la incubada del 2 %', () => {
+  const cifras = require('../web/js/cifras.js');
+  // Geometría real (Chromium 390×844, maqueta con 7 mesas, zoom 0,5): la fila
+  // de Ruptura empieza en x = 100 y su primer puesto tapa desde x = 104; a su
+  // izquierda caben 96 px y «RUPTURA DONCHIAN» pide 116.
+  const filas = [
+    ['tendencia', 'Tendencia SMA', '4Hour', 'incubacion', 0.02, [162, 111], [260, 156]],
+    ['momentum', 'Momentum cripto', '1Day', 'titular', 0.4, [131, 126], null],
+    ['reversion', 'Reversión RSI', '1Day', 'incubacion', 0.02, [131, 142], null],
+    ['ruptura', 'Ruptura Donchian', '1Day', 'titular', 0.4, [100, 142], [197, 187]],
+    ['etf-rot', 'Rotación ETF', '1Day', 'incubacion', 0.02, [69, 157], [313, 276]],
+    ['tendencia-2', 'Tendencia rápida', '4Hour', 'incubacion', 0.02, [38, 173], [224, 262]],
+    ['reversion-2', 'Reversión DOGE', '1Day', 'incubacion', 0.02, [7, 188], [104, 233]],
+  ];
+  const ocupado = [[166, 117, 31], [179, 131, 63], [225, 146, 31], [135, 132, 31], [164, 147, 31], [176, 161, 66], [221, 176, 34], [249, 191, 37],
+    [260, 206, 74], [319, 224, 31], [349, 239, 31], [104, 148, 31], [117, 162, 63], [162, 177, 31], [73, 163, 31], [101, 178, 34], [130, 192, 33],
+    [162, 207, 28], [190, 222, 32], [220, 237, 30], [250, 251, 30], [278, 266, 32], [42, 179, 31], [71, 193, 31], [100, 208, 31], [128, 223, 34],
+    [156, 237, 37], [185, 252, 39], [7, 194, 39], [37, 209, 37], [68, 224, 34]].map(([x, y, w]) => ({ x, y, w, h: 20 }));
+  const medir = texto => texto.length * 6;             // ≈ 800 8px de la fuente del parqué
+  const inst = { ahora: T0, directivas: {}, mesas: [] };
+  const items = filas.map(([id, nombre, marco, estado, peso, ini, fin]) => {
+    const mesa = { id, nombre, marco, estado, peso };
+    return { id, prioridad: peso, inicio: { x: ini[0], y: ini[1] }, fin: fin ? { x: fin[0], y: fin[1] } : null,
+      formas: dibujo.formasRotulo({ mesaId: id, nombre, marco, estado }, mesa, inst, medir) };
+  });
+  const r = dibujo.colocarRotulos(items, { ancho: 390, alto: 698, h: 14, ocupado });
+  const ids = r.map(x => x.id);
+  assert.ok(ids.includes('ruptura'), `se ven ${ids}`);
+  assert.ok(ids.includes('momentum'), `se ven ${ids}`);
+  const rup = r.find(x => x.id === 'ruptura');
+  assert.equal(rup.texto, 'RUPTURA', 'con el nombre corto, a la izquierda de su fila');
+  assert.ok(rup.x + rup.w <= 100);
+  // Nada se pisa ni se sale.
+  for (const x of r) {
+    assert.ok(x.x >= 4 && x.x + x.w <= 386, `${x.id} fuera`);
+    for (const b of ocupado.concat(r.filter(o => o !== x))) {
+      assert.ok(!(x.x < b.x + b.w && b.x < x.x + x.w && x.y < b.y + b.h && b.y < x.y + x.h), `${x.id} pisa algo`);
+    }
+  }
+  // Una incubada no quita el sitio a una titular: si cae alguna, es de menos peso.
+  const fuera = filas.filter(f => !ids.includes(f[0]));
+  assert.ok(fuera.every(f => f[4] <= Math.min(...filas.filter(g => ids.includes(g[0])).map(g => g[4]))), `fuera: ${fuera.map(f => f[0])}`);
+});
+
+test('rótulos: la forma mínima solo se usa si no cabe ninguna otra en ningún sitio (en escritorio sigue el nombre entero)', () => {
+  const inst = { ahora: T0, directivas: {}, mesas: [] };
+  const medir = texto => texto.length * 6;
+  const formas = dibujo.formasRotulo({ mesaId: 'ruptura', nombre: 'Ruptura Donchian', marco: '1Day', estado: 'titular' }, { nombre: 'Ruptura Donchian', marco: '1Day', estado: 'titular' }, inst, medir);
+  assert.deepEqual(formas.map(f => f.texto), ['RUPTURA DONCHIAN · 1D', 'RUPTURA DONCHIAN', 'RUPTURA']);
+  // Sin sitio a la izquierda de la fila pero sí detrás de su final: el nombre entero detrás, no el corto delante.
+  const r = dibujo.colocarRotulos([{ id: 'ruptura', inicio: { x: 90, y: 100 }, fin: { x: 600, y: 300 }, formas, prioridad: 0.4 }],
+    { ancho: 1440, alto: 900, h: 16, ocupado: [{ x: 0, y: 90, w: 20, h: 40 }] });   // «RUPTURA» sí cabría delante
+  assert.equal(r[0].texto, 'RUPTURA DONCHIAN · 1D');
+  // Un nombre de una palabra no repite forma.
+  assert.equal(dibujo.formasRotulo({ mesaId: 'x', nombre: 'Rotación', marco: '1Day', estado: 'titular' }, { nombre: 'Rotación', marco: '1Day', estado: 'titular' }, inst, medir).length, 2);
+});
+
+test('límites: un solo signo menos en todo el panel (el de las cifras, «-»), no guion y «−» mezclados', () => {
+  const i = instBase();
+  i.cabecera.vigilancia = { perdidaDiaPct: -0.005, caidaPct: -0.01, desdeReapertura: false };
+  const tex = lienzoFalso(480, 270);
+  dibujo.pintarLimites(tex, i);
+  const todo = tex.textos.map(x => x.texto).join(' | ');
+  assert.ok(!/−/.test(todo), todo);
+  assert.ok(tex.hay(/^-0,50 % \/ -2,00 %$/), todo);
 });

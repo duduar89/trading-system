@@ -260,3 +260,27 @@ test('manda el fondo.factorTamano del servidor (§7): la interfaz no lo recalcul
   assert.equal(cifras.rotuloTamano(nada.tamano), '');
   assert.equal(cifras.explicacionTamano(nada.tamano), '');
 });
+
+test('una directiva que acaba otro día lleva fecha y hora (como el feed); si acaba hoy, solo la hora', () => {
+  const ahora = Date.UTC(2026, 8, 30, 8, 40);           // 10:40 en Madrid
+  const hoy = ahora + 3 * 3600000;                      // 13:40
+  const otroDia = ahora + 72 * 3600000;                 // 3 oct 12:40 en Madrid (cambio de hora el 25-oct)
+  const dia = cifras.momento(otroDia, ahora);
+  assert.match(dia, /^3 oct \d\d:40$/);
+  const inst = hasta => ({ ahora, fondo: { nivel: 'normal', multiplicadorCaida: 1, factorTamano: { total: 0.5, comite: 1, megafono: 0.5, caida: 1 } },
+    directivas: { modo: 'NORMAL', reduccion: { factor: 0.5, hasta } } });
+  let n = cifras.nivelEfectivo(inst(otroDia), ahora);
+  assert.equal(cifras.rotuloTamano(n.tamano), `RIESGO ×0,5 hasta ${dia} · Megáfono`);
+  assert.equal(cifras.explicacionTamano(n.tamano), `Posiciones nuevas a ×0,5 del tamaño normal: reducción del Megáfono (×0,5 hasta el ${dia}).`);
+  n = cifras.nivelEfectivo(inst(hoy), ahora);
+  assert.equal(cifras.rotuloTamano(n.tamano), 'RIESGO ×0,5 hasta 13:40 · Megáfono');
+  assert.equal(cifras.explicacionTamano(n.tamano), 'Posiciones nuevas a ×0,5 del tamaño normal: reducción del Megáfono (×0,5 hasta las 13:40).');
+  // El «solo cerrar» del Megáfono, igual.
+  n = cifras.nivelEfectivo({ ahora, fondo: { nivel: 'normal' }, directivas: { modo: 'NORMAL', soloCerrarHasta: otroDia } }, ahora);
+  assert.equal(n.motivo, `Directiva del Megáfono: solo cerrar hasta el ${dia}.`);
+  assert.equal(cifras.hastaLas(otroDia, ahora), `el ${dia}`);
+  assert.equal(cifras.hastaLas(hoy, ahora), 'las 13:40');
+  // Mismo texto que el servidor (src/util/formato.js).
+  assert.equal(cifras.hastaLas(otroDia, ahora), formato.hastaLas(otroDia, ahora));
+  assert.equal(cifras.momento(otroDia, ahora), formato.momento(otroDia, ahora));
+});

@@ -870,13 +870,13 @@
   function textoNivel(n) {
     if (!n) return '';
     if (n.nivel === 'normal' || !n.nivel) {
-      const tam = n.tamano || cifras.tamanoEntradas(n.defensivo, n.reduccion, null);
+      const tam = n.tamano || cifras.tamanoEntradas(n.defensivo, n.reduccion, null, n.ahora);
       return cifras.rotuloTamano(tam).toUpperCase();
     }
     if (n.nivel === 'bloqueado') return 'BLOQUEADO';
     if (n.nivel === 'pausado') return 'PAUSADO · SOLO CERRAR';
     if (n.origen === 'comité') return 'SOLO CERRAR · COMITÉ';
-    if (n.origen === 'Megáfono') return `SOLO CERRAR HASTA ${cifras.hora(n.hasta)} · MEGÁFONO`;
+    if (n.origen === 'Megáfono') return `SOLO CERRAR HASTA ${cifras.cuando(n.hasta, n.ahora).toUpperCase()} · MEGÁFONO`;
     return 'SOLO CERRAR';
   }
 
@@ -1166,10 +1166,12 @@
       `${cifras.pct(cab.exposicionBrutaPct, { decimales: 0 })} / ${cifras.pct(lim.maxExposicionBruta, { decimales: 0 })}`);
     barraLimite(c, x, 136, w, 'Exposición cripto', cab.exposicionCriptoPct, lim.maxExposicionCripto,
       `${cifras.pct(cab.exposicionCriptoPct, { decimales: 0 })} / ${cifras.pct(lim.maxExposicionCripto, { decimales: 0 })}`);
+    // El límite con el mismo signo que la cifra y que el resto del panel
+    // (cifras.pct: «-»); «−2,00 %» al lado de «-0,50 %» se leía como otra cosa.
     barraLimite(c, x, 188, w, 'Pérdida del día', med.perdida ?? 0, lim.perdidaDiariaSoloCerrar,
-      `${med.perdida === null ? '—' : cifras.pct(-med.perdida)} / −${cifras.pct(lim.perdidaDiariaSoloCerrar)}`);
+      `${med.perdida === null ? '—' : cifras.pct(-med.perdida)} / ${cifras.pct(-lim.perdidaDiariaSoloCerrar)}`);
     barraLimite(c, x, 240, w, 'Caída desde máximo', med.caida ?? 0, lim.caidaKill,
-      `${med.caida === null ? '—' : cifras.pct(-med.caida)} / −${cifras.pct(lim.caidaKill, { decimales: 0 })}`);
+      `${med.caida === null ? '—' : cifras.pct(-med.caida)} / ${cifras.pct(-lim.caidaKill, { decimales: 0 })}`);
   }
 
   function pintarPantallaRegimen(tex, inst) {
@@ -1229,10 +1231,15 @@
   // móvil los rótulos empezaban en x = −35… −133 (cortados) y son lo que se
   // toca para abrir la ficha de la mesa.
   // Van por prioridad (la elegida y después más peso): con poco sitio cede una
-  // incubada del 2 %, no una titular del 40 %.
-  //   items: [{ id, inicio: { x, y }, fin: { x, y } | null, formas: [{ texto, w }], prioridad, seleccionado }]
+  // incubada del 2 %, no una titular del 40 %. Una forma `recurso` (el nombre
+  // mínimo, formasRotulo) solo se prueba cuando ninguna otra cabe en ningún
+  // sitio: así la de más peso no se queda sin rótulo (en el móvil con 7
+  // mesas, Ruptura del 40 % no cabía ni con el texto corto y salían las
+  // incubadas del 2 %) y ocupa antes que las de menos el sitio que haya,
+  // desplazándolas; en escritorio sigue el nombre entero.
+  //   items: [{ id, inicio: { x, y }, fin: { x, y } | null, formas: [{ texto, w, recurso? }], prioridad, seleccionado }]
   //   o: { ancho, alto, h, ocupado: [{ x, y, w, h }], margen }
-  //   → [{ id, x, y, w, h, texto, forma }]   (forma: 0 largo, 1 corto)
+  //   → [{ id, x, y, w, h, texto, forma }]   (forma: 0 largo, 1 corto, 2 mínimo)
   function colocarRotulos(items, o) {
     const margen = Number.isFinite(o.margen) ? o.margen : 4;
     const h = o.h;
@@ -1272,10 +1279,15 @@
     const salida = [];
     for (const { it } of orden) {
       let hecho = null;
-      for (const sitio of sitios) {
-        for (let forma = 0; forma < it.formas.length && !hecho; forma++) {
-          const p = sitio(it, it.formas[forma].w);
-          if (p) hecho = { id: it.id, x: p.x, y: p.y, w: it.formas[forma].w, h, texto: it.formas[forma].texto, forma };
+      // Primera pasada con las formas normales; la segunda, con las de recurso.
+      for (const recurso of [false, true]) {
+        for (const sitio of sitios) {
+          for (let forma = 0; forma < it.formas.length && !hecho; forma++) {
+            if (Boolean(it.formas[forma].recurso) !== recurso) continue;
+            const p = sitio(it, it.formas[forma].w);
+            if (p) hecho = { id: it.id, x: p.x, y: p.y, w: it.formas[forma].w, h, texto: it.formas[forma].texto, forma };
+          }
+          if (hecho) break;
         }
         if (hecho) break;
       }
@@ -1290,6 +1302,21 @@
       salida.push(hecho);
     }
     return salida;
+  }
+
+  // Formas del rótulo de una mesa, de más a menos texto: el largo («RUPTURA
+  // DONCHIAN · 1D»), el corto (nombre y bloqueos) y el mínimo (primera palabra
+  // y bloqueos), que colocarRotulos solo usa de último recurso. `medir(texto)`
+  // da el ancho del texto en px (ctx.measureText con la fuente del rótulo);
+  // cada forma suma 20 px de relleno y punto. Sin repetidas.
+  function formasRotulo(r, mesa, inst, medir) {
+    const textos = [cifras.rotuloMesa(r, mesa, inst), cifras.rotuloMesa(r, mesa, inst, { compacto: true }), cifras.rotuloMesa(r, mesa, inst, { minimo: true })];
+    const formas = [];
+    textos.forEach((texto, k) => {
+      if (formas.some(f => f.texto === texto)) return;
+      formas.push(Object.assign({ texto, w: Math.ceil(medir(texto) + 20) }, k === 2 ? { recurso: true } : {}));
+    });
+    return formas;
   }
 
   function pintarPizarra(tex, tipo) {
@@ -1318,6 +1345,6 @@
     pintarEdificio, pintarTrozoPared, pintarBordeDelantero, pintarMueble, pintarMonitor, pintarPantallaPared,
     pintarPantallaGigante, pintarLimites, pintarPantallaRegimen, pintarPantallaComite, pintarPizarra,
     pintarVentanaTex, pintarRelojesTex, colorCielo, horaDe, TEX_VENTANA, TEX_RELOJES,
-    estadoMonitor, COLORES_MONITOR, textoNivel, colocarRotulos, disposicionCotizaciones,
+    estadoMonitor, COLORES_MONITOR, textoNivel, colocarRotulos, formasRotulo, disposicionCotizaciones,
   };
 });

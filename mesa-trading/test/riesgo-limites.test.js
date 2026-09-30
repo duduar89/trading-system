@@ -274,3 +274,45 @@ test('normalizarDirectivas descarta lo caducado', () => {
 test('sin límites en el contexto es un error de programación', () => {
   assert.throws(() => evaluarPropuesta(prop(), { ...ctx(), limites: undefined }), /limites/);
 });
+
+// ---------- Factor de tamaño (§5.3, §6.7): lo aplica mesas.js sobre el nocional
+// final de dimensionar(); Riesgos lo comprueba sin volver a multiplicar. ----------
+
+const { factorTamano } = require('../src/riesgo/limites');
+
+test('factorTamano: DEFENSIVO × multiplicador de la mesa × Megáfono (el más duro) × caída', () => {
+  const directivas = { modo: 'DEFENSIVO', multiplicadores: { tendencia: 0.5 }, reduccion: { factor: 0.5, hasta: AHORA + HORA } };
+  assert.deepEqual(factorTamano({ directivas, multiplicadorCaida: 0.5, mesaId: 'tendencia', ahora: AHORA }),
+    { total: 0.0625, comite: 0.5, mesa: 0.5, megafono: 0.5, caida: 0.5 });
+  // Sin mesa (el del fondo entero, §7): el multiplicador por mesa no entra.
+  assert.deepEqual(factorTamano({ directivas, multiplicadorCaida: 1, ahora: AHORA }), { total: 0.25, comite: 0.5, mesa: 1, megafono: 0.5, caida: 1 });
+  // Lo caducado no cuenta; un multiplicador de más de 1 no afloja nada.
+  assert.equal(factorTamano({ directivas: { reduccion: { factor: 0.5, hasta: AHORA - 1 }, multiplicadores: { tendencia: 2 } }, multiplicadorCaida: 1, mesaId: 'tendencia', ahora: AHORA }).total, 1);
+  assert.equal(factorTamano({ directivas: null, multiplicadorCaida: undefined, ahora: AHORA }).total, 1);
+});
+
+test('factor declarado: si la propuesta ya lo trae aplicado, Riesgos no vuelve a multiplicar', () => {
+  const directivas = { modo: 'DEFENSIVO', reduccion: { factor: 0.5, hasta: AHORA + HORA } };
+  // 5.000 de base × 0,5 × 0,5 × 0,5 (caída) = 625, ya aplicado por las mesas.
+  const r = evaluarPropuesta(prop({ nocional: 625, factorTamano: 0.125 }), ctx({ directivas, multiplicadorCaida: 0.5 }));
+  assert.equal(r.decision, 'aprobar', JSON.stringify(r.motivos));
+  cerca(r.nocional, 625);
+});
+
+test('factor declarado de menos: se recorta lo que falta (el Megáfono llegó después), con su motivo', () => {
+  const directivas = { modo: 'DEFENSIVO', reduccion: { factor: 0.5, hasta: AHORA + HORA } };
+  const r = evaluarPropuesta(prop({ nocional: 2500, factorTamano: 0.5 }), ctx({ directivas }));
+  assert.equal(r.decision, 'reducir');
+  cerca(r.nocional, 1250);
+  const m = r.motivos.find(x => x.limite === 'factorTamano');
+  assert.ok(m, JSON.stringify(r.motivos));
+  assert.match(m.texto, /×0,5.*×0,25/);
+  assert.match(m.texto, /2\.500 \$ → 1\.250 \$/);
+});
+
+test('sin factor declarado (el tamaño no vino de las mesas), Riesgos aplica el factor entero: también el DEFENSIVO y el ×0,5 de la mesa', () => {
+  const directivas = { modo: 'DEFENSIVO', multiplicadores: { tendencia: 0.5 } };
+  const r = evaluarPropuesta(prop(), ctx({ directivas }));
+  cerca(r.nocional, 1250);
+  assert.deepEqual(r.motivos.map(m => m.limite), ['modoDefensivo', 'multiplicadorMesa']);
+});

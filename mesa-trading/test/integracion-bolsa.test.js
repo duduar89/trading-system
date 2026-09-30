@@ -89,12 +89,15 @@ test('una apertura encolada se vuelve a dimensionar a la apertura: DEFENSIVO y �
   const { orquestador: o, irA, pendiente, procesar } = await montarBolsa();
   await irA(MIE_APERTURA, true);
   // Decidida a las 16:10 ET con el fondo normal: 10.000 $ (tope por activo).
+  // Los comités de la noche la dejan en ×0,25 (DEFENSIVO × mesa a ×0,5) sobre
+  // ese nocional final: 2.500 $. Con el recorte en el capital salían 5.000 $
+  // (el tope por activo se comía la mitad del recorte).
   o.estado.directivas.modo = 'DEFENSIVO';
   o.estado.directivas.multiplicadores['momentum-etf'] = 0.5;
   o.estado.pendientes = [pendiente('momentum-etf-SPY', 'momentum-etf', { pesoSenal: 0.5, volAnual: 0.15 })];
   await procesar();
   const valor = o.libros.puesto('momentum-etf-SPY').cantidad * 500;
-  assert.ok(valor > 4900 && valor < 5100, `se compran unos 5.000 $ (100.000 · 0,4 · 0,5 · 0,5 · 0,5), no 10.000: ${valor}`);
+  assert.ok(valor > 2450 && valor < 2550, `se compran unos 2.500 $ (10.000 del tope por activo × 0,5 × 0,5), no 10.000 ni 5.000: ${valor}`);
 
   o.mesaPorId('reversion-etf').estado = 'banquillo';
   const mensajes = [];

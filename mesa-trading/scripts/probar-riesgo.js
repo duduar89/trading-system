@@ -12,6 +12,8 @@ const { vigilar } = require('../src/riesgo/vigilante');
 const { casiIgual } = require('../src/util/numeros');
 const { directivasSinComite } = require('../src/agentes/departamentos/riesgos');
 const { factorTamano } = require('../src/agentes/departamentos/mesas');
+const { factorTamano: factorTamanoMesa } = require('../src/riesgo/limites');
+const { dimensionar } = require('../src/cuant/dimensionado');
 
 let fallos = 0;
 function caso(nombre, obtenido, esperado, tol = 1e-9) {
@@ -92,12 +94,22 @@ caso('la sombra con el fondo real en pausa → vetada', limitesDe(evaluarPropues
 const conNoticia = directivasSinComite({ ...dirs, activosVetados: [...dirs.activosVetados, { simbolo: 'BTC/USD', hasta: AHORA + HORA, motivo: 'noticia grave', origen: 'noticias' }] }, AHORA);
 caso('la sombra con una noticia grave de BTC → vetada (no es del comité)', limitesDe(evaluarPropuesta(prop(), ctx({ directivas: conNoticia }))), ['activoVetado']);
 
-console.log('— Recorte real del tamaño (fondo.factorTamano, §7)');
+console.log('— Recorte real del tamaño (fondo.factorTamano, §7; §6.7: sobre el nocional FINAL de dimensionar)');
 const ctxFondo = (directivas, multiplicadorCaida) => ({ estado: { directivas, fondo: { multiplicadorCaida } }, reloj: { ahora: () => AHORA } });
 const conMegafono = { ...dirs, modo: 'DEFENSIVO', multiplicadores: {}, activosVetados: [] };
 caso('DEFENSIVO × Megáfono ×0,5 × caída ×0,5 = 0,125', factorTamano(ctxFondo(conMegafono, 0.5), AHORA), { total: 0.125, comite: 0.5, megafono: 0.5, caida: 0.5 });
-caso('… Riesgos aplica Megáfono × caída al nocional: 5.000 × 0,25', decision(evaluarPropuesta(prop(), ctx({ directivas: conMegafono, multiplicadorCaida: 0.5 }))), 'reducir 1250');
 caso('la reducción del Megáfono caduca a su hora', factorTamano(ctxFondo(conMegafono, 1), AHORA + 3 * HORA), { total: 0.5, comite: 0.5, megafono: 1, caida: 1 });
+// Capital de mesa 40.000 $ (peso 0,4), BTC a 100.000 con stop 90.000 (10 %):
+// dimensionar da min(40.000, 0,5 % · 100.000 / 0,10 = 5.000, 10.000) = 5.000 (riesgo).
+// Con el DEFENSIVO en el capital salía min(20.000, 5.000, 10.000) = 5.000: ×1.
+const dimRiesgo = dimensionar({ capitalMesa: 40000, peso: 1, precio: 100000, stop: 90000, volAnual: 0.3, patrimonio: 100000, limites: L });
+caso('dimensionar con el stop al 10 %: 5.000 por riesgo', `${dimRiesgo.nocional} ${dimRiesgo.limitadoPor}`, '5000 riesgo');
+const fDef = factorTamanoMesa({ directivas: { modo: 'DEFENSIVO' }, multiplicadorCaida: 1, mesaId: 'tendencia', ahora: AHORA });
+caso('… × DEFENSIVO 0,5 sobre ese nocional final = 2.500 (×0,5 exacto)', dimRiesgo.nocional * fDef.total, 2500);
+caso('… y Riesgos no lo vuelve a multiplicar', decision(evaluarPropuesta(prop({ nocional: 2500, stop: 90000, factorTamano: fDef.total }), ctx({ directivas: { modo: 'DEFENSIVO' } }))), 'aprobar 2500');
+caso('sin factor declarado, Riesgos aplica el entero: 5.000 × 0,125', decision(evaluarPropuesta(prop(), ctx({ directivas: conMegafono, multiplicadorCaida: 0.5 }))), 'reducir 625');
+caso('declarado ×0,5 cuando toca ×0,25 (llegó el Megáfono): recorta lo que falta, 2.500 → 1.250',
+  decision(evaluarPropuesta(prop({ nocional: 2500, factorTamano: 0.5 }), ctx({ directivas: { modo: 'DEFENSIVO', reduccion: { factor: 0.5, hasta: AHORA + HORA } } }))), 'reducir 1250');
 
 console.log('— Vigilante (inicio del día 100.000 $, pico 100.000 $, martes 15:00 UTC)');
 const v = (extra = {}) => vigilar({ ahora: AHORA, patrimonio: 100000, patrimonioInicioDia: 100000, pico: 100000, puestos: [], precios: {}, limites: L, nivelActual: 'normal', soloCerrarHasta: null, ...extra });
