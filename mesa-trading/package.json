@@ -4,7 +4,9 @@
   "private": true,
   "description": "Fondo de agentes de IA que opera en papel (Alpaca paper o bróker simulado con 100.000 $), con parqué isométrico en el navegador.",
   "main": "src/index.js",
-  "engines": { "node": ">=20.6" },
+  "engines": {
+    "node": ">=20.6"
+  },
   "scripts": {
     "start": "node src/index.js",
     "start-proxy": "node --use-env-proxy src/index.js",
@@ -14,6 +16,7 @@
     "probar": "node scripts/probar-todo.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "0.129.0"
+    "@anthropic-ai/sdk": "0.129.0",
+    "mysql2": "3.24.5"
   }
 }
