@@ -6,7 +6,7 @@ tratamiento; reseñas con las normas de Google y adaptadores reales de Google y 
 de Flowww espera su primera exportación. **La web nueva está hecha y revisada** (95 páginas, con el
 formulario conectado a la app): se publica cuando la clínica complete lo pendiente (⛔ 12). Falta conectar las cuentas reales (envío de WhatsApp, Google, IA)
 y los datos de la clínica, que esperan las puertas ⛔.
-**Última actualización:** 30-sep-2026 · **968 pruebas en verde** · ESLint limpio
+**Última actualización:** 30-sep-2026 · **969 pruebas en verde** · ESLint limpio
 
 El encargo completo está en [`docs/ENCARGO.md`](docs/ENCARGO.md). Este fichero dice dónde estamos:
 se lee al empezar cada vuelta del loop y se actualiza al terminarla.
@@ -26,7 +26,7 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
 
 ## Pruebas
 
-`npm test` con MariaDB local (10.11): **968 pruebas en verde**. Lo más importante:
+`npm test` con MariaDB local (10.11): **969 pruebas en verde**. Lo más importante:
 
 - **Agenda:** hora de Madrid, limpiezas, crema anestésica, comidas, aparatos, festivos, diez reservas
   a la vez → una; horas redondas.
