@@ -144,6 +144,12 @@ function retiradas(t, plan) {
     t.detalle(nuevas.map((x) => `cita ${x.cita.id} de la app${codigo(x)} · ${cuando(x.cita.inicio)} · ${plan.nombres.tratamiento(x.cita.tratamiento_id)}: ${queLePasa(x, plan)}`));
   }
   if (avisadas) t.linea(`→ ${plural(avisadas, 'importada antes ya estaba', 'importadas antes ya estaban')} a revisar desde otra importación: no se vuelve a avisar`, 1);
+  const vuelven = plan.reaparecidas || [];
+  if (vuelven.length) {
+    t.linea(`→ ${plural(vuelven.length, 'importada antes que estaba', 'importadas antes que estaban')} a revisar vuelve${vuelven.length === 1 ? '' : 'n'} a salir igual en Flowww: `
+      + `sigue${vuelven.length === 1 ? '' : 'n'} sin recordatorios; si sigue${vuelven.length === 1 ? '' : 'n'} en pie, --recordatorios si --cita <número> (o deshacer la importación que ${vuelven.length === 1 ? 'la' : 'las'} retiró):`, 1);
+    t.detalle(vuelven.map((x) => `cita ${x.cita.id} de la app · ${cuando(x.cita.inicio)} · ${plan.nombres.tratamiento(x.cita.tratamiento_id)} (fila ${x.fila})`));
+  }
   if (plan.importadasFuera) {
     const n = plan.importadasFuera;
     t.linea(`→ ${plural(n, 'importada antes es', 'importadas antes son')} de después de la última fecha de este fichero (${plan.rangoCitas.hasta.split('-').reverse().join('/')}): `

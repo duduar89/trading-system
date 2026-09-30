@@ -54,6 +54,8 @@ Dos exportaciones en CSV (si salen en Excel, «Guardar como» → «CSV»). Vale
 **Citas: todas las que haya desde hoy**, sin filtrar por profesional, cabina ni fechas (las pasadas no
 hacen falta: si vienen, no se traen). Tiene que ser la exportación **completa**: al repetir la
 importación, una cita que ya se trajo y no sale en la nueva se da por anulada en Flowww (sección 6).
+Si Flowww no deja sacarlas todas de una vez, se juntan los ficheros en uno (con una sola cabecera)
+antes de importar.
 
 | Columna | Nombres que se reconocen solos |
 |---|---|

@@ -396,13 +396,15 @@ function retirar(ctx, cita, tipo, datos = {}) {
 }
 
 // Una cita que ya se trajo y sigue pendiente en la app: si en Flowww se ha anulado o ha cambiado de
-// hora o de tratamiento, no se toca sola (en la app también puede haber cambiado): a revisar.
+// hora o de tratamiento, no se toca sola (en la app también puede haber cambiado): a revisar. Si estaba
+// a revisar y vuelve a salir tal cual (p. ej., faltaba en una exportación incompleta), tampoco: se dice.
 function comprobarImportada(ctx, e, antes) {
   if (e.estadoClase === F.IGNORAR) return retirar(ctx, antes, 'anulada', { fila: e.fila });
   const otroTratamiento = e.tratamientoCasado && e.tratamientoCasado !== antes.tratamiento_id ? e.tratamientoCasado : null;
   if (new Date(antes.inicio).getTime() !== e.inicio.getTime() || otroTratamiento) {
-    retirar(ctx, antes, 'cambiada', { fila: e.fila, inicio: e.inicio, tratamiento: otroTratamiento });
+    return retirar(ctx, antes, 'cambiada', { fila: e.fila, inicio: e.inicio, tratamiento: otroTratamiento });
   }
+  if (ctx.ref.retiradas.has(antes.id) && !antes.recordatorios) ctx.plan.reaparecidas.push({ cita: antes, fila: e.fila });
 }
 
 // Lo importado antes que sigue pendiente en la app y no sale en este fichero: o se ha movido en Flowww
@@ -617,7 +619,7 @@ async function planificar(con, { pacientes, citas, mapa, ahora, aplicar, sinReco
   const plan = {
     aplicar, aplicado: false, ahora, lote: null, sinRecordatorios, errores: [], pacientes: [], citas: [],
     servicios: new Map(), profesionales: new Map(), salas: new Map(), estados: new Map(),
-    dudosas: [], codigosNoUnicos: [], variosServicios: [], retiradas: [], importadasFuera: 0, rangoCitas: null,
+    dudosas: [], codigosNoUnicos: [], variosServicios: [], retiradas: [], reaparecidas: [], importadasFuera: 0, rangoCitas: null,
   };
   const m = F.leerMapa(mapa);
   plan.errores.push(...m.errores);

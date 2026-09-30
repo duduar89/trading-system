@@ -468,6 +468,9 @@ test('una cita importada que ya no sale en la exportación final se queda sin re
     // Otra vez lo mismo: ni otra tarea ni otro lote.
     assert.equal((await I.importar(pool, { citas: final, aplicar: true, ahora: AHORA })).lote, null);
     assert.equal((await pool.query('SELECT COUNT(*) AS n FROM tareas'))[0][0].n, 1);
+    // Si luego vuelve a salir tal cual (a aquella exportación le faltaba), no se toca sola: se dice.
+    const completa = await I.importar(pool, { citas: csv('citas.csv', [cab, k1, k2, k3].join('\n')), ahora: AHORA });
+    assert.match(completa.informe, new RegExp(`1 importada antes que estaba a revisar vuelve a salir igual en Flowww: sigue sin recordatorios; si sigue en pie, --recordatorios si --cita <número> \\(o deshacer la importación que la retiró\\):\n\\s+cita ${await id('K-2')} de la app · jue 15/10/2026 17:00 · Limpieza facial profunda \\(fila 3\\)`));
 
     // Si el fichero no era el bueno (le faltaban citas), deshacer le devuelve los recordatorios.
     const d = await I.deshacer(pool, { aplicar: true, ahora: AHORA });
