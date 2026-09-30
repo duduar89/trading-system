@@ -278,11 +278,37 @@ async function sinNombre(pagina) {
   }
 }
 
+// Sin el foco del navegador en la pestaña (document.hasFocus() falso) ningún control pinta su foco:
+// :focus no casa aunque el control sea el activo. Con la máquina muy cargada la pestaña del panel lo
+// ha llegado a perder a mitad de una pantalla, y la prueba decía «el foco apenas se ve» de controles
+// que están bien. Antes de medir se trae al frente y, si aun así no lo tiene, se le pide al navegador
+// que la trate como enfocada (emulación del foco, la que usa Playwright). Devuelve si lo tiene.
+async function conFocoDePestana(pagina, estado) {
+  if (await pagina.evaluate(() => document.hasFocus())) return true;
+  await pagina.bringToFront();
+  if (await pagina.evaluate(() => document.hasFocus())) return true;
+  try {
+    estado.cdp ||= await pagina.context().newCDPSession(pagina);
+    await estado.cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  } catch { /* otro navegador: basta con haberla traído al frente */ }
+  return pagina.evaluate(() => document.hasFocus());
+}
+
 // El foco se ve con el teclado: tras un Tab (el navegador pasa a «modo teclado»), se enfoca cada
 // control y se compara su zona con foco y sin él. Uno de cada clase (firma), como mucho `maximo`; con
 // `vistos` (las firmas ya comprobadas en otras pantallas, con el mismo tema) no se repiten.
 async function focosInvisibles(pagina, { maximo = 30, vistos = new Set() } = {}) {
+  const estado = { cdp: null };
+  try {
+    return await medirFocos(pagina, { maximo, vistos, estado });
+  } finally {
+    await estado.cdp?.detach().catch(() => {});
+  }
+}
+
+async function medirFocos(pagina, { maximo, vistos, estado }) {
   await pagina.evaluate(instalarWcag);
+  await conFocoDePestana(pagina, estado);
   await pagina.evaluate(() => { document.activeElement?.blur?.(); window.scrollTo(0, 0); });
   await pagina.keyboard.press('Tab');
   const firmas = await pagina.evaluate(([max, ya]) => {
@@ -304,22 +330,34 @@ async function focosInvisibles(pagina, { maximo = 30, vistos = new Set() } = {})
   const total = firmas.length;
   const malos = [];
   for (let i = 0; i < total; i++) {
-    const caja = await pagina.evaluate((k) => {
-      const el = window.__focables[k];
-      el.scrollIntoView({ block: 'center', inline: 'nearest' });
-      el.focus();
-      const r = el.getBoundingClientRect();
-      const x = Math.max(0, Math.floor(r.left - 6));
-      const y = Math.max(0, Math.floor(r.top - 6));
-      return { x, y, width: Math.min(document.documentElement.clientWidth, Math.ceil(r.right + 6)) - x, height: Math.min(window.innerHeight, Math.ceil(r.bottom + 6)) - y, ancho: r.width, alto: r.height, enfocado: document.activeElement === el };
-    }, i);
-    if (!caja.enfocado || caja.width < 4 || caja.height < 4) continue;
-    const clip = { x: caja.x, y: caja.y, width: caja.width, height: caja.height };
-    const con = (await pagina.screenshot({ clip, animations: 'disabled' })).toString('base64');
-    await pagina.evaluate((k) => window.__focables[k].blur(), i);
-    const sin = (await pagina.screenshot({ clip, animations: 'disabled' })).toString('base64');
-    const r = await pagina.evaluate(([a, b, k, c]) => window.__wcag.focoVisible(a, b, c).then((v) => ({ ...v, desc: window.__wcag.describir(window.__focables[k]) })), [con, sin, i, caja]);
-    if (r.fuertes < r.hacen) malos.push(`${r.desc}: el foco apenas se ve (${r.fuertes} píxeles con contraste 3:1; hacen falta ${r.hacen})`);
+    // La captura con foco solo vale si la pestaña lo tenía antes y después de hacerla; si no, se repite
+    // (dos veces como mucho) y, si no lo recupera, se dice eso y no que el foco no se vea.
+    let medida = null;
+    for (let intento = 0; intento < 3 && !medida; intento++) {
+      if (intento && !(await conFocoDePestana(pagina, estado))) break;
+      const caja = await pagina.evaluate((k) => {
+        const el = window.__focables[k];
+        el.scrollIntoView({ block: 'center', inline: 'nearest' });
+        el.focus();
+        const r = el.getBoundingClientRect();
+        const x = Math.max(0, Math.floor(r.left - 6));
+        const y = Math.max(0, Math.floor(r.top - 6));
+        return { x, y, width: Math.min(document.documentElement.clientWidth, Math.ceil(r.right + 6)) - x, height: Math.min(window.innerHeight, Math.ceil(r.bottom + 6)) - y, ancho: r.width, alto: r.height, enfocado: document.activeElement === el, pestana: document.hasFocus() };
+      }, i);
+      if (!caja.enfocado || caja.width < 4 || caja.height < 4) { medida = { omitir: true }; break; }
+      if (!caja.pestana) continue;
+      const clip = { x: caja.x, y: caja.y, width: caja.width, height: caja.height };
+      const con = (await pagina.screenshot({ clip, animations: 'disabled' })).toString('base64');
+      const seguia = await pagina.evaluate((k) => { const el = window.__focables[k]; const ok = document.hasFocus() && document.activeElement === el; el.blur(); return ok; }, i);
+      if (!seguia) continue;
+      const sin = (await pagina.screenshot({ clip, animations: 'disabled' })).toString('base64');
+      medida = { con, sin, caja };
+    }
+    const desc = await pagina.evaluate((k) => window.__wcag.describir(window.__focables[k]), i);
+    if (medida?.omitir) continue;
+    if (!medida) { malos.push(`${desc}: no se ha podido medir el foco (la pestaña no tiene el foco del navegador)`); continue; }
+    const r = await pagina.evaluate(([a, b, c]) => window.__wcag.focoVisible(a, b, c), [medida.con, medida.sin, medida.caja]);
+    if (r.fuertes < r.hacen) malos.push(`${desc}: el foco apenas se ve (${r.fuertes} píxeles con contraste 3:1; hacen falta ${r.hacen})`);
   }
   return malos;
 }
