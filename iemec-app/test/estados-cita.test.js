@@ -609,7 +609,7 @@ test('ruta del panel: sin sesión no entra; con sesión marca, explica lo que no
       const reloj = { ahora: en('2026-10-13', '12:00') };
       const app = express();
       app.use(express.json());
-      app.use((req, _res, next) => { req.ahora = reloj.ahora; req.usuario = { email: 'recepcion@iemec' }; next(); });
+      app.use((req, _res, next) => { req.ahora = reloj.ahora; req.usuario = { email: 'recepcion@iemec', rol: 'recepcion' }; next(); });
       app.use('/api/panel', rutasPanel({ pool }));
       await conServidor(app, async (base) => {
         const get = async (ruta) => (await fetch(`${base}/api/panel${ruta}`)).json();

@@ -9,7 +9,9 @@
 //     avance.
 //   · Varias passkeys por persona, borrar una perdida y desactivar usuarios. Administración gestiona
 //     el equipo, pero a quien es de dirección (y el rol de dirección) solo lo toca dirección: un enlace
-//     nuevo o una passkey borrada serían quedarse con su cuenta. Siempre queda alguien de dirección.
+//     nuevo o una passkey borrada serían quedarse con su cuenta. Por lo mismo, una cuenta de dirección
+//     solo se estrena con un enlace que dio dirección (o la consola): al pasar a dirección, los que dio
+//     administración se anulan. Siempre queda alguien de dirección.
 //   · PANEL_CLAVE: solo acceso de emergencia de dirección, con cada uso en eventos.
 // El RP ID y el origen salen de URL_PUBLICA. Los retos se guardan en la base, caducan a los 5 minutos y
 // se gastan al usarlos. userVerification «preferred» y sin atestación: no se pide ni se guarda qué
@@ -41,6 +43,8 @@ const MOTIVOS = {
   ULTIMA_DIRECCION: [409, 'Tiene que quedar al menos una persona activa de dirección.'],
   SOLO_DIRECCION: [403, 'A las personas de dirección, y el rol de dirección, solo los gestiona dirección.'],
   INVITACION_NO_VALE: [410, 'Este enlace no es válido. Pide uno nuevo a dirección.'],
+  INVITACION_SUSTITUIDA: [410, 'Este enlace se ha sustituido por otro más reciente: usa el último que te han mandado.'],
+  INVITACION_ANULADA: [410, 'Este enlace ya no vale. Pide uno nuevo a dirección.'],
   INVITACION_USADA: [410, 'Este enlace ya se ha usado. Si necesitas otra passkey, pide un enlace nuevo a dirección.'],
   INVITACION_CADUCADA: [410, 'Este enlace ha caducado (dura 24 horas). Pide uno nuevo a dirección.'],
   RETO_NO_VALE: [400, 'Esa respuesta ya se ha usado o no es de este panel. Vuelve a intentarlo.'],
@@ -69,6 +73,20 @@ const fallo = (codigo, causa) => new ErrorAcceso(codigo, causa);
 // que puede con todo.
 function soloDireccion(actorRol, ...roles) {
   if (actorRol && actorRol !== 'direccion' && roles.includes('direccion')) throw fallo('SOLO_DIRECCION');
+}
+
+// Las transacciones de este módulo, una vez más si MariaDB deshace una por un bloqueo cruzado con otra
+// (ER_LOCK_DEADLOCK): así llega la respuesta de verdad (p. ej., «tiene que quedar alguien de dirección»)
+// en vez de un 500. Aquí solo se toca la base, así que repetirla no hace nada dos veces.
+async function enTransaccion(fn, pool) {
+  for (let intento = 1; ; intento++) {
+    try {
+      return await transaccion(fn, pool);
+    } catch (err) {
+      if (intento < 2 && err.code === 'ER_LOCK_DEADLOCK') continue;
+      throw err;
+    }
+  }
 }
 
 // ── Utilidades ──────────────────────────────────────────────────────────────────────────────
@@ -122,12 +140,14 @@ async function gastarReto(con, respuesta, { proposito, ahora }) {
 }
 
 // ── Usuarios e invitaciones ─────────────────────────────────────────────────────────────────
-async function nuevaInvitacion(con, { usuarioId, actor, ahora }) {
+// Guarda el rol de quien da el enlace (sin rol, la consola): una cuenta de dirección solo se estrena con
+// uno de dirección.
+async function nuevaInvitacion(con, { usuarioId, actor, actorRol = null, ahora }) {
   await con.query('UPDATE invitaciones SET anulada_en = ? WHERE usuario_id = ? AND usada_en IS NULL AND anulada_en IS NULL', [ahora, usuarioId]);
   const token = crypto.randomBytes(32).toString('base64url');
   const caduca = new Date(ahora.getTime() + INVITACION_MS);
-  await con.query('INSERT INTO invitaciones (usuario_id, token_huella, caduca_en, creada_por, creado_en) VALUES (?, ?, ?, ?, ?)',
-    [usuarioId, huella(token), caduca, actor, ahora]);
+  await con.query('INSERT INTO invitaciones (usuario_id, token_huella, caduca_en, creada_por, creada_por_rol, creado_en) VALUES (?, ?, ?, ?, ?, ?)',
+    [usuarioId, huella(token), caduca, actor, actorRol, ahora]);
   await registrar(con, { tipo: 'invitacion_creada', entidad: 'usuario', entidadId: usuarioId, actor, datos: { caduca } });
   return { enlace: enlaceDeAlta(token), caduca };
 }
@@ -140,7 +160,7 @@ async function crearUsuario(pool, { email, nombre, rol, actor, actorRol = null, 
   if (!n || n.length > 120) throw fallo('NOMBRE_VACIO');
   if (!ROLES.includes(rol)) throw fallo('ROL_DESCONOCIDO');
   soloDireccion(actorRol, rol);
-  return transaccion(async (con) => {
+  return enTransaccion(async (con) => {
     let id;
     try {
       const [r] = await con.query('INSERT INTO usuarios (email, nombre, rol, id_webauthn, creado_en, creado_por) VALUES (?, ?, ?, ?, ?, ?)',
@@ -151,32 +171,43 @@ async function crearUsuario(pool, { email, nombre, rol, actor, actorRol = null, 
       throw err;
     }
     await registrar(con, { tipo: 'usuario_creado', entidad: 'usuario', entidadId: id, actor, datos: { rol } });
-    return { usuario: { id, email: e, nombre: n, rol }, ...(await nuevaInvitacion(con, { usuarioId: id, actor, ahora })) };
+    return { usuario: { id, email: e, nombre: n, rol }, ...(await nuevaInvitacion(con, { usuarioId: id, actor, actorRol, ahora })) };
   }, pool);
 }
 
 // Un enlace nuevo para alguien que ya está (perdió sus passkeys o no llegó a usar el primero). Anula el
 // anterior.
 async function invitar(pool, { usuarioId, actor, actorRol = null, ahora = new Date() }) {
-  return transaccion(async (con) => {
+  return enTransaccion(async (con) => {
     const [[u]] = await con.query('SELECT id, rol, activo FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
     if (!u) throw fallo('USUARIO_DESCONOCIDO');
     soloDireccion(actorRol, u.rol);
     if (!u.activo) throw fallo('USUARIO_INACTIVO');
-    return nuevaInvitacion(con, { usuarioId: u.id, actor, ahora });
+    return nuevaInvitacion(con, { usuarioId: u.id, actor, actorRol, ahora });
   }, pool);
 }
 
+// Un enlace que ya no vale dice por qué: usado, sustituido por otro más reciente, anulado (la persona se
+// desactivó, o pasó a dirección y el enlace no lo dio dirección) o caducado. Solo el que no existe es
+// INVITACION_NO_VALE, el único que cuenta como intento de colarse (servidor/rutas/acceso.js).
 async function leerInvitacion(con, token, ahora, { bloquear = false } = {}) {
   if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw fallo('INVITACION_NO_VALE');
   const [[i]] = await con.query(
-    `SELECT i.id, i.usuario_id, i.caduca_en, i.usada_en, i.anulada_en, u.email, u.nombre, u.rol, u.activo, u.sesion_version
+    `SELECT i.id, i.usuario_id, i.caduca_en, i.usada_en, i.anulada_en, i.creada_por_rol, u.email, u.nombre, u.rol, u.activo, u.sesion_version
        FROM invitaciones i JOIN usuarios u ON u.id = i.usuario_id WHERE i.token_huella = ?${bloquear ? ' FOR UPDATE' : ''}`, [huella(token)]);
-  if (!i || i.anulada_en || !i.activo) throw fallo('INVITACION_NO_VALE');
+  if (!i) throw fallo('INVITACION_NO_VALE');
   if (i.usada_en) throw fallo('INVITACION_USADA');
+  if (i.anulada_en) {
+    const [[otro]] = await con.query('SELECT id FROM invitaciones WHERE usuario_id = ? AND id > ? LIMIT 1', [i.usuario_id, i.id]);
+    throw fallo(otro && i.activo ? 'INVITACION_SUSTITUIDA' : 'INVITACION_ANULADA');
+  }
+  if (!i.activo || (i.rol === 'direccion' && !deDireccion(i))) throw fallo('INVITACION_ANULADA');
   if (new Date(i.caduca_en) <= ahora) throw fallo('INVITACION_CADUCADA');
   return i;
 }
+
+// El enlace lo dio dirección o la consola del servidor (sin rol).
+const deDireccion = (invitacion) => invitacion.creada_por_rol == null || invitacion.creada_por_rol === 'direccion';
 
 // Lo que ve quien abre el enlace, si todavía vale.
 async function verInvitacion(pool, { token, ahora = new Date() }) {
@@ -211,24 +242,36 @@ const passkeyPublica = (p) => ({ id: p.id, dispositivo: p.dispositivo, sincroniz
 /**
  * Cambia el rol de alguien o lo desactiva (o reactiva). Desactivar corta al momento sus sesiones y
  * anula su enlace pendiente. Nadie se desactiva a sí mismo y siempre queda alguien activo de dirección
- * (que es quien puede con todo el equipo).
+ * (que es quien puede con todo el equipo). Al pasar a dirección se anulan los enlaces pendientes que no
+ * dio dirección (quien los dio los ha visto) y el evento guarda qué passkeys tenía: alguna la pudo
+ * registrar otra persona, y el panel las enseña antes de confirmar el cambio.
  */
 async function cambiarUsuario(pool, { id, rol, activo, actor, actorId = null, actorRol = null, ahora = new Date() }) {
-  return transaccion(async (con) => {
-    const [[u]] = await con.query('SELECT id, rol, activo FROM usuarios WHERE id = ? FOR UPDATE', [id]);
+  return enTransaccion(async (con) => {
+    // El equipo entero (unas pocas filas), bloqueado de una vez y siempre en el mismo orden: dos cambios a
+    // la vez se esperan el uno al otro en vez de cruzarse, y «queda alguien de dirección» se cuenta sobre
+    // lo que hay de verdad.
+    const [todos] = await con.query('SELECT id, rol, activo FROM usuarios ORDER BY id FOR UPDATE');
+    const u = todos.find((x) => x.id === id);
     if (!u) throw fallo('USUARIO_DESCONOCIDO');
     const nuevoRol = rol === undefined ? u.rol : rol;
     const nuevoActivo = activo === undefined ? Boolean(u.activo) : Boolean(activo);
     if (!ROLES.includes(nuevoRol)) throw fallo('ROL_DESCONOCIDO');
     soloDireccion(actorRol, u.rol, nuevoRol);
     if (actorId === u.id && !nuevoActivo) throw fallo('NO_A_TI_MISMO');
-    if (u.activo && u.rol === 'direccion' && !(nuevoActivo && nuevoRol === 'direccion')) {
-      const [[otros]] = await con.query("SELECT COUNT(*) AS n FROM usuarios WHERE activo AND rol = 'direccion' AND id <> ? FOR UPDATE", [u.id]);
-      if (!Number(otros.n)) throw fallo('ULTIMA_DIRECCION');
-    }
+    const otrosDeDireccion = todos.filter((x) => x.id !== u.id && x.activo && x.rol === 'direccion').length;
+    if (u.activo && u.rol === 'direccion' && !(nuevoActivo && nuevoRol === 'direccion') && !otrosDeDireccion) throw fallo('ULTIMA_DIRECCION');
     if (nuevoRol !== u.rol) {
       await con.query('UPDATE usuarios SET rol = ? WHERE id = ?', [nuevoRol, u.id]);
-      await registrar(con, { tipo: 'usuario_rol_cambiado', entidad: 'usuario', entidadId: u.id, actor, datos: { de: u.rol, a: nuevoRol } });
+      const datos = { de: u.rol, a: nuevoRol };
+      if (nuevoRol === 'direccion') {
+        const [anulados] = await con.query(
+          `UPDATE invitaciones SET anulada_en = ? WHERE usuario_id = ? AND usada_en IS NULL AND anulada_en IS NULL
+              AND creada_por_rol IS NOT NULL AND creada_por_rol <> 'direccion'`, [ahora, u.id]);
+        const [suyas] = await con.query('SELECT id FROM passkeys WHERE usuario_id = ? ORDER BY id', [u.id]);
+        Object.assign(datos, { enlacesAnulados: anulados.affectedRows, passkeys: suyas.map((p) => p.id) });
+      }
+      await registrar(con, { tipo: 'usuario_rol_cambiado', entidad: 'usuario', entidadId: u.id, actor, datos });
     }
     if (nuevoActivo !== Boolean(u.activo)) {
       if (nuevoActivo) {
@@ -315,8 +358,12 @@ async function completarAlta(pool, { token, respuesta, dispositivo, ahora = new 
   const { reto, invitacionId } = await gastarReto(pool, respuesta, { proposito: 'alta', ahora });
   if (invitacionId !== antes.id) throw fallo('RETO_NO_VALE');
   const info = await verificarRegistro(respuesta, reto);
-  return transaccion(async (con) => {
-    // Otra vez y bloqueada: si dos pestañas completan el alta a la vez, solo vale una.
+  return enTransaccion(async (con) => {
+    // Otra vez y bloqueada: si dos pestañas completan el alta a la vez, solo vale una, y si mientras tanto
+    // le han mandado otro enlace, la han desactivado o ha pasado a dirección, este ya no vale. Primero la
+    // persona y después su enlace, en el mismo orden que un enlace nuevo o un cambio de rol: así esas
+    // transacciones se esperan en lugar de cruzarse.
+    await con.query('SELECT id FROM usuarios WHERE id = ? FOR UPDATE', [antes.usuario_id]);
     const i = await leerInvitacion(con, token, ahora, { bloquear: true });
     await con.query('UPDATE invitaciones SET usada_en = ? WHERE id = ?', [ahora, i.id]);
     const passkeyId = await guardarPasskey(con, { usuarioId: i.usuario_id, info, dispositivo, actor: i.email, ahora });
@@ -337,7 +384,7 @@ async function registrarNuevaPasskey(pool, { usuarioId, respuesta, dispositivo, 
   const { reto, usuarioId: delReto } = await gastarReto(pool, respuesta, { proposito: 'nueva_passkey', ahora });
   if (delReto !== usuarioId) throw fallo('RETO_NO_VALE');
   const info = await verificarRegistro(respuesta, reto);
-  const id = await transaccion((con) => guardarPasskey(con, { usuarioId, info, dispositivo, actor, ahora }), pool);
+  const id = await enTransaccion((con) => guardarPasskey(con, { usuarioId, info, dispositivo, actor, ahora }), pool);
   const [[p]] = await pool.query('SELECT id, dispositivo, sincronizada, creado_en, ultimo_uso_en FROM passkeys WHERE id = ?', [id]);
   return passkeyPublica(p);
 }
@@ -350,7 +397,7 @@ async function passkeysDe(pool, usuarioId) {
 // usuarioId: solo si es de esa persona (la suya, desde «Mis passkeys», o la de quien se elige en
 // «Equipo»); sin él, cualquiera.
 async function borrarPasskey(pool, { id, usuarioId = null, actor, actorRol = null }) {
-  return transaccion(async (con) => {
+  return enTransaccion(async (con) => {
     const [[p]] = await con.query(
       `SELECT p.id, p.usuario_id, p.dispositivo, u.rol FROM passkeys p JOIN usuarios u ON u.id = p.usuario_id
         WHERE p.id = ?${usuarioId == null ? '' : ' AND p.usuario_id = ?'} FOR UPDATE`, usuarioId == null ? [id] : [id, usuarioId]);
@@ -371,11 +418,14 @@ async function opcionesEntrar(pool, { ahora = new Date() } = {}) {
 
 async function verificarEntrada(pool, { respuesta, ahora = new Date() }) {
   const { reto } = await gastarReto(pool, respuesta, { proposito: 'entrar', ahora });
-  const credencial = typeof respuesta?.id === 'string' && respuesta.id.length <= 1400 ? respuesta.id : null;
-  const [[pk]] = credencial ? await pool.query(
+  // El id de la credencial va en base64url (y se busca en una columna ascii): lo demás no es de un
+  // autenticador y no llega a la base.
+  const credencial = respuesta?.id;
+  if (typeof credencial !== 'string' || !/^[A-Za-z0-9_-]{1,1400}$/.test(credencial)) throw fallo('PASSKEY_NO_VALE', 'id de credencial que no es base64url');
+  const [[pk]] = await pool.query(
     `SELECT p.id, p.usuario_id, p.credencial_id, p.clave_publica, p.contador, p.transportes,
             u.email, u.nombre, u.rol, u.activo, u.id_webauthn, u.sesion_version
-       FROM passkeys p JOIN usuarios u ON u.id = p.usuario_id WHERE p.credencial_id = ?`, [credencial]) : [[null]];
+       FROM passkeys p JOIN usuarios u ON u.id = p.usuario_id WHERE p.credencial_id = ?`, [credencial]);
   if (!pk) throw fallo('CREDENCIAL_DESCONOCIDA');
   // La passkey dice de quién es (userHandle): tiene que ser de la persona que la dio de alta.
   const handle = respuesta.response?.userHandle;
@@ -411,7 +461,7 @@ async function verificarEntrada(pool, { respuesta, ahora = new Date() }) {
     await registrar(pool, { tipo: 'passkey_contador_no_avanza', entidad: 'usuario', entidadId: pk.usuario_id, actor: pk.email, datos: { passkey: pk.id, guardado: pk.contador, recibido: nuevo, aLaVez: true } });
     throw fallo('CONTADOR');
   }
-  await transaccion(async (con) => {
+  await enTransaccion(async (con) => {
     await con.query('UPDATE usuarios SET ultimo_acceso_en = ? WHERE id = ?', [ahora, pk.usuario_id]);
     await registrar(con, { tipo: 'sesion_iniciada', entidad: 'usuario', entidadId: pk.usuario_id, actor: pk.email, datos: { passkey: pk.id } });
   }, pool);
@@ -438,7 +488,7 @@ async function entrarConClave(pool, { email, clave, ip = null, ahora = new Date(
     await registrar(pool, { tipo: 'acceso_emergencia_fallido', entidad: 'usuario', entidadId: u?.id ?? null, actor: 'desconocido', datos: { motivo, ip: huellaIp(ip) } });
     throw fallo('CLAVE_INCORRECTA');
   }
-  await transaccion(async (con) => {
+  await enTransaccion(async (con) => {
     await con.query('UPDATE usuarios SET ultimo_acceso_en = ? WHERE id = ?', [ahora, u.id]);
     await registrar(con, { tipo: 'acceso_emergencia', entidad: 'usuario', entidadId: u.id, actor: u.email, datos: { ip: huellaIp(ip) } });
   }, pool);

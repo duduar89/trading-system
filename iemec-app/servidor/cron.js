@@ -7,12 +7,12 @@
 const config = require('./config');
 const db = require('./db');
 const cola = require('./cola');
+const acceso = require('./acceso');
 const entrada = require('./entrada');
 const agenda = require('./agenda');
 const repesca = require('./repesca/motor');
 const resenas = require('./resenas');
 const avisos = require('./avisos-cita');
-const acceso = require('./acceso');
 const { crearIa } = require('./integraciones/ia');
 const { crearWhatsApp } = require('./integraciones/whatsapp');
 const T = require('../motor/tiempo');

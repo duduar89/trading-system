@@ -63,10 +63,11 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
    | `META_VERIFY_TOKEN`, `META_APP_SECRET`, `META_TOKEN_PAGINA`, `META_PAGINA_ID` | leads de los formularios de Meta: ídem |
    | `LEADS_CLAVE` | alta de leads de la web y GHL (`POST /api/leads`), 16 caracteres o más |
 
-   **Mejor todo en el `.env`:** el cron (paso 4) es otro proceso, lanzado desde la terminal, y no ve
-   las variables de «Setup Node.js App»; solo lee el `.env` (`servidor/config.js`). Es el cron el que
-   procesa lo que llega de WhatsApp y de Meta: con `MODO_META` sin poner en su `.env`, cada lead de
-   Meta acaba en una tarea para recepción en vez de entrar solo.
+   **Mejor todo en el `.env`:** el cron (paso 4) y el primer enlace (paso 7) son otros procesos,
+   lanzados desde la terminal, y no ven las variables de «Setup Node.js App»; solo leen el `.env`
+   (`servidor/config.js`). Es el cron el que procesa lo que llega de WhatsApp y de Meta: con
+   `MODO_META` sin poner en su `.env`, cada lead de Meta acaba en una tarea para recepción en vez de
+   entrar solo.
 
    **Guarda `CLAVE_CIFRADO` también fuera del servidor** (gestor de contraseñas): sin ella, las
    conversaciones guardadas no se pueden leer.
@@ -84,11 +85,19 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
 6. **Secretos para desplegar:** desde tu terminal, `bash scripts/secretos-despliegue.sh`. Crea una
    clave SSH solo para esto, te dice cómo autorizarla en cPanel y guarda los secretos en GitHub
    (`IEMEC_SSH_KEY`, `IEMEC_SSH_HOST`, `IEMEC_SSH_USER`, `IEMEC_KNOWN_HOSTS`, `IEMEC_DOMINIO`).
-7. **Primer acceso al panel:** por SSH, en `~/iemec-app`,
-   `node scripts/invitar.js --email direccion@… --nombre "…" --rol direccion` imprime un enlace de un
-   solo uso que caduca a las 24 h. Se abre en el móvil de dirección y se crea la passkey. A partir de
-   ahí, el resto del equipo se da de alta desde «Equipo» (cada uno con su rol) y, si alguien pierde
-   todas sus passkeys, dirección le manda un enlace nuevo desde ahí (o se repite este paso).
+7. **Primer acceso al panel:** por SSH, con el Node de la app (como el cron del paso 4; sin activarlo,
+   la terminal puede no tener `node` o tener uno antiguo que no lee el `.env`):
+
+   ```bash
+   . ~/nodevenv/iemec-app/22/bin/activate && cd ~/iemec-app && node scripts/invitar.js --email direccion@… --nombre "…" --rol direccion
+   ```
+
+   Imprime un enlace de un solo uso que caduca a las 24 h. El enlace sale con `URL_PUBLICA` del `.env`
+   (la terminal no ve las variables de «Setup Node.js App»): si falta, avisa de que sale con
+   `http://localhost:3004`, y con `NODE_ENV=production` y sin https se para sin crear nada. Se abre en
+   el móvil de dirección y se crea la passkey. A partir de ahí, el resto del equipo se da de alta desde
+   «Equipo» (cada uno con su rol) y, si alguien pierde todas sus passkeys, dirección le manda un enlace
+   nuevo desde ahí (o se repite este paso).
 
 ## 3. Cada vez que se sube
 

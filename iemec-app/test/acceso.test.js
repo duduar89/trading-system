@@ -7,10 +7,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
 const { prepararBdDePrueba, BD_PRUEBAS } = require('./ayuda-bd');
 const acceso = require('../servidor/acceso');
 const { firmar } = require('../servidor/sesion');
+const { huellaIp } = require('../servidor/seguridad');
 const {
   ORIGEN, ENTORNO, ponerEntorno, conServidor, appConReloj, cliente, tokenDe, darDeAlta, entrar, personaConSesion, Autenticador,
 } = require('./ayuda-acceso');
@@ -205,6 +206,25 @@ test('passkeys del personal', async (t) => {
         assert.equal((await darDeAlta(cliente(base), autCopia, tokenDe(alta3.enlace))).status, 201, 'el enlace no se ha gastado');
       });
 
+      // El id de la credencial se busca en una columna ascii: lo que no es base64url se rechaza antes (un
+      // «é» hacía fallar la consulta con un 500 que no contaba como intento).
+      await t.test('un id de credencial que no es base64url no vale y cuenta como fallo', async () => {
+        const ip = '192.0.2.61';
+        const torcidos = [(id) => `${id}é`, (id) => `${id}"`, () => 'A'.repeat(1401), () => 42];
+        for (const torcer of torcidos) {
+          const c = cliente(base, { ip });
+          const op = await c.pedir('/api/acceso/entrar/opciones', { metodo: 'POST', cuerpo: {} });
+          const buena = dir.aut.firmar(op.json);
+          const id = torcer(buena.id);
+          const r = await c.pedir('/api/acceso/entrar', { metodo: 'POST', cuerpo: { respuesta: { ...buena, id, rawId: id } } });
+          assert.deepEqual([r.status, r.json.codigo], [401, 'PASSKEY_NO_VALE'], String(id));
+          assert.equal(c.cookie, null);
+        }
+        const [f] = await q('SELECT intentos FROM limites_acceso WHERE clave = ?', [`fallos:${huellaIp(ip)}`]);
+        assert.equal(f.intentos, torcidos.length, 'cada uno suma al límite de fallos de la IP');
+        assert.equal((await entrar(cliente(base), dir.aut)).status, 200, 'la passkey buena sigue entrando');
+      });
+
       await t.test('enlace caducado, sustituido por otro o de mentira', async () => {
         const c = cliente(base);
         const a = await acceso.crearUsuario(pool, { email: 'marketing@ejemplo.com', nombre: 'Marketing Prueba', rol: 'marketing', actor: 'pruebas', ahora: T0 });
@@ -218,7 +238,9 @@ test('passkeys del personal', async (t) => {
         // Dirección le manda otro: el viejo deja de valer y el nuevo sí vale.
         const nuevo = await dir.c.pedir(`/api/panel/equipo/${a.usuario.id}/invitacion`, { metodo: 'POST' });
         assert.equal(nuevo.status, 201, JSON.stringify(nuevo.json));
-        assert.equal((await c.pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: viejo } })).json.codigo, 'INVITACION_NO_VALE');
+        const sustituido = await c.pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: viejo } });
+        assert.deepEqual([sustituido.status, sustituido.json.codigo], [410, 'INVITACION_SUSTITUIDA']);
+        assert.match(sustituido.json.error, /se ha sustituido por otro más reciente: usa el último/);
         const token2 = tokenDe(nuevo.json.enlace);
         assert.equal((await c.pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: token2 } })).status, 200);
         // Caduca mientras la persona está con el móvil: tampoco.
@@ -236,8 +258,12 @@ test('passkeys del personal', async (t) => {
       await t.test('desactivar a alguien: no entra y la sesión que tenía deja de valer al momento', async () => {
         const est = await personaConSesion(pool, base, { email: 'estetica@ejemplo.com', nombre: 'Estética Prueba', rol: 'estetica', ahora: reloj.ahora });
         assert.equal((await est.c.pedir('/api/panel/hoy')).status, 200);
+        const pendiente = await dir.c.pedir(`/api/panel/equipo/${est.usuario.id}/invitacion`, { metodo: 'POST' });
         const off = await dir.c.pedir(`/api/panel/equipo/${est.usuario.id}`, { metodo: 'PATCH', cuerpo: { activo: false } });
         assert.equal(off.status, 200, JSON.stringify(off.json));
+        // El enlace que tenía pendiente se anula (no «se sustituye»: no hay otro).
+        const anulado = await cliente(base).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: tokenDe(pendiente.json.enlace) } });
+        assert.deepEqual([anulado.status, anulado.json.codigo], [410, 'INVITACION_ANULADA']);
         assert.equal((await est.c.pedir('/api/panel/hoy')).status, 401, 'la misma cookie, en la petición siguiente');
         assert.equal((await est.c.pedir('/api/sesion')).status, 401);
         const otra = await entrar(cliente(base), est.aut);
@@ -371,6 +397,25 @@ test('passkeys del personal', async (t) => {
         const respuesta = aut.firmar(op.json);
         const dos = await Promise.all([1, 2].map(() => cliente(base).pedir('/api/acceso/entrar', { metodo: 'POST', cuerpo: { respuesta } })));
         assert.deepEqual(dos.map((r) => r.status).sort(), [200, 400]);
+        // La persona completa su enlace justo cuando dirección le manda otro o la desactiva: pasa una cosa u
+        // otra, nunca un 500 porque las dos transacciones se esperen la una a la otra.
+        const gestora = cliente(base);
+        assert.equal((await entrar(gestora, dir.aut)).status, 200);
+        for (let ronda = 0; ronda < 8; ronda++) {
+          const x = await acceso.crearUsuario(pool, { email: `cruce${ronda}@ejemplo.com`, nombre: 'Cruce Prueba', rol: 'recepcion', actor: 'pruebas', ahora: T0 });
+          const tk = tokenDe(x.enlace);
+          const cx = cliente(base);
+          const opx = await cx.pedir('/api/acceso/alta/opciones', { metodo: 'POST', cuerpo: { token: tk } });
+          const resp = new Autenticador({ origen: ORIGEN }).registrar(opx.json);
+          const [altaX, gestion] = await Promise.all([
+            cx.pedir('/api/acceso/alta', { metodo: 'POST', cuerpo: { token: tk, respuesta: resp } }),
+            ronda % 2
+              ? gestora.pedir(`/api/panel/equipo/${x.usuario.id}`, { metodo: 'PATCH', cuerpo: { activo: false } })
+              : gestora.pedir(`/api/panel/equipo/${x.usuario.id}/invitacion`, { metodo: 'POST' }),
+          ]);
+          assert.ok([200, 201].includes(gestion.status), `ronda ${ronda}: ${gestion.status} ${JSON.stringify(gestion.json)}`);
+          assert.ok(altaX.status === 201 || ['INVITACION_SUSTITUIDA', 'INVITACION_ANULADA'].includes(altaX.json.codigo), `ronda ${ronda}: ${altaX.status} ${JSON.stringify(altaX.json)}`);
+        }
       });
 
       await t.test('el primer enlace, desde la terminal del servidor (scripts/invitar.js)', async () => {
@@ -385,10 +430,25 @@ test('passkeys del personal', async (t) => {
         // Otra vez con el mismo correo: enlace nuevo, y el anterior deja de valer.
         const otra = correr('--email', 'primera@ejemplo.com');
         assert.match(otra, /✓ Enlace nuevo de Primera Directora/);
-        assert.equal((await cliente(base).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: tokenDe(enlace) } })).json.codigo, 'INVITACION_NO_VALE');
+        assert.equal((await cliente(base).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: tokenDe(enlace) } })).json.codigo, 'INVITACION_SUSTITUIDA');
         const [ev] = await q("SELECT actor FROM eventos WHERE tipo = 'usuario_creado' AND entidad_id = (SELECT id FROM usuarios WHERE email = 'primera@ejemplo.com')");
         assert.match(ev.actor, /^consola:/);
         assert.throws(() => correr(), /Uso: node scripts\/invitar\.js/);
+        // Sin URL_PUBLICA (en cPanel, si solo está en «Setup Node.js App») avisa: el enlace sale con la del
+        // portátil. En producción, sin https, se para antes de crear nada. (Vacía y no borrada: así tampoco
+        // la pone el .env del portátil.)
+        const lanzar = (entorno, ...args) => spawnSync(process.execPath, [script, ...args], { env: { ...process.env, DB_NAME: BD_PRUEBAS.database, ...entorno }, encoding: 'utf8' });
+        const sinUrl = lanzar({ URL_PUBLICA: '' }, '--email', 'sin-url@ejemplo.com', '--nombre', 'Sin Url', '--rol', 'medico');
+        assert.equal(sinUrl.status, 0, sinUrl.stderr);
+        assert.match(sinUrl.stderr, /⚠ Falta URL_PUBLICA: el enlace sale con http:\/\/localhost:3004, que solo abre en el portátil/);
+        const sinHttps = lanzar({ NODE_ENV: 'production', URL_PUBLICA: 'http://agenda.ejemplo.com' }, '--email', 'sin-https@ejemplo.com', '--nombre', 'Sin Https', '--rol', 'medico');
+        assert.equal(sinHttps.status, 1);
+        assert.match(sinHttps.stderr, /✗ URL_PUBLICA tiene que ser la dirección https del panel \(ahora: http:\/\/agenda\.ejemplo\.com\)/);
+        assert.equal((await q("SELECT COUNT(*) AS n FROM usuarios WHERE email = 'sin-https@ejemplo.com'"))[0].n, 0, 'no ha creado nada');
+        const bien = lanzar({ NODE_ENV: 'production', URL_PUBLICA: 'https://agenda.ejemplo.com' }, '--email', 'sin-https@ejemplo.com', '--nombre', 'Con Https', '--rol', 'medico');
+        assert.equal(bien.status, 0, bien.stderr);
+        assert.match(bien.stdout, /https:\/\/agenda\.ejemplo\.com\/#alta\/[A-Za-z0-9_-]{43}/);
+        assert.equal(bien.stderr, '');
       });
     });
   } finally {

@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS passkeys (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Enlaces de alta (y de passkey nueva, si alguien pierde las suyas). Un enlace nuevo anula el anterior.
+-- creada_por_rol: el rol de quien lo dio (NULL, la consola del servidor). Una cuenta de dirección solo se
+-- estrena con un enlace de dirección: al pasar a dirección, los que dio otro rol se anulan.
 CREATE TABLE IF NOT EXISTS invitaciones (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   usuario_id SMALLINT UNSIGNED NOT NULL,
@@ -46,6 +48,7 @@ CREATE TABLE IF NOT EXISTS invitaciones (
   usada_en DATETIME NULL,
   anulada_en DATETIME NULL,
   creada_por VARCHAR(160) NOT NULL,
+  creada_por_rol ENUM('direccion','recepcion','medico','estetica','marketing','admin') NULL,
   creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY invitacion_token (token_huella),
   KEY invitacion_usuario (usuario_id, caduca_en),

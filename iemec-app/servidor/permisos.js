@@ -1,9 +1,9 @@
 'use strict';
 // Quién puede hacer qué en el panel: una sola tabla, cada permiso con los roles que lo tienen. La usan
-// las rutas (exige) y el panel (la sesión lleva la lista de permisos para ocultar lo que no se puede
-// usar). Los permisos de «todo el personal» están aquí para que se vean de un vistazo, pero no se
-// comprueban ruta a ruta: para llegar al panel ya hace falta la sesión de alguien del equipo, y todos
-// los roles son del equipo.
+// las rutas (exige; las del panel, todas juntas al principio de servidor/rutas/panel.js) y el panel (la
+// sesión lleva la lista de permisos para ocultar lo que no se puede usar). También los de «todo el
+// personal» se comprueban en su ruta: si un día se le quita uno a un rol (p. ej., lo que decida el DPO
+// sobre las conversaciones), el servidor se lo niega en ese momento, no solo el panel deja de enseñarlo.
 const ROLES = ['direccion', 'recepcion', 'medico', 'estetica', 'marketing', 'admin'];
 const TODOS = ROLES;
 
@@ -14,13 +14,19 @@ const NOMBRE_ROL = {
 // que: lo que permite, dicho para el mensaje de «no tienes permiso».
 const PERMISOS = {
   'citas.estado': { roles: TODOS, que: 'marcar la llegada, la cita completada o «No vino»' },
-  'citas.reservar': { roles: TODOS, que: 'dar citas' },
+  // También la lista de espera y sus ofertas de hueco: son citas que se dan.
+  'citas.reservar': { roles: TODOS, que: 'dar citas y llevar la lista de espera' },
+  // Leerlas también: llevan lo que ha contado cada paciente.
   'conversaciones.atender': { roles: TODOS, que: 'atender conversaciones' },
   'tareas.cerrar': { roles: TODOS, que: 'cerrar tareas' },
   'seguimientos.editar': { roles: TODOS, que: 'cambiar seguimientos' },
   'resenas.aprobar': { roles: ['direccion', 'marketing'], que: 'aprobar y publicar respuestas a reseñas' },
+  // La reseña con alerta clínica (una posible complicación, una reclamación) la contesta dirección médica,
+  // no marketing. Si el servicio de reseñas también lo comprueba, que lea los roles de aquí.
+  'resenas.alerta_clinica': { roles: ['direccion', 'medico', 'admin'], que: 'contestar reseñas con alerta clínica' },
   'salas.editar': { roles: ['direccion', 'admin'], que: 'cambiar las salas y los tratamientos' },
-  // Para cuando haya pantalla de ofertas: su ruta tiene que llevar exige('ofertas.gestionar').
+  // El catálogo de ofertas comerciales (tabla ofertas), para cuando tenga pantalla: su ruta tiene que
+  // llevar exige('ofertas.gestionar'). No son las ofertas de hueco de la lista de espera (citas.reservar).
   'ofertas.gestionar': { roles: ['direccion', 'admin'], que: 'gestionar las ofertas' },
   // A quien es de dirección (y el rol de dirección) solo lo gestiona dirección: servidor/acceso.js.
   'usuarios.gestionar': { roles: ['direccion', 'admin'], que: 'gestionar el equipo y sus accesos' },

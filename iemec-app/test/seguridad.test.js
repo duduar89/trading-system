@@ -12,7 +12,7 @@ const express = require('express');
 const { prepararBdDePrueba } = require('./ayuda-bd');
 const acceso = require('../servidor/acceso');
 const { crearApp } = require('../servidor/index');
-const { CSP_PANEL } = require('../servidor/seguridad');
+const { CSP_PANEL, huellaIp } = require('../servidor/seguridad');
 const mysql = require('mysql2/promise');
 const { migrar, listar } = require('../servidor/migraciones');
 const { BD_PRUEBAS } = require('./ayuda-bd');
@@ -230,38 +230,61 @@ test('seguridad del acceso', async (t) => {
         } finally { fs.rmSync(carpeta, { recursive: true, force: true }); }
       });
 
-      await t.test('límite de intentos: veinte fallos por IP y cuarto de hora; luego ni la passkey buena', async () => {
+      await t.test('límite de intentos: veinte fallos por IP frenan enlaces y clave de emergencia, no la passkey', async () => {
         const ip = '203.0.113.50';
         for (let i = 0; i < 20; i++) {
           const r = await cliente(base, { ip }).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: `falso-${i}` } });
           assert.equal(r.status, 410);
         }
-        const bloqueada = await entrar(cliente(base, { ip }), dir.aut).catch((err) => err);
-        assert.match(String(bloqueada.message), /429/, 'ni siquiera da el reto');
-        const directa = await cliente(base, { ip }).pedir('/api/acceso/entrar', { metodo: 'POST', cuerpo: { respuesta: {} } });
-        assert.deepEqual([directa.status, directa.json.codigo], [429, 'DEMASIADOS_INTENTOS']);
-        assert.equal((await entrar(cliente(base, { ip: '203.0.113.51' }), dir.aut)).status, 200, 'otra IP entra');
+        const pendiente = await acceso.crearUsuario(pool, { email: 'pendiente@ejemplo.com', nombre: 'Enlace Pendiente', rol: 'estetica', actor: 'pruebas', ahora: reloj.ahora });
+        const fuera = ponerEntorno({ PANEL_CLAVE: CLAVE });
+        try {
+          const frenadas = [
+            await cliente(base, { ip }).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: tokenDe(pendiente.enlace) } }),
+            await cliente(base, { ip }).pedir('/api/acceso/alta/opciones', { metodo: 'POST', cuerpo: { token: tokenDe(pendiente.enlace) } }),
+            await cliente(base, { ip }).pedir('/api/acceso/emergencia', { metodo: 'POST', cuerpo: { email: 'direccion@ejemplo.com', clave: CLAVE } }),
+          ];
+          for (const r of frenadas) assert.deepEqual([r.status, r.json.codigo], [429, 'DEMASIADOS_INTENTOS']);
+        } finally { fuera(); }
+        // Con la passkey se entra igual: no se puede adivinar (reto de un solo uso, firma y contador) y toda la
+        // clínica sale por la misma IP; quien la comparta (la wifi de pacientes, un equipo infectado) no puede
+        // dejar fuera al equipo. Tampoco las respuestas que no cuadran la frenan.
+        assert.equal((await entrar(cliente(base, { ip }), rec.aut)).status, 200, 'recepción entra con su passkey desde esa IP');
+        for (let i = 0; i < 5; i++) assert.equal((await cliente(base, { ip }).pedir('/api/acceso/entrar', { metodo: 'POST', cuerpo: { respuesta: {} } })).status, 400);
+        assert.equal((await entrar(cliente(base, { ip }), dir.aut)).status, 200);
         const claves = await q("SELECT clave FROM limites_acceso WHERE clave LIKE 'fallos:%'");
         assert.ok(claves.every((f) => !f.clave.includes('203.0.113')), 'de la IP solo se guarda una huella');
         reloj.ahora = mas(16);
-        assert.equal((await entrar(cliente(base, { ip }), dir.aut)).status, 200, 'pasado el cuarto de hora, vuelve a entrar');
-        // Lo que le pasa a alguien del equipo (un enlace ya usado, una passkey borrada que el navegador aún
-        // ofrece) no cuenta: la clínica entera sale con la misma IP.
+        assert.equal((await cliente(base, { ip }).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: tokenDe(pendiente.enlace) } })).status, 200, 'pasado el cuarto de hora, vuelve a abrir enlaces');
+        // Lo que le pasa a alguien del equipo (un enlace ya usado o sustituido por otro más reciente, el de
+        // alguien desactivado, una passkey borrada que el navegador aún ofrece) no cuenta.
         const oficina = '203.0.113.53';
         const usado = await acceso.crearUsuario(pool, { email: 'usado@ejemplo.com', nombre: 'Enlace Usado', rol: 'medico', actor: 'pruebas', ahora: reloj.ahora });
         const autUsado = new Autenticador({ origen: ORIGEN });
         assert.equal((await darDeAlta(cliente(base, { ip: oficina }), autUsado, tokenDe(usado.enlace))).status, 201);
+        const primero = await acceso.crearUsuario(pool, { email: 'sustituido@ejemplo.com', nombre: 'Enlace Sustituido', rol: 'recepcion', actor: 'pruebas', ahora: reloj.ahora });
+        await acceso.invitar(pool, { usuarioId: primero.usuario.id, actor: 'pruebas', ahora: reloj.ahora });
+        const baja = await acceso.crearUsuario(pool, { email: 'baja@ejemplo.com', nombre: 'Enlace De Baja', rol: 'marketing', actor: 'pruebas', ahora: reloj.ahora });
+        await acceso.cambiarUsuario(pool, { id: baja.usuario.id, activo: false, actor: 'pruebas', ahora: reloj.ahora });
         const borrada = new Autenticador({ origen: ORIGEN });
         borrada.registrar({ challenge: 'z'.repeat(43), rp: { id: 'localhost' }, user: { id: 'w'.repeat(22) } });
+        const abrir = async (enlace) => (await cliente(base, { ip: oficina }).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: tokenDe(enlace) } })).json.codigo;
         for (let i = 0; i < 25; i++) {
-          assert.equal((await cliente(base, { ip: oficina }).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: tokenDe(usado.enlace) } })).json.codigo, 'INVITACION_USADA');
+          assert.equal(await abrir(usado.enlace), 'INVITACION_USADA');
+          assert.equal(await abrir(primero.enlace), 'INVITACION_SUSTITUIDA');
+          assert.equal(await abrir(baja.enlace), 'INVITACION_ANULADA');
           if (i < 10) assert.equal((await entrar(cliente(base, { ip: oficina }), borrada)).json.codigo, 'CREDENCIAL_DESCONOCIDA');
         }
-        assert.equal((await entrar(cliente(base, { ip: oficina }), dir.aut)).status, 200, 'la oficina sigue entrando');
-        // Retos: sesenta por IP y cuarto de hora.
+        assert.equal((await q('SELECT COUNT(*) AS n FROM limites_acceso WHERE clave = ?', [`fallos:${huellaIp(oficina)}`]))[0].n, 0, 'ni un fallo');
+        assert.equal((await abrir(pendiente.enlace)), undefined, 'la oficina sigue abriendo enlaces');
+        assert.equal((await entrar(cliente(base, { ip: oficina }), dir.aut)).status, 200, 'y entrando');
+        // Retos para entrar: muchos más que los que pide la clínica (300 por IP y cuarto de hora), pero con
+        // tope. Los de alta y los de una passkey nueva, 60.
         const glotona = cliente(base, { ip: '203.0.113.52' });
-        for (let i = 0; i < 60; i++) assert.equal((await glotona.pedir('/api/acceso/entrar/opciones', { metodo: 'POST', cuerpo: {} })).status, 200);
+        for (let i = 0; i < 300; i++) assert.equal((await glotona.pedir('/api/acceso/entrar/opciones', { metodo: 'POST', cuerpo: {} })).status, 200, `reto ${i + 1}`);
         assert.equal((await glotona.pedir('/api/acceso/entrar/opciones', { metodo: 'POST', cuerpo: {} })).status, 429);
+        for (let i = 0; i < 60; i++) assert.equal((await glotona.pedir('/api/acceso/alta/opciones', { metodo: 'POST', cuerpo: { token: tokenDe(pendiente.enlace) } })).status, 200);
+        assert.equal((await glotona.pedir('/api/acceso/alta/opciones', { metodo: 'POST', cuerpo: { token: tokenDe(pendiente.enlace) } })).status, 429);
         // El cron borra las ventanas pasadas.
         await acceso.purgar(pool, mas(60));
         assert.equal((await q('SELECT COUNT(*) AS n FROM limites_acceso'))[0].n, 0);

@@ -2,7 +2,10 @@
 // Entrar al panel, antes de tener sesión (/api/acceso): el enlace de alta, registrar la passkey,
 // entrar con passkey y el acceso de emergencia con PANEL_CLAVE. Todo va por POST, también el token del
 // enlace (así no queda en ninguna URL de un registro), y con límite de intentos por IP: retos pedidos,
-// fallos (cada error de aquí cuenta) e intentos con la clave de emergencia.
+// fallos e intentos con la clave de emergencia. Los fallos frenan el enlace y la clave de emergencia,
+// que es lo que se podría intentar adivinar; entrar con passkey no (no se puede adivinar, y toda la
+// clínica sale por la misma IP: quien la comparta no puede dejar fuera al equipo). Para entrar solo
+// cuentan los retos pedidos, con un tope muy por encima de lo que pide la clínica.
 const express = require('express');
 const acceso = require('../acceso');
 const { iniciarSesion, sesionPublica, modoDemo } = require('../sesion');
@@ -34,11 +37,12 @@ function rutasAcceso({ pool }) {
     res.status(201).json(sesionPublica(usuario));
   }));
 
-  r.post('/entrar/opciones', frenar(p), contar(p, 'retos'), envolver(async (req, res) => {
+  r.post('/entrar/opciones', contar(p, 'entrar'), envolver(async (req, res) => {
     res.json(await acceso.opcionesEntrar(p(), { ahora: ahoraDe(req) }));
   }));
 
-  r.post('/entrar', frenar(p), envolver(async (req, res) => {
+  // Sin límite propio: cada respuesta gasta un reto de los de arriba.
+  r.post('/entrar', envolver(async (req, res) => {
     const { usuario, passkeyId } = await acceso.verificarEntrada(p(), { respuesta: cuerpo(req).respuesta, ahora: ahoraDe(req) });
     iniciarSesion(res, usuario, { passkeyId, ahora: ahoraDe(req) });
     res.json(sesionPublica(usuario));
@@ -56,9 +60,9 @@ function rutasAcceso({ pool }) {
 }
 
 // Los que cuentan para el límite de fallos de la IP: lo que parece un intento de colarse (un enlace que
-// no existe, una firma o una clave que no cuadran, una respuesta repetida). No cuentan un enlace viejo,
-// una passkey borrada que el navegador aún ofrece ni tardar más de la cuenta: toda la clínica sale con la
-// misma IP y no puede quedarse fuera por eso.
+// no existe, una firma o una clave que no cuadran, una respuesta repetida). No cuentan un enlace viejo
+// (usado, sustituido por otro o anulado), una passkey borrada que el navegador aún ofrece ni tardar más
+// de la cuenta: le pasa a cualquiera del equipo, y la clínica entera sale con la misma IP.
 const CUENTAN = new Set(['INVITACION_NO_VALE', 'RETO_NO_VALE', 'PASSKEY_NO_VALE', 'PASSKEY_DE_OTRO', 'CONTADOR', 'CLAVE_INCORRECTA']);
 
 // Errores de acceso: su estado y su mensaje (y, en las rutas sin sesión, si cuenta como fallo). Una
