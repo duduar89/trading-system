@@ -349,6 +349,8 @@ test('ruta del panel: sin sesión no entra; con sesión marca, explica lo que no
         assert.deepEqual(d2.acciones, ['llegada'], 'la de las 12:30 aún no ha empezado');
         assert.equal(d2.espera, 'Aún no ha empezado: se puede marcar como completada desde las 12:30');
         assert.equal((await fetch(`${base}/api/panel/citas/999999`)).status, 404);
+        assert.equal((await fetch(`${base}/api/panel/citas/abc`)).status, 404);
+        assert.equal((await post('abc', { estado: 'llegada' })).status, 404);
 
         const r1 = await post(c1.id, { estado: 'llegada' });
         assert.equal(r1.status, 200);

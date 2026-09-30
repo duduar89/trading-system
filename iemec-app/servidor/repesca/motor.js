@@ -806,8 +806,9 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
     }
     const nombre = await nombreDe(pool, ins);
     const variables = [nombre, await nombreTratamiento(pool, conv)].slice(0, (p.cuerpo.match(/\{\{\d+\}\}/g) || []).length);
-    // Última red: un mensaje comercial no sale si, ya relleno, no pasa el filtro de publicidad sanitaria.
-    if (comercial && !revisar(rellenar(p, variables), { tipo: 'marketing' }).ok) {
+    // Última red: un mensaje comercial no sale si, ya relleno, no pasa el filtro de publicidad
+    // sanitaria (la baja ya se comprobó al aprobar la plantilla; aquí cuenta lo que ponen las variables).
+    if (comercial && !revisar(rellenar(p, variables), { tipo: 'marketing', tieneBaja: true }).ok) {
       await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, vence_en) VALUES ('revisar_ia', ?, ?, ?)",
         [`El mensaje «${paso.uso}» no pasa el filtro de publicidad sanitaria: escribir a mano`, ins.paciente_id, new Date(ahora.getTime() + 3600000)]);
       await avanzar({ bloqueado: 'filtro legal' });

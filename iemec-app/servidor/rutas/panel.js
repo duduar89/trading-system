@@ -100,15 +100,17 @@ function rutasPanel({ pool, deps = null }) {
   }));
 
   // ── La cita que abre recepción: detalle y estado (ha llegado, completada, no vino, deshacer) ─
+  const idCita = (req) => (/^\d{1,10}$/.test(req.params.id) ? Number(req.params.id) : null);
   r.get('/citas/:id', envolver(async (req, res) => {
-    const d = await estados.detalle(p(), Number(req.params.id), { ahora: req.ahora || new Date() });
+    const d = idCita(req) && await estados.detalle(p(), idCita(req), { ahora: req.ahora || new Date() });
     if (!d) return res.status(404).json({ error: 'No existe esa cita' });
     res.json(d);
   }));
 
   // Cuerpo: { estado: 'llegada' | 'completada' | 'no_presentada' } o { deshacer: true }.
   r.post('/citas/:id/estado', envolver(async (req, res) => {
-    const id = Number(req.params.id);
+    const id = idCita(req);
+    if (!id) return res.status(404).json({ error: 'No existe esa cita', codigo: 'CITA_DESCONOCIDA' });
     const ahora = req.ahora || new Date();
     const actor = req.usuario?.email || 'panel';
     let cita;
