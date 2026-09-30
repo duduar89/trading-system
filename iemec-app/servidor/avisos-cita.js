@@ -35,9 +35,13 @@ const USOS = {
 // La confirmación de una cita que sustituye a otra. Sin esa plantilla aprobada, sale la confirmación.
 const USO_CAMBIADA = 'cita_cambiada';
 
-function textoLibre(tipo, c, nombre, { cambiada = false } = {}) {
+// reenvio: recepción le ha cambiado el enlace (lo había perdido, lo compartía…) y se lo vuelve a mandar.
+function textoLibre(tipo, c, nombre, { cambiada = false, reenvio = false } = {}) {
   const hola = `Hola${nombre ? ` ${nombre}` : ''}`;
   const donde = c.donde ? ` en ${c.donde}` : '';
+  if (tipo === 'confirmacion' && reenvio) {
+    return `${hola}, te mandamos el enlace nuevo de tu cita ${R.textoDia(c.fecha)} a las ${c.hora}${donde}: el anterior ya no funciona.${R.enlacesCita(c)}`;
+  }
   if (tipo === 'confirmacion') {
     return cambiada
       ? `${hola}, tu cita ha cambiado: ahora te esperamos ${R.textoDia(c.fecha)} a las ${c.hora}${donde}. Si tenías la anterior en tu calendario, bórrala y añade esta.${R.enlacesCita(c)}`
@@ -92,7 +96,7 @@ async function sustituyeAOtra(q, citaId) {
   return Boolean(vieja);
 }
 
-async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
+async function avisar(deps, citaId, tipo, { ahora = new Date(), reenvio = false } = {}) {
   const { pool } = deps;
   const { columna } = USOS[tipo];
   // Se marca primero: si dos procesos llegan a la vez, solo uno lo manda.
@@ -100,7 +104,7 @@ async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
   if (marca.affectedRows !== 1) return { citaId, tipo, omitido: 'ya avisado' };
   const paso = { enviando: false };
   try {
-    return await mandarAviso(deps, citaId, tipo, { ahora, paso });
+    return await mandarAviso(deps, citaId, tipo, { ahora, paso, reenvio });
   } catch (err) {
     // Si falla antes de mandarlo (en un despliegue, el código nuevo con la base aún sin migrar; la base
     // caída un momento), se desmarca y el cron lo vuelve a intentar al minuto siguiente: si no, ese aviso
@@ -115,7 +119,7 @@ async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
 }
 
 // El aviso, ya marcado. paso.enviando: si ya se ha intentado mandar (a partir de ahí, no se desmarca).
-async function mandarAviso(deps, citaId, tipo, { ahora, paso }) {
+async function mandarAviso(deps, citaId, tipo, { ahora, paso, reenvio }) {
   const { pool } = deps;
   const { uso } = USOS[tipo];
   const [[fila]] = await pool.query(
@@ -124,7 +128,8 @@ async function mandarAviso(deps, citaId, tipo, { ahora, paso }) {
   const c = await R.datosCita(pool, citaId);
   // «Paciente» es el nombre que se pone a quien reserva sin decirlo: no se le saluda así.
   const nombre = fila.nombre && fila.nombre !== 'Paciente' ? fila.nombre : null;
-  const cambiada = tipo === 'confirmacion' && await sustituyeAOtra(pool, citaId);
+  // Si se le vuelve a mandar con el enlace nuevo, no es «tu cita ha cambiado»: la cita es la misma.
+  const cambiada = !reenvio && tipo === 'confirmacion' && await sustituyeAOtra(pool, citaId);
 
   const con = await pool.getConnection();
   let conv;
@@ -144,7 +149,7 @@ async function mandarAviso(deps, citaId, tipo, { ahora, paso }) {
   let plantilla = null;
   if (ventanaAbierta) {
     paso.enviando = true;
-    envio = await R.enviar(deps, conv, { texto: textoLibre(tipo, c, nombre, { cambiada }), autor: 'sistema', ahora });
+    envio = await R.enviar(deps, conv, { texto: textoLibre(tipo, c, nombre, { cambiada, reenvio }), autor: 'sistema', ahora });
   } else {
     const plantillas = await R.plantillasBd(pool);
     plantilla = (cambiada && elegirPlantilla(USO_CAMBIADA, plantillas)) || elegirPlantilla(uso, plantillas);
@@ -152,7 +157,8 @@ async function mandarAviso(deps, citaId, tipo, { ahora, paso }) {
     const falta = plantilla ? faltaEnPlantilla(plantilla, envioPlantilla) : `falta la plantilla aprobada «${uso}»`;
     if (falta) {
       await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, conversacion_id, vence_en) VALUES ('otro', ?, ?, ?, ?)",
-        [`No sale el aviso de la cita (${falta}): avisar a mano`.slice(0, 200), fila.paciente_id, conv.id, new Date(ahora.getTime() + HORA)]);
+        [`${reenvio ? 'No sale su enlace nuevo de la cita' : 'No sale el aviso de la cita'} (${falta}): ${reenvio ? 'dárselo' : 'avisar'} a mano`.slice(0, 200),
+          fila.paciente_id, conv.id, new Date(ahora.getTime() + HORA)]);
       await registrar(pool, { tipo: 'aviso_cita_sin_plantilla', entidad: 'cita', entidadId: citaId, datos: { tipo, uso: plantilla?.uso || uso, motivo: falta } });
       return { citaId, tipo, fallido: plantilla ? falta : 'sin plantilla' };
     }
@@ -169,9 +175,22 @@ async function mandarAviso(deps, citaId, tipo, { ahora, paso }) {
   }
   await registrar(pool, {
     tipo: `aviso_cita_${tipo}`, entidad: 'cita', entidadId: citaId,
-    datos: { ventanaAbierta: Boolean(ventanaAbierta), estado: envio.estado, ...(plantilla ? { plantilla: plantilla.nombre } : {}), ...(cambiada ? { cambiada } : {}) },
+    datos: {
+      ventanaAbierta: Boolean(ventanaAbierta), estado: envio.estado, ...(plantilla ? { plantilla: plantilla.nombre } : {}), ...(cambiada ? { cambiada } : {}),
+      ...(reenvio ? { reenvio } : {}),
+    },
   });
   return { citaId, tipo, envio };
+}
+
+// Le vuelve a mandar su cita con el enlace nuevo, después de que recepción se lo cambie
+// (agenda.cambiarEnlace): la confirmación de siempre (por texto, o con su plantilla si la ventana está
+// cerrada), aunque ya la tuviera. Solo de una cita confirmada que aún no ha llegado.
+async function reenviarEnlace(deps, citaId, { ahora = new Date() } = {}) {
+  const [[c]] = await deps.pool.query('SELECT estado, inicio FROM citas WHERE id = ?', [citaId]);
+  if (c?.estado !== 'confirmada' || new Date(c.inicio) <= ahora) return { citaId, tipo: 'confirmacion', omitido: 'la cita no está confirmada o ya ha llegado su hora' };
+  await deps.pool.query('UPDATE citas SET aviso_confirmacion_en = NULL WHERE id = ?', [citaId]);
+  return avisar(deps, citaId, 'confirmacion', { ahora, reenvio: true });
 }
 
 // Qué avisos tocan ahora.
@@ -228,4 +247,4 @@ async function cerrarConversacionesDeCitasPasadas(pool, ahora = new Date()) {
   return r.affectedRows;
 }
 
-module.exports = { avisar, pendientes, enviarPendientes, cerrarConversacionesDeCitasPasadas, textoLibre, variablesPlantilla };
+module.exports = { avisar, reenviarEnlace, pendientes, enviarPendientes, cerrarConversacionesDeCitasPasadas, textoLibre, variablesPlantilla };

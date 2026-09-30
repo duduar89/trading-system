@@ -127,6 +127,47 @@ async function cifrarTokensAntiguos(q, { log = () => {}, claveDeDesarrollo = enP
   return filas.length;
 }
 
+// Cambia el enlace de «Tu cita» cuando el paciente lo pide (ha perdido el móvil, ha cambiado de
+// teléfono, comparte su calendario): el que tenía deja de valer al momento, esté donde esté (WhatsApp,
+// su calendario, un reenvío). También el de las citas de la misma cadena de cambios (las que se
+// cambiaron a esta y a la que se cambió), porque la página de una lleva a la otra. El UID del .ics no
+// cambia: es el mismo evento. Devuelve la cita que está en pie (la última de la cadena) con su enlace
+// nuevo, y qué citas han cambiado.
+async function cambiarEnlace(pool, citaId, { actor = 'sistema' } = {}) {
+  const con = await pool.getConnection();
+  try {
+    await con.beginTransaction();
+    const [[pedida]] = await con.query('SELECT id FROM citas WHERE id = ? FOR UPDATE', [citaId]);
+    if (!pedida) throw new ErrorAgenda('CITA_DESCONOCIDA', 'No existe esa cita');
+    const ids = new Set([pedida.id]);
+    for (let nuevas = [pedida.id]; nuevas.length && ids.size < 50;) {
+      const [filas] = await con.query(
+        'SELECT id FROM citas WHERE reprograma_a_id IN (?) UNION SELECT reprograma_a_id FROM citas WHERE id IN (?) AND reprograma_a_id IS NOT NULL',
+        [nuevas, nuevas]);
+      nuevas = filas.map((f) => f.id).filter((id) => !ids.has(id));
+      for (const id of nuevas) ids.add(id);
+    }
+    // SELECT *: si aún tiene el token en claro de antes de la 010 (token_antiguo), también se borra; si
+    // no, cifrarTokensAntiguos lo volvería a dar por bueno.
+    const [cadena] = await con.query('SELECT * FROM citas WHERE id IN (?) ORDER BY id FOR UPDATE', [[...ids]]);
+    const tokens = new Map();
+    for (const c of cadena) {
+      const { token, columnas } = nuevoToken();
+      await con.query('UPDATE citas SET ? WHERE id = ?', [{ ...columnas, ...('token_antiguo' in c ? { token_antiguo: null } : {}) }, c.id]);
+      tokens.set(c.id, token);
+      await registrar(con, { tipo: 'cita_enlace_cambiado', entidad: 'cita', entidadId: c.id, actor, datos: { pedido: pedida.id } });
+    }
+    await con.commit();
+    const enPie = cadena.find((c) => c.estado !== 'reprogramada') || cadena.find((c) => c.id === pedida.id);
+    return { citaId: enPie.id, token: tokens.get(enPie.id), cambiadas: cadena.map((c) => c.id) };
+  } catch (err) {
+    await con.rollback().catch(() => {});
+    throw err;
+  } finally {
+    con.release();
+  }
+}
+
 // ── La sede de la cita ────────────────────────────────────────────────────────────────────────
 // Dónde es la cita: la sede de su sala o, si la sala no tiene (o la cita no tiene sala), la
 // principal. Sin sedes dadas de alta, lo que diga la ficha de la clínica. La cabina no sale de aquí:
@@ -462,7 +503,7 @@ async function caducarRetenciones(pool, ahora = new Date()) {
 
 module.exports = {
   DIAS_ENLACE, tokenValido, huellaToken, nuevoToken, tokenDe, tokenParaEnviar, caducidadEnlace, enlaceCaducado, uidIcs,
-  cifrarTokensAntiguos, sedeDe,
+  cifrarTokensAntiguos, cambiarEnlace, sedeDe,
   huecos, proximosHuecos, reservar, cambiarEstado, deshacerEstado, ultimoCambio, confirmar, cancelar, confirmarRetenida,
   caducarRetenciones, cargarDia, sigueEnPie, ErrorAgenda,
 };

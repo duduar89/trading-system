@@ -20,6 +20,7 @@ const { prepararBdDePrueba, BD_PRUEBAS } = require('./ayuda-bd');
 const { crearPool } = require('../servidor/db');
 const { migrar } = require('../servidor/migraciones');
 const { crearApp } = require('../servidor/index');
+const { rutasPanel } = require('../servidor/rutas/panel');
 const agenda = require('../servidor/agenda');
 const avisos = require('../servidor/avisos-cita');
 const espera = require('../servidor/avisos-espera');
@@ -732,6 +733,84 @@ test('cambiar de cabina en la misma sede no toca el calendario del paciente ni l
       assert.match(antes, /UID:[0-9a-f-]{36}\r\n/);
     });
     assert.deepEqual((await avisos.pendientes(pool, ahora)).filter((a) => a.id === cita.id), [], 'ni aviso');
+  } finally {
+    await pool.end();
+  }
+});
+
+test('cambiar el enlace desde el panel: el de antes deja de valer (también el de la cita de la que viene) y se le manda el nuevo', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const whatsapp = crearWhatsApp('simulado');
+  const deps = { pool, ia: crearIa('simulado'), whatsapp };
+  try {
+    await sembrar(pool);
+    const dada = new Date('2026-10-12T08:00:00Z');
+    const ahora = mas(dada, 60);
+    const p = await paciente(pool, 'Irene');
+    // La cambió una vez: la página de la de antes lleva a la nueva.
+    const vieja = await agenda.reservar(pool, { pacienteId: p.id, tratamientoId: 'laser-intimo', fecha: '2026-10-19', hora: '17:00', origen: 'recepcion', ahora: dada });
+    const cita = await agenda.reservar(pool, { pacienteId: p.id, tratamientoId: 'laser-intimo', fecha: '2026-10-20', hora: '17:00', origen: 'recepcion', reprograma: vieja.id, ahora: dada });
+    await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id IN (?)', [dada, [vieja.id, cita.id]]);
+    // El panel (recepción, con su sesión) y las páginas del paciente, con el reloj parado.
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => { req.ahora = ahora; req.usuario = { email: 'recepcion@iemec', rol: 'recepcion' }; next(); });
+    app.use('/api/panel', rutasPanel({ pool, deps }));
+    app.use(crearApp({ pool, deps }));
+    await conServidor(app, async (base) => {
+      const estado = async (ruta) => (await fetch(`${base}${ruta}`, { redirect: 'manual' })).status;
+      const cambiar = (id, cuerpo) => fetch(`${base}/api/panel/citas/${id}/enlace`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+      assert.match(await (await fetch(`${base}/c/${vieja.token}`)).text(), new RegExp(`href="/c/${cita.token}"`));
+
+      const r = await cambiar(cita.id, { reenviar: true });
+      assert.equal(r.status, 200);
+      const d = await r.json();
+      const nuevo = d.enlaceCita.slice('/c/'.length);
+      assert.match(nuevo, /^[A-Za-z0-9_-]{43}$/);
+      assert.notEqual(nuevo, cita.token);
+      assert.deepEqual([d.enlaceCambiado.citaId, d.enlaceCambiado.citas], [cita.id, [vieja.id, cita.id]]);
+      assert.equal(d.enlaceCambiado.envio.envio.estado, 'enviado');
+      // Los de antes ya no valen para nada (ni la página, ni el .ics, ni «Añadir al calendario»); el
+      // nuevo, sí, y su .ics es el mismo evento.
+      for (const ruta of [`/c/${cita.token}`, `/c/${cita.token}.ics`, `/cal/${cita.token}`, `/c/${vieja.token}`, `/c/${vieja.token}.ics`]) assert.equal(await estado(ruta), 404, ruta);
+      assert.equal(await estado(`/c/${nuevo}`), 200);
+      const ics = new ICAL.Event(new ICAL.Component(ICAL.parse(await (await fetch(`${base}/c/${nuevo}.ics`)).text())).getFirstSubcomponent('vevent'));
+      assert.equal(ics.uid, cita.uidIcs, 'el mismo evento');
+      // Con la ventana cerrada, la confirmación de siempre con el enlace nuevo (y no «tu cita ha cambiado»).
+      const m = whatsapp.enviados.filter((x) => x.telefono === p.telefono).at(-1);
+      assert.equal(m.nombre, 'iemec_cita_confirmada');
+      assert.deepEqual(m.botones.map((b) => b.valor), [nuevo, nuevo]);
+      const [ev] = await pool.query("SELECT entidad_id, actor, datos FROM eventos WHERE tipo = 'cita_enlace_cambiado' ORDER BY id");
+      assert.deepEqual(ev.map((e) => [Number(e.entidad_id), e.actor]), [[vieja.id, 'recepcion@iemec'], [cita.id, 'recepcion@iemec']]);
+      assert.ok(!JSON.stringify(ev).includes(nuevo), 'el enlace no queda en el registro');
+
+      // Sin «mandárselo», no sale nada. Con la ventana abierta, un texto que lo dice.
+      const enviados = whatsapp.enviados.length;
+      const d2 = await (await cambiar(cita.id, { reenviar: false })).json();
+      assert.equal(d2.enlaceCambiado.envio, null);
+      assert.equal(whatsapp.enviados.length, enviados);
+      await pool.query('UPDATE conversaciones SET ventana_hasta = ? WHERE telefono = ?', [mas(ahora, 60), p.telefono]);
+      const d3 = await (await cambiar(cita.id, { reenviar: true })).json();
+      const otro = d3.enlaceCita.slice('/c/'.length);
+      assert.equal(whatsapp.enviados.at(-1).texto,
+        `Hola Irene, te mandamos el enlace nuevo de tu cita el martes 20 de octubre a las 17:00 en ${SEDE}: el anterior ya no funciona.\n\n`
+        + `Añádela a tu calendario con un toque: http://localhost:3004/cal/${otro}\nPara verla, cambiarla o cancelarla: http://localhost:3004/c/${otro}`);
+      assert.equal(await estado(`/c/${d2.enlaceCita.slice('/c/'.length)}`), 404);
+      assert.equal((await cambiar(999999, {})).status, 404);
+    });
+
+    // Una cita con el token aún en claro (la 010 lanzada sin CLAVE_CIFRADO): también se borra, o migrar lo
+    // volvería a dar por bueno al cifrarlo.
+    const enClaro = crypto.randomBytes(32).toString('base64url');
+    const suelta = await agenda.reservar(pool, { pacienteId: p.id, tratamientoId: 'laser-intimo', fecha: '2026-10-21', hora: '12:00', origen: 'recepcion', ahora: dada });
+    await pool.query('UPDATE citas SET token_antiguo = ?, token_hash = ?, token_cifrado = NULL, token_iv = NULL, token_tag = NULL WHERE id = ?', [enClaro, agenda.huellaToken(enClaro), suelta.id]);
+    const hecho = await agenda.cambiarEnlace(pool, suelta.id, { actor: 'recepcion@iemec' });
+    assert.equal(await agenda.cifrarTokensAntiguos(pool), 0);
+    const [[s]] = await pool.query('SELECT * FROM citas WHERE id = ?', [suelta.id]);
+    assert.equal(s.token_antiguo, null);
+    assert.equal(agenda.tokenDe(s), hecho.token);
+    assert.notDeepEqual(s.token_hash, agenda.huellaToken(enClaro));
   } finally {
     await pool.end();
   }

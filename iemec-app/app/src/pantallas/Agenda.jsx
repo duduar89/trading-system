@@ -259,6 +259,66 @@ function nadaQueMarcar(d) {
   return 'Ahora no hay nada que marcar en esta cita.';
 }
 
+// Lo que ha pasado al cambiar su enlace (y al mandárselo, si se pidió).
+function resumenEnlace(e, reenviar) {
+  const partes = ['Enlace cambiado: el que tenía ya no funciona.'];
+  if (e?.citas?.length > 1) partes.push('Tampoco el de la cita que se cambió a esta.');
+  const x = e?.envio;
+  if (!reenviar) partes.push('Dáselo tú desde su página «Tu cita».');
+  else if (x?.envio?.estado === 'enviado') partes.push('Le hemos mandado el nuevo por WhatsApp.');
+  else if (x?.fallido) partes.push(`No se le ha podido mandar (${x.fallido}): queda una tarea para dárselo a mano.`);
+  else partes.push(`No se le ha mandado${x?.omitido ? ` (${x.omitido})` : ''}: dáselo tú desde su página «Tu cita».`);
+  return partes.join(' ');
+}
+
+// Cambiar el enlace de «Tu cita» cuando el paciente lo pide (ha perdido el móvil, ha cambiado de
+// teléfono, comparte su calendario): el que tenía deja de funcionar. Antes, se pide confirmación.
+function CambiarEnlace({ id, alCambiar }) {
+  const [abierto, setAbierto] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+  const [aviso, setAviso] = useState(null);
+  const cambiar = async (reenviar) => {
+    setOcupado(true);
+    setAviso(null);
+    try {
+      const r = await api(`/panel/citas/${id}/enlace`, { metodo: 'POST', cuerpo: { reenviar } });
+      setAviso({ texto: resumenEnlace(r.enlaceCambiado, reenviar) });
+      setAbierto(false);
+      alCambiar();
+    } catch (err) {
+      setAviso({ texto: err.message, error: true });
+    } finally {
+      setOcupado(false);
+    }
+  };
+  return (
+    <div className="mt-3 text-sm">
+      {abierto ? (
+        <div className="rounded-xl border filete p-3" role="group" aria-labelledby={`enlace-${id}`}>
+          <p id={`enlace-${id}`}>
+            El enlace que tiene dejará de funcionar, también el de su calendario. Hazlo si lo ha perdido, ha cambiado de teléfono o comparte su calendario.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Boton variante="lleno" disabled={ocupado} onClick={() => cambiar(true)}>Cambiarlo y mandárselo</Boton>
+            <Boton disabled={ocupado} onClick={() => cambiar(false)}>Solo cambiarlo</Boton>
+            <Boton disabled={ocupado} onClick={() => setAbierto(false)}>No cambiar</Boton>
+          </div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => { setAviso(null); setAbierto(true); }}
+          className="cursor-pointer underline decoration-oro/60 underline-offset-4 hover:decoration-oro">
+          Cambiar su enlace…
+        </button>
+      )}
+      {aviso && (
+        <p role={aviso.error ? 'alert' : 'status'} className={`mt-3 rounded-xl border px-3 py-2 ${aviso.error ? `border-rosa/60 ${ROSA}` : 'filete'}`}>
+          {aviso.texto}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // El detalle de una cita, con los botones que tocan según su estado y la hora. Es un diálogo
 // nativo: atrapa el foco, se cierra con Esc (o fuera) y el foco vuelve a la tarjeta.
 function DetalleCita({ id, alCerrar, alCambiar }) {
@@ -341,6 +401,7 @@ function DetalleCita({ id, alCerrar, alCambiar }) {
               ? <a href={`#conversaciones/${d.conversacionId}`} className="underline decoration-oro/60 underline-offset-4 hover:decoration-oro">Su conversación</a>
               : <span style={suave}>Aún no tiene conversación de WhatsApp</span>}
           </p>
+          <CambiarEnlace id={id} alCambiar={recargar} />
           <section className="mt-5 border-t border-[var(--borde)] pt-5" aria-labelledby="cita-marcar">
             <h3 id="cita-marcar" className="etiqueta">Qué ha pasado con la cita</h3>
             {d.acciones.length > 0 || d.deshacer ? (
