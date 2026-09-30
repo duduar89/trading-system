@@ -205,10 +205,15 @@ async function semillar(pool, { demo = false, log = () => {}, carpeta = CARPETA 
     log(`${t.tratamientos.length} tratamientos (${reservables} se reservan), ${(t.aparatos || []).length} aparatos y ${(t.faqs || []).length} respuestas (sin aprobar)`
       + (retirados.tratamientos?.length ? `; ${retirados.tratamientos.length} tratamientos retirados del catálogo anterior` : ''));
   }
+  // Mientras sea borrador (no se ha mandado a Meta), la plantilla se pone al día con la biblioteca:
+  // el texto, los botones, los ejemplos y la cabecera van juntos.
   for (const p of BIBLIOTECA) {
-    await q(`INSERT INTO plantillas (nombre, uso, categoria, cuerpo, botones, ejemplos, estado, calidad)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE cuerpo = IF(estado = 'borrador', VALUES(cuerpo), cuerpo)`,
-    [p.nombre, p.uso, p.categoria, p.cuerpo, JSON.stringify(p.botones || []), JSON.stringify(p.ejemplos || []), demo ? 'aprobada' : 'borrador', demo ? 'verde' : 'pendiente']);
+    await q(`INSERT INTO plantillas (nombre, uso, categoria, cabecera, cuerpo, botones, ejemplos, estado, calidad)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE
+               cabecera = IF(estado = 'borrador', VALUES(cabecera), cabecera), botones = IF(estado = 'borrador', VALUES(botones), botones),
+               ejemplos = IF(estado = 'borrador', VALUES(ejemplos), ejemplos), cuerpo = IF(estado = 'borrador', VALUES(cuerpo), cuerpo)`,
+    [p.nombre, p.uso, p.categoria, p.cabecera ? JSON.stringify(p.cabecera) : null, p.cuerpo, JSON.stringify(p.botones || []), JSON.stringify(p.ejemplos || []),
+      demo ? 'aprobada' : 'borrador', demo ? 'verde' : 'pendiente']);
   }
   for (const o of OFERTAS) {
     await q(`INSERT INTO ofertas (codigo, nombre, tipo, texto_paciente, familias, importe_min, requiere_aprobacion, activa)
