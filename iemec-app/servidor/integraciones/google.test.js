@@ -577,3 +577,51 @@ test('verificador de Pub/Sub: el token bueno pasa; firma, emisor, audiencia, cue
   await assert.rejects(verificar(firmar(carga(), { kid: 'clave-3' }), opciones), /clave desconocida/);
   assert.equal(cargas, 2);
 });
+
+test('verificador de Pub/Sub: una sola descarga de claves a la vez; si Google no las da, las de antes siguen valiendo', async () => {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const tiempo = relojFalso('2026-10-06T10:00:00Z');
+  let cargas = 0;
+  let caido = false;
+  let soltar = null;
+  const fetch = async () => {
+    cargas++;
+    if (caido) return json(503, {});
+    await new Promise((ok) => { soltar = ok; });
+    return json(200, { keys: [{ ...publicKey.export({ format: 'jwk' }), kid: 'k1', alg: 'RS256', use: 'sig' }] }, { 'Cache-Control': 'public, max-age=600' });
+  };
+  const verificar = crearVerificadorPubSub({ fetch, reloj: tiempo.reloj });
+  const AUD = 'https://agenda.clinica-de-prueba.example/webhooks/google';
+  const EMAIL = 'avisos@iemec-app.iam.gserviceaccount.com';
+  const token = () => {
+    const ahora = Math.floor(tiempo.reloj().getTime() / 1000);
+    const h = Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'k1' })).toString('base64url');
+    const c = Buffer.from(JSON.stringify({ aud: AUD, email: EMAIL, email_verified: true, iat: ahora, exp: ahora + 3600, iss: 'https://accounts.google.com' })).toString('base64url');
+    return `${h}.${c}.${crypto.sign('RSA-SHA256', Buffer.from(`${h}.${c}`), privateKey).toString('base64url')}`;
+  };
+  const opciones = { audiencia: AUD, email: EMAIL };
+  // Tres avisos a la vez, recién arrancado: una sola descarga para los tres.
+  const tres = [verificar(token(), opciones), verificar(token(), opciones), verificar(token(), opciones)];
+  await new Promise((ok) => { setImmediate(ok); });
+  soltar();
+  assert.equal((await Promise.all(tres)).length, 3);
+  assert.equal(cargas, 1);
+  // Caducan y Google no contesta: valen las de antes, y no se vuelven a pedir hasta 30 s después.
+  tiempo.avanzar(601000);
+  caido = true;
+  assert.equal((await verificar(token(), opciones)).email, EMAIL);
+  assert.equal((await verificar(token(), opciones)).email, EMAIL);
+  assert.equal(cargas, 2);
+  tiempo.avanzar(31000);
+  await verificar(token(), opciones);
+  assert.equal(cargas, 3);
+  // Sin ninguna clave (recién arrancado y Google caído): no es culpa del token (sin «motivo»: 503).
+  let otras = 0;
+  const sinClaves = crearVerificadorPubSub({ fetch: async () => { otras++; return json(500, {}); }, reloj: tiempo.reloj });
+  await assert.rejects(sinClaves(token(), opciones), (err) => /claves públicas de Google \(500\)/.test(err.message) && !err.motivo);
+  await assert.rejects(sinClaves(token(), opciones), (err) => !err.motivo);
+  assert.equal(otras, 1, 'no se vuelven a pedir en cada aviso');
+  tiempo.avanzar(31000);
+  await assert.rejects(sinClaves(token(), opciones), (err) => !err.motivo);
+  assert.equal(otras, 2);
+});

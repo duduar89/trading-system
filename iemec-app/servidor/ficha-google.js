@@ -4,10 +4,11 @@
 // (salvo borrar lo guardado de la API que haya pasado de plazo).
 //
 //   Aviso (POST /webhooks/google → «webhooks» + trabajo «webhook_google»): una reseña nueva o cambiada
-//   se pide a Google y pasa a la importación de reseñas (servidor/resenas.js), que la analiza y le
-//   prepara el borrador de respuesta; nada se publica sin que lo apruebe una persona. Los demás avisos
-//   (Google cambia la ficha, cambia quién la controla, una foto de un usuario, una ficha duplicada)
-//   son tareas para una persona: nada se deshace solo.
+//   se pide a Google y pasa a la importación de reseñas de siempre (servidor/resenas.js, de la pieza de
+//   reseñas), que decide qué guarda: a una nueva le hace el análisis y el borrador de respuesta. Nada
+//   se publica sin que lo apruebe una persona. Los demás avisos (Google cambia la ficha, cambia quién la
+//   controla, una foto de un usuario, una ficha duplicada) son tareas para una persona: nada se deshace
+//   solo.
 //   Cada día, desde las 7:00 de Madrid: las reseñas tocadas en la última semana (por si se perdió un
 //   aviso), las métricas de los últimos 30 días y la ficha (el place ID, quién la controla, los cambios
 //   de Google y el aviso de reseñas sospechosas de Places). Una vez por semana: todas las reseñas y las
@@ -19,6 +20,7 @@ const cola = require('./cola');
 const resenas = require('./resenas');
 const { descifrarCuerpo } = require('./entrada');
 const { registrar } = require('./eventos');
+const { adaptadorReal, enReal, tareaUnica, conAviso, unaVez } = require('./trabajos-externos');
 const { crearGoogle, leerAvisoPubSub } = require('./integraciones/google');
 const T = require('../motor/tiempo');
 
@@ -27,8 +29,6 @@ const DIA = 86400000;
 const HORA_DESDE = 7 * 60;
 const RETENCION_DIAS = 30;
 const DIAS_RESENAS = 8;
-const DOS_HORAS = 2 * 3600000;
-const QUINCE_MIN = 15 * 60000;
 
 const TAREAS = {
   cambiosDeGoogle: 'Google ha cambiado datos de la ficha: revisarlos en Business Profile (no se deshacen solos)',
@@ -41,33 +41,11 @@ const TAREAS = {
 
 const mesAnterior = (fecha) => T.sumarMeses(T.primerDiaDelMes(fecha), -1).slice(0, 7);
 
-// Con `node --test` nunca se crea el adaptador real a partir del entorno: una prueba no puede llamar a
-// Google aunque el .env del portátil tenga claves (las pruebas pasan el suyo, con un fetch falso).
-const bajoPruebas = (env) => env === process.env && Boolean(process.env.NODE_TEST_CONTEXT);
-
-// El adaptador de Google para el cron: el que venga en deps (pruebas) o el real de la configuración.
-// Sin credenciales, crearGoogle lanza y el error sale en el informe del cron.
-function adaptador(deps, env = process.env) {
-  if (deps.google) return deps.google.modo === 'real' ? deps.google : null;
-  if (env.MODO_GOOGLE !== 'real' || bajoPruebas(env)) return null;
-  deps.google = crearGoogle('real', { env });
-  return deps.google;
-}
-
-const activo = (deps, env = process.env) => (deps.google ? deps.google.modo === 'real' : env.MODO_GOOGLE === 'real' && !bajoPruebas(env));
-
-// Una tarea para una persona, una sola abierta por asunto; si llega urgente, la abierta pasa a urgente.
-async function tareaUnica(pool, { titulo, urgente = false, ahora = new Date() }) {
-  const t = titulo.slice(0, 200);
-  const [[abierta]] = await pool.query("SELECT id FROM tareas WHERE estado = 'abierta' AND titulo = ? LIMIT 1", [t]);
-  if (abierta) {
-    if (urgente) await pool.query('UPDATE tareas SET urgente = TRUE WHERE id = ?', [abierta.id]);
-    return abierta.id;
-  }
-  const [r] = await pool.query("INSERT INTO tareas (tipo, titulo, urgente, vence_en) VALUES ('otro', ?, ?, ?)",
-    [t, urgente, new Date(ahora.getTime() + (urgente ? QUINCE_MIN : DOS_HORAS))]);
-  return r.insertId;
-}
+// El adaptador de Google para el cron: el de deps (las pruebas) o el real de la configuración
+// (MODO_GOOGLE=real). Nunca el real a partir del .env bajo `node --test`.
+const MODO = { clave: 'google', variable: 'MODO_GOOGLE', crear: (env) => crearGoogle('real', { env }) };
+const adaptador = (deps, env = process.env) => adaptadorReal(deps, MODO, env);
+const activo = (deps, env = process.env) => enReal(deps, MODO, env);
 
 // ── Avisos de Pub/Sub ──────────────────────────────────────────────────────────────────────
 
@@ -93,8 +71,7 @@ async function atenderAviso(deps, aviso, { ahora, webhookId }) {
         throw err;
       }
       if (!r) return { sinNota: true };
-      // La importación de siempre, con esta reseña sola: la analiza, le prepara el borrador y no
-      // publica nada.
+      // La importación de siempre, con esta reseña sola (el adaptador, con su lista de una).
       return { tipo: aviso.tipo, ...(await resenas.importarResenas(pool, { ...google, listarResenas: async () => [r] })) };
     }
     case 'GOOGLE_UPDATE': return { tareaId: await tareaUnica(pool, { titulo: TAREAS.cambiosDeGoogle, ahora }) };
@@ -219,7 +196,7 @@ async function purgar(pool, ahora = new Date()) {
 
 async function purgarCadaDia(pool, ahora = new Date()) {
   const fecha = T.fechaMadrid(ahora);
-  const r = await cola.unaVez(pool, `google-purga-${fecha}`, new Date(ahora.getTime() + 2 * DIA), async () => {
+  const r = await unaVez(pool, `google-purga-${fecha}`, new Date(ahora.getTime() + 2 * DIA), async () => {
     await pool.query("DELETE FROM candados WHERE (nombre LIKE 'google-%' OR nombre LIKE 'posiciones-%') AND hasta < ?", [ahora]);
     return purgar(pool, ahora);
   });
@@ -237,7 +214,7 @@ async function programar(pool, google, { ahora = new Date() } = {}) {
     encolados.push(tipo);
   };
   const { ficha, places } = google.capacidades || {};
-  await cola.unaVez(pool, `google-dia-${p.fecha}`, new Date(ahora.getTime() + 2 * DIA), async () => {
+  await unaVez(pool, `google-dia-${p.fecha}`, new Date(ahora.getTime() + 2 * DIA), async () => {
     if (ficha) {
       await encolar(TRABAJOS.resenas, { desde: new Date(ahora.getTime() - DIAS_RESENAS * DIA).toISOString() }, `google-resenas-${p.fecha}`);
       await encolar(TRABAJOS.metricas, {}, `google-metricas-${p.fecha}`);
@@ -246,7 +223,7 @@ async function programar(pool, google, { ahora = new Date() } = {}) {
   });
   if (ficha) {
     const lunes = T.sumarDias(p.fecha, 1 - p.diaSemana);
-    await cola.unaVez(pool, `google-semana-${lunes}`, new Date(ahora.getTime() + 8 * DIA), async () => {
+    await unaVez(pool, `google-semana-${lunes}`, new Date(ahora.getTime() + 8 * DIA), async () => {
       await encolar(TRABAJOS.resenas, { desde: null }, `google-resenas-todas-${lunes}`);
       await encolar(TRABAJOS.palabras, { mes: mesAnterior(p.fecha) }, `google-palabras-${lunes}`);
     });
@@ -254,43 +231,28 @@ async function programar(pool, google, { ahora = new Date() } = {}) {
   return encolados;
 }
 
-// En el último intento, que una persona lo sepa (una por asunto).
-function conAviso(pool, ahora, que, fn) {
-  return async (carga, extra = {}) => {
-    try {
-      return await fn(carga, extra);
-    } catch (err) {
-      const t = extra.trabajo;
-      if (t && t.intentos >= t.max_intentos) {
-        await tareaUnica(pool, { titulo: `Google: no se ha podido ${que} (${String(err.message).slice(0, 100)}). Ver docs/GOOGLE.md`, ahora });
-      }
-      throw err;
-    }
-  };
-}
-
 /**
  * Una vuelta del cron (dentro de su candado): programa lo del día y de la semana y hace lo que haya en
  * la cola, con tiempo tasado. null si Google no está en real.
  */
 async function vuelta(deps, { ahora = new Date(), env = process.env, presupuestoMs = 20000 } = {}) {
-  const google = adaptador(deps, env);
+  const google = adaptador(deps, env); // queda en deps.google
   if (!google) return null;
-  const d = { ...deps, google };
   const { pool } = deps;
   const programados = await programar(pool, google, { ahora });
   const cortarEn = Date.now() + presupuestoMs;
+  const aviso = (que, fn) => conAviso(pool, ahora, `Google: no se ha podido ${que}`, fn);
   const r = await cola.procesar(pool, {
-    [TRABAJOS.aviso]: conAviso(pool, ahora, 'atender un aviso de la ficha', (c) => procesarAviso(d, c.webhookId, { ahora })),
-    [TRABAJOS.resenas]: conAviso(pool, ahora, 'traer las reseñas', (c) => sincronizarResenas(d, { desde: c.desde || null })),
-    [TRABAJOS.metricas]: conAviso(pool, ahora, 'traer las métricas', () => guardarMetricas(d, { ahora })),
-    [TRABAJOS.palabras]: conAviso(pool, ahora, 'traer las búsquedas del mes', (c) => guardarPalabras(d, { mes: c.mes })),
-    [TRABAJOS.ficha]: conAviso(pool, ahora, 'revisar la ficha', () => revisarFicha(d, { ahora })),
+    [TRABAJOS.aviso]: aviso('atender un aviso de la ficha', (c) => procesarAviso(deps, c.webhookId, { ahora })),
+    [TRABAJOS.resenas]: aviso('traer las reseñas', (c) => sincronizarResenas(deps, { desde: c.desde || null })),
+    [TRABAJOS.metricas]: aviso('traer las métricas', () => guardarMetricas(deps, { ahora })),
+    [TRABAJOS.palabras]: aviso('traer las búsquedas del mes', (c) => guardarPalabras(deps, { mes: c.mes })),
+    [TRABAJOS.ficha]: aviso('revisar la ficha', () => revisarFicha(deps, { ahora })),
   }, { ahora, limite: 10, cortarEn });
   return programados.length ? { programados, ...r } : r;
 }
 
 module.exports = {
   TRABAJOS, TAREAS, RETENCION_DIAS, activo, adaptador, vuelta, programar, procesarAviso, sincronizarResenas, guardarMetricas,
-  guardarPalabras, revisarFicha, publicarNovedad, purgar, purgarCadaDia, tareaUnica,
+  guardarPalabras, revisarFicha, publicarNovedad, purgar, purgarCadaDia,
 };

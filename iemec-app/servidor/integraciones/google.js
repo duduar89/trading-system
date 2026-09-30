@@ -240,17 +240,19 @@ function leerAvisoPubSub(cuerpo) {
  * Comprueba el token OIDC que Pub/Sub pone en «Authorization: Bearer …» de cada aviso push: firma
  * RS256 con las claves públicas de Google, emisor, caducidad, audiencia y la cuenta de servicio de la
  * suscripción (con el correo verificado). Las claves se guardan en memoria lo que diga Cache-Control;
- * una clave desconocida vuelve a pedirlas (Google las rota), como mucho una vez por minuto.
+ * una clave desconocida vuelve a pedirlas (Google las rota), como mucho una vez por minuto. Se
+ * descargan una sola vez aunque lleguen varios avisos a la vez; si Google no las da, las de antes
+ * siguen valiendo y se vuelve a probar a los 30 s; sin ninguna, el error no es del token (503).
  */
 function crearVerificadorPubSub({ fetch = globalThis.fetch, reloj = () => new Date(), url = CERTIFICADOS, margenS = 300 } = {}) {
   let claves = new Map();
   let caducan = 0;
   let ultimaCarga = -Infinity;
+  let ultimoError = null;
+  let cargando = null;
   const fallo = (motivo) => Object.assign(new Error(`Token de Google no válido: ${motivo}`), { motivo });
 
-  async function cargar() {
-    const ahora = reloj().getTime();
-    ultimaCarga = ahora;
+  async function descargar() {
     const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if (!r.ok) throw new Error(`No se pudieron leer las claves públicas de Google (${r.status})`);
     const d = await r.json();
@@ -261,14 +263,33 @@ function crearVerificadorPubSub({ fetch = globalThis.fetch, reloj = () => new Da
         nuevas.set(k.kid, crypto.createPublicKey({ key: k, format: 'jwk' }));
       } catch { /* una clave que no se entiende no vale para nada */ }
     }
+    if (!nuevas.size) throw new Error('Las claves públicas de Google han llegado vacías');
     const edad = /max-age=(\d+)/.exec(r.headers?.get?.('cache-control') || '');
-    claves = nuevas;
-    caducan = ahora + (edad ? Number(edad[1]) : 3600) * 1000;
+    return { nuevas, segundos: edad ? Number(edad[1]) : 3600 };
+  }
+
+  function cargar() {
+    if (!cargando) {
+      ultimaCarga = reloj().getTime();
+      cargando = descargar()
+        .then(({ nuevas, segundos }) => {
+          claves = nuevas;
+          caducan = reloj().getTime() + segundos * 1000;
+          ultimoError = null;
+        })
+        .catch((err) => {
+          caducan = reloj().getTime() + 30000;
+          ultimoError = err;
+        })
+        .finally(() => { cargando = null; });
+    }
+    return cargando;
   }
 
   async function clave(kid) {
     const ahora = reloj().getTime();
     if (ahora >= caducan || (!claves.has(kid) && ahora - ultimaCarga > 60000)) await cargar();
+    if (!claves.size && ultimoError) throw ultimoError;
     return claves.get(kid) || null;
   }
 

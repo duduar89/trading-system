@@ -5,7 +5,10 @@
 //     azar, para que dos procesos no vuelvan a la vez. Lo que pide esperar más no se espera aquí: el
 //     error sale marcado como «reintentable» y lo reintenta la cola del cron (1, 2, 4, 8 minutos).
 //   · Cuotas: como mucho N llamadas por minuto en este proceso. La que no cabe espera su turno si es
-//     cuestión de segundos; si no, también se deja para la cola.
+//     cuestión de segundos; si no, error reintentable (la cola la repite; en el panel, se dice que
+//     espere). Las cuotas de Google son por proyecto y aquí solo se ve este proceso: basta porque el
+//     cron hace pocas llamadas por vuelta y las ediciones solo salen del panel; si aun así Google
+//     contesta 429, se espera y se reintenta.
 // Las esperas son de segundos y dentro de una misma llamada: no programan trabajo (eso es del cron).
 
 const esperarDeVerdad = (ms) => new Promise((ok) => { setTimeout(ok, ms); });
@@ -69,7 +72,7 @@ function crearCuota(porMinuto, { reloj = () => new Date(), esperar = esperarDeVe
       }
       const ms = marcas[0] + 60000 - ahora;
       if (ms > maxEsperaMs) {
-        throw errorExterno(`Cuota de ${porMinuto} llamadas por minuto a ${nombre} agotada: se deja para la próxima vuelta`, { reintentable: true });
+        throw errorExterno(`Cuota de ${porMinuto} llamadas por minuto a ${nombre} agotada: vuelve a intentarlo en ${Math.ceil(ms / 1000)} segundos`, { reintentable: true });
       }
       await esperar(ms);
     }

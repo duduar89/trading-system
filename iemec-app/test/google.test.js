@@ -386,6 +386,27 @@ test('lo del día y de la semana de Google, por la cola: solo en real y con cred
       const [[x]] = await pool.query('SELECT COUNT(*) AS n FROM tareas WHERE titulo = ?', [fichaGoogle.TAREAS.sospechosas]);
       assert.equal(x.n, 1);
     });
+
+    await t.test('un error sin arreglo (el token revocado) llega a una persona al primer intento, y la cola sigue probando', async () => {
+      const revocado = crearGoogle('real', { env: ENV_GOOGLE, esperar: async () => {}, fetch: async () => json(400, { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' }) });
+      const r = await fichaGoogle.vuelta({ pool, google: revocado }, { ahora: new Date('2026-10-08T06:00:00Z') });
+      assert.deepEqual([r.hechos, r.reintentos], [0, 3]);
+      const [tareas] = await pool.query("SELECT titulo FROM tareas WHERE titulo LIKE 'Google: no se ha podido%' ORDER BY id");
+      assert.deepEqual(tareas.map((x) => x.titulo.replace(/ \(.*$/, '')), ['Google: no se ha podido traer las reseñas', 'Google: no se ha podido traer las métricas', 'Google: no se ha podido revisar la ficha']);
+      assert.ok(tareas.every((x) => /token de refresco ha caducado o se ha revocado/.test(x.titulo)));
+      const [[c]] = await pool.query("SELECT estado, intentos FROM cola WHERE clave_unica = 'google-resenas-2026-10-08'");
+      assert.deepEqual([c.estado, c.intentos], ['pendiente', 1]);
+    });
+
+    await t.test('si falla al programar el día (la base, un momento), la marca se quita y la vuelta siguiente lo programa', async () => {
+      let fallar = 1;
+      const tropieza = { query: (sql, a) => (/INSERT INTO cola/.test(sql) && fallar-- > 0 ? Promise.reject(new Error('Lock wait timeout exceeded')) : pool.query(sql, a)) };
+      const ahora = new Date('2026-10-09T06:00:00Z');
+      await assert.rejects(fichaGoogle.programar(tropieza, google, { ahora }), /Lock wait timeout/);
+      const [[marca]] = await pool.query("SELECT COUNT(*) AS n FROM candados WHERE nombre = 'google-dia-2026-10-09'");
+      assert.equal(marca.n, 0);
+      assert.deepEqual(await fichaGoogle.programar(pool, google, { ahora: min(ahora, 1) }), ['google_resenas', 'google_metricas', 'google_ficha']);
+    });
   } finally {
     await pool.end();
   }
@@ -490,6 +511,8 @@ test('posiciones en Google Maps con DataForSEO: tope de gasto, lo que se guarda 
       assert.deepEqual(posiciones.ajustes(env).palabras, ['medicina estética', 'botox', 'clínica capilar']);
       assert.equal(posiciones.ajustes({}).palabras.length, 12);
       assert.throws(() => posiciones.ajustes({ POSICIONES_MALLA: 'mucha' }), /POSICIONES_MALLA/);
+      assert.throws(() => posiciones.ajustes({ POSICIONES_MALLA: '8' }), /POSICIONES_MALLA no es válido: tiene que ser un número impar/);
+      assert.equal(posiciones.ajustes({ POSICIONES_MALLA: '9' }).lado, 9);
       assert.throws(() => posiciones.ajustes({ POSICIONES_CENTRO: 'Boadilla' }), /POSICIONES_CENTRO/);
       assert.equal(posiciones.activo({ dataforseo: crearDataForSeo('simulado') }), false);
       assert.equal(posiciones.activo({}), false, 'con node --test, nunca el real a partir del .env');
@@ -571,11 +594,24 @@ test('posiciones en Google Maps con DataForSEO: tope de gasto, lo que se guarda 
       assert.match(f.error, /40401/);
     });
 
-    await t.test('sin el place ID de la clínica no se gasta nada', async () => {
+    await t.test('sin el place ID de la clínica no se gasta nada, y una persona lo sabe al momento', async () => {
       await pool.query('UPDATE clinica SET google_place_id = NULL');
       const antes = posts().length;
       await assert.rejects(posiciones.enviarPasada(deps, { pasada: '2026-10-19', ahora: new Date('2026-10-19T05:30:00Z'), env: { ...env, POSICIONES_TOPE_MES_USD: '5' } }), /place ID/);
+      const r = await posiciones.vuelta(deps, { ahora: new Date('2026-10-19T05:30:00Z'), env: { ...env, POSICIONES_TOPE_MES_USD: '5' } });
+      assert.equal(r.pasadaProgramada, '2026-10-19');
+      assert.equal(r.cola.reintentos, 1);
       assert.equal(posts().length, antes);
+      const [[tarea]] = await pool.query("SELECT titulo FROM tareas WHERE titulo LIKE 'DataForSEO: no se ha podido enviar la pasada%'");
+      assert.match(tarea.titulo, /Falta el place ID/);
+    });
+
+    await t.test('una configuración que no vale no deja la semana sin medir sin que nadie lo sepa', async () => {
+      await assert.rejects(posiciones.vuelta(deps, { ahora: new Date('2026-10-26T06:30:00Z'), env: { ...env, POSICIONES_MALLA: '8' } }), /impar/);
+      const [[tarea]] = await pool.query("SELECT titulo FROM tareas WHERE titulo LIKE 'DataForSEO: la configuración de la malla no vale%'");
+      assert.match(tarea.titulo, /POSICIONES_MALLA/);
+      const [[marca]] = await pool.query("SELECT COUNT(*) AS n FROM candados WHERE nombre = 'posiciones-semana-2026-10-26'");
+      assert.equal(marca.n, 0, 'la semana sigue pendiente para cuando se arregle');
     });
   } finally {
     await pool.end();

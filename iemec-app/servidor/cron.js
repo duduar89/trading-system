@@ -23,13 +23,17 @@ const T = require('../motor/tiempo');
 // fuera, con su propio candado para no hacer esperar a lo de cada minuto. Solo en modo real y con
 // credenciales (servidor/ficha-google.js y servidor/posiciones.js): si falta algo, lo dice el informe
 // y lo demás sigue. Lo guardado de la API de Google que pasa de plazo se borra en cualquier modo.
+// El candado dura 5 minutos (una vuelta lenta, con reintentos, no se pisa con la del minuto
+// siguiente) y se suelta al terminar.
+const CANDADO_EXTERNOS_MS = 5 * 60000;
+
 async function externos(d, ahora) {
   const informe = {};
   const purgadas = await fichaGoogle.purgarCadaDia(d.pool, ahora);
   if (purgadas) informe.googlePurgadas = purgadas;
   const activos = [['google', fichaGoogle], ['posiciones', posiciones]].filter(([, m]) => m.activo(d));
   if (!activos.length) return informe;
-  const r = await cola.conCandado(d.pool, 'cron-google', 55000, async () => {
+  const r = await cola.conCandado(d.pool, 'cron-google', CANDADO_EXTERNOS_MS, async () => {
     const hecho = {};
     for (const [nombre, m] of activos) {
       try {

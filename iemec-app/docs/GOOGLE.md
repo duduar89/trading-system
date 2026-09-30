@@ -170,9 +170,11 @@ de uso no se han revisado (puerta).
 ## 5. Lo que hace el cron
 
 Todo va por la cola (`cola.encolar` con clave única y `cola.unaVez` para no repetir el día o la
-semana), dentro del candado `cron-google` y con 20 s por vuelta para cada parte, aparte de lo de cada
-minuto. **Solo en modo real y con credenciales**; con `node --test`, nunca se crea un adaptador real a
-partir del `.env` (una prueba no puede llamar a Google aunque el portátil tenga claves).
+semana; si algo falla al programar, la marca se quita y la vuelta siguiente lo vuelve a intentar),
+dentro del candado `cron-google` (5 minutos como mucho; se suelta al terminar) y con 20 s por vuelta
+para cada parte, aparte de lo de cada minuto. **Solo en modo real y con credenciales**; con
+`node --test`, nunca se crea un adaptador real a partir del `.env` (una prueba no puede llamar a Google
+aunque el portátil tenga claves).
 
 | Cuándo | Trabajo | Qué hace |
 |---|---|---|
@@ -185,9 +187,12 @@ partir del `.env` (una prueba no puede llamar a Google aunque el portátil tenga
 | Cada semana (`POSICIONES_DIA`) | `posiciones_enviar` y `posiciones_recoger` | La malla de DataForSEO (sección 4) |
 | Cada día, en cualquier modo | — | Lo guardado de la Performance API que pasa de plazo se borra |
 
-Si un trabajo falla, la cola lo reintenta (1, 2, 4, 8… minutos); al último intento queda una tarea
-«Google: no se ha podido…» con el error. El informe del cron (`~/logs/iemec-cron.log`) lleva `google`
-y `posiciones` cuando están en real; si falta una credencial, lo dice ahí.
+Si un trabajo falla, la cola lo reintenta (1, 2, 4, 8… minutos). Si el error no tiene arreglo sin una
+persona (token revocado, permisos, falta de place ID, sin saldo) o es el último intento, queda al
+momento una tarea «Google: no se ha podido…» o «DataForSEO: …» con el error (una por asunto), y la cola
+sigue probando por si se arregla. Una variable de la malla que no vale (`POSICIONES_MALLA` par, un
+centro que no es una coordenada) también deja su tarea. El informe del cron (`~/logs/iemec-cron.log`)
+lleva `google` y `posiciones` cuando están en real; si falta una credencial, lo dice ahí.
 
 ## 6. Lo que se guarda y cuánto
 

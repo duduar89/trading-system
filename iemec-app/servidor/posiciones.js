@@ -18,6 +18,7 @@ const T = require('../motor/tiempo');
 const M = require('../motor/posiciones/malla');
 const { crearDataForSeo } = require('./integraciones/dataforseo');
 const { registrar } = require('./eventos');
+const { adaptadorReal, enReal, tareaUnica, conAviso, unaVez } = require('./trabajos-externos');
 
 const TRABAJOS = { enviar: 'posiciones_enviar', recoger: 'posiciones_recoger' };
 const HORA_DESDE = 7 * 60;
@@ -31,10 +32,12 @@ const PRECIO_PAGINA = 0.0006;
 const usd = (x) => Math.round(Number(x) * 1e6) / 1e6;
 const sinTildes = (s) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
-function numero(nombre, valor, porDefecto, { min, max, entero = false }) {
+function numero(nombre, valor, porDefecto, { min, max, entero = false, impar = false }) {
   if (valor == null || String(valor).trim() === '') return porDefecto;
   const n = Number(valor);
-  if (!Number.isFinite(n) || n < min || n > max || (entero && !Number.isInteger(n))) throw new Error(`${nombre} no es válido: tiene que ir de ${min} a ${max}`);
+  if (!Number.isFinite(n) || n < min || n > max || (entero && !Number.isInteger(n)) || (impar && n % 2 === 0)) {
+    throw new Error(`${nombre} no es válido: tiene que ${impar ? 'ser un número impar' : 'ir'} de ${min} a ${max}`);
+  }
   return n;
 }
 
@@ -53,7 +56,7 @@ function ajustes(env = process.env) {
   return {
     palabras,
     centro,
-    lado: numero('POSICIONES_MALLA', env.POSICIONES_MALLA, 7, { min: 1, max: 15, entero: true }),
+    lado: numero('POSICIONES_MALLA', env.POSICIONES_MALLA, 7, { min: 1, max: 15, entero: true, impar: true }),
     pasoKm: numero('POSICIONES_PASO_KM', env.POSICIONES_PASO_KM, 1.5, { min: 0.1, max: 10 }),
     zoom: numero('POSICIONES_ZOOM', env.POSICIONES_ZOOM, 15, { min: 3, max: 21, entero: true }),
     profundidad: numero('POSICIONES_PROFUNDIDAD', env.POSICIONES_PROFUNDIDAD, 20, { min: 1, max: 100, entero: true }),
@@ -63,19 +66,11 @@ function ajustes(env = process.env) {
   };
 }
 
-// Con `node --test` nunca se crea el adaptador real a partir del entorno (ver servidor/ficha-google.js).
-const bajoPruebas = (env) => env === process.env && Boolean(process.env.NODE_TEST_CONTEXT);
-
-// El adaptador para el cron: el que venga en deps (pruebas) o el real de la configuración. Sin
-// credenciales, crearDataForSeo lanza y el error sale en el informe del cron.
-function adaptador(deps, env = process.env) {
-  if (deps.dataforseo) return deps.dataforseo.modo === 'real' ? deps.dataforseo : null;
-  if (env.MODO_DATAFORSEO !== 'real' || bajoPruebas(env)) return null;
-  deps.dataforseo = crearDataForSeo('real', { env });
-  return deps.dataforseo;
-}
-
-const activo = (deps, env = process.env) => (deps.dataforseo ? deps.dataforseo.modo === 'real' : env.MODO_DATAFORSEO === 'real' && !bajoPruebas(env));
+// El adaptador para el cron: el de deps (las pruebas) o el real de la configuración
+// (MODO_DATAFORSEO=real). Nunca el real a partir del .env bajo `node --test`.
+const MODO = { clave: 'dataforseo', variable: 'MODO_DATAFORSEO', crear: (env) => crearDataForSeo('real', { env }) };
+const adaptador = (deps, env = process.env) => adaptadorReal(deps, MODO, env);
+const activo = (deps, env = process.env) => enReal(deps, MODO, env);
 
 // Cómo reconocer a la clínica en los resultados: su place ID (el de la base o GOOGLE_PLACE_ID) y, si
 // se sabe, su CID (GOOGLE_CID).
@@ -223,29 +218,37 @@ async function programar(pool, { ahora = new Date(), a }) {
   const p = T.partesMadrid(ahora);
   if (p.diaSemana < a.dia || p.minutos < HORA_DESDE) return null;
   const lunes = T.sumarDias(p.fecha, 1 - p.diaSemana);
-  const r = await cola.unaVez(pool, `posiciones-semana-${lunes}`, new Date(ahora.getTime() + 8 * 86400000), () =>
+  const r = await unaVez(pool, `posiciones-semana-${lunes}`, new Date(ahora.getTime() + 8 * 86400000), () =>
     cola.encolar(pool, TRABAJOS.enviar, { pasada: p.fecha }, { claveUnica: `posiciones-enviar-${p.fecha}`, ejecutarEn: ahora, maxIntentos: 6 }));
   return r.ejecutado ? p.fecha : null;
 }
 
 /** Una vuelta del cron (dentro de su candado). null si DataForSEO no está en real. */
 async function vuelta(deps, { ahora = new Date(), env = process.env, presupuestoMs = 20000 } = {}) {
-  const dfs = adaptador(deps, env);
+  const dfs = adaptador(deps, env); // queda en deps.dataforseo
   if (!dfs) return null;
-  const d = { ...deps, dataforseo: dfs };
   const { pool } = deps;
-  const a = ajustes(env);
+  let a;
+  try {
+    a = ajustes(env);
+  } catch (err) {
+    // Una variable mal puesta no puede dejar la semana sin medir sin que nadie lo sepa.
+    await tareaUnica(pool, { titulo: `DataForSEO: la configuración de la malla no vale (${err.message}). Ver docs/GOOGLE.md`, ahora });
+    throw err;
+  }
   const pasada = await programar(pool, { ahora, a });
   await asegurarRecogida(pool, ahora);
   const cortarEn = Date.now() + presupuestoMs;
   const informe = pasada ? { pasadaProgramada: pasada } : {};
   informe.cola = await cola.procesar(pool, {
-    [TRABAJOS.enviar]: async (c) => { informe.enviada = await enviarPasada(d, { pasada: c.pasada, ahora, env }); },
-    [TRABAJOS.recoger]: async () => {
-      const r = await recogerPendientes(d, { ahora, env, cortarEn });
+    [TRABAJOS.enviar]: conAviso(pool, ahora, 'DataForSEO: no se ha podido enviar la pasada de posiciones', async (c) => {
+      informe.enviada = await enviarPasada(deps, { pasada: c.pasada, ahora, env });
+    }),
+    [TRABAJOS.recoger]: conAviso(pool, ahora, 'DataForSEO: no se han podido recoger las posiciones', async () => {
+      const r = await recogerPendientes(deps, { ahora, env, cortarEn });
       informe.recogida = r;
       return r.quedan ? cola.aplazar({ minutos: RECOGER_CADA_MIN }) : r;
-    },
+    }),
   }, { ahora, limite: 5, cortarEn });
   return informe;
 }
