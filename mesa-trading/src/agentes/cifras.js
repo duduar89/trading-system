@@ -6,6 +6,12 @@
 // Formatos que entiende: 1.234,56 · 1,234.56 · 12 % · 3,5 $ · 5 pb · 84k · 1,2 M.
 // Un «1.234» es ambiguo (mil doscientos o uno coma dos): se prueban las dos
 // lecturas y basta con que una cuadre.
+//
+// Signo: un «+» o «-» (o «−») pegado al número y precedido de espacio, «(» o
+// el principio del texto es un signo escrito, y tiene que coincidir con el del
+// dato: «+523,40 $» no pasa si el dato es −523,40. Sin signo escrito se compara
+// el valor absoluto («pérdida de 45,20 $» con pnl −45,2 pasa). «7-25» o
+// «83.900 - 84.120» no llevan signo.
 
 // Hora de reloj (16:00): no es una cifra de negocio, pero tampoco se inventa:
 // solo pasa si la misma hora aparece escrita en los datos.
@@ -53,7 +59,15 @@ function lecturas(token) {
   return salida;
 }
 
-// Números del texto con su contexto. Devuelve [{ texto, lecturas, unidad, escalas, multiplicador, libre }].
+// Signo escrito delante del número que empieza en la posición i: 1, −1 o 0.
+function signoDelante(s, i) {
+  const c1 = i > 0 ? s[i - 1] : '';
+  if (!c1 || !/[+\-−]/.test(c1)) return 0;
+  if (i >= 2 && !/[\s(]/.test(s[i - 2])) return 0;
+  return c1 === '+' ? 1 : -1;
+}
+
+// Números del texto con su contexto. Devuelve [{ texto, lecturas, unidad, escalas, multiplicador, libre, signo }].
 function extraerNumeros(texto) {
   const s = String(texto ?? '');
   const horas = [];
@@ -68,6 +82,7 @@ function extraerNumeros(texto) {
     if (antes && RE_LETRA.test(antes)) continue;
     const lects = lecturas(token);
     if (!lects.length) continue;
+    const signo = signoDelante(sinHoras, i);
     const resto = sinHoras.slice(i + token.length);
     let unidad = null; let escalas = [1]; let multiplicador = 1; let sufijo = '';
     for (const suf of SUFIJOS) {
@@ -82,9 +97,10 @@ function extraerNumeros(texto) {
     const dinero = /^\s?[$€]/.test(resto) || /[$€]\s?$/.test(sinHoras.slice(Math.max(0, i - 2), i));
     if (dinero && !unidad) unidad = 'dinero';
     // Conteos, días y horas (0-31) pasan siempre, pero solo si son enteros sin
-    // unidad: «12 %» o «5 $» sí son cifras que hay que encontrar.
-    const libre = !unidad && lects.length === 1 && lects[0].decimales === 0 && !/[.,]/.test(token) && lects[0].valor <= 31;
-    numeros.push({ texto: (token + sufijo).trim(), lecturas: lects, unidad, escalas, multiplicador, libre });
+    // unidad ni signo: «12 %», «5 $» o «+3» sí son cifras que hay que encontrar.
+    const libre = !unidad && !signo && lects.length === 1 && lects[0].decimales === 0 && !/[.,]/.test(token) && lects[0].valor <= 31;
+    const marca = signo === 1 ? '+' : signo === -1 ? '-' : '';
+    numeros.push({ texto: (marca + token + sufijo).trim(), lecturas: lects, unidad, escalas, multiplicador, libre, signo });
   }
   return { numeros, horas };
 }
@@ -100,7 +116,8 @@ function numerosDeEntrada(entrada) {
     if (typeof x === 'number') { if (Number.isFinite(x)) valores.push(x); return; }
     if (typeof x === 'string') {
       const { numeros, horas: hs } = extraerNumeros(x);
-      for (const n of numeros) for (const l of n.lecturas) valores.push(l.valor * n.multiplicador);
+      // «(kill en -15 %)» dentro de un texto dado conserva su signo.
+      for (const n of numeros) for (const l of n.lecturas) valores.push((n.signo || 1) * l.valor * n.multiplicador);
       for (const h of hs) horas.add(h);
       return;
     }
@@ -122,6 +139,9 @@ function cuadra(valor, decimales, dato) {
 function numeroEncontrado(n, valores) {
   for (const l of n.lecturas) {
     for (const dato of valores) {
+      // Con signo escrito, el dato tiene que tener el mismo. Un cero (dato o
+      // cifra redondeada a 0) no tiene signo que contradecir.
+      if (n.signo && dato !== 0 && l.valor !== 0 && Math.sign(dato) !== n.signo) continue;
       if (n.multiplicador !== 1) {
         // 84k con dato 84.123: se compara en la unidad del texto (miles).
         if (cuadra(l.valor, l.decimales, dato / n.multiplicador)) return true;

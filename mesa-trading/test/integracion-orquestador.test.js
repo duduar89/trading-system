@@ -28,6 +28,8 @@ function llmFalso(respuestas) {
     },
     estado: () => ({ activo: true, modeloComite: 'claude-opus-5-5', modeloAgentes: 'claude-opus-5-5', gastoHoyUsd: 0, presupuestoDiaUsd: 2, llamadasHoy: 0, ultimoError: null }),
     gastoHoy: () => 0,
+    gastoDelDia: () => 0,
+    gastoEntre: () => 0,
     fijarModelos() {},
     fijarPresupuesto() {},
   };
@@ -148,15 +150,20 @@ test('arranque seguro: resuelve las órdenes a medias por idCliente, no reenvía
   assert.ok(registros.some(r => r.idCliente === 'mt-ruptura-BTCUSD-prueba-abrir-1' && r.estado === 'EJECUTADA'));
   assert.equal(o2.estado.conciliacion.limpia, true, o2.estado.conciliacion.resumen);
   assert.deepEqual(Object.keys(o2.estado.ordenesEnVuelo), []);
-  // Bloqueado: el latido no abre nada.
-  const pos0 = JSON.stringify(await b.broker.posiciones());
+  // Bloqueado: el latido no abre nada. Lo que el bróker aún tiene es un kill
+  // que no terminó: el vigilante lo vuelve a vender (solo ventas de kill).
+  const ordenes0 = b.broker.estado.ordenes.length;
   for (let i = 0; i < 12; i++) { b.reloj.avanzar(PASO); await o2.paso(); }
   assert.equal(o2.estado.fondo.nivel, 'bloqueado');
-  assert.equal(JSON.stringify((await b.broker.posiciones()).map(x => [x.simbolo, x.cantidad])), JSON.stringify(JSON.parse(pos0).map(x => [x.simbolo, x.cantidad])));
-  // Un tercer arranque no vuelve a aplicar la misma ejecución.
+  const nuevas = b.broker.estado.ordenes.slice(ordenes0);
+  assert.ok(nuevas.length > 0 && nuevas.every(x => x.lado === 'venta'), 'bloqueado: solo ventas');
+  assert.deepEqual(await b.broker.posiciones(), [], 'el reintento del kill lo vende todo');
+  assert.equal(o2.estado.fondo.killReintento, null);
+  // Un tercer arranque no vuelve a aplicar la misma ejecución (ni la venta del kill).
   o2.guardar();
   const c = await crearOrquestador({ carpeta });
-  assert.ok(Math.abs(c.orquestador.libros.puesto('ruptura-BTC').cantidad - enviada.cantidadEjecutada) < 1e-12);
+  assert.equal(c.orquestador.libros.puesto('ruptura-BTC').cantidad, 0);
+  assert.deepEqual(await c.broker.posiciones(), []);
   await o.detener(); await o2.detener(); await c.orquestador.detener();
   fs.rmSync(carpeta, { recursive: true, force: true });
 });

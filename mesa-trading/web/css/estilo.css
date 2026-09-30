@@ -9,7 +9,9 @@
   --borde-2: #2e3858;
   --texto: #e6e9f2;
   --secundario: #8a93b0;
-  --tenue: #5d6685;
+  /* Antes #5d6685: 3,0:1 sobre el panel, por debajo del 4,5:1 de AA para la
+     hora y el departamento de cada mensaje, que son datos. */
+  --tenue: var(--secundario);
   --positivo: #22c55e;
   --negativo: #ef4444;
   --aviso: #f59e0b;
@@ -70,6 +72,10 @@ button { cursor: pointer; }
 .neg { color: var(--negativo); }
 .pildoras { display: flex; gap: 6px; align-items: center; margin-left: auto; min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 4px 0; }
 .pildoras::-webkit-scrollbar { display: none; }
+/* El estado del fondo, lo primero: si la fila no cabe, lo que se corta es el final. */
+#p-nivel { order: -2; }
+/* Una fila que se desliza (sin barra) se desvanece por la derecha: hay más. */
+.pildoras.desborda, .acciones.desborda { -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
 .pildora {
   flex: none;
   display: inline-flex; align-items: center;
@@ -142,6 +148,8 @@ button { cursor: pointer; }
 .tipo-cierre { background: rgba(59, 130, 246, .2); color: #93c5fd; }
 .msg p { margin: 2px 0 0; font-size: 12px; color: #cfd4e4; overflow-wrap: anywhere; }
 .vacio { color: var(--tenue); font-size: 12px; padding: 12px 8px; margin: 0; }
+.separador-dia { display: flex; align-items: center; gap: 8px; margin: 8px 4px 2px; color: var(--secundario); font-size: 10.5px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.separador-dia::before, .separador-dia::after { content: ""; flex: 1; height: 1px; background: var(--borde-2); }
 .nuevos {
   position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
   border: 0; border-radius: 999px; padding: 6px 12px;
@@ -174,6 +182,8 @@ button { cursor: pointer; }
   z-index: 4;
   box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
 }
+.franja.ambar { background: rgba(180, 83, 9, .94); color: #fff7ed; }
+.visualmente-oculto { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .avisos { position: absolute; left: 12px; bottom: 10px; display: flex; flex-direction: column; gap: 4px; max-width: min(520px, 60%); pointer-events: none; z-index: 1; }
 .aviso {
   font-size: 11px; color: #fcd34d;
@@ -217,6 +227,14 @@ button { cursor: pointer; }
 .que-decide h3, .ultimo h3 { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--secundario); margin: 10px 0 3px; }
 .que-decide p, .ultimo p { margin: 0; font-size: 12px; color: #cfd4e4; }
 .ultimo time { color: var(--tenue); font-variant-numeric: tabular-nums; }
+.tabla dd.viejo { color: #fcd34d; }
+.bloqueo { font-size: 12px; font-weight: 650; color: #fcd34d; background: rgba(245, 158, 11, .1); border-left: 3px solid var(--aviso); border-radius: 4px; padding: 6px 8px; margin: 6px 0; }
+.bloque-mesa { margin: 10px 0 4px; padding: 8px 10px; background: var(--panel-2); border-radius: 9px; }
+.bloque-mesa h3 { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--secundario); margin: 0 0 3px; }
+.bloque-mesa p { margin: 0 0 4px; font-size: 12px; color: #cfd4e4; }
+.bloque-mesa .nota-mesa { color: var(--secundario); }
+.boton.enlace { height: 28px; padding: 0 10px; font-size: 12px; }
+.lista-puestos { display: flex; flex-wrap: wrap; gap: 5px; }
 
 /* ---------- botonera ---------- */
 .botonera {
@@ -320,6 +338,35 @@ textarea.campo { resize: vertical; min-height: 70px; }
 .limites th { text-align: left; font-weight: 500; color: #c1c8dc; padding: 3px 0; border-bottom: 1px solid var(--borde); }
 .limites td { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--borde); }
 .cargando { color: var(--secundario); }
+.modal.ancho { width: min(760px, calc(100vw - 32px)); }
+.tabla-scroll { overflow-x: auto; }
+table.resultados { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+table.resultados th, table.resultados td { padding: 5px 6px; border-bottom: 1px solid var(--borde); text-align: right; white-space: nowrap; }
+table.resultados th:first-child { text-align: left; }
+table.resultados thead th { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--secundario); white-space: normal; vertical-align: bottom; }
+table.resultados tbody th { white-space: normal; }
+table.resultados .boton.enlace { height: auto; min-height: 28px; padding: 3px 9px; text-align: left; }
+table.resultados tbody th { font-weight: 650; color: var(--texto); }
+table.resultados td.pos { color: var(--positivo); }
+table.resultados td.neg { color: var(--negativo); }
+table.resultados .fila-fondo th, table.resultados .fila-fondo td { background: rgba(59, 130, 246, .08); }
+table.resultados .fila-sin-comite th { color: #fcd34d; }
+.resultados-mejora .tabla { margin: 2px 0; }
+.aviso-sin-asignar { margin: 0; color: #fcd34d; font-weight: 650; font-size: 12.5px; }
+.hipotesis { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.hipotesis > li { border: 1px solid var(--borde); border-radius: 9px; padding: 7px 9px; }
+.hipotesis p { margin: 3px 0; font-size: 12.5px; }
+.hip-cab { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--secundario); }
+.hip-estado { font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.hip-aprobada .hip-estado { color: var(--positivo); }
+.hip-rechazada .hip-estado { color: #fca5a5; }
+.hip-evaluando .hip-estado { color: #fcd34d; }
+.criterios { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; font-size: 12px; }
+.criterios li { display: flex; justify-content: space-between; gap: 10px; }
+.criterios li.ok b::before { content: "✓ "; color: var(--positivo); }
+.criterios li.error b::before { content: "✗ "; color: var(--negativo); }
+.criterios span { color: #c1c8dc; text-align: right; font-variant-numeric: tabular-nums; }
+.notas-reabrir { margin: 0; padding-left: 18px; color: #fcd34d; font-size: 12.5px; display: grid; gap: 3px; }
 
 /* ---------- tostadas ---------- */
 .tostadas { position: fixed; left: 50%; top: calc(var(--alto-barra) + 14px); transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; z-index: 50; pointer-events: none; }
@@ -345,8 +392,14 @@ textarea.campo { resize: vertical; min-height: 70px; }
 }
 @media (max-width: 960px) {
   :root { --ancho-lateral: 270px; }
+}
+/* Tableta y portátil pequeño (hasta 1279 px: con texto, los 8 mandos piden
+   ~950 px de botonera): se quedan en icono (con aria-label y
+   title), salvo el Kill switch, que nunca pierde su texto. */
+@media (min-width: 768px) and (max-width: 1279px) {
   .boton span { display: none; }
   .boton { padding: 0 10px; }
+  .boton.peligro span { display: inline; }
 }
 
 /* ---------- móvil (< 768 px) ---------- */
@@ -365,6 +418,11 @@ textarea.campo { resize: vertical; min-height: 70px; }
   .valor, .valor-linea { font-size: 15px; }
   .sub { font-size: 11px; }
   .pildoras { order: 3; width: 100%; margin-left: 0; }
+  /* Lo primero que se ve en el móvil: el estado del fondo y el modo. */
+  #p-modo { order: -1; }
+  /* Kill switch y Pausar delante: no pueden quedar fuera de la pantalla. */
+  .acciones [data-accion="kill"] { order: -2; }
+  .acciones [data-accion="pausar"] { order: -1; }
   .boton span { display: inline; }
   .boton { height: 38px; }
   .acciones { flex: 1; }
@@ -404,6 +462,18 @@ textarea.campo { resize: vertical; min-height: 70px; }
   .tarjeta .cerrar { top: 0; right: 0; width: 40px; height: 40px; }
   .tabla { font-size: 14px; gap: 6px 12px; }
   .tostadas { top: 120px; }
+  /* Resultados en el móvil: las cinco columnas caben sin deslizar. */
+  .modal.ancho .bloque { padding: 9px 9px; }
+  table.resultados { font-size: 11.5px; }
+  table.resultados th, table.resultados td { padding: 4px 3px; }
+  table.resultados thead th { font-size: 9.5px; letter-spacing: .02em; }
+  table.resultados .boton.enlace { font-size: 11.5px; padding: 3px 6px; }
+  .modal.ancho .modal-cuerpo { padding: 14px 12px; }
+}
+@media (max-width: 380px) {
+  table.resultados { font-size: 11px; }
+  table.resultados thead th { font-size: 9px; letter-spacing: 0; }
+  .modal.ancho .bloque { padding: 8px 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

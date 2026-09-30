@@ -157,6 +157,13 @@ test('cerrarTodo vende todo; las acciones con la bolsa cerrada quedan en errores
   assert.equal(r.errores[0].tipo, 'mercado_cerrado');
   const pos = await broker.posiciones();
   assert.deepEqual(pos.map(p => p.simbolo), ['SPY']);
+  // Igual que AlpacaBroker: la orden de cada liquidación vuelve para poder apuntarla.
+  assert.equal(r.ordenes.length, 1);
+  assert.equal(r.ordenes[0].simbolo, 'BTC/USD');
+  assert.equal(r.ordenes[0].lado, 'venta');
+  assert.equal(r.ordenes[0].estado, 'ejecutada');
+  assert.equal(r.ordenes[0].cantidadEjecutada, 0.009975);
+  assert.equal(await broker.cancelarOrden(r.ordenes[0].id), false, 'todo se llena al instante: nada que cancelar');
 });
 
 test('patrimonioAyer: el último patrimonio visto el día UTC anterior', async () => {
@@ -181,4 +188,71 @@ test('relojMercado y activo del simulado', async () => {
   assert.equal(a.fraccionable, true);
   assert.equal(a.minNocional, 1);
   assert.equal(broker.nombre, 'simulado');
+});
+
+test('idCliente repetido con OTRA orden (símbolo, lado o importe distintos) → invalida, sin tocar nada', async () => {
+  const { broker } = crear({ precios: { 'BTC/USD': 100000, 'SOL/USD': 125 } });
+  const a = await broker.enviarOrden({ idCliente: 'mt-x', simbolo: 'BTC/USD', lado: 'compra', nocional: 1000 });
+  const ok = e => e instanceof ErrorBroker && e.tipo === 'invalida' && /ya usado/.test(e.message);
+  await assert.rejects(broker.enviarOrden({ idCliente: 'mt-x', simbolo: 'BTC/USD', lado: 'compra', nocional: 5000 }), ok);
+  await assert.rejects(broker.enviarOrden({ idCliente: 'mt-x', simbolo: 'SOL/USD', lado: 'compra', nocional: 1000 }), ok);
+  await assert.rejects(broker.enviarOrden({ idCliente: 'mt-x', simbolo: 'BTC/USD', lado: 'venta', cantidad: 0.001 }), ok);
+  assert.equal((await broker.cuenta()).efectivo, 99000);
+  assert.deepEqual(await broker.ordenPorIdCliente('mt-x'), a);
+});
+
+// En Windows un rename puede dar EPERM/EBUSY un instante (OneDrive, antivirus,
+// indexador). Si pasa justo después de llenar, la orden YA está hecha en
+// memoria: no puede volver como error, o los libros no la apuntarían y
+// quedaría una posición huérfana en el bróker.
+function fallarRenames(codigo = 'EPERM') {
+  const original = fs.renameSync;
+  const control = { activo: true, fallos: 0 };
+  fs.renameSync = (...args) => {
+    if (control.activo) {
+      control.fallos++;
+      const e = new Error(`${codigo}: operation not permitted, rename '${args[0]}'`);
+      e.code = codigo;
+      throw e;
+    }
+    return original(...args);
+  };
+  control.restaurar = () => { fs.renameSync = original; };
+  return control;
+}
+
+test('un fallo al guardar tras llenar (EPERM) no convierte la ejecución en error: vuelve ejecutada y se guarda en el siguiente cuenta()', async () => {
+  const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'mt-sim-eperm-'));
+  const ruta = path.join(carpeta, 'broker-simulado.json');
+  const { broker, fuente, reloj } = crear({ ruta });
+  const fallo = fallarRenames();
+  let compra;
+  try {
+    compra = await broker.enviarOrden({ idCliente: 'e1', simbolo: 'BTC/USD', lado: 'compra', nocional: 1000 });
+  } finally { fallo.activo = false; }
+  try {
+    assert.ok(fallo.fallos >= 1, 'el rename falló de verdad');
+    assert.equal(compra.estado, 'ejecutada');
+    assert.equal(compra.cantidadEjecutada, 0.009975);
+    // El disco aún no la tiene; el siguiente cuenta() la guarda.
+    assert.equal(JSON.parse(fs.readFileSync(ruta, 'utf8')).ordenes.length, 0);
+    await broker.cuenta();
+    assert.equal(JSON.parse(fs.readFileSync(ruta, 'utf8')).ordenes.length, 1);
+
+    // Lo mismo en una venta.
+    fallo.activo = true;
+    let venta;
+    try {
+      venta = await broker.enviarOrden({ idCliente: 'e2', simbolo: 'BTC/USD', lado: 'venta', cantidad: 0.009975 });
+    } finally { fallo.activo = false; }
+    assert.equal(venta.estado, 'ejecutada');
+    await broker.cuenta();
+    const recargado = new BrokerSimulado({ fuente, reloj, ruta, costes: { deslizamiento: 0 } });
+    assert.deepEqual(await recargado.posiciones(), []);
+    assert.ok(casiIgual((await recargado.cuenta()).efectivo, 99000 + 0.009975 * 100000 * (1 - 0.0025)));
+    assert.equal((await recargado.ordenPorIdCliente('e2')).estado, 'ejecutada');
+  } finally {
+    fallo.restaurar();
+    fs.rmSync(carpeta, { recursive: true, force: true });
+  }
 });

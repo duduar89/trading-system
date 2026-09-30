@@ -55,7 +55,9 @@ mecanismos, todos con reglas fijadas de antemano:
    (70 % peso anterior, 30 % nuevo).
 2. **Despidos.** Si una mesa tiene un Sharpe ajustado por debajo de −0,5 con
    40 o más operaciones, o cae más del 25 %, pasa al banquillo: capital 0,
-   pero sigue operando en sombra por si se recupera.
+   cierra sus posiciones y no abre nada nuevo, tampoco en la sombra «mismas
+   mesas sin comité» (con peso 0 no tiene capital). Lo que tuviera abierto en
+   sombra solo se cierra por su regla.
 3. **Contrataciones por el laboratorio** (los lunes). Como mucho 3 hipótesis
    por semana, siempre dentro de una lista cerrada: familia de estrategia,
    parámetros de una rejilla y filtros de un catálogo. El LLM no se inventa
@@ -66,13 +68,21 @@ mecanismos, todos con reglas fijadas de antemano:
    - Sharpe deflactado de 0,90 o más, contando todas las hipótesis probadas
      hasta la fecha.
    - 30 operaciones o más.
-   - Caída no peor que la de la mesa actual.
+   - Caída como mucho 1,5 veces la de la mesa vigente de la misma familia en
+     el mismo tramo, o 1,5 veces la de comprar y mantener si no hay mesa de
+     esa familia.
    - Correlación menor de 0,7 con las mesas que ya hay.
+
+   Una hipótesis con el mismo contenido (familia, vela, activos, parámetros y
+   filtros) no se vuelve a probar en 90 días, aunque cambie la semana: cada
+   repetición sumaría ensayos al Sharpe deflactado.
 
    Si aprueba, entra en **incubación** con el 2 % durante 60 días. Solo asciende
    si en papel no va mucho peor que en su backtest.
 4. **Lecciones.** El auditor clasifica cada operación cerrada. Si una causa se
    repite 5 veces en 30 días en una mesa, se convierte en una hipótesis concreta.
+   Las operaciones cerradas por el kill switch, a mano o en la orden de prueba
+   no cuentan: no las cerró la regla de la mesa.
    Por ejemplo, «contra régimen» se convierte en «probar la mesa con el filtro
    de no abrir en RISK-OFF», que pasa por el laboratorio como cualquier otra.
    Las lecciones nunca cambian un parámetro directamente.

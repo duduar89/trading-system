@@ -18,6 +18,8 @@
   const ALTO_PARED_EXTERIOR = 88;    // paredes del fondo (fila 0 y col 0): llevan pantallas y ventanas
   const ALTO_PARED_INTERIOR = 22;    // tabiques bajos: dejan ver a quien pasa detrás
   const GROSOR_PARED = 0.2;
+  const MAX_FILAS_PARQUE = 6;        // con 6 filas el paso es 1,94: la silla de una fila no pisa la mesa de detrás
+  const HUECO_ENTRE_MESAS = 0.5;     // pasillo entre dos mesas que comparten fila
 
   // Copia de §6.1 por si la instantánea llega sin departamentos (maqueta a medias).
   const DEPARTAMENTOS_POR_DEFECTO = [
@@ -195,57 +197,67 @@
     const grupos = mesas.map(m => ({ mesa: m, puestos: porMesa.get(m.id) })).filter(g => g.puestos.length);
     if (huerfanos.length) grupos.push({ mesa: { id: 'otros', nombre: 'Otros puestos', marco: '' }, puestos: huerfanos });
 
-    // Con más de 6 mesas no cabe una fila por mesa: se juntan las que caben en 16 teselas.
-    const MAX_ANCHO_FILA = 16;
+    // Con más de 6 mesas no cabe una fila por mesa: se juntan varias en una
+    // fila. Nunca más de 6 filas: por debajo de un paso de 1,94 teselas la silla
+    // (hasta fila + 1,85) cae encima de la mesa de detrás. Si no caben, se meten
+    // más puestos por fila (más estrechos) en lugar de apretar las filas.
     let filasParque = grupos.map(g => [g]);
-    if (grupos.length > 6) {
-      filasParque = [];
-      let actual = [];
-      let usado = 0;
-      for (const g of grupos) {
-        const w = g.puestos.length * 2;
-        if (actual.length && usado + w > MAX_ANCHO_FILA) { filasParque.push(actual); actual = []; usado = 0; }
-        actual.push(g);
-        usado += w;
+    if (grupos.length > MAX_FILAS_PARQUE) {
+      for (let cabe = 8; ; cabe++) {
+        filasParque = [];
+        let actual = [];
+        let usado = 0;
+        for (const g of grupos) {
+          const n = g.puestos.length;
+          if (actual.length && usado + n > cabe) { filasParque.push(actual); actual = []; usado = 0; }
+          actual.push(g);
+          usado += n;
+        }
+        if (actual.length) filasParque.push(actual);
+        if (filasParque.length <= MAX_FILAS_PARQUE) break;
       }
-      if (actual.length) filasParque.push(actual);
     }
     const nFilas = filasParque.length;
     const PRIMERA = 3.2;
     const paso = nFilas <= 1 ? 0 : Math.min(3, (12.9 - PRIMERA) / (nFilas - 1));
     // Todas las filas empiezan en la misma columna y con el mismo ancho de
     // puesto: los puestos quedan en columnas y el rótulo de cada mesa, a la
-    // izquierda, no cae debajo de las etiquetas de otra fila.
+    // izquierda, no cae debajo de las etiquetas de otra fila. Entre dos mesas
+    // de la misma fila queda media tesela de pasillo, para ver dónde acaba cada una.
     const INICIO_FILA = 2.6;
     const LARGO_FILA = 15.2;
-    const masLarga = Math.max(1, ...filasParque.map(f => f.reduce((s, g) => s + g.puestos.length, 0)));
-    const anchoPuesto = Math.min(2.5, LARGO_FILA / masLarga);
+    const anchoPuesto = Math.min(2.5, ...filasParque.map(f => {
+      const n = f.reduce((s, g) => s + g.puestos.length, 0);
+      return (LARGO_FILA - HUECO_ENTRE_MESAS * (f.length - 1)) / Math.max(1, n);
+    }));
     filasParque.forEach((grupoFila, k) => {
       const fila = Math.round((PRIMERA + k * paso) * 100) / 100;
-      const lista = [];
-      for (const g of grupoFila) for (const p of g.puestos) lista.push({ p, mesa: g.mesa });
-      const hechos = filaDeMesas('parque', {
-        n: lista.length, c0: INICIO_FILA, c1: INICIO_FILA + anchoPuesto * lista.length, fila,
-        anchoMax: anchoPuesto, hueco: anchoPuesto > 2.1 ? 0.28 : 0.1, fondo: 0.9, alto: 18, puestos: lista.map(x => x.p.id),
-        sitioExtra: i => ({ puestoId: lista[i].p.id }),
-      });
-      hechos.forEach((h, i) => {
-        const { p, mesa } = lista[i];
-        geoPuestos.set(p.id, {
-          puestoId: p.id, mesaId: p.mesaId, etiqueta: p.etiqueta, c0: h.c0, c1: h.c1, f0: fila, f1: fila + h.fondo,
-          sitio: h.sitio, monitores: h.monitores.map(x => x.id), mesaMueble: h.mesa.id,
-          ancla: { col: (h.c0 + h.c1) / 2, fila: fila + 0.18, z: h.mesa.alto + 34 },
-          mesaNombre: mesa.nombre || mesa.id,
+      const compartida = grupoFila.length > 1;
+      let c0 = INICIO_FILA;
+      grupoFila.forEach((g, orden) => {
+        const lista = g.puestos.map(p => ({ p, mesa: g.mesa }));
+        const hechos = filaDeMesas('parque', {
+          n: lista.length, c0, c1: c0 + anchoPuesto * lista.length, fila,
+          anchoMax: anchoPuesto, hueco: anchoPuesto > 2.1 ? 0.28 : 0.1, fondo: 0.9, alto: 18, puestos: lista.map(x => x.p.id),
+          sitioExtra: i => ({ puestoId: lista[i].p.id }),
         });
-      });
-      // Rótulo de cada mesa al principio de su tramo de fila.
-      let cursor = 0;
-      for (const g of grupoFila) {
-        const primero = hechos[cursor];
+        hechos.forEach((h, i) => {
+          const { p, mesa } = lista[i];
+          geoPuestos.set(p.id, {
+            puestoId: p.id, mesaId: p.mesaId, etiqueta: p.etiqueta, c0: h.c0, c1: h.c1, f0: fila, f1: fila + h.fondo,
+            sitio: h.sitio, monitores: h.monitores.map(x => x.id), mesaMueble: h.mesa.id,
+            ancla: { col: (h.c0 + h.c1) / 2, fila: fila + 0.18, z: h.mesa.alto + 34 },
+            mesaNombre: mesa.nombre || mesa.id,
+          });
+        });
+        // Rótulo de la mesa a la izquierda del principio de la FILA (el único
+        // hueco libre en la proyección): si la fila es compartida, los rótulos
+        // se apilan por `orden` y llevan de qué activo a qué activo va su tramo.
         rotulosFila.push({ mesaId: g.mesa.id, nombre: g.mesa.nombre || g.mesa.id, marco: g.mesa.marco || '', estado: g.mesa.estado || '',
-          col: primero.c0 - 0.1, fila: fila + 0.18, z: primero.mesa.alto + 34 });
-        cursor += g.puestos.length;
-      }
+          col: INICIO_FILA + (hechos[0].c0 - c0) - 0.1, fila: fila + 0.18, z: hechos[0].mesa.alto + 34, orden, compartida,
+          desde: lista[0].p.etiqueta || '', hasta: lista[lista.length - 1].p.etiqueta || '' });
+        c0 += anchoPuesto * lista.length + HUECO_ENTRE_MESAS;
+      });
     });
 
     // Visitas y mobiliario del parqué.
@@ -696,7 +708,7 @@
   }
 
   return {
-    COLS, FILAS, CELDA, ANCHO_PUERTA, ALTO_PARED_EXTERIOR, ALTO_PARED_INTERIOR, GROSOR_PARED,
+    COLS, FILAS, CELDA, ANCHO_PUERTA, ALTO_PARED_EXTERIOR, ALTO_PARED_INTERIOR, GROSOR_PARED, MAX_FILAS_PARQUE, HUECO_ENTRE_MESAS,
     SALAS, ORDEN_SALAS, PAREDES, DEPARTAMENTOS_POR_DEFECTO,
     construirMapa, asignarSitios, posicionDePie, ruta, salaEn, elevacionEn, salaDeAgente, salaCasa, firmaEstructura,
     cruzaPared, celdaDe, libre, aLaVista, departamentosDe,

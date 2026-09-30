@@ -7,7 +7,7 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 const { anadirJSONL, leerJSONL } = require('../util/almacen');
-const { RelojReal, diaUTC } = require('../util/reloj');
+const { RelojReal, diaUTC, DIA } = require('../util/reloj');
 const log = require('../util/log').crear('llm');
 
 // Modelos con salvavidas del servidor: si su clasificador rechaza, la API
@@ -32,6 +32,18 @@ const TARIFAS = Object.freeze({
 // Modelo que no está en la tabla: se cobra a la tarifa más cara, para que el
 // tope diario nunca se quede corto por un modelo nuevo puesto en el .env.
 const TARIFA_DESCONOCIDA = TARIFAS['claude-fable-5-1'];
+// Modelos a los que el salvavidas del servidor puede mandar un rechazo. Su
+// intento se cobra además del intento rechazado (usage.iterations).
+const DESTINOS_SALVAVIDAS = Object.freeze(['claude-opus-5', 'claude-opus-4-8']);
+
+// Timeout y reintentos por petición. Un no-streaming con muchos tokens de
+// salida tarda más de 60 s (el SDK calcula hasta ~112 s con 4000 y ~197 s con
+// 7000): el timeout crece con maxTokens, y un solo reintento, porque cada
+// intento cortado puede haberse cobrado igual.
+const REINTENTOS = 1;
+const timeoutPara = maxTokens => Math.min(600_000, Math.max(60_000, maxTokens * 40));
+// Días de gasto que se guardan en memoria para gastoDelDia/gastoEntre.
+const DIAS_HISTORIAL = 8;
 
 const CARACTERES_POR_TOKEN = 3;   // estimación prudente (§6.3): sobreestima tokens en español
 
@@ -209,6 +221,25 @@ function estimarCosteMaximo({ modelo, sistema, contenido, esquema, maxTokens }) 
   return (Math.ceil(caracteres / CARACTERES_POR_TOKEN) * tarifa.entrada + maxTokens * tarifa.salida) / 1e6;
 }
 
+// Lo que puede añadir el salvavidas: un segundo intento en el destino más caro,
+// con la entrada más la salida parcial del intento rechazado como contexto y
+// maxTokens de salida. Solo en los modelos que lo llevan (via beta).
+function reservaSalvavidas({ modelo, sistema, contenido, esquema, maxTokens }) {
+  if (!usaBeta(modelo)) return 0;
+  const caracteres = String(sistema || '').length + String(contenido || '').length + JSON.stringify(esquema || {}).length;
+  const entradaTok = Math.ceil(caracteres / CARACTERES_POR_TOKEN) + maxTokens;
+  return Math.max(...DESTINOS_SALVAVIDAS.map((m) => {
+    const t = tarifaDe(m).tarifa;
+    return (entradaTok * t.entrada + maxTokens * t.salida) / 1e6;
+  }));
+}
+
+// Máximo que se reserva contra el tope diario antes de llamar: un intento más,
+// si el modelo lleva salvavidas, el del modelo de reserva.
+function reservaMaxima(p) {
+  return estimarCosteMaximo(p) + reservaSalvavidas(p);
+}
+
 const SISTEMA_POR_DEFECTO = 'Eres un agente de una mesa de trading en papel. Respondes solo con el JSON pedido, en español.';
 
 function crearLLM({
@@ -235,15 +266,22 @@ function crearLLM({
   const ahoraGasto = () => (reloj && reloj.tipo !== 'simulado' && typeof reloj.ahora === 'function' ? reloj.ahora() : Date.now());
 
   const cuenta = { dia: diaUTC(ahoraGasto()), gastoUsd: 0, llamadas: 0 };
+  // Gasto de los últimos días ({ t, costeUsd }, t en tiempo real): el cierre
+  // diario de las 00:05 pregunta por el día que cierra, cuando gastoHoy() ya
+  // se ha puesto a cero.
+  let historial = [];
   // Tras un reinicio, el gasto del día sale del registro: si no, cada arranque
   // regalaría otro presupuesto entero.
   if (rutaCostes) {
     try {
+      const desde = ahoraGasto() - DIAS_HISTORIAL * DIA;
       for (const r of leerJSONL(rutaCostes, 5000)) {
-        if (r && Number.isFinite(r.t) && diaUTC(r.t) === cuenta.dia) {
+        if (!r || !Number.isFinite(r.t)) continue;
+        if (diaUTC(r.t) === cuenta.dia) {
           cuenta.gastoUsd += n0(r.costeUsd);
           cuenta.llamadas += 1;
         }
+        if (r.t >= desde && n0(r.costeUsd) > 0) historial.push({ t: r.t, costeUsd: n0(r.costeUsd) });
       }
     } catch (e) {
       log.aviso(`no se pudo leer ${rutaCostes}: ${e.message}`);
@@ -253,6 +291,13 @@ function crearLLM({
   function alDia() {
     const hoy = diaUTC(ahoraGasto());
     if (hoy !== cuenta.dia) { cuenta.dia = hoy; cuenta.gastoUsd = 0; cuenta.llamadas = 0; }
+  }
+
+  function anotarGasto(t, costeUsd) {
+    if (!(costeUsd > 0)) return;
+    historial.push({ t, costeUsd });
+    const limite = ahoraGasto() - DIAS_HISTORIAL * DIA;
+    if (historial.length && historial[0].t < limite) historial = historial.filter(x => x.t >= limite);
   }
 
   function apuntar(registro) {
@@ -287,7 +332,9 @@ function crearLLM({
     const esq = esquema || { type: 'object' };
 
     alDia();
-    const estimado = estimarCosteMaximo({ modelo, sistema: textoSistema, contenido, esquema: esq, maxTokens: tope });
+    // Con salvavidas se reserva también el intento del modelo de reserva: si
+    // no, una llamada que cabe podría acabar costando más que el tope.
+    const estimado = reservaMaxima({ modelo, sistema: textoSistema, contenido, esquema: esq, maxTokens: tope });
     if (cuenta.gastoUsd + reservado + estimado > presupuesto) {
       return {
         ok: false,
@@ -297,12 +344,13 @@ function crearLLM({
     }
 
     const { via, cuerpo } = construirPeticion({ modelo, maxTokens: tope, esfuerzo: nivel, sistema: textoSistema, contenido, esquema: esq });
+    const opcionesPeticion = { timeout: timeoutPara(tope), maxRetries: REINTENTOS };
     reservado += estimado;
     const t = ahoraGasto();
     const inicio = Date.now();
     let respuesta;
     try {
-      respuesta = via === 'beta' ? await api.beta.messages.create(cuerpo) : await api.messages.create(cuerpo);
+      respuesta = via === 'beta' ? await api.beta.messages.create(cuerpo, opcionesPeticion) : await api.messages.create(cuerpo, opcionesPeticion);
     } catch (e) {
       reservado -= estimado;
       const detalle = describirError(e);
@@ -313,10 +361,21 @@ function crearLLM({
         log.aviso(`${proposito}: ${detalle}`);
       }
       ultimoError = detalle;
+      // Cortada por timeout, la petición llegó al servidor (cada intento) y
+      // puede estar cobrada: se apunta como gastado lo reservado, marcado
+      // como estimado. El resto de errores (401, 429, 5xx, sin conexión) no
+      // llegan a generar y cuentan 0.
+      const cortada = e instanceof Anthropic.APIConnectionTimeoutError;
+      const coste = cortada ? estimado * (1 + REINTENTOS) : 0;
       alDia();
+      cuenta.gastoUsd += coste;
       cuenta.llamadas += 1;
-      apuntar({ t, proposito, modelo, entrada: 0, salida: 0, cacheLectura: 0, cacheEscritura: 0, costeUsd: 0, ok: false, motivo: 'error', ms: Date.now() - inicio });
-      return { ok: false, motivo: 'error', detalle, costeUsd: 0 };
+      anotarGasto(t, coste);
+      apuntar({
+        t, proposito, modelo, entrada: 0, salida: 0, cacheLectura: 0, cacheEscritura: 0, costeUsd: coste, ok: false, motivo: 'error', ms: Date.now() - inicio,
+        ...(cortada ? { estimado: true } : {}),
+      });
+      return { ok: false, motivo: 'error', detalle, costeUsd: coste };
     }
     reservado -= estimado;
     const ms = Date.now() - inicio;
@@ -325,6 +384,7 @@ function crearLLM({
     alDia();
     cuenta.gastoUsd += costeUsd;
     cuenta.llamadas += 1;
+    anotarGasto(t, costeUsd);
 
     const resultado = interpretarRespuesta(respuesta, esq);
     apuntar({
@@ -343,6 +403,21 @@ function crearLLM({
     get activo() { return activo(); },
     pedirJSON,
     gastoHoy() { alDia(); return cuenta.gastoUsd; },
+    // Gasto de un día UTC ('AAAA-MM-DD') de los últimos ocho, con la misma
+    // clave que /api/costes-llm. El día es el del dinero (tiempo real): con el
+    // reloj acelerado de la demo no corresponde al día simulado.
+    gastoDelDia(dia) {
+      let s = 0;
+      for (const x of historial) if (diaUTC(x.t) === dia) s += x.costeUsd;
+      return s;
+    },
+    // Gasto con desde < t ≤ hasta (ms, tiempo real), para un cierre que cubre
+    // más de un día.
+    gastoEntre(desde, hasta) {
+      let s = 0;
+      for (const x of historial) if (x.t > desde && x.t <= hasta) s += x.costeUsd;
+      return s;
+    },
     estado() {
       alDia();
       return {
@@ -395,6 +470,7 @@ function interpretarRespuesta(respuesta, esquema) {
 function describirError(e) {
   if (e instanceof Anthropic.AuthenticationError) return 'Clave de Anthropic rechazada (401).';
   if (e instanceof Anthropic.RateLimitError) return 'Límite de peticiones de la API (429).';
+  if (e instanceof Anthropic.APIConnectionTimeoutError) return 'La API no respondió a tiempo (timeout): puede haberse cobrado.';
   if (e instanceof Anthropic.APIConnectionError) return `Sin conexión con la API: ${e.message}`;
   if (e instanceof Anthropic.APIError) return `Error de la API${e.status ? ` ${e.status}` : ''}: ${String(e.message).slice(0, 200)}`;
   return `Error inesperado: ${e && e.message ? e.message : String(e)}`;
@@ -406,6 +482,9 @@ module.exports = {
   costeDeUso,
   costeTokens,
   estimarCosteMaximo,
+  reservaSalvavidas,
+  reservaMaxima,
+  timeoutPara,
   validarEsquema,
   esquemaParaApi,
   interpretarRespuesta,
@@ -413,6 +492,8 @@ module.exports = {
   TARIFAS,
   MODELOS_BETA,
   BETA_FALLBACK,
+  DESTINOS_SALVAVIDAS,
+  REINTENTOS,
   ESFUERZOS,
   ESFUERZO_POR_DEFECTO,
   MOTIVOS,

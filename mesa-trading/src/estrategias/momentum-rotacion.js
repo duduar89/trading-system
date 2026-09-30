@@ -13,6 +13,16 @@
 //   etf:    media de las rentabilidades a 63, 126 y 252 sesiones, rebalanceo
 //           mensual: decide al cierre de la primera sesión de cada mes (no hace
 //           falta calendario de festivos para saber que empezó el mes).
+//
+// `iAnterior` (opcional) es la última vela que se decidió: si el rebalanceo
+// cayó en una vela que no se decidió (ordenador apagado el lunes), se hace en
+// la primera que se decida después. Sin iAnterior es la vela anterior.
+//
+// Tras un hueco en los datos de un símbolo (comun.umbralHueco) su puntuación
+// queda vacía mientras sus indicadores miren algo de antes (comun.velasMemoria,
+// las mismas velas que el motor lo deja sin decidir): si no, la rentabilidad de
+// 28 velas mezcla precios de antes y después (SOL en Alpaca, +650 % falsos) y
+// el símbolo ocupa un puesto del top que nadie puede comprar.
 
 const { rentabilidad, volatilidad, atr, cierres } = require('../mercado/indicadores');
 const formato = require('../util/formato');
@@ -68,12 +78,15 @@ function preparar(velasPorSimbolo, params) {
     const velas = velasPorSimbolo[s];
     const cc = cierres(velas);
     const pa = c.periodosAnio([s], marco);
+    const huecos = c.reanudaciones(velas, c.umbralHueco(c.MARCOS[marco]));
+    const ventana = c.velasMemoria({ calentamiento, marco }, p);
     const rents = p.lookbacks.map(L => rentabilidad(cc, L));
     const vols = p.ajustarVol ? p.lookbacks.map(L => volatilidad(cc, Math.max(2, L), pa)) : null;
     const n = cc.length;
     const puntuacion = new Array(n).fill(null);
     const rentMedia = new Array(n).fill(null);
     for (let i = 0; i < n; i++) {
+      if (huecos.length && i - c.ultimaReanudacion(huecos, i) < ventana) continue;
       let sp = 0; let sr = 0; let ok = true;
       for (let k = 0; k < p.lookbacks.length; k++) {
         const r = rents[k][i];
@@ -93,15 +106,20 @@ function preparar(velasPorSimbolo, params) {
   return { familia, marco, marcoMs, params: p, velas: velasPorSimbolo, simbolos, porSimbolo, peso: 1 / p.top, _ranking: new Map() };
 }
 
-function esRebalanceo(prep, s, i) {
-  const t = s.t[i];
+// ¿Hay rebalanceo en alguna vela de (iAnterior, i]? Semanal: una vela que
+// termina el lunes 00:00 UTC. Mensual: cambio de mes entre iAnterior e i.
+function esRebalanceo(prep, s, i, iAnterior = i - 1) {
+  const desde = Number.isInteger(iAnterior) && iAnterior < i ? iAnterior : i - 1;
   if (prep.params.rebalanceo === 'semanal') {
-    const siguiente = new Date(t + prep.marcoMs);
-    return siguiente.getUTCDay() === 1 && siguiente.getUTCHours() === 0 && siguiente.getUTCMinutes() === 0;
+    for (let k = Math.max(desde + 1, 0); k <= i; k++) {
+      const siguiente = new Date(s.t[k] + prep.marcoMs);
+      if (siguiente.getUTCDay() === 1 && siguiente.getUTCHours() === 0 && siguiente.getUTCMinutes() === 0) return true;
+    }
+    return false;
   }
-  if (i === 0) return false;
-  const a = new Date(s.t[i - 1]);
-  const b = new Date(t);
+  if (desde < 0) return false;
+  const a = new Date(s.t[desde]);
+  const b = new Date(s.t[i]);
   return a.getUTCMonth() !== b.getUTCMonth() || a.getUTCFullYear() !== b.getUTCFullYear();
 }
 
@@ -141,14 +159,14 @@ function textoPerfil(p) {
   return p.ajustarVol ? `momentum ${lb} d ajustado por vol.` : `momentum ${lb} sesiones`;
 }
 
-function decidir(prep, { simbolo, i, posicion = null, contexto = {}, textos = true } = {}) {
+function decidir(prep, { simbolo, i, iAnterior, posicion = null, contexto = {}, textos = true } = {}) {
   const p = prep.params;
   const s = prep.porSimbolo[simbolo];
   const et = c.etiqueta(simbolo);
   const prox = p.rebalanceo === 'semanal' ? 'el lunes' : 'a principio de mes';
   if (!s || i < 0 || i >= s.c.length) return c.senal(posicion ? 'mantener' : 'nada', { estado: textos ? `Sin datos de ${et}` : '' });
 
-  if (!esRebalanceo(prep, s, i)) {
+  if (!esRebalanceo(prep, s, i, iAnterior)) {
     if (posicion) {
       return c.senal('mantener', {
         peso: prep.peso, stop: posicion.stop ?? null,

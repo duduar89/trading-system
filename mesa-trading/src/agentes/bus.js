@@ -74,7 +74,10 @@ class Bus extends EventEmitter {
   }
 
   // filtro: función (m) → boolean, u objeto { canal, tipo, de, para, departamento, desde }
-  // donde cada campo puede ser un valor o una lista; `desde` = t estrictamente mayor.
+  // donde cada campo puede ser un valor o una lista; `desde` = t mayor O IGUAL:
+  // con el reloj acelerado muchos mensajes comparten instante, y quien pagina
+  // con el último t visto perdería los publicados después en ese mismo t. Los
+  // que ya tenía vuelven a llegar: se reconocen por su id.
   ultimos(n = 150, filtro) {
     let lista = this.memoria;
     if (typeof filtro === 'function') lista = lista.filter(filtro);
@@ -100,7 +103,7 @@ function cumple(m, filtro) {
     if (v === undefined) continue;
     if (Array.isArray(v) ? !v.includes(m[campo]) : m[campo] !== v) return false;
   }
-  if (filtro.desde !== undefined && !(m.t > filtro.desde)) return false;
+  if (filtro.desde !== undefined && !(m.t >= filtro.desde)) return false;
   return true;
 }
 

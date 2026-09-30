@@ -39,13 +39,15 @@ function mesa(id, nombre, estrategia, universo, params, estado = 'titular', nota
 
 // Tendencia 4H y Reversión cripto arrancan en incubación (2 % del capital) y no
 // como titulares: con velas reales de Alpaca de 2021 a sep-2026 y costes
-// incluidos pierden (Sharpe −0,51 y −0,42; tendencia pagó 4.478 $ de
-// comisiones sobre 10.000 $ en 548 operaciones). Tienen que ganarse el puesto
+// incluidos pierden (Sharpe −0,52 y −0,42; tendencia pagó 4.434 $ de
+// comisiones sobre 10.000 $ en 539 operaciones). Tienen que ganarse el puesto
 // en papel como cualquier estrategia nueva. Ver scripts/probar-backtest.js --real.
+// Cifras con el motor que trata el hueco de SOL en Alpaca (jul-2023 → ago-2024);
+// antes de ese arreglo salían −0,51, 4.478 $ y 548.
 function mesasIniciales({ hayAlpaca = false } = {}) {
   const mesas = [
     mesa('tendencia', 'Tendencia SMA', tendenciaSma, ['BTC/USD', 'ETH/USD', 'SOL/USD'], null, 'incubacion',
-      'Backtest real 2021-2026 con costes: Sharpe −0,51. Empieza en prueba con el 2 %.'),
+      'Backtest real 2021-2026 con costes: Sharpe −0,52. Empieza en prueba con el 2 %.'),
     mesa('momentum', 'Momentum cripto', momentumRotacion, CRIPTO),
     mesa('reversion', 'Reversión RSI', reversionRsi, ['BTC/USD', 'ETH/USD'], null, 'incubacion',
       'Backtest real 2021-2026 con costes: Sharpe −0,42. Empieza en prueba con el 2 %.'),
@@ -67,9 +69,7 @@ function velasNecesarias(mesa) {
   const e = FAMILIAS[mesa.familia];
   if (!e) throw new Error(`familia desconocida: ${mesa.familia}`);
   const p = { ...(e.parametrosPara ? e.parametrosPara(mesa.universo || []) : e.parametrosPorDefecto), ...(mesa.params || {}) };
-  let n = e.calentamiento(p) + 15 * (p.atr || 14);
-  if ((mesa.filtros || []).some(f => f.id === 'vol-max')) n = Math.max(n, comun.velasFiltroVol(e.marco) + 1);
-  return n;
+  return comun.velasMemoria(e, p, mesa.filtros || []);
 }
 
 module.exports = { FAMILIAS, mesasIniciales, velasNecesarias };

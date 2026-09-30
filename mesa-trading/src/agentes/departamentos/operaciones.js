@@ -8,21 +8,32 @@
 // cerrada esperan a la apertura + 5 min. Al arrancar, lo que quedó en
 // INTENCIÓN/ENVIADA se consulta por idCliente antes de nada: nunca se
 // reenvía a ciegas.
+// - Antes de vender se concilia ESE símbolo con la regla de la conciliación:
+//   con Alpaca la comisión de compra se cobra en el activo y, si la venta llega
+//   antes que la conciliación del latido (un stop, un kill, la prueba), vender
+//   lo disponible dejaría en los libros un resto fantasma que ya no se cierra.
+// - Un error de red al enviar NO es un rechazo: la orden pudo entrar. Queda en
+//   vuelo como DESCONOCIDA y se consulta por idCliente antes de mandar nada más
+//   de ese símbolo (si no, la mesa volvería a comprar).
+// - Una orden en vuelo se consulta primero por idCliente: si el bróker no la
+//   conoce (404), no llegó y se abandona; si lleva 60 s sin terminar (cripto
+//   gtc llenada a medias fuera del collar), se cancela lo que falta.
 //
 // Controller: conciliación en cada latido (escala lo que es comisión, avisa
 // de lo grave y, con 3 graves seguidas, pausa), cierre diario (curvas, sombras,
-// métricas), informes diario y semanal y el kill switch.
+// métricas), informes diario y semanal y el kill switch (con reintento si no
+// consigue vender todo).
 
 const path = require('path');
 const universo = require('../../mercado/universo');
 const calendario = require('../../mercado/calendario');
-const { conciliar } = require('../../cartera/conciliacion');
+const { conciliar, factorEscalado } = require('../../cartera/conciliacion');
 const { valorarBenchmarks } = require('../../cartera/benchmarks');
 const { metricasMesa, sharpeRodante, alarmaDeriva } = require('../../aprendizaje/evaluador');
 const plantillas = require('../plantillas');
 const { anadirJSONL, leerJSONL } = require('../../util/almacen');
 const { redondearAbajo } = require('../../util/numeros');
-const { diaUTC, MIN, DIA } = require('../../util/reloj');
+const { diaUTC, inicioVela, MIN, HORA, DIA } = require('../../util/reloj');
 const f = require('../../util/formato');
 const log = require('../../util/log').crear('operaciones');
 const { EPS, etiqueta, isoCompacto } = require('./comun');
@@ -30,6 +41,20 @@ const { EPS, etiqueta, isoCompacto } = require('./comun');
 const ESTADOS_FINALES = new Set(['ejecutada', 'cancelada', 'rechazada', 'caducada']);
 const POLVO_USD = 0.01;           // lo que queda tras cerrar y vale menos de un céntimo es redondeo
 const GRAVES_PARA_PAUSAR = 3;
+// Una orden a mercado que lleva un minuto sin terminar es una decisión vieja:
+// se cancela lo que falta (lo ejecutado se apunta y el resto se decide de nuevo).
+const CANCELAR_TRAS = 60_000;
+// Tras un kill, lo que el bróker aún tenga por encima de esto se vuelve a
+// intentar vender (por debajo es polvo que ni se puede vender).
+const MIN_REINTENTO_USD = 1;
+// Espera entre reintentos del kill: 1, 2, 4, 8 y luego cada 10 min.
+const esperaReintento = n => Math.min(10 * MIN, MIN * 2 ** Math.max(0, n));
+// El cierre de las 00:05 que llega más tarde que esto (portátil apagado o
+// dormido) arranca el día nuevo desde el último patrimonio visto antes de las 00:00.
+const CIERRE_TARDE = 15 * MIN;
+// Contraste de la comisión estimada de Alpaca con la real (CFEE).
+const DESVIO_COMISION = 0.05;
+const DIAS_COMISIONES = 10;
 
 class Ejecutor {
   constructor(ctx) {
@@ -45,9 +70,19 @@ class Ejecutor {
     try { anadirJSONL(this.ruta, { t: this.ctx.reloj.ahora(), ...reg }); } catch (e) { log.error(`no se pudo apuntar la orden: ${e.message}`); }
   }
 
-  // mt-<mesaId>-<CLAVE>-<vela ISO compacta>-<accion>-<n> (§6.7), ≤ 128.
+  // mt-<sal>-<mesaId>-<CLAVE>-<vela ISO compacta>-<accion>-<n>, ≤ 128. La sal
+  // es propia de cada carpeta de datos (el instante en que se creó su
+  // estado.json, en base 36): el contador n solo conoce el ordenes.jsonl de su
+  // carpeta, y otra carpeta sobre la misma cuenta paper repetiría el id de una
+  // orden vieja (Alpaca devolvería la vieja como si fuera la nueva).
+  _sal() {
+    const c = this.ctx.estado && this.ctx.estado.creado;
+    return Number.isFinite(c) ? Math.floor(c / 1000).toString(36) : null;
+  }
+
   idCliente({ mesaId, simbolo, velaT, accion }) {
-    const base = `mt-${mesaId}-${universo.clave(simbolo)}-${isoCompacto(velaT)}-${accion}`;
+    const sal = this._sal();
+    const base = `mt-${sal ? `${sal}-` : ''}${mesaId}-${universo.clave(simbolo)}-${isoCompacto(velaT)}-${accion}`;
     let n = 1;
     while (this.usados.has(`${base}-${n}`)) n++;
     const id = `${base}-${n}`.slice(0, 128);
@@ -112,17 +147,27 @@ class Ejecutor {
       const posiciones = await ctx.broker.posiciones();
       const pos = posiciones.find(p => p.simbolo === orden.simbolo);
       const disponible = pos ? Number(pos.disponible ?? pos.cantidad) : 0;
-      cantidad = redondearAbajo(Math.min(Number(orden.cantidad) || 0, disponible), await this._incremento(orden.simbolo));
-      // Cierre total del único puesto del símbolo: se vende justo lo que dice
-      // el bróker, para no dejar en él un resto de redondeo sin dueño.
-      const propios = new Set([orden.puestoId, ...(orden.reparto || []).map(r => r.puestoId)]);
-      const otros = ctx.libros.listaPuestos({ sombra: false })
-        .filter(p => p.simbolo === orden.simbolo && !propios.has(p.puestoId))
-        .reduce((s, p) => s + p.cantidad, 0);
       const precio = ctx.vivo.precios[orden.simbolo] ? ctx.vivo.precios[orden.simbolo].precio : 0;
-      if (orden.cierraTodo && otros * precio < POLVO_USD && disponible > 0 && Math.abs(disponible - (Number(orden.cantidad) || 0)) * precio < POLVO_USD) {
-        cantidad = disponible;
+      const factor = this._conciliarAntesDeVender(orden.simbolo, pos);
+      // Cierre total de todos los puestos del símbolo: se vende lo que haya en
+      // los libros (ya conciliados) o lo que pide la orden (el kill pide todo lo
+      // del bróker, huérfanas incluidas), lo mayor; y si es justo lo que dice el
+      // bróker, exactamente eso, para no dejar un resto de redondeo sin dueño.
+      const propios = new Set([orden.puestoId, ...(orden.reparto || []).map(r => r.puestoId)]);
+      let otros = 0;
+      let deLibros = 0;
+      for (const p of ctx.libros.listaPuestos({ sombra: false })) {
+        if (p.simbolo !== orden.simbolo) continue;
+        if (propios.has(p.puestoId)) deLibros += p.cantidad; else otros += p.cantidad;
       }
+      // Sin precio no se puede decir que un resto es polvo: solo cuenta el cero.
+      const esPolvo = q => (precio > 0 ? Math.abs(q) * precio < POLVO_USD : Math.abs(q) <= EPS);
+      const cubreTodo = Boolean(orden.cierraTodo) && esPolvo(otros);
+      // Venta de un solo puesto entre varios: su cantidad salió de los libros
+      // antes de conciliar, así que se escala igual (no se lleva lo de otra mesa).
+      const pedida = cubreTodo ? Math.max(Number(orden.cantidad) || 0, deLibros) : (Number(orden.cantidad) || 0) * (factor || 1);
+      cantidad = redondearAbajo(Math.min(pedida, disponible), await this._incremento(orden.simbolo));
+      if (cubreTodo && disponible > 0 && esPolvo(disponible - pedida)) cantidad = disponible;
       if (!(cantidad > 0)) {
         ctx.bus.publicar({
           de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
@@ -153,7 +198,21 @@ class Ejecutor {
     try {
       enviada = await ctx.broker.enviarOrden(envio);
     } catch (err) {
-      this._registrar({ estado: 'ERROR', idCliente, tipoError: err.tipo || 'desconocido', mensaje: String(err.message).slice(0, 300) });
+      const mensaje = String(err && err.message).slice(0, 300);
+      if (esIncierto(err)) {
+        // Sin respuesta (red, timeout, 5xx): la orden pudo entrar. No es un
+        // rechazo: queda en vuelo, bloquea otras de este símbolo y aplaza la
+        // conciliación hasta saber por su idCliente si existe.
+        this._registrar({ estado: 'DESCONOCIDA', idCliente, tipoError: err.tipo || 'desconocido', mensaje });
+        ctx.estado.ordenesEnVuelo[idCliente] = { ...registro, enviadaT: ahora, incierta: true };
+        ctx.bus.publicar({
+          de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
+          texto: plantillas.frase(`Sin respuesta del bróker con la orden de ${e}: no sé si entró. La compruebo por su idCliente antes de mandar nada más de ${e}.`),
+          datos: { puestoId: orden.puestoId, idCliente, tipoError: err.tipo || null }, importancia: 3,
+        });
+        return { ok: false, motivo: 'incierta', error: err };
+      }
+      this._registrar({ estado: 'ERROR', idCliente, tipoError: err.tipo || 'desconocido', mensaje });
       ctx.bus.publicar({
         de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
         texto: plantillas.frase(`El bróker rechazó la orden de ${e} (${err.tipo || 'error'}): ${String(err.message).slice(0, 80)}`),
@@ -166,21 +225,78 @@ class Ejecutor {
     return this._resolver(idCliente, enviada);
   }
 
+  // Concilia un símbolo justo antes de venderlo, con la misma regla que la
+  // conciliación de cada latido (factorEscalado): si libros y bróker difieren
+  // en menos de la tolerancia, es comisión cobrada en el activo o redondeo y se
+  // escala. No se toca si hay otra orden en vuelo del símbolo (el descuadre
+  // sería transitorio).
+  _conciliarAntesDeVender(simbolo, pos) {
+    const ctx = this.ctx;
+    if (!pos) return null;
+    if (Object.values(ctx.estado.ordenesEnVuelo).some(o => o.simbolo === simbolo)) return null;
+    const qL = ctx.libros.totalesPorSimbolo({ sombra: false })[simbolo] || 0;
+    const factor = factorEscalado(qL, Number(pos.cantidad));
+    if (factor === null) return null;
+    ctx.libros.escalarSimbolo(simbolo, factor, 'conciliación antes de vender');
+    ctx.bus.publicar({
+      de: 'controller', canal: 'riesgo', tipo: 'nota',
+      texto: plantillas.conciliacion({ acciones: [{ tipo: 'escalar', simbolo, factor }], grave: false }),
+      datos: { acciones: [{ tipo: 'escalar', simbolo, factor }], antesDeVender: true },
+    });
+    return factor;
+  }
+
+  // Una orden que el bróker no conoce (404 con la red funcionando) no llegó:
+  // se abandona, sin repetirla (la decisión ya es vieja).
+  _abandonar(idCliente) {
+    const ctx = this.ctx;
+    const reg = ctx.estado.ordenesEnVuelo[idCliente];
+    delete ctx.estado.ordenesEnVuelo[idCliente];
+    this._registrar({ estado: 'ABANDONADA', idCliente });
+    // Un 404 de una orden que el bróker había aceptado es anómalo; el de una
+    // que se quedó sin respuesta o en INTENCIÓN, no.
+    const aceptada = Boolean(reg) && !reg.incierta && (reg.enviadaT !== undefined || reg.estado === 'ENVIADA');
+    ctx.bus.publicar({
+      de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
+      texto: plantillas.frase(`Orden ${idCliente} sin rastro en el bróker: no se envió y no se repite.`),
+      datos: { idCliente, puestoId: reg && reg.puestoId }, importancia: aceptada ? 3 : 2,
+    });
+  }
+
   // Espera (o consulta) el estado final de una orden en vuelo y la aplica.
+  // Sin la orden en la mano, primero se pregunta por su idCliente: null (404)
+  // → nunca llegó y se abandona; si la consulta falla, sigue en vuelo hasta
+  // el latido siguiente.
   async _resolver(idCliente, ultima = null) {
     const ctx = this.ctx;
     const registro = ctx.estado.ordenesEnVuelo[idCliente];
     if (!registro) return { ok: false, motivo: 'desconocida' };
     let orden = ultima;
+    if (!orden) {
+      try {
+        orden = await ctx.broker.ordenPorIdCliente(idCliente);
+      } catch (err) {
+        log.aviso(`consulta de ${idCliente}: ${err.message}`);
+        return { ok: false, motivo: 'sin_estado' };
+      }
+      if (!orden) {
+        this._abandonar(idCliente);
+        return { ok: false, motivo: 'abandonada' };
+      }
+    }
     try {
-      if (!orden || !ESTADOS_FINALES.has(orden.estado)) orden = await ctx.broker.esperarEjecucion(idCliente, { timeoutMs: 20_000 });
+      if (!ESTADOS_FINALES.has(orden.estado)) orden = await ctx.broker.esperarEjecucion(idCliente, { timeoutMs: 20_000 });
     } catch (err) {
       log.aviso(`no se pudo saber el estado de ${idCliente}: ${err.message}`);
       return { ok: false, motivo: 'sin_estado' };
     }
+    if (orden && !ESTADOS_FINALES.has(orden.estado)) orden = await this._cancelarSiVieja(idCliente, registro, orden);
     if (!orden || !ESTADOS_FINALES.has(orden.estado)) return { ok: false, motivo: 'en_vuelo' };
     delete ctx.estado.ordenesEnVuelo[idCliente];
-    this._registrar({ estado: orden.estado.toUpperCase(), idCliente, cantidadEjecutada: orden.cantidadEjecutada, precioMedio: orden.precioMedio, comision: orden.comision ?? null });
+    this._registrar({
+      estado: orden.estado.toUpperCase(), idCliente, cantidadEjecutada: orden.cantidadEjecutada, precioMedio: orden.precioMedio, comision: orden.comision ?? null,
+      ...(orden.comisionEstimada ? { comisionEstimada: true } : {}),
+    });
     if (!(orden.cantidadEjecutada > 0) || !(orden.precioMedio > 0)) {
       ctx.bus.publicar({
         de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
@@ -190,6 +306,55 @@ class Ejecutor {
       return { ok: false, motivo: orden.estado };
     }
     return { ok: true, ...this._aplicar(registro, orden) };
+  }
+
+  // Cripto va con gtc: una venta llenada a medias fuera del collar del 2 % se
+  // queda viva sin límite, bloquea el símbolo y aplaza la conciliación. A los
+  // 60 s se cancela lo que falta; lo ejecutado se apunta por el camino normal
+  // y el resto lo vuelve a pedir quien lo pidió (el stop, en el latido siguiente).
+  async _cancelarSiVieja(idCliente, registro, orden) {
+    const ctx = this.ctx;
+    if (typeof ctx.broker.cancelarOrden !== 'function' || !orden.id) return orden;
+    const desde = registro.enviadaT ?? registro.t;
+    if (!Number.isFinite(desde) || ctx.reloj.ahora() - desde < CANCELAR_TRAS) return orden;
+    if (registro.cancelacionPedida) {
+      try { return await ctx.broker.esperarEjecucion(idCliente, { timeoutMs: 10_000 }); } catch (_) { return orden; }
+    }
+    try {
+      // false: ya no se puede cancelar (se llenó entretanto): basta con releerla.
+      if (!(await ctx.broker.cancelarOrden(orden.id))) return (await ctx.broker.ordenPorIdCliente(idCliente)) || orden;
+      registro.cancelacionPedida = true;
+      ctx.bus.publicar({
+        de: 'ejecutor', canal: 'ejecucion', tipo: 'nota',
+        texto: plantillas.frase(`La orden de ${etiqueta(registro.simbolo)} lleva más de un minuto sin completarse: cancelo lo que falta. Lo ejecutado se apunta y el resto se decide de nuevo.`),
+        datos: { idCliente, puestoId: registro.puestoId, cantidadEjecutada: orden.cantidadEjecutada ?? null },
+      });
+      return await ctx.broker.esperarEjecucion(idCliente, { timeoutMs: 10_000 });
+    } catch (err) {
+      log.aviso(`no se pudo cancelar ${idCliente}: ${err.message}`);
+      return orden;
+    }
+  }
+
+  // Sigue una orden que el fondo no generó (las liquidaciones de cerrarTodo):
+  // se apunta como las suyas y, al terminar, entra en los libros repartida
+  // entre los puestos del símbolo.
+  async seguirAjena(orden, extra = {}) {
+    const ctx = this.ctx;
+    if (!orden || !orden.idCliente) return { ok: false, motivo: 'sin_id' };
+    const idCliente = orden.idCliente;
+    const reparto = ctx.libros.listaPuestos({ sombra: false })
+      .filter(p => p.simbolo === orden.simbolo && p.cantidad > EPS)
+      .map(p => ({ puestoId: p.puestoId, cantidad: p.cantidad }));
+    const registro = {
+      puestoId: reparto.length ? reparto[0].puestoId : null, mesaId: 'fondo', simbolo: orden.simbolo, lado: orden.lado,
+      cantidad: orden.cantidad ?? null, nocional: orden.nocional ?? null, reparto, cierraTodo: true, idCliente, ...extra,
+    };
+    this.usados.add(idCliente);
+    this._registrar({ estado: 'INTENCION', ...registro });
+    this._registrar({ estado: 'ENVIADA', idCliente, id: orden.id });
+    ctx.estado.ordenesEnVuelo[idCliente] = { ...registro, enviadaT: ctx.reloj.ahora() };
+    return this._resolver(idCliente, orden);
   }
 
   // Aplica una ejecución a los libros. Un kill reparte una sola venta entre
@@ -237,6 +402,13 @@ class Ejecutor {
       datos: { puestoId: registro.puestoId, idCliente: registro.idCliente, simbolo: registro.simbolo, lado: registro.lado, cantidad, precio, comision, motivo: registro.motivo },
     });
     for (const op of cerradas) ctx.registrarOperacion(op);
+    // Comisión estimada (Alpaca no la da en la orden): se suma por día para
+    // contrastarla con la real (CFEE) en el cierre diario.
+    if (orden.comisionEstimada && comision > 0) {
+      const porDia = ctx.estado.comisionesEstimadas || (ctx.estado.comisionesEstimadas = {});
+      const d = diaUTC(t);
+      porDia[d] = (porDia[d] || 0) + comision;
+    }
     return { cantidad, precio, comision, operaciones: cerradas };
   }
 
@@ -257,9 +429,11 @@ class Ejecutor {
     return n;
   }
 
-  // Al arrancar (y en cada latido para las que quedaron sin estado final):
-  // se consulta por idCliente. Si el bróker no la conoce, no llegó a enviarse:
-  // se abandona (la decisión ya es vieja) y se dice.
+  // Al arrancar: lo EJECUTADO después del último estado.json se vuelve a
+  // aplicar (los libros descartan lo repetido) y lo que quedó en INTENCIÓN,
+  // ENVIADA o DESCONOCIDA pasa a en vuelo y se resuelve como en cada latido
+  // (resolverEnVuelo): se consulta por idCliente y, si el bróker no la
+  // conoce, no llegó a enviarse y se abandona.
   async resolverAlArrancar() {
     const ctx = this.ctx;
     const ultimos = new Map();
@@ -275,29 +449,15 @@ class Ejecutor {
         if (!res.duplicada) resueltas++;
         continue;
       }
-      if (r.estado !== 'INTENCION' && r.estado !== 'ENVIADA') continue;
-      if (!ctx.estado.ordenesEnVuelo[idCliente]) ctx.estado.ordenesEnVuelo[idCliente] = { ...r };
+      if (r.estado !== 'INTENCION' && r.estado !== 'ENVIADA' && r.estado !== 'DESCONOCIDA') continue;
+      if (!ctx.estado.ordenesEnVuelo[idCliente]) ctx.estado.ordenesEnVuelo[idCliente] = { ...r, ...(r.estado === 'DESCONOCIDA' ? { incierta: true } : {}) };
     }
-    for (const idCliente of Object.keys(ctx.estado.ordenesEnVuelo)) {
-      let orden = null;
-      try { orden = await ctx.broker.ordenPorIdCliente(idCliente); } catch (e) { log.aviso(`consulta de ${idCliente}: ${e.message}`); continue; }
-      if (!orden) {
-        const reg = ctx.estado.ordenesEnVuelo[idCliente];
-        delete ctx.estado.ordenesEnVuelo[idCliente];
-        this._registrar({ estado: 'ABANDONADA', idCliente });
-        ctx.bus.publicar({
-          de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
-          texto: plantillas.frase(`Orden ${idCliente} sin rastro en el bróker tras el reinicio: no se envió y no se repite.`),
-          datos: { idCliente, puestoId: reg && reg.puestoId }, importancia: 2,
-        });
-        continue;
-      }
-      const r = await this._resolver(idCliente, orden);
-      if (r.ok) resueltas++;
-    }
-    return resueltas;
+    return resueltas + await this.resolverEnVuelo();
   }
 
+  // En cada latido (y en el kill): cada orden en vuelo se consulta por
+  // idCliente (_resolver). Una que el bróker no conoce se abandona en el
+  // primer latido con red, sin gastar los 20 s de esperarEjecucion.
   async resolverEnVuelo() {
     let n = 0;
     for (const idCliente of Object.keys(this.ctx.estado.ordenesEnVuelo)) {
@@ -306,6 +466,15 @@ class Ejecutor {
     }
     return n;
   }
+}
+
+// ¿Error de envío tras el que la orden pudo entrar? Red, timeout y 5xx
+// ('red'), o un error sin respuesta del bróker (sin tipo, o 'desconocido' sin
+// código HTTP). Un 403/422/429 sí trae respuesta: es un rechazo.
+function esIncierto(err) {
+  const tipo = err && err.tipo;
+  if (tipo === 'red' || !tipo) return true;
+  return tipo === 'desconocido' && !err.status;
 }
 
 // ---------- Controller ----------
@@ -368,11 +537,23 @@ function anotarCurva(lista, punto, max = 3650) {
 }
 
 // Cierre diario (00:05 UTC): curvas del día que acaba, métricas de mesa,
-// nuevo día de P&L e informe. Devuelve las operaciones del día (para el Auditor).
+// nuevo día de P&L e informe. Devuelve las operaciones del cierre (para el Auditor).
+//
+// Si llega tarde (portátil apagado o dormido a las 00:05):
+// - el día que se cierra es el de la referencia (diaInicio), no el de la hora
+//   del arranque, así que no falta ningún día en la curva diaria;
+// - las operaciones van por ventana de tiempo (desde el cierre anterior), así
+//   que cada una pasa por un cierre y por el Auditor exactamente una vez;
+// - el informe dice el tramo real si no dura 24 h;
+// - el día nuevo arranca desde el último patrimonio visto antes de las 00:00
+//   (la curva horaria): lo perdido durante la noche cuenta para los límites
+//   del día, que si no se saltarían sin avisar (los límites solo se aprietan).
 function cierreDiario(ctx) {
   const ahora = ctx.reloj.ahora();
   const e = ctx.estado;
-  const dia = diaUTC(ahora - 10 * MIN);           // el día que acaba de terminar
+  const dia = e.diaInicio || diaUTC(ahora - 10 * MIN);            // el día que se cierra
+  const medianoche = inicioVela(ahora, DIA);
+  const desde = Number.isFinite(e.ultimoCierreT) ? e.ultimoCierreT : inicioVela(ahora - 10 * MIN, DIA);
   const patrimonio = ctx.vivo.patrimonio;
 
   anotarCurva(e.curvaDiaria, { dia, valor: patrimonio });
@@ -394,24 +575,84 @@ function cierreDiario(ctx) {
     });
   }
 
-  // P&L del día que acaba y arranque del nuevo.
+  // P&L de lo que se cierra y arranque del día nuevo.
   const pnlDia = patrimonio - e.patrimonioInicioDia;
   const pnlDiaPct = e.patrimonioInicioDia > 0 ? pnlDia / e.patrimonioInicioDia : null;
-  const opsDia = ctx.operaciones.filter(o => o.salidaT !== null && diaUTC(o.salidaT) === dia && o.motivoSalida !== 'prueba');
+  const opsDia = ctx.operaciones.filter(o => o.salidaT !== null && o.salidaT > desde && o.salidaT <= ahora && o.motivoSalida !== 'prueba');
   const ganadoras = opsDia.filter(o => o.pnl > 0).length;
-  e.patrimonioInicioDia = patrimonio;
+  let inicio = patrimonio;
+  if (ahora - medianoche > CIERRE_TARDE) {
+    for (let k = e.curva.length - 1; k >= 0; k--) {
+      const p = e.curva[k];
+      if (p.t < medianoche) { if (p.patrimonio > 0) inicio = p.patrimonio; break; }
+    }
+  }
+  e.patrimonioInicioDia = inicio;
   e.diaInicio = diaUTC(ahora);
+  // La referencia de vigilancia de una reapertura vale solo el día en que se reabrió.
+  e.inicioDiaVigilancia = null;
+  e.diaInicioVigilancia = null;
   e.inicioDiaPuestos = {};
   for (const [pid, v] of Object.entries(ctx.vivo.valoracion ? ctx.vivo.valoracion.porPuesto : {})) e.inicioDiaPuestos[pid] = v.realizado + v.pnlAbierto;
+  e.ultimoCierreT = ahora;
 
   const informe = {
-    dia, patrimonio, pnlDia, pnlDiaPct, operaciones: opsDia.length,
-    acierto: opsDia.length ? ganadoras / opsDia.length : null, gastoLLMUsd: ctx.llm ? ctx.llm.gastoHoy() : 0,
+    dia, desde, hasta: ahora, patrimonio, pnlDia, pnlDiaPct, operaciones: opsDia.length,
+    acierto: opsDia.length ? ganadoras / opsDia.length : null, gastoLLMUsd: gastoLLMDe(ctx, desde, ahora, dia),
   };
   const texto = plantillas.informeDiario(informe);
   ctx.bus.publicar({ de: 'controller', canal: 'direccion', tipo: 'informe', texto, datos: informe, importancia: 2 });
   anadirJSONL(path.join(ctx.carpeta, 'informes.jsonl'), { t: ahora, tipo: 'diario', texto, ...informe });
+
+  // Comisión estimada de Alpaca frente a la real (CFEE) del día anterior al
+  // que se cierra: Alpaca la apunta al final del día, así tiene un día de margen.
+  if (ctx.broker && typeof ctx.broker.comisiones === 'function' && typeof ctx.lanzar === 'function') {
+    const anterior = diaUTC(Date.parse(`${dia}T00:00:00Z`) - DIA);
+    ctx.lanzar('contraste de comisiones', () => contrastarComisiones(ctx, anterior));
+  }
   return opsDia;
+}
+
+// Gasto del LLM de lo que cubre el cierre (tiempo real). En sintético el día
+// del gasto es el real y no el simulado: no se da cifra (null la omite).
+function gastoLLMDe(ctx, desde, hasta, dia) {
+  const llm = ctx.llm;
+  if (!llm || !ctx.reloj || ctx.reloj.tipo === 'simulado') return null;
+  if (typeof llm.gastoEntre === 'function') return llm.gastoEntre(desde, hasta);
+  if (typeof llm.gastoDelDia === 'function') return llm.gastoDelDia(dia);
+  return null;
+}
+
+// Contrasta la comisión que se estimó (a la tasa taker, ficha §4) con la que
+// Alpaca apuntó como CFEE ese día. Responde con datos a si paper cobra de
+// verdad y a qué nivel; si no cuadra, lo dice el Controller (no cambia nada:
+// qué tasa usar lo decide Eduardo).
+async function contrastarComisiones(ctx, dia) {
+  const e = ctx.estado;
+  const porDia = e.comisionesEstimadas || (e.comisionesEstimadas = {});
+  const limite = diaUTC(Date.parse(`${dia}T00:00:00Z`) - DIAS_COMISIONES * DIA);
+  for (const d of Object.keys(porDia)) if (d < limite) delete porDia[d];
+  const estimada = porDia[dia] || 0;
+  if (!(estimada > 0)) return null;
+  const inicioDia = Date.parse(`${dia}T00:00:00Z`);
+  const lista = await ctx.broker.comisiones({ desde: inicioDia - DIA });
+  const delDia = (lista || []).filter(x => Number.isFinite(x.t) && diaUTC(x.t) === dia);
+  const sinImporte = delDia.filter(x => x.importeUsd === null || x.importeUsd === undefined).length;
+  const real = delDia.reduce((s, x) => s + (Number(x.importeUsd) || 0), 0);
+  const desvio = (real - estimada) / estimada;
+  const r = { dia, estimada, real, apuntes: delDia.length, sinImporte, desvio };
+  if (!delDia.length || sinImporte || Math.abs(desvio) > DESVIO_COMISION) {
+    const detalle = !delDia.length
+      ? 'Alpaca no ha apuntado ninguna comisión (CFEE) ese día'
+      : `Alpaca apuntó ${f.usd(real)}${sinImporte ? ` (${sinImporte} apuntes sin importe en dólares)` : ''}, un ${f.pct(desvio, { signo: true, decimales: 1 })}`;
+    ctx.bus.publicar({
+      de: 'controller', canal: 'riesgo', tipo: 'alerta',
+      texto: plantillas.frase(`Comisiones del ${dia}: estimadas ${f.usd(estimada)}; ${detalle}. Revisar la tasa con la que se estima.`, 200),
+      datos: r, importancia: 2,
+    });
+  }
+  delete porDia[dia];
+  return r;
 }
 
 function sharpes90(ctx) {
@@ -451,15 +692,20 @@ function informeSemanal(ctx) {
   return datos;
 }
 
-// Kill switch (§7): cancela todo, vende todo lo que hay en el bróker
-// repartiendo cada venta entre los puestos del símbolo, barre lo que quede
-// con cerrarTodo() y deja el fondo bloqueado. Los puestos sombra no se tocan:
-// son una cartera hipotética.
+// Kill switch (§7): bloquea (y lo guarda ya: un kill que muere a mitad tiene
+// que arrancar bloqueado), cancela todo y vende todo lo del bróker con el
+// Ejecutor, repartiendo cada venta entre los puestos del símbolo. Los puestos
+// sombra no se tocan: son una cartera hipotética.
+// Si el bróker falla a mitad (red caída, una venta rechazada), el fondo queda
+// bloqueado y lo que quede se vuelve a intentar vender solo, con esperas
+// crecientes (reintentarKill, desde el vigilante del orquestador).
 async function killSwitch(ctx, motivo) {
   const e = ctx.estado;
   e.fondo.nivel = 'bloqueado';
   e.fondo.motivo = motivo;
   e.fondo.soloCerrarHasta = null;
+  e.fondo.killReintento = null;
+  try { ctx.guardar(); } catch (err) { log.aviso(`no se pudo guardar el bloqueo: ${err.message}`); }
   // La plantilla ya pone el punto: el motivo del vigilante trae el suyo.
   ctx.bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'alerta', texto: plantillas.killSwitch({ motivo: String(motivo || '').replace(/[.\s]+$/, '') }), datos: { motivo }, importancia: 3 });
   for (const a of ctx.plantilla) ctx.moverAgente(a.id, null, 'de_pie');
@@ -467,37 +713,138 @@ async function killSwitch(ctx, motivo) {
   try { await ctx.broker.cancelarTodas(); } catch (err) { log.aviso(`cancelarTodas: ${err.message}`); }
   // Lo cancelado (o ejecutado a medias) entra en los libros antes de vender.
   try { await ctx.ejecutor.resolverEnVuelo(); } catch (err) { log.aviso(`órdenes en vuelo: ${err.message}`); }
+  const r = await venderKill(ctx);
+  programarReintento(ctx, r, 0);
+  if (r.abiertos.length || r.errores.length || r.quedanEnBroker.length) {
+    ctx.bus.publicar({
+      de: 'riesgos', canal: 'riesgo', tipo: 'alerta',
+      texto: plantillas.frase(`Tras el kill quedan ${r.abiertos.length} puestos abiertos y ${r.errores.length} errores${r.quedanEnBroker.length ? `: se reintenta vender ${r.quedanEnBroker.map(etiqueta).join(', ')} cada pocos minutos` : ''}.`),
+      datos: { abiertos: r.abiertos, errores: r.errores, quedanEnBroker: r.quedanEnBroker }, importancia: 3,
+    });
+  }
+  return r;
+}
+
+// Reintento con el fondo bloqueado: vende lo que el bróker aún tenga, sin
+// volver a publicar el KILL SWITCH ni vaciar las ventas que esperan a la apertura.
+async function reintentarKill(ctx) {
+  const e = ctx.estado;
+  const previo = e.fondo.killReintento || { n: 0 };
+  const n = (previo.n || 0) + 1;
+  const r = await venderKill(ctx);
+  programarReintento(ctx, r, n);
+  if (r.quedanEnBroker.length) {
+    ctx.bus.publicar({
+      de: 'riesgos', canal: 'riesgo', tipo: 'alerta',
+      texto: plantillas.frase(`Kill, reintento ${n}: siguen en el bróker ${r.quedanEnBroker.map(etiqueta).join(', ')}. Vuelvo a intentarlo a las ${f.hora(e.fondo.killReintento.proximo)}.`),
+      datos: { n, quedanEnBroker: r.quedanEnBroker, errores: r.errores }, importancia: 3,
+    });
+  } else {
+    ctx.bus.publicar({
+      de: 'riesgos', canal: 'riesgo', tipo: 'alerta',
+      texto: plantillas.frase(`Kill completado en el reintento ${n}: el bróker ya no tiene nada${r.esperanApertura.length ? ` salvo ${r.esperanApertura.map(etiqueta).join(', ')}, que se vende a la apertura` : ''}.`),
+      datos: { n, cerradas: r.cerradas, esperanApertura: r.esperanApertura }, importancia: 3,
+    });
+  }
+  return r;
+}
+
+function programarReintento(ctx, r, n) {
+  const e = ctx.estado;
+  e.fondo.killReintento = r.quedanEnBroker.length ? { n, proximo: ctx.reloj.ahora() + esperaReintento(n) } : null;
+}
+
+// Símbolos del bróker que tras un kill habría que vender aún: posiciones de
+// más de MIN_REINTENTO_USD sin una venta ya encolada para la apertura ni una
+// orden en vuelo.
+function quedanEnBroker(ctx, posiciones = ctx.vivo.posicionesBroker || []) {
+  const e = ctx.estado;
+  const esperan = new Set(e.pendientes.filter(o => o.lado === 'venta').map(o => o.simbolo));
+  const enVuelo = new Set(Object.values(e.ordenesEnVuelo).map(o => o.simbolo));
+  return (posiciones || [])
+    .filter(p => Math.abs(Number(p.valor) || 0) >= MIN_REINTENTO_USD && !esperan.has(p.simbolo) && !enVuelo.has(p.simbolo))
+    .map(p => p.simbolo);
+}
+
+// Vende con el Ejecutor todo lo que tenga el bróker. Ningún fallo del bróker
+// corta la venta a mitad: se anota y se sigue con el siguiente símbolo.
+async function venderKill(ctx) {
+  const e = ctx.estado;
   const ahora = ctx.reloj.ahora();
   const cerradas = [];
   const errores = [];
-  const posiciones = await ctx.broker.posiciones();
-  for (const pos of posiciones) {
+  const esperanApertura = new Set(e.pendientes.filter(o => o.lado === 'venta' && o.tipo === 'kill').map(o => o.simbolo));
+
+  const leerPosiciones = async () => {
+    try { return await ctx.broker.posiciones(); } catch (err) { errores.push({ simbolo: null, motivo: `posiciones: ${err.message}` }); return null; }
+  };
+  const vender = async (simbolo, cantidad) => {
+    if (esperanApertura.has(simbolo)) return 'espera';
+    if (Object.values(e.ordenesEnVuelo).some(o => o.simbolo === simbolo)) return 'en_vuelo';
     const reparto = ctx.libros.listaPuestos({ sombra: false })
-      .filter(p => p.simbolo === pos.simbolo && p.cantidad > EPS)
+      .filter(p => p.simbolo === simbolo && p.cantidad > EPS)
       .map(p => ({ puestoId: p.puestoId, cantidad: p.cantidad }));
-    const r = await ctx.ejecutor.ejecutar({
-      puestoId: reparto.length ? reparto[0].puestoId : null, mesaId: 'fondo', simbolo: pos.simbolo, lado: 'venta',
-      cantidad: Number(pos.disponible ?? pos.cantidad), tipo: 'kill', motivo: 'kill', accion: 'kill', velaT: ahora, reparto, cierraTodo: true,
-    });
-    if (r && r.ok) cerradas.push(pos.simbolo); else errores.push({ simbolo: pos.simbolo, motivo: r && r.motivo });
+    let r;
+    try {
+      r = await ctx.ejecutor.ejecutar({
+        puestoId: reparto.length ? reparto[0].puestoId : null, mesaId: 'fondo', simbolo, lado: 'venta',
+        cantidad, tipo: 'kill', motivo: 'kill', accion: 'kill', velaT: ahora, reparto, cierraTodo: true,
+      });
+    } catch (err) {
+      r = { ok: false, motivo: err.message };
+    }
+    if (r && r.ok) return 'ok';
+    if (r && r.pendiente) { esperanApertura.add(simbolo); return 'espera'; }
+    return (r && r.motivo) || 'error';
+  };
+
+  // Primera pasada: lo que dice el bróker.
+  const fallidos = new Map();
+  const posiciones = await leerPosiciones();
+  for (const pos of posiciones || []) {
+    const r = await vender(pos.simbolo, Number(pos.disponible ?? pos.cantidad));
+    if (r === 'ok') cerradas.push(pos.simbolo); else if (r !== 'espera') fallidos.set(pos.simbolo, r);
   }
-  // Barrido final por si algo no pasó por la cola (acciones con la bolsa cerrada quedan en errores).
-  try {
-    const barrido = await ctx.broker.cerrarTodo();
-    for (const x of barrido.errores || []) errores.push(x);
-  } catch (err) { errores.push({ simbolo: null, motivo: err.message }); }
-  await ctx.refrescarCartera();
-  const abiertos = ctx.libros.listaPuestos({ sombra: false }).filter(p => p.cantidad > EPS);
-  if (abiertos.length || errores.length) {
-    ctx.bus.publicar({
-      de: 'riesgos', canal: 'riesgo', tipo: 'alerta',
-      texto: plantillas.frase(`Tras el kill quedan ${abiertos.length} puestos abiertos y ${errores.length} errores: revisar a mano.`),
-      datos: { abiertos: abiertos.map(p => p.puestoId), errores }, importancia: 3,
-    });
+  // Segunda pasada para lo que quedó a medias (una venta llenada en parte,
+  // sin respuesta o rechazada): se cancela, lo ejecutado entra en los libros
+  // y se vuelve a vender lo que diga el bróker.
+  if (fallidos.size) {
+    try { await ctx.broker.cancelarTodas(); } catch (err) { log.aviso(`cancelarTodas: ${err.message}`); }
+    try { await ctx.ejecutor.resolverEnVuelo(); } catch (err) { log.aviso(`órdenes en vuelo: ${err.message}`); }
+    const otra = await leerPosiciones();
+    for (const pos of otra || []) {
+      if (!fallidos.has(pos.simbolo)) continue;
+      const r = await vender(pos.simbolo, Number(pos.disponible ?? pos.cantidad));
+      if (r === 'ok') { cerradas.push(pos.simbolo); fallidos.delete(pos.simbolo); } else if (r !== 'espera') fallidos.set(pos.simbolo, r);
+    }
+    for (const s of [...fallidos.keys()]) if (otra && !otra.some(p => p.simbolo === s)) fallidos.delete(s);
   }
-  return { cerradas, errores, abiertos: abiertos.map(p => p.puestoId) };
+  for (const [simbolo, motivo] of fallidos) errores.push({ simbolo, motivo });
+
+  // Último recurso, cerrarTodo(): solo si no hay ventas de acciones esperando
+  // a la apertura (con Alpaca, su DELETE dejaría otra venta encolada que nadie
+  // sigue) y siguiendo cada liquidación como una orden propia.
+  if (fallidos.size && !esperanApertura.size && typeof ctx.broker.cerrarTodo === 'function') {
+    try {
+      const barrido = await ctx.broker.cerrarTodo();
+      for (const o of barrido.ordenes || []) {
+        try { await ctx.ejecutor.seguirAjena(o, { tipo: 'kill', motivo: 'kill', accion: 'kill' }); } catch (err) { log.aviso(`liquidación de ${o.simbolo}: ${err.message}`); }
+      }
+      for (const x of barrido.errores || []) {
+        if (x.tipo === 'mercado_cerrado') esperanApertura.add(x.simbolo); else errores.push(x);
+      }
+    } catch (err) { errores.push({ simbolo: null, motivo: err.message }); }
+  }
+
+  try { await ctx.refrescarCartera(); } catch (err) { errores.push({ simbolo: null, motivo: `valoración: ${err.message}` }); }
+  const abiertos = ctx.libros.listaPuestos({ sombra: false }).filter(p => p.cantidad > EPS).map(p => p.puestoId);
+  // Sin la lista del bróker no se puede saber qué queda: al menos lo de los libros.
+  let quedan = quedanEnBroker(ctx);
+  if (posiciones === null && !quedan.length) quedan = [...new Set(ctx.libros.listaPuestos({ sombra: false }).filter(p => p.cantidad > EPS).map(p => p.simbolo))];
+  return { cerradas, errores, esperanApertura: [...esperanApertura], quedanEnBroker: quedan.filter(s => !esperanApertura.has(s)), abiertos };
 }
 
 module.exports = {
-  Ejecutor, conciliarCadaLatido, cierreDiario, informeSemanal, killSwitch, valorMesa, pnlMesaTotal, sharpes90, anotarCurva, GRAVES_PARA_PAUSAR,
+  Ejecutor, conciliarCadaLatido, cierreDiario, informeSemanal, killSwitch, reintentarKill, venderKill, quedanEnBroker, contrastarComisiones,
+  valorMesa, pnlMesaTotal, sharpes90, anotarCurva, esIncierto, GRAVES_PARA_PAUSAR, CANCELAR_TRAS, esperaReintento,
 };

@@ -8,40 +8,27 @@
 // Sin margen, sin cortos y sin acciones con el mercado cerrado: esos casos se
 // rechazan con ErrorBroker del mismo tipo que daría Alpaca.
 //
-// Diferencia con Alpaca que hay que conocer: aquí `cantidadEjecutada` es lo que
-// ENTRA en la posición (neto de comisión en compras cripto) y `comision` va en
-// dólares; Alpaca da filled_qty bruto y comision null, y la diferencia la
-// arregla la conciliación. `cantidadBruta` lleva la cifra bruta por si hace falta.
+// Diferencia con Alpaca que hay que conocer: Alpaca NO rechaza una orden
+// market/day de acciones con la bolsa cerrada; la acepta y la deja en cola
+// hasta la apertura siguiente (también las liquidaciones de cerrarTodo). Aquí
+// se rechaza con 'mercado_cerrado', como fija el contrato, y el Ejecutor
+// encola él mismo esas órdenes; con Alpaca hay que seguir la que devuelve
+// cerrarTodo en `ordenes`.
+//
+// Mismo contrato de Orden que AlpacaBroker: `cantidadEjecutada` es lo que
+// ENTRA en la posición (neto de comisión en compras cripto), `comision` va en
+// dólares y `cantidadBruta` lleva la cifra bruta. Alpaca no da la comisión en
+// la orden y el adaptador la estima a la misma tasa (alpaca-broker.js).
 
 const { ErrorBroker } = require('./errores');
+const { COSTES_POR_DEFECTO, DECIMALES, aFuncion, redondear9, diferenciaOrden } = require('./comun');
 const universo = require('../mercado/universo');
 const calendarioPorDefecto = require('../mercado/calendario');
 const { leerJSON, escribirJSON } = require('../util/almacen');
 const { diaUTC } = require('../util/reloj');
+const log = require('../util/log').crear('broker-simulado');
 
-const DECIMALES = 9;                    // Alpaca admite hasta 9 decimales en qty
 const MAX_ORDENES_GUARDADAS = 1000;
-
-const redondear9 = x => Number(x.toFixed(DECIMALES));
-
-// Costes por defecto: comisión taker nivel 1 de Alpaca cripto (0,25 %, ficha
-// §4), acciones sin comisión. Deslizamiento: BTC/ETH 5 pb, resto cripto 15 pb,
-// ETF 2 pb (§3.4). Misma forma que los `costes` del backtest.
-const COSTES_POR_DEFECTO = Object.freeze({
-  comision: s => (universo.esCripto(s) ? 0.0025 : 0),
-  deslizamiento: s => {
-    if (s === 'BTC/USD' || s === 'ETH/USD') return 0.0005;
-    return universo.esCripto(s) ? 0.0015 : 0.0002;
-  },
-});
-
-// Acepta funciones (sim → fracción), números fijos o mapas { simbolo: fracción }.
-function aFuncion(valor, porDefecto) {
-  if (typeof valor === 'function') return valor;
-  if (typeof valor === 'number') return () => valor;
-  if (valor && typeof valor === 'object') return s => (s in valor ? valor[s] : porDefecto(s));
-  return porDefecto;
-}
 
 function estadoInicial(capital, ahora) {
   return {
@@ -67,13 +54,30 @@ class BrokerSimulado {
     this.calendario = calendario;
     this.comision = aFuncion(costes.comision, COSTES_POR_DEFECTO.comision);
     this.deslizamiento = aFuncion(costes.deslizamiento, COSTES_POR_DEFECTO.deslizamiento);
-    const guardado = ruta ? leerJSON(ruta, null) : null;
+    // Crítico: si el fichero existe pero no se puede leer (bloqueado un
+    // instante, corrupto), arrancar con 100.000 $ nuevos dejaría los libros
+    // contra un bróker vacío. Mejor no arrancar (lo decide util/almacen).
+    const guardado = ruta ? leerJSON(ruta, null, { critico: true }) : null;
     this.estado = guardado && guardado.version === 1 ? guardado : estadoInicial(capitalInicial, reloj.ahora());
+    this.guardadoPendiente = false;
     if (!guardado && ruta) this._guardar();
   }
 
+  // Una vez cambiado el estado (una orden llenada), no poder escribirlo en
+  // disco NO puede convertir la ejecución en un error: el Ejecutor la daría
+  // por rechazada, no la apuntaría y quedaría una posición sin puesto. Se
+  // avisa y se reintenta en la siguiente llamada que guarde (cuenta(), en
+  // cada latido).
   _guardar() {
-    if (this.ruta) escribirJSON(this.ruta, this.estado);
+    if (!this.ruta) return;
+    try {
+      escribirJSON(this.ruta, this.estado, { durable: true });
+      if (this.guardadoPendiente) log.info(`${this.ruta} guardado de nuevo tras el fallo anterior`);
+      this.guardadoPendiente = false;
+    } catch (e) {
+      if (!this.guardadoPendiente) log.aviso(`no se pudo guardar ${this.ruta} (${e.code || e.message}); se reintenta en la siguiente llamada`);
+      this.guardadoPendiente = true;
+    }
   }
 
   async _precios(simbolos) {
@@ -132,9 +136,14 @@ class BrokerSimulado {
   }
 
   async enviarOrden({ idCliente, simbolo, lado, cantidad, nocional } = {}) {
-    // Idempotente como Alpaca: repetir un idCliente devuelve la orden que ya hay.
+    // Idempotente como Alpaca: repetir un idCliente devuelve la orden que ya
+    // hay, pero solo si es la misma orden; si no, el id lo usa otra.
     const previa = this.estado.ordenes.find(o => o.idCliente === idCliente);
-    if (previa) return { ...previa };
+    if (previa) {
+      const diferencia = diferenciaOrden(previa, { simbolo, lado, cantidad, nocional });
+      if (diferencia) throw this._rechazo(`idCliente ${idCliente} ya usado por otra orden (${diferencia})`, 'invalida', 422);
+      return { ...previa };
+    }
 
     if (!idCliente || typeof idCliente !== 'string' || idCliente.length > 128) {
       throw this._rechazo('idCliente obligatorio y de 128 caracteres como mucho', 'invalida', 422);
@@ -237,21 +246,27 @@ class BrokerSimulado {
 
   async cancelarTodas() { return 0; }
 
+  // Todo se llena al instante: no queda nada que cancelar (como el 422 de
+  // Alpaca para una orden ya terminada).
+  async cancelarOrden() { return false; }
+
   // Kill switch: vende todo a mercado. Las acciones con el mercado cerrado no
-  // se pueden vender y quedan en `errores`.
+  // se pueden vender y quedan en `errores`. Las órdenes de liquidación van en
+  // `ordenes`, como en AlpacaBroker.
   async cerrarTodo() {
     const cerradas = [];
     const errores = [];
+    const ordenes = [];
     const t = this.reloj.ahora();
     for (const [simbolo, pos] of Object.entries({ ...this.estado.posiciones })) {
       try {
-        await this.enviarOrden({ idCliente: `kill-${universo.clave(simbolo)}-${t}-${this.estado.contador + 1}`, simbolo, lado: 'venta', cantidad: pos.cantidad });
+        ordenes.push(await this.enviarOrden({ idCliente: `kill-${universo.clave(simbolo)}-${t}-${this.estado.contador + 1}`, simbolo, lado: 'venta', cantidad: pos.cantidad }));
         cerradas.push(simbolo);
       } catch (e) {
         errores.push({ simbolo, status: e.status || null, mensaje: e.message, tipo: e.tipo });
       }
     }
-    return { cerradas, errores };
+    return { cerradas, errores, ordenes };
   }
 
   async relojMercado() {

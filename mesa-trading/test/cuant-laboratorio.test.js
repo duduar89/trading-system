@@ -143,7 +143,8 @@ test('evaluarHipotesis: sobre ruido no aprueba y el informe dice por qué', asyn
   assert.ok(r.criterios.some(c => !c.ok));
   const dd = r.criterios.find(c => c.nombre === 'maxDD OOS');
   assert.ok(Math.abs(dd.umbral - 0.3) < 1e-12); // 1,5 × 0,2
-  assert.equal(dd.fuenteReferencia, 'mesas activas');
+  assert.equal(dd.fuenteReferencia, 'mesa vigente de la familia');
+  assert.match(r.informe, /1,5 × mesa vigente de la familia/);
   assert.match(r.informe, /RECHAZADA\.$/);
   assert.match(r.informe, /NO cumple/);
 });
@@ -160,4 +161,86 @@ test('evaluarHipotesis: sin histórico suficiente → rechazada', async () => {
   const r = await lab.evaluarHipotesis(H, { cargarVelas: async s => poco[s] });
   assert.equal(r.aprobada, false);
   assert.match(r.informe, /Sin datos suficientes/);
+});
+
+// ---- Sin repetir hipótesis (firma de contenido) y DSR con todos los ensayos ----
+
+test('firmaHipotesis: el contenido, no el id, la semana ni el orden', () => {
+  const a = { ...H, id: 'h-2026-06-01-x', filtros: [{ id: 'fg-max', parametro: 80 }, { id: 'regimen-no-riskoff', parametro: null }], params: { umbral: 5, atrStop: 3.5 } };
+  const b = { ...a, id: 'h-2026-06-08-x', motivo: 'otro', universo: ['ETH/USD', 'BTC/USD'], filtros: [...a.filtros].reverse(), params: { atrStop: 3.5, umbral: 5 } };
+  assert.equal(lab.firmaHipotesis(a), lab.firmaHipotesis(b));
+  assert.notEqual(lab.firmaHipotesis(a), lab.firmaHipotesis({ ...a, params: { umbral: 10, atrStop: 3.5 } }));
+  assert.notEqual(lab.firmaHipotesis(a), lab.firmaHipotesis({ ...a, filtros: [] }));
+  assert.notEqual(lab.firmaHipotesis(a), lab.firmaHipotesis({ ...a, universo: ['BTC/USD'] }));
+});
+
+test('generarHipotesis: no repite una hipótesis ya evaluada en los últimos 90 días aunque cambie la semana', () => {
+  const mesas = mesasIniciales({ hayAlpaca: false });
+  const pistas = [
+    { mesaId: 'tendencia', categoria: 'señal_falsa', n: 9 },
+    { mesaId: 'ruptura', categoria: 'stop_estrecho', n: 3 },
+  ];
+  const lunes1 = Date.UTC(2026, 5, 1);
+  const s1 = lab.generarHipotesis({ mesas, pistas, semana: '2026-06-01', ahora: lunes1 });
+  const tend = s1.find(h => h.mesaId === 'tendencia');
+  assert.ok(tend);
+  // Entrada del laboratorio tal como la guarda revisionSemanal ({ id, h, t, estado }).
+  const previas = s1.map(h => ({ id: h.id, h, t: lunes1, estado: 'rechazada' }));
+  const lunes2 = lunes1 + 7 * DIA;
+  const s2 = lab.generarHipotesis({ mesas, pistas, semana: '2026-06-08', previas, ahora: lunes2 });
+  const firmas1 = new Set(s1.map(lab.firmaHipotesis));
+  assert.ok(s2.every(h => !firmas1.has(lab.firmaHipotesis(h))), 'se repitió una hipótesis de la semana anterior');
+  assert.ok(s2.length >= 1, 'el hueco lo aprovecha otra (exploración)');
+  // Pasados 90 días se puede volver a probar.
+  const s3 = lab.generarHipotesis({ mesas, pistas, semana: '2026-09-07', previas, ahora: lunes1 + 91 * DIA });
+  assert.ok(s3.some(h => lab.firmaHipotesis(h) === lab.firmaHipotesis(tend)));
+  // Una aprobada pendiente de contratar (con su firma) o una mesa contratada de ella también bloquean.
+  const aprobada = { ...tend, params: { ...tend.params, atrStop: 3.5 }, firma: lab.firmaHipotesis(tend), t: lunes1 };
+  assert.ok(!lab.generarHipotesis({ mesas, pistas, semana: 'x', previas: [aprobada], ahora: lunes2 }).some(h => h.mesaId === 'tendencia' && h.origen === 'leccion'));
+  const conLab = [...mesas, { id: 'lab1', familia: tend.familia, marco: tend.marco, universo: tend.universo, estado: 'incubacion', filtros: [], firmaHipotesis: lab.firmaHipotesis(tend) }];
+  assert.ok(!lab.generarHipotesis({ mesas: conLab, pistas, semana: 'x', ahora: lunes1 + 200 * DIA }).some(h => lab.firmaHipotesis(h) === lab.firmaHipotesis(tend)));
+});
+
+test('generarHipotesis: la lección y la exploración de la misma semana nunca son la misma hipótesis', () => {
+  const mesas = mesasIniciales({ hayAlpaca: false });
+  const pistas = [{ mesaId: 'tendencia', categoria: 'contra_regimen', n: 5 }];
+  let exploracionesDistintas = 0;
+  for (let w = 0; w < 120; w++) {
+    const hs = lab.generarHipotesis({ mesas, pistas, semana: `2026-S${w}` });
+    const firmas = hs.map(lab.firmaHipotesis);
+    assert.equal(new Set(firmas).size, firmas.length, `semana ${w}: ${hs.map(h => h.id).join(', ')}`);
+    assert.equal(hs.length, 2); // la lección y una exploración que no la repite
+    if (hs[1].origen === 'exploracion') exploracionesDistintas++;
+  }
+  assert.equal(exploracionesDistintas, 120);
+});
+
+test('evaluarHipotesis: el DSR usa la varianza de TODOS los ensayos guardados', async () => {
+  // Sobre ruido con Sharpe OOS alto por azar (1,24): con solo sus 18 combinaciones el DSR es 0,45.
+  const ruido = cestaSintetica(['BTC/USD', 'ETH/USD'], 1500, 3);
+  const comunes = { cargarVelas: async s => ruido[s], ensayosPrevios: 200, universo: UNIVERSO };
+  const solo = await lab.evaluarHipotesis(H, comunes);
+  // Ensayos anteriores muy dispersos: el Sharpe máximo esperado por azar sube y el DSR baja.
+  const dispersos = Array.from({ length: 200 }, (_, k) => (k % 2 ? 3 : -3));
+  const todos = await lab.evaluarHipotesis(H, { ...comunes, sharpesPrevios: dispersos });
+  assert.ok(Number.isFinite(solo.dsr) && Number.isFinite(todos.dsr));
+  assert.ok(todos.dsr < solo.dsr - 0.05, `${todos.dsr} no baja frente a ${solo.dsr}`);
+  assert.ok(todos.sharpeUmbral > solo.sharpeUmbral);
+});
+
+test('evaluarHipotesis: maxDDReferencia puede ser una función del tramo fuera de muestra', async () => {
+  const ruido = cestaSintetica(['BTC/USD', 'ETH/USD'], 1500, 3);
+  let tramoPedido = null;
+  const r = await lab.evaluarHipotesis(H, {
+    cargarVelas: async s => ruido[s], ensayosPrevios: 10,
+    maxDDReferencia: async tramo => { tramoPedido = tramo; return { valor: 0.2, mesaId: 'reversion' }; },
+  });
+  const v = r.walkforward.ventanas;
+  assert.deepEqual(tramoPedido, { desde: v[0].desde, hasta: v[v.length - 1].hasta });
+  const dd = r.criterios.find(c => c.nombre === 'maxDD OOS');
+  assert.ok(Math.abs(dd.umbral - 0.3) < 1e-12);
+  assert.equal(dd.fuenteReferencia, 'mesa reversion');
+  // Si la función no da referencia, comprar y mantener.
+  const r2 = await lab.evaluarHipotesis(H, { cargarVelas: async s => ruido[s], ensayosPrevios: 10, maxDDReferencia: () => undefined });
+  assert.equal(r2.criterios.find(c => c.nombre === 'maxDD OOS').fuenteReferencia, 'comprar y mantener');
 });

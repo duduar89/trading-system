@@ -29,9 +29,9 @@ claves hay más (analistas y operadores de ETF).
 
 | Mesa | Estrategia | Vela | Activos | Estado inicial | Por qué |
 |---|---|---|---|---|---|
-| Momentum cripto | Cada lunes compra las 2 cripto con mejor rentabilidad de 28 días ajustada por volatilidad, solo si suben | 1 día | BTC, ETH, SOL, LINK, AVAX, DOGE | **Titular** | Backtest real 2021-2026 con costes: Sharpe 0,79 frente a 0,66 de comprar y mantener, con un tercio de su caída |
-| Ruptura Donchian | Compra al romper el máximo de 20 días, vende al perder el mínimo de 10 | 1 día | BTC, ETH, SOL | **Titular** | Sharpe 0,67, igual que comprar y mantener, con menos de la mitad de caída |
-| Tendencia SMA | SMA 7 > SMA 25 con el precio sobre la SMA 200 (la del vídeo) | 4 horas | BTC, ETH, SOL | **Incubación (2 %)** | Pierde con costes: Sharpe −0,51, se deja en comisiones casi la mitad del capital |
+| Momentum cripto | Cada lunes compra las 2 cripto con mejor rentabilidad de 28 días ajustada por volatilidad, solo si suben | 1 día | BTC, ETH, SOL, LINK, AVAX, DOGE | **Titular** | Backtest real 2021-2026 con costes: Sharpe 0,83 frente a 0,63 de comprar y mantener, con menos de un tercio de su caída (28 % frente a 95 %) |
+| Ruptura Donchian | Compra al romper el máximo de 20 días, vende al perder el mínimo de 10 | 1 día | BTC, ETH, SOL | **Titular** | Sharpe 0,64, algo por debajo del 0,66 de comprar y mantener, con algo más de un tercio de su caída (36 % frente a 95 %). Si sigue de titular lo decide Eduardo |
+| Tendencia SMA | SMA 7 > SMA 25 con el precio sobre la SMA 200 (la del vídeo) | 4 horas | BTC, ETH, SOL | **Incubación (2 %)** | Pierde con costes: Sharpe −0,52; en 539 operaciones se deja en comisiones 4.434 $ de cada 10.000 $ |
 | Reversión RSI | Compra caídas extremas (RSI(2) < 10) en tendencia alcista | 1 día | BTC, ETH | **Incubación (2 %)** | Pierde con costes: Sharpe −0,42 |
 | Momentum ETF (con claves) | Rotación mensual entre SPY, QQQ, IWM, TLT y GLD | 1 día | ETF | Titular | Sin comprobar con datos reales (necesita claves) |
 | Reversión ETF (con claves) | RSI(2) en SPY y QQQ | 1 día | ETF | Titular | Sin comprobar con datos reales (necesita claves) |

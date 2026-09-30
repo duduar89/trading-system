@@ -6,6 +6,9 @@
 //   node scripts/probar-backtest.js --real   además, velas reales de BTC/ETH/SOL desde
 //                                            2021 y cada familia por defecto frente a
 //                                            comprar y mantener (caché en data/cache/probar/)
+//   --datos=<carpeta>   la caché va en <carpeta>/cache/probar/ en vez de data/
+//   --usar-cache        con --real, usa la caché aunque tenga más de 12 h (sin red):
+//                       repite las cifras de una descarga anterior
 //
 // Detrás de un proxy corporativo, el fetch de Node necesita NODE_USE_ENV_PROXY=1.
 
@@ -23,6 +26,8 @@ const { HORA } = require('../src/util/reloj');
 
 const DIA = 86_400_000;
 const T0 = Date.UTC(2020, 0, 6);
+const ARG = Object.fromEntries(process.argv.slice(2).map(a => /^--([a-z-]+)(?:=(.*))?$/.exec(a)).filter(Boolean).map(m => [m[1], m[2] === undefined ? true : m[2]]));
+const CARPETA_DATOS = typeof ARG.datos === 'string' && ARG.datos ? path.resolve(ARG.datos) : path.join(RAIZ, 'data');
 let fallos = 0;
 function caso(nombre, fn) {
   try {
@@ -137,6 +142,41 @@ function casosOffline() {
     cerca(m.rentabilidad, 0.089);
   });
 
+  // Hueco de datos como el de SOL en Alpaca (jul-2023 → ago-2024): 10 velas a
+  // 20, 30 días sin ninguna y 10 más; la primera de después abre con el precio
+  // rancio de antes (18) y cierra al de verdad (157).
+  const conHueco = () => [
+    ...Array.from({ length: 10 }, (_, d) => ({ t: T0 + d * DIA, o: 20, h: 20.5, l: 19.5, c: 20, v: 0 })),
+    ...Array.from({ length: 10 }, (_, k) => (k === 0
+      ? { t: T0 + 40 * DIA, o: 18, h: 159, l: 18, c: 157, v: 0 }
+      : { t: T0 + (40 + k) * DIA, o: 157, h: 158, l: 156, c: 157, v: 0 })),
+  ];
+
+  caso('hueco: la orden decidida justo antes caduca (no se compra a 18 con el precio en 157)', () => {
+    const r = backtest({ velas: { 'SOL/USD': conHueco() }, estrategia: guion({ abrirEn: 9 }), capital: 10000, costes: COSTES, limites: ABIERTOS, volObjetivo: Infinity });
+    assert.equal(r.operaciones.length, 0);
+    assert.ok(r.curva.every(p => p.valor === 10000));
+  });
+
+  caso('hueco: lo abierto se vende al último cierre de antes (20·0,9985), motivo «hueco», P&L −79,74 $ y cuadre', () => {
+    const serie = conHueco();
+    const r = backtest({ velas: { 'SOL/USD': serie }, estrategia: guion({ abrirEn: 2 }), capital: 10000, costes: COSTES, limites: ABIERTOS, volObjetivo: Infinity });
+    assert.equal(r.operaciones.length, 1);
+    const op = r.operaciones[0];
+    assert.equal(op.motivoSalida, 'hueco');
+    assert.equal(op.entradaT, serie[3].t);
+    assert.equal(op.salidaT, serie[9].t + DIA);
+    cerca(op.entradaPrecio, 20 * 1.0015, 1e-12);
+    cerca(op.salidaPrecio, 20 * 0.9985, 1e-12);
+    // A mano: 9.975 $ (10.000 menos la comisión de compra) / 20,03 = 498,002996 SOL;
+    // 498,002996 · 19,97 = 9.945,11982 − 0,25 % = 9.920,25702 → P&L −79,74298 $.
+    const cantidad = 9975 / (20 * 1.0015);
+    cerca(op.pnl, cantidad * 20 * 0.9985 * 0.9975 - 10000, 1e-8);
+    cerca(op.pnl, -79.74298, 1e-5);
+    cerca(r.curva[r.curva.length - 1].valor - 10000, op.pnl, 1e-9);
+    for (let k = 1; k < r.curva.length; k++) assert.ok(Math.abs(r.curva[k].valor / r.curva[k - 1].valor - 1) < 0.01, 'salto en la curva');
+  });
+
   caso('walk-forward: 48 meses calientes dan 5 ventanas 18/6 contiguas', () => {
     const v = calcularVentanas({ tCalentado: Date.UTC(2020, 0, 1), tFin: Date.UTC(2024, 0, 1), entrenoMeses: 18, pruebaMeses: 6 });
     assert.equal(v.length, 5);
@@ -179,9 +219,10 @@ async function pedir(url) {
 // aunque se pida limit=10000, así que 5 años son ~300 páginas por símbolo.
 // La caché solo vale si la paginación terminó sola (completa: true).
 async function descargar(simbolo, marco) {
-  const ruta = path.join(RAIZ, 'data', 'cache', 'probar', `${simbolo.replace('/', '')}_${marco}.json`);
+  const ruta = path.join(CARPETA_DATOS, 'cache', 'probar', `${simbolo.replace('/', '')}_${marco}.json`);
   const cache = leerJSON(ruta);
-  if (cache && cache.completa === true && Array.isArray(cache.velas) && Date.now() - cache.descargado < 12 * HORA) return cache.velas;
+  if (cache && cache.completa === true && Array.isArray(cache.velas) && (ARG['usar-cache'] || Date.now() - cache.descargado < 12 * HORA)) return cache.velas;
+  if (ARG['usar-cache']) throw new Error(`--usar-cache sin caché completa en ${ruta}`);
   const marcoMs = comun.MARCOS[marco];
   const porT = new Map();
   let token = null;

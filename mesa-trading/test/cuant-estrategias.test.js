@@ -401,3 +401,90 @@ test('Señal: forma de §4.3 y peso 1/universo en familias por activo', () => {
     }
   }
 });
+
+// ---- Velas sin decidir (ordenador apagado o dormido) e huecos en los datos ----
+
+test('tendencia-sma: un cruce que cae en una vela sin decidir se recupera con iAnterior', () => {
+  // VELAS_CRUCE: la condición falla en i=5 y se cumple en i=6, 7 y 8. Si la última
+  // vela decidida fue la 5 y la 6 no se decidió (apagado), en la 7 se entra tarde.
+  const prep = tendencia.preparar({ 'SOL/USD': VELAS_CRUCE }, P_CRUCE);
+  const d = extra => tendencia.decidir(prep, { simbolo: 'SOL/USD', i: 7, posicion: null, contexto: {}, ...extra });
+  assert.equal(d({}).accion, 'nada');                       // sin iAnterior: como el backtest (flanco en 6, no en 7)
+  assert.equal(d({ iAnterior: 6 }).accion, 'nada');         // la 6 se decidió: el cruce ya se vio
+  const tarde = d({ iAnterior: 5 });
+  assert.equal(tarde.accion, 'abrir');                      // la 6 no se decidió: el cruce ocurrió mientras tanto
+  assert.equal(tarde.stop, tendencia.decidir(prep, { simbolo: 'SOL/USD', i: 7, iAnterior: 5, contexto: {}, textos: false }).stop);
+  // Si la condición se cumplía ya en la última decidida y no falló en medio, no hay cruce nuevo.
+  assert.equal(tendencia.decidir(prep, { simbolo: 'SOL/USD', i: 8, iAnterior: 6, contexto: {} }).accion, 'nada');
+});
+
+test('momentum cripto: el rebalanceo del lunes no se pierde si el domingo no se decidió', () => {
+  const velas = diasSeguidos({
+    'BTC/USD': [10, 11, 12, 13, 14, 15, 16, 17],
+    'ETH/USD': [10, 10.1, 10.2, 10.3, 10.5, 10.8, 11, 11.1],
+    'SOL/USD': [10, 9.8, 9.5, 9, 8, 7.5, 7, 6.5],
+  });
+  const prep = momentum.preparar(velas, { lookbacks: [2], ajustarVol: false, top: 2, rebalanceo: 'semanal', soloPositivos: true, atr: 2, atrStop: 3 });
+  // i=6 (domingo) es la vela del rebalanceo. Última decidida: 5; siguiente: 7.
+  assert.equal(momentum.decidir(prep, { simbolo: 'BTC/USD', i: 7, contexto: {} }).accion, 'nada');
+  assert.equal(momentum.decidir(prep, { simbolo: 'BTC/USD', i: 7, iAnterior: 6, contexto: {} }).accion, 'nada');
+  assert.equal(momentum.decidir(prep, { simbolo: 'BTC/USD', i: 7, iAnterior: 5, contexto: {} }).accion, 'abrir');
+  assert.equal(momentum.esRebalanceo(prep, prep.porSimbolo['BTC/USD'], 7, 5), true);
+  assert.equal(momentum.esRebalanceo(prep, prep.porSimbolo['BTC/USD'], 7), false);
+});
+
+test('momentum etf: la primera sesión del mes sin decidir se rebalancea en la siguiente', () => {
+  const t0 = Date.UTC(2020, 0, 27);
+  const dias = [];
+  for (let d = 0; dias.length < 12; d++) { const t = t0 + d * DIA; const w = new Date(t).getUTCDay(); if (w !== 0 && w !== 6) dias.push(t); }
+  const mk = cc => cc.map((c, i) => ({ t: dias[i], o: c, h: c, l: c, c, v: 0 }));
+  const velas = { SPY: mk([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]), TLT: mk([12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]) };
+  const prep = momentum.preparar(velas, { ...momentum.parametrosEtf, lookbacks: [2], atr: 2 });
+  // i=5 es la primera sesión de febrero. Última decidida: 4 (enero); siguiente: 6.
+  assert.equal(momentum.decidir(prep, { simbolo: 'SPY', i: 6, contexto: {} }).accion, 'nada');
+  assert.equal(momentum.decidir(prep, { simbolo: 'SPY', i: 6, iAnterior: 5, contexto: {} }).accion, 'nada');
+  assert.equal(momentum.decidir(prep, { simbolo: 'SPY', i: 6, iAnterior: 4, contexto: {} }).accion, 'abrir');
+});
+
+test('momentum: tras un HUECO en los datos la puntuación no mezcla precios de antes y no desplaza a los demás', () => {
+  // SOL deja de tener velas del día 10 al 39 y vuelve 10 veces más cara (como SOL en
+  // Alpaca). El domingo 41 su rentabilidad de 2 velas cruzaría el hueco: +900 %.
+  const n = 100;
+  const btc = Array.from({ length: n }, (_, d) => 100 * 1.01 ** d);
+  const eth = Array.from({ length: n }, (_, d) => 50 * 1.005 ** d);
+  const velas = diasSeguidos({ 'BTC/USD': btc, 'ETH/USD': eth });
+  velas['SOL/USD'] = Array.from({ length: n }, (_, d) => d)
+    .filter(d => d < 10 || d >= 40)
+    .map(d => { const c = d < 10 ? 10 : 100; return { t: T0 + d * DIA, o: c, h: c, l: c, c, v: 0 }; });
+  const params = { lookbacks: [2], ajustarVol: false, top: 2, rebalanceo: 'semanal', soloPositivos: true, atr: 2, atrStop: 3 };
+  const prep = momentum.preparar(velas, params);
+  const sol = prep.porSimbolo['SOL/USD'];
+  const iSol = velas['SOL/USD'].findIndex(v => v.t === T0 + 41 * DIA);
+  assert.equal(new Date(T0 + 41 * DIA).getUTCDay(), 0); // domingo: rebalanceo
+  assert.equal(sol.puntuacion[iSol], null);
+  assert.equal(momentum.decidir(prep, { simbolo: 'SOL/USD', i: iSol, contexto: {} }).accion, 'nada');
+  assert.equal(momentum.decidir(prep, { simbolo: 'BTC/USD', i: 41, contexto: {} }).accion, 'abrir');
+  assert.equal(momentum.decidir(prep, { simbolo: 'ETH/USD', i: 41, contexto: {} }).accion, 'abrir');
+  // Vacía mientras el motor no lo deja decidir (velasMemoria: calentamiento + 15·ATR);
+  // después vuelve a puntuar, ya solo con precios de después.
+  const ventana = comun.velasMemoria(momentum, params);
+  assert.equal(ventana, 3 + 15 * 2);
+  const vuelta = 10;                                  // índice de SOL de la primera vela tras el hueco
+  assert.equal(sol.puntuacion[vuelta + ventana - 1], null);
+  assert.equal(sol.rentMedia[vuelta + ventana], 0);
+  // Sin hueco (series continuas) nada cambia: la puntuación existe desde el lookback.
+  assert.notEqual(prep.porSimbolo['BTC/USD'].puntuacion[2], null);
+});
+
+test('comun.umbralHueco: noches, fines de semana y puentes no son hueco; semanas sin velas, sí', () => {
+  const H4 = 4 * 3600e3;
+  assert.equal(comun.umbralHueco(DIA), 5 * DIA);
+  assert.equal(comun.umbralHueco(H4), 5 * DIA);
+  const puente = [{ t: Date.UTC(2026, 3, 2, 4) }, { t: Date.UTC(2026, 3, 6, 4) }]; // jueves → lunes (Viernes Santo)
+  assert.deepEqual(comun.reanudaciones(puente, comun.umbralHueco(DIA)), []);
+  const hueco = [{ t: T0 }, { t: T0 + DIA }, { t: T0 + 30 * DIA }, { t: T0 + 31 * DIA }];
+  assert.deepEqual(comun.reanudaciones(hueco, comun.umbralHueco(DIA)), [2]);
+  assert.equal(comun.ultimaReanudacion([2, 9], 1), -Infinity);
+  assert.equal(comun.ultimaReanudacion([2, 9], 5), 2);
+  assert.equal(comun.ultimaReanudacion([2, 9], 9), 9);
+});

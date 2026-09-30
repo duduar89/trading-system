@@ -124,15 +124,26 @@ async function probarCuenta(reloj, limitador, claves, ordenPrueba) {
     return broker.esperarEjecucion(idCompra, { timeoutMs: 30_000 });
   });
   if (!compra) return;
-  comprobar('compra ejecutada', compra.estado === 'ejecutada', `${compra.cantidadEjecutada} BTC a ${compra.precioMedio} $ (estado ${compra.estado})`);
-  // La comisión se cobra en BTC: lo que entra en la posición es menos que filled_qty.
+  const inicioPrueba = reloj.ahora() - 60_000;
+  comprobar('compra ejecutada', compra.estado === 'ejecutada',
+    `filled_qty ${compra.cantidadBruta} BTC a ${compra.precioMedio} $; neto estimado ${compra.cantidadEjecutada} y comisión estimada ${formato.usd(compra.comision)} (estado ${compra.estado})`);
+  // La comisión se cobra en BTC: lo que entra en la posición es menos que
+  // filled_qty. El adaptador lo ESTIMA a la tasa taker (0,25 %); aquí se
+  // compara con lo que de verdad ha entrado (ficha §4: no está documentado si
+  // paper cobra).
   let despues = antes;
   for (let i = 0; i < 10 && despues <= antes; i++) {
     await reloj.dormir(1000);
     despues = ((await broker.posiciones()).find(p => p.simbolo === 'BTC/USD') || { cantidad: 0 }).cantidad;
   }
   const recibido = despues - antes;
-  comprobar('la posición crece', recibido > 0, `+${recibido.toFixed(9)} BTC (filled_qty ${compra.cantidadEjecutada}; diferencia ${(compra.cantidadEjecutada - recibido).toFixed(9)} = comisión en el activo)`);
+  const bruta = compra.cantidadBruta;
+  const tasaReal = bruta > 0 ? 1 - recibido / bruta : null;
+  comprobar('la posición crece', recibido > 0, `+${recibido.toFixed(9)} BTC (filled_qty ${bruta}; se quedó ${(bruta - recibido).toFixed(9)} BTC = comisión real ${tasaReal === null ? '—' : formato.pct(tasaReal, { decimales: 3 })})`);
+  // Si no cuadra, las cifras de los libros llevan una comisión que no es la
+  // real: hay que fijar costes.comision del AlpacaBroker (0 si paper no cobra).
+  comprobar('la comisión estimada coincide con la que cobra paper', Math.abs(recibido - compra.cantidadEjecutada) <= Math.max(2e-9, bruta * 1e-4),
+    `estimado ${compra.cantidadEjecutada}, recibido ${recibido.toFixed(9)}${Math.abs(recibido - bruta) <= 2e-9 ? ': paper NO cobra comisión en el activo' : ''}`);
   const posBtc = (await broker.posiciones()).find(p => p.simbolo === 'BTC/USD');
   const vender = redondearAbajo(Math.min(recibido, posBtc ? posBtc.disponible : 0), a && a.incremento ? a.incremento : 1e-9);
   const idVenta = `mt-prueba-BTCUSD-${sello}-venta`;
@@ -140,7 +151,13 @@ async function probarCuenta(reloj, limitador, claves, ordenPrueba) {
     await broker.enviarOrden({ idCliente: idVenta, simbolo: 'BTC/USD', lado: 'venta', cantidad: vender });
     return broker.esperarEjecucion(idVenta, { timeoutMs: 30_000 });
   });
-  if (venta) comprobar('venta ejecutada', venta.estado === 'ejecutada', `${venta.cantidadEjecutada} BTC a ${venta.precioMedio} $`);
+  if (venta) comprobar('venta ejecutada', venta.estado === 'ejecutada', `${venta.cantidadEjecutada} BTC a ${venta.precioMedio} $; comisión estimada ${formato.usd(venta.comision)}`);
+  // Alpaca apunta la comisión real (CFEE) al final del día: justo después de
+  // operar lo normal es que aún no esté. Mañana se puede contrastar.
+  const cfee = await paso('actividades CFEE', () => broker.comisiones({ desde: inicioPrueba }));
+  if (cfee) {
+    console.log(`       CFEE desde la compra: ${cfee.length ? cfee.map(x => `${x.cantidad ?? ''} ${x.simbolo ?? ''} ${x.importe ?? ''} $`).join(' · ') : 'ninguna todavía (se apuntan al final del día)'}`);
+  }
 }
 
 async function main() {

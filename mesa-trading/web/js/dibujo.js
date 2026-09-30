@@ -289,10 +289,13 @@
       if (p.eje === 'col' && p.desde === 0) caja(ctx, p.en - 0.14, -0.02, p.en + 0.14, 0.12, 0, H, '#465281');
       if (p.eje === 'fila' && p.desde === 0) caja(ctx, -0.02, p.en - 0.14, 0.12, p.en + 0.14, 0, H, '#465281');
     }
+    // Ventanas y relojes NO van aquí: dependen de la hora de la mesa (simulada
+    // en sintético) y se pegan cada fotograma como textura (pintarVentanaTex,
+    // pintarRelojesTex), igual que la pantalla gigante. En la capa estática
+    // iban con la hora real del portátil y se contradecían con el resto.
     for (const d of mapa.decoraciones) {
-      if (d.tipo === 'ventana') pintarVentana(ctx, d, o.ahora || Date.now());
-      else if (d.tipo === 'relojes') pintarRelojes(ctx, d, o.ahora || Date.now());
-      else if (d.tipo === 'rotuloParque') pintarRotuloParque(ctx, d);
+      if (d.tipo === 'ventana' || d.tipo === 'relojes') continue;
+      if (d.tipo === 'rotuloParque') pintarRotuloParque(ctx, d);
       else if (d.tipo === 'pantallaGigante' || d.tipo === 'limites') pintarMarcoPantalla(ctx, d);
     }
     // Muebles pegados al fondo que nadie puede tapar por detrás.
@@ -322,68 +325,84 @@
     return ['#070d24', '#1b2a58', '#141b33', true];
   }
 
-  function pintarVentana(ctx, d, ahora) {
-    const hora = new Date(ahora).getHours();
-    const [arriba, abajo, edificios, luces] = colorCielo(hora);
-    const m = marcoPared(d.pared, d.desde, d.hasta, d.z0, d.z1);
-    const W = 200; const Hh = 110;
-    conMarco(ctx, m, W, Hh, (c) => {
-      const g = c.createLinearGradient(0, 0, 0, Hh);
-      g.addColorStop(0, arriba); g.addColorStop(1, abajo);
-      c.fillStyle = g;
-      c.fillRect(0, 0, W, Hh);
-      const r = azar(Math.round(d.desde * 97 + d.hasta * 13));
-      let x = -4;
-      while (x < W) {
-        const w = 14 + r() * 26;
-        const h = 22 + r() * 62;
-        c.fillStyle = edificios;
-        c.fillRect(x, Hh - h, w - 2, h);
-        if (luces) {
-          c.fillStyle = 'rgba(255, 214, 120, 0.8)';
-          for (let yy = Hh - h + 5; yy < Hh - 4; yy += 7) {
-            for (let xx = x + 3; xx < x + w - 5; xx += 6) if (r() < 0.35) c.fillRect(xx, yy, 2.4, 3);
-          }
+  // Tamaño lógico de las texturas de ventana y relojes (se pintan al doble para
+  // que no se vean borrosas con zoom en pantallas retina).
+  const TEX_VENTANA = { w: 200, h: 110 };
+  const TEX_RELOJES = { w: 400, h: 70 };
+
+  // Hora «de pared» de un instante en la zona del panel (0-23), para el cielo.
+  function horaDe(ahora) {
+    try { return Number(new Intl.DateTimeFormat('es-ES', { hour: 'numeric', hourCycle: 'h23', timeZone: cifras.ZONA }).format(new Date(ahora))); } catch (_) { return new Date(ahora).getHours(); }
+  }
+
+  function prepararTex(tex, w, h) {
+    const c = tex.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, tex.width, tex.height);
+    c.setTransform(tex.width / w, 0, 0, tex.height / h, 0, 0);
+    return c;
+  }
+
+  // Ventana: cielo según la hora de la mesa y siluetas deterministas por ventana.
+  function pintarVentanaTex(tex, d, ahora) {
+    const [arriba, abajo, edificios, luces] = colorCielo(horaDe(ahora));
+    const W = TEX_VENTANA.w; const Hh = TEX_VENTANA.h;
+    const c = prepararTex(tex, W, Hh);
+    const g = c.createLinearGradient(0, 0, 0, Hh);
+    g.addColorStop(0, arriba); g.addColorStop(1, abajo);
+    c.fillStyle = g;
+    c.fillRect(0, 0, W, Hh);
+    const r = azar(Math.round(d.desde * 97 + d.hasta * 13));
+    let x = -4;
+    while (x < W) {
+      const w = 14 + r() * 26;
+      const h = 22 + r() * 62;
+      c.fillStyle = edificios;
+      c.fillRect(x, Hh - h, w - 2, h);
+      if (luces) {
+        c.fillStyle = 'rgba(255, 214, 120, 0.8)';
+        for (let yy = Hh - h + 5; yy < Hh - 4; yy += 7) {
+          for (let xx = x + 3; xx < x + w - 5; xx += 6) if (r() < 0.35) c.fillRect(xx, yy, 2.4, 3);
         }
-        x += w;
       }
-      // Marco y parteluces.
-      c.strokeStyle = '#d4dbea';
-      c.lineWidth = 5;
-      c.strokeRect(2.5, 2.5, W - 5, Hh - 5);
-      c.lineWidth = 3;
-      c.beginPath();
-      c.moveTo(W / 2, 0); c.lineTo(W / 2, Hh);
-      c.moveTo(0, Hh * 0.42); c.lineTo(W, Hh * 0.42);
-      c.stroke();
-      // Reflejo.
-      c.fillStyle = 'rgba(255,255,255,0.10)';
-      c.beginPath(); c.moveTo(20, 0); c.lineTo(60, 0); c.lineTo(10, Hh); c.lineTo(-30, Hh); c.closePath(); c.fill();
-    });
+      x += w;
+    }
+    // Marco y parteluces.
+    c.strokeStyle = '#d4dbea';
+    c.lineWidth = 5;
+    c.strokeRect(2.5, 2.5, W - 5, Hh - 5);
+    c.lineWidth = 3;
+    c.beginPath();
+    c.moveTo(W / 2, 0); c.lineTo(W / 2, Hh);
+    c.moveTo(0, Hh * 0.42); c.lineTo(W, Hh * 0.42);
+    c.stroke();
+    // Reflejo.
+    c.fillStyle = 'rgba(255,255,255,0.10)';
+    c.beginPath(); c.moveTo(20, 0); c.lineTo(60, 0); c.lineTo(10, Hh); c.lineTo(-30, Hh); c.closePath(); c.fill();
+    return colorCielo(horaDe(ahora))[0];
   }
 
   const CIUDADES = [['NUEVA YORK', 'America/New_York'], ['LONDRES', 'Europe/London'], ['MADRID', 'Europe/Madrid'], ['TOKIO', 'Asia/Tokyo']];
-  function pintarRelojes(ctx, d, ahora) {
-    const m = marcoPared(d.pared, d.desde, d.hasta, d.z0, d.z1);
-    const W = 400; const Hh = 70;
-    conMarco(ctx, m, W, Hh, (c) => {
-      CIUDADES.forEach(([nombre, zona], i) => {
-        const x = i * 100 + 4;
-        c.fillStyle = '#0d1226';
-        rectRedondo(c, x, 4, 92, 62, 6);
-        c.fill();
-        c.fillStyle = '#8a93b0';
-        c.font = `700 11px ${FUENTE}`;
-        c.textAlign = 'center';
-        c.fillText(nombre, x + 46, 22);
-        c.fillStyle = '#ffb547';
-        c.font = `700 24px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
-        let h = '--:--';
-        try { h = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: zona }).format(new Date(ahora)); } catch (_) { /* zona no disponible */ }
-        c.fillText(h, x + 46, 54);
-      });
-      c.textAlign = 'left';
+  // Relojes de pared con la hora de la MESA (la simulada en sintético).
+  function pintarRelojesTex(tex, ahora) {
+    const W = TEX_RELOJES.w;
+    const c = prepararTex(tex, W, TEX_RELOJES.h);
+    CIUDADES.forEach(([nombre, zona], i) => {
+      const x = i * 100 + 4;
+      c.fillStyle = '#0d1226';
+      rectRedondo(c, x, 4, 92, 62, 6);
+      c.fill();
+      c.fillStyle = '#8a93b0';
+      c.font = `700 11px ${FUENTE}`;
+      c.textAlign = 'center';
+      c.fillText(nombre, x + 46, 22);
+      c.fillStyle = '#ffb547';
+      c.font = `700 24px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+      let h = '--:--';
+      try { h = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: zona }).format(new Date(ahora)); } catch (_) { /* zona no disponible */ }
+      c.fillText(h, x + 46, 54);
     });
+    c.textAlign = 'left';
   }
 
   function pintarRotuloParque(ctx, d) {
@@ -844,6 +863,50 @@
     return v > 0 ? '#34d399' : v < 0 ? '#f87171' : '#8a93b0';
   }
 
+  // Texto corto del nivel efectivo del fondo (barra, pantalla gigante): dice
+  // también de dónde viene un «solo cerrar» que no pone el vigilante.
+  function textoNivel(n) {
+    if (!n || n.nivel === 'normal') return n && n.defensivo ? 'DEFENSIVO ×0,5' : '';
+    if (n.nivel === 'bloqueado') return 'BLOQUEADO';
+    if (n.nivel === 'pausado') return 'PAUSADO · SOLO CERRAR';
+    if (n.origen === 'comité') return 'SOLO CERRAR · COMITÉ';
+    if (n.origen === 'Megáfono') return `SOLO CERRAR HASTA ${cifras.hora(n.hasta)} · MEGÁFONO`;
+    return 'SOLO CERRAR';
+  }
+
+  // Orden de las cotizaciones cuando no caben todas en una columna: primero las
+  // que tienen posición, luego el orden del universo.
+  function ordenarCotizaciones(inst) {
+    const cot = (inst.cotizaciones || []).slice();
+    const conPos = new Set((inst.posiciones || []).map(p => p.simbolo));
+    return cot.map((q, k) => ({ q, k })).sort((a, b) => (conPos.has(b.q.simbolo) - conPos.has(a.q.simbolo)) || a.k - b.k).map(x => x.q);
+  }
+
+  // Una fila de cotización. Un precio parado (más viejo que el límite de §5.3,
+  // o sin hora) se pinta apagado y, en lugar de la variación, dice su edad.
+  function filaCotizacion(c, q, inst, x, y, o) {
+    const edad = cifras.precioViejo(q, inst.ahora, inst.limites);
+    const viejo = !!(edad && edad.viejo);
+    c.globalAlpha = viejo ? 0.45 : 1;
+    c.fillStyle = '#e6e9f2';
+    c.font = `800 ${o.fuente}px ${FUENTE}`;
+    c.fillText(q.etiqueta || q.simbolo, x, y);
+    c.textAlign = 'right';
+    c.font = `600 ${o.fuente}px ${FUENTE}`;
+    c.fillText(cifras.precio(q.precio), x + o.xPrecio, y);
+    c.font = `700 ${o.fuente - 2}px ${FUENTE}`;
+    if (viejo) {
+      c.fillStyle = '#fcd34d';
+      c.fillText(edad.edadMs === null ? 'sin hora' : cifras.hace(edad.edadMs), x + o.xVar, y);
+    } else {
+      c.fillStyle = colorVar(q.var24hPct);
+      const flecha = q.var24hPct > 0 ? '▲ ' : q.var24hPct < 0 ? '▼ ' : '';
+      c.fillText(flecha + cifras.pct(q.var24hPct, { signo: true }), x + o.xVar, y);
+    }
+    c.textAlign = 'left';
+    c.globalAlpha = 1;
+  }
+
   // Pantalla gigante: cotizaciones | patrimonio, resultado y curva | hechos de la mesa.
   function pintarPantallaGigante(tex, inst, extra) {
     const c = tex.getContext('2d');
@@ -884,25 +947,28 @@
     c.fillRect(x1 - 16, 76, 2, H - 96);
     c.fillRect(x2 - 16, 76, 2, H - 96);
 
-    // Cotizaciones.
+    // Cotizaciones: hasta 6 en una columna; con más (modo Alpaca: 6 cripto y
+    // 8 ETF) en dos columnas de hasta 7, con las que tienen posición delante.
     c.fillStyle = '#8a93b0';
     c.font = `700 22px ${FUENTE}`;
     c.fillText('COTIZACIONES', 30, 100);
-    const cot = (inst.cotizaciones || []).slice(0, 6);
-    cot.forEach((q, k) => {
-      const y = 142 + k * 36;
-      c.fillStyle = '#e6e9f2';
-      c.font = `800 26px ${FUENTE}`;
-      c.fillText(q.etiqueta || q.simbolo, 30, y);
-      c.textAlign = 'right';
-      c.font = `600 26px ${FUENTE}`;
-      c.fillText(cifras.precio(q.precio), 390, y);
-      c.fillStyle = colorVar(q.var24hPct);
-      c.font = `700 24px ${FUENTE}`;
-      const flecha = q.var24hPct > 0 ? '▲ ' : q.var24hPct < 0 ? '▼ ' : '';
-      c.fillText(flecha + cifras.pct(q.var24hPct, { signo: true }), 566, y);
-      c.textAlign = 'left';
-    });
+    const todas = inst.cotizaciones || [];
+    if (todas.length <= 6) {
+      todas.forEach((q, k) => filaCotizacion(c, q, inst, 30, 142 + k * 36, { fuente: 26, xPrecio: 360, xVar: 536 }));
+    } else {
+      const orden = ordenarCotizaciones(inst);
+      const MAX = 14;
+      const visibles = orden.length > MAX ? orden.slice(0, MAX - 1) : orden;
+      visibles.forEach((q, k) => {
+        const col = k < 7 ? 0 : 1;
+        filaCotizacion(c, q, inst, col ? 300 : 30, 130 + (k % 7) * 30, { fuente: 20, xPrecio: 158, xVar: 262 });
+      });
+      if (orden.length > MAX) {
+        c.fillStyle = '#8a93b0';
+        c.font = `700 18px ${FUENTE}`;
+        c.fillText(`+${cifras.numero(orden.length - (MAX - 1))} más`, 300, 130 + 6 * 30);
+      }
+    }
 
     // Patrimonio y curva.
     c.fillStyle = '#8a93b0';
@@ -949,16 +1015,21 @@
       c.beginPath(); c.arc(cx1, Y(ultimo), 7, 0, Math.PI * 2); c.fill();
     }
 
-    // Hechos de la mesa.
+    // Hechos de la mesa. La hora lleva el día si no es de hoy (reloj de la
+    // mesa): las mesas diarias operan poco y casi todo lo de aquí es de otro día.
     c.fillStyle = '#8a93b0';
     c.font = `700 22px ${FUENTE}`;
     c.fillText('HECHOS DE LA MESA', x2, 100);
     const hechos = (inst.ejecuciones || []).slice().sort((a, b) => b.t - a.t).slice(0, 6);
     if (!hechos.length) {
-      c.fillStyle = '#5d6685';
+      c.fillStyle = '#8a93b0';
       c.font = `600 24px ${FUENTE}`;
       c.fillText('Sin ejecuciones todavía', x2, 150);
     }
+    c.font = `600 21px ${FUENTE}`;
+    const horas = hechos.map(h => cifras.momento(h.t, inst.ahora));
+    const anchoHora = Math.max(58, ...horas.map(t => c.measureText(t).width));
+    const xTexto = x2 + 16 + Math.ceil(anchoHora) + 16;
     hechos.forEach((h, k) => {
       const y = 142 + k * 36;
       const compra = h.lado === 'compra';
@@ -966,16 +1037,17 @@
       c.fillRect(x2, y - 22, 6, 26);
       c.fillStyle = '#8a93b0';
       c.font = `600 21px ${FUENTE}`;
-      c.fillText(cifras.hora(h.t), x2 + 16, y);
+      c.fillText(horas[k], x2 + 16, y);
       c.fillStyle = '#e6e9f2';
       c.font = `700 23px ${FUENTE}`;
       const texto = `${compra ? 'COMPRA' : 'VENTA'} ${cifras.cantidad(h.cantidad, 4)} ${h.etiqueta || ''} a ${cifras.precio(h.precio)}`;
-      c.fillText(textoAjustado(c, texto, W - x2 - 110), x2 + 90, y);
+      c.fillText(textoAjustado(c, texto, W - xTexto - 20), xTexto, y);
     });
 
-    // Estado del fondo: el kill switch pone la pantalla en rojo.
-    const nivel = inst.fondo && inst.fondo.nivel;
-    if (nivel === 'bloqueado') {
+    // Estado del fondo: el kill switch pone la pantalla en rojo; cualquier
+    // «solo cerrar» (vigilante, pausa, comité o Megáfono) sale en la franja ámbar.
+    const n = cifras.nivelEfectivo(inst, inst.ahora);
+    if (n.nivel === 'bloqueado') {
       c.fillStyle = 'rgba(185, 28, 28, 0.82)';
       rectRedondo(c, 0, 0, W, H, 14);
       c.fill();
@@ -984,17 +1056,21 @@
       c.font = `900 64px ${FUENTE}`;
       c.fillText('KILL SWITCH · FONDO BLOQUEADO', W / 2, H / 2 + 4);
       c.font = `600 28px ${FUENTE}`;
-      c.fillText(textoAjustado(c, (inst.fondo.motivo || 'Todo cerrado. Solo sale con Reabrir.'), W - 200), W / 2, H / 2 + 52);
+      c.fillText(textoAjustado(c, (n.motivo || 'Todo cerrado. Solo sale con Reabrir.'), W - 200), W / 2, H / 2 + 52);
       c.textAlign = 'left';
-    } else if (nivel === 'solo_cerrar' || nivel === 'pausado') {
-      c.fillStyle = '#f59e0b';
-      rectRedondo(c, W / 2 - 170, 16, 340, 38, 19);
-      c.fill();
-      c.fillStyle = '#1a1300';
-      c.textAlign = 'center';
-      c.font = `800 22px ${FUENTE}`;
-      c.fillText(nivel === 'pausado' ? 'PAUSADO · SOLO CERRAR' : 'SOLO CERRAR', W / 2, 43);
-      c.textAlign = 'left';
+    } else {
+      const texto = textoNivel(n);
+      if (texto) {
+        c.font = `800 22px ${FUENTE}`;
+        const w = Math.ceil(c.measureText(texto).width) + 60;
+        c.fillStyle = '#f59e0b';
+        rectRedondo(c, W / 2 - w / 2, 16, w, 38, 19);
+        c.fill();
+        c.fillStyle = '#1a1300';
+        c.textAlign = 'center';
+        c.fillText(texto, W / 2, 43);
+        c.textAlign = 'left';
+      }
     }
   }
 
@@ -1032,12 +1108,20 @@
       `${cifras.pct(cab.exposicionBrutaPct, { decimales: 0 })} / ${cifras.pct(lim.maxExposicionBruta, { decimales: 0 })}`);
     barraLimite(c, x, 136, w, 'Exposición cripto', cab.exposicionCriptoPct, lim.maxExposicionCripto,
       `${cifras.pct(cab.exposicionCriptoPct, { decimales: 0 })} / ${cifras.pct(lim.maxExposicionCripto, { decimales: 0 })}`);
-    const perdida = Number.isFinite(cab.pnlDiaPct) ? Math.max(0, -cab.pnlDiaPct) : 0;
-    barraLimite(c, x, 188, w, 'Pérdida del día', perdida, lim.perdidaDiariaSoloCerrar,
-      `${cifras.pct(-perdida)} / −${cifras.pct(lim.perdidaDiariaSoloCerrar)}`);
-    const caida = Number.isFinite(cab.caida) ? Math.abs(cab.caida) : 0;
-    barraLimite(c, x, 240, w, 'Caída desde máximo', caida, lim.caidaKill,
-      `${cifras.pct(-caida)} / −${cifras.pct(lim.caidaKill, { decimales: 0 })}`);
+    // Lo que mide el vigilante (tras reabrir un kill, desde la reapertura; la
+    // cabecera sigue contando desde el máximo histórico).
+    const med = cifras.medidaLimites(inst);
+    if (med.desdeReapertura) {
+      c.fillStyle = '#fbbf24';
+      c.font = `700 16px ${FUENTE}`;
+      c.textAlign = 'right';
+      c.fillText('medido desde la reapertura', W - 24, 40);
+      c.textAlign = 'left';
+    }
+    barraLimite(c, x, 188, w, 'Pérdida del día', med.perdida ?? 0, lim.perdidaDiariaSoloCerrar,
+      `${med.perdida === null ? '—' : cifras.pct(-med.perdida)} / −${cifras.pct(lim.perdidaDiariaSoloCerrar)}`);
+    barraLimite(c, x, 240, w, 'Caída desde máximo', med.caida ?? 0, lim.caidaKill,
+      `${med.caida === null ? '—' : cifras.pct(-med.caida)} / −${cifras.pct(lim.caidaKill, { decimales: 0 })}`);
   }
 
   function pintarPantallaRegimen(tex, inst) {
@@ -1073,8 +1157,12 @@
     c.fillText('COMITÉ', 20, 36);
     const modo = cab.modoComite || 'NORMAL';
     c.fillStyle = modo === 'NORMAL' ? '#22c55e' : modo === 'DEFENSIVO' ? '#f59e0b' : '#ef4444';
-    c.font = `900 44px ${FUENTE}`;
-    c.fillText(modo, 20, 88);
+    // «SOLO CERRAR» con espacio y, si no cabe, a menos cuerpo (nunca cortado).
+    const rotulo = cifras.modoComite(modo);
+    let cuerpo = 44;
+    c.font = `900 ${cuerpo}px ${FUENTE}`;
+    while (cuerpo > 24 && c.measureText(rotulo).width > W - 40) { cuerpo -= 2; c.font = `900 ${cuerpo}px ${FUENTE}`; }
+    c.fillText(rotulo, 20, 88, W - 40);
     c.fillStyle = '#d6c7b0';
     c.font = `700 22px ${FUENTE}`;
     const resta = Number.isFinite(cab.proximoComite) && Number.isFinite(ahoraServidor) ? cab.proximoComite - ahoraServidor : null;
@@ -1106,6 +1194,7 @@
     marcoPared, conMarco, pegarTextura, lienzo,
     pintarEdificio, pintarTrozoPared, pintarBordeDelantero, pintarMueble, pintarMonitor, pintarPantallaPared,
     pintarPantallaGigante, pintarLimites, pintarPantallaRegimen, pintarPantallaComite, pintarPizarra,
-    estadoMonitor, COLORES_MONITOR,
+    pintarVentanaTex, pintarRelojesTex, colorCielo, horaDe, TEX_VENTANA, TEX_RELOJES,
+    estadoMonitor, COLORES_MONITOR, textoNivel,
   };
 });

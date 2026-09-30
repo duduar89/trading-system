@@ -40,6 +40,7 @@
     pausar: '<rect x="6.5" y="5" width="3.6" height="14" rx="1"/><rect x="13.9" y="5" width="3.6" height="14" rx="1"/>',
     reabrir: '<path d="M7 5l12 7-12 7z"/>',
     kill: '<path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/>',
+    resultados: '<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M3 20h18"/><path d="M20 7l-3.5 3.5-2-2L12 11"/>',
     ajustes: '<path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h4"/><path d="M12 17h8"/><circle cx="10" cy="17" r="2"/><path d="M4 12h2"/><path d="M10 12h10"/><circle cx="8" cy="12" r="2"/>',
     izq: '<path d="M15 6l-6 6 6 6"/>', der: '<path d="M9 6l6 6-6 6"/>', arriba: '<path d="M6 15l6-6 6 6"/>', abajo: '<path d="M6 9l6 6 6-6"/>',
     mas: '<path d="M12 5v14M5 12h14"/>', menos: '<path d="M5 12h14"/>',
@@ -83,17 +84,29 @@
 
   const etq = s => String(s || '').split('/')[0];
 
+  // Texto acotado (un motivo escrito por un LLM no puede llenar el modal).
+  function frase(texto, max) {
+    const t = String(texto || '').replace(/\s+/g, ' ').trim().replace(/[.\s]+$/, '');
+    return t.length > max ? t.slice(0, max - 1).replace(/\s+\S*$/, '') + '…' : t;
+  }
+
+  // Nombre de una mesa para las personas («Reversión RSI», no «reversion»).
+  function nombreMesa(id, mesas) {
+    const m = (mesas || []).find(x => x.id === id);
+    return (m && m.nombre) || id || '—';
+  }
+
   // Una directiva del Megáfono en castellano (lista cerrada de §6.5).
-  function textoDirectiva(d) {
+  function textoDirectiva(d, mesas) {
     const h = Number.isFinite(d.horas) ? ` durante ${cifras.numero(d.horas)} h` : '';
     switch (d.tipo) {
       case 'reducir_riesgo': return `Reducir el tamaño de las entradas al ${cifras.pct(d.factor, { decimales: 0 })}${h}.`;
       case 'pausar_activo': return `No abrir en ${etq(d.simbolo)}${h}.`;
-      case 'pausar_mesa': return `Pausar la mesa ${d.mesaId}${h}.`;
+      case 'pausar_mesa': return `Pausar la mesa ${nombreMesa(d.mesaId, mesas)}${h}.`;
       case 'solo_cerrar': return `Solo cerrar posiciones, sin abrir nada${h}.`;
       case 'reanudar_activo': return `Quitar la pausa del Megáfono en ${etq(d.simbolo)}.`;
-      case 'reanudar_mesa': return `Quitar la pausa del Megáfono a la mesa ${d.mesaId}.`;
-      case 'sin_efecto': return `Sin efecto: ${d.motivo || 'no hay nada que aplicar'}.`;
+      case 'reanudar_mesa': return `Quitar la pausa del Megáfono a la mesa ${nombreMesa(d.mesaId, mesas)}.`;
+      case 'sin_efecto': return `Sin efecto: ${frase(d.motivo, 160) || 'no hay nada que aplicar'}.`;
       default: return 'Directiva desconocida: no se aplica.';
     }
   }
@@ -113,6 +126,8 @@
     manejadores: {},
     tarjeta: null,
     ultimoFoco: null,
+    conexion: { ok: true, texto: '' },
+    viejo: null,
   };
 
   function colorDep(id) {
@@ -130,6 +145,7 @@
     est.departamentos = (opciones && opciones.departamentos) || [];
     construirBotonera();
     construirChips();
+    for (const id of ['pildoras', 'acciones']) { const n = $(id); if (n) n.addEventListener('scroll', marcarDesborde, { passive: true }); }
     const feed = $('feed');
     feed.addEventListener('scroll', () => {
       if (pegadoAbajo()) { est.nuevosSinVer = 0; $('nuevos').hidden = true; }
@@ -142,6 +158,7 @@
       asa.setAttribute('aria-expanded', String(abierta));
       if (abierta) bajarDelTodo();
     });
+    window.addEventListener('resize', () => { marcarDesborde(); ajustarModoTarjeta(); });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !$('modal').open && est.tarjeta) {
         ocultarTarjeta();
@@ -181,12 +198,14 @@
     const acc = $('acciones');
     acc.textContent = '';
     const botones = [
-      ['comite', 'Comité'], ['megafono', 'Megáfono'], ['prueba', 'Prueba'], ['pausar', 'Pausar todo'],
+      ['comite', 'Comité'], ['megafono', 'Megáfono'], ['resultados', 'Resultados'], ['prueba', 'Prueba'], ['pausar', 'Pausar todo'],
       ['reabrir', 'Reabrir'], ['kill', 'Kill switch'], ['ajustes', 'Ajustes'],
     ];
+    // aria-label y title iguales al texto: entre 768 y 1100 px solo se ven los
+    // iconos y sin ellos un lector de pantalla decía siete veces «botón».
     for (const [id, texto] of botones) {
       acc.appendChild(el('button', { class: 'boton' + (id === 'kill' ? ' peligro' : ''), type: 'button', 'data-accion': id,
-        onclick: () => abrirModal(id) }, icono(id), el('span', { text: texto })));
+        'aria-label': texto, title: texto, onclick: () => abrirModal(id) }, icono(id), el('span', { text: texto })));
     }
     const cam = $('camara');
     cam.textContent = '';
@@ -195,6 +214,15 @@
     for (const [id, etiqueta] of mandos) {
       cam.appendChild(el('button', { class: 'boton-icono', type: 'button', 'aria-label': etiqueta, title: etiqueta,
         onclick: () => est.manejadores.alCamara && est.manejadores.alCamara(id) }, icono(id)));
+    }
+  }
+
+  // Filas que se deslizan sin barra (píldoras, botonera): si no caben, se
+  // desvanecen por la derecha para que se vea que hay más.
+  function marcarDesborde() {
+    for (const id of ['pildoras', 'acciones']) {
+      const n = $(id);
+      if (n) n.classList.toggle('desborda', n.scrollWidth > n.clientWidth + 1 && n.scrollLeft + n.clientWidth < n.scrollWidth - 1);
     }
   }
 
@@ -235,12 +263,20 @@
       pf.className = 'pildora gris';
     }
 
-    const nivel = inst.fondo && inst.fondo.nivel;
+    // Estado de verdad del fondo: además del nivel (vigilante, pausa, kill),
+    // el «solo cerrar» del comité o del Megáfono y el modo DEFENSIVO.
+    const n = cifras.nivelEfectivo(inst, inst.ahora);
     const pn = $('p-nivel');
-    pn.hidden = !nivel || nivel === 'normal';
-    pn.textContent = nivel === 'bloqueado' ? 'BLOQUEADO' : nivel === 'pausado' ? 'PAUSADO' : 'SOLO CERRAR';
-    pn.className = 'pildora ' + (nivel === 'bloqueado' ? 'roja fuerte' : 'ambar');
-    pn.title = (inst.fondo && inst.fondo.motivo) || '';
+    let textoNivel = '';
+    if (n.nivel === 'bloqueado') textoNivel = 'BLOQUEADO';
+    else if (n.nivel === 'pausado') textoNivel = 'PAUSADO';
+    else if (n.nivel === 'solo_cerrar') textoNivel = n.origen === 'Megáfono' ? `SOLO CERRAR hasta ${cifras.hora(n.hasta)} · Megáfono` : n.origen === 'comité' ? 'SOLO CERRAR · comité' : 'SOLO CERRAR';
+    else if (n.defensivo) textoNivel = 'DEFENSIVO ×0,5';
+    pn.hidden = !textoNivel;
+    pn.textContent = textoNivel;
+    pn.className = 'pildora ' + (n.nivel === 'bloqueado' ? 'roja fuerte' : 'ambar');
+    pn.title = n.nivel === 'normal' && n.defensivo ? 'Modo DEFENSIVO del comité: las mesas abren con la mitad de capital.' : (n.motivo || '');
+    pn.setAttribute('aria-label', textoNivel ? `Estado del fondo: ${textoNivel}. ${pn.title}` : '');
 
     const pm = $('p-modo');
     const modo = inst.modo;
@@ -261,6 +297,7 @@
     }
     $('p-maqueta').hidden = !(o && o.maqueta);
     actualizarComite(inst, o && o.ahoraServidor);
+    marcarDesborde();
     const avisos = $('avisos');
     const lista = Array.isArray(inst.avisos) ? inst.avisos : [];
     const clave = lista.join('|');
@@ -279,7 +316,7 @@
     const reunido = (inst.agentes || []).some(a => a.sala === 'comite');
     pc.textContent = reunido ? 'Comité reunido' : resta > 0 ? `Comité en ${cifras.cuentaAtras(resta)}` : 'Comité pendiente';
     pc.className = 'pildora ' + (reunido ? 'ambar' : 'gris');
-    pc.title = `Modo del comité: ${cab.modoComite || '—'}`;
+    pc.title = `Modo del comité: ${cifras.modoComite(cab.modoComite)}`;
   }
 
   // ---------- feed ----------
@@ -300,23 +337,61 @@
     $('nuevos').hidden = true;
   }
 
-  function nodoMensaje(m) {
-    const humano = !m.departamento;
-    const color = humano ? '#f59e0b' : colorDep(m.departamento);
-    const destacado = TIPO_DESTACADO[m.tipo];
-    return el('article', { class: 'msg' + (m.canal === 'megafono' ? ' megafono' : '') + (m.tipo === 'veto' || m.tipo === 'alerta' ? ' alerta' : ''),
-      'data-id': m.id },
-    el('div', { class: 'avatar', style: `background:${color}`, 'aria-hidden': 'true', text: humano ? 'M' : iniciales(m.deNombre) }),
-    el('div', { class: 'cuerpo' },
-      el('div', { class: 'cab' },
-        el('b', { text: humano ? (m.canal === 'megafono' ? 'Megáfono' : (m.deNombre || 'Sistema')) : (m.deNombre || m.de) }),
-        humano ? null : el('span', { class: 'dep', text: nombreDep(m.departamento) }),
-        destacado && !(humano && m.tipo === 'megafono') ? el('span', { class: 'tipo tipo-' + m.tipo, text: destacado }) : null,
-        el('time', { text: cifras.hora(m.t) })),
-      el('p', { text: m.texto })));
+  // Reloj de la mesa para decidir qué es «hoy» (nunca Date.now(): en sintético no coinciden).
+  function ahoraMesa() {
+    const f = est.manejadores.ahoraServidor;
+    const v = typeof f === 'function' ? f() : null;
+    if (Number.isFinite(v)) return v;
+    const inst = est.manejadores.instantanea ? est.manejadores.instantanea() : null;
+    return inst && Number.isFinite(inst.ahora) ? inst.ahora : null;
   }
 
-  // Añade mensajes nuevos (sin repetir). Devuelve los que eran nuevos.
+  function nodoMensaje(m) {
+    const humano = !m.departamento;
+    const megafono = m.canal === 'megafono';
+    // La «M» ámbar es la marca del Megáfono; los avisos del sistema van en gris.
+    const color = !humano ? colorDep(m.departamento) : megafono ? '#f59e0b' : '#64748b';
+    const letra = !humano ? iniciales(m.deNombre) : megafono ? 'M' : 'S';
+    const destacado = TIPO_DESTACADO[m.tipo];
+    const n = el('article', { class: 'msg' + (megafono ? ' megafono' : '') + (m.tipo === 'veto' || m.tipo === 'alerta' ? ' alerta' : ''),
+      'data-id': m.id },
+    el('div', { class: 'avatar', style: `background:${color}`, 'aria-hidden': 'true', text: letra }),
+    el('div', { class: 'cuerpo' },
+      el('div', { class: 'cab' },
+        el('b', { text: humano ? (megafono ? 'Megáfono' : (m.deNombre || 'Sistema')) : (m.deNombre || m.de) }),
+        humano ? null : el('span', { class: 'dep', text: nombreDep(m.departamento) }),
+        destacado && !(humano && m.tipo === 'megafono') ? el('span', { class: 'tipo tipo-' + m.tipo, text: destacado }) : null,
+        el('time', { text: cifras.hora(m.t), datetime: Number.isFinite(m.t) ? new Date(m.t).toISOString() : null })),
+      el('p', { text: m.texto })));
+    n.dataset.t = m.t;
+    n.dataset.dia = cifras.dia(m.t) || '';
+    return n;
+  }
+
+  // Separador de día en el feed: la hora de cada mensaje va sin fecha, así que
+  // al cambiar de día (o tras un reinicio con mensajes de otros días) se dice.
+  function separadorDia(t) {
+    const hoy = cifras.dia(ahoraMesa());
+    const d = cifras.dia(t);
+    const texto = d && d === hoy ? `Hoy · ${cifras.fechaCorta(t)}` : cifras.fechaCorta(t);
+    const s = el('div', { class: 'separador-dia', role: 'separator', 'aria-label': texto }, el('span', { text: texto }));
+    s.dataset.dia = d || '';
+    return s;
+  }
+
+  function ultimoDiaDelFeed(feed) {
+    for (let n = feed.lastElementChild; n; n = n.previousElementSibling) if (n.classList.contains('msg')) return n.dataset.dia || null;
+    return null;
+  }
+
+  // El primero del feed siempre dice de qué día es (aunque se hayan podado los de arriba).
+  function asegurarSeparadorArriba(feed) {
+    const primero = feed.firstElementChild;
+    if (primero && primero.classList.contains('msg')) feed.insertBefore(separadorDia(Number(primero.dataset.t)), primero);
+  }
+
+  // Añade mensajes nuevos (sin repetir: se quitan los duplicados por id, también
+  // los que vuelven a llegar con la instantánea o al reconectar). Devuelve los nuevos.
   function anadirMensajes(lista) {
     const nuevos = [];
     for (const m of lista || []) {
@@ -332,19 +407,22 @@
     }
     const feed = $('feed');
     const abajo = pegadoAbajo();
-    const ultimoT = feed.lastElementChild ? Number(feed.lastElementChild.dataset.t) : -Infinity;
+    const ultimo = feed.lastElementChild;
+    const ultimoT = ultimo && ultimo.classList.contains('msg') ? Number(ultimo.dataset.t) : -Infinity;
     const enOrden = nuevos.every(m => m.t >= ultimoT);
-    if (!enOrden || nuevos.length > 60) {
+    if (!enOrden || nuevos.length > 60 || (ultimo && !ultimo.classList.contains('msg') && !ultimo.classList.contains('separador-dia'))) {
       repintarFeed(abajo);
     } else {
+      let dia = ultimoDiaDelFeed(feed);
       for (const m of nuevos) {
         if (!pasaFiltro(m)) continue;
         const n = nodoMensaje(m);
-        n.dataset.t = m.t;
+        if (n.dataset.dia !== dia) { feed.appendChild(separadorDia(m.t)); dia = n.dataset.dia; }
         feed.appendChild(n);
         if (!abajo) est.nuevosSinVer++;
       }
       while (feed.childElementCount > MAX_DOM) feed.removeChild(feed.firstElementChild);
+      asegurarSeparadorArriba(feed);
       if (abajo) feed.scrollTop = feed.scrollHeight;
       else if (est.nuevosSinVer > 0) {
         const b = $('nuevos');
@@ -361,7 +439,12 @@
     feed.textContent = '';
     const lista = est.mensajes.filter(pasaFiltro).slice(-MAX_DOM);
     const frag = document.createDocumentFragment();
-    for (const m of lista) { const n = nodoMensaje(m); n.dataset.t = m.t; frag.appendChild(n); }
+    let dia = null;
+    for (const m of lista) {
+      const n = nodoMensaje(m);
+      if (n.dataset.dia !== dia) { frag.appendChild(separadorDia(m.t)); dia = n.dataset.dia; }
+      frag.appendChild(n);
+    }
     feed.appendChild(frag);
     if (!lista.length) feed.appendChild(el('p', { class: 'vacio', text: 'Sin mensajes de este departamento todavía.' }));
     if (bajar !== false) bajarDelTodo();
@@ -377,92 +460,179 @@
     return [el('dt', { text: nombre }), el('dd', { class: clase || null, text: valor })];
   }
 
+  const esMovil = () => Boolean(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
+  const FONDO_TARJETA = ['barra', 'lateral', 'lienzo', 'botonera'];
+
+  // En el móvil la tarjeta tapa la pantalla entera: es un diálogo y lo de
+  // detrás queda inerte (Tab no se escapa a los botones tapados).
+  function fijarInerte(activo) {
+    for (const id of FONDO_TARJETA) {
+      const n = $(id);
+      if (!n) continue;
+      if (activo) n.setAttribute('inert', ''); else n.removeAttribute('inert');
+    }
+  }
+
+  // Diálogo a pantalla completa en el móvil; panel no modal en escritorio. Se
+  // vuelve a decidir al cambiar el tamaño con la tarjeta abierta.
+  function ajustarModoTarjeta() {
+    const t = $('tarjeta');
+    if (!t || t.hidden || !est.tarjeta) { fijarInerte(false); return; }
+    if (esMovil()) {
+      t.setAttribute('role', 'dialog');
+      t.setAttribute('aria-modal', 'true');
+      fijarInerte(true);
+    } else {
+      t.removeAttribute('role');
+      t.removeAttribute('aria-modal');
+      fijarInerte(false);
+    }
+  }
+
   function mostrarTarjeta(sel, inst) {
     est.tarjeta = sel;
     const t = $('tarjeta');
     const primera = t.hidden;
+    const focoDentro = !primera && t.contains(document.activeElement);
     t.hidden = false;
+    if (primera) est.ultimoFoco = document.activeElement;
     rellenarTarjeta(sel, inst);
-    if (primera) {
-      est.ultimoFoco = document.activeElement;
-      const cerrar = t.querySelector('.cerrar');
-      if (cerrar && window.matchMedia && window.matchMedia('(max-width: 767px)').matches) cerrar.focus();
-    }
+    if (focoDentro && !esMovil()) { const c = t.querySelector('.cerrar'); if (c) c.focus(); }
+    ajustarModoTarjeta();
+    if (esMovil()) { const cerrar = t.querySelector('.cerrar'); if (cerrar) cerrar.focus(); }
   }
+
+  const botonCerrar = () => el('button', { class: 'cerrar boton-icono', type: 'button', 'aria-label': 'Cerrar ficha', title: 'Cerrar ficha',
+    onclick: () => { ocultarTarjeta(); if (est.manejadores.alCerrarTarjeta) est.manejadores.alCerrarTarjeta(); } }, icono('cerrar'));
+
+  const irA = (sel, texto) => el('button', { class: 'boton enlace', type: 'button', text: texto,
+    onclick: () => { if (est.manejadores.alSeleccionar) est.manejadores.alSeleccionar(sel); } });
 
   function rellenarTarjeta(sel, inst) {
     const t = $('tarjeta');
     t.textContent = '';
     if (!sel || !inst) return;
-    const cerrar = el('button', { class: 'cerrar boton-icono', type: 'button', 'aria-label': 'Cerrar ficha',
-      onclick: () => { ocultarTarjeta(); if (est.manejadores.alCerrarTarjeta) est.manejadores.alCerrarTarjeta(); } }, icono('cerrar'));
-    if (sel.tipo === 'puesto') {
-      const p = (inst.puestos || []).find(x => x.id === sel.id);
-      if (!p) { t.appendChild(el('p', { class: 'vacio', text: 'Este puesto ya no existe.' })); t.appendChild(cerrar); return; }
-      const mesa = (inst.mesas || []).find(m => m.id === p.mesaId) || {};
-      const ag = (inst.agentes || []).find(a => a.id === p.agenteId);
-      const cot = (inst.cotizaciones || []).find(c => c.simbolo === p.simbolo);
-      const pos = p.posicion;
-      const precio = cot ? cot.precio : null;
-      const situacion = mesa.estado === 'banquillo' ? 'banquillo' : pos ? 'comprado' : 'sin posición';
-      const distStop = pos && precio && pos.stop ? (precio - pos.stop) / precio : null;
-      const ultimo = ultimoMensajeDe(p.agenteId);
-      t.appendChild(el('header', { class: 'tarjeta-cab' },
-        el('div', { class: 'tarjeta-titulo', id: 'tarjeta-titulo' },
-          el('span', { class: 'etq', text: p.etiqueta }), ` · ${mesa.nombre || p.mesaId}`),
-        el('div', { class: 'tarjeta-sub', text: `${p.simbolo} · ${mesa.familia || ''} ${NOMBRE_MARCO[mesa.marco] || mesa.marco || ''} · ${mesa.estado || ''}` }),
-        cerrar));
-      if (ag) {
-        t.appendChild(el('div', { class: 'tarjeta-persona' },
-          el('span', { class: 'avatar', style: `background:${colorDep(ag.departamento)}`, text: iniciales(ag.nombre) }),
-          el('div', {}, el('b', { text: ag.nombre }), el('span', { text: `${ag.rol} · ${ESTADO_AGENTE[ag.estado] || ag.estado}` }))));
-      }
-      const dl = el('dl', { class: 'tabla' },
-        fila('Situación', situacion, pos ? 'pos' : ''),
-        fila('Nocional', pos ? cifras.usd(pos.nocional) : '—'),
-        fila('Cantidad', pos ? `${cifras.cantidad(pos.cantidad)} ${p.etiqueta}` : '—'),
-        fila('Entrada', pos ? cifras.precio(pos.entrada) : '—'),
-        fila('Stop', pos ? `${cifras.precio(pos.stop)}${distStop !== null ? ` (a ${cifras.pct(distStop, { decimales: 1 })})` : ''}` : '—'),
-        fila('Objetivo', pos && Number.isFinite(pos.objetivo) ? cifras.precio(pos.objetivo) : '—'),
-        fila('Abierto', pos ? `${cifras.usd(pos.pnlAbierto, { signo: true })} (${cifras.pct(pos.pnlAbiertoPct, { signo: true })})` : '—',
-          pos ? cifras.claseSigno(pos.pnlAbierto, 0.005) : ''),
-        fila('P&L del día', cifras.usd(p.pnlDia, { signo: true }), cifras.claseSigno(p.pnlDia, 0.005)),
-        fila('Operaciones', cifras.numero(p.operaciones)),
-        fila('Acierto', cifras.pct(p.acierto, { decimales: 0 })),
-        fila('Adherencia', cifras.pct(p.adherencia, { decimales: 0 })),
-        fila('Factor', Number.isFinite(p.factorBeneficio) ? cifras.numero(p.factorBeneficio, 2) : '—'),
-        fila('Precio', precio !== null ? cifras.precio(precio) : '—'),
-        fila('Última señal', p.ultimaSenal ? `${p.ultimaSenal.accion} · ${cifras.hora(p.ultimaSenal.t)}` : '—'));
-      t.appendChild(dl);
-      if (Array.isArray(p.chispa) && p.chispa.length > 1) t.appendChild(chispaSvg(p.chispa, pos ? (pos.pnlAbierto >= 0 ? '#22c55e' : '#ef4444') : '#8a93b0'));
-      if (p.estadoTexto) t.appendChild(el('p', { class: 'estado-texto', text: p.estadoTexto }));
-      t.appendChild(bloqueUltimo(ultimo));
-    } else {
-      const ag = (inst.agentes || []).find(a => a.id === sel.id);
-      if (!ag) { t.appendChild(el('p', { class: 'vacio', text: 'Este agente ya no está en la plantilla.' })); t.appendChild(cerrar); return; }
-      const llm = inst.llm || {};
-      const modelo = ag.id === 'cio' ? llm.modeloComite : llm.modeloAgentes;
-      t.appendChild(el('header', { class: 'tarjeta-cab' },
-        el('div', { class: 'tarjeta-titulo', id: 'tarjeta-titulo', text: ag.nombre }),
-        el('div', { class: 'tarjeta-sub', text: `${ag.rol} · ${nombreDep(ag.departamento)}` }),
-        cerrar));
+    const cerrar = botonCerrar();
+    if (sel.tipo === 'puesto') rellenarPuesto(t, sel, inst, cerrar);
+    else if (sel.tipo === 'mesa') rellenarMesa(t, sel, inst, cerrar);
+    else rellenarAgente(t, sel, inst, cerrar);
+  }
+
+  function rellenarPuesto(t, sel, inst, cerrar) {
+    const p = (inst.puestos || []).find(x => x.id === sel.id);
+    if (!p) { t.appendChild(el('p', { class: 'vacio', text: 'Este puesto ya no existe.' })); t.appendChild(cerrar); return; }
+    const mesa = (inst.mesas || []).find(m => m.id === p.mesaId) || {};
+    const ag = (inst.agentes || []).find(a => a.id === p.agenteId);
+    const cot = (inst.cotizaciones || []).find(c => c.simbolo === p.simbolo);
+    const pos = p.posicion;
+    const precio = cot ? cot.precio : null;
+    const edad = cot ? cifras.precioViejo(cot, inst.ahora, inst.limites) : null;
+    const situacion = mesa.estado === 'banquillo' ? 'banquillo' : pos ? 'comprado' : 'sin posición';
+    const distStop = pos && precio && pos.stop ? (precio - pos.stop) / precio : null;
+    const ultimo = ultimoMensajeDe(p.agenteId);
+    const bloqueos = cifras.bloqueosPuesto(inst, p, inst.ahora);
+    t.appendChild(el('header', { class: 'tarjeta-cab' },
+      el('div', { class: 'tarjeta-titulo', id: 'tarjeta-titulo' },
+        el('span', { class: 'etq', text: p.etiqueta }), ` · ${mesa.nombre || p.mesaId}`),
+      el('div', { class: 'tarjeta-sub', text: `${p.simbolo} · ${mesa.familia || ''} ${NOMBRE_MARCO[mesa.marco] || mesa.marco || ''} · ${cifras.estadoMesa(mesa.estado)}` }),
+      cerrar));
+    if (ag) {
       t.appendChild(el('div', { class: 'tarjeta-persona' },
         el('span', { class: 'avatar', style: `background:${colorDep(ag.departamento)}`, text: iniciales(ag.nombre) }),
-        el('div', {}, el('b', { text: ESTADO_AGENTE[ag.estado] || ag.estado || '—' }), el('span', { text: NOMBRE_SALA[ag.sala] || ag.sala || '—' }))));
-      t.appendChild(el('dl', { class: 'tabla' },
-        fila('Rol', ag.rol || '—'),
-        fila('Usa LLM', ag.usaLLM ? (llm.activo ? `Sí · ${modelo || '—'}` : 'Sí, pero el LLM está apagado: plantillas') : 'No: reglas y plantillas'),
-        ag.etiqueta ? fila('Activo', ag.etiqueta) : null,
-        fila('Estado', ESTADO_AGENTE[ag.estado] || ag.estado || '—'),
-        fila('Sala', NOMBRE_SALA[ag.sala] || ag.sala || '—')));
-      t.appendChild(el('div', { class: 'que-decide' }, el('h3', { text: 'Qué decide' }), el('p', { text: ag.queDecide || '—' })));
-      t.appendChild(bloqueUltimo(ultimoMensajeDe(ag.id)));
+        el('div', {}, el('b', { text: ag.nombre }), el('span', { text: `${ag.rol} · ${ESTADO_AGENTE[ag.estado] || ag.estado}` }))));
+    }
+    for (const b of bloqueos) t.appendChild(el('p', { class: 'bloqueo', text: b.texto }));
+    const precioTexto = precio === null || precio === undefined ? '—'
+      : `${cifras.precio(precio)}${edad && edad.viejo ? ` (${edad.edadMs === null ? 'sin hora' : cifras.hace(edad.edadMs)})` : ''}`;
+    const dl = el('dl', { class: 'tabla' },
+      fila('Situación', situacion, pos ? 'pos' : ''),
+      fila('Nocional', pos ? cifras.usd(pos.nocional) : '—'),
+      fila('Cantidad', pos ? `${cifras.cantidad(pos.cantidad)} ${p.etiqueta}` : '—'),
+      fila('Entrada', pos ? cifras.precio(pos.entrada) : '—'),
+      fila('Stop', pos ? `${cifras.precio(pos.stop)}${distStop !== null ? ` (a ${cifras.pct(distStop, { decimales: 1 })})` : ''}` : '—'),
+      fila('Objetivo', pos && Number.isFinite(pos.objetivo) ? cifras.precio(pos.objetivo) : '—'),
+      fila('Abierto', pos ? `${cifras.usd(pos.pnlAbierto, { signo: true })} (${cifras.pct(pos.pnlAbiertoPct, { signo: true })})` : '—',
+        pos ? cifras.claseSigno(pos.pnlAbierto, 0.005) : ''),
+      fila('P&L del día', cifras.usd(p.pnlDia, { signo: true }), cifras.claseSigno(p.pnlDia, 0.005)),
+      fila('Operaciones', cifras.numero(p.operaciones)),
+      fila('Acierto', cifras.pct(p.acierto, { decimales: 0 })),
+      fila('Adherencia', cifras.pct(p.adherencia, { decimales: 0 })),
+      fila('Factor', Number.isFinite(p.factorBeneficio) ? cifras.numero(p.factorBeneficio, 2) : '—'),
+      fila('Precio', precioTexto, edad && edad.viejo ? 'viejo' : ''),
+      fila('Última señal', p.ultimaSenal ? `${p.ultimaSenal.accion} · ${cifras.momento(p.ultimaSenal.t, inst.ahora)}` : '—'));
+    t.appendChild(dl);
+    if (Array.isArray(p.chispa) && p.chispa.length > 1) t.appendChild(chispaSvg(p.chispa, pos ? (pos.pnlAbierto >= 0 ? '#22c55e' : '#ef4444') : '#8a93b0'));
+    if (p.estadoTexto) t.appendChild(el('p', { class: 'estado-texto', text: p.estadoTexto }));
+    // La mesa del puesto: estado, peso y la nota de Dirección (por qué está así).
+    if (mesa.id) {
+      t.appendChild(el('div', { class: 'bloque-mesa' },
+        el('h3', { text: 'Mesa' }),
+        el('p', {}, `${mesa.nombre} · ${cifras.estadoMesa(mesa.estado)} · peso ${cifras.pct(mesa.peso, { decimales: 0 })}`),
+        mesa.nota ? el('p', { class: 'nota-mesa', text: mesa.nota }) : null,
+        irA({ tipo: 'mesa', id: mesa.id }, 'Ver la mesa')));
+    }
+    t.appendChild(bloqueUltimo(ultimo, inst.ahora));
+  }
+
+  function rellenarMesa(t, sel, inst, cerrar) {
+    const m = (inst.mesas || []).find(x => x.id === sel.id);
+    if (!m) { t.appendChild(el('p', { class: 'vacio', text: 'Esta mesa ya no existe.' })); t.appendChild(cerrar); return; }
+    const met = m.metricas || {};
+    const puestos = (inst.puestos || []).filter(p => p.mesaId === m.id);
+    t.appendChild(el('header', { class: 'tarjeta-cab' },
+      el('div', { class: 'tarjeta-titulo', id: 'tarjeta-titulo', text: m.nombre || m.id }),
+      el('div', { class: 'tarjeta-sub', text: `${m.familia || ''} ${NOMBRE_MARCO[m.marco] || m.marco || ''} · ${cifras.estadoMesa(m.estado)}` }),
+      cerrar));
+    if (m.nota) t.appendChild(el('p', { class: 'estado-texto', text: m.nota }));
+    for (const b of cifras.bloqueosMesa(inst, m.id, inst.ahora)) t.appendChild(el('p', { class: 'bloqueo', text: b.texto }));
+    const n2 = x => (Number.isFinite(x) ? cifras.numero(x, 2) : '—');
+    t.appendChild(el('dl', { class: 'tabla' },
+      fila('Estado', cifras.estadoMesa(m.estado)),
+      fila('Peso', cifras.pct(m.peso, { decimales: 0 })),
+      fila('Capital', cifras.usd(m.capital)),
+      fila('Multiplicador del comité', Number.isFinite(m.multiplicador) ? `×${cifras.numero(m.multiplicador, m.multiplicador % 1 ? 1 : 0)}` : '—'),
+      fila('P&L del día', cifras.usd(m.pnlDia, { signo: true }), cifras.claseSigno(m.pnlDia, 0.005)),
+      fila('P&L total', cifras.usd(met.pnlTotal, { signo: true }), cifras.claseSigno(met.pnlTotal, 0.005)),
+      fila('Operaciones', cifras.numero(met.operaciones)),
+      fila('Acierto', cifras.pct(met.acierto, { decimales: 0 })),
+      fila('Factor', n2(met.factorBeneficio)),
+      fila('Sharpe', n2(met.sharpe)),
+      fila('Sharpe ajustado', n2(met.sharpeAjustado)),
+      fila('Caída máxima', cifras.pct(met.maxDD, { decimales: 1 })),
+      fila('Adherencia', cifras.pct(met.adherencia, { decimales: 0 })),
+      fila('Universo', (m.universo || []).join(', ') || '—')));
+    if (puestos.length) {
+      t.appendChild(el('div', { class: 'que-decide' }, el('h3', { text: 'Puestos' }),
+        el('div', { class: 'lista-puestos' }, puestos.map(p => irA({ tipo: 'puesto', id: p.id },
+          `${p.etiqueta}${p.posicion ? ` · ${cifras.pct(p.posicion.pnlAbiertoPct, { signo: true, decimales: 1 })}` : ''}`)))));
     }
   }
 
-  function bloqueUltimo(m) {
+  function rellenarAgente(t, sel, inst, cerrar) {
+    const ag = (inst.agentes || []).find(a => a.id === sel.id);
+    if (!ag) { t.appendChild(el('p', { class: 'vacio', text: 'Este agente ya no está en la plantilla.' })); t.appendChild(cerrar); return; }
+    const llm = inst.llm || {};
+    const modelo = ag.id === 'cio' ? llm.modeloComite : llm.modeloAgentes;
+    t.appendChild(el('header', { class: 'tarjeta-cab' },
+      el('div', { class: 'tarjeta-titulo', id: 'tarjeta-titulo', text: ag.nombre }),
+      el('div', { class: 'tarjeta-sub', text: `${ag.rol} · ${nombreDep(ag.departamento)}` }),
+      cerrar));
+    t.appendChild(el('div', { class: 'tarjeta-persona' },
+      el('span', { class: 'avatar', style: `background:${colorDep(ag.departamento)}`, text: iniciales(ag.nombre) }),
+      el('div', {}, el('b', { text: ESTADO_AGENTE[ag.estado] || ag.estado || '—' }), el('span', { text: NOMBRE_SALA[ag.sala] || ag.sala || '—' }))));
+    t.appendChild(el('dl', { class: 'tabla' },
+      fila('Rol', ag.rol || '—'),
+      fila('Usa LLM', ag.usaLLM ? (llm.activo ? `Sí · ${modelo || '—'}` : 'Sí, pero el LLM está apagado: plantillas') : 'No: reglas y plantillas'),
+      ag.etiqueta ? fila('Activo', ag.etiqueta) : null,
+      fila('Estado', ESTADO_AGENTE[ag.estado] || ag.estado || '—'),
+      fila('Sala', NOMBRE_SALA[ag.sala] || ag.sala || '—')));
+    t.appendChild(el('div', { class: 'que-decide' }, el('h3', { text: 'Qué decide' }), el('p', { text: ag.queDecide || '—' })));
+    t.appendChild(bloqueUltimo(ultimoMensajeDe(ag.id), inst.ahora));
+  }
+
+  function bloqueUltimo(m, ahora) {
     return el('div', { class: 'ultimo' }, el('h3', { text: 'Último mensaje' }),
-      m ? el('p', {}, el('time', { text: cifras.hora(m.t) + ' · ' }), m.texto) : el('p', { class: 'vacio', text: 'Todavía no ha dicho nada.' }));
+      m ? el('p', {}, el('time', { text: cifras.momento(m.t, ahora) + ' · ' }), m.texto) : el('p', { class: 'vacio', text: 'Todavía no ha dicho nada.' }));
   }
 
   function chispaSvg(serie, color) {
@@ -482,26 +652,74 @@
 
   function ocultarTarjeta() {
     est.tarjeta = null;
-    $('tarjeta').hidden = true;
+    const t = $('tarjeta');
+    t.hidden = true;
+    // Siempre, mire lo que mire el ancho: si la ventana cambió de tamaño con la
+    // tarjeta abierta, no puede quedar la página inerte.
+    fijarInerte(false);
+    t.removeAttribute('role');
+    t.removeAttribute('aria-modal');
     if (est.ultimoFoco && est.ultimoFoco.focus && document.contains(est.ultimoFoco)) {
       try { est.ultimoFoco.focus({ preventScroll: true }); } catch (_) { /* nada */ }
     }
   }
 
+  // La tarjeta se rehace con cada estado, mensaje o movimiento de un agente.
+  // Si el foco estaba dentro, vuelve a su botón equivalente (si no, caía a
+  // <body> varias veces por segundo y el lector de pantalla empezaba de nuevo).
   function refrescarTarjeta(inst) {
-    if (est.tarjeta && !$('tarjeta').hidden) {
-      const t = $('tarjeta');
-      const scroll = t.scrollTop;
-      rellenarTarjeta(est.tarjeta, inst);
-      t.scrollTop = scroll;
+    const t = $('tarjeta');
+    if (!est.tarjeta || t.hidden) return;
+    const activo = document.activeElement;
+    const teniaFoco = t.contains(activo);
+    let indice = -1;
+    if (teniaFoco) indice = Array.from(t.querySelectorAll('button')).indexOf(activo);
+    const scroll = t.scrollTop;
+    rellenarTarjeta(est.tarjeta, inst);
+    t.scrollTop = scroll;
+    if (teniaFoco) {
+      const botones = t.querySelectorAll('button');
+      const destino = (indice >= 0 && botones[indice]) || t.querySelector('.cerrar');
+      if (destino) { try { destino.focus({ preventScroll: true }); } catch (_) { destino.focus(); } }
     }
   }
 
   // ---------- conexión, avisos, tostadas ----------
-  function conexion(ok, espera) {
+  // Franja de arriba: roja sin conexión (diciendo por qué, si se sabe) y ámbar
+  // con conexión pero sin datos nuevos desde hace demasiado.
+  function textoConexion(espera, motivo) {
+    const reintento = espera ? ` Reintentando en ${cifras.numero(Math.round(espera / 1000))} s…` : '';
+    if (motivo === 'token') return 'Falta el token del panel: abre la URL con ?token=… (el valor de PANEL_TOKEN).';
+    if (motivo === 'token-malo') return 'El token del panel no vale: revisa el ?token=… de la URL (tiene que ser el de PANEL_TOKEN).';
+    if (motivo === 'lleno') return `Hay demasiados paneles abiertos contra la mesa: cierra alguna pestaña.${reintento}`;
+    if (motivo === 'arrancando') return `La mesa está arrancando (histórico, órdenes a medias y conciliación).${reintento}`;
+    return `Sin conexión con la mesa, reintentando${espera ? ` en ${cifras.numero(Math.round(espera / 1000))} s` : ''}…`;
+  }
+
+  function pintarFranja() {
     const f = $('franja');
-    f.hidden = !!ok;
-    if (!ok) f.textContent = `Sin conexión con la mesa, reintentando${espera ? ` en ${cifras.numero(Math.round(espera / 1000))} s` : ''}…`;
+    if (!est.conexion.ok) {
+      f.hidden = false;
+      f.className = 'franja';
+      f.textContent = est.conexion.texto;
+    } else if (est.viejo) {
+      f.hidden = false;
+      f.className = 'franja ambar';
+      f.textContent = est.viejo;
+    } else {
+      f.hidden = true;
+    }
+  }
+
+  function conexion(ok, espera, motivo) {
+    est.conexion = { ok: !!ok, texto: ok ? '' : textoConexion(espera, motivo) };
+    pintarFranja();
+  }
+
+  function datosViejos(texto) {
+    if ((texto || null) === est.viejo) return;
+    est.viejo = texto || null;
+    pintarFranja();
   }
 
   function tostada(texto, tipo) {
@@ -517,7 +735,7 @@
     const d = $('modal');
     const cuerpo = $('modal-cuerpo');
     cuerpo.textContent = '';
-    d.className = 'modal' + (tipo === 'kill' ? ' peligro' : '');
+    d.className = 'modal' + (tipo === 'kill' ? ' peligro' : '') + (tipo === 'resultados' ? ' ancho' : '');
     const fn = MODALES[tipo];
     if (!fn) return;
     fn(cuerpo);
@@ -578,7 +796,99 @@
     return { input, valor: () => input.value.trim(), campo: el('label', { class: 'confirmar' }, el('span', {}, 'Escribe ', el('b', { text: palabra }), ' para confirmar'), input) };
   }
 
+  // ---------- resultados: sombras, mejora, mesas, capital sin asignar, laboratorio ----------
+
+  const ESTADO_HIPOTESIS = { pendiente: 'Pendiente', evaluando: 'Evaluando', aprobada: 'Aprobada', rechazada: 'Rechazada' };
+  const n2 = x => (Number.isFinite(x) ? cifras.numero(x, 2) : '—');
+  const conSigno = (texto, x) => (x > 0 && /[1-9]/.test(texto) ? '+' + texto : texto);
+
+  function valorCriterio(c, v) {
+    if (!Number.isFinite(v)) return '—';
+    if (/maxDD|caída|ventanas/i.test(c.nombre || '')) return cifras.pct(v, { decimales: 0 });
+    if (Number.isInteger(v)) return cifras.numero(v);
+    return cifras.numero(v, 2);
+  }
+
+  // Capital de partida sin mirar la configuración: todas las sombras empiezan
+  // con él, así que sale de cualquiera (valor / (1 + rentabilidad)).
+  function capitalDe(inst) {
+    for (const b of inst.benchmarks || []) {
+      if (Number.isFinite(b.valor) && Number.isFinite(b.rentabilidad) && b.rentabilidad > -1) return b.valor / (1 + b.rentabilidad);
+    }
+    return null;
+  }
+
+  function construirResultados(c, inst) {
+    c.append(...cabModal('Resultados', `Lo que gana el fondo frente a sus carteras sombra, todas con costes. Datos de las ${inst ? cifras.hora(inst.ahora) : '—'}.`));
+    if (!inst) { c.append(el('p', { class: 'vacio', text: 'Todavía no hay datos de la mesa.' }), el('div', { class: 'modal-pie' }, el('button', { class: 'boton primario', type: 'button', text: 'Cerrar', onclick: cerrarModal }))); return; }
+    const cab = inst.cabecera || {};
+    const mejora = inst.mejora || {};
+    const capital = capitalDe(inst);
+    const rentFondo = Number.isFinite(capital) && capital > 0 && Number.isFinite(cab.patrimonio) ? cab.patrimonio / capital - 1 : null;
+
+    // ¿Aporta algo el comité? (principio 7: se mide contra las mismas mesas sin él).
+    const dif = Number.isFinite(mejora.sharpe90Fondo) && Number.isFinite(mejora.sharpe90SinComite) ? mejora.sharpe90Fondo - mejora.sharpe90SinComite : null;
+    c.append(el('section', { class: 'bloque resultados-mejora', 'aria-labelledby': 'res-mejora' },
+      el('h3', { id: 'res-mejora', text: '¿Aporta algo el comité?' }),
+      el('dl', { class: 'tabla' },
+        fila('Sharpe 90 d del fondo', n2(mejora.sharpe90Fondo)),
+        fila('Sharpe 90 d sin comité', n2(mejora.sharpe90SinComite)),
+        fila('Sharpe 90 d de BTC', n2(mejora.sharpe90Btc)),
+        fila('Fondo − sin comité', dif === null ? '—' : conSigno(cifras.numero(dif, 2), dif), cifras.claseSigno(dif, 0.005))),
+      mejora.texto ? el('p', { class: 'nota', text: mejora.texto }) : null));
+
+    // Sombras.
+    const filas = [{ id: 'fondo', nombre: 'El fondo', valor: cab.patrimonio, rentabilidad: rentFondo, sharpe90: mejora.sharpe90Fondo, fondo: true }]
+      .concat(inst.benchmarks || []);
+    c.append(el('section', { class: 'bloque', 'aria-labelledby': 'res-sombras' },
+      el('h3', { id: 'res-sombras', text: 'Frente a las carteras sombra' }),
+      el('div', { class: 'tabla-scroll' }, el('table', { class: 'resultados' },
+        el('thead', {}, el('tr', {}, ['Cartera', 'Valor', 'Rentab.', 'Sharpe 90 d', 'Fondo − esta'].map(x => el('th', { scope: 'col', text: x })))),
+        el('tbody', {}, filas.map(b => el('tr', { class: b.fondo ? 'fila-fondo' : (b.id === 'sin-comite' ? 'fila-sin-comite' : null) },
+          el('th', { scope: 'row', text: b.nombre || b.id }),
+          el('td', { text: cifras.usd(b.valor) }),
+          el('td', { class: cifras.claseSigno(b.rentabilidad, 0.00005), text: cifras.pct(b.rentabilidad, { signo: true }) }),
+          el('td', { text: n2(b.sharpe90) }),
+          el('td', { class: b.fondo ? null : cifras.claseSigno(cab.patrimonio - b.valor, 0.005),
+            text: b.fondo ? '' : (Number.isFinite(b.valor) && Number.isFinite(cab.patrimonio) ? cifras.usd(cab.patrimonio - b.valor, { signo: true }) : '—') }))))))));
+
+    // Mesas y capital sin asignar.
+    const sa = cifras.sinAsignar(inst);
+    c.append(el('section', { class: 'bloque', 'aria-labelledby': 'res-mesas' },
+      el('h3', { id: 'res-mesas', text: 'Mesas' }),
+      sa && sa.fraccion > 0.0005 ? el('p', { class: 'aviso-sin-asignar',
+        text: `Sin asignar: ${cifras.pct(sa.fraccion, { decimales: 0 })} del patrimonio${Number.isFinite(sa.usd) ? ` (${cifras.usd(sa.usd)})` : ''}. Queda en efectivo: ninguna mesa lo usa.` }) : null,
+      el('div', { class: 'tabla-scroll' }, el('table', { class: 'resultados' },
+        el('thead', {}, el('tr', {}, ['Mesa', 'Estado', 'Peso', 'Sharpe', 'P&L total'].map(x => el('th', { scope: 'col', text: x })))),
+        el('tbody', {}, (inst.mesas || []).map(m => el('tr', {},
+          el('th', { scope: 'row' }, el('button', { class: 'boton enlace', type: 'button', text: m.nombre || m.id,
+            onclick: () => { cerrarModal(); if (est.manejadores.alSeleccionar) est.manejadores.alSeleccionar({ tipo: 'mesa', id: m.id }); } })),
+          el('td', { text: cifras.estadoMesa(m.estado) }),
+          el('td', { text: cifras.pct(m.peso, { decimales: 0 }) }),
+          el('td', { text: n2(m.metricas && m.metricas.sharpe) }),
+          el('td', { class: cifras.claseSigno(m.metricas && m.metricas.pnlTotal, 0.005), text: cifras.usd(m.metricas && m.metricas.pnlTotal, { signo: true }) })))))),
+      (inst.mesas || []).filter(m => m.nota).map(m => el('p', { class: 'nota' }, el('b', { text: `${m.nombre}: ` }), m.nota))));
+
+    // Laboratorio.
+    const lab = inst.laboratorio || {};
+    const hip = Array.isArray(lab.hipotesis) ? lab.hipotesis : [];
+    c.append(el('section', { class: 'bloque', 'aria-labelledby': 'res-lab' },
+      el('h3', { id: 'res-lab', text: 'Laboratorio' }),
+      el('p', { class: 'nota', text: `${cifras.numero(lab.ensayosTotales)} ensayos acumulados (cuentan para el Sharpe deflactado). Próxima revisión: ${cifras.momento(lab.proximaRevision, inst.ahora)}.` }),
+      hip.length ? el('ul', { class: 'hipotesis' }, hip.map(h => el('li', { class: 'hip-' + h.estado },
+        el('div', { class: 'hip-cab' }, el('span', { class: 'hip-estado', text: ESTADO_HIPOTESIS[h.estado] || h.estado || '—' }),
+          el('time', { text: cifras.momento(h.t, inst.ahora) })),
+        el('p', { text: h.descripcion || h.id }),
+        (h.criterios || []).length ? el('ul', { class: 'criterios' }, h.criterios.map(k => el('li', { class: k.ok ? 'ok' : 'error' },
+          el('b', { text: k.nombre }), el('span', { text: `${valorCriterio(k, k.valor)} (${k.ok ? 'pasa' : 'no pasa'}: ${valorCriterio(k, k.umbral)})` })))) : null)))
+        : el('p', { class: 'vacio', text: 'Sin hipótesis todavía.' })));
+    c.append(el('div', { class: 'modal-pie' }, el('button', { class: 'boton primario', type: 'button', text: 'Cerrar', onclick: cerrarModal })));
+  }
+
   const MODALES = {
+    resultados(c) {
+      construirResultados(c, est.manejadores.instantanea ? est.manejadores.instantanea() : null);
+    },
     comite(c) {
       const res = zonaResultado();
       const b = el('button', { class: 'boton primario', type: 'button', text: 'Convocar ahora' });
@@ -600,7 +910,7 @@
         if (!p) { propuesta.hidden = true; aplicar.hidden = true; return; }
         propuesta.hidden = false;
         propuesta.append(el('h3', { text: 'Propuesta' }), el('p', { class: 'explicacion', text: p.explicacion || '' }),
-          el('ul', {}, (p.directivas || []).map(d => el('li', { class: d.tipo === 'sin_efecto' ? 'sin-efecto' : '', text: textoDirectiva(d) }))));
+          el('ul', {}, (p.directivas || []).map(d => el('li', { class: d.tipo === 'sin_efecto' ? 'sin-efecto' : '', text: textoDirectiva(d, inst && inst.mesas) }))));
         const util = (p.directivas || []).some(d => d.tipo !== 'sin_efecto');
         aplicar.hidden = false;
         aplicar.disabled = !util;
@@ -644,11 +954,20 @@
       c.append(...cabModal('Pausar todo', 'Pasa el fondo a «solo cerrar» hasta que alguien pulse Reabrir: no se abre nada nuevo; las salidas y los stops siguen funcionando.'), res, pieModal(b));
     },
     reabrir(c) {
+      const inst = est.manejadores.instantanea ? est.manejadores.instantanea() : null;
       const res = zonaResultado();
       const b = el('button', { class: 'boton primario', type: 'button', text: 'Reabrir' });
       const conf = confirmacion('REABRIR', b);
       b.addEventListener('click', () => ejecutar(b, res, 'reabrir', { confirmacion: conf.valor() }));
-      c.append(...cabModal('Reabrir', 'Vuelve a nivel normal si la conciliación con el bróker está limpia. Es la única salida de una pausa o de un kill switch.'), conf.campo, res, pieModal(b));
+      const notas = [];
+      const nivel = inst && inst.fondo && inst.fondo.nivel;
+      if (nivel === 'solo_cerrar') notas.push('Ahora el fondo está en «solo cerrar» por la pérdida del día: eso no se reabre a mano, dura hasta las 00:00 UTC.');
+      const n = inst ? cifras.nivelEfectivo(inst, inst.ahora) : null;
+      const d = (inst && inst.directivas) || {};
+      if (d.modo === 'SOLO_CERRAR') notas.push('El comité tiene el fondo en SOLO CERRAR: Reabrir no lo quita; lo cambia el próximo comité.');
+      if (Number.isFinite(d.soloCerrarHasta) && n && (n.origen === 'Megáfono' || d.soloCerrarHasta > inst.ahora)) notas.push(`El Megáfono tiene «solo cerrar» hasta las ${cifras.hora(d.soloCerrarHasta)}: Reabrir no lo quita.`);
+      c.append(...cabModal('Reabrir', 'Vuelve a nivel normal si la conciliación con el bróker está limpia. Es la única salida de una pausa o de un kill switch. No quita las directivas del Megáfono ni las del comité.'),
+        notas.length ? el('ul', { class: 'notas-reabrir' }, notas.map(x => el('li', { text: x }))) : null, conf.campo, res, pieModal(b));
     },
     kill(c) {
       const res = zonaResultado();
@@ -710,7 +1029,7 @@
 
   return {
     iniciar, fijarDepartamentos, actualizarBarra, actualizarComite, anadirMensajes, repintarFeed, ultimoMensajeDe,
-    mostrarTarjeta, ocultarTarjeta, refrescarTarjeta, conexion, tostada, abrirModal, cerrarModal,
-    textoDirectiva, iniciales, get tarjeta() { return est.tarjeta; }, _est: est,
+    mostrarTarjeta, ocultarTarjeta, refrescarTarjeta, conexion, datosViejos, textoConexion, tostada, abrirModal, cerrarModal,
+    textoDirectiva, nombreMesa, frase, valorCriterio, capitalDe, iniciales, get tarjeta() { return est.tarjeta; }, _est: est,
   };
 });

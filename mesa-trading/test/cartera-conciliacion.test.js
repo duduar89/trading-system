@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Libros } = require('../src/cartera/libros');
-const { conciliar } = require('../src/cartera/conciliacion');
+const { conciliar, factorEscalado, exposicionConBroker } = require('../src/cartera/conciliacion');
 
 const cerca = (a, b, tol = 1e-12) => assert.ok(Math.abs(a - b) <= tol, `${a} ≠ ${b}`);
 
@@ -91,4 +91,41 @@ test('tolerancia configurable: 0,5 % hace grave un −0,6 %', () => {
   const l = libros([['tendencia-BTC', 'tendencia', 'BTC/USD', 1]]);
   const r = conciliar({ posicionesBroker: [{ simbolo: 'BTC/USD', cantidad: 0.994 }], libros: l, tolerancia: 0.005 });
   assert.equal(r.grave, true);
+});
+
+test('factorEscalado: la misma regla que conciliar (ruido → nada; ≤ 1 % → factor; más → grave, nada)', () => {
+  assert.equal(factorEscalado(1, 1), null);
+  assert.equal(factorEscalado(1, 1 + 1e-12), null);
+  cerca(factorEscalado(1, 0.9975), 0.9975);
+  cerca(factorEscalado(0.9975, 1), 1 / 0.9975);          // paper que no cobra: los libros netos, el bróker bruto
+  cerca(factorEscalado(1, 0.99), 0.99);                   // justo en la tolerancia
+  assert.equal(factorEscalado(1, 0.985), null);           // −1,5 %: grave
+  assert.equal(factorEscalado(0, 1), null);
+  assert.equal(factorEscalado(1, 0), null);
+  assert.equal(factorEscalado(1, 0.995, 0.001), null);    // tolerancia configurable
+});
+
+test('exposicionConBroker: una huérfana del bróker cuenta para los topes; porPuesto y porMesa no cambian', () => {
+  const l = libros([['tendencia-BTC', 'tendencia', 'BTC/USD', 50], ['momentum-SPY', 'momentum-etf', 'SPY', 10]]);
+  const val = l.valorar({ 'BTC/USD': 100, SPY: 100 });
+  cerca(val.exposicionPorActivo['BTC/USD'], 5000);
+  // En el bróker: BTC con 40.000 $ de más (cuenta usada antes), DOGE sin puesto y SPY algo por debajo (lectura vieja).
+  const pos = [
+    { simbolo: 'BTC/USD', cantidad: 450, valor: 45000 },
+    { simbolo: 'DOGEUSD', cantidad: 1000, valor: 300 },       // clave de Alpaca: se canoniza
+    { simbolo: 'SPY', cantidad: 9, valor: 900 },
+  ];
+  const r = exposicionConBroker(val, pos);
+  cerca(r.exposicionPorActivo['BTC/USD'], 45000);
+  cerca(r.exposicionPorActivo['DOGE/USD'], 300);
+  cerca(r.exposicionPorActivo.SPY, 1000, 1e-9);             // máximo: la cifra de los libros no se rebaja
+  cerca(r.exposicionBruta, 46300, 1e-9);
+  cerca(r.exposicionCripto, 45300, 1e-9);
+  assert.equal(r.posicionesAbiertas, 3);
+  assert.equal(r.porPuesto, val.porPuesto);
+  assert.equal(r.porMesa, val.porMesa);
+  // Sin huérfanas, lo mismo que los libros.
+  const igual = exposicionConBroker(val, [{ simbolo: 'BTC/USD', cantidad: 50, valor: 5000 }, { simbolo: 'SPY', cantidad: 10, valor: 1000 }]);
+  cerca(igual.exposicionBruta, val.exposicionBruta);
+  assert.equal(igual.posicionesAbiertas, val.posicionesAbiertas);
 });

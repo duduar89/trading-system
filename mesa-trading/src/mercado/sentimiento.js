@@ -14,6 +14,14 @@ const { RelojReal, HORA, DIA, diaUTC, inicioVela } = require('../util/reloj');
 
 const URL_FNG = 'https://api.alternative.me/fng/';
 
+// Retraso con el que se da por conocido el valor de un día. alternative.me lo
+// publica justo a las 00:00 UTC, el mismo instante en que deciden las mesas
+// diarias: en vivo, con la caché de 1 h, a esa hora casi siempre se tiene aún
+// el de ayer. Para que vivo y backtest usen el mismo dato, el valor vigente en
+// t es valorEn(historico, t − RETRASO_FG): a las 00:00 el de ayer, desde las
+// 01:00 el de hoy.
+const RETRASO_FG = HORA;
+
 const ETIQUETAS = Object.freeze({
   'Extreme Fear': 'Miedo extremo',
   Fear: 'Miedo',
@@ -156,4 +164,4 @@ function valorEn(historico, t) {
   return res;
 }
 
-module.exports = { MiedoCodicia, ETIQUETAS, BANDAS_MEDIDAS, traducir, valorSintetico, valorEn, URL_FNG };
+module.exports = { MiedoCodicia, ETIQUETAS, BANDAS_MEDIDAS, traducir, valorSintetico, valorEn, URL_FNG, RETRASO_FG };

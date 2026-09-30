@@ -84,6 +84,39 @@ function velasFiltroVol(marco) {
   return velasPorDias(marco, 30) + velasPorDias(marco, 365);
 }
 
+// Hueco en los datos de un símbolo: más de 4 velas y más de 5 días sin
+// ninguna. Con 5 días de mínimo, las noches, los fines de semana y los puentes
+// de las acciones no cuentan como hueco; un símbolo que la fuente deja de dar
+// durante meses (SOL en Alpaca, jul-2023 → ago-2024), sí.
+function umbralHueco(marcoMs) {
+  return Math.max(4 * (marcoMs || DIA), 5 * DIA);
+}
+
+// Índices j de la serie en que se reanuda tras un hueco (t[j] − t[j−1] > umbral).
+function reanudaciones(serie, umbral) {
+  const js = [];
+  for (let j = 1; j < serie.length; j++) if (serie[j].t - serie[j - 1].t > umbral) js.push(j);
+  return js;
+}
+
+// Última reanudación ≤ j (o −Infinity si no hay ninguna).
+function ultimaReanudacion(js, j) {
+  let lo = 0; let hi = js.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (js[m] <= j) lo = m + 1; else hi = m; }
+  return lo ? js[lo - 1] : -Infinity;
+}
+
+// Velas que tarda la decisión en no depender de nada anterior: el
+// calentamiento de la familia, 15 periodos de ATR/RSI de Wilder (su memoria
+// cae por debajo de 2·10⁻⁷) y, con el filtro vol-max, su año de ventana. Es lo
+// que el vivo prepara (velasNecesarias) y lo que el motor espera tras un hueco.
+function velasMemoria(estrategia, params, filtros = []) {
+  const p = params || {};
+  let n = estrategia.calentamiento(p) + (Number.isFinite(p.atr) ? 15 * p.atr : 0);
+  if ((filtros || []).some(f => f && f.id === 'vol-max')) n = Math.max(n, velasFiltroVol(estrategia.marco) + 1);
+  return n;
+}
+
 // Aplica los filtros de la mesa a una apertura. Devuelve el filtro que la
 // bloquea o null. Solo se calcula el percentil si hay un filtro vol-max.
 function filtroQueBloquea(prep, simbolo, i, contexto) {
@@ -124,5 +157,5 @@ function indicesPorT(velas) {
 module.exports = {
   MARCOS, etiqueta, textoMarco, esCripto, periodosAnio, combinaciones, numeroCombinaciones,
   igual, siguienteMayor, siguienteMenor, DOMINIO_ATR_STOP, volPercentil, velasFiltroVol, velasPorDias,
-  filtroQueBloquea, textoBloqueo, senal, indicesPorT,
+  filtroQueBloquea, textoBloqueo, senal, indicesPorT, umbralHueco, reanudaciones, ultimaReanudacion, velasMemoria,
 };

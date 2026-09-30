@@ -1,12 +1,28 @@
 'use strict';
 // Servidor + orquestador sintético (§7): forma de la instantánea (campo a campo
 // contra la maqueta de la interfaz), estáticos, SSE, cada comando, token y
-// límite del cuerpo.
+// límite del cuerpo. Además, los casos conocidos de la revisión del servidor:
+// CSRF (Origin, Sec-Fetch-Site, Content-Type), DNS rebinding (Host), tope de
+// paneles SSE, panel que deja de leer, API mientras arranca, /api/mensajes
+// inclusivo y más allá de la memoria, y el arranque de src/index.js (un solo
+// proceso por carpeta, escucha antes de iniciar, HOST abierto sin token,
+// Ctrl+C doble y avisos del banner).
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { crearOrquestador, arrancarServidor, pedir, abrirSSE, PASO } = require('./integracion-ayuda');
+const fs = require('fs');
+const os = require('os');
+const net = require('net');
+const path = require('path');
+const { spawn } = require('child_process');
+const { crearOrquestador, arrancarServidor, pedir, abrirSSE, carpetaTemporal, llmApagado, PASO, INICIO } = require('./integracion-ayuda');
+const { crearServidor } = require('../src/servidor');
+const { crearConfig } = require('../src/config');
+const { construir, avisosDeArranque, lineaLLM, consejoSinRed, urlsDelPanel } = require('../src/index');
+const { leerJSONL } = require('../src/util/almacen');
 const { crearMaqueta } = require('../web/js/maqueta.js');
+
+const RAIZ = path.join(__dirname, '..');
 
 const tipoDe = v => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
 
@@ -17,6 +33,7 @@ const FORMA = {
   cabecera: {
     patrimonio: 'number', pnlDia: 'number', pnlDiaPct: 'number', caida: 'number', exposicionBrutaPct: 'number', exposicionCriptoPct: 'number',
     posiciones: 'number', regimen: { valor: 'string', detalle: 'string' }, miedoCodicia: 'object|null', proximoComite: 'number', modoComite: 'string',
+    sinAsignar: { fraccion: 'number', usd: 'number' }, vigilancia: { perdidaDiaPct: 'number|null', caidaPct: 'number', desdeReapertura: 'boolean' },
   },
   llm: { activo: 'boolean', modeloComite: 'string', modeloAgentes: 'string', gastoHoyUsd: 'number', presupuestoDiaUsd: 'number' },
   curva: 'array', cotizaciones: 'array', departamentos: 'array', agentes: 'array', mesas: 'array', puestos: 'array', posiciones: 'array',
@@ -117,9 +134,11 @@ test('la instantánea tiene la misma forma que la maqueta de la interfaz', async
   mismasClaves(real, maq, '$');
   for (const k of ['fondo', 'cabecera', 'llm', 'mejora', 'directivas', 'laboratorio']) mismasClaves(real[k], maq[k], k);
   mismasClaves(real.cabecera.regimen, maq.cabecera.regimen, 'cabecera.regimen');
+  mismasClaves(real.cabecera.sinAsignar, maq.cabecera.sinAsignar, 'cabecera.sinAsignar');
+  mismasClaves(real.cabecera.vigilancia, maq.cabecera.vigilancia, 'cabecera.vigilancia');
   mismasClaves(real.cabecera.miedoCodicia, maq.cabecera.miedoCodicia, 'cabecera.miedoCodicia');
   mismasClaves(real.limites, maq.limites, 'limites');
-  const pares = { agentes: [], mesas: ['nota'], puestos: [], posiciones: [], benchmarks: [], cotizaciones: [], departamentos: [], curva: [], ejecuciones: [], mensajes: [] };
+  const pares = { agentes: [], mesas: [], puestos: [], posiciones: [], benchmarks: [], cotizaciones: [], departamentos: [], curva: [], ejecuciones: [], mensajes: [] };
   for (const [lista, extras] of Object.entries(pares)) {
     if (!real[lista].length || !maq[lista].length) continue;
     mismasClaves(real[lista][0], maq[lista][0], `${lista}[0]`, extras);
@@ -270,6 +289,232 @@ test('otras rutas GET: mensajes, operaciones y costes del LLM', async () => {
   assert.equal(c.json.totalUsd, 0);
 });
 
+// ---------- Revisión del servidor: casos conocidos ----------
+
+const nivel = async () => (await pedir(srv.base, '/api/estado')).json.fondo.nivel;
+
+test('CSRF: los POST exigen JSON y se rechazan si vienen de otra web (Origin o Sec-Fetch-Site)', async () => {
+  assert.equal(await nivel(), 'normal');
+  const url = '/api/comando/pausar';
+  // Petición «simple» de otra web: text/plain no pide permiso previo al navegador.
+  const plano = await pedir(srv.base, url, { metodo: 'POST', cuerpo: '{"confirmacion":"KILL"}', cabeceras: { 'content-type': 'text/plain' } });
+  assert.equal(plano.status, 415, plano.texto);
+  assert.equal(plano.json.ok, false);
+  const formulario = await pedir(srv.base, url, { metodo: 'POST', cuerpo: 'a=1', cabeceras: { 'content-type': 'application/x-www-form-urlencoded' } });
+  assert.equal(formulario.status, 415);
+  // JSON, pero desde otra web.
+  const ajeno = await pedir(srv.base, url, { metodo: 'POST', cuerpo: {}, cabeceras: { origin: 'https://sitio-malicioso.example' } });
+  assert.equal(ajeno.status, 403, ajeno.texto);
+  assert.equal(ajeno.json.ok, false);
+  const nulo = await pedir(srv.base, url, { metodo: 'POST', cuerpo: {}, cabeceras: { origin: 'null' } });
+  assert.equal(nulo.status, 403);
+  const otroPuerto = await pedir(srv.base, url, { metodo: 'POST', cuerpo: {}, cabeceras: { origin: 'http://127.0.0.1:1' } });
+  assert.equal(otroPuerto.status, 403);
+  const cruzado = await pedir(srv.base, url, { metodo: 'POST', cuerpo: {}, cabeceras: { 'sec-fetch-site': 'cross-site' } });
+  assert.equal(cruzado.status, 403);
+  for (const r of ['/api/comando/kill', '/api/comando/reabrir']) {
+    const x = await pedir(srv.base, r, { metodo: 'POST', cuerpo: { confirmacion: 'KILL' }, cabeceras: { origin: 'https://sitio-malicioso.example', 'sec-fetch-site': 'cross-site' } });
+    assert.equal(x.status, 403, r);
+  }
+  assert.equal(await nivel(), 'normal', 'ningún comando de otra web ha llegado al fondo');
+  // Lecturas de otra web: tampoco.
+  assert.equal((await pedir(srv.base, '/api/estado', { cabeceras: { 'sec-fetch-site': 'cross-site' } })).status, 403);
+  assert.equal((await pedir(srv.base, '/api/operaciones', { cabeceras: { origin: 'https://sitio-malicioso.example' } })).status, 403);
+  // SSE con Origin ajeno: 403 y sin oyentes nuevos.
+  const antes = ctx.orquestador.listenerCount('estado');
+  const sseAjeno = await pedir(srv.base, '/api/eventos', { cabeceras: { origin: 'https://sitio-malicioso.example' } });
+  assert.equal(sseAjeno.status, 403);
+  assert.equal(ctx.orquestador.listenerCount('estado'), antes);
+  // El propio panel sí: mismo origen (el navegador manda Origin en los POST) y JSON.
+  const propio = await pedir(srv.base, '/api/comando/ajustes', { metodo: 'POST', cuerpo: {}, cabeceras: { origin: srv.base, 'sec-fetch-site': 'same-origin' } });
+  assert.equal(propio.status, 200, propio.texto);
+  assert.equal(propio.json.ok, true);
+  const localhost = await pedir(srv.base, '/api/comando/ajustes', { metodo: 'POST', cuerpo: {}, cabeceras: { host: `localhost:${srv.puerto}`, origin: `http://localhost:${srv.puerto}` } });
+  assert.equal(localhost.status, 200);
+  // curl sin Origin ni Sec-Fetch-Site, con JSON: vale (el token, si lo hay, sigue mandando).
+  assert.equal((await pedir(srv.base, '/api/comando/ajustes', { metodo: 'POST', cuerpo: {} })).status, 200);
+});
+
+test('Host: un nombre ajeno (DNS rebinding) no llega ni a la API ni a los estáticos', async () => {
+  const ajeno = { host: `atacante.example:${srv.puerto}` };
+  const estado = await pedir(srv.base, '/api/estado', { cabeceras: ajeno });
+  assert.equal(estado.status, 421, estado.texto);
+  assert.doesNotMatch(estado.texto, /patrimonio/);
+  // Con rebinding, Origin y Host son los dos del atacante: comparar uno con otro no basta.
+  const pausa = await pedir(srv.base, '/api/comando/pausar', { metodo: 'POST', cuerpo: {}, cabeceras: { ...ajeno, origin: `http://atacante.example:${srv.puerto}` } });
+  assert.equal(pausa.status, 421);
+  assert.equal(await nivel(), 'normal');
+  assert.equal((await pedir(srv.base, '/', { cabeceras: ajeno })).status, 421);
+  // Otro puerto en el Host tampoco (el panel se sirve en este).
+  assert.equal((await pedir(srv.base, '/api/estado', { cabeceras: { host: '127.0.0.1:1' } })).status, 421);
+  // Los nombres propios sí.
+  for (const host of [`127.0.0.1:${srv.puerto}`, `localhost:${srv.puerto}`, `LOCALHOST:${srv.puerto}`, `[::1]:${srv.puerto}`]) {
+    assert.equal((await pedir(srv.base, '/api/estado', { cabeceras: { host } })).status, 200, host);
+  }
+});
+
+test('SSE: como mucho 20 paneles a la vez; el 21 recibe 503 y al cerrar uno vuelve a haber sitio', async () => {
+  const s3 = await arrancarServidor(ctx.orquestador);
+  const abiertos = [];
+  try {
+    const antes = ctx.orquestador.listenerCount('estado');
+    for (let i = 0; i < 20; i++) {
+      const x = abrirSSE(s3.base);
+      abiertos.push(x);
+      assert.equal((await x.listo).statusCode, 200, `panel ${i + 1}`);
+    }
+    assert.equal(s3.servidor.clientesSSE.size, 20);
+    const sobra = await pedir(s3.base, '/api/eventos');
+    assert.equal(sobra.status, 503);
+    assert.match(sobra.json.mensaje, /20/);
+    assert.equal(ctx.orquestador.listenerCount('estado'), antes + 20);
+    abiertos.shift().cerrar();
+    await esperarQue(() => s3.servidor.clientesSSE.size === 19);
+    const otro = abrirSSE(s3.base);
+    abiertos.push(otro);
+    assert.equal((await otro.listo).statusCode, 200);
+    for (const x of abiertos.splice(0)) x.cerrar();
+    await esperarQue(() => s3.servidor.clientesSSE.size === 0);
+    assert.equal(ctx.orquestador.listenerCount('estado'), antes);
+  } finally {
+    for (const x of abiertos) x.cerrar();
+    await new Promise(r => s3.servidor.close(r));
+  }
+});
+
+// Un cliente TCP que pide el SSE y no lee nunca (móvil dormido, pestaña congelada).
+function sseQueNoLee(puerto) {
+  const s = net.connect(puerto, '127.0.0.1');
+  s.on('error', () => {});
+  s.write(`GET /api/eventos HTTP/1.1\r\nHost: 127.0.0.1:${puerto}\r\n\r\n`);
+  s.pause();
+  return s;
+}
+
+async function esperarQue(cond, ms = 5000, cada = 20) {
+  const fin = Date.now() + ms;
+  while (Date.now() < fin) { if (cond()) return; await new Promise(r => setTimeout(r, cada)); }
+  assert.ok(cond(), 'no se cumplió a tiempo');
+}
+
+test('SSE: un panel que deja de leer se corta (por lo pendiente o por atasco) y el que lee sigue recibiendo', async () => {
+  // Mensajes de 256 KB: el que lee va al día (se espera a que reciba cada uno);
+  // el que no lee acumula hasta pasar los búferes del núcleo y el tope.
+  const relleno = 'x'.repeat(256 * 1024);
+  for (const [caso, opciones] of [['pendiente', { maxPendienteSSE: 1024 * 1024, maxAtascoSSEMs: 600_000 }], ['atasco', { maxPendienteSSE: 1024 ** 3, maxAtascoSSEMs: 300 }]]) {
+    const servidor = crearServidor({ orquestador: ctx.orquestador, raizWeb: path.join(RAIZ, 'web'), carpetaDatos: ctx.orquestador.carpeta, pingMs: 50, ...opciones });
+    await new Promise(r => servidor.listen(0, '127.0.0.1', r));
+    const { port } = servidor.address();
+    const antes = ctx.orquestador.listenerCount('mensaje');
+    const atascado = sseQueNoLee(port);
+    const lector = abrirSSE(`http://127.0.0.1:${port}`);
+    try {
+      await lector.listo;
+      await esperarQue(() => servidor.clientesSSE.size === 2);
+      const recibidos = () => lector.eventos.filter(e => e.tipo === 'mensaje' && e.datos.prueba === caso).length;
+      let enviados = 0;
+      while (servidor.clientesSSE.size === 2 && enviados < 400) {
+        ctx.orquestador.emit('mensaje', { id: `prueba-${caso}-${enviados}`, prueba: caso, relleno });
+        enviados++;
+        await esperarQue(() => recibidos() === enviados, 5000, 2);
+        await new Promise(r => setTimeout(r, 5));
+      }
+      await esperarQue(() => servidor.clientesSSE.size === 1, 5000);
+      assert.ok(enviados < 400, `${caso}: el que no lee se corta (${enviados} mensajes de 256 KB)`);
+      assert.equal(ctx.orquestador.listenerCount('mensaje'), antes + 1, `${caso}: solo quedan los oyentes del lector`);
+      // Instantáneas seguidas a un panel que aún no ha vaciado la anterior: no se
+      // amontonan, la última sustituye a las demás y es la que le llega.
+      for (let i = 0; i < 3; i++) ctx.orquestador.emit('estado', { version: 1, relleno: relleno + relleno, i, caso });
+      await esperarQue(() => lector.eventos.some(e => e.tipo === 'estado' && e.datos.caso === caso && e.datos.i === 2), 5000);
+      assert.equal(lector.eventos.filter(e => e.tipo === 'estado' && e.datos.caso === caso && e.datos.i === 1).length, 0, 'la intermedia no se manda');
+      assert.equal(recibidos(), enviados, 'el lector no ha perdido ningún mensaje');
+      await lector.esperar('ping', 2000);
+      assert.equal(servidor.clientesSSE.size, 1, 'el lector sigue conectado');
+    } finally {
+      atascado.destroy();
+      lector.cerrar();
+      await new Promise(r => servidor.close(r));
+    }
+    await esperarQue(() => ctx.orquestador.listenerCount('mensaje') === antes);
+  }
+});
+
+test('mientras la mesa arranca, el servidor ya escucha: estáticos 200 y API 503 (no revienta la instantánea)', async () => {
+  const carpeta = carpetaTemporal();
+  const config = crearConfig({ modo: 'sintetico', datos: carpeta, semilla: '42' });
+  config.inicio = INICIO;
+  const piezas = construir(config, { llm: llmApagado(), opciones: { comiteEnSegundoPlano: false, pausaComiteMs: 0, intervaloEstadoMs: 0 } });
+  const s = await arrancarServidor(piezas.orquestador);
+  try {
+    const e = await pedir(s.base, '/api/estado');
+    assert.equal(e.status, 503, e.texto);
+    assert.equal(e.json.ok, false);
+    assert.match(e.json.mensaje, /arrancando/);
+    assert.equal((await pedir(s.base, '/api/eventos')).status, 503);
+    assert.equal((await pedir(s.base, '/api/comando/pausar', { metodo: 'POST', cuerpo: {} })).status, 503);
+    assert.equal((await pedir(s.base, '/api/mensajes?desde=0')).status, 503);
+    assert.equal((await pedir(s.base, '/')).status, 200);
+    await piezas.orquestador.iniciar();
+    assert.equal((await pedir(s.base, '/api/estado')).status, 200);
+  } finally {
+    await new Promise(r => s.servidor.close(r));
+    await piezas.orquestador.detener();
+  }
+});
+
+test('/api/mensajes?desde= es inclusivo: entran todos los del mismo instante', async () => {
+  await ctx.orquestador.esperarTareas();   // que nada publique mientras se compara
+  const bus = ctx.orquestador.bus;
+  const mem = bus.memoria;
+  // Un instante que compartan varios mensajes (en sintético pasa a menudo),
+  // dentro de lo que hay en memoria: posterior al más viejo y anterior al último.
+  const cuenta = {};
+  for (const m of mem) cuenta[m.t] = (cuenta[m.t] || 0) + 1;
+  const t = Number(Object.keys(cuenta).reverse().find(k => cuenta[k] > 1 && Number(k) > mem[0].t && Number(k) < mem[mem.length - 1].t));
+  assert.ok(Number.isFinite(t), 'hay mensajes que comparten instante');
+  const r = await pedir(srv.base, `/api/mensajes?desde=${t}`);
+  assert.equal(r.status, 200);
+  const esperados = mem.filter(m => m.t >= t).map(m => m.id);
+  assert.deepEqual(r.json.map(m => m.id), esperados);
+  assert.equal(r.json.filter(m => m.t === t).length, cuenta[t], 'los del mismo instante entran todos');
+});
+
+test('/api/mensajes?desde= anterior a la memoria del bus: completa con mensajes.jsonl, en orden y sin repetidos', async () => {
+  const { Bus } = require('../src/agentes/bus');
+  const { RelojSimulado } = require('../src/util/reloj');
+  const carpeta = carpetaTemporal();
+  const reloj = new RelojSimulado(INICIO);
+  const bus = new Bus({ reloj, ruta: path.join(carpeta, 'mensajes.jsonl'), maxMemoria: 20 });
+  for (let i = 0; i < 60; i++) {
+    if (i % 3 === 0) reloj.avanzar(PASO);   // tres mensajes por instante
+    bus.publicar({ de: 'sistema', canal: 'sistema', tipo: 'nota', texto: `nota ${i}` });
+  }
+  assert.equal(bus.memoria.length, 20);
+  // La memoria empieza a mitad de un instante: el mensaje 40 comparte t con el 39 y el 41.
+  assert.equal(bus.memoria[0].texto, 'nota 40');
+  const falso = Object.assign(new (require('events').EventEmitter)(), { iniciado: true, bus, carpeta, operaciones: [], instantanea: () => ({ version: 1 }) });
+  const s = await arrancarServidor(falso);
+  try {
+    const disco = leerJSONL(bus.ruta);
+    for (const desde of [bus.memoria[0].t, disco[10].t, 0, reloj.ahora()]) {
+      const r = await pedir(s.base, `/api/mensajes?desde=${desde}`);
+      assert.equal(r.status, 200);
+      const ids = r.json.map(m => m.id);
+      assert.deepEqual(ids, disco.filter(m => m.t >= desde).map(m => m.id), `desde=${desde}`);
+      assert.equal(new Set(ids).size, ids.length, 'sin repetidos');
+    }
+    // El mismo instante del más viejo de la memoria trae también los que ya salieron de ella.
+    const r = await pedir(s.base, `/api/mensajes?desde=${bus.memoria[0].t}`);
+    assert.deepEqual(r.json.slice(0, 3).map(m => m.texto), ['nota 39', 'nota 40', 'nota 41']);
+    assert.ok(r.json.some(m => m.texto === 'nota 39'), 'nota 39 comparte instante con la 40 y ya no está en memoria');
+    // Sin desde (o vacío), todo lo que hay (hasta el tope de lectura del disco).
+    assert.equal((await pedir(s.base, '/api/mensajes')).json.length, 60);
+    assert.equal((await pedir(s.base, '/api/mensajes?desde=')).json.length, 60);
+  } finally {
+    await new Promise(r => s.servidor.close(r));
+  }
+});
+
 test('kill: sin confirmación → 400; con confirmación → todo cerrado y bloqueado', async () => {
   const sin = await pedir(srv.base, '/api/comando/kill', { metodo: 'POST', cuerpo: {} });
   assert.equal(sin.status, 400);
@@ -309,4 +554,208 @@ test('PANEL_TOKEN: /api/* pide el token por cabecera o ?token=; los estáticos n
   } finally {
     await new Promise(r => s2.servidor.close(r));
   }
+});
+
+// ---------- Arranque (src/index.js) ----------
+
+// Entorno limpio para un proceso hijo: sin puerto, host, token ni clave del
+// entorno de quien corre las pruebas, y sin salida a la API de Anthropic.
+function entornoHijo(extra = {}) {
+  const env = { ...process.env };
+  for (const k of ['PUERTO', 'HOST', 'PANEL_TOKEN', 'ANTHROPIC_API_KEY', 'MODO', 'CARPETA_DATOS', 'VELOCIDAD', 'NODE_OPTIONS']) delete env[k];
+  return { ...env, ANTHROPIC_BASE_URL: 'http://127.0.0.1:9', ...extra };
+}
+
+function puertoLibre() {
+  return new Promise((resolver, rechazar) => {
+    const s = net.createServer();
+    s.once('error', rechazar);
+    s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolver(port)); });
+  });
+}
+
+// Lanza node src/index.js en sintético. `esperar(re)` resuelve cuando la salida
+// (stdout + stderr) casa con re; `fin` con { codigo, salida }.
+// Si una prueba falla a mitad, ningún proceso hijo se queda corriendo.
+const hijos = new Set();
+process.on('exit', () => { for (const h of hijos) { try { h.kill('SIGKILL'); } catch (_) { /* ya salió */ } } });
+
+function lanzarMesa({ puerto, datos, env = {}, precarga = null, args = [] }) {
+  const argv = [...(precarga ? ['-r', precarga] : []), path.join(RAIZ, 'src', 'index.js'), '--modo=sintetico', '--velocidad=1', `--puerto=${puerto}`, `--datos=${datos}`, ...args];
+  const hijo = spawn(process.execPath, argv, { cwd: RAIZ, env: entornoHijo(env), stdio: ['ignore', 'pipe', 'pipe'] });
+  hijos.add(hijo);
+  hijo.on('exit', () => hijos.delete(hijo));
+  let salida = '';
+  const esperando = [];
+  const mirar = () => { for (const w of [...esperando]) if (w.re.test(salida)) { esperando.splice(esperando.indexOf(w), 1); w.resolver(salida); } };
+  hijo.stdout.on('data', d => { salida += d; mirar(); });
+  hijo.stderr.on('data', d => { salida += d; mirar(); });
+  const fin = new Promise(resolver => hijo.on('close', (codigo, senal) => resolver({ codigo, senal, salida })));
+  return {
+    hijo, fin,
+    get salida() { return salida; },
+    esperar(re, ms = 15_000) {
+      if (re.test(salida)) return Promise.resolve(salida);
+      return new Promise((resolver, rechazar) => {
+        const w = { re, resolver };
+        esperando.push(w);
+        setTimeout(() => rechazar(new Error(`sin ${re} en ${ms} ms. Salida:\n${salida}`)), ms).unref();
+      });
+    },
+  };
+}
+
+async function conTope(promesa, ms, que) {
+  let t;
+  const tope = new Promise((_, rechazar) => { t = setTimeout(() => rechazar(new Error(`${que}: más de ${ms} ms`)), ms); });
+  try { return await Promise.race([promesa, tope]); } finally { clearTimeout(t); }
+}
+
+test('arranque: HOST abierto a la red sin PANEL_TOKEN no arranca ni toca la carpeta', async () => {
+  const datos = path.join(carpetaTemporal(), 'datos');
+  const m = lanzarMesa({ puerto: await puertoLibre(), datos, env: { HOST: '0.0.0.0', PANEL_TOKEN: '' } });
+  const r = await conTope(m.fin, 15_000, 'arranque');
+  assert.equal(r.codigo, 1, r.salida);
+  assert.match(r.salida, /HOST=0\.0\.0\.0/);
+  assert.match(r.salida, /PANEL_TOKEN/);
+  assert.equal(fs.existsSync(path.join(datos, 'estado.json')), false);
+  assert.equal(fs.existsSync(path.join(datos, '.proceso')), false);
+});
+
+test('arranque: un solo proceso por carpeta, y escucha ANTES de iniciar (un puerto ocupado no toca los datos)', async () => {
+  const x = path.join(carpetaTemporal(), 'x');
+  const y = path.join(carpetaTemporal(), 'y');
+  const p1 = await puertoLibre();
+  const a = lanzarMesa({ puerto: p1, datos: x });
+  try {
+    await a.esperar(/Ctrl\+C para parar/);
+    assert.ok(fs.existsSync(path.join(x, '.proceso')));
+    // A ×1 el primer latido va justo tras el banner y el siguiente, 5 min después:
+    // se espera a que estado.json deje de cambiar.
+    const leerEstado = () => fs.readFileSync(path.join(x, 'estado.json'), 'utf8');
+    let previo = leerEstado();
+    for (let i = 0; i < 50; i++) {
+      await new Promise(r => setTimeout(r, 300));
+      const ahora = leerEstado();
+      if (ahora === previo && /"tendencia": \d/.test(ahora)) break;
+      previo = ahora;
+    }
+    const mensajesAntes = fs.readFileSync(path.join(x, 'mensajes.jsonl'), 'utf8');
+    const estadoAntes = fs.readFileSync(path.join(x, 'estado.json'), 'utf8');
+    const brokerAntes = fs.readFileSync(path.join(x, 'broker-simulado.json'), 'utf8');
+    // Misma carpeta, otro puerto: se niega sin escribir nada en la carpeta del otro.
+    const b = lanzarMesa({ puerto: await puertoLibre(), datos: x });
+    const rb = await conTope(b.fin, 15_000, 'segundo proceso');
+    assert.equal(rb.codigo, 1, rb.salida);
+    assert.match(rb.salida, /Otra mesa ya usa la carpeta/);
+    assert.equal((fs.readFileSync(path.join(x, 'mensajes.jsonl'), 'utf8').match(/Mesa en marcha/g) || []).length, (mensajesAntes.match(/Mesa en marcha/g) || []).length);
+    assert.equal(fs.readFileSync(path.join(x, 'broker-simulado.json'), 'utf8'), brokerAntes, 'el segundo no reescribe el bróker del primero');
+    assert.equal(fs.readFileSync(path.join(x, 'estado.json'), 'utf8'), estadoAntes);
+    assert.match(fs.readFileSync(path.join(x, '.proceso'), 'utf8'), new RegExp(`"pid":${a.hijo.pid}\\b`));
+    // Mismo puerto, otra carpeta: falla al escuchar, antes de iniciar nada.
+    const c = lanzarMesa({ puerto: p1, datos: y });
+    const rc = await conTope(c.fin, 15_000, 'puerto ocupado');
+    assert.equal(rc.codigo, 1, rc.salida);
+    assert.match(rc.salida, new RegExp(`puerto ${p1}.*(en uso|ocupado)`, 'i'));
+    for (const f of ['estado.json', 'mensajes.jsonl', 'ordenes.jsonl', '.proceso']) assert.equal(fs.existsSync(path.join(y, f)), false, `${f} en la carpeta del que no arrancó`);
+  } finally {
+    a.hijo.kill('SIGINT');
+  }
+  const ra = await conTope(a.fin, 15_000, 'Ctrl+C');
+  assert.equal(ra.codigo, 0, ra.salida);
+  assert.match(ra.salida, /Estado guardado/);
+  assert.equal(fs.existsSync(path.join(x, '.proceso')), false, 'suelta el bloqueo al salir');
+});
+
+test('arranque: el segundo Ctrl+C sale ya aunque el cierre esté colgado; si guardar falla no dice «Estado guardado» y sale con 1', async () => {
+  const precarga = path.join(carpetaTemporal(), 'precarga.js');
+  fs.writeFileSync(precarga, `'use strict';
+const { Orquestador } = require(${JSON.stringify(path.join(RAIZ, 'src', 'orquestador.js'))});
+const modo = process.env.PRUEBA_DETENER;
+if (modo === 'colgado') Orquestador.prototype.detener = () => new Promise(() => {});
+if (modo === 'falla') Orquestador.prototype.detener = async () => { throw Object.assign(new Error('EPERM: operation not permitted, rename estado.json'), { code: 'EPERM' }); };
+`);
+  // Colgado (la red no responde dentro del latido): el segundo Ctrl+C sale en el acto.
+  const datos1 = path.join(carpetaTemporal(), 'c1');
+  const a = lanzarMesa({ puerto: await puertoLibre(), datos: datos1, precarga, env: { PRUEBA_DETENER: 'colgado' } });
+  await a.esperar(/Ctrl\+C para parar/);
+  a.hijo.kill('SIGINT');
+  await a.esperar(/otro Ctrl\+C sale ya/i);
+  const t0 = Date.now();
+  a.hijo.kill('SIGINT');
+  const ra = await conTope(a.fin, 5_000, 'segundo Ctrl+C');
+  assert.ok(Date.now() - t0 < 3_000);
+  assert.notEqual(ra.codigo, 0);
+  assert.match(ra.salida, /Salgo ya/);
+  assert.doesNotMatch(ra.salida, /Estado guardado/);
+  assert.equal(fs.existsSync(path.join(datos1, '.proceso')), false, 'suelta el bloqueo también al salir deprisa');
+  // Falla al guardar: lo dice y sale con 1.
+  const b = lanzarMesa({ puerto: await puertoLibre(), datos: path.join(carpetaTemporal(), 'c2'), precarga, env: { PRUEBA_DETENER: 'falla' } });
+  await b.esperar(/Ctrl\+C para parar/);
+  b.hijo.kill('SIGINT');
+  const rb = await conTope(b.fin, 10_000, 'cierre fallido');
+  assert.equal(rb.codigo, 1, rb.salida);
+  assert.doesNotMatch(rb.salida, /Estado guardado/);
+  assert.match(rb.salida, /No se pudo guardar/);
+  assert.match(rb.salida, /EPERM/);
+});
+
+test('arranque: los avisos dicen lo que manda de verdad (LLM guardado en Ajustes, proxy, gasto de la demo)', () => {
+  const base = {
+    modo: 'simulado', alpaca: { hay: true }, llm: { modeloComite: 'claude-opus-5-5', modeloAgentes: 'claude-opus-5-5', presupuestoDiaUsd: 2 },
+    proxy: { activo: false, ignoradasEnEnv: [] }, cadencias: { comiteHoras: 4 },
+  };
+  const llmDe = (e) => ({ activo: true, estado: () => ({ activo: true, modeloComite: 'claude-opus-5-5', modeloAgentes: 'claude-opus-5-5', presupuestoDiaUsd: 2, ...e }) });
+  const orq = { velocidad: 1, estado: { fondo: { nivel: 'normal' } } };
+  const avisos = (config, llm, entorno = {}, o = orq) => avisosDeArranque({ config, llm, orquestador: o, entorno });
+
+  // LLM: el banner enseña lo guardado desde Ajustes, y avisa si el .env dice otra cosa.
+  const guardado = llmDe({ presupuestoDiaUsd: 50, modeloComite: 'claude-fable-5-1' });
+  assert.match(lineaLLM(base, guardado), /comité claude-fable-5-1.*tope 50 \$\/día/);
+  assert.doesNotMatch(lineaLLM(base, guardado), /tope 2 \$/);
+  const a1 = avisos(base, guardado).join('\n');
+  assert.match(a1, /Ajustes/);
+  assert.match(a1, /tope 2 \$\/día/);
+  assert.match(a1, /comité claude-opus-5-5/);
+  assert.doesNotMatch(avisos(base, llmDe({})).join('\n'), /Ajustes/);
+  assert.match(lineaLLM(base, { activo: false, estado: () => ({}) }), /apagado/);
+
+  // Proxy: solo se aconseja si hay proxy en el entorno y Node no lo usa; con npm run start-proxy.
+  const conProxy = avisos(base, llmDe({}), { HTTPS_PROXY: 'http://proxy:3128' }).join('\n');
+  assert.match(conProxy, /npm run start-proxy/);
+  assert.doesNotMatch(conProxy, /NODE_USE_ENV_PROXY=1 npm start/);
+  assert.doesNotMatch(avisos({ ...base, proxy: { activo: true, ignoradasEnEnv: [] } }, llmDe({}), { HTTPS_PROXY: 'http://proxy:3128' }).join('\n'), /proxy/i);
+  assert.doesNotMatch(avisos(base, llmDe({}), {}).join('\n'), /proxy/i, 'sin proxy no se repite el consejo en cada arranque');
+  const enEnv = avisos({ ...base, proxy: { activo: false, ignoradasEnEnv: ['NODE_USE_ENV_PROXY', 'HTTPS_PROXY'] } }, llmDe({})).join('\n');
+  assert.match(enEnv, /\.env/);
+  assert.match(enEnv, /NODE_USE_ENV_PROXY, HTTPS_PROXY/);
+  assert.doesNotMatch(avisos({ ...base, modo: 'sintetico' }, { activo: false, estado: () => ({}) }, { HTTPS_PROXY: 'x' }).join('\n'), /proxy/i, 'la demo no usa la red');
+
+  // Demo con clave: avisa de que gasta dinero real y de cada cuánto hay comité.
+  const demo = avisos({ ...base, modo: 'sintetico' }, llmDe({}), {}, { velocidad: 600, estado: { fondo: { nivel: 'normal' } } }).join('\n');
+  assert.match(demo, /dinero real/);
+  assert.match(demo, /tope 2 \$\/día/);
+  assert.match(demo, /cada 24 s/);
+  assert.doesNotMatch(avisos({ ...base, modo: 'sintetico' }, { activo: false, estado: () => ({}) }).join('\n'), /dinero real/);
+
+  // Sin red al arrancar: el consejo depende de si el proxy ya está activo.
+  const sinRed = new Error('fetch failed');
+  assert.match(consejoSinRed(sinRed, { proxyActivo: false, entorno: { HTTPS_PROXY: 'x' } }), /npm run start-proxy/);
+  assert.match(consejoSinRed(sinRed, { proxyActivo: true, entorno: { HTTPS_PROXY: 'x' } }), /proxy.*no responde/i);
+  assert.doesNotMatch(consejoSinRed(sinRed, { proxyActivo: true, entorno: { HTTPS_PROXY: 'x' } }), /start-proxy|NODE_USE_ENV_PROXY/);
+  assert.match(consejoSinRed(sinRed, { proxyActivo: false, entorno: {} }), /red/);
+  assert.equal(consejoSinRed(new Error('MODO=alpaca necesita claves'), { proxyActivo: false, entorno: {} }), null);
+
+  // URL del panel: con un host abierto no se imprime 0.0.0.0 (no se puede abrir) sino las de verdad.
+  const urls = urlsDelPanel({ host: '0.0.0.0', puerto: 8765, token: 'abc' });
+  assert.ok(urls.length >= 1);
+  assert.ok(urls.every(u => !u.includes('0.0.0.0')));
+  assert.ok(urls.every(u => u.endsWith('/?token=abc')));
+  assert.deepEqual(urlsDelPanel({ host: '127.0.0.1', puerto: 8765, token: '' }), ['http://127.0.0.1:8765/']);
+});
+
+test('package.json: npm run start-proxy arranca con el proxy del entorno en cualquier sistema', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(RAIZ, 'package.json'), 'utf8'));
+  assert.equal(pkg.scripts['start-proxy'], 'node --use-env-proxy src/index.js');
+  assert.doesNotMatch(JSON.stringify(pkg.scripts), /NODE_USE_ENV_PROXY=1 /, 'nada con sintaxis de Linux, que no vale en cmd ni PowerShell');
 });

@@ -34,6 +34,7 @@
     seleccion: null, destellos: new Map(), puestos: new Map(), mesas: new Map(), deps: new Map(),
     ancho: 0, alto: 0, dpr: 1, encuadrada: false, capaClave: '', etiquetasPintadas: [],
     texturasSucias: true, animPatr: null, patrMostrado: null, ultimoPintado: 0, parado: false,
+    rotulosPintados: [], cursor: -1, llegadas: [], relojesClave: '', ventanasClave: '',
     stats: { frames: 0, msPintar: 0, maxMs: 0 },
   };
 
@@ -41,6 +42,8 @@
   const texturas = {
     gigante: lienzoTex(1800, 340), limites: lienzoTex(480, 270), regimen: lienzoTex(340, 140), comite: lienzoTex(340, 140),
     laboratorio: lienzoTex(200, 100), analisis: lienzoTex(200, 100),
+    relojes: lienzoTex(dibujo.TEX_RELOJES.w * 2, dibujo.TEX_RELOJES.h * 2),
+    ventanas: new Map(),   // una por ventana: cada una tiene su propia silueta de edificios
   };
   dibujo.pintarPizarra(texturas.laboratorio, 'laboratorio');
   dibujo.pintarPizarra(texturas.analisis, 'analisis');
@@ -139,6 +142,9 @@
     const anterior = est.inst;
     est.inst = inst;
     est.recibido = Date.now();
+    est.llegadas.push(est.recibido);
+    if (est.llegadas.length > 8) est.llegadas.shift();
+    paneles.datosViejos(null);
     est.puestos = new Map((inst.puestos || []).map(p => [p.id, p]));
     est.mesas = new Map((inst.mesas || []).map(m => [m.id, m]));
     const deps = mapaMod.departamentosDe(inst.departamentos);
@@ -167,7 +173,8 @@
     est.texturasSucias = true;
     paneles.actualizarBarra(inst, { maqueta: ES_MAQUETA, ahoraServidor: ahoraServidor() });
     if (est.seleccion) {
-      const existe = est.seleccion.tipo === 'puesto' ? est.puestos.has(est.seleccion.id) : (inst.agentes || []).some(a => a.id === est.seleccion.id);
+      const s = est.seleccion;
+      const existe = s.tipo === 'puesto' ? est.puestos.has(s.id) : s.tipo === 'mesa' ? est.mesas.has(s.id) : (inst.agentes || []).some(a => a.id === s.id);
       if (!existe) deseleccionar(); else paneles.refrescarTarjeta(inst);
     }
   }
@@ -221,7 +228,27 @@
     est.texturasSucias = true;
   }
 
-  function alConexion(ok, espera) { paneles.conexion(ok, espera); }
+  function alConexion(ok, espera, motivo) {
+    paneles.conexion(ok, espera, motivo);
+    if (!ok) est.llegadas = [];
+  }
+
+  // ¿Llevamos demasiado sin una instantánea nueva? El 'ping' mantiene viva la
+  // conexión aunque el latido esté colgado (red caída con Alpaca: cada petición
+  // tarda minutos en fallar), así que la franja roja no sale y las cifras se
+  // quedan congeladas como si fueran de ahora. Se compara con el ritmo al que
+  // llegan (mediana de los últimos intervalos): 2,5 latidos, nunca menos de 20 s.
+  function comprobarDatosParados() {
+    if (ES_MAQUETA || !est.inst) return;
+    const r = cifras.datosParados(est.llegadas, Date.now());
+    // Texto que cambia como mucho una vez por minuto: la franja es role=status
+    // y un lector de pantalla la leería cada segundo.
+    const min = Math.floor((r.pasadoMs || 0) / 60000);
+    const cuando = min < 1 ? 'hace menos de un minuto' : min < 90 ? `hace ${min} min` : cifras.hace(r.pasadoMs);
+    paneles.datosViejos(r.parado
+      ? `Cifras sin actualizar: el último dato de la mesa llegó ${cuando} (¿red o datos caídos?). Precios y patrimonio pueden no ser los de ahora.`
+      : null);
+  }
 
   // ---------- fuente real: GET /api/estado + SSE con reconexión creciente ----------
 
@@ -233,20 +260,78 @@
     let temporizador = null;
     let ultimoLatido = Date.now();
     let abierto = false;
+    // Por qué no hay conexión, si se sabe: 'token' (falta), 'token-malo',
+    // 'lleno' (el servidor ya tiene el máximo de paneles), 'arrancando' (la
+    // API responde 503 mientras el orquestador arranca). Sin motivo: red.
+    let motivo = null;
+    let esperaMostrada = 0;
 
     function traerEstado() {
       return fetch('/api/estado', { headers: cabeceras(), cache: 'no-store' })
-        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); });
+        .then(r => {
+          if (r.status === 401 || r.status === 403) { const e = new Error(`HTTP ${r.status}`); e.codigo = r.status; throw e; }
+          if (r.status === 503) {
+            return r.json().catch(() => null).then(j => {
+              const e = new Error('HTTP 503'); e.codigo = 503; e.motivo = cifras.motivo503(j); throw e;
+            });
+          }
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        });
+    }
+
+    // EventSource no enseña el código HTTP: si falla antes de abrir con la API
+    // respondiendo bien, se pregunta una vez a /api/eventos para saber si es un
+    // 503 (demasiados paneles abiertos) y se corta en cuanto llegan las cabeceras.
+    function sondearEventos() {
+      if (typeof AbortController !== 'function') return;
+      const ac = new AbortController();
+      fetch(conToken('/api/eventos'), { headers: cabeceras(), cache: 'no-store', signal: ac.signal })
+        .then(r => {
+          // Un 503 trae un JSON corto (no es el SSE): se lee para saber si es
+          // «arrancando» o «lleno» antes de cortar.
+          const cuerpo = r.status === 503 ? r.json().catch(() => null) : Promise.resolve(null);
+          return cuerpo.then(j => {
+            ac.abort();
+            const antes = motivo;
+            if (r.status === 503) motivo = cifras.motivo503(j);
+            else if (r.status === 401 || r.status === 403) motivo = TOKEN ? 'token-malo' : 'token';
+            if (motivo !== antes && !abierto) man.conexion(false, esperaMostrada, motivo);
+          });
+        })
+        .catch(() => { /* sin red: ya lo dice la franja */ });
     }
 
     function conectar() {
       temporizador = null;
-      traerEstado().then(i => man.estado(i)).catch(() => { if (!abierto) reintentar(); });
+      let apiBien = false;
+      let sseFallo = false;
+      traerEstado().then(i => {
+        apiBien = true;
+        if (motivo === 'token' || motivo === 'token-malo' || motivo === 'arrancando') motivo = null;
+        man.estado(i);
+        if (sseFallo && !abierto) sondearEventos();
+      })
+        .catch((e) => {
+          if (e && (e.codigo === 401 || e.codigo === 403)) {
+            motivo = TOKEN ? 'token-malo' : 'token';
+            man.conexion(false, esperaMostrada, motivo);
+          } else if (e && e.codigo === 503) {
+            motivo = e.motivo;
+            man.conexion(false, esperaMostrada, motivo);
+          }
+          if (!abierto) reintentar();
+        });
       try {
         es = new EventSource(conToken('/api/eventos'));
       } catch (_) { reintentar(); return; }
-      es.onopen = () => { abierto = true; espera = 1000; ultimoLatido = Date.now(); man.conexion(true); };
-      es.onerror = () => reintentar();
+      es.onopen = () => { abierto = true; espera = 1000; motivo = null; ultimoLatido = Date.now(); man.conexion(true); };
+      es.onerror = () => {
+        // Falla antes de abrir: si la API ya respondió bien, se pregunta por qué
+        // (si aún no, lo hará ella al responder).
+        if (!abierto) { sseFallo = true; if (apiBien) sondearEventos(); }
+        reintentar();
+      };
       for (const tipo of ['estado', 'mensaje', 'agente', 'ejecucion', 'ping']) {
         es.addEventListener(tipo, (ev) => {
           ultimoLatido = Date.now();
@@ -264,7 +349,8 @@
       if (temporizador) return;
       const e = espera;
       espera = Math.min(30000, espera * 2);
-      man.conexion(false, e);
+      esperaMostrada = e;
+      man.conexion(false, e, motivo);
       temporizador = setTimeout(conectar, e);
     }
 
@@ -298,14 +384,14 @@
   // ---------- pintado ----------
 
   function repintarCapa() {
-    const clave = `${camara.version}|${est.firma}|${est.ancho}x${est.alto}@${est.dpr}|${Math.floor(Date.now() / 60000)}`;
+    const clave = `${camara.version}|${est.firma}|${est.ancho}x${est.alto}@${est.dpr}`;
     if (clave === est.capaClave) return;
     est.capaClave = clave;
     const Z = camara.zoom * est.dpr;
     cctx.setTransform(1, 0, 0, 1, 0, 0);
     cctx.clearRect(0, 0, capa.width, capa.height);
     cctx.setTransform(Z, 0, 0, Z, camara.x * est.dpr, camara.y * est.dpr);
-    dibujo.pintarEdificio(cctx, est.mapa, { ahora: Date.now(), escalaSombra: Z });
+    dibujo.pintarEdificio(cctx, est.mapa, { escalaSombra: Z });
   }
 
   function repintarTexturas(t) {
@@ -318,12 +404,36 @@
       if (p >= 1) est.animPatr = null;
       est.texturasSucias = true;
     }
+    repintarReloj();
     if (!est.texturasSucias) return;
     est.texturasSucias = false;
     dibujo.pintarPantallaGigante(texturas.gigante, inst, { patrimonioAnimado: patrAnim });
     dibujo.pintarLimites(texturas.limites, inst);
     dibujo.pintarPantallaRegimen(texturas.regimen, inst);
     dibujo.pintarPantallaComite(texturas.comite, inst, ahoraServidor());
+  }
+
+  // Relojes de pared y cielo de las ventanas con la hora de la MESA (simulada
+  // en sintético), como el resto de la pantalla. Solo se repintan si cambia el
+  // minuto (relojes) o el tramo del cielo (ventanas).
+  const claveVentana = d => `${d.pared}|${d.desde}|${d.hasta}`;
+  function repintarReloj() {
+    const ahora = ahoraServidor();
+    const minuto = String(Math.floor(ahora / 60000));
+    if (minuto !== est.relojesClave) {
+      est.relojesClave = minuto;
+      dibujo.pintarRelojesTex(texturas.relojes, ahora);
+    }
+    const cielo = dibujo.colorCielo(dibujo.horaDe(ahora))[0] + '|' + est.firma;
+    if (cielo !== est.ventanasClave && est.mapa) {
+      est.ventanasClave = cielo;
+      for (const d of est.mapa.decoraciones) {
+        if (d.tipo !== 'ventana') continue;
+        let tex = texturas.ventanas.get(claveVentana(d));
+        if (!tex) { tex = lienzoTex(dibujo.TEX_VENTANA.w * 2, dibujo.TEX_VENTANA.h * 2); texturas.ventanas.set(claveVentana(d), tex); }
+        dibujo.pintarVentanaTex(tex, d, ahora);
+      }
+    }
   }
 
   const COLOR_ETIQUETA = {
@@ -346,6 +456,8 @@
     for (const d of est.mapa.decoraciones) {
       if (d.tipo === 'pantallaGigante') dibujo.pegarTextura(ctx, d, texturas.gigante);
       else if (d.tipo === 'limites') dibujo.pegarTextura(ctx, d, texturas.limites);
+      else if (d.tipo === 'relojes') dibujo.pegarTextura(ctx, d, texturas.relojes);
+      else if (d.tipo === 'ventana') dibujo.pegarTextura(ctx, d, texturas.ventanas.get(claveVentana(d)));
     }
 
     // Ventana visible en mundo, para no pintar lo que cae fuera.
@@ -398,9 +510,10 @@
 
     // Capa de rótulos en píxeles CSS.
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    pintarRotulosFila(inst);
     pintarEtiquetas(t, seleccionPuesto);
+    pintarRotulosFila(inst);
     pintarBocadillos(t, pjs);
+    pintarCursor();
 
     const ms = performance.now() - inicio;
     est.stats.frames++;
@@ -426,8 +539,11 @@
       if (a.x < -60 || a.x > est.ancho + 60 || a.y < -30 || a.y > est.alto + 30) continue;
       const mesa = est.mesas.get(p.mesaId);
       const estado = dibujo.estadoMonitor(p, est.destellos.get(p.id), t, mesa && mesa.estado === 'banquillo');
-      const color = COLOR_ETIQUETA[estado] || '#64748b';
-      const texto = p.etiqueta;
+      // Un puesto que no puede abrir (activo vetado, mesa en pausa o a ×0) lleva
+      // borde ámbar; si es su activo el vetado, lo dice la etiqueta.
+      const bloqueos = cifras.bloqueosPuesto(est.inst, p, est.inst && est.inst.ahora);
+      const color = bloqueos.length ? '#f59e0b' : (COLOR_ETIQUETA[estado] || '#64748b');
+      const texto = bloqueos.some(b => b.tipo === 'activo') ? `${p.etiqueta} · VETADO` : p.etiqueta;
       const pnl = verPnl && p.posicion && Number.isFinite(p.posicion.pnlAbiertoPct) ? cifras.pct(p.posicion.pnlAbiertoPct, { signo: true, decimales: 1 }) : '';
       ctx.font = `800 ${fuente}px ${dibujo.FUENTE}`;
       const w1 = ctx.measureText(texto).width;
@@ -462,31 +578,126 @@
     }
   }
 
-  const MARCO_CORTO = { '1Hour': '1H', '4Hour': '4H', '1Day': '1D' };
   function pintarRotulosFila(inst) {
+    est.rotulosPintados = [];
     if (!est.mapa || camara.zoom < 0.42) return;
     const escala = Math.max(0.85, Math.min(1.1, camara.zoom * 1.2));
     ctx.font = `800 ${Math.round(9.5 * escala * 10) / 10}px ${dibujo.FUENTE}`;
     ctx.textBaseline = 'middle';
+    const h = Math.round(16 * escala);
+    // Lo ya pintado (etiquetas de puesto y rótulos anteriores): un rótulo que
+    // se montaría encima pasa a su forma corta y, si ni así cabe, no se pinta
+    // hasta acercar la cámara (un texto encima de otro no se lee).
+    const ocupado = est.etiquetasPintadas.map(e => ({ x: e.x, y: e.y, w: e.w, h: e.h }));
+    // Sitio libre para un rótulo de ancho w: el de siempre o, si pisa algo, un
+    // poco más a la izquierda (como mucho 160 px); null si no hay.
+    const colocar = (x0, y, w) => {
+      let x = x0;
+      for (let k = 0; k < 4 && x >= x0 - 160; k++) {
+        const o = ocupado.find(b => x < b.x + b.w && b.x < x + w && y < b.y + b.h && b.y < y + h);
+        if (!o) return x;
+        x = Math.round(o.x - w - 4);
+      }
+      return null;
+    };
     for (const r of est.mapa.rotulosFila) {
       // A la altura de las etiquetas de puesto y a la izquierda de la fila: la
-      // fila de delante queda más abajo y la de detrás más a la derecha.
+      // fila de delante queda más abajo y la de detrás más a la derecha. Si la
+      // fila la comparten varias mesas, sus rótulos se apilan hacia abajo.
       const mesa = est.mesas.get(r.mesaId) || {};
       const a = camara.aPantalla(r.col, r.fila, r.z || 52);
       const estado = mesa.estado || r.estado;
-      const texto = `${(mesa.nombre || r.nombre).toUpperCase()} · ${MARCO_CORTO[mesa.marco || r.marco] || ''}${estado && estado !== 'titular' ? ` · ${estado.toUpperCase()}` : ''}`;
-      const w = ctx.measureText(texto).width + 20;
-      const h = Math.round(16 * escala);
-      const x = Math.round(a.x - w - 4);
-      const y = Math.round(a.y - h);
-      ctx.fillStyle = 'rgba(20, 27, 50, 0.82)';
+      const sel = est.seleccion && est.seleccion.tipo === 'mesa' && est.seleccion.id === r.mesaId;
+      const y = Math.round(a.y - h + (r.orden || 0) * (h + 2));
+      let texto = cifras.rotuloMesa(r, mesa, inst);
+      let w = ctx.measureText(texto).width + 20;
+      let x = colocar(Math.round(a.x - w - 4), y, w);
+      if (x === null) {
+        texto = cifras.rotuloMesa(r, mesa, inst, { compacto: true });
+        w = ctx.measureText(texto).width + 20;
+        x = colocar(Math.round(a.x - w - 4), y, w);
+        if (x === null) { if (!sel) continue; x = Math.round(a.x - w - 4); }
+      }
+      const bloqueada = cifras.bloqueosMesa(inst, r.mesaId, inst && inst.ahora).length > 0;
+      ocupado.push({ x, y, w, h });
+      ctx.fillStyle = sel ? 'rgba(40, 32, 8, 0.95)' : 'rgba(20, 27, 50, 0.82)';
       pillRedonda(x, y, w, h, h / 2); ctx.fill();
-      ctx.fillStyle = estado === 'incubacion' ? '#22d3ee' : estado === 'banquillo' ? '#64748b' : '#3b82f6';
+      if (sel || bloqueada) { ctx.lineWidth = 1.4; ctx.strokeStyle = sel ? '#fbbf24' : '#f59e0b'; ctx.stroke(); }
+      ctx.fillStyle = bloqueada ? '#f59e0b' : estado === 'incubacion' ? '#22d3ee' : estado === 'banquillo' ? '#64748b' : '#3b82f6';
       ctx.beginPath(); ctx.arc(x + 8, y + h / 2, 2.6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = estado === 'incubacion' ? '#67e8f9' : estado === 'banquillo' ? '#94a3b8' : '#dbe3f5';
+      ctx.fillStyle = bloqueada ? '#fcd34d' : estado === 'incubacion' ? '#67e8f9' : estado === 'banquillo' ? '#94a3b8' : '#dbe3f5';
       ctx.fillText(texto, x + 14, y + h / 2 + 0.5);
+      est.rotulosPintados.push({ x, y, w, h, mesaId: r.mesaId });
     }
     ctx.textBaseline = 'alphabetic';
+  }
+
+  // Recorrido con el teclado: puestos (en el orden del parqué) y después las
+  // personas que no tienen puesto. n / AvPág avanza, p / RePág retrocede,
+  // Intro abre la ficha. El elegido lleva un anillo y se anuncia.
+  function recorrido() {
+    const lista = [];
+    if (!est.mapa) return lista;
+    for (const g of est.mapa.puestos.values()) if (est.puestos.has(g.puestoId)) lista.push({ tipo: 'puesto', id: g.puestoId });
+    for (const a of (est.inst && est.inst.agentes) || []) if (!a.puestoId) lista.push({ tipo: 'agente', id: a.id });
+    return lista;
+  }
+
+  function nombreDe(sel) {
+    if (!sel) return '';
+    if (sel.tipo === 'puesto') {
+      const p = est.puestos.get(sel.id);
+      const m = p && est.mesas.get(p.mesaId);
+      if (!p) return '';
+      const pos = p.posicion ? `comprado, ${cifras.pct(p.posicion.pnlAbiertoPct, { signo: true })}` : 'sin posición';
+      return `Puesto ${p.etiqueta} de ${m ? m.nombre : p.mesaId}: ${pos}.`;
+    }
+    const a = ((est.inst && est.inst.agentes) || []).find(x => x.id === sel.id);
+    return a ? `${a.nombre}, ${a.rol}.` : '';
+  }
+
+  function moverCursor(paso) {
+    const lista = recorrido();
+    if (!lista.length) return;
+    est.cursor = ((est.cursor < 0 ? (paso > 0 ? -1 : 0) : est.cursor) + paso + lista.length) % lista.length;
+    const sel = lista[est.cursor];
+    const pto = puntoDe(sel);
+    if (pto) {
+      camara.x += est.ancho / 2 - pto.x;
+      camara.y += est.alto / 2 - pto.y;
+      camara.version++;
+      limitarCamara();
+    }
+    const anuncio = document.getElementById('anuncio');
+    if (anuncio) anuncio.textContent = `${nombreDe(sel)} Intro para ver la ficha.`;
+  }
+
+  // Punto de pantalla (px CSS) de un puesto o de una persona.
+  function puntoDe(sel) {
+    if (!sel || !est.mapa) return null;
+    if (sel.tipo === 'puesto') {
+      const g = est.mapa.puestos.get(sel.id);
+      return g ? camara.aPantalla(g.ancla.col, g.ancla.fila, g.ancla.z) : null;
+    }
+    const p = est.elenco.personajes.get(sel.id);
+    if (!p) return null;
+    const c = pers.cabeza(p);
+    return camara.mundoAPantalla(c.x, c.y);
+  }
+
+  function pintarCursor() {
+    if (est.cursor < 0 || document.activeElement !== lienzo) return;
+    const sel = recorrido()[est.cursor];
+    const p = puntoDe(sel);
+    if (!p) return;
+    ctx.save();
+    ctx.strokeStyle = '#60a5fa';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - (sel.tipo === 'puesto' ? 10 : 0), 26, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function pintarBocadillos(t, pjs) {
@@ -506,6 +717,15 @@
 
   // ---------- bucle ----------
 
+  // En sintético muy acelerado un comité dura un par de segundos reales: a paso
+  // normal los jefes no llegaban nunca a la sala. Se anda más rápido cuanto más
+  // corre el reloj (×600 → ×2, ×3.000 → ×10, tope ×12).
+  function ritmoAndar() {
+    const i = est.inst;
+    if (!i || i.modo !== 'sintetico' || !Number.isFinite(i.velocidad)) return 1;
+    return Math.min(12, Math.max(1, i.velocidad / 300));
+  }
+
   let ultimaActualizacion = performance.now();
   function bucle(t) {
     if (document.hidden) { est.parado = true; return; }
@@ -514,7 +734,7 @@
     est.ultimoPintado = t;
     const dt = Math.min(0.1, (t - ultimaActualizacion) / 1000);
     ultimaActualizacion = t;
-    est.elenco.actualizar(dt);
+    est.elenco.actualizar(dt * ritmoAndar());
     for (const [id, d] of est.destellos) if (d.hasta < t) est.destellos.delete(id);
     try { pintar(t); } catch (e) { console.error(e); }
   }
@@ -530,6 +750,7 @@
       paneles.actualizarComite(est.inst, ahoraServidor());
       est.texturasSucias = true;
     }
+    comprobarDatosParados();
   }, 1000);
 
   // ---------- selección ----------
@@ -541,6 +762,9 @@
   function deseleccionar() { est.seleccion = null; paneles.ocultarTarjeta(); }
 
   function buscarEn(px, py) {
+    for (const r of est.rotulosPintados) {
+      if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) return { tipo: 'mesa', id: r.mesaId };
+    }
     for (const e of est.etiquetasPintadas) {
       if (px >= e.x && px <= e.x + e.w && py >= e.y && py <= e.y + e.h) return { tipo: 'puesto', id: e.puestoId };
     }
@@ -642,6 +866,13 @@
       '+': () => camara.zoomEn(est.ancho / 2, est.alto / 2, 1.2), '=': () => camara.zoomEn(est.ancho / 2, est.alto / 2, 1.2),
       '-': () => camara.zoomEn(est.ancho / 2, est.alto / 2, 1 / 1.2), 0: () => encuadrar(),
     };
+    const recorrer = { n: 1, N: 1, PageDown: 1, p: -1, P: -1, PageUp: -1 };
+    if (recorrer[e.key]) { e.preventDefault(); moverCursor(recorrer[e.key]); return; }
+    if ((e.key === 'Enter' || e.key === ' ') && est.cursor >= 0) {
+      const sel = recorrido()[est.cursor];
+      if (sel) { e.preventDefault(); seleccionar(sel); }
+      return;
+    }
     const fn = mapaTeclas[e.key];
     if (fn) { e.preventDefault(); fn(); limitarCamara(); }
   });
@@ -667,6 +898,8 @@
     instantanea: () => est.inst,
     alCamara: mandoCamara,
     alCerrarTarjeta: () => { est.seleccion = null; },
+    alSeleccionar: (sel) => seleccionar(sel),
+    ahoraServidor: () => ahoraServidor(),
   });
   construir(null);
   redimensionar();

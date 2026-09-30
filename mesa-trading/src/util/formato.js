@@ -10,9 +10,12 @@ const F2 = nf(2, 2);
 
 // Intl en es-ES no agrupa miles en números de 4 cifras (1234 → "1234"); en
 // cifras de dinero lo queremos siempre (1.234 $), así que se agrupa a mano.
+// Un cero redondeado no lleva signo: «-0,00 %» (un −0 o un −0,00001) se lee
+// como una pérdida que no existe.
+const hayDigito = texto => /[1-9]/.test(texto);
 function agrupar(texto) {
   const [ent, dec] = texto.split(',');
-  const signo = ent.startsWith('-') ? '-' : '';
+  const signo = ent.startsWith('-') && hayDigito(texto) ? '-' : '';
   const digitos = ent.replace(/^-/, '').replace(/\./g, '');
   const conPuntos = digitos.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return signo + conPuntos + (dec !== undefined ? ',' + dec : '');
@@ -23,7 +26,7 @@ function usd(x, { signo = false } = {}) {
   if (x === null || x === undefined || !Number.isFinite(x)) return '—';
   const abs = Math.abs(x);
   const cuerpo = agrupar(abs >= 1000 ? F0.format(x) : F2.format(x));
-  const pref = signo && x > 0 ? '+' : '';
+  const pref = signo && x > 0 && hayDigito(cuerpo) ? '+' : '';
   return `${pref}${cuerpo} $`;
 }
 
@@ -31,8 +34,9 @@ function usd(x, { signo = false } = {}) {
 function pct(fraccion, { decimales = 2, signo = false } = {}) {
   if (fraccion === null || fraccion === undefined || !Number.isFinite(fraccion)) return '—';
   const v = fraccion * 100;
-  const pref = signo && v > 0 ? '+' : '';
-  return `${pref}${agrupar(nf(decimales, decimales).format(v))} %`;
+  const cuerpo = agrupar(nf(decimales, decimales).format(v));
+  const pref = signo && v > 0 && hayDigito(cuerpo) ? '+' : '';
+  return `${pref}${cuerpo} %`;
 }
 
 // Precio de un activo: más decimales cuanto más barato (DOGE 0,1234; BTC 83.547).

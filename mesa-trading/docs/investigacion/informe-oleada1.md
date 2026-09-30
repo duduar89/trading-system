@@ -70,7 +70,7 @@
 - B (AlpacaDatos) — dos hallazgos con datos reales:
   1. En 4Hour, /v1beta3/crypto/us/bars devuelve unas 43 velas por página aunque se pida limit=10000 (parece limitado a unas 10.000 barras de 1 minuto por página). Cinco años son unas 300 páginas por símbolo: hay que paginar sin tope bajo y respetar las 180 peticiones/min.
   2. SOL/USD no cotizó en Alpaca del 2023-07-06 al 2024-08-26 (416 velas diarias, 2.503 de 4H). Los indicadores tratan como contiguas las velas a los dos lados del hueco.
-- Para Eduardo y el comité: con los valores por defecto del contrato, tendencia-sma 4H (7/25/200) pierde por costes. Sin costes gana +66 %; con costes pierde −41 %. Tuvo 548 operaciones, 419 de ellas por el trailing, y pagó 4.478 $ de comisiones sobre 10.000 $. reversion-rsi en cripto también es negativa. Son las mesas iniciales que dicta el contrato, y cambiarlas es decisión de Eduardo.
+- Para Eduardo y el comité: con los valores por defecto del contrato, tendencia-sma 4H (7/25/200) pierde por costes. Sin costes gana +63 %; con costes pierde −41 %. Tuvo 539 operaciones y pagó 4.434 $ de comisiones sobre 10.000 $ (cifras con el motor que trata el hueco de SOL; antes, +66 %, 548 operaciones, 419 por el trailing, y 4.478 $). reversion-rsi en cripto también es negativa. Son las mesas iniciales que dicta el contrato, y cambiarlas es decisión de Eduardo.
 - Las dos mesas de ETF (momentum-etf y reversion-etf) no se han podido comprobar con datos reales: hacen falta claves de Alpaca.
 - El DSR usa como varianza V solo la dispersión de las combinaciones de la hipótesis actual, no la de todos los ensayos históricos. Para usar la de todos, F tendría que guardar los sharpesEnsayos de cada evaluación junto al contador.
 --- NOTAS
@@ -78,6 +78,8 @@ PRIMERA COMPROBACIÓN HONESTA CON DATOS REALES
 (NODE_USE_ENV_PROXY=1 node scripts/probar-backtest.js --real)
 
 Datos: velas diarias y de 4H de BTC, ETH y SOL desde el 1-ene-2021 hasta el 28/29-sep-2026, de Alpaca, con caché en data/cache/probar/. SOL tiene el hueco que Alpaca no cotizó (2023-07 → 2024-08).
+
+**Corrección del 30-sep-2026.** Las tablas de abajo ya son las del motor que trata ese hueco. La vela de SOL del 26-ago-2024 abre a 18,14 $, el precio de julio de 2023, y cierra a 157,25 $. Antes, una orden decidida antes del hueco se llenaba a esa apertura rancia y multiplicaba por más de ocho: de ahí salía buena parte del +195,7 % (Sharpe 0,67) de ruptura. Ahora lo abierto se vende al último cierre anterior al hueco (motivo «hueco»), no se compra a la apertura de vuelta y el símbolo no decide hasta recalentar. Comprar y mantener se mide igual: vende antes del hueco y vuelve a entrar en la segunda vela de después. Así deja fuera la subida real de SOL durante el hueco (de 20 $ a 157 $), que ninguna mesa puede operar sin datos; con ella salía entre +734 % y +1.252 %. Las otras cifras viejas: momentum 0,79 y tendencia −0,51 con 548 operaciones. Con las nuevas ya no se sostiene que «ruptura empata con comprar y mantener».
 Costes: los de §3.4 más la penalización de papel del 0,1 % por lado.
 Cada estrategia empieza a contar tras su calentamiento. C&M es comprar y mantener a partes iguales el mismo universo desde la misma fecha, con los mismos costes.
 
@@ -85,38 +87,38 @@ Cada estrategia empieza a contar tras su calentamiento. C&M es comprar y mantene
 
 | Familia | Rent. | CAGR | Sharpe | maxDD | Ops | Expos. | C&M rent. | C&M Sharpe | C&M maxDD |
 |---|---|---|---|---|---|---|---|---|---|
-| tendencia-sma 4H (BTC/ETH/SOL) | −41,0 % | −8,9 % | −0,51 | 54,2 % | 548 | 15 % | +734 % | 0,65 | 94,5 % |
-| momentum-rotacion 1D (BTC/ETH/SOL) | +110,2 % | 14,0 % | 0,79 | 27,7 % | 103 | 19 % | +1.031 % | 0,66 | 94,7 % |
-| reversion-rsi 1D (BTC/ETH) | −9,7 % | −2,0 % | −0,42 | 12,0 % | 88 | 2 % | +114 % | 0,54 | 76,9 % |
-| ruptura-donchian 1D (BTC/ETH/SOL) | +195,7 % | 21,0 % | 0,67 | 36,3 % | 89 | 23 % | +1.252 % | 0,67 | 94,8 % |
+| tendencia-sma 4H (BTC/ETH/SOL) | −41,4 % | −9,0 % | −0,52 | 54,5 % | 539 | 15 % | +120,6 % | 0,58 | 94,5 % |
+| momentum-rotacion 1D (BTC/ETH/SOL) | +120,2 % | 15,0 % | 0,83 | 27,7 % | 102 | 19 % | +166,7 % | 0,63 | 94,7 % |
+| reversion-rsi 1D (BTC/ETH) | −9,7 % | −2,0 % | −0,42 | 12,0 % | 88 | 2 % | +113,9 % | 0,54 | 76,9 % |
+| ruptura-donchian 1D (BTC/ETH/SOL) | +87,8 % | 11,7 % | 0,64 | 36,3 % | 83 | 21 % | +207,3 % | 0,66 | 94,8 % |
 
 **Tabla 2 — Calidad de la señal:** la misma estrategia sin límites del fondo, con peso completo por activo.
 
 | Familia | Rent. | Sharpe | maxDD | Factor |
 |---|---|---|---|---|
-| tendencia | −75,2 % | −0,81 | 83,1 % | 0,72 |
-| momentum | +1.575 % | 1,15 | 63,0 % | 1,66 |
+| tendencia | −74,4 % | −0,80 | 82,6 % | 0,72 |
+| momentum | +1.489 % | 1,14 | 63,0 % | 1,71 |
 | reversión | −19,4 % | −0,20 | 27,8 % | 0,76 |
-| ruptura | +934 % | 0,70 | 55,6 % | 1,92 |
+| ruptura | +283 % | 0,82 | 55,6 % | 1,52 |
 
 **Tabla 3 — Walk-forward fuera de muestra** con la rejilla completa (8 ventanas de 18/6 meses; 7 en reversión):
 
 | Familia | Sharpe OOS | Rent. OOS | maxDD | Ops | Ventanas en positivo | DSR |
 |---|---|---|---|---|---|---|
-| tendencia | 0,24 | +11,5 % | 22,1 % | 250 | 6/8 | 0,31 |
-| momentum | 0,68 | +50,9 % | 21,3 % | 80 | 5/8 | 0,49 |
+| tendencia | 0,24 | +11,4 % | 22,1 % | 247 | 6/8 | 0,30 |
+| momentum | 0,60 | +38,3 % | 24,3 % | 71 | 5/8 | 0,41 |
 | reversión | −0,43 | −7,4 % | 10,8 % | 43 | 3/7 | 0,05 |
-| ruptura | 0,11 | +1,3 % | 30,5 % | 53 | 3/8 | 0,28 |
+| ruptura | 0,42 | +25,5 % | 21,2 % | 41 | 4/8 | 0,54 |
 
 LECTURA
 
-- En rentabilidad bruta ninguna familia se acerca a comprar y mantener en este periodo alcista de la cripto. Es lo esperable: están invertidas entre el 2 % y el 23 % del tiempo.
+- En rentabilidad ninguna familia llega a comprar y mantener en este periodo alcista de la cripto (momentum +120 % frente a +167 %; ruptura +88 % frente a +207 %). Es lo esperable: están invertidas entre el 2 % y el 21 % del tiempo.
 - En Sharpe:
-  - momentum-rotacion mejora a comprar y mantener (0,79 frente a 0,66) con un tercio de su caída máxima.
-  - ruptura empata (0,67 frente a 0,67) con menos de la mitad de caída.
+  - momentum-rotacion mejora a comprar y mantener (0,83 frente a 0,63) con menos de un tercio de su caída máxima.
+  - ruptura queda algo por debajo (0,64 frente a 0,66), con algo más de un tercio de la caída.
   - tendencia 4H y reversión RSI pierden dinero.
-- He comprobado que lo de tendencia no es un fallo del motor: sin costes la misma regla gana +66 % (Sharpe 0,65); lo que la mata es la rotación con una comisión del 0,25 %.
-- Fuera de muestra NINGUNA familia pasaría el laboratorio: el DSR máximo es 0,49 (momentum), frente a 0,90 exigido. La evidencia estadística de ventaja es nula o débil, en línea con la advertencia de la propuesta cuant.
+- He comprobado que lo de tendencia no es un fallo del motor: sin costes la misma regla gana +63 % (Sharpe 0,63); lo que la mata es la rotación con una comisión del 0,25 %.
+- Fuera de muestra NINGUNA familia pasaría el laboratorio: el DSR máximo es 0,54 (ruptura), frente a 0,90 exigido. La evidencia estadística de ventaja es nula o débil, en línea con la advertencia de la propuesta cuant.
 - El walk-forward de cada familia con datos reales tarda entre 0,2 y 2,8 s.
 
 VERIFICACIONES DE NORMA DE LA CASA

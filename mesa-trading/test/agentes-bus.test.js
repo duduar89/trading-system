@@ -69,7 +69,9 @@ test('maxMemoria recorta y ultimos(n, filtro) filtra por objeto o función', () 
   assert.deepEqual(bus.ultimos(150, { canal: 'riesgo' }).map(m => m.texto), ['2', '4']);
   assert.deepEqual(bus.ultimos(150, { canal: ['riesgo', 'parque'], tipo: 'nota' }).length, 4);
   assert.deepEqual(bus.ultimos(150, m => m.texto === '3').map(m => m.texto), ['3']);
-  assert.deepEqual(bus.desde(T0 + 4000).map(m => m.texto), ['4', '5']);
+  // `desde` incluye el propio instante.
+  assert.deepEqual(bus.desde(T0 + 4000).map(m => m.texto), ['3', '4', '5']);
+  assert.deepEqual(bus.desde(T0 + 4001).map(m => m.texto), ['4', '5']);
   assert.deepEqual(bus.ultimos(0), []);
 });
 
@@ -82,4 +84,21 @@ test('canal o tipo fuera de lista: sistema (o error en modo estricto)', () => {
   assert.throws(() => estricto.publicar({ de: 'x', canal: 'chismes', tipo: 'nota', texto: 'hola' }), /canal desconocido/);
   assert.equal(CANALES.length, 10);
   assert.equal(TIPOS.length, 23);
+});
+
+test('desde(t) incluye los mensajes de ese mismo instante: paginar con el último t visto no pierde ninguno', () => {
+  const reloj = new RelojSimulado(T0);
+  const bus = new Bus({ reloj, agentes: AGENTES });
+  // Caso de la revisión: en sintético muchos mensajes comparten t.
+  bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'nota', texto: 'a' });
+  bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'nota', texto: 'b' });
+  const vistos = bus.desde(-Infinity);
+  const ultimoT = vistos[vistos.length - 1].t;
+  bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'nota', texto: 'c' });   // mismo instante, después de leer
+  const nuevos = bus.desde(ultimoT);
+  assert.deepEqual(nuevos.map(m => m.texto), ['a', 'b', 'c']);
+  // Quien pagina quita los repetidos por id y se queda exactamente con el nuevo.
+  const ids = new Set(vistos.map(m => m.id));
+  assert.deepEqual(nuevos.filter(m => !ids.has(m.id)).map(m => m.texto), ['c']);
+  assert.deepEqual(bus.ultimos(150, { desde: ultimoT, tipo: 'nota' }).length, 3);
 });

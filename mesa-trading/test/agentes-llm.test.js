@@ -7,6 +7,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 
 const {
   crearLLM, costeDeUso, validarEsquema, esquemaParaApi, construirPeticion, estimarCosteMaximo, tarifaDe,
+  reservaSalvavidas, reservaMaxima, timeoutPara,
 } = require('../src/agentes/llm');
 const { RelojSimulado, DIA, diaUTC } = require('../src/util/reloj');
 const { leerJSONL } = require('../src/util/almacen');
@@ -177,13 +178,14 @@ test('tope diario: el gasto acumulado cuenta, sobrevive a un reinicio y se reini
   const rutaCostes = path.join(dir, 'llm-costes.jsonl');
   const reloj = relojFijo(T0);
   const fetch = fetchFalso(mensaje({ texto: BUENO }));
-  const base = { apiKey: 'sk-prueba', reloj, presupuestoDiaUsd: 0.05, fetch, rutaCostes };
+  const base = { apiKey: 'sk-prueba', reloj, presupuestoDiaUsd: 0.08, fetch, rutaCostes };
   const llm = crearLLM(base);
   const p = { ...PETICION, uso: 'comite', maxTokens: 1000 };
-  // Cada llamada estima ≈ 0,02 $ de salida (1000 · 20/1e6) y cuesta 0,0194 $.
-  assert.equal((await llm.pedirJSON(p)).ok, true);   // 0      + 0,0203 ≤ 0,05
-  assert.equal((await llm.pedirJSON(p)).ok, true);   // 0,0194 + 0,0203 ≤ 0,05
-  const tercera = await llm.pedirJSON(p);            // 0,0388 + 0,0203 > 0,05
+  // Cada llamada reserva 0,0508 $ (0,0204 de un intento de opus-5-5 + 0,0305
+  // del salvavidas en opus-4-8/opus-5) y cuesta 0,0194 $.
+  assert.equal((await llm.pedirJSON(p)).ok, true);   // 0      + 0,0508 ≤ 0,08
+  assert.equal((await llm.pedirJSON(p)).ok, true);   // 0,0194 + 0,0508 ≤ 0,08
+  const tercera = await llm.pedirJSON(p);            // 0,0388 + 0,0508 > 0,08
   assert.equal(tercera.motivo, 'presupuesto');
   assert.equal(fetch.llamadas.length, 2);
   // Reinicio: el gasto del día sale del fichero.
@@ -346,3 +348,113 @@ test('entrada no serializable: error sin lanzar y sin red', async () => {
   assert.equal(r.motivo, 'error');
   assert.equal(fetch.llamadas.length, 0);
 });
+
+test('gasto de un día concreto: el cierre de las 00:05 ve el del día que cierra, también tras reiniciar', async () => {
+  const dir = carpetaTemporal();
+  const rutaCostes = path.join(dir, 'llm-costes.jsonl');
+  // opus-5-5: 1000 de entrada (0,004 $) + 2000 de salida (0,04 $) = 0,044 $ por llamada.
+  const usage = { input_tokens: 1000, output_tokens: 2000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  const reloj = relojFijo(Date.UTC(2026, 8, 29, 4, 0));
+  const llm = crearLLM({ apiKey: 'sk-prueba', reloj, presupuestoDiaUsd: 5, fetch: fetchFalso(mensaje({ texto: BUENO, usage })), rutaCostes });
+  // Caso de la revisión: 5 comités el 29-sep (04:00 … 20:00) y 1 a las 00:00 del 30.
+  for (let i = 0; i < 6; i++) { assert.equal((await llm.pedirJSON({ ...PETICION, uso: 'comite' })).ok, true); reloj.avanzar(4 * 3600_000); }
+  reloj.t = Date.UTC(2026, 8, 30, 0, 5);   // el cierre diario
+  assert.ok(Math.abs(llm.gastoDelDia('2026-09-29') - 0.22) < 1e-12);
+  assert.ok(Math.abs(llm.gastoHoy() - 0.044) < 1e-12);   // lo que hoy enseñaría el informe
+  assert.ok(Math.abs(llm.gastoDelDia('2026-09-30') - llm.gastoHoy()) < 1e-12);
+  assert.equal(llm.gastoDelDia('2026-09-28'), 0);
+  // Un tramo de más de un día (cierre tardío) suma lo que cae dentro: desde < t ≤ hasta.
+  assert.ok(Math.abs(llm.gastoEntre(Date.UTC(2026, 8, 29, 0, 5), Date.UTC(2026, 8, 30, 0, 5)) - 0.264) < 1e-12);
+  assert.ok(Math.abs(llm.gastoEntre(Date.UTC(2026, 8, 29, 4, 0), Date.UTC(2026, 8, 29, 8, 0)) - 0.044) < 1e-12);
+  // Tras un reinicio sobre el mismo registro, las mismas cifras.
+  const otro = crearLLM({ apiKey: 'sk-prueba', reloj, presupuestoDiaUsd: 5, fetch: fetchFalso(mensaje({ texto: BUENO })), rutaCostes });
+  assert.ok(Math.abs(otro.gastoDelDia('2026-09-29') - 0.22) < 1e-12);
+  assert.ok(Math.abs(otro.gastoHoy() - 0.044) < 1e-12);
+  // Sin clave también existe (el cierre diario no tiene que comprobarlo).
+  assert.equal(crearLLM({ apiKey: '' }).gastoDelDia('2026-09-29'), 0);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('con salvavidas se reserva también el intento del modelo de reserva: el tope no se pasa', async () => {
+  // Peor caso: opus-5-5 rechaza tras generar maxTokens y el salvavidas responde
+  // en opus-4-8 con la entrada + la parcial como contexto y maxTokens de salida.
+  const p = { modelo: 'claude-opus-5-5', sistema: 'a'.repeat(100), contenido: 'b'.repeat(198), esquema: {}, maxTokens: 1000 };
+  // 100 tokens de entrada: 0,0204 $ el primer intento; el segundo (100 + 1000)·5 + 1000·25 = 30.500 → 0,0305 $.
+  assert.ok(Math.abs(reservaSalvavidas(p) - 0.0305) < 1e-12);
+  assert.ok(Math.abs(reservaMaxima(p) - 0.0509) < 1e-12);
+  const peor = costeDeUso({ iterations: [
+    { model: 'claude-opus-5-5', input_tokens: 100, output_tokens: 1000 },
+    { model: 'claude-opus-4-8', input_tokens: 1100, output_tokens: 1000 },
+  ] }, 'claude-opus-5-5').costeUsd;
+  assert.ok(peor <= reservaMaxima(p) + 1e-12);
+  // Sin salvavidas (haiku) no se reserva nada más.
+  assert.equal(reservaSalvavidas({ ...p, modelo: 'claude-haiku-4-5' }), 0);
+
+  // Caso de la revisión: con un tope en el que cabe un intento pero no dos, ya no se llama.
+  const conTramos = mensaje({ texto: BUENO, usage: { input_tokens: 1000, output_tokens: 1000, iterations: [
+    { model: 'claude-opus-5-5', input_tokens: 1000, output_tokens: 0 },
+    { model: 'claude-opus-4-8', input_tokens: 1000, output_tokens: 1000 },
+  ] } });
+  const { llm, fetch } = llmCon(conTramos, { presupuestoDiaUsd: 0.03 });
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'comite', maxTokens: 1000 });   // un intento: 0,0204 ≤ 0,03; con salvavidas 0,0508
+  assert.equal(r.motivo, 'presupuesto');
+  assert.equal(fetch.llamadas.length, 0);
+  assert.ok(llm.gastoHoy() <= 0.03);
+  // Con haiku (sin salvavidas) la misma llamada sí cabe.
+  const h = llmCon(mensaje({ texto: BUENO, model: 'claude-haiku-4-5' }), { presupuestoDiaUsd: 0.03, modeloComite: 'claude-haiku-4-5' });
+  assert.equal((await h.llm.pedirJSON({ ...PETICION, uso: 'comite', maxTokens: 1000 })).ok, true);
+});
+
+test('timeout por petición según maxTokens y un solo reintento', async () => {
+  assert.equal(timeoutPara(1500), 60000);     // el Megáfono sigue siendo interactivo
+  assert.equal(timeoutPara(4000), 160000);    // comité
+  assert.equal(timeoutPara(7000), 280000);    // post-mortem de 40 operaciones
+  assert.equal(timeoutPara(100000), 600000);
+  const vistos = [];
+  const cliente = { beta: { messages: { create: async (cuerpo, opciones) => { vistos.push(opciones); return mensaje({ texto: BUENO }); } } } };
+  const llm = crearLLM({ cliente, reloj: relojFijo(T0) });
+  await llm.pedirJSON({ ...PETICION, uso: 'comite', maxTokens: 4000 });
+  assert.deepEqual(vistos[0], { timeout: 160000, maxRetries: 1 });
+  // Con el SDK real, las opciones por petición mandan sobre las del cliente (60 s, 2 reintentos).
+  const { llm: real, fetch } = llmCon(mensaje({ texto: BUENO }));
+  await real.pedirJSON({ ...PETICION, uso: 'agentes', maxTokens: 7000 });
+  assert.equal(fetch.llamadas[0].cabeceras['x-stainless-timeout'], '280');
+});
+
+test('una llamada cortada por timeout se apunta con lo reservado (puede estar cobrada), no a 0 $', async () => {
+  const dir = carpetaTemporal();
+  const rutaCostes = path.join(dir, 'llm-costes.jsonl');
+  // El fetch «se cuelga»: el SDK lo ve como timeout, reintenta una vez y lanza APIConnectionTimeoutError.
+  let intentos = 0;
+  const fetch = async () => { intentos++; throw new Error('Request timed out'); };
+  const llm = crearLLM({ apiKey: 'sk-prueba', reloj: relojFijo(T0), presupuestoDiaUsd: 5, fetch, rutaCostes });
+  const r = await llm.pedirJSON({ ...PETICION, uso: 'comite', maxTokens: 1000 });
+  assert.equal(r.ok, false);
+  assert.equal(r.motivo, 'error');
+  assert.equal(intentos, 2);   // 1 + un reintento
+  const reservado = reservaMaxima({ modelo: 'claude-opus-5-5', sistema: PETICION.sistema, contenido: fetchContenido(), esquema: ESQUEMA, maxTokens: 1000 });
+  assert.ok(Math.abs(r.costeUsd - 2 * reservado) < 1e-12);
+  assert.ok(Math.abs(llm.gastoHoy() - 2 * reservado) < 1e-12);
+  const [fila] = leerJSONL(rutaCostes);
+  assert.equal(fila.estimado, true);
+  assert.ok(Math.abs(fila.costeUsd - 2 * reservado) < 1e-12);
+  // Sobrevive al reinicio (el arranque suma costeUsd del registro).
+  assert.ok(Math.abs(crearLLM({ apiKey: 'sk-prueba', reloj: relojFijo(T0), rutaCostes }).gastoHoy() - 2 * reservado) < 1e-12);
+
+  // Con un cliente inyectado que lanza el error tipado del SDK, igual.
+  const cliente = { beta: { messages: { create: async () => { throw new Anthropic.APIConnectionTimeoutError(); } } } };
+  const llm2 = crearLLM({ cliente, reloj: relojFijo(T0) });
+  const r2 = await llm2.pedirJSON({ ...PETICION, uso: 'comite', maxTokens: 1000 });
+  assert.ok(r2.costeUsd > 0);
+  assert.ok(Math.abs(llm2.gastoHoy() - r2.costeUsd) < 1e-12);
+  // Un error que no llega a generar (sin conexión) sigue en 0.
+  const sinRed = { beta: { messages: { create: async () => { throw new Anthropic.APIConnectionError({ message: 'sin red' }); } } } };
+  const llm3 = crearLLM({ cliente: sinRed, reloj: relojFijo(T0) });
+  assert.equal((await llm3.pedirJSON({ ...PETICION, uso: 'comite' })).costeUsd, 0);
+  assert.equal(llm3.gastoHoy(), 0);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+function fetchContenido() {
+  return `${PETICION.instrucciones}\n\nDatos (JSON):\n${JSON.stringify(PETICION.entrada)}`;
+}

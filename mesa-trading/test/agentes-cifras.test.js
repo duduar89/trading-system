@@ -69,3 +69,27 @@ test('texto vacío o sin números: ok', () => {
   assert.equal(verificarCifras(null, null).ok, true);
   assert.equal(verificarCifras('Sin posición. Esperando señal.', {}).ok, true);
 });
+
+test('signo: una pérdida escrita como ganancia no pasa (y al revés)', () => {
+  // Caso de la revisión: «hoy +523,40 $» con el día en −523,40 $.
+  assert.deepEqual(verificarCifras('hoy +523,40 $', { pnlDia: -523.4 }).noEncontradas, ['+523,40']);
+  assert.equal(verificarCifras('hoy -523,40 $', { pnlDia: -523.4 }).ok, true);
+  assert.equal(verificarCifras('+1.587,45 $', { pnl: -1587.45 }).ok, false);
+  assert.equal(verificarCifras('−2,10 %', { r: 0.021 }).ok, false);
+  assert.equal(verificarCifras('(+1,13 %)', { r: -0.0113 }).ok, false);
+  assert.equal(verificarCifras('(-1,13 %)', { r: -0.0113 }).ok, true);
+  // Sin signo escrito se sigue comparando el valor absoluto.
+  assert.equal(verificarCifras('perdió 45,20 $', { pnl: -45.2 }).ok, true);
+  // Un entero pequeño con signo ya no pasa gratis: «(+3)» con −3 puntos.
+  assert.equal(verificarCifras('Régimen RISK-OFF (+3)', { puntos: -3 }).ok, false);
+  assert.equal(verificarCifras('Régimen RISK-OFF (−3)', { puntos: -3 }).ok, true);
+  // Guiones que no son signo: rangos y restas.
+  assert.equal(verificarCifras('SMA 7-25 y 83.900 - 84.120', { a: 83900, b: 84120 }).ok, true);
+  // Un cero redondeado no tiene signo que contradecir.
+  assert.equal(verificarCifras('Caída -0,00 %', { c: 0 }).ok, true);
+  assert.equal(verificarCifras('hoy +0,00 %', { r: -0.00001 }).ok, true);
+  // El signo de un número escrito dentro de un texto de la entrada se conserva.
+  assert.equal(verificarCifras('kill en -15 %', { regla: '(kill en -15 %)' }).ok, true);
+  assert.equal(verificarCifras('kill en +15 %', { regla: '(kill en -15 %)' }).ok, false);
+  assert.deepEqual(extraerNumeros('(-0,53 %) y +3').numeros.map(n => [n.texto, n.signo]), [['-0,53 %', -1], ['+3', 1]]);
+});

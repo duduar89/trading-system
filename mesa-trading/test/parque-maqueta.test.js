@@ -13,12 +13,15 @@ const FORMA = {
   raiz: ['version', 'ahora', 'modo', 'broker', 'velocidad', 'fondo', 'cabecera', 'llm', 'curva', 'cotizaciones', 'departamentos', 'agentes',
     'mesas', 'puestos', 'posiciones', 'benchmarks', 'mejora', 'directivas', 'megafonoPendiente', 'mensajes', 'ejecuciones', 'laboratorio', 'limites', 'avisos'],
   fondo: ['nivel', 'motivo', 'multiplicadorCaida'],
-  cabecera: ['patrimonio', 'pnlDia', 'pnlDiaPct', 'caida', 'exposicionBrutaPct', 'exposicionCriptoPct', 'posiciones', 'regimen', 'miedoCodicia', 'proximoComite', 'modoComite'],
+  cabecera: ['patrimonio', 'pnlDia', 'pnlDiaPct', 'caida', 'exposicionBrutaPct', 'exposicionCriptoPct', 'posiciones', 'regimen', 'miedoCodicia', 'proximoComite', 'modoComite',
+    'sinAsignar', 'vigilancia'],
+  sinAsignar: ['fraccion', 'usd'],
+  vigilancia: ['perdidaDiaPct', 'caidaPct', 'desdeReapertura'],
   llm: ['activo', 'modeloComite', 'modeloAgentes', 'gastoHoyUsd', 'presupuestoDiaUsd'],
   curva: ['t', 'patrimonio'],
   cotizacion: ['simbolo', 'etiqueta', 'precio', 'var24hPct', 't'],
   agente: ['id', 'nombre', 'departamento', 'rol', 'queDecide', 'usaLLM', 'sala', 'estado', 'bocadillo', 'mesaId', 'simbolo', 'etiqueta', 'puestoId'],
-  mesa: ['id', 'nombre', 'familia', 'marco', 'estado', 'peso', 'capital', 'multiplicador', 'universo', 'params', 'metricas', 'pnlDia'],
+  mesa: ['id', 'nombre', 'familia', 'marco', 'estado', 'peso', 'capital', 'multiplicador', 'universo', 'params', 'metricas', 'pnlDia', 'nota'],
   metricas: ['operaciones', 'acierto', 'factorBeneficio', 'sharpe', 'sharpeAjustado', 'maxDD', 'adherencia', 'pnlTotal'],
   puesto: ['id', 'mesaId', 'simbolo', 'etiqueta', 'agenteId', 'posicion', 'pnlDia', 'operaciones', 'acierto', 'factorBeneficio', 'adherencia', 'estadoTexto', 'ultimaSenal', 'chispa'],
   posicionPuesto: ['cantidad', 'nocional', 'entrada', 'stop', 'objetivo', 'pnlAbierto', 'pnlAbiertoPct', 'abiertaT'],
@@ -45,6 +48,9 @@ function comprobarForma(i) {
   assert.deepEqual(claves(i.cabecera), FORMA.cabecera.slice().sort());
   assert.deepEqual(claves(i.cabecera.regimen), ['detalle', 'valor']);
   assert.deepEqual(claves(i.cabecera.miedoCodicia), ['etiqueta', 'sintetico', 'valor']);
+  assert.deepEqual(claves(i.cabecera.sinAsignar), FORMA.sinAsignar.slice().sort());
+  assert.deepEqual(claves(i.cabecera.vigilancia), FORMA.vigilancia.slice().sort());
+  assert.equal(typeof i.cabecera.vigilancia.desdeReapertura, 'boolean');
   assert.ok(['NORMAL', 'DEFENSIVO', 'SOLO_CERRAR'].includes(i.cabecera.modoComite));
   assert.deepEqual(claves(i.llm), FORMA.llm.slice().sort());
   assert.ok(i.curva.length <= 500);
@@ -188,8 +194,17 @@ test('comandos: confirmaciones, Megáfono con propuesta y Aplicar, kill y reabri
   assert.equal(i.posiciones.length, 0);
   assert.ok(i.agentes.every(a => a.estado === 'de_pie'), 'kill switch: todos de pie');
   assert.equal(s.comando('comite').ok, false, 'sin comité con el fondo bloqueado');
-  assert.ok(s.comando('reabrir', { confirmacion: 'REABRIR' }).ok);
-  assert.equal(s.instantanea().fondo.nivel, 'normal');
+  assert.equal(i.cabecera.vigilancia.desdeReapertura, false);
+  const re = s.comando('reabrir', { confirmacion: 'REABRIR' });
+  assert.ok(re.ok);
+  // Como el servidor: reabrir no borra el máximo histórico y lo dice con cifras;
+  // el vigilante (barra de LÍMITES) mide desde la reapertura.
+  assert.match(re.mensaje, /máximo histórico \(\d{3}\.\d{3} \$\)/);
+  const tras = s.instantanea();
+  assert.equal(tras.fondo.nivel, 'normal');
+  assert.equal(tras.cabecera.vigilancia.desdeReapertura, true);
+  assert.equal(tras.cabecera.vigilancia.caidaPct, 0);
+  assert.ok(tras.cabecera.caida < 0, 'la cabecera sigue midiendo desde el máximo histórico');
   assert.ok(s.comando('pausar').ok);
   assert.equal(s.instantanea().fondo.nivel, 'pausado');
 });
@@ -208,4 +223,32 @@ test('ajustes: se ven los límites; se cambian presupuesto, modelos y velocidad;
   const mal = s.comando('ajustes', { modeloComite: 'gpt-9' });
   assert.equal(mal.ok, false);
   assert.equal(s.instantanea().llm.modeloComite, 'claude-opus-5-5');
+});
+
+test('mesas como en el arranque real: incubadas al 2 % con su nota y el 16 % sin asignar avisado', () => {
+  const i = crearMaqueta({ semilla: 7, ahora: T0 }).instantanea();
+  const inc = i.mesas.filter(m => m.estado === 'incubacion');
+  assert.deepEqual(inc.map(m => m.id), ['tendencia', 'reversion']);
+  for (const m of inc) { assert.equal(m.peso, 0.02); assert.match(m.nota, /Sharpe/); }
+  assert.ok(i.mesas.filter(m => m.estado === 'titular').every(m => m.peso === 0.4 && m.nota === null));
+  assert.ok(i.avisos.some(a => /^16 % del capital sin asignar/.test(a)), i.avisos.join(' | '));
+  assert.ok(Math.abs(i.cabecera.sinAsignar.fraccion - 0.16) < 1e-9);
+  assert.ok(Math.abs(i.cabecera.sinAsignar.usd - i.cabecera.patrimonio * 0.16) < 0.01);
+  // Las notas y los nombres son los del arranque real (src/estrategias/index.js).
+  const reales = require('../src/estrategias').mesasIniciales({ hayAlpaca: false });
+  for (const m of i.mesas) {
+    const r = reales.find(x => x.id === m.id);
+    assert.equal(m.nota, r.nota ?? null, m.id);
+    assert.equal(m.nombre, r.nombre, m.id);
+  }
+});
+
+test('avisos: lo que bloquea el fondo va el primero (en el móvil se corta por el final)', () => {
+  const s = crearMaqueta({ semilla: 7, ahora: T0 });
+  assert.ok(s.comando('pausar').ok);
+  assert.match(s.instantanea().avisos[0], /^Fondo en pausa/);
+  assert.ok(s.comando('kill', { confirmacion: 'KILL' }).ok);
+  assert.match(s.instantanea().avisos[0], /^Fondo bloqueado por el kill switch/);
+  assert.ok(s.comando('reabrir', { confirmacion: 'REABRIR' }).ok);
+  assert.ok(!s.instantanea().avisos.some(a => /bloqueado|pausa/.test(a)));
 });

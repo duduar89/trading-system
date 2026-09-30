@@ -17,7 +17,11 @@
 // del universo. Sin LLM, o si no valida: plan por defecto (mayoría de votos,
 // en empate el más prudente; multiplicadores 1; vetos = eventos graves de
 // noticias). Las intervenciones del LLM sustituyen a las plantillas de los
-// puntos 1-6 solo si pasan verificarCifras() contra los datos que se le dieron.
+// puntos 1-6 solo si pasan verificarCifras() contra los datos DE SU PUNTO (un
+// «80 %» que es un límite no vale como exposición del Controller) y no nombran
+// un voto, un modo o un régimen distinto del que calculó el código. La razón
+// de la Presidenta no se publica si Riesgos vetó su modo o si contradice lo
+// que se aplica.
 
 const plantillas = require('./plantillas');
 const { verificarCifras } = require('./cifras');
@@ -25,7 +29,9 @@ const { directivasVigentes } = require('./megafono');
 const { HORA } = require('../util/reloj');
 const f = require('../util/formato');
 const { pnlMesaTotal } = require('./departamentos/operaciones');
+const { referenciasVigilancia } = require('./departamentos/riesgos');
 const { etiqueta } = require('./departamentos/comun');
+const { diaUTC } = require('../util/reloj');
 
 const JEFES = Object.freeze(['cio', 'controller', 'macro', 'riesgos', 'laboratorio']);
 const MODOS = Object.freeze(['NORMAL', 'DEFENSIVO', 'SOLO_CERRAR']);
@@ -39,6 +45,24 @@ const CERCA = 0.8;           // un límite «cerca de saltar» es el 80 % de su 
 const VETO_HORAS = 24;
 
 const esperarReal = ms => (ms > 0 ? new Promise(r => setTimeout(r, ms)) : Promise.resolve());
+
+// Modos y regímenes que nombra un texto. En mayúsculas a propósito: «nivel
+// normal» en minúscula es el nivel de riesgo, no un modo.
+const RE_MODO = /\b(NORMAL|DEFENSIVO|SOLO_CERRAR)\b/g;
+const RE_REGIMEN = /\b(RISK-ON|RISK-OFF|NEUTRAL)\b/g;
+const nombra = (re, texto) => [...String(texto || '').matchAll(re)].map(m => m[1]);
+
+// ¿El texto de un punto dice un voto o un régimen distinto del calculado?
+function contradice(punto, texto, datos) {
+  if ((punto === 'macro' || punto === 'riesgos') && nombra(RE_MODO, texto).some(m => m !== datos.votos[punto])) return true;
+  return nombra(RE_REGIMEN, texto).some(r => r !== datos.macro.regimen);
+}
+
+// Entrada con la que se comprueban las cifras de una intervención: solo los
+// datos de su punto (y los límites, que son el tema de Riesgos).
+function entradaDelPunto(entrada, punto) {
+  return { hora: entrada.hora, [punto]: entrada[punto], ...(punto === 'riesgos' ? { limites: entrada.limites } : {}) };
+}
 
 function cercanos(ctx, patrimonio, pnlDiaPct, caida) {
   const lim = ctx.limites;
@@ -67,6 +91,11 @@ function reunirDatos(ctx) {
   const pnlDia = patrimonio - e.patrimonioInicioDia;
   const pnlDiaPct = e.patrimonioInicioDia > 0 ? pnlDia / e.patrimonioInicioDia : null;
   const caida = e.pico > 0 ? Math.min(0, patrimonio / e.pico - 1) : 0;
+  // «Cerca de saltar» se mide con lo que mide el vigilante (tras una
+  // reapertura, desde la reapertura); el Controller cuenta el resultado real.
+  const ref = referenciasVigilancia(e, ahora);
+  const pnlDiaLimite = ref.diaInicio === diaUTC(ahora) && ref.patrimonioInicioDia > 0 ? patrimonio / ref.patrimonioInicioDia - 1 : null;
+  const caidaLimite = ref.pico > 0 ? Math.min(0, patrimonio / Math.max(ref.pico, patrimonio) - 1) : 0;
   const val = v.valoracion || { exposicionBruta: 0, exposicionCripto: 0, posicionesAbiertas: 0 };
   const controller = {
     patrimonio, pnlDia, pnlDiaPct, caida,
@@ -78,7 +107,7 @@ function reunirDatos(ctx) {
   const votoMacro = reg.valor === 'RISK-OFF' ? 'DEFENSIVO' : 'NORMAL';
   const macro = { regimen: reg.valor, puntos: reg.puntos, detalle: reg.detalle, fg: e.macro.fg ? e.macro.fg.valor : null, voto: votoMacro };
   const votoRiesgos = e.fondo.nivel !== 'normal' || caida <= CAIDA_DEFENSIVA ? 'DEFENSIVO' : 'NORMAL';
-  const riesgos = { nivel: e.fondo.nivel, vetos: e.contadores.vetosDesdeComite || 0, cercanos: cercanos(ctx, patrimonio, pnlDiaPct, caida), caida, voto: votoRiesgos };
+  const riesgos = { nivel: e.fondo.nivel, vetos: e.contadores.vetosDesdeComite || 0, cercanos: cercanos(ctx, patrimonio, pnlDiaLimite, caidaLimite), caida, voto: votoRiesgos };
   const previos = (e.comite && e.comite.pnlMesas) || {};
   const porMesa = e.mesas.filter(m => m.estado !== 'banquillo').map(m => {
     const total = pnlMesaTotal(ctx, m.id);
@@ -200,7 +229,9 @@ async function celebrar(ctx, { motivo = 'programado' } = {}) {
   // comités en tiempo de pantalla (a ×3000, 4 h simuladas son 4,8 s).
   const intervaloPantalla = (ctx.config.cadencias.comiteHoras * HORA) / (ctx.modo === 'sintetico' ? Math.max(1, ctx.velocidad) : 1);
   const pausaMs = Math.min(ctx.opciones.pausaComiteMs || 0, intervaloPantalla / 2 / 8);
-  const pausa = () => esperarReal(pausaMs);
+  // detener() corta las pausas en curso (pausaPantalla): un Ctrl+C durante el
+  // comité no espera a que acabe el orden del día en la pantalla.
+  const pausa = () => (typeof ctx.pausaPantalla === 'function' ? ctx.pausaPantalla(pausaMs) : esperarReal(pausaMs));
   try {
     for (const id of JEFES) ctx.moverAgente(id, 'comite', 'reunion');
     ctx.bus.publicar({
@@ -236,10 +267,14 @@ async function celebrar(ctx, { motivo = 'programado' } = {}) {
         decision = normalizarDecision(r.datos, mesasActivas, simbolos, datos.votos);
         fuente = 'llm';
         const rz = String(r.datos.razon || '').trim();
-        if (rz && verificarCifras(rz, entrada).ok) razon = plantillas.frase(rz, 200);
+        // Con el veto de Riesgos el modo aplicado no es el que razonó el LLM.
+        const razonCuadra = rz && !decision.vetoRiesgos && !nombra(RE_MODO, rz).some(m => m !== decision.modo) && !contradice('decision', rz, datos);
+        if (razonCuadra && verificarCifras(rz, entrada).ok) razon = plantillas.frase(rz, 200);
         for (const it of r.datos.intervenciones || []) {
           const texto = String(it.texto || '').trim();
-          if (texto && PUNTOS.includes(it.agente) && !intervenciones[it.agente] && verificarCifras(texto, entrada).ok) intervenciones[it.agente] = plantillas.frase(texto, 200);
+          if (!texto || !PUNTOS.includes(it.agente) || intervenciones[it.agente]) continue;
+          if (contradice(it.agente, texto, datos)) continue;
+          if (verificarCifras(texto, entradaDelPunto(entrada, it.agente)).ok) intervenciones[it.agente] = plantillas.frase(texto, 200);
         }
       } else {
         motivoDefecto = r.motivo;
@@ -250,7 +285,8 @@ async function celebrar(ctx, { motivo = 'programado' } = {}) {
       await pausa();
       let texto = intervenciones[punto] || textoPlantilla(punto, datos);
       const esVoto = punto === 'macro' || punto === 'riesgos';
-      if (esVoto && intervenciones[punto] && !/voto/i.test(texto)) texto = plantillas.frase(`${texto} Voto ${datos.votos[punto]}.`, 200);
+      // El voto del código se dice siempre, salvo que el texto ya lo diga con ese valor.
+      if (esVoto && intervenciones[punto] && !new RegExp(`\\bvoto:? ${datos.votos[punto]}\\b`, 'i').test(texto)) texto = plantillas.frase(`${texto} Voto ${datos.votos[punto]}.`, 200);
       ctx.bus.publicar({
         de: PORTAVOZ[punto], canal: 'comite', tipo: esVoto ? 'voto' : 'informe', texto,
         datos: { punto, fuente: intervenciones[punto] ? 'llm' : 'plantilla', ...(esVoto ? { voto: datos.votos[punto] } : {}), ...(punto === 'riesgos' ? { cercanos: datos.riesgos.cercanos } : {}) },
@@ -260,7 +296,7 @@ async function celebrar(ctx, { motivo = 'programado' } = {}) {
     await pausa();
     const ahora = ctx.reloj.ahora();
     aplicarDecision(ctx, decision, ahora);
-    let texto = plantillas.decisionComite({ ...decision, fuente });
+    let texto = plantillas.decisionComite({ ...decision, fuente }, e.mesas);
     if (decision.vetoRiesgos) texto = plantillas.frase(`${texto} Riesgos vota ${datos.votos.riesgos}: veto a NORMAL.`, 200);
     if (razon) texto = plantillas.frase(`${texto} ${razon}`, 280);
     ctx.bus.publicar({
@@ -282,4 +318,4 @@ async function celebrar(ctx, { motivo = 'programado' } = {}) {
   }
 }
 
-module.exports = { celebrar, reunirDatos, planPorDefecto, esquemaDecision, normalizarDecision, aplicarDecision, JEFES, PUNTOS, MODOS };
+module.exports = { celebrar, reunirDatos, planPorDefecto, esquemaDecision, normalizarDecision, aplicarDecision, contradice, entradaDelPunto, JEFES, PUNTOS, MODOS };

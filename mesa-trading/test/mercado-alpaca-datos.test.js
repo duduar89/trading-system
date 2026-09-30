@@ -131,6 +131,71 @@ test('una vela que se publica tarde no se pierde: se vuelve a mirar la cola', as
   assert.equal(fetch.llamadas.length, n, 'con la cola completa no se vuelve a pedir');
 });
 
+test('cripto: una vela revisada tras la primera lectura se corrige (también en disco) al pedir la siguiente', async () => {
+  const carpeta = tmp();
+  const reloj = new RelojSimulado(T0 + 12 * HORA + 10_000);   // 12:00:10: la de 11:00 recién cerrada
+  let revisada = false;
+  const fetch = fetchFalso((ll, n) => {
+    const r = servidorVelas({ porPagina: 1000 })(ll, n);
+    for (const b of r.json.bars['BTC/USD']) if (b.t === new Date(T0 + 11 * HORA).toISOString() && !revisada) b.c = 1;   // provisional
+    return r;
+  });
+  const d = new AlpacaDatos({ fetch, reloj, carpetaCache: carpeta, limitador: null });
+  const a = await d.velas('BTC/USD', '1Hour', { desde: T0, hasta: reloj.ahora() });
+  assert.equal(a[11].c, 1, 'primera lectura: la provisional');
+  revisada = true;
+  reloj.avanzar(HORA);   // 13:00:10: se pide la de 12:00 desde lo firme, que incluye otra vez la de 11:00
+  const b = await d.velas('BTC/USD', '1Hour', { desde: T0, hasta: reloj.ahora() });
+  assert.equal(b[11].c, 111.5);
+  const enDisco = JSON.parse(fs.readFileSync(path.join(carpeta, 'velas', 'BTCUSD_1Hour.json'), 'utf8'));
+  assert.equal(enDisco.velas.find(v => v[0] === T0 + 11 * HORA)[4], 111.5, 'la caché en disco guarda la definitiva');
+});
+
+test('acciones 1Day: una diaria publicada tarde (16:20 ET) y provisional hasta las 17:00 ET no se pierde ni se congela', async () => {
+  // Servidor pesimista: la diaria de D aparece a las 16:20 ET (20:20Z en
+  // verano) y su cierre es provisional (400+i) hasta las 17:00 ET (500+i).
+  const dias = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-28', '2026-09-29'];
+  const carpeta = tmp();
+  const reloj = new RelojSimulado(Date.UTC(2026, 8, 24, 21, 0));
+  const fetch = fetchFalso((ll) => {
+    const ini = Date.parse(ll.params.start), fin = Date.parse(ll.params.end);
+    const bars = [];
+    dias.forEach((dia, i) => {
+      const t = Date.parse(`${dia}T04:00:00Z`);
+      const minutos = (reloj.ahora() - Date.parse(`${dia}T00:00:00Z`)) / 60_000;
+      if (t < ini || t > fin || minutos < 20 * 60 + 20) return;
+      bars.push({ t: `${dia}T04:00:00Z`, o: 500 + i, h: 510 + i, l: 390 + i, c: minutos < 21 * 60 ? 400 + i : 500 + i, v: 1 });
+    });
+    return { json: { bars: { SPY: bars }, next_page_token: null } };
+  });
+  const d = new AlpacaDatos({ claveId: 'PK', secreto: 'S', fetch, reloj, carpetaCache: carpeta, limitador: null });
+  const desde = Date.UTC(2026, 8, 18);
+  await d.velas('SPY', '1Day', { desde, hasta: reloj.ahora() });
+  // Macro pide SPY 1Day en el primer latido de cada hora: justo al cierre (16:00 ET), antes de que se publique.
+  const consultas = [
+    '2026-09-25T20:00:30Z', '2026-09-25T20:30:30Z', '2026-09-25T21:15:30Z', '2026-09-25T23:00:30Z',
+    '2026-09-28T20:00:30Z', '2026-09-28T20:40:30Z', '2026-09-29T20:30:30Z', '2026-09-29T21:30:30Z', '2026-09-30T02:00:00Z',
+  ];
+  let v = [];
+  for (const iso of consultas) {
+    reloj.fijar(Date.parse(iso));
+    v = await d.velas('SPY', '1Day', { desde, hasta: reloj.ahora() });
+  }
+  const cierres = Object.fromEntries(v.map(x => [new Date(x.t).toISOString().slice(0, 10), x.c]));
+  assert.deepEqual(cierres, {
+    '2026-09-21': 500, '2026-09-22': 501, '2026-09-23': 502, '2026-09-24': 503,
+    '2026-09-25': 504, '2026-09-28': 505, '2026-09-29': 506,
+  }, 'todas las diarias, con el cierre definitivo');
+  // Lo guardado en disco (lo que leen backtests y walk-forward) también es lo definitivo.
+  const enDisco = JSON.parse(fs.readFileSync(path.join(carpeta, 'velas', 'SPY_1Day.json'), 'utf8'));
+  assert.deepEqual(enDisco.velas.map(x => x[4]), [500, 501, 502, 503, 504, 505, 506]);
+  // Y pasado el margen ya no se vuelve a pedir.
+  const n = fetch.llamadas.length;
+  reloj.fijar(Date.parse('2026-09-30T03:00:00Z'));
+  await d.velas('SPY', '1Day', { desde, hasta: reloj.ahora() });
+  assert.equal(fetch.llamadas.length, n);
+});
+
 test('marco no admitido lanza; acciones sin claves no se piden', async () => {
   const fetch = fetchFalso(() => { throw new Error('no debería pedir'); });
   const d = new AlpacaDatos({ fetch, reloj: new RelojSimulado(T0), limitador: null });
@@ -227,4 +292,20 @@ test('un 429 en datos se reintenta y la segunda vez responde', async () => {
   assert.equal(v.length, 3);
   assert.equal(fetch.llamadas.length, 2);
   assert.deepEqual(esperas, [1000]);
+});
+
+test('ultimos: timeout corto y un solo reintento, para no retener el latido minutos con la red colgada; velas() conserva los suyos', async () => {
+  const llamadas = { ultimos: 0, velas: 0 };
+  const colgado = async (url) => {
+    llamadas[String(url).includes('/latest/') ? 'ultimos' : 'velas']++;
+    return new Promise(() => {});
+  };
+  const d = new AlpacaDatos({ fetch: colgado, reloj: new RelojSimulado(T0 + 3 * HORA), limitador: null, dormir: async () => {}, timeoutMs: 20, timeoutUltimosMs: 20 });
+  await assert.rejects(d.ultimos(['BTC/USD']), e => e.tipo === 'red');
+  assert.equal(llamadas.ultimos, 2, 'un intento y un reintento');
+  await assert.rejects(d.velas('BTC/USD', '1Hour', { desde: T0, hasta: T0 + 3 * HORA }), e => e.tipo === 'red');
+  assert.equal(llamadas.velas, 6, 'las velas mantienen sus 5 reintentos');
+  const porDefecto = new AlpacaDatos({ fetch: colgado, limitador: null });
+  assert.equal(porDefecto.timeoutUltimosMs, 10_000);
+  assert.equal(porDefecto.reintentosUltimos, 1);
 });

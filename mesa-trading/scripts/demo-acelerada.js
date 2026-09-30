@@ -15,6 +15,8 @@
 //   - hubo operaciones y hubo comités cada 4 h;
 //   - tras un reinicio simulado (guardar, otro orquestador desde el mismo
 //     data/) el estado se recupera igual;
+//   - ninguna operación se apunta dos veces en operaciones.jsonl (mismo id y
+//     misma entrada) y el bloqueo de la carpeta (.proceso) se suelta al parar;
 //   - al final, un kill switch forzado lo cierra todo y deja el fondo bloqueado.
 // Sin --con-llm no se usa el LLM aunque haya clave en el .env (la demo no gasta).
 
@@ -26,6 +28,7 @@ const { construir } = require('../src/index');
 const { crearLLM } = require('../src/agentes/llm');
 const universo = require('../src/mercado/universo');
 const { casiIgual } = require('../src/util/numeros');
+const { leerJSONL } = require('../src/util/almacen');
 const { MIN, HORA, DIA } = require('../src/util/reloj');
 const f = require('../src/util/formato');
 const logMod = require('../src/util/log');
@@ -241,8 +244,16 @@ async function ejecutarDemo({ dias = 60, semilla = 42, inicio = INICIO_POR_DEFEC
   if (rSinConfirmar.codigo !== 400) fallar('un kill sin confirmación no devuelve 400');
   await comprobarCuadre('tras el kill');
   await orq.detener();
+  if (fs.existsSync(path.join(dir, '.proceso'))) fallar('el bloqueo de la carpeta (.proceso) no se suelta al parar');
+  const vistas = new Set();
+  for (const op of leerJSONL(path.join(dir, 'operaciones.jsonl'))) {
+    const k = `${op.id}|${op.entradaT}`;
+    if (vistas.has(k)) fallar(`la operación ${op.id} está dos veces en operaciones.jsonl`);
+    vistas.add(k);
+  }
 
-  const costeLLM = orq.llm.estado().gastoHoyUsd || 0;
+  // Lo gastado en esta demo (llm-costes.jsonl de su carpeta), no el gasto de hoy del reloj real.
+  const costeLLM = leerJSONL(path.join(dir, 'llm-costes.jsonl')).reduce((s, x) => s + (Number(x.costeUsd) || 0), 0);
   const resumen = {
     dias, semilla, carpeta: dir, duracionS: (Date.now() - t0) / 1000,
     capital, patrimonio: inst.cabecera.patrimonio, rentabilidad: inst.cabecera.patrimonio / capital - 1,

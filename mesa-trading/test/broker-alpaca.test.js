@@ -243,7 +243,11 @@ test('timeout en el envío → consulta por idCliente, la encuentra y NO duplica
   assert.equal(consultas.length, 1);
   assert.equal(consultas[0].url, 'https://paper-api.alpaca.markets/v2/orders:by_client_order_id?client_order_id=mt-tendencia-BTCUSD-20260929T1600-abrir-1');
   assert.equal(o.estado, 'ejecutada');
-  assert.equal(o.cantidadEjecutada, 0.0119);
+  // filled_qty es bruto; en la posición entra el neto (la comisión se cobra en el activo).
+  assert.equal(o.cantidadBruta, 0.0119);
+  assert.equal(o.cantidadEjecutada, 0.01187025);
+  assert.ok(Math.abs(o.comision - 2.499) < 1e-9, `comisión ${o.comision} = 0,0119 × 84.000 × 0,0025`);
+  assert.equal(o.comisionEstimada, true);
   assert.equal(o.precioMedio, 84000);
 });
 
@@ -269,13 +273,67 @@ test('500 en el envío → consulta por idCliente antes de nada', async () => {
   assert.equal(o.estado, 'pendiente');
 });
 
-test('422 «client_order_id must be unique» prueba que ya entró: devuelve la existente', async () => {
+test('422 «client_order_id must be unique» en el PRIMER envío: no es nuestra, no se adopta → invalida', async () => {
+  // Nada de esta llamada llegó antes al bróker: el id lo usa otra orden (otra
+  // carpeta de datos sobre la misma cuenta). Adoptarla apuntaría una compra que no se hizo.
   const { broker, fetch } = crear((ll) => (ll.metodo === 'POST'
     ? { status: 422, json: { code: 40010001, message: 'client_order_id must be unique' } }
     : { json: ordenAlpaca({ status: 'filled', filled_qty: '0.0119', filled_avg_price: '84000' }) }));
-  const o = await broker.enviarOrden({ idCliente: 'mt-tendencia-BTCUSD-20260929T1600-abrir-1', simbolo: 'BTC/USD', lado: 'compra', nocional: 1000 });
-  assert.equal(o.estado, 'ejecutada');
+  await assert.rejects(
+    broker.enviarOrden({ idCliente: 'mt-tendencia-BTCUSD-20260929T1600-abrir-1', simbolo: 'BTC/USD', lado: 'compra', nocional: 1000 }),
+    e => e instanceof ErrorBroker && e.tipo === 'invalida' && /ya usado/.test(e.message),
+  );
   assert.equal(fetch.llamadas.filter(l => l.metodo === 'POST').length, 1);
+  assert.equal(fetch.llamadas.filter(l => l.metodo === 'GET').length, 0, 'ni se consulta');
+});
+
+test('reintento: POST sin respuesta → GET 404 → POST 422 duplicado → adopta la existente si es la misma orden', async () => {
+  const secuencia = [];
+  const { broker } = crear((ll, n) => {
+    secuencia.push(ll.metodo);
+    if (ll.metodo === 'POST') return n === 1 ? 'colgar' : { status: 422, json: { code: 40010001, message: 'client_order_id must be unique' } };
+    return secuencia.filter(x => x === 'GET').length === 1
+      ? { status: 404, json: { message: 'order not found' } }
+      : { json: ordenAlpaca({ status: 'filled', filled_qty: '0.0119', filled_avg_price: '84000' }) };
+  }, { timeoutMs: 30 });
+  const o = await broker.enviarOrden({ idCliente: 'mt-tendencia-BTCUSD-20260929T1600-abrir-1', simbolo: 'BTC/USD', lado: 'compra', nocional: 1000 });
+  assert.deepEqual(secuencia, ['POST', 'GET', 'POST', 'GET']);
+  assert.equal(o.estado, 'ejecutada');
+  assert.equal(o.idCliente, 'mt-tendencia-BTCUSD-20260929T1600-abrir-1');
+});
+
+test('una orden existente con nuestro idCliente pero OTRO contenido no se adopta en ninguno de los tres caminos', async () => {
+  const pedida = { idCliente: 'mt-tendencia-BTCUSD-20260929T1600-abrir-1', simbolo: 'BTC/USD', lado: 'compra', nocional: 1000 };
+  const otras = [
+    ordenAlpaca({ status: 'filled', notional: '5000', filled_qty: '0.06', filled_avg_price: '84000' }),   // otro importe
+    ordenAlpaca({ status: 'filled', symbol: 'SOL/USD', filled_qty: '8', filled_avg_price: '125' }),     // otro símbolo
+    ordenAlpaca({ status: 'filled', side: 'sell', notional: null, qty: '0.01', filled_qty: '0.01', filled_avg_price: '84000' }), // otro lado
+  ];
+  const ok = e => e instanceof ErrorBroker && e.tipo === 'invalida' && /ya usado/.test(e.message);
+  for (const otra of otras) {
+    // (1) Tras un POST sin respuesta, la consulta del reintento la encuentra.
+    const a = crear(ll => (ll.metodo === 'POST' ? 'colgar' : { json: otra }), { timeoutMs: 30 });
+    await assert.rejects(a.broker.enviarOrden(pedida), ok, 'consulta del reintento');
+    // (2) POST sin respuesta → 404 → POST 422 duplicado → la consulta la encuentra.
+    let gets = 0;
+    const b = crear((ll, n) => {
+      if (ll.metodo === 'POST') return n === 1 ? new TypeError('fetch failed') : { status: 422, json: { message: 'client_order_id must be unique' } };
+      return ++gets === 1 ? { status: 404, json: {} } : { json: otra };
+    });
+    await assert.rejects(b.broker.enviarOrden(pedida), ok, 'consulta tras el 422');
+    // (3) Tres POST sin respuesta; la comprobación final la encuentra.
+    let consultas = 0;
+    const c = crear(ll => (ll.metodo === 'POST' ? new TypeError('fetch failed') : ++consultas < 3 ? { status: 404, json: {} } : { json: otra }));
+    await assert.rejects(c.broker.enviarOrden(pedida), ok, 'comprobación final');
+  }
+});
+
+test('tras un POST sin respuesta, si la consulta por idCliente falla con otro error (401) se avisa como red: pudo entrar', async () => {
+  const { broker } = crear(ll => (ll.metodo === 'POST' ? new TypeError('fetch failed') : { status: 401, json: { message: 'unauthorized.' } }));
+  await assert.rejects(
+    broker.enviarOrden({ idCliente: 'id-incierta', simbolo: 'BTC/USD', lado: 'compra', nocional: 50 }),
+    e => e instanceof ErrorBroker && e.tipo === 'red' && /pudo entrar/.test(e.message),
+  );
 });
 
 test('fallo de red persistente: tres POST separados por consultas y lanza red', async () => {
@@ -300,7 +358,8 @@ test('esperarEjecucion sondea hasta un estado final', async () => {
   const o = await broker.esperarEjecucion('mt-tendencia-BTCUSD-20260929T1600-abrir-1', { timeoutMs: 20_000, intervaloMs: 1000 });
   assert.equal(fetch.llamadas.length, 3);
   assert.equal(o.estado, 'ejecutada');
-  assert.equal(o.cantidadEjecutada, 0.0119);
+  assert.equal(o.cantidadBruta, 0.0119);
+  assert.equal(o.cantidadEjecutada, 0.01187025);
 });
 
 test('esperarEjecucion devuelve la última vista si no llega a final (reloj parado)', async () => {
@@ -333,7 +392,7 @@ test('ordenesAbiertas, cancelarTodas (207) y cerrarTodo (207 con un fallo)', asy
     if (ll.url.endsWith('/v2/orders')) return { status: 207, json: [{ id: 'a', status: 200 }, { id: 'b', status: 500 }] };
     return {
       status: 207, json: [
-        { symbol: 'BTCUSD', status: 200, body: { asset_class: 'crypto', symbol: 'BTCUSD' } },
+        { symbol: 'BTCUSD', status: 200, body: ordenAlpaca({ id: 'liq-1', client_order_id: 'alpaca-liq-1', symbol: 'BTC/USD', side: 'sell', notional: null, qty: '0.012', status: 'accepted' }) },
         { symbol: 'SPY', status: 403, body: { message: 'market closed', asset_class: 'us_equity' } },
       ],
     };
@@ -348,12 +407,20 @@ test('ordenesAbiertas, cancelarTodas (207) y cerrarTodo (207 con un fallo)', asy
   assert.deepEqual(r.cerradas, ['BTC/USD']);
   assert.equal(r.errores.length, 1);
   assert.equal(r.errores[0].simbolo, 'SPY');
+  // La liquidación es una orden nueva que el fondo no envió: se devuelve para poder seguirla.
+  assert.equal(r.ordenes.length, 1);
+  assert.equal(r.ordenes[0].idCliente, 'alpaca-liq-1');
+  assert.equal(r.ordenes[0].simbolo, 'BTC/USD');
+  assert.equal(r.ordenes[0].lado, 'venta');
+  assert.equal(r.ordenes[0].cantidad, 0.012);
+  assert.equal(r.ordenes[0].estado, 'pendiente');
 });
 
 test('cerrarTodo no lanza aunque Alpaca devuelva 500', async () => {
   const { broker } = crear(() => ({ status: 500, json: { message: 'Failed to liquidate' } }), { maxReintentos: 0 });
   const r = await broker.cerrarTodo();
   assert.deepEqual(r.cerradas, []);
+  assert.deepEqual(r.ordenes, []);
   assert.equal(r.errores.length, 1);
 });
 
@@ -372,4 +439,94 @@ test('todas las peticiones van a la URL de papel', async () => {
   await broker.relojMercado().catch(() => {});
   await broker.ordenesAbiertas().catch(() => {});
   for (const ll of fetch.llamadas) assert.ok(ll.url.startsWith('https://paper-api.alpaca.markets/'), ll.url);
+});
+
+// ---- comisión cripto estimada (ficha §4) --------------------------------------
+// Alpaca cobra la comisión sobre lo que se RECIBE: al comprar, en el activo
+// (filled_qty es bruto y a la posición llega menos); al vender, en dólares. La
+// orden no trae la comisión, así que el adaptador la estima a la tasa taker y
+// deja la orden con el mismo contrato que BrokerSimulado.
+const compraBTC = extra => ordenAlpaca({ status: 'filled', notional: '1000', filled_qty: '0.01', filled_avg_price: '100000', ...extra });
+const ventaBTC = extra => ordenAlpaca({ status: 'filled', side: 'sell', notional: null, qty: '0.009975', filled_qty: '0.009975', filled_avg_price: '110000', ...extra });
+
+test('CASO CONOCIDO: compra de 1.000 $ de BTC a 100.000 → filled_qty 0,01 bruto; entran 0,009975 y la comisión estimada es 2,5 $', () => {
+  const o = mapearOrden(compraBTC());
+  assert.equal(o.cantidadBruta, 0.01);
+  assert.equal(o.cantidadEjecutada, 0.009975, '0,01 × (1 − 0,0025)');
+  assert.ok(Math.abs(o.comision - 2.5) < 1e-9, `comisión ${o.comision}`);
+  assert.equal(o.comisionEstimada, true);
+  // Mismas cifras que el caso conocido de BrokerSimulado (test/broker-simulado.test.js).
+});
+
+test('CASO CONOCIDO: venta de 0,009975 BTC a 110.000 → la cantidad sale entera y la comisión es 2,743125 $', () => {
+  const o = mapearOrden(ventaBTC());
+  assert.equal(o.cantidadBruta, 0.009975);
+  assert.equal(o.cantidadEjecutada, 0.009975);
+  assert.ok(Math.abs(o.comision - 2.743125) < 1e-9, `comisión ${o.comision} = 0,009975 × 110.000 × 0,0025`);
+  assert.equal(o.comisionEstimada, true);
+});
+
+test('comisión: acciones 0 y cantidad entera; cripto sin ejecutar null; ejecución parcial neta de lo ejecutado', () => {
+  const spy = mapearOrden(ordenAlpaca({ symbol: 'SPY', asset_class: 'us_equity', status: 'filled', notional: '1000', filled_qty: '2', filled_avg_price: '500', time_in_force: 'day' }));
+  assert.equal(spy.comision, 0);
+  assert.equal(spy.cantidadEjecutada, 2);
+  assert.equal(spy.comisionEstimada, false);
+  const pendiente = mapearOrden(ordenAlpaca());
+  assert.equal(pendiente.comision, null);
+  assert.equal(pendiente.cantidadEjecutada, 0);
+  const parcial = mapearOrden(compraBTC({ status: 'partially_filled', filled_qty: '0.004' }));
+  assert.equal(parcial.estado, 'parcial');
+  assert.equal(parcial.cantidadBruta, 0.004);
+  assert.equal(parcial.cantidadEjecutada, 0.00399);
+  assert.ok(Math.abs(parcial.comision - 1) < 1e-9);
+});
+
+test('la tasa se puede configurar: con comisión 0 (paper que no cobra) lo ejecutado es lo bruto', async () => {
+  const { broker } = crear(() => ({ json: compraBTC() }), { costes: { comision: 0 } });
+  const o = await broker.enviarOrden({ idCliente: 'mt-tendencia-BTCUSD-20260929T1600-abrir-1', simbolo: 'BTC/USD', lado: 'compra', nocional: 1000 });
+  assert.equal(o.cantidadEjecutada, 0.01);
+  assert.equal(o.comision, 0);
+  const tasaFija = mapearOrden(compraBTC(), { comision: 0.0022 });
+  assert.equal(tasaFija.cantidadEjecutada, 0.009978);
+  assert.ok(Math.abs(tasaFija.comision - 2.2) < 1e-9);
+});
+
+test('todas las lecturas de órdenes estiman igual (enviar, consultar, esperar, abiertas)', async () => {
+  const { broker } = crear(ll => (ll.url.includes('status=open') ? { json: [compraBTC({ status: 'partially_filled' })] } : { json: compraBTC() }));
+  const vistas = [
+    await broker.enviarOrden({ idCliente: 'mt-tendencia-BTCUSD-20260929T1600-abrir-1', simbolo: 'BTC/USD', lado: 'compra', nocional: 1000 }),
+    await broker.ordenPorIdCliente('mt-tendencia-BTCUSD-20260929T1600-abrir-1'),
+    await broker.esperarEjecucion('mt-tendencia-BTCUSD-20260929T1600-abrir-1'),
+    (await broker.ordenesAbiertas())[0],
+  ];
+  for (const o of vistas) {
+    assert.equal(o.cantidadEjecutada, 0.009975);
+    assert.ok(Math.abs(o.comision - 2.5) < 1e-9);
+  }
+});
+
+// ---- cancelar una orden concreta ------------------------------------------------
+test('cancelarOrden: DELETE /v2/orders/{id}; 204 → true; 422 (ya no se puede) o 404 → false, sin lanzar', async () => {
+  const respuestas = [{ status: 204 }, { status: 422, json: { message: 'order is not cancelable' } }, { status: 404, json: { message: 'order not found' } }];
+  const { broker, fetch } = crear((ll, n) => respuestas[n - 1]);
+  assert.equal(await broker.cancelarOrden('b0b6dd9d-8b9b 1'), true);
+  assert.equal(fetch.llamadas[0].metodo, 'DELETE');
+  assert.equal(fetch.llamadas[0].url, 'https://paper-api.alpaca.markets/v2/orders/b0b6dd9d-8b9b%201');
+  assert.equal(await broker.cancelarOrden('x'), false);
+  assert.equal(await broker.cancelarOrden('y'), false);
+  await assert.rejects(broker.cancelarOrden(''), e => e.tipo === 'invalida');
+});
+
+test('comisiones (CFEE): la de compra viene en el activo y la de venta en dólares; importeUsd las pone en dólares', async () => {
+  const { broker, fetch } = crear(() => ({ json: [
+    { id: 'a1', activity_type: 'CFEE', date: '2026-09-29', symbol: 'BTCUSD', qty: '-0.000025', price: '100000', net_amount: '0' },
+    { id: 'a2', activity_type: 'CFEE', date: '2026-09-29', symbol: 'BTCUSD', qty: '0', price: '110000', net_amount: '-2.743125' },
+    { id: 'a3', activity_type: 'CFEE', date: '2026-09-29', symbol: 'ETHUSD', qty: '-0.001', net_amount: '0' },
+  ] }));
+  const c = await broker.comisiones({ desde: Date.UTC(2026, 8, 29) });
+  assert.equal(fetch.llamadas[0].url, 'https://paper-api.alpaca.markets/v2/account/activities/CFEE?after=2026-09-29T00%3A00%3A00.000Z');
+  assert.equal(c[0].simbolo, 'BTC/USD');
+  assert.ok(Math.abs(c[0].importeUsd - 2.5) < 1e-9, 'compra: 0,000025 BTC × 100.000');
+  assert.ok(Math.abs(c[1].importeUsd - 2.743125) < 1e-9, 'venta: en dólares');
+  assert.equal(c[2].importeUsd, null, 'sin precio no se inventa');
 });

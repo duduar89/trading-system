@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { MiedoCodicia, traducir, valorSintetico, valorEn } = require('../src/mercado/sentimiento');
+const { MiedoCodicia, traducir, valorSintetico, valorEn, RETRASO_FG } = require('../src/mercado/sentimiento');
 const { DatosSinteticos } = require('../src/mercado/sintetico');
 const { RelojSimulado, HORA, DIA } = require('../src/util/reloj');
 
@@ -124,4 +124,13 @@ test('modo sintético: marcado, 0-100, etiqueta en español y el histórico acab
   const h2 = await mc.historico();
   assert.deepEqual(h2.slice(0, h.length), h);
   assert.equal(fetch.llamadas.length, 0);
+});
+
+test('RETRASO_FG: una decisión a las 00:00 UTC usa el valor de AYER (el de hoy se publica en ese mismo instante); a las 04:00, el de hoy', () => {
+  // Una sola regla para vivo y backtest: el valor vigente en t es valorEn(hist, t − RETRASO_FG).
+  assert.equal(RETRASO_FG, HORA);
+  const hist = [{ dia: '2026-09-28', valor: 20 }, { dia: '2026-09-29', valor: 29 }, { dia: '2026-09-30', valor: 30 }];
+  const medianoche = Date.UTC(2026, 8, 30);
+  assert.equal(valorEn(hist, medianoche - RETRASO_FG).valor, 29);
+  assert.equal(valorEn(hist, medianoche + 4 * HORA - RETRASO_FG).valor, 30);
 });

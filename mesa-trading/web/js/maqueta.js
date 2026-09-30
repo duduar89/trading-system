@@ -47,15 +47,19 @@
   ];
   const POR_ETIQUETA = Object.fromEntries(ACTIVOS.map(a => [a.etiqueta, a]));
 
+  // Como en el arranque real (src/estrategias/index.js): dos titulares al 40 %
+  // (techo del asignador) y dos en incubación al 2 %; el 16 % queda sin asignar.
   const MESAS = [
     { id: 'tendencia', nombre: 'Tendencia SMA', familia: 'tendencia-sma', marco: '4Hour', universo: ['BTC', 'ETH', 'SOL'],
-      params: { rapida: 7, lenta: 25, filtro: 200, atrStop: 2.5 }, peso: 0.3 },
-    { id: 'momentum', nombre: 'Momentum rotación', familia: 'momentum-rotacion', marco: '1Day', universo: ['BTC', 'ETH', 'SOL', 'LINK', 'AVAX', 'DOGE'],
-      params: { lookback: 28, top: 2, rebalanceo: 'lunes' }, peso: 0.3 },
+      params: { rapida: 7, lenta: 25, filtro: 200, atrStop: 2.5 }, peso: 0.02, estado: 'incubacion',
+      nota: 'Backtest real 2021-2026 con costes: Sharpe −0,52. Empieza en prueba con el 2 %.' },
+    { id: 'momentum', nombre: 'Momentum cripto', familia: 'momentum-rotacion', marco: '1Day', universo: ['BTC', 'ETH', 'SOL', 'LINK', 'AVAX', 'DOGE'],
+      params: { lookback: 28, top: 2, rebalanceo: 'lunes' }, peso: 0.4, estado: 'titular', nota: null },
     { id: 'reversion', nombre: 'Reversión RSI', familia: 'reversion-rsi', marco: '1Day', universo: ['BTC', 'ETH'],
-      params: { rsi: 2, umbral: 10, salidaSma: 5, maxVelas: 5 }, peso: 0.2 },
+      params: { rsi: 2, umbral: 10, salidaSma: 5, maxVelas: 5 }, peso: 0.02, estado: 'incubacion',
+      nota: 'Backtest real 2021-2026 con costes: Sharpe −0,42. Empieza en prueba con el 2 %.' },
     { id: 'ruptura', nombre: 'Ruptura Donchian', familia: 'ruptura-donchian', marco: '1Day', universo: ['BTC', 'ETH', 'SOL'],
-      params: { entrada: 20, salida: 10, atrStop: 2 }, peso: 0.2 },
+      params: { entrada: 20, salida: 10, atrStop: 2 }, peso: 0.4, estado: 'titular', nota: null },
   ];
 
   const FIJOS = [
@@ -96,12 +100,13 @@
 
   // Formato mínimo para los textos (el de verdad lo pone el servidor).
   const nf = (d) => new Intl.NumberFormat('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d });
-  const agrupar = (s) => { const [e, d] = s.split(','); const sg = e.startsWith('-') ? '-' : ''; const g = e.replace(/^-/, '').replace(/\./g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); return sg + g + (d !== undefined ? ',' + d : ''); };
+  const agrupar = (s) => { const [e, d] = s.split(','); const sg = e.startsWith('-') && /[1-9]/.test(s) ? '-' : ''; const g = e.replace(/^-/, '').replace(/\./g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); return sg + g + (d !== undefined ? ',' + d : ''); };
   const usd = (x, signo) => (signo && x > 0 ? '+' : '') + agrupar(Math.abs(x) >= 1000 ? nf(0).format(x) : nf(2).format(x)) + ' $';
   const pct = (x, d, signo) => (signo && x > 0 ? '+' : '') + agrupar(nf(d === undefined ? 2 : d).format(x * 100)) + ' %';
   const prec = (x) => { const a = Math.abs(x); return agrupar(nf(a >= 1000 ? 0 : a >= 10 ? 2 : a >= 1 ? 3 : 4).format(x)); };
   const cant = (x) => agrupar(new Intl.NumberFormat('es-ES', { maximumFractionDigits: x >= 100 ? 1 : x >= 1 ? 3 : 5 }).format(x));
-  const hora = (t) => new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' }).format(new Date(t));
+  // En hora de Madrid, como formato.hora del servidor y la hora del feed.
+  const hora = (t) => new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' }).format(new Date(t));
   const copia = (x) => JSON.parse(JSON.stringify(x));
 
   function crearMaqueta(opciones) {
@@ -201,6 +206,9 @@
     const patrimonio = () => efectivo + valorPosiciones();
     const patrimonioInicioDia = patrimonio() - 184.2;
     let pico = Math.max(CAPITAL + 1250, patrimonio());
+    // Referencia del vigilante tras un Reabrir humano (como el servidor): la
+    // cabecera sigue midiendo desde el máximo histórico y el inicio real del día.
+    let vigilancia = null;
 
     // Curva: 300 puntos hacia atrás cada 5 min que acaban en el patrimonio de ahora.
     const curva = [];
@@ -471,10 +479,37 @@
         regimen: { valor: 'RISK-ON', detalle: 'BTC sobre SMA200 (+1), SMA50 > SMA200 (+1), vol. 30 d 46 % (0); sin datos de SPY.' },
         miedoCodicia: { valor: 70, etiqueta: 'Codicia', sintetico: true },
         proximoComite, modoComite,
+        sinAsignar: capitalSinAsignar(patr),
+        vigilancia: {
+          perdidaDiaPct: vigilancia ? patr / vigilancia.inicioDia - 1 : (patr - patrimonioInicioDia) / patrimonioInicioDia,
+          caidaPct: vigilancia ? Math.min(0, patr / Math.max(vigilancia.pico, patr) - 1) : Math.min(0, patr / pico - 1),
+          desdeReapertura: Boolean(vigilancia),
+        },
       };
     }
 
+    // Capital que ninguna mesa tiene (queda en efectivo), como _sinAsignar del servidor.
+    function capitalSinAsignar(patr) {
+      const asignado = MESAS.reduce((s, m) => s + (m.estado !== 'banquillo' && m.peso > 0 ? m.peso : 0), 0);
+      const fraccion = Math.max(0, 1 - asignado);
+      return { fraccion, usd: patr > 0 ? redondear(patr * fraccion) : 0 };
+    }
+
     function redondear(x) { return Math.round(x * 100) / 100; }
+
+    // Avisos como los del servidor: lo que bloquea el fondo va delante (en el
+    // móvil el aviso va en una línea y se corta por el final).
+    function avisos() {
+      const lista = [];
+      if (fondo.nivel === 'bloqueado') lista.push('Fondo bloqueado por el kill switch: solo sale con Reabrir.');
+      else if (fondo.nivel === 'pausado') lista.push('Fondo en pausa: solo cierra posiciones hasta Reabrir.');
+      else if (fondo.nivel === 'solo_cerrar') lista.push(`Solo cerrar hasta las 00:00 UTC: ${fondo.motivo || 'límite de pérdida del día'}`);
+      const sa = capitalSinAsignar(patrimonio());
+      if (sa.fraccion > 0.0005) lista.push(`${pct(sa.fraccion, 0)} del capital sin asignar: queda en efectivo (techo del 40 % por mesa).`);
+      lista.push('Con el ordenador apagado no hay stops: en cripto no existen órdenes stop simples.');
+      lista.push('Maqueta: todos los datos de esta pantalla son inventados.');
+      return lista;
+    }
 
     function instantanea() {
       const cab = cabecera();
@@ -505,11 +540,12 @@
         const regla = ps.reduce((s, p) => s + p._porRegla, 0);
         const sharpe = redondear(((ganado - perdido) / Math.max(1, ops)) / 60);
         return {
-          id: m.id, nombre: m.nombre, familia: m.familia, marco: m.marco, estado: 'titular', peso: m.peso,
+          id: m.id, nombre: m.nombre, familia: m.familia, marco: m.marco, estado: m.estado, peso: m.peso,
           capital: redondear(cab.patrimonio * m.peso), multiplicador: directivas.multiplicadores[m.id], universo: m.universo.slice(), params: copia(m.params),
           metricas: { operaciones: ops, acierto: ops ? gan / ops : null, factorBeneficio: perdido > 0 ? ganado / perdido : null, sharpe,
             sharpeAjustado: redondear(sharpe * ops / (ops + 30)), maxDD: 0.031 + ops * 0.001, adherencia: ops ? regla / ops : null, pnlTotal: redondear(ganado - perdido) },
           pnlDia: redondear(vistaPuestos.filter(p => p.mesaId === m.id).reduce((s, p) => s + p.pnlDia, 0)),
+          nota: m.nota,
         };
       });
       const porSimbolo = new Map();
@@ -554,10 +590,7 @@
         ejecuciones: copia(ejecuciones.slice(0, 30)),
         laboratorio: copia(laboratorio),
         limites: Object.assign({}, LIMITES),
-        avisos: [
-          'Con el ordenador apagado no hay stops: en cripto no existen órdenes stop simples.',
-          'Maqueta: todos los datos de esta pantalla son inventados.',
-        ],
+        avisos: avisos(),
       };
     }
 
@@ -612,6 +645,7 @@
       }
       const patr = patrimonio();
       if (patr > pico) pico = patr;
+      if (vigilancia && patr > vigilancia.pico) vigilancia.pico = patr;
       // Stops: si el precio toca el stop, se cierra (como el vigilante).
       for (const p of puestos) {
         if (p.posicion && precios[p.etiqueta] <= p.posicion.stop) cerrarPosicion(p, 'stop');
@@ -743,10 +777,20 @@
         }
         case 'reabrir': {
           if (c.confirmacion !== 'REABRIR') return { ok: false, mensaje: 'Para reabrir hay que escribir REABRIR.' };
+          if (fondo.nivel === 'solo_cerrar') return { ok: false, mensaje: 'No se reabre: el «solo cerrar» por la pérdida del día dura hasta las 00:00 UTC y se levanta solo.' };
+          if (fondo.nivel === 'normal') return { ok: true, mensaje: 'El fondo ya estaba en nivel normal.' };
+          const venia = fondo.nivel;
           fondo = { nivel: 'normal', motivo: null, multiplicadorCaida: 1 };
           for (const a of agentes) if (a.estado === 'de_pie') moverAgente(a.id, a.sala === 'comite' ? SALA_DE[a.departamento] : a.sala, 'trabajando');
-          decir('riesgos', 'riesgo', 'alerta', 'Reabierto por un humano. Conciliación limpia; vuelta a nivel normal.', { importancia: 3 });
-          return { ok: true, mensaje: 'Reabierto: vuelta a nivel normal.' };
+          // Como plantillas.reabrir: el máximo histórico no se borra y se dice con cifras.
+          const patr = patrimonio();
+          const maximo = Math.max(pico, patr);
+          if (venia === 'bloqueado') vigilancia = { inicioDia: patr, pico: patr };
+          const cifrasPico = maximo - patr < 0.005
+            ? `El fondo está en su máximo histórico (${usd(maximo)}).`
+            : `El fondo sigue un ${pct((maximo - patr) / maximo)} (${usd(maximo - patr)}) por debajo de su máximo histórico (${usd(maximo)}).`;
+          decir('riesgos', 'riesgo', 'alerta', `Reabierto por un humano desde el panel. ${cifrasPico}`, { importancia: 3 });
+          return { ok: true, mensaje: `Reabierto: vuelta a nivel normal. ${cifrasPico}` };
         }
         case 'kill': {
           if (c.confirmacion !== 'KILL') return { ok: false, mensaje: 'Para el kill switch hay que escribir KILL.' };

@@ -9,7 +9,7 @@
 // - Sin cambio con < 20 operaciones o < 60 días: no se mueve capital por ruido.
 // - Suavizado 0,7·actual + 0,3·objetivo, suelo 5 %, techo 40 %.
 // - Incubación fija 2 %; los titulares se reparten 1 − Σ incubación.
-// - Despido (banquillo, peso 0, sigue en sombra): sharpeAjustado < −0,5 con
+// - Despido (banquillo, peso 0; su sombra ya no abre nada): sharpeAjustado < −0,5 con
 //   ≥ 40 operaciones, o caída máxima de la mesa > 25 %.
 // - Incubación de ≥ 60 días: asciende si Sharpe de papel > Sharpe de
 //   backtest − 1 con ≥ 10 operaciones; si no, se descarta.
@@ -152,8 +152,8 @@ function reasignar({ mesas = [], ahora = null } = {}) {
       despidos.push(m.id);
       pesos[m.id] = 0;
       motivos[m.id] = porCaida
-        ? `Despido al banquillo: caída máxima ${p1(met.maxDD)} (máximo ${p1(R.despidoMaxDD)}). Sigue en sombra.`
-        : `Despido al banquillo: Sharpe ajustado ${n2(met.sharpeAjustado)} con ${ops} operaciones (umbral ${n2(R.despidoSharpe)} con ≥ ${R.despidoMinOperaciones}). Sigue en sombra.`;
+        ? `Despido al banquillo: caída máxima ${p1(met.maxDD)} (máximo ${p1(R.despidoMaxDD)}).`
+        : `Despido al banquillo: Sharpe ajustado ${n2(met.sharpeAjustado)} con ${ops} operaciones (umbral ${n2(R.despidoSharpe)} con ≥ ${R.despidoMinOperaciones}).`;
       continue;
     }
     titulares.push({ m, ops, dias });

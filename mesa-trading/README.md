@@ -45,8 +45,11 @@ npm test              # ~400 pruebas
 npm run probar        # casos conocidos (contabilidad, riesgo, indicadores…) + demo corta
 ```
 
-Detrás de un proxy corporativo, Node necesita `NODE_USE_ENV_PROXY=1` para
-llegar a internet.
+Detrás de un proxy corporativo, arranca con `npm run start-proxy` en vez de
+`npm start`: hace que Node use el proxy de las variables del sistema. Hace
+falta Node 22.21 o posterior (en Node 20 no existen ni la variable
+`NODE_USE_ENV_PROXY` ni el flag `--use-env-proxy`). Las variables del proxy
+van en el sistema, no en el `.env`: Node las lee al arrancar.
 
 ## Qué hay dentro
 
@@ -64,10 +67,11 @@ llegar a internet.
 | Botón | Qué hace |
 |---|---|
 | Comité | Convoca el comité ahora |
-| Megáfono | Le dices al fondo algo en castellano («pausa SOL 6 horas»). Te enseña la directiva y solo entra si pulsas Aplicar. Solo puede apretar, nunca aflojar |
+| Megáfono | Le dices al fondo algo en castellano («pausa SOL 6 horas»). Te enseña la directiva y solo entra si pulsas Aplicar. Solo puede apretar, nunca aflojar. Sin duración, dura hasta el comité siguiente |
+| Resultados | El fondo frente a sus carteras sombra (comprar y mantener y «mismas mesas sin comité»), si el comité aporta algo, las mesas con su nota, el capital sin asignar y el laboratorio |
 | Prueba | Comprueba bróker, datos, índice de miedo y codicia, y la IA. Si escribes PRUEBA, compra y vende 15 $ de BTC |
 | Pausar todo | Solo se cierran posiciones hasta que reabras |
-| Reabrir | Escribiendo REABRIR, si las posiciones cuadran con el bróker |
+| Reabrir | Escribiendo REABRIR, si las posiciones cuadran con el bróker. Sale de la pausa y del bloqueo del kill; el «solo cerrar» por la pérdida del día no se reabre (dura hasta las 00:00 UTC). No borra el máximo histórico: la caída se sigue contando desde él |
 | Kill switch | Escribiendo KILL: cancela todo, cierra todo y deja el fondo bloqueado, también tras reiniciar |
 | Ajustes | Tope de gasto en IA, modelos y velocidad de la demo. Los límites de riesgo solo se ven |
 

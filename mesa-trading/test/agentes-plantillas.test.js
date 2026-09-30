@@ -54,7 +54,7 @@ const CASOS = {
   ],
   leccion: [
     { mesaId: 'tendencia', etiqueta: 'SOL', categoria: 'stop_estrecho', pnl: -45.2, barras: 2 },
-    { mesaId: 'momentum', etiqueta: 'ETH', categoria: 'señal_falsa', leccion: 'ETH perdió -80,00 $: la señal no se confirmó.' },
+    { mesaId: 'momentum', etiqueta: 'ETH', categoria: 'señal_falsa', leccion: 'ETH perdió 80,00 $: la señal no se confirmó.' },
   ],
   hipotesis: [
     { id: 'h-2026-40-1', familia: 'tendencia-sma', marco: '4Hour', universo: ['BTC/USD', 'ETH/USD', 'SOL/USD'], filtros: [{ id: 'regimen-no-riskoff' }], origen: 'leccion' },
@@ -132,7 +132,7 @@ test('casos conocidos: frases exactas', () => {
   assert.equal(p.cierre(CASOS.cierre[1]), 'Cerrada BTC por stop: -45,20 $ (-1,20 %) en 1 vela.');
   assert.equal(p.directiva({ tipo: 'reducir_riesgo', factor: 0.5, horas: 12 }), 'Reducir el tamaño de las entradas al 50 % durante 12 h.');
   assert.equal(p.decisionComite(CASOS.decisionComite[0]),
-    'Decisión: modo DEFENSIVO. Mesas a la mitad: tendencia, ruptura. Mesas paradas: reversion. Vetos 24 h: SOL, DOGE. (plan por defecto)');
+    'Decisión: modo DEFENSIVO (plan por defecto). Mesas paradas: reversion. Vetos 24 h: SOL, DOGE. Mesas a la mitad: tendencia, ruptura.');
   assert.equal(p.soloCerrar(CASOS.soloCerrar[0]), 'Solo cerrar hasta las 00:00: pérdida del día −2,10 % (límite −2 %).');
   assert.equal(p.regimen(CASOS.regimen[1]), 'Régimen RISK-OFF (−2).');
   assert.equal(p.informeComite.controller(INFORMES.controller),
@@ -150,4 +150,50 @@ test('frase(): recorta a 140 con puntos suspensivos y sin partir números', () =
   assert.ok(reg.length <= 140);
   assert.match(reg, /\(0\)…$/);
   assert.equal(p.veto({ motivos: [{ texto: 'x' }] }), 'Veto al activo: x');
+});
+
+const MESAS = [
+  { id: 'tendencia', nombre: 'Tendencia SMA' }, { id: 'reversion', nombre: 'Reversión RSI' },
+  { id: 'ruptura', nombre: 'Ruptura Donchian' }, { id: 'lab3', nombre: 'Tendencia SMA lenta' },
+];
+
+test('directiva y decisión del comité: con la lista de mesas, el nombre y no el id', () => {
+  assert.equal(p.directiva({ tipo: 'pausar_mesa', mesaId: 'reversion', horas: 6 }, MESAS), 'Pausar la mesa Reversión RSI durante 6 h.');
+  assert.equal(p.directiva({ tipo: 'reanudar_mesa', mesaId: 'lab3' }, MESAS), 'Quitar la pausa del Megáfono a la mesa Tendencia SMA lenta.');
+  // Sin lista (o mesa que no está) se queda el id, como antes.
+  assert.equal(p.directiva({ tipo: 'pausar_mesa', mesaId: 'reversion', horas: 6 }), 'Pausar la mesa reversion durante 6 h.');
+  assert.equal(p.directiva({ tipo: 'pausar_mesa', mesaId: 'otra', horas: 6 }, MESAS), 'Pausar la mesa otra durante 6 h.');
+  assert.equal(p.decisionComite({ modo: 'NORMAL', multiplicadores: { reversion: 0, lab3: 0.5 }, vetos: [] }, MESAS),
+    'Decisión: modo NORMAL. Mesas paradas: Reversión RSI. Mesas a la mitad: Tendencia SMA lenta.');
+  comprobar(p.decisionComite(CASOS.decisionComite[0], MESAS), 'decisionComite(con nombres)');
+});
+
+test('despido: dice lo que pasa de verdad (sin «sigue en sombra») y lo dice antes que el motivo', () => {
+  const x = p.despido({ nombre: 'Ruptura Donchian', motivo: 'maxDD 27 % > 25 %' });
+  assert.equal(x, 'Mesa Ruptura Donchian al banquillo (cierra sus puestos y no abre nada nuevo, ni en sombra): maxDD 27 % > 25 %.');
+  assert.doesNotMatch(x, /[Ss]igue en sombra/);
+  // Con un motivo largo se recorta el motivo, no lo que pasa.
+  const largo = p.despido({ nombre: 'Tendencia SMA lenta', motivo: 'descartada tras la incubación. ' + 'x '.repeat(80) });
+  assert.match(largo, /ni en sombra\):/);
+  assert.ok(largo.length <= 140);
+});
+
+test('informe diario: un cierre tardío dice el tramo real, no la fecha de un solo día', () => {
+  const base = { dia: '2026-06-04', patrimonio: 100415, pnlDia: 443.67, pnlDiaPct: 0.00442, operaciones: 5, acierto: 0.4, gastoLLMUsd: 0.22 };
+  // Caso de la revisión: apagado el 2-jun, encendido el 4-jun a las 08:00 UTC.
+  assert.equal(p.informeDiario({ ...base, desde: Date.UTC(2026, 5, 2, 0, 5), hasta: Date.UTC(2026, 5, 4, 8, 0) }),
+    'Cierre (02-jun 00:05 → 04-jun 08:00 UTC, 56 h): 100.415 $ (+443,67 $, +0,44 %). 5 operaciones, acierto 40 %. LLM 0,22 $.');
+  // Un día normal (24 h ± 30 min) sigue con la fecha.
+  const dia = p.informeDiario({ ...base, desde: Date.UTC(2026, 5, 3, 0, 5), hasta: Date.UTC(2026, 5, 4, 0, 20) });
+  assert.equal(dia, 'Cierre 2026-06-04: 100.415 $ (+443,67 $, +0,44 %). 5 operaciones, acierto 40 %. LLM 0,22 $.');
+  // Sin gasto de LLM conocido (null, p. ej. en sintético) no se dice nada de él.
+  assert.doesNotMatch(p.informeDiario({ ...base, gastoLLMUsd: null }), /LLM/);
+});
+
+test('reabrir: con patrimonio y máximo histórico, dice cuánto le falta al fondo para volver a él', () => {
+  assert.equal(p.reabrir({ quien: 'un humano desde el panel', patrimonio: 95544, pico: 109000 }),
+    'Reabierto por un humano desde el panel. El fondo sigue un 12,34 % (13.456 $) por debajo de su máximo histórico (109.000 $).');
+  assert.equal(p.reabrir({ quien: 'Eduardo', patrimonio: 109000, pico: 109000 }), 'Reabierto por Eduardo. El fondo está en su máximo histórico (109.000 $).');
+  assert.equal(p.reabrir({ quien: 'Eduardo', patrimonio: 110000, pico: 109000 }), 'Reabierto por Eduardo. El fondo está en su máximo histórico (110.000 $).');
+  assert.equal(p.reabrir({ quien: 'Eduardo' }), 'Reabierto por Eduardo. Conciliación limpia; vuelta a nivel normal.');
 });

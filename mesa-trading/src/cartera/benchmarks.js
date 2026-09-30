@@ -10,12 +10,16 @@
 // sombra en los libros.
 
 const universo = require('../mercado/universo');
+const { COSTES_POR_DEFECTO } = require('../broker/comun');
 const { precioDe } = require('./libros');
 
 const VERSION = 1;
 
-// Comisión por defecto: la de Alpaca (taker nivel 1 cripto 0,25 %, acciones 0; ficha §4).
-const comisionPorDefecto = s => (universo.esCripto(s) ? 0.0025 : 0);
+// Comisión por defecto: la MISMA tasa que usan el bróker simulado, la
+// estimación de Alpaca y el sombra «sin comité» (broker/comun.js; taker nivel
+// 1 cripto 0,25 %, acciones 0; ficha §4). Una sola fuente: si se comprueba que
+// paper no cobra, se cambia ahí y todos comparan neto contra neto.
+const comisionPorDefecto = s => COSTES_POR_DEFECTO.comision(s);
 
 const CARTERAS = Object.freeze([
   { id: 'btc', nombre: '100 % BTC', pesos: { 'BTC/USD': 1 }, conAlpaca: false },

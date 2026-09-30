@@ -21,6 +21,12 @@ const HORAS_MAX = 72;
 // Megáfono aprieta caduca solo.
 const HORAS_POR_DEFECTO = 4;
 const ORIGEN = 'megafono';
+// Cifras de las reglas del Megáfono: un motivo de sin_efecto puede citarlas.
+const LIMITES = Object.freeze([HORAS_MIN, HORAS_MAX, HORAS_POR_DEFECTO, ...FACTORES]);
+// Motivo de sin_efecto cuando el del LLM trae una cifra que no está ni en la
+// orden ni en las reglas (§0.2): no se enseña.
+const MOTIVO_FIJO = 'La orden no encaja en la lista cerrada o pide más riesgo.';
+const MAX_MOTIVO = 140;
 
 const quitarTildes = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const etiquetaDe = a => (a && typeof a === 'object' ? a.etiqueta || String(a.simbolo || '').split('/')[0] : String(a || '').split('/')[0]);
@@ -48,6 +54,15 @@ function resolverMesa(valor, mesas = []) {
 function horasValidas(h) {
   return Number.isInteger(h) && h >= HORAS_MIN && h <= HORAS_MAX;
 }
+
+// Duración por defecto pedida por quien llama (p. ej. el intervalo del
+// comité); si no vale, la del contrato.
+const horasPorDefectoDe = h => (horasValidas(h) ? h : HORAS_POR_DEFECTO);
+
+const nombreMesa = (id, mesas = []) => {
+  const m = (mesas || []).find(x => x && x.id === id);
+  return (m && m.nombre) || id;
+};
 
 const vigente = (hasta, ahora) => hasta === null || hasta === undefined || hasta > ahora;
 
@@ -105,7 +120,7 @@ function validarDirectiva(d, ctx = {}) {
       const mesaId = resolverMesa(d.mesaId, mesas);
       if (!mesaId) return mal(`Mesa desconocida: ${d.mesaId}.`);
       if (ctx.directivas && !hayPausaMegafono(ctx.directivas, 'mesasPausadas', 'mesaId', mesaId, ctx.ahora)) {
-        return mal(`No hay ninguna pausa del Megáfono sobre la mesa ${mesaId} que deshacer.`);
+        return mal(`No hay ninguna pausa del Megáfono sobre la mesa ${nombreMesa(mesaId, mesas)} que deshacer.`);
       }
       return { ok: true, error: null, directiva: { tipo: d.tipo, mesaId } };
     }
@@ -356,19 +371,30 @@ function esquemaLLM(universo, mesas) {
   };
 }
 
-const INSTRUCCIONES = [
-  'Convierte «texto» en directivas. Tipos:',
-  '- reducir_riesgo: factor 0.25, 0.5 o 0.75 (tamaño de las entradas nuevas) y horas.',
-  '- pausar_activo: simbolo (etiqueta de «activos») y horas. pausar_mesa: mesaId (de «mesas») y horas.',
-  '- solo_cerrar: horas (no se abre nada nuevo). reanudar_activo / reanudar_mesa: deshacen una pausa previa.',
-  '- sin_efecto: motivo, si la orden no encaja o pide más riesgo.',
-  `Horas: entero de ${HORAS_MIN} a ${HORAS_MAX}; si el texto no dice duración, ${HORAS_POR_DEFECTO}. Campos que no apliquen: null.`,
-  'explicacion: una frase corta que diga lo que has entendido, sin cifras que no estén en el texto o en estas reglas.',
-].join('\n');
+function instrucciones(horasPorDefecto = HORAS_POR_DEFECTO) {
+  return [
+    'Convierte «texto» en directivas. Tipos:',
+    '- reducir_riesgo: factor 0.25, 0.5 o 0.75 (tamaño de las entradas nuevas) y horas.',
+    '- pausar_activo: simbolo (etiqueta de «activos») y horas. pausar_mesa: mesaId (de «mesas») y horas.',
+    '- solo_cerrar: horas (no se abre nada nuevo). reanudar_activo / reanudar_mesa: deshacen una pausa previa.',
+    '- sin_efecto: motivo, si la orden no encaja o pide más riesgo.',
+    `Horas: entero de ${HORAS_MIN} a ${HORAS_MAX}; si el texto no dice duración, ${horasPorDefecto}. Campos que no apliquen: null.`,
+    'explicacion: una frase corta que diga lo que has entendido, sin cifras que no estén en el texto.',
+  ].join('\n');
+}
+const INSTRUCCIONES = instrucciones();
 
-function explicar(directivas, notas) {
+// El motivo de un sin_efecto lo escribe el LLM: solo se enseña si sus cifras
+// están en la orden o en las reglas, y recortado.
+function motivoComprobado(motivo, texto, limites) {
+  const m = String(motivo || '').trim();
+  if (!m) return MOTIVO_FIJO;
+  return verificarCifras(m, { texto: String(texto || ''), limites }).ok ? plantillas.frase(m, MAX_MOTIVO) : MOTIVO_FIJO;
+}
+
+function explicar(directivas, notas, mesas = []) {
   const partes = directivas.map(d => {
-    const x = plantillas.directiva(d).replace(/\.$/, '');
+    const x = plantillas.directiva(d, mesas).replace(/\.$/, '');
     return x.charAt(0).toLowerCase() + x.slice(1);
   });
   const base = partes.length ? `He entendido: ${partes.join('; ')}.` : 'No he entendido ninguna orden de la lista cerrada.';
@@ -376,8 +402,12 @@ function explicar(directivas, notas) {
 }
 
 // Devuelve { directivas, explicacion, fuente: 'llm'|'palabras_clave' }. No aplica nada.
-async function interpretar(texto, { llm, universo = [], mesas = [], directivas: estado, ahora } = {}) {
+// `horasPorDefecto`: duración cuando la orden no dice cuánto (por defecto 4 h,
+// hasta el siguiente comité); quien llama puede pasar su intervalo de comité.
+async function interpretar(texto, { llm, universo = [], mesas = [], directivas: estado, ahora, horasPorDefecto } = {}) {
   const ctx = { universo, mesas, directivas: estado, ahora };
+  const hDef = horasPorDefectoDe(horasPorDefecto);
+  const limites = [...LIMITES, hDef];
   if (llm && llm.activo) {
     const r = await llm.pedirJSON({
       uso: 'agentes',
@@ -388,7 +418,7 @@ async function interpretar(texto, { llm, universo = [], mesas = [], directivas: 
         activos: universo.map(a => ({ etiqueta: etiquetaDe(a), nombre: (a && a.nombre) || etiquetaDe(a) })),
         mesas: mesas.map(m => ({ id: m.id, nombre: m.nombre || m.id })),
       },
-      instrucciones: INSTRUCCIONES,
+      instrucciones: hDef === HORAS_POR_DEFECTO ? INSTRUCCIONES : instrucciones(hDef),
       esquema: esquemaLLM(universo, mesas),
       maxTokens: 1500,
     });
@@ -396,22 +426,27 @@ async function interpretar(texto, { llm, universo = [], mesas = [], directivas: 
       const validas = []; const notas = [];
       for (const d of r.datos.directivas) {
         const v = validarDirectiva(d, ctx);
-        if (v.ok) validas.push(v.directiva);
-        else notas.push(v.error.replace(/\.$/, ''));
+        if (!v.ok) { notas.push(v.error.replace(/\.$/, '')); continue; }
+        if (v.directiva.tipo === 'sin_efecto') v.directiva.motivo = motivoComprobado(v.directiva.motivo, texto, limites);
+        validas.push(v.directiva);
       }
       const utiles = validas.filter(d => d.tipo !== 'sin_efecto');
       if (utiles.length || validas.length) {
         const directivas = utiles.length ? utiles : validas;
-        // La explicación del LLM solo se enseña si sus cifras están en el texto o en las directivas.
+        // La explicación del LLM solo se enseña si sus cifras están en la orden
+        // o en las directivas, sin nada que haya escrito el propio LLM (el
+        // motivo de un sin_efecto) ni las reglas: un «75 %» de la lista no
+        // puede colarse en una reducción al 50 %.
         const suya = String(r.datos.explicacion || '').trim();
-        const comprobada = suya && verificarCifras(suya, { texto, directivas, limites: [HORAS_MIN, HORAS_MAX, HORAS_POR_DEFECTO, ...FACTORES] }).ok;
-        const explicacion = comprobada && !notas.length ? plantillas.frase(suya, 280) : explicar(directivas, notas);
+        const soloCodigo = directivas.map(({ motivo, ...d }) => d);
+        const comprobada = suya && verificarCifras(suya, { texto: String(texto || ''), directivas: soloCodigo }).ok;
+        const explicacion = comprobada && !notas.length ? plantillas.frase(suya, 280) : explicar(directivas, notas, mesas);
         return { directivas, explicacion, fuente: 'llm', costeUsd: r.costeUsd };
       }
     }
     // LLM sin respuesta válida: se cae a palabras clave, que no cuestan nada.
   }
-  const { directivas: brutas, notas } = interpretarPalabrasClave(texto, { universo, mesas });
+  const { directivas: brutas, notas } = interpretarPalabrasClave(texto, { universo, mesas, horasPorDefecto: hDef });
   const validas = [];
   for (const d of brutas) {
     const v = validarDirectiva(d, ctx);
@@ -419,7 +454,7 @@ async function interpretar(texto, { llm, universo = [], mesas = [], directivas: 
     else notas.push(v.error.replace(/\.$/, ''));
   }
   const directivas = validas.length ? validas : [{ tipo: 'sin_efecto', motivo: 'No he entendido ninguna orden de la lista cerrada (pausa, para, reduce, baja, solo cerrar, no abras, reanuda).' }];
-  return { directivas, explicacion: validas.length ? explicar(validas, notas) : explicar([], notas.length ? notas : ['prueba con «pausa SOL 24 h» o «reduce el riesgo a la mitad»']), fuente: 'palabras_clave' };
+  return { directivas, explicacion: validas.length ? explicar(validas, notas, mesas) : explicar([], notas.length ? notas : ['prueba con «pausa SOL 24 h» o «reduce el riesgo a la mitad»']), fuente: 'palabras_clave' };
 }
 
 module.exports = {
@@ -436,4 +471,5 @@ module.exports = {
   HORAS_MIN,
   HORAS_MAX,
   HORAS_POR_DEFECTO,
+  MOTIVO_FIJO,
 };

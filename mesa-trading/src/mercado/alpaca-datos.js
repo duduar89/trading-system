@@ -41,6 +41,10 @@ class AlpacaDatos {
     claveId = '', secreto = '', fetch = globalThis.fetch, reloj = new RelojReal(), carpetaCache = null,
     limitador = new Limitador(), calendario = calendarioPorDefecto, timeoutMs = 20_000, maxReintentos = 5,
     dormir, urlDatos = URL_DATOS, limitePagina = 10_000,
+    // ultimos() se pide en cada latido y el latido siguiente ya reintenta: con
+    // 20 s × 6 intentos + esperas, una red colgada retendría el latido (y con él
+    // el kill, el Ctrl+C y los stops) unos 151 s por petición. Así, ~21 s.
+    timeoutUltimosMs = 10_000, reintentosUltimos = 1,
   } = {}) {
     if (typeof fetch !== 'function') throw new Error('AlpacaDatos necesita fetch');
     this.claveId = claveId;
@@ -53,6 +57,8 @@ class AlpacaDatos {
     this.calendario = calendario;
     this.timeoutMs = timeoutMs;
     this.maxReintentos = maxReintentos;
+    this.timeoutUltimosMs = timeoutUltimosMs;
+    this.reintentosUltimos = reintentosUltimos;
     this.dormir = dormir || (ms => new Promise(r => setTimeout(r, ms)));
     this.urlDatos = urlDatos.replace(/\/+$/, '');
     this.limitePagina = Math.min(10_000, Math.max(1, limitePagina)); // Alpaca: máx. 10.000 (ficha §3)
@@ -69,14 +75,14 @@ class AlpacaDatos {
     return { 'APCA-API-KEY-ID': this.claveId, 'APCA-API-SECRET-KEY': this.secreto, Accept: 'application/json' };
   }
 
-  async _get(ruta, params, { conClaves }) {
+  async _get(ruta, params, { conClaves, timeoutMs = this.timeoutMs, maxReintentos = this.maxReintentos }) {
     const q = new URLSearchParams(params).toString();
     this.peticiones++;
     const { json } = await pedir({
       fetch: this.fetch, url: `${this.urlDatos}${ruta}?${q}`, metodo: 'GET',
       cabeceras: conClaves ? this._cabeceras() : { Accept: 'application/json' },
-      timeoutMs: this.timeoutMs, limitador: this.limitador, reintentar: true,
-      maxReintentos: this.maxReintentos, dormir: this.dormir, contexto: `GET ${ruta}`,
+      timeoutMs, limitador: this.limitador, reintentar: true,
+      maxReintentos, dormir: this.dormir, contexto: `GET ${ruta}`,
     });
     return json || {};
   }
@@ -108,8 +114,9 @@ class AlpacaDatos {
   }
 
   // Una vela recién cerrada tarda en publicarse (la de 19:31 llegó a las 19:32,
-  // ficha §3). El tramo cubierto se queda este margen por detrás para volver a
-  // mirar la cola; si no, una vela pedida antes de publicarse faltaría siempre.
+  // ficha §3) y puede llegar primero a medias. El tramo cubierto se queda este
+  // margen por detrás del cierre para volver a mirar la cola; si no, una vela
+  // pedida antes de publicarse faltaría siempre, y una provisional se quedaría así.
   _retraso(simbolo, marco) {
     if (universo.esCripto(simbolo)) return 5 * MIN;
     return marco === '1Day' ? 2 * HORA : 15 * MIN;
@@ -199,13 +206,19 @@ class AlpacaDatos {
     if (ini > fin) return [];
     const horizonte = this._horizonte(simbolo, marco, ahora);
     const tope = Math.min(fin, horizonte);                                   // se pide hasta aquí
-    const firme = Math.min(fin, horizonte - this._retraso(simbolo, marco));  // se da por cubierto hasta aquí
+    // Se da por cubierto hasta la última vela cerrada hace más del margen de
+    // publicación. Se calcula como el horizonte de (ahora − margen), no como
+    // horizonte − margen: en la diaria de acciones el horizonte es la
+    // medianoche ET + 12 h y restarle 2 h daba por firme la vela del día en
+    // cuanto se pedía tras el cierre, publicada o no (y a medias o no).
+    const firme = Math.min(fin, this._horizonte(simbolo, marco, ahora - this._retraso(simbolo, marco)));
 
     let entrada = this._leerCache(simbolo, marco);
     let cambiada = false;
     if (!entrada) {
       if (ini <= tope) {
-        entrada = { desde: ini, hasta: Math.max(ini - 1, firme), velas: await this._pedirVelas(simbolo, marco, ini, tope) };
+        // ultimaCola: la cola se acaba de pedir; no se repite antes de 30 s.
+        entrada = { desde: ini, hasta: Math.max(ini - 1, firme), velas: await this._pedirVelas(simbolo, marco, ini, tope), ultimaCola: ahora };
         cambiada = true;
       }
     } else {
@@ -217,7 +230,15 @@ class AlpacaDatos {
         entrada = { ...entrada, desde: ini, velas: unir(nuevas, entrada.velas) };
         cambiada = true;
       }
-      if (tope > entrada.hasta && this._faltaCola(entrada, simbolo, marco, entrada.hasta, tope)) {
+      // La cola se vuelve a pedir si falta alguna vela o, en acciones, si la
+      // última guardada aún no es firme: la diaria puede llegar a medias y se
+      // lee durante las 2 h siguientes (Macro, mesas de ETF, caché en disco).
+      // En cripto no: la mesa decide con la primera lectura y una revisión
+      // entra igual al pedir la vela siguiente; mirarla en cada latido del
+      // margen multiplicaría por 6 las peticiones sin cambiar ninguna decisión.
+      const ultima = entrada.velas[entrada.velas.length - 1];
+      const sinFirmar = !universo.esCripto(simbolo) && Boolean(ultima && ultima.t > entrada.hasta);
+      if (tope > entrada.hasta && (sinFirmar || this._faltaCola(entrada, simbolo, marco, entrada.hasta, tope))) {
         // Sin martillear: una vela que de verdad no existe se vuelve a pedir como mucho cada 30 s.
         const reciente = entrada.ultimaCola !== undefined && ahora - entrada.ultimaCola < 30_000 && ahora >= entrada.ultimaCola;
         if (!reciente) {
@@ -243,8 +264,9 @@ class AlpacaDatos {
     const res = {};
     const cripto = simbolos.filter(s => universo.esCripto(s));
     const acciones = simbolos.filter(s => !universo.esCripto(s));
+    const rapido = { timeoutMs: this.timeoutUltimosMs, maxReintentos: this.reintentosUltimos };
     if (cripto.length) {
-      const jq = await this._get('/v1beta3/crypto/us/latest/quotes', { symbols: cripto.join(',') }, { conClaves: false });
+      const jq = await this._get('/v1beta3/crypto/us/latest/quotes', { symbols: cripto.join(',') }, { conClaves: false, ...rapido });
       for (const s of cripto) {
         const q = jq.quotes && jq.quotes[s];
         const bp = q ? Number(q.bp) : NaN, ap = q ? Number(q.ap) : NaN;
@@ -253,7 +275,7 @@ class AlpacaDatos {
       }
       const faltan = cripto.filter(s => !res[s]);
       if (faltan.length) {
-        const jb = await this._get('/v1beta3/crypto/us/latest/bars', { symbols: faltan.join(',') }, { conClaves: false });
+        const jb = await this._get('/v1beta3/crypto/us/latest/bars', { symbols: faltan.join(',') }, { conClaves: false, ...rapido });
         for (const s of faltan) {
           const b = jb.bars && jb.bars[s];
           if (b && Number(b.c) > 0) res[s] = { precio: Number(b.c), t: Date.parse(b.t) };
@@ -261,7 +283,7 @@ class AlpacaDatos {
       }
     }
     if (acciones.length && this.hayClaves) {
-      const json = await this._get('/v2/stocks/snapshots', { symbols: acciones.join(','), feed: 'iex' }, { conClaves: true });
+      const json = await this._get('/v2/stocks/snapshots', { symbols: acciones.join(','), feed: 'iex' }, { conClaves: true, ...rapido });
       // La doc no deja claro si viene envuelto en `snapshots` (ficha §3): se aceptan las dos formas.
       const mapa = json.snapshots || json;
       for (const s of acciones) {

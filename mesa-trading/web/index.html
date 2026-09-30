@@ -51,7 +51,8 @@
     </aside>
 
     <main class="escena" id="escena">
-      <canvas id="lienzo" role="img" aria-label="Parqué isométrico de la mesa: pulsa un puesto o una persona para ver su ficha. Arrastra para mover, rueda o pellizco para acercar." tabindex="0"></canvas>
+      <canvas id="lienzo" role="img" aria-label="Parqué isométrico de la mesa: pulsa un puesto, una persona o el rótulo de una mesa para ver su ficha. Arrastra para mover, rueda o pellizco para acercar. Con el teclado: flechas para mover, + y − para acercar, n y p para recorrer puestos y personas, Intro para abrir la ficha." tabindex="0"></canvas>
+      <p class="visualmente-oculto" id="anuncio" role="status" aria-live="polite"></p>
       <div class="franja" id="franja" role="status" hidden>Sin conexión con la mesa, reintentando…</div>
       <div class="avisos" id="avisos" aria-label="Avisos"></div>
       <section class="tarjeta" id="tarjeta" hidden aria-labelledby="tarjeta-titulo"></section>

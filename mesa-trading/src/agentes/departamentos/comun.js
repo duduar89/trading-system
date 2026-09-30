@@ -10,7 +10,7 @@
 // cargar desde disco.
 
 const universo = require('../../mercado/universo');
-const { COSTES_POR_DEFECTO } = require('../../broker/simulado');
+const { COSTES_POR_DEFECTO } = require('../../broker/comun');
 
 const EPS = 1e-12;
 

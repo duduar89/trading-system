@@ -7,10 +7,15 @@
 //   2. asignador.reasignar() con las métricas de papel de cada mesa.
 //   3. Aplica pesos (anotando el flujo en la curva de la mesa para que la
 //      reasignación no cuente como rentabilidad), ascensos, despidos y
-//      descartes. Una mesa al banquillo cierra sus puestos reales, sigue en
-//      sombra y sus operadores pasan al estado 'banquillo'.
+//      descartes. Una mesa al banquillo cierra sus puestos reales y sus
+//      operadores pasan al estado 'banquillo'. Con peso 0 su sombra ya no abre
+//      nada (dimensiona con 0 $); lo que tuviera abierto en sombra se cierra
+//      por su regla. pesoAntesBanquillo queda solo como registro.
+// Una hipótesis aprobada se contrata una sola vez: se descartan las aprobadas
+// con la misma firma (contenido) que otra de la lista o que una mesa viva.
 
 const { FAMILIAS } = require('../../estrategias');
+const { firmaHipotesis } = require('../../cuant/laboratorio');
 const { reasignar, REGLAS } = require('../../aprendizaje/asignador');
 const plantillas = require('../plantillas');
 const { DIA } = require('../../util/reloj');
@@ -53,6 +58,7 @@ function contratar(ctx, h) {
     metricas: null,
     backtest: null,
     hipotesisId: h.id,
+    firmaHipotesis: h.firma || firmaHipotesis(h),
   };
   ctx.agregarMesa(mesa);
   ctx.bus.publicar({
@@ -96,7 +102,13 @@ async function revisionMensual(ctx) {
   e.cadencias.proximoMensual = siguienteMes(ahora);
 
   const contratadas = [];
-  for (const h of e.laboratorio.aprobadas.splice(0)) contratadas.push(contratar(ctx, h));
+  const vivas = new Set(e.mesas.filter(m => m.estado !== 'banquillo' && m.firmaHipotesis).map(m => m.firmaHipotesis));
+  for (const h of e.laboratorio.aprobadas.splice(0)) {
+    const firma = h.firma || firmaHipotesis(h);
+    if (firma && vivas.has(firma)) continue;          // ya hay una mesa con ese mismo contenido
+    if (firma) vivas.add(firma);
+    contratadas.push(contratar(ctx, { ...h, firma }));
+  }
 
   const entrada = e.mesas.map(m => ({
     id: m.id,

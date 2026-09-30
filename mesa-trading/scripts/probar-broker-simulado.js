@@ -65,6 +65,42 @@ async function main() {
   caso('efectivo tras recargar', (await recargado.cuenta()).efectivo, 100094.506875);
   caso('la orden de compra sigue ahí', (await recargado.ordenPorIdCliente('caso-compra')).cantidadEjecutada, 0.009975);
 
+  console.log('— idCliente repetido con otra orden');
+  await rechaza('mismo id, otro importe', recargado.enviarOrden({ idCliente: 'caso-compra', simbolo: 'BTC/USD', lado: 'compra', nocional: 2000 }), 'invalida');
+  caso('mismo id y misma orden: devuelve la que hay', (await recargado.enviarOrden({ idCliente: 'caso-compra', simbolo: 'BTC/USD', lado: 'compra', nocional: 1000 })).id, 'sim-1');
+
+  console.log('— EPERM al guardar justo después de llenar (Windows: OneDrive, antivirus)');
+  // La orden ya está hecha en memoria: tiene que volver ejecutada, no como
+  // error (el Ejecutor no la apuntaría y quedaría una posición sin puesto).
+  reloj.fijar(Date.UTC(2026, 8, 29, 15));
+  precios['BTC/USD'] = 100000;
+  const renombrar = fs.renameSync;
+  let fallar = true;
+  fs.renameSync = (...a) => {
+    if (fallar) { const e = new Error('EPERM: operation not permitted, rename'); e.code = 'EPERM'; throw e; }
+    return renombrar(...a);
+  };
+  try {
+    const cE = await recargado.enviarOrden({ idCliente: 'eperm-compra', simbolo: 'BTC/USD', lado: 'compra', nocional: 1000 });
+    caso('compra con EPERM: vuelve ejecutada', cE.estado, 'ejecutada');
+    caso('compra con EPERM: BTC recibidos', cE.cantidadEjecutada, 0.009975);
+    caso('aún no está en disco', JSON.parse(fs.readFileSync(ruta, 'utf8')).ordenes.some(o => o.idCliente === 'eperm-compra'), false);
+    fallar = false;
+    await recargado.cuenta();
+    caso('el siguiente cuenta() la guarda', JSON.parse(fs.readFileSync(ruta, 'utf8')).ordenes.some(o => o.idCliente === 'eperm-compra'), true);
+    fallar = true;
+    const vE = await recargado.enviarOrden({ idCliente: 'eperm-venta', simbolo: 'BTC/USD', lado: 'venta', cantidad: 0.009975 });
+    caso('venta con EPERM: vuelve ejecutada', vE.estado, 'ejecutada');
+    fallar = false;
+    await recargado.cuenta();
+    const otraVez = new BrokerSimulado({ fuente, reloj, ruta, costes: { deslizamiento: 0 } });
+    caso('tras recargar, la venta está y no queda BTC', (await otraVez.posiciones()).length, 0);
+    // 100.094,506875 − 1.000 + 0,009975 × 100.000 × (1 − 0,0025) = 100.089,5125 $
+    caso('efectivo tras compra y venta con EPERM', (await otraVez.cuenta()).efectivo, 100094.506875 - 1000 + 0.009975 * 100000 * (1 - 0.0025));
+  } finally {
+    fs.renameSync = renombrar;
+  }
+
   fs.rmSync(carpeta, { recursive: true, force: true });
   console.log(fallos ? `\n${fallos} FALLO(S)` : '\nTodos los casos cuadran.');
   process.exit(fallos ? 1 : 0);

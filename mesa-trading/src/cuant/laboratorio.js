@@ -15,6 +15,16 @@
 //   stop_estrecho  → atrStop + 0,5
 //   señal_falsa    → vecino más lento de la rejilla
 //   noticia, ejecucion → nada (no hay histórico con qué probarlas)
+//
+// Sin repetir: una hipótesis es su CONTENIDO (firmaHipotesis: familia, marco,
+// universo, filtros y los params que fija al generarse), no su id, que lleva
+// la semana. No se genera una cuyo contenido ya se evaluó (o está pendiente,
+// o aprobada) en los últimos 90 días, ni dos iguales en la misma semana: cada
+// repetición suma ensayos al DSR y una aprobada dos veces se contrataba dos
+// veces.
+//
+// DSR: N = ensayos acumulados y la varianza de los Sharpe es la de TODOS los
+// ensayos guardados (sharpesPrevios), no solo los de esta hipótesis.
 
 const { FAMILIAS } = require('../estrategias');
 const { validarFiltro } = require('../estrategias/filtros');
@@ -33,6 +43,8 @@ const CRITERIOS = Object.freeze({
   correlacionMax: 0.7,
 });
 const MAX_HIPOTESIS = 3;
+const DIAS_SIN_REPETIR = 90;
+const DIA_MS = 86_400_000;
 
 // Filtros que prueba la exploración semanal, en este orden (dentro del catálogo).
 const EXPLORACION = Object.freeze([
@@ -98,6 +110,21 @@ function varianzaMuestral(xs) {
   return xs.reduce((s, x) => s + (x - m) ** 2, 0) / (xs.length - 1);
 }
 
+// Contenido de una hipótesis, sobre lo que FIJA al generarse (nunca sobre los
+// parámetros finales que elige el walk-forward): dos hipótesis con la misma
+// firma son la misma prueba aunque cambien el id, la semana o el motivo.
+function firmaHipotesis(h) {
+  if (!h || typeof h !== 'object') return null;
+  const filtros = (h.filtros || [])
+    .map(f => [f.id, f.parametro === undefined ? null : f.parametro])
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+  const params = h.params && typeof h.params === 'object' ? h.params : {};
+  return JSON.stringify([
+    h.familia, h.marco, [...(h.universo || [])].sort(), filtros,
+    Object.keys(params).sort().map(k => [k, params[k]]),
+  ]);
+}
+
 function describirHipotesis(h) {
   const ets = h.universo.map(comun.etiqueta).join(', ');
   const filtros = (h.filtros || []).map(f => (f.parametro === null || f.parametro === undefined ? f.id : `${f.id} ${f.parametro}`));
@@ -107,8 +134,14 @@ function describirHipotesis(h) {
 
 const sino = ok => (ok ? 'cumple' : 'NO cumple');
 
+// maxDDReferencia: número, o función del tramo fuera de muestra que usará el
+// walk-forward — ({ desde, hasta }) → número | { valor, mesaId } (o su
+// promesa) —, para medir la referencia justo en ese tramo sin recalcularlo.
+// sharpesPrevios: Sharpe anualizados de todos los ensayos anteriores (el
+// laboratorio los guarda); la varianza del DSR se calcula con ellos y los de
+// esta hipótesis.
 async function evaluarHipotesis(h, {
-  cargarVelas, contextoHistorico, ensayosPrevios = 0, retornosMesasActivas = {}, maxDDReferencia,
+  cargarVelas, contextoHistorico, ensayosPrevios = 0, sharpesPrevios = [], retornosMesasActivas = {}, maxDDReferencia,
   costes, limites, universo, familias = FAMILIAS, pesoMesa = 1, capital = 10000,
 } = {}) {
   const v = validarHipotesis(h, { universo, familias });
@@ -149,15 +182,17 @@ async function evaluarHipotesis(h, {
   criterios.push({ nombre: 'Ventanas de prueba en positivo', valor: fraccion, umbral: CRITERIOS.fraccionVentanas, ok: fraccion >= CRITERIOS.fraccionVentanas, positivas, total });
 
   // DSR en unidades DIARIAS: Sharpe diario de la curva OOS y varianza de los
-  // Sharpe anualizados de los ensayos pasada a diaria (÷ periodosAnio).
+  // Sharpe anualizados de TODOS los ensayos (los guardados y los de esta
+  // hipótesis) pasada a diaria (÷ periodosAnio).
   const rets = wf.oos.retornosDiarios.map(x => x.r);
   const mom = momentos(rets);
   const srDiario = mom.desviacion > 0 ? mom.media / mom.desviacion : NaN;
+  const todosSharpes = [...(Array.isArray(sharpesPrevios) ? sharpesPrevios : []), ...wf.sharpesEnsayos].filter(Number.isFinite);
   const dsr = sharpeDeflactado({
     sharpe: srDiario,
     n: rets.length,
     ensayos,
-    varianzaSharpes: varianzaMuestral(wf.sharpesEnsayos) / pa,
+    varianzaSharpes: varianzaMuestral(todosSharpes) / pa,
     asimetria: mom.asimetria,
     curtosis: mom.curtosis,
   });
@@ -165,12 +200,15 @@ async function evaluarHipotesis(h, {
 
   criterios.push({ nombre: 'Operaciones OOS', valor: m.operaciones, umbral: CRITERIOS.operacionesMin, ok: m.operaciones >= CRITERIOS.operacionesMin });
 
-  // Sin referencia de las mesas activas, la referencia es comprar y mantener
-  // el mismo universo en el mismo tramo OOS.
-  let ref = maxDDReferencia;
-  let fuenteRef = 'mesas activas';
+  // Referencia: la caída de la mesa vigente de la misma familia en el mismo
+  // tramo OOS; sin ella, comprar y mantener el mismo universo en ese tramo.
+  const tramo = { desde: wf.ventanas[0].desde, hasta: wf.ventanas[total - 1].hasta };
+  let ref = typeof maxDDReferencia === 'function' ? await maxDDReferencia(tramo) : maxDDReferencia;
+  let mesaRef = null;
+  if (ref && typeof ref === 'object') { mesaRef = ref.mesaId || null; ref = ref.valor; }
+  let fuenteRef = mesaRef ? `mesa ${mesaRef}` : 'mesa vigente de la familia';
   if (!(typeof ref === 'number' && ref > 0)) {
-    const bh = compraYMantener({ velas, capital, costes: cst, desde: wf.ventanas[0].desde, hasta: wf.ventanas[total - 1].hasta, periodosAnio: pa, marcoMs: comun.MARCOS[h.marco] });
+    const bh = compraYMantener({ velas, capital, costes: cst, desde: tramo.desde, hasta: tramo.hasta, periodosAnio: pa, marcoMs: comun.MARCOS[h.marco] });
     ref = bh.metricas.maxDD;
     fuenteRef = 'comprar y mantener';
   }
@@ -239,8 +277,26 @@ function indiceSemana(semana, n) {
   return n ? h % n : 0;
 }
 
-function generarHipotesis({ mesas = [], pistas = [], semana = '' } = {}) {
+// Firmas que no se pueden volver a proponer: las de `previas` (entradas del
+// laboratorio: { h, t } o hipótesis con t y, si la tiene, firma) de los
+// últimos `dias` días, y las de las mesas vivas contratadas de una hipótesis.
+function firmasBloqueadas({ previas = [], mesas = [], ahora = null, dias = DIAS_SIN_REPETIR } = {}) {
+  const desde = Number.isFinite(ahora) ? ahora - dias * DIA_MS : -Infinity;
+  const out = new Set();
+  for (const p of previas || []) {
+    if (!p) continue;
+    if (Number.isFinite(p.t) && p.t < desde) continue;
+    const f = p.firma || firmaHipotesis(p.h || p);
+    if (f) out.add(f);
+  }
+  for (const m of mesas || []) if (m && m.firmaHipotesis && m.estado !== 'banquillo') out.add(m.firmaHipotesis);
+  return out;
+}
+
+function generarHipotesis({ mesas = [], pistas = [], semana = '', previas = [], ahora = null, diasSinRepetir = DIAS_SIN_REPETIR } = {}) {
   const salida = [];
+  const bloqueadas = firmasBloqueadas({ previas, mesas, ahora, dias: diasSinRepetir });
+  const libre = h => { const f = firmaHipotesis(h); return !bloqueadas.has(f) && !salida.some(x => firmaHipotesis(x) === f); };
   const vistas = new Set();
   const porId = new Map(mesas.map(m => [m.id, m]));
   const ordenadas = [...(pistas || [])].sort((a, b) => (b.n - a.n) || String(a.mesaId).localeCompare(String(b.mesaId)) || String(a.categoria).localeCompare(String(b.categoria)));
@@ -272,6 +328,7 @@ function generarHipotesis({ mesas = [], pistas = [], semana = '' } = {}) {
       continue; // noticia, ejecucion y el resto no generan hipótesis
     }
     vistas.add(clave);
+    if (!libre(h)) continue; // ya evaluada en los últimos 90 días, o repetida esta semana
     salida.push(h);
   }
 
@@ -283,17 +340,18 @@ function generarHipotesis({ mesas = [], pistas = [], semana = '' } = {}) {
       if (!FAMILIAS[mesa.familia] || mesa.estado === 'banquillo') continue;
       for (const f of EXPLORACION) {
         if ((mesa.filtros || []).some(x => x.id === f.id)) continue;
-        candidatos.push({ mesa, f });
+        const h = base(mesa, semana, `explora-${f.id}`, 'exploracion', `Exploración semanal: ${mesa.id} con filtro ${f.id}${f.parametro === null ? '' : ` ${f.parametro}`}`);
+        h.filtros.push({ ...f });
+        // Se descartan ANTES de elegir: así el hueco lo aprovecha otro candidato.
+        if (libre(h)) candidatos.push(h);
       }
     }
-    if (candidatos.length) {
-      const { mesa, f } = candidatos[indiceSemana(semana, candidatos.length)];
-      const h = base(mesa, semana, `explora-${f.id}`, 'exploracion', `Exploración semanal: ${mesa.id} con filtro ${f.id}${f.parametro === null ? '' : ` ${f.parametro}`}`);
-      h.filtros.push({ ...f });
-      salida.push(h);
-    }
+    if (candidatos.length) salida.push(candidatos[indiceSemana(semana, candidatos.length)]);
   }
   return salida.slice(0, MAX_HIPOTESIS);
 }
 
-module.exports = { validarHipotesis, evaluarHipotesis, generarHipotesis, describirHipotesis, CRITERIOS, MAX_HIPOTESIS, EXPLORACION };
+module.exports = {
+  validarHipotesis, evaluarHipotesis, generarHipotesis, describirHipotesis, firmaHipotesis, firmasBloqueadas,
+  CRITERIOS, MAX_HIPOTESIS, EXPLORACION, DIAS_SIN_REPETIR,
+};

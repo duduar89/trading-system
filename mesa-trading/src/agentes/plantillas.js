@@ -16,24 +16,33 @@
 //   cierre({ etiqueta, pnl, pnlPct, motivoSalida, barras, rMultiple })
 //   stopSaltado({ etiqueta, precio, stop })
 //   informeComite(jefe, datos) o informeComite.<jefe>(datos), jefe ∈ controller|macro|riesgos|mesas|laboratorio|megafono
-//   decisionComite({ modo, multiplicadores: {mesaId: m}, vetos: [simbolo], fuente: 'llm'|'defecto' })
-//   directiva(d)  (una directiva del Megáfono, §6.5)
+//   decisionComite({ modo, multiplicadores: {mesaId: m}, vetos: [simbolo], fuente: 'llm'|'defecto' }, mesas?)
+//   directiva(d, mesas?)  (una directiva del Megáfono, §6.5)
+//     mesas: [{ id, nombre }] opcional; con ella se escribe el nombre de la mesa
+//     («Reversión RSI») en vez de su id («reversion», «lab3»).
 //   leccion({ mesaId, etiqueta, categoria, pnl, barras, leccion })
 //   hipotesis({ id, familia, marco, universo, filtros, origen })
 //   resultadoHipotesis({ id, aprobada, criterios: [{ nombre, valor, umbral, ok }] })
 //   contratacion({ nombre, familia, peso, universo })
 //   despido({ nombre, motivo })
-//   informeDiario({ dia, patrimonio, pnlDia, pnlDiaPct, operaciones, acierto, gastoLLMUsd })
+//   informeDiario({ dia, desde?, hasta?, patrimonio, pnlDia, pnlDiaPct, operaciones, acierto, gastoLLMUsd })
+//     desde/hasta (ms): tramo que cubre el cierre; si no dura 24 h (±30 min),
+//     se escribe el tramo en vez del día. gastoLLMUsd null: no se dice.
 //   informeSemanal({ rentabilidad, sharpe90Fondo, sharpe90SinComite, sharpe90Btc })
 //   descanso({ minutos })
 //   killSwitch({ motivo })
 //   soloCerrar({ motivo, hasta })
-//   reabrir({ quien })
+//   reabrir({ quien, patrimonio?, pico? })  (con las dos cifras, dice cuánto
+//     acumula el fondo desde su máximo histórico)
 //   conciliacion({ acciones: [{ tipo, simbolo }], grave })
 
 const f = require('../util/formato');
 
 const MAX = 140;
+const MIN = 60_000;
+const HORA = 60 * MIN;
+const DIA = 24 * HORA;
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 // Una frase: espacios normalizados y, como mucho, 140 caracteres. Se corta
 // por un separador, nunca a mitad de un número: «54…» se leería como cifra.
@@ -67,6 +76,21 @@ const CATEGORIA_TEXTO = {
 };
 
 const MOTIVO_SALIDA = { señal: 'por señal', stop: 'por stop', kill: 'por kill switch', riesgo: 'por riesgo', manual: 'a mano', prueba: 'de prueba', fin: 'al final' };
+
+// Nombre de una mesa para el humano: el de la lista si está, si no su id.
+function nombreMesa(id, mesas) {
+  const m = Array.isArray(mesas) ? mesas.find(x => x && x.id === id) : null;
+  return t((m && m.nombre) || id);
+}
+
+// «02-jun 00:05» en UTC (el día de los cierres es el día UTC).
+function momentoUTC(ms) {
+  const d = new Date(ms);
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${dd}-${MESES[d.getUTCMonth()]} ${hh}:${mm}`;
+}
 
 function lista(xs, max = 4) {
   const v = (xs || []).map(x => t(x, '')).filter(Boolean);
@@ -188,26 +212,28 @@ function informeComite(jefe, datos) {
 }
 Object.assign(informeComite, INFORMES);
 
-function decisionComite({ modo, multiplicadores, vetos, fuente } = {}) {
+function decisionComite({ modo, multiplicadores, vetos, fuente } = {}, mesas = null) {
   const porValor = { 0: [], 0.5: [] };
-  for (const [id, m] of Object.entries(multiplicadores || {})) if (m === 0 || m === 0.5) porValor[m].push(id);
-  const partes = [`Decisión: modo ${t(modo, 'NORMAL')}.`];
-  if (porValor[0.5].length) partes.push(`Mesas a la mitad: ${lista(porValor[0.5], 3)}.`);
+  for (const [id, m] of Object.entries(multiplicadores || {})) if (m === 0 || m === 0.5) porValor[m].push(nombreMesa(id, mesas));
+  // De más a menos grave, con «(plan por defecto)» en la cabeza: con nombres
+  // de mesa largos, lo que se recorta es lo último, las mesas a la mitad.
+  const partes = [`Decisión: modo ${t(modo, 'NORMAL')}${fuente === 'defecto' ? ' (plan por defecto)' : ''}.`];
   if (porValor[0].length) partes.push(`Mesas paradas: ${lista(porValor[0], 3)}.`);
   if (vetos && vetos.length) partes.push(`Vetos 24 h: ${lista(vetos.map(etq), 3)}.`);
-  if (fuente === 'defecto') partes.push('(plan por defecto)');
+  if (porValor[0.5].length) partes.push(`Mesas a la mitad: ${lista(porValor[0.5], 3)}.`);
   return frase(partes.join(' '));
 }
 
-function directiva(d = {}) {
+function directiva(d = {}, mesas = null) {
+  d = d || {};
   const h = fin(d.horas) ? ` durante ${f.numero(d.horas)} h` : '';
   switch (d.tipo) {
     case 'reducir_riesgo': return frase(`Reducir el tamaño de las entradas al ${f.pct(d.factor, { decimales: 0 })}${h}.`);
     case 'pausar_activo': return frase(`No abrir en ${etq(d.simbolo)}${h}.`);
-    case 'pausar_mesa': return frase(`Pausar la mesa ${t(d.mesaId)}${h}.`);
+    case 'pausar_mesa': return frase(`Pausar la mesa ${nombreMesa(d.mesaId, mesas)}${h}.`);
     case 'solo_cerrar': return frase(`Solo cerrar posiciones, sin abrir nada${h}.`);
     case 'reanudar_activo': return frase(`Quitar la pausa del Megáfono en ${etq(d.simbolo)}.`);
-    case 'reanudar_mesa': return frase(`Quitar la pausa del Megáfono a la mesa ${t(d.mesaId)}.`);
+    case 'reanudar_mesa': return frase(`Quitar la pausa del Megáfono a la mesa ${nombreMesa(d.mesaId, mesas)}.`);
     case 'sin_efecto': return frase(`Sin efecto: ${t(d.motivo, 'no hay nada que aplicar')}.`.replace(/\.\.$/, '.'));
     default: return frase('Directiva desconocida: no se aplica.');
   }
@@ -244,14 +270,23 @@ function contratacion({ nombre, familia, peso, universo } = {}) {
   return frase(`Contratada la mesa ${t(nombre)} (${t(familia)})${u}, en incubación con ${f.pct(peso, { decimales: 0 })} del capital.`);
 }
 
+// Con peso 0, la sombra de la mesa dimensiona con 0 $ y ya no abre nada: lo
+// que tenga abierto en sombra solo se cierra por su regla. Lo que pasa de
+// verdad va delante, para que un motivo largo no lo corte.
 function despido({ nombre, motivo } = {}) {
-  return frase(`Mesa ${t(nombre)} al banquillo: ${t(motivo, 'resultados por debajo del umbral')}. Sigue en sombra.`);
+  const m = String(t(motivo, 'resultados por debajo del umbral')).replace(/[.\s]+$/, '');
+  return frase(`Mesa ${t(nombre)} al banquillo (cierra sus puestos y no abre nada nuevo, ni en sombra): ${m}.`);
 }
 
-function informeDiario({ dia, patrimonio, pnlDia, pnlDiaPct, operaciones, acierto, gastoLLMUsd } = {}) {
+function informeDiario({ dia, desde, hasta, patrimonio, pnlDia, pnlDiaPct, operaciones, acierto, gastoLLMUsd } = {}) {
   const ac = fin(acierto) ? `, acierto ${f.pct(acierto, { decimales: 0 })}` : '';
   const llm = fin(gastoLLMUsd) ? ` LLM ${f.usd(gastoLLMUsd)}.` : '';
-  return frase(`Cierre ${t(dia)}: ${f.usd(patrimonio)} (${f.usd(pnlDia, { signo: true })}, ${f.pct(pnlDiaPct, { signo: true })}). `
+  // Un cierre que llega tarde (portátil apagado a las 00:05) cubre más de un
+  // día: se dice el tramo real en vez de ponerle la fecha de un solo día.
+  const tramo = fin(desde) && fin(hasta) && hasta > desde && Math.abs(hasta - desde - DIA) > 30 * MIN
+    ? `(${momentoUTC(desde)} → ${momentoUTC(hasta)} UTC, ${f.numero(Math.round((hasta - desde) / HORA))} h)`
+    : t(dia);
+  return frase(`Cierre ${tramo}: ${f.usd(patrimonio)} (${f.usd(pnlDia, { signo: true })}, ${f.pct(pnlDiaPct, { signo: true })}). `
     + `${f.numero(fin(operaciones) ? operaciones : 0)} operaciones${ac}.${llm}`);
 }
 
@@ -273,8 +308,16 @@ function soloCerrar({ motivo, hasta } = {}) {
   return frase(`Solo cerrar ${h}: ${t(motivo, 'límite de pérdida')}.`);
 }
 
-function reabrir({ quien } = {}) {
-  return frase(`Reabierto por ${t(quien, 'un humano')}. Conciliación limpia; vuelta a nivel normal.`);
+// Reabrir no borra el máximo histórico: el mensaje dice con cifras cuánto
+// acumula el fondo desde él (el vigilante mide aparte desde la reapertura).
+function reabrir({ quien, patrimonio, pico } = {}) {
+  const q = t(quien, 'un humano');
+  if (!fin(patrimonio) || !fin(pico) || !(pico > 0)) return frase(`Reabierto por ${q}. Conciliación limpia; vuelta a nivel normal.`);
+  const maximo = Math.max(pico, patrimonio);
+  const perdida = maximo - patrimonio;
+  const cabeza = `Reabierto por ${q}.`;
+  if (perdida < 0.005) return frase(`${cabeza} El fondo está en su máximo histórico (${f.usd(maximo)}).`);
+  return frase(`${cabeza} El fondo sigue un ${f.pct(perdida / maximo)} (${f.usd(perdida)}) por debajo de su máximo histórico (${f.usd(maximo)}).`);
 }
 
 function conciliacion({ acciones, grave } = {}) {

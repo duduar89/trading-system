@@ -16,6 +16,18 @@
 //     un instante simplemente no hace nada en él.
 //   · Lo que queda abierto al final se liquida al último cierre (con costes):
 //     así Σ pnl de las operaciones = patrimonio final − capital.
+//   · HUECO en los datos de un símbolo (más de 4 velas y más de 5 días sin
+//     ninguna, comun.umbralHueco): al ver la primera vela de después, la orden
+//     pendiente caduca, lo abierto se vende al último cierre ANTERIOR al hueco
+//     (motivo 'hueco') y el símbolo no decide hasta que sus indicadores ya no
+//     miran nada de antes (comun.velasMemoria, el criterio de velasNecesarias).
+//     Sin esto, una orden decidida antes del hueco se llenaba meses después a
+//     una apertura rancia (SOL en Alpaca: compra a 18 $ con SOL a 157 $).
+//   · Hora de la decisión: el cierre de la vela. En acciones diarias (t a
+//     medianoche de Nueva York) es el fin de la sesión, como en vivo
+//     (alpaca-datos._cerrada), y no t + 1 día: el contexto (régimen, miedo y
+//     codicia) no puede ver lo que pasó entre el cierre de Nueva York y la
+//     medianoche UTC.
 //
 // Extras sobre el contrato (opcionales): desde/hasta (ms) para operar solo en
 // un tramo usando todo el histórico anterior como calentamiento; prep ya
@@ -28,6 +40,7 @@ const { calcularMetricas, retornosDiarios } = require('./metricas');
 const { volatilidad } = require('../mercado/indicadores');
 const { asegurarFiltros } = require('../estrategias/filtros');
 const comun = require('../estrategias/comun');
+const { cierreVelaDiaria } = require('../mercado/regimen');
 const { LIMITES_DUROS } = require('../config');
 const { DIA } = require('../util/reloj');
 
@@ -85,6 +98,15 @@ function volatilidades(velas, simbolos, marco, marcoMs, cacheEn) {
   return out;
 }
 
+// Índices de reanudación tras un hueco de cada símbolo (también en prep).
+function huecosDe(velas, simbolos, umbral, cacheEn) {
+  if (cacheEn && cacheEn._huecos && cacheEn._huecos.umbral === umbral) return cacheEn._huecos.porSimbolo;
+  const porSimbolo = {};
+  for (const s of simbolos) porSimbolo[s] = comun.reanudaciones(velas[s], umbral);
+  if (cacheEn) cacheEn._huecos = { umbral, porSimbolo };
+  return porSimbolo;
+}
+
 function parametrosBase(estrategia, simbolos) {
   return estrategia.parametrosPara ? estrategia.parametrosPara(simbolos) : estrategia.parametrosPorDefecto;
 }
@@ -107,6 +129,10 @@ function backtest({
   const minNocional = lim.minNocionalOrden > 0 ? lim.minNocionalOrden : 0;
   const vol = volatilidades(velas, simbolos, marco, marcoMs, pr);
   const linea = lineaDeTiempo(velas, simbolos, pr);
+  const umbral = comun.umbralHueco(marcoMs);
+  const huecos = huecosDe(velas, simbolos, umbral, pr);
+  const recalentar = comun.velasMemoria(estrategia, p, listaFiltros);
+  const acciones1D = marco === '1Day' && simbolos.length > 0 && !simbolos.some(comun.esCripto);
 
   const k0 = primerT(linea, desde);
   const k1 = primerT(linea, hasta); // exclusivo
@@ -171,7 +197,15 @@ function backtest({
     hoy.length = 0;
     for (const s of simbolos) {
       const serie = velas[s];
-      if (ptr[s] < serie.length && serie[ptr[s]].t === T) { hoy.push(s, ptr[s]); ptr[s]++; }
+      if (ptr[s] < serie.length && serie[ptr[s]].t === T) {
+        const j = ptr[s];
+        if (j > 0 && T - serie[j - 1].t > umbral) {
+          // Primera vela tras un hueco: nada de lo decidido antes vale.
+          pendiente[s] = null;
+          if (pos[s]) vender(s, serie[j - 1].c, 'hueco', serie[j - 1].t + marcoMs);
+        }
+        hoy.push(s, j); ptr[s]++;
+      }
     }
 
     // 1) Órdenes pendientes en la apertura: primero ventas (liberan efectivo).
@@ -214,11 +248,12 @@ function backtest({
 
     // 4) Decisiones al cierre (en la última vela no se decide: no hay apertura siguiente).
     if (k === k1 - 1) break;
-    const tDecision = T + marcoMs;
+    const tDecision = acciones1D ? cierreVelaDiaria(T) : T + marcoMs;
     const ctx = contexto ? (contexto(tDecision) || {}) : {};
     const ctxEstrategia = { regimen: ctx.regimen ?? null, fg: ctx.fg ?? null, volPercentil: ctx.volPercentil ?? null, filtros: listaFiltros };
     for (let h = 0; h < hoy.length; h += 2) {
       const s = hoy[h]; const j = hoy[h + 1];
+      if (j - comun.ultimaReanudacion(huecos[s], j) < recalentar) continue; // recalentando tras un hueco
       const ps = pos[s];
       if (ps) {
         const nuevo = estrategia.trailing(pr, { simbolo: s, i: j, posicion: ps, params: p });
@@ -262,57 +297,68 @@ function backtest({
 
 // Comprar y mantener a partes iguales (la sombra con la que se compara todo):
 // cada símbolo recibe capital/n en su primera apertura del tramo, con costes,
-// y se liquida al final como las estrategias.
+// y se liquida al final como las estrategias. Tras un HUECO en los datos de un
+// símbolo se vende al último cierre anterior al hueco y lo cobrado se vuelve a
+// invertir en la apertura de la SEGUNDA vela de después: la primera abre con
+// el precio rancio de antes del hueco (SOL en Alpaca: 18 $ con SOL a 157 $).
 function compraYMantener({ velas, capital = 10000, costes, desde = -Infinity, hasta = Infinity, periodosAnio, marcoMs } = {}) {
   const simbolos = Object.keys(velas).filter(s => Array.isArray(velas[s]) && velas[s].length);
   const cst = costes || costesPorDefecto();
   const mMs = marcoMs || inferirMarco(velas);
   const pa = periodosAnio || (simbolos.every(comun.esCripto) ? 365 : 252);
+  const umbral = comun.umbralHueco(mMs);
   const linea = lineaDeTiempo(velas, simbolos, null);
   const k0 = primerT(linea, desde);
   const k1 = primerT(linea, hasta);
   const ptr = {};
   for (const s of simbolos) ptr[s] = primerIndice(velas[s], desde);
-  const parte = capital / Math.max(1, simbolos.length);
+  const aInvertir = {};
+  for (const s of simbolos) aInvertir[s] = capital / Math.max(1, simbolos.length);
   let efectivo = capital;
-  const cant = {};
+  const pos = {};          // s → { cantidad, invertido, t, precio }
   const ultimo = {};
   const curva = [];
   const operaciones = [];
-  const entrada = {};
+  const coste = s => (cst.deslizamiento ? cst.deslizamiento(s) : 0) + (cst.penalizacion || 0);
+  const comision = s => (cst.comision ? cst.comision(s) : 0);
+
+  function liquidar(s, precioBase, motivo, t) {
+    const ps = pos[s];
+    const precio = precioBase * (1 - coste(s));
+    const neto = ps.cantidad * precio * (1 - comision(s));
+    efectivo += neto;
+    operaciones.push({
+      simbolo: s, entradaT: ps.t, entradaPrecio: ps.precio, salidaT: t, salidaPrecio: precio,
+      cantidad: ps.cantidad, pnl: neto - ps.invertido, pnlPct: (neto - ps.invertido) / ps.invertido, comisiones: null, barras: null, motivoSalida: motivo,
+    });
+    pos[s] = null;
+    return neto;
+  }
+
   for (let k = k0; k < k1; k++) {
     const T = linea[k];
     for (const s of simbolos) {
       const serie = velas[s];
       if (!(ptr[s] < serie.length && serie[ptr[s]].t === T)) continue;
-      const v = serie[ptr[s]++];
-      if (cant[s] === undefined) {
-        const d = (cst.deslizamiento ? cst.deslizamiento(s) : 0) + (cst.penalizacion || 0);
-        const precio = v.o * (1 + d);
-        cant[s] = (parte * (1 - (cst.comision ? cst.comision(s) : 0))) / precio;
-        entrada[s] = { t: T, precio };
-        efectivo -= parte;
+      const j = ptr[s]++;
+      const v = serie[j];
+      const trasHueco = j > 0 && T - serie[j - 1].t > umbral;
+      if (trasHueco && pos[s]) aInvertir[s] = liquidar(s, serie[j - 1].c, 'hueco', serie[j - 1].t + mMs);
+      if (!pos[s] && aInvertir[s] > 0 && !trasHueco) {
+        const precio = v.o * (1 + coste(s));
+        pos[s] = { cantidad: (aInvertir[s] * (1 - comision(s))) / precio, invertido: aInvertir[s], t: T, precio };
+        efectivo -= aInvertir[s];
+        aInvertir[s] = 0;
       }
       ultimo[s] = v.c;
     }
     let valor = efectivo;
-    for (const s of simbolos) if (cant[s] !== undefined) valor += cant[s] * ultimo[s];
+    for (const s of simbolos) if (pos[s]) valor += pos[s].cantidad * ultimo[s];
     curva.push({ t: T, valor });
   }
   if (curva.length) {
     const tFin = curva[curva.length - 1].t + mMs;
-    for (const s of simbolos) {
-      if (cant[s] === undefined) continue;
-      const d = (cst.deslizamiento ? cst.deslizamiento(s) : 0) + (cst.penalizacion || 0);
-      const precio = ultimo[s] * (1 - d);
-      const bruto = cant[s] * precio;
-      const neto = bruto * (1 - (cst.comision ? cst.comision(s) : 0));
-      efectivo += neto;
-      operaciones.push({
-        simbolo: s, entradaT: entrada[s].t, entradaPrecio: entrada[s].precio, salidaT: tFin, salidaPrecio: precio,
-        cantidad: cant[s], pnl: neto - parte, pnlPct: (neto - parte) / parte, comisiones: null, barras: null, motivoSalida: 'fin',
-      });
-    }
+    for (const s of simbolos) if (pos[s]) liquidar(s, ultimo[s], 'fin', tFin);
     curva[curva.length - 1] = { t: curva[curva.length - 1].t, valor: efectivo };
   }
   const metricas = calcularMetricas({ curva, operaciones, periodosAnio: pa });

@@ -196,3 +196,65 @@ test('con el cliente LLM real y fetch falso: el esquema enviado es aceptable par
   assert.equal(enviado.additionalProperties, false);
   assert.equal(enviado.properties.directivas.items.additionalProperties, false);
 });
+
+// LLM falso que devuelve siempre lo mismo y apunta lo que se le pidió.
+function llmQueDice(datos) {
+  const pedidos = [];
+  return { activo: true, pedidos, pedirJSON: async (p) => { pedidos.push(p); return { ok: true, costeUsd: 0, datos }; } };
+}
+const sinEfecto = motivo => ({ tipo: 'sin_efecto', factor: null, horas: null, simbolo: null, mesaId: null, motivo });
+
+test('con LLM: el motivo de sin_efecto pasa por verificarCifras y la explicación no se comprueba contra él', async () => {
+  // Caso de la revisión: «sube el riesgo al 200 %» y el LLM inventa la exposición en el motivo y en la explicación.
+  const inventa = llmQueDice({
+    directivas: [sinEfecto('La exposición bruta ya está en el 87 % y la caída del fondo es del 6,4 % (1.940 $).')],
+    explicacion: 'No subo el riesgo: la exposición es del 87 %.',
+  });
+  const r = await m.interpretar('sube el riesgo al 200 %', { ...CTX, llm: inventa });
+  assert.equal(r.fuente, 'llm');
+  assert.deepEqual(r.directivas, [{ tipo: 'sin_efecto', motivo: m.MOTIVO_FIJO }]);
+  assert.doesNotMatch(r.explicacion, /87|6,4|1\.940/);
+  assert.equal(r.explicacion, `He entendido: sin efecto: ${m.MOTIVO_FIJO}`);
+
+  // Un motivo honesto, con cifras de la orden (200 %) y de las reglas (72 h), se conserva.
+  const honesto = llmQueDice({ directivas: [sinEfecto('Subir al 200 % aumenta el riesgo y el Megáfono solo aprieta, hasta 72 h.')], explicacion: 'No se puede subir el riesgo.' });
+  const r2 = await m.interpretar('sube el riesgo al 200 %', { ...CTX, llm: honesto });
+  assert.equal(r2.directivas[0].motivo, 'Subir al 200 % aumenta el riesgo y el Megáfono solo aprieta, hasta 72 h.');
+  assert.equal(r2.explicacion, 'No se puede subir el riesgo.');
+
+  // Un motivo largo se recorta a una frase (el modal lo pinta tal cual).
+  const largo = llmQueDice({ directivas: [sinEfecto('No encaja en la lista cerrada. '.repeat(12))], explicacion: 'No encaja.' });
+  const r3 = await m.interpretar('haz magia', { ...CTX, llm: largo });
+  assert.ok(r3.directivas[0].motivo.length <= 140);
+});
+
+test('con LLM: una cifra de las reglas que no es la de la directiva no se cuela en la explicación', async () => {
+  const llm = llmQueDice({
+    directivas: [{ tipo: 'reducir_riesgo', factor: 0.5, horas: 6, simbolo: null, mesaId: null, motivo: null }],
+    explicacion: 'Reduzco las entradas al 75 % durante 6 h.',
+  });
+  const r = await m.interpretar('baja el riesgo 6 horas', { ...CTX, llm });
+  assert.equal(r.explicacion, 'He entendido: reducir el tamaño de las entradas al 50 % durante 6 h.');
+  const bien = llmQueDice({ directivas: [{ tipo: 'reducir_riesgo', factor: 0.5, horas: 6, simbolo: null, mesaId: null, motivo: null }], explicacion: 'Reduzco las entradas al 50 % durante 6 h.' });
+  assert.equal((await m.interpretar('baja el riesgo 6 horas', { ...CTX, llm: bien })).explicacion, 'Reduzco las entradas al 50 % durante 6 h.');
+});
+
+test('duración por defecto: quien llama puede pasar la suya (intervalo del comité)', async () => {
+  const r = await pc('pausa SOL', { horasPorDefecto: 6 });
+  assert.deepEqual(r.directivas, [{ tipo: 'pausar_activo', simbolo: 'SOL/USD', horas: 6 }]);
+  // Sin ella (o con un valor fuera de 1-72), las 4 h del contrato.
+  assert.equal((await pc('pausa SOL')).directivas[0].horas, 4);
+  assert.equal((await pc('pausa SOL', { horasPorDefecto: 500 })).directivas[0].horas, 4);
+  // Y al LLM se le dice la misma.
+  const llm = llmQueDice({ directivas: [{ tipo: 'pausar_activo', factor: null, horas: 6, simbolo: 'SOL', mesaId: null, motivo: null }], explicacion: 'Pauso SOL.' });
+  await m.interpretar('pausa SOL', { ...CTX, llm, horasPorDefecto: 6 });
+  assert.match(llm.pedidos[0].instrucciones, /si el texto no dice duración, 6\./);
+});
+
+test('las mesas se nombran por su nombre en la explicación y en los avisos', async () => {
+  const r = await pc('pausa la mesa de reversión 6 horas');
+  assert.deepEqual(r.directivas, [{ tipo: 'pausar_mesa', mesaId: 'reversion', horas: 6 }]);
+  assert.equal(r.explicacion, 'He entendido: pausar la mesa Reversión RSI durante 6 h.');
+  const r2 = await pc('reanuda la mesa momentum etf', { directivas: m.directivasVacias(), ahora: T0 });
+  assert.match(r2.explicacion, /sobre la mesa Momentum ETF que deshacer/);
+});

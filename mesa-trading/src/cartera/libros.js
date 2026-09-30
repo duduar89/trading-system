@@ -166,8 +166,10 @@ class Libros {
     if (lado !== 'compra' && lado !== 'venta') throw new Error(`Libros: lado inválido «${lado}»`);
     if (!positivo(cantidad)) throw new Error(`Libros: cantidad inválida ${cantidad} en ${puestoId}`);
     if (!positivo(precio)) throw new Error(`Libros: precio inválido ${precio} en ${puestoId}`);
-    // Alpaca cripto da la comisión como null (la cobra en el activo): se
-    // cuenta 0 aquí y la diferencia la corrige escalarSimbolo al conciliar.
+    // La comisión llega en dólares: la del simulado, o la ESTIMADA por
+    // AlpacaBroker (comisionEstimada), que ya da la cantidad neta de lo cobrado
+    // en el activo. Sin número (una orden cripto sin nada ejecutado) cuenta 0;
+    // lo que quede de diferencia lo corrige escalarSimbolo al conciliar.
     const com = esNumero(comision) ? comision : 0;
 
     if (idCliente) {

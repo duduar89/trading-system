@@ -184,3 +184,58 @@ test('la firma del plano cambia al contratar una mesa y no con los precios', () 
   otra.puestos.push({ id: 'nueva-BTC', mesaId: 'nueva' });
   assert.notEqual(mapa.firmaEstructura(otra), f1);
 });
+
+// Con las mesas que va contratando el laboratorio (o con Alpaca: 6 + las
+// contratadas) el parqué no puede apretar las filas hasta que una silla caiga
+// encima de la mesa de detrás ni juntar mesas sin decir cuál es cuál.
+function comprobarParque(n) {
+  const m = mapa.construirMapa(conMesas(n));
+  const geo = Array.from(m.puestos.values());
+  const filas = Array.from(new Set(geo.map(p => p.f0))).sort((a, b) => a - b);
+  assert.ok(filas.length <= mapa.MAX_FILAS_PARQUE, `${n} mesas: ${filas.length} filas`);
+  for (let k = 1; k < filas.length; k++) assert.ok(filas[k] - filas[k - 1] >= 1.94 - 1e-9, `${n} mesas: paso ${filas[k] - filas[k - 1]}`);
+  const mesasParque = m.muebles.filter(x => x.tipo === 'mesa' && x.sala === 'parque');
+  const sillas = m.muebles.filter(x => (x.tipo === 'silla' || x.tipo === 'respaldo') && x.sala === 'parque');
+  const solapa = (a, b) => a.c0 < b.c1 - 1e-6 && b.c0 < a.c1 - 1e-6 && a.f0 < b.f1 - 1e-6 && b.f0 < a.f1 - 1e-6;
+  for (const s of sillas) for (const me of mesasParque) assert.ok(!solapa(s, me), `${n} mesas: ${s.id} encima de ${me.id}`);
+  for (const g of geo) {
+    for (const me of mesasParque) {
+      if (me.id === g.mesaMueble) continue;
+      const dentro = g.sitio.col > me.c0 && g.sitio.col < me.c1 && g.sitio.fila > me.f0 && g.sitio.fila < me.f1;
+      assert.ok(!dentro, `${n} mesas: el operador de ${g.puestoId} sentado dentro de ${me.id}`);
+    }
+    assert.equal(mapa.salaEn(g.c1 - 0.01, g.f1 + 0.9), 'parque', `${g.puestoId} cabe en el parqué con su silla`);
+  }
+  // Rótulos: todos los de una fila a la izquierda de la fila (ningún puesto de
+  // otra mesa a su izquierda), apilados por orden y, si la fila es compartida,
+  // diciendo de qué activo a qué activo va su tramo.
+  for (const f of filas) {
+    const enFila = geo.filter(p => p.f0 === f).sort((a, b) => a.c0 - b.c0);
+    const rotulos = m.rotulosFila.filter(r => Math.abs(r.fila - (f + 0.18)) < 1e-9);
+    const minC0 = Math.min(...enFila.map(p => p.c0));
+    assert.deepEqual(rotulos.map(r => r.orden), rotulos.map((_, k) => k), `fila ${f}: orden de apilado`);
+    for (const r of rotulos) {
+      assert.ok(r.col < minC0, `fila ${f}: el rótulo de ${r.mesaId} tiene puestos a su izquierda`);
+      assert.equal(r.compartida, rotulos.length > 1);
+      const suyos = enFila.filter(p => p.mesaId === r.mesaId);
+      assert.deepEqual([r.desde, r.hasta], [suyos[0].etiqueta, suyos[suyos.length - 1].etiqueta]);
+    }
+    // Media tesela de pasillo entre dos mesas que comparten fila.
+    for (let k = 1; k < enFila.length; k++) {
+      if (enFila[k].mesaId !== enFila[k - 1].mesaId) assert.ok(enFila[k].c0 - enFila[k - 1].c1 >= mapa.HUECO_ENTRE_MESAS - 1e-9, `fila ${f}: sin pasillo entre mesas`);
+    }
+  }
+  return { m, filas };
+}
+
+test('7 mesas: filas compartidas con rótulos apilados a la izquierda y pasillo entre mesas', () => {
+  const { m } = comprobarParque(7);
+  assert.ok(m.rotulosFila.some(r => r.compartida && r.orden === 1), 'alguna fila compartida');
+});
+
+test('12 y 16 mesas: nunca más de 6 filas, paso ≥ 1,94 y ninguna silla encima de otra mesa', () => {
+  for (const n of [12, 16]) {
+    const { m } = comprobarParque(n);
+    assert.equal(m.puestos.size, conMesas(n).puestos.length);
+  }
+});

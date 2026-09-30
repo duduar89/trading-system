@@ -37,8 +37,20 @@ test('reglas fijas: una operación por rama, en el orden del contrato', () => {
 
 test('la lección de las reglas lleva cifras de la operación y pasa su propia comprobación', () => {
   const r = pm.clasificarReglas(op({ motivoSalida: 'stop', barras: 2 }));
-  assert.equal(r.leccion, 'SOL tocó el stop en 2 velas y perdió -45,20 $.');
+  assert.equal(r.leccion, 'SOL tocó el stop en 2 velas y perdió 45,20 $.');
   assert.ok(r.leccion.length <= 140);
+});
+
+test('lecciones por reglas: «perdió»/«ganó» con el importe sin signo, sin doble negativo', () => {
+  const l = cambios => pm.clasificarReglas(op(cambios)).leccion;
+  assert.equal(l({ pnl: -1234.5 }), 'SOL perdió 1.235 $: la señal no se confirmó.');
+  assert.equal(l({ regimenEntrada: 'RISK-OFF' }), 'SOL entró en RISK-OFF y perdió 45,20 $.');
+  assert.equal(l({ deslizamiento: 0.006 }), 'SOL perdió 45,20 $ con 0,60 % de deslizamiento en contra.');
+  assert.equal(l({ pnl: 120, motivoSalida: 'kill' }), 'SOL ganó 120,00 $ pero salió por kill, no por su regla.');
+  // La frase neutra sí lleva el signo.
+  assert.equal(l({ pnl: 120 }), 'SOL salió por regla con +120,00 $: la regla funcionó como estaba escrita.');
+  assert.equal(l({ pnl: null }), 'SOL perdió —: la señal no se confirmó.');
+  for (const pnl of [-45.2, -1234.5, 0]) assert.doesNotMatch(l({ pnl }), /perdió -/);
 });
 
 test('lote sin LLM: todo por reglas y [] si no hay operaciones', async () => {
@@ -79,7 +91,7 @@ test('lote con LLM: enum de categorías, una llamada, lección comprobada contra
   };
   const r = await pm.lote({ operaciones: ops, llm });
   assert.equal(llamadas, 1);
-  assert.deepEqual(r[0], { operacionId: 'op-1', mesaId: 'tendencia', simbolo: 'SOL/USD', categoria: 'noticia', leccion: 'SOL perdió 45,20 $ tras un titular.', fuente: 'llm' });
+  assert.deepEqual(r[0], { operacionId: 'op-1', mesaId: 'tendencia', simbolo: 'SOL/USD', motivoSalida: 'señal', categoria: 'noticia', leccion: 'SOL perdió 45,20 $ tras un titular.', fuente: 'llm' });
   assert.equal(r[1].fuente, 'reglas');
   assert.equal(r[1].categoria, 'stop_estrecho');
   assert.equal(r[2].fuente, 'reglas');
@@ -114,4 +126,51 @@ test('hipotesisDesdeLecciones: (mesa × categoría) con n ≥ 5, sin aciertos ni
     { mesaId: 'tendencia', categoria: 'stop_estrecho', n: 5 },
   ]);
   assert.deepEqual(pm.hipotesisDesdeLecciones([]), []);
+});
+
+test('lote con LLM: una perdedora no puede salir como «suerte» ni con el signo o el verbo cambiados', async () => {
+  // Caso de la revisión: pnl −45,20 y el LLM escribe «ganó +45,20 $ (+1,13 %)» con categoría suerte.
+  const perdedora = op({ id: 'op-1', pnl: -45.2, pnlPct: -0.0113 });
+  const ganadora = op({ id: 'op-2', pnl: 45.2, pnlPct: 0.0113, motivoSalida: 'señal' });
+  const respuestas = [
+    { operacionId: 'op-1', categoria: 'suerte', leccion: 'SOL ganó +45,20 $ (+1,13 %) sin seguir la regla.' },
+    { operacionId: 'op-2', categoria: 'señal_falsa', leccion: 'SOL perdió 45,20 $.' },
+  ];
+  const llm = { activo: true, pedirJSON: async () => ({ ok: true, costeUsd: 0, datos: { clasificaciones: respuestas } }) };
+  const r = await pm.lote({ operaciones: [perdedora, ganadora], llm });
+  assert.equal(r[0].fuente, 'reglas');
+  assert.equal(r[0].categoria, 'señal_falsa');
+  assert.equal(r[0].leccion, 'SOL perdió 45,20 $: la señal no se confirmó.');
+  assert.equal(r[1].fuente, 'reglas');
+  assert.equal(r[1].categoria, 'acierto_de_libro');
+
+  // Categoría compatible, pero la cifra con signo cambiado o el verbo contrario: reglas.
+  const casos = [
+    ['señal_falsa', 'SOL cerró con +45,20 $ tras una señal falsa.'],
+    ['señal_falsa', 'SOL ganó 45,20 $ con una señal falsa.'],
+  ];
+  for (const [categoria, leccion] of casos) {
+    const llm2 = { activo: true, pedirJSON: async () => ({ ok: true, costeUsd: 0, datos: { clasificaciones: [{ operacionId: 'op-1', categoria, leccion }] } }) };
+    const [x] = await pm.lote({ operaciones: [perdedora], llm: llm2 });
+    assert.equal(x.fuente, 'reglas', leccion);
+  }
+  // Y una lección honesta de la misma perdedora sí pasa.
+  const llm3 = { activo: true, pedirJSON: async () => ({ ok: true, costeUsd: 0, datos: { clasificaciones: [{ operacionId: 'op-1', categoria: 'señal_falsa', leccion: 'SOL perdió 45,20 $ (-1,13 %): la ruptura no siguió.' }] } }) };
+  assert.equal((await pm.lote({ operaciones: [perdedora], llm: llm3 }))[0].fuente, 'llm');
+});
+
+test('pistas: las operaciones cerradas por kill, a mano o de prueba no cuentan', async () => {
+  // lote() deja el motivo de salida en cada lección para poder apartarlas.
+  const lecc = await pm.lote({ operaciones: [op({ id: 'k1', motivoSalida: 'kill' })], llm: null });
+  assert.equal(lecc[0].motivoSalida, 'kill');
+  assert.equal(lecc[0].categoria, 'señal_falsa');
+  const lecciones = [
+    ...Array(6).fill({ mesaId: 'tendencia', categoria: 'señal_falsa', motivoSalida: 'kill' }),
+    ...Array(5).fill({ mesaId: 'momentum', categoria: 'señal_falsa', motivoSalida: 'manual' }),
+    ...Array(5).fill({ mesaId: 'ruptura', categoria: 'señal_falsa', operacion: { mesaId: 'ruptura', motivoSalida: 'prueba' } }),
+    ...Array(4).fill({ mesaId: 'reversion', categoria: 'stop_estrecho', motivoSalida: 'stop' }),
+    { mesaId: 'reversion', categoria: 'stop_estrecho', motivoSalida: 'kill' },
+    ...Array(5).fill({ mesaId: 'reversion', categoria: 'señal_falsa', motivoSalida: 'señal' }),
+  ];
+  assert.deepEqual(pm.hipotesisDesdeLecciones(lecciones), [{ mesaId: 'reversion', categoria: 'señal_falsa', n: 5 }]);
 });

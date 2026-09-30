@@ -6,6 +6,12 @@
 // Se abre cuando la condición completa (rápida > lenta Y cierre > filtro) PASA
 // a cumplirse en esta vela, no mientras se cumple: después de un stop no se
 // vuelve a entrar en la misma tendencia hasta que la señal se reinicie.
+//
+// `iAnterior` (opcional) es la última vela que se decidió. En vivo, con el
+// ordenador apagado o dormido, las velas de en medio no se deciden: si la
+// condición falló en alguna de ellas y ahora se cumple, el cruce ocurrió
+// mientras tanto y se entra ahora (tarde, al cierre de i). Sin iAnterior es la
+// vela anterior, como en el backtest.
 
 const { sma, atr, cierres } = require('../mercado/indicadores');
 const formato = require('../util/formato');
@@ -48,7 +54,13 @@ function condicion(s, i) {
   return r !== null && l !== null && f !== null && r > l && s.c[i] > f;
 }
 
-function decidir(prep, { simbolo, i, posicion = null, contexto = {}, textos = true } = {}) {
+// ¿La condición dejó de cumplirse en alguna vela de [desde, hasta]? (la señal se reinició)
+function huboReinicio(s, desde, hasta) {
+  for (let k = Math.max(desde, -1); k <= hasta; k++) if (!condicion(s, k)) return true;
+  return false;
+}
+
+function decidir(prep, { simbolo, i, iAnterior, posicion = null, contexto = {}, textos = true } = {}) {
   const p = prep.params;
   const s = prep.porSimbolo[simbolo];
   const et = c.etiqueta(simbolo);
@@ -73,7 +85,8 @@ function decidir(prep, { simbolo, i, posicion = null, contexto = {}, textos = tr
     });
   }
 
-  if (condicion(s, i) && !condicion(s, i - 1)) {
+  const desde = Number.isInteger(iAnterior) && iAnterior < i ? iAnterior : i - 1;
+  if (condicion(s, i) && huboReinicio(s, desde, i - 1)) {
     const stop = cierre - p.atrStop * a;
     const motivo = textos ? `${txtMedias}; cierre ${formato.precio(cierre)} > SMA${p.filtro} ${formato.precio(f)}` : '';
     const filtro = c.filtroQueBloquea(prep, simbolo, i, contexto);

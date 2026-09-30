@@ -36,8 +36,10 @@ en verde.
 
 Al tocar bróker o datos de Alpaca, primero `docs/investigacion/ficha-alpaca.md`
 (API comprobada: comisión cobrada en el activo, posiciones `BTCUSD`, páginas
-semanales en 4H, anti-lavado). En este contenedor, la red de Node necesita
-`NODE_USE_ENV_PROXY=1`.
+semanales en 4H, anti-lavado). En este contenedor, la red de Node necesita el
+proxy: `npm run start-proxy` para la mesa y `NODE_USE_ENV_PROXY=1` delante de
+los scripts (Node 22.21 o posterior; en Node 20 no existen ni la variable ni
+el flag `--use-env-proxy`).
 
 ## Git
 

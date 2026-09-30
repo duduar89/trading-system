@@ -5,34 +5,42 @@
 //   velas del histórico. Corre en segundo plano y en trozos: el walk-forward
 //   cede el bucle con setImmediate entre backtests y aquí se cede también
 //   entre hipótesis, así los latidos (stops, precios) no esperan.
-// - El contador de ensayos se persiste con los Sharpe de cada ensayo (el DSR
-//   penaliza por todo lo probado, no solo por lo de esta semana).
-// - Pesos y referencias (pendientes de A): cada hipótesis se evalúa como una
-//   mesa con el 25 % del fondo (pesoMesa 0,25), y maxDDReferencia es la caída
-//   máxima del backtest de la mesa vigente de la misma familia en el mismo
-//   tramo fuera de muestra; sin mesa de esa familia, el laboratorio usa
-//   comprar y mantener.
-// - Lo aprobado queda en `aprobadas` hasta la contratación mensual (Dirección).
+// - El contador de ensayos se persiste con los Sharpe de cada ensayo: el DSR
+//   penaliza por todo lo probado (N acumulado y la varianza de TODOS los
+//   Sharpe guardados, sharpesPrevios), no solo por lo de esta semana.
+// - Sin repetir: no se propone una hipótesis cuyo contenido (firmaHipotesis:
+//   familia, marco, universo, params, filtros) ya se evaluó en los últimos 90
+//   días, está pendiente o aprobada, o es el de una mesa viva, aunque cambie
+//   la semana (el id lleva la semana dentro).
+// - Pesos y referencias: cada hipótesis se evalúa como una mesa con el 25 %
+//   del fondo (pesoMesa 0,25), y maxDDReferencia es la caída máxima del
+//   backtest de la mesa vigente de la misma familia en el MISMO tramo fuera de
+//   muestra que usa el walk-forward (evaluarHipotesis pasa el tramo); sin mesa
+//   de esa familia, el laboratorio usa comprar y mantener.
+// - Lo aprobado queda en `aprobadas` (con su firma) hasta la contratación
+//   mensual (Dirección).
 // - Auditor: post-mortem en lote una vez al día; las lecciones se guardan con
-//   mesaId y alimentan las pistas de la semana (hipotesisDesdeLecciones).
+//   mesaId y motivo de salida y alimentan las pistas de la semana
+//   (hipotesisDesdeLecciones, que no saca pistas de lo cerrado por un kill, a
+//   mano o en la prueba).
 
 const { FAMILIAS } = require('../../estrategias');
 const comunEst = require('../../estrategias/comun');
-const { evaluarHipotesis, generarHipotesis, describirHipotesis } = require('../../cuant/laboratorio');
-const { calcularVentanas } = require('../../backtest/walkforward');
+const { evaluarHipotesis, generarHipotesis, describirHipotesis, firmaHipotesis } = require('../../cuant/laboratorio');
 const { backtest, costesPorDefecto } = require('../../backtest/motor');
 const { regimenEnFecha } = require('../../mercado/regimen');
-const { valorEn } = require('../../mercado/sentimiento');
+const { valorEn, RETRASO_FG } = require('../../mercado/sentimiento');
 const postmortem = require('../postmortem');
 const plantillas = require('../plantillas');
 const f = require('../../util/formato');
 const { diaUTC, DIA } = require('../../util/reloj');
 const { momentos } = require('../../backtest/metricas');
-const { paramsDe } = require('./mesas');
+const { paramsDe, desdeCalentamiento } = require('./mesas');
 const { etiqueta } = require('./comun');
 const log = require('../../util/log').crear('laboratorio');
 
 const PESO_HIPOTESIS = 0.25;
+const DIAS_SIN_REPETIR = 90;
 const MAX_SHARPES_GUARDADOS = 5000;
 const DIAS_LECCIONES = 90;
 const DIAS_PISTAS = 30;
@@ -61,35 +69,12 @@ async function crearContextoHistorico(ctx, cargar) {
   const spy = ctx.universo.some(a => a.simbolo === 'SPY') ? await cargar('SPY', '1Day') : null;
   let fgHist = [];
   try { fgHist = (await ctx.fg.historico()) || []; } catch (e) { log.aviso(`sin histórico de miedo y codicia: ${e.message}`); }
+  // Miedo y codicia vigente en t: el de t − RETRASO_FG, como en vivo (el de
+  // un día se publica a las 00:00, el mismo instante en que deciden las diarias).
   return t => {
-    const f = fgHist.length ? valorEn(fgHist, t) : null;
+    const f = fgHist.length ? valorEn(fgHist, t - RETRASO_FG) : null;
     return { regimen: regimenEnFecha(btc, spy, t), fg: f ? f.valor : null };
   };
-}
-
-// Tramo fuera de muestra que usará el walk-forward, calculado con la misma
-// regla (18/6 meses y, si no hay 4 ventanas, 12/3) para medir la referencia
-// de caída en el mismo tramo.
-function tramoOOS(est, velas, fijos = {}) {
-  const simbolos = Object.keys(velas).filter(s => velas[s] && velas[s].length);
-  if (!simbolos.length) return null;
-  const rejilla = est.rejillaPara ? est.rejillaPara(simbolos) : est.rejilla;
-  const base = est.parametrosPara ? est.parametrosPara(simbolos) : est.parametrosPorDefecto;
-  const combos = comunEst.combinaciones(rejilla, base, fijos);
-  const calent = Math.max(...combos.map(c => est.calentamiento(c)));
-  const marcoMs = comunEst.MARCOS[est.marco];
-  let tCalentado = Infinity;
-  let tFin = -Infinity;
-  for (const s of simbolos) {
-    const serie = velas[s];
-    if (serie.length > calent) tCalentado = Math.min(tCalentado, serie[calent].t);
-    tFin = Math.max(tFin, serie[serie.length - 1].t + marcoMs);
-  }
-  if (!Number.isFinite(tCalentado)) return null;
-  let v = calcularVentanas({ tCalentado, tFin, entrenoMeses: 18, pruebaMeses: 6 });
-  if (v.length < 4) v = calcularVentanas({ tCalentado, tFin, entrenoMeses: 12, pruebaMeses: 3 });
-  if (v.length < 4) return null;
-  return { desde: v[0].pruebaDesde, hasta: v[v.length - 1].pruebaHasta };
 }
 
 async function velasDeMesa(mesa, cargar) {
@@ -101,15 +86,14 @@ async function velasDeMesa(mesa, cargar) {
   return velas;
 }
 
-async function maxDDReferencia(ctx, h, { cargar, contexto }) {
+// Caída máxima de la mesa vigente de la misma familia en el tramo fuera de
+// muestra que usa el walk-forward (evaluarHipotesis lo pasa): { valor, mesaId }.
+async function maxDDReferencia(ctx, h, tramo, { cargar, contexto }) {
   const vivas = ctx.estado.mesas.filter(m => m.familia === h.familia && m.estado !== 'banquillo');
   const mesa = vivas.find(m => m.id === h.mesaId) || vivas[0];
   if (!mesa) return { valor: undefined, mesaId: null };
+  if (!tramo || !Number.isFinite(tramo.desde) || !Number.isFinite(tramo.hasta)) return { valor: undefined, mesaId: mesa.id };
   const est = FAMILIAS[h.familia];
-  const velasH = {};
-  for (const s of h.universo) velasH[s] = await cargar(s, h.marco);
-  const tramo = tramoOOS(est, velasH, h.params || {});
-  if (!tramo) return { valor: undefined, mesaId: mesa.id };
   const velas = await velasDeMesa(mesa, cargar);
   const r = backtest({
     velas, estrategia: est, params: paramsDe(mesa), filtros: mesa.filtros || [], costes: costesPorDefecto(), contexto,
@@ -138,18 +122,35 @@ function siguienteLunes(t) {
   return Math.floor(t / DIA) * DIA + dias * DIA + 10 * 60_000;
 }
 
+// Firmas que ya no se pueden proponer: hipótesis de los últimos 90 días (las
+// guarda lab.hipotesis con su t), las aprobadas pendientes de contratar y las
+// mesas vivas contratadas de una hipótesis (firmasBloqueadas mira mesas).
+function previasDe(lab) {
+  return [
+    ...lab.hipotesis.map(x => ({ h: x.h, t: x.t, firma: x.firma || null })),
+    ...lab.aprobadas.map(a => ({ h: a, t: a.t, firma: a.firma || null })),
+  ];
+}
+
 // Semanal: nuevas hipótesis y su evaluación en segundo plano.
 function revisionSemanal(ctx) {
   const ahora = ctx.reloj.ahora();
   const lab = ctx.estado.laboratorio;
   const semana = diaUTC(ahora);
-  const lecciones = ctx.estado.lecciones.filter(l => l.t >= ahora - DIAS_PISTAS * DIA);
+  // Lecciones guardadas antes de llevar motivoSalida: se completa con el de su
+  // operación, para que las de un kill o a mano tampoco den pistas.
+  const salidaDe = new Map(ctx.operaciones.map(o => [String(o.id), o.motivoSalida]));
+  const lecciones = ctx.estado.lecciones
+    .filter(l => l.t >= ahora - DIAS_PISTAS * DIA)
+    .map(l => (l.motivoSalida == null && salidaDe.has(String(l.operacionId)) ? { ...l, motivoSalida: salidaDe.get(String(l.operacionId)) } : l));
   const pistas = postmortem.hipotesisDesdeLecciones(lecciones);
-  const nuevas = generarHipotesis({ mesas: ctx.estado.mesas, pistas, semana })
-    .filter(h => !lab.hipotesis.some(x => x.id === h.id));
+  const previas = previasDe(lab);
+  const vistas = new Set(previas.filter(p => p.t >= ahora - DIAS_SIN_REPETIR * DIA).map(p => p.firma || firmaHipotesis(p.h)));
+  const nuevas = generarHipotesis({ mesas: ctx.estado.mesas, pistas, semana, previas, ahora })
+    .filter(h => !lab.hipotesis.some(x => x.id === h.id) && !vistas.has(firmaHipotesis(h)));
   lab.proximaRevision = siguienteLunes(ahora);
   for (const h of nuevas) {
-    lab.hipotesis.push({ id: h.id, h, descripcion: describirHipotesis(h), estado: 'pendiente', criterios: [], t: ahora, informe: null });
+    lab.hipotesis.push({ id: h.id, h, firma: firmaHipotesis(h), descripcion: describirHipotesis(h), estado: 'pendiente', criterios: [], t: ahora, informe: null });
     ctx.bus.publicar({ de: 'laboratorio', canal: 'laboratorio', tipo: 'hipotesis', texto: plantillas.hipotesis(h), datos: { id: h.id, origen: h.origen, motivo: h.motivo, mesaId: h.mesaId }, importancia: 2 });
   }
   if (lab.hipotesis.length > 60) lab.hipotesis.splice(0, lab.hipotesis.length - 60);
@@ -171,15 +172,18 @@ async function evaluarPendientes(ctx) {
       if (!entrada) break;
       entrada.estado = 'evaluando';
       const h = entrada.h;
+      const firma = entrada.firma || firmaHipotesis(h);
       const ahora = ctx.reloj.ahora();
       const cargar = crearCargador(ctx, ahora);
       const contexto = await crearContextoHistorico(ctx, cargar);
-      const ref = await maxDDReferencia(ctx, h, { cargar, contexto });
       await ceder();
       const ensayosPrevios = lab.ensayosTotales;
+      let ref = { valor: undefined, mesaId: null };
       const res = await evaluarHipotesis(h, {
-        cargarVelas: cargar, contextoHistorico: contexto, ensayosPrevios, retornosMesasActivas: retornosMesasActivas(ctx),
-        maxDDReferencia: ref.valor, costes: costesPorDefecto(), limites: ctx.limites, universo: ctx.universo, pesoMesa: PESO_HIPOTESIS,
+        cargarVelas: cargar, contextoHistorico: contexto, ensayosPrevios, sharpesPrevios: [...lab.sharpesEnsayos],
+        retornosMesasActivas: retornosMesasActivas(ctx),
+        maxDDReferencia: async tramo => { ref = await maxDDReferencia(ctx, h, tramo, { cargar, contexto }); return ref; },
+        costes: costesPorDefecto(), limites: ctx.limites, universo: ctx.universo, pesoMesa: PESO_HIPOTESIS,
       });
       const wf = res.walkforward;
       if (wf) {
@@ -190,11 +194,16 @@ async function evaluarPendientes(ctx) {
         if (lab.ensayos.length > 200) lab.ensayos.splice(0, lab.ensayos.length - 200);
       }
       entrada.estado = res.aprobada ? 'aprobada' : 'rechazada';
+      entrada.firma = firma;
       entrada.criterios = (res.criterios || []).map(c => ({ nombre: c.nombre, valor: c.valor, umbral: c.umbral, ok: c.ok }));
       entrada.informe = res.informe;
-      entrada.referenciaDD = { valor: ref.valor ?? null, mesaId: ref.mesaId };
+      entrada.referenciaDD = { valor: ref.valor ?? null, mesaId: ref.mesaId ?? null };
       entrada.tFin = ctx.reloj.ahora();
-      if (res.aprobada) lab.aprobadas.push({ ...h, params: { ...(h.params || {}), ...(res.paramsFinales || {}) }, informe: res.informe, t: ctx.reloj.ahora() });
+      // La firma es la del contenido que fijó la hipótesis (antes de los
+      // parámetros finales del walk-forward): una aprobada no entra dos veces.
+      if (res.aprobada && !lab.aprobadas.some(a => a.firma === firma)) {
+        lab.aprobadas.push({ ...h, params: { ...(h.params || {}), ...(res.paramsFinales || {}) }, firma, informe: res.informe, t: ctx.reloj.ahora() });
+      }
       ctx.bus.publicar({
         de: 'laboratorio', canal: 'laboratorio', tipo: 'hipotesis',
         texto: plantillas.resultadoHipotesis({ id: h.id, aprobada: res.aprobada, criterios: res.criterios }),
@@ -218,12 +227,16 @@ async function backtestMesa(ctx, mesa) {
   if (!est) return null;
   const ahora = ctx.reloj.ahora();
   const dias = ctx.modo === 'sintetico' ? 365 : (mesa.marco === '1Day' ? 365 : 180);
-  const n = 400;   // calentamiento de sobra para cualquier familia
-  const marcoMs = comunEst.MARCOS[mesa.marco];
+  // El mismo calentamiento que el vivo (velasNecesarias, con el año del filtro
+  // vol-max y el factor de sesiones de las acciones), con 400 velas de suelo:
+  // con 400 fijas, en 4H el percentil de vol-max no llegaba a tener valor y la
+  // referencia era la de la estrategia sin filtro.
+  const inicioTramo = ahora - dias * DIA;
+  const desdeVelas = Math.min(desdeCalentamiento(mesa, inicioTramo), inicioTramo - 400 * comunEst.MARCOS[mesa.marco]);
   const velas = {};
   for (const s of mesa.universo) {
     if (!ctx.datos.disponible(s)) continue;
-    const v = await ctx.datos.velas(s, mesa.marco, { desde: ahora - dias * DIA - n * marcoMs, hasta: ahora });
+    const v = await ctx.datos.velas(s, mesa.marco, { desde: desdeVelas, hasta: ahora });
     if (v.length) velas[s] = v;
   }
   if (!Object.keys(velas).length) return null;
@@ -232,7 +245,7 @@ async function backtestMesa(ctx, mesa) {
   const contexto = await crearContextoHistorico(ctx, cargar);
   const r = backtest({
     velas, estrategia: est, params: paramsDe(mesa), filtros: mesa.filtros || [], costes: costesPorDefecto(), contexto,
-    limites: ctx.limites, desde: ahora - dias * DIA, pesoMesa: mesa.peso > 0 ? mesa.peso : PESO_HIPOTESIS,
+    limites: ctx.limites, desde: inicioTramo, pesoMesa: mesa.peso > 0 ? mesa.peso : PESO_HIPOTESIS,
   });
   const rs = r.retornosDiarios.map(x => x.r);
   const m = momentos(rs);
@@ -275,7 +288,7 @@ async function auditoria(ctx, operaciones) {
   const porId = new Map(ops.map(o => [String(o.id), o]));
   for (const l of res) {
     const op = porId.get(l.operacionId) || {};
-    ctx.estado.lecciones.push({ t: ahora, ...l, mesaId: l.mesaId ?? op.mesaId ?? null });
+    ctx.estado.lecciones.push({ t: ahora, ...l, mesaId: l.mesaId ?? op.mesaId ?? null, motivoSalida: l.motivoSalida ?? op.motivoSalida ?? null });
     ctx.bus.publicar({
       de: 'auditor', canal: 'laboratorio', tipo: 'leccion',
       texto: plantillas.leccion({ mesaId: l.mesaId, etiqueta: etiqueta(l.simbolo), categoria: l.categoria, pnl: op.pnl, barras: op.barras, leccion: l.leccion }),
@@ -288,6 +301,6 @@ async function auditoria(ctx, operaciones) {
 }
 
 module.exports = {
-  revisionSemanal, evaluarPendientes, backtestsPendientes, backtestMesa, auditoria, tramoOOS, maxDDReferencia, siguienteLunes,
+  revisionSemanal, evaluarPendientes, backtestsPendientes, backtestMesa, auditoria, maxDDReferencia, siguienteLunes, crearContextoHistorico,
   PESO_HIPOTESIS,
 };

@@ -13,6 +13,7 @@
 // prudente. La volatilidad de BTC se anualiza con 365 (cripto cotiza a diario).
 
 const { sma, volatilidad } = require('./indicadores');
+const calendario = require('./calendario');
 const { DIA } = require('../util/reloj');
 const formato = require('../util/formato');
 
@@ -41,14 +42,41 @@ function series(velas, conMedias50yVol) {
   return s;
 }
 
-// Último índice cuya vela diaria ya había CERRADO en t (v.t + DIA ≤ t).
+// Instante en que CIERRA la vela diaria que empieza en t. Acciones (Alpaca
+// marca la diaria a medianoche de Nueva York): al terminar esa sesión, 16:00
+// ET o 13:00 en cierre temprano, la misma regla que alpaca-datos._cerrada en
+// vivo. Cripto (medianoche UTC, que nunca es medianoche de Nueva York) y
+// cualquier otra marca: t + 1 día.
+function cierreVelaDiaria(t) {
+  const dia = calendario.diaET(t);
+  if (calendario.msDesdeET(dia, 0, 0) === t) {
+    const c = calendario.cierreSesion(dia);
+    if (c !== null) return c;
+  }
+  return t + DIA;
+}
+
+// Cierre de cada vela de la serie (se memoriza: se busca en cada decisión).
+const cacheCierres = new WeakMap();
+function cierresDe(velas) {
+  const g = cacheCierres.get(velas);
+  const ultimaT = velas.length ? velas[velas.length - 1].t : null;
+  if (g && g.largo === velas.length && g.ultimaT === ultimaT) return g.cierres;
+  const cierres = Float64Array.from(velas, v => cierreVelaDiaria(v.t));
+  cacheCierres.set(velas, { largo: velas.length, ultimaT, cierres });
+  return cierres;
+}
+
+// Último índice cuya vela diaria ya había CERRADO en t (cierre ≤ t).
 function ultimoCerrado(velas, t) {
+  if (!velas.length) return -1;
+  const cierres = cierresDe(velas);
   let lo = 0;
   let hi = velas.length - 1;
   let res = -1;
   while (lo <= hi) {
     const m = (lo + hi) >> 1;
-    if (velas[m].t + DIA <= t) { res = m; lo = m + 1; } else hi = m - 1;
+    if (cierres[m] <= t) { res = m; lo = m + 1; } else hi = m - 1;
   }
   return res;
 }
@@ -129,8 +157,9 @@ function calcularRegimen({ btcDiario, spyDiario } = {}) {
 }
 
 // Régimen tal y como se habría visto en el instante t: solo velas diarias
-// cerradas en t. Para SPY (vela con marca de medianoche de Nueva York) esto es
-// conservador: la da por cerrada un día después de su inicio.
+// cerradas en t (cierreVelaDiaria). La SPY del día cuenta desde el cierre de
+// Nueva York, igual que en vivo: una decisión cripto de las 00:00 UTC la ve, y
+// una de ETF al cierre de la sesión también.
 // Se memoriza por par de índices: el laboratorio lo pide en cada vela de cada
 // combinación y el texto con cifras (Intl) es lo caro.
 const SIN_SPY = [];
@@ -153,4 +182,4 @@ function regimenEnFecha(btcDiario, spyDiario, t) {
   return r;
 }
 
-module.exports = { calcularRegimen, regimenEnFecha, UMBRAL_VOL };
+module.exports = { calcularRegimen, regimenEnFecha, cierreVelaDiaria, UMBRAL_VOL };

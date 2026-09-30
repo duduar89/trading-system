@@ -70,3 +70,27 @@ test('CAUSALIDAD: regimenEnFecha con 50 velas de más da lo mismo que con la ser
     assert.deepEqual(regimenEnFecha(btc, spy, t), corto);
   }
 });
+
+test('SPY (t a medianoche de Nueva York) cuenta como cerrada al terminar la sesión, como en vivo', () => {
+  const cal = require('../src/mercado/calendario');
+  const { cierreVelaDiaria } = require('../src/mercado/regimen');
+  // 230 sesiones de 2026 con cierres crecientes (SMA200 existe al final).
+  const spy = [];
+  for (let d = Date.UTC(2026, 0, 2); spy.length < 230; d += DIA) {
+    const dia = new Date(d).toISOString().slice(0, 10);
+    if (cal.esDiaHabil(dia)) spy.push({ t: cal.msDesdeET(dia, 0, 0), o: 400 + spy.length, h: 400 + spy.length, l: 400 + spy.length, c: 400 + spy.length, v: 0 });
+  }
+  const k = spy.findIndex(v => cal.diaET(v.t) === '2026-11-27');      // cierre temprano (13:00 ET)
+  const k2 = spy.findIndex(v => cal.diaET(v.t) === '2026-11-25');     // sesión normal
+  assert.ok(k > 200 && k2 > 200);
+  assert.equal(cierreVelaDiaria(spy[k2].t), cal.msDesdeET('2026-11-25', 16, 0));
+  assert.equal(cierreVelaDiaria(spy[k].t), cal.msDesdeET('2026-11-27', 13, 0));
+  assert.equal(cierreVelaDiaria(Date.UTC(2026, 10, 25)), Date.UTC(2026, 10, 26)); // cripto: t + 1 día
+  const spyEn = t => regimenEnFecha([], spy, t).componentes.find(c => c.nombre === 'spy_sobre_sma200').valor;
+  // Un minuto antes del cierre, la vela del día aún no cuenta; al cierre, sí.
+  assert.equal(spyEn(cal.msDesdeET('2026-11-25', 15, 59)), spy[k2 - 1].c);
+  assert.equal(spyEn(cal.msDesdeET('2026-11-25', 16, 0)), spy[k2].c);
+  assert.equal(spyEn(cal.msDesdeET('2026-11-27', 13, 0)), spy[k].c);
+  // Decisión cripto a las 00:00 UTC del día siguiente: ya ve la SPY del día (antes esperaba a las 05:00Z).
+  assert.equal(spyEn(Date.UTC(2026, 10, 26)), spy[k2].c);
+});

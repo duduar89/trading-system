@@ -92,14 +92,20 @@ async velas(simbolo, marco, { desde, hasta }) → Vela[]
 //  ascendente, sin duplicados, SOLO cerradas respecto a reloj.ahora():
 //  cripto: t + marcoMs <= ahora. Acciones 1Day: la vela del día D cuenta como
 //  cerrada cuando la sesión de D ha terminado (calendario.cierreSesion).
-async ultimos(simbolos) → { [simbolo]: { precio, t } }   // t = instante del dato (ms)
+async ultimos(simbolos) → { [simbolo]: { precio, t, demanda?, oferta?, cierreAnterior? } }   // t = instante del dato (ms)
+//  cripto: punto medio de la última cotización (demanda = bid, oferta = ask); si falta, cierre de la vela de 1 min.
+//  acciones: último trade del snapshot (o la vela de 1 min) y cierreAnterior = cierre diario anterior.
 async noticias(simbolos, { desde, limite }) → [{ id, titular, resumen, fuente, t, url, simbolos }]  // [] si no hay claves
 disponible(simbolo) → boolean
 ```
 
-`AlpacaDatos({ claveId, secreto, fetch = globalThis.fetch, reloj, carpetaCache, limitador })`:
-- Cripto: `https://data.alpaca.markets/v1beta3/crypto/us/bars` y `/latest/bars`
-  (o `/latest/trades`), **sin cabeceras** aunque haya claves (una clave mala da
+`AlpacaDatos({ claveId, secreto, fetch = globalThis.fetch, reloj, carpetaCache, limitador, timeoutMs = 20000, maxReintentos = 5, timeoutUltimosMs = 10000, reintentosUltimos = 1 })`:
+- `ultimos()` va con su propio timeout y un solo reintento (unos 21 s como
+  mucho): se pide en cada latido y el siguiente ya reintenta. Con los 20 s × 6
+  intentos del resto, una red colgada retendría el latido (y con él el kill,
+  el Ctrl+C y los stops) unos 151 s.
+- Cripto: `https://data.alpaca.markets/v1beta3/crypto/us/bars`, `/latest/quotes`
+  y `/latest/bars`, **sin cabeceras** aunque haya claves (una clave mala da
   401 incluso en el endpoint público, ficha §0.2). Un símbolo por petición
   (el `limit` es total entre símbolos). Paginación con `page_token` hasta que
   `next_page_token` sea null.
@@ -127,6 +133,12 @@ Velas de cualquier marco por agregación de la trayectoria base, alineadas a UTC
   «Miedo extremo», Fear → «Miedo», Neutral → «Neutral», Greed → «Codicia»,
   Extreme Greed → «Codicia extrema».
 - `async historico() → [{ dia: 'AAAA-MM-DD', valor }]` desde `?limit=0`, caché en disco 24 h.
+- `valorEn(historico, t) → { dia, valor } | null`: el del último día ≤ el de `t`.
+- `RETRASO_FG = 1 h`: el valor vigente en `t` es `valorEn(historico, t − RETRASO_FG)`,
+  en vivo (mesas, macro guarda los últimos días en `macro.fgDias`) y en el
+  backtest y el laboratorio. alternative.me publica el del día a las 00:00 UTC,
+  el mismo instante en que deciden las mesas diarias: a esa hora se usa el de
+  ayer y desde la 01:00 el de hoy.
 - En modo sintético: valor derivado de la rentabilidad de 30 días del BTC
   sintético (0-100), marcado `sintetico: true`.
 
@@ -150,15 +162,32 @@ async ordenPorIdCliente(idCliente) → Orden | null
 async esperarEjecucion(idCliente, { timeoutMs = 20000 }) → Orden        // sondea hasta estado final o timeout
 async ordenesAbiertas() → Orden[]
 async cancelarTodas() → number
-async cerrarTodo() → { cerradas: [simbolo], errores: [] }               // DELETE /v2/positions?cancel_orders=true
+async cancelarOrden(id /* el id del bróker, no el idCliente */) → boolean   // false: ya no se puede cancelar (terminó, 422/404)
+async cerrarTodo() → { cerradas: [simbolo], errores: [{ simbolo, status, mensaje, tipo }], ordenes: Orden[] }   // DELETE /v2/positions?cancel_orders=true
 async relojMercado() → { abierto, proximaApertura, proximoCierre }
 async activo(simbolo) → { negociable, fraccionable, minCantidad, incremento, minNocional }
+async comisiones({ desde }) → [{ id, t, simbolo, cantidad, importe, precio, importeUsd }]   // solo AlpacaBroker: actividades CFEE
 
 Orden = { id, idCliente, simbolo, lado, cantidad, nocional, estado: 'pendiente'|'parcial'|'ejecutada'|'cancelada'|'rechazada'|'caducada',
-          cantidadEjecutada, precioMedio, comision /* $ o null si el bróker no la da */, creada, actualizada, motivo }
+          cantidadEjecutada /* lo que ENTRA en la posición: neto de la comisión en compras cripto */,
+          cantidadBruta /* filled_qty */, precioMedio,
+          comision /* $: la del simulado; en Alpaca cripto, ESTIMADA a la tasa de costes.comision; acciones 0;
+                      null si no se ejecutó nada */, comisionEstimada /* true en Alpaca cripto */,
+          creada, actualizada, motivo }
 ```
 
-- `idCliente` ≤ 128 caracteres, determinista (lo construye F, §6.3).
+- `cerrarTodo().ordenes`: cada liquidación es una orden NUEVA, con un
+  idCliente que el fondo no generó; el Ejecutor la sigue (`seguirAjena`) y la
+  apunta en los libros como una propia. Con la bolsa cerrada Alpaca acepta la
+  venta de acciones y la deja en cola hasta la apertura.
+- `comisiones()`: Alpaca apunta la comisión cripto al final del día (CFEE). La
+  de una compra va en el activo (qty negativa) y la de una venta en dólares;
+  `importeUsd` la pone en dólares cuando se puede (sin precio, null). Sirve para
+  contrastar la comisión estimada (§6.9, cierre diario).
+- `idCliente` ≤ 128 caracteres, único por carpeta de datos: lleva la sal de la
+  carpeta (§6.7). Si el bróker ya tiene una orden con ese idCliente y es la
+  misma (símbolo, lado e importe), se adopta; si es OTRA orden, `ErrorBroker`
+  de tipo `'invalida'` (422) y no se apunta nada.
 - `AlpacaBroker`: base `https://paper-api.alpaca.markets` fija; importes
   vienen como string → `Number()`. Posiciones cripto vienen como `BTCUSD` →
   `universo.desdeClave`. Para vender usar `qty_available`. No leer
@@ -168,6 +197,12 @@ Orden = { id, idCliente, simbolo, lado, cantidad, nocional, estado: 'pendiente'|
 - Errores: `class ErrorBroker extends Error { status, tipo, reintentable, cuerpo }` con
   `tipo ∈ 'fondos'|'cantidad'|'invalida'|'lavado'|'limite'|'auth'|'red'|'mercado_cerrado'|'desconocido'`
   (`src/broker/errores.js`). 403 «insufficient buying power» → fondos; 403 «insufficient qty» → cantidad; 403 wash trade → lavado; 422 → invalida; 429 → limite; 401 → auth.
+- `AlpacaBroker({ claveId, secreto, reloj, limitador, costes })`: `costes.comision`
+  (sim → fracción, número o mapa; misma forma que en `BrokerSimulado`) es la
+  tasa con la que se estima la comisión cripto de cada orden. Por defecto la de
+  `COSTES_POR_DEFECTO` (`src/broker/comun.js`, la ÚNICA fuente de la tasa: la
+  usan el simulado, las carteras sombra y esta estimación). 0 si se comprueba
+  que paper no cobra.
 - `BrokerSimulado({ capitalInicial = 100000, fuente /* {ultimos} */, reloj, ruta, calendario, costes })`:
   llena al instante al último precio ± deslizamiento; **imita a Alpaca en la
   comisión cripto**: en compras se cobra en el activo recibido (recibes
@@ -203,7 +238,13 @@ Regla fija, documentada en el propio fichero:
 - SPY cierre > SMA200 (si hay datos): +1, si no −1.
 - `puntos ≥ 2` → RISK-ON; `puntos ≤ −2` → RISK-OFF; si no, NEUTRAL.
 
-`regimenEnFecha(btcDiario, spyDiario, t)` para el laboratorio (usa solo velas cerradas antes de `t`).
+`regimenEnFecha(btcDiario, spyDiario, t)` para el laboratorio y el backtest:
+usa solo las velas diarias ya CERRADAS en `t`. Una vela de BTC (medianoche
+UTC) cierra a `t + 1 día`; la de la SPY (medianoche de Nueva York) cierra al
+terminar su sesión (16:00 ET o 13:00 en cierre temprano), como en vivo. Así una
+decisión cripto de las 00:00 UTC ve la SPY del día anterior, y una de ETF al
+cierre de la sesión ve la de ese día. Exporta `cierreVelaDiaria(t) → ms`, el
+instante en que cierra la vela diaria que empieza en `t`.
 
 ### 4.3 Estrategias (`src/estrategias/<familia>.js` + `index.js`)
 
@@ -216,7 +257,8 @@ module.exports = {
   rejilla: { ... },                       // producto cartesiano ≤ 30 combinaciones
   calentamiento(params) → número de velas,
   preparar(velasPorSimbolo /* {sim: Vela[]} mismo marco */, params) → prep,   // arrays causales precalculados
-  decidir(prep, { simbolo, i, posicion /* null o {cantidad, entrada, stop, maxPrecio, barrasAbierta} */, t, contexto }) → Senal,
+  decidir(prep, { simbolo, i, iAnterior? /* última vela decidida; por defecto i − 1 */,
+                   posicion /* null o {cantidad, entrada, stop, maxPrecio, barrasAbierta} */, t, contexto }) → Senal,
   trailing(prep, { simbolo, i, posicion, params }) → nuevoStop | null,       // nunca por debajo del stop actual
 }
 
@@ -232,6 +274,11 @@ Senal = {
 
 `contexto` = `{ regimen, fg, filtros }`; `filtros` = lista de filtros activos
 de la mesa (`src/estrategias/filtros.js`): solo bloquean `abrir`.
+
+`iAnterior` lo pasa el vivo cuando se saltó velas (ordenador apagado o
+dormido): un cruce (tendencia) o un rebalanceo (momentum) que cayó en
+`(iAnterior, i]` se decide ahora, tarde, al cierre de `i`. Ruptura y reversión
+lo ignoran: miran solo la vela `i` (si deben entrar tarde lo decide Eduardo).
 
 Familias y valores por defecto (los de `propuesta-cuant.md`, no se optimizan en vivo):
 
@@ -282,7 +329,19 @@ backtest({ velas /* {sim: Vela[]} mismo marco */, estrategia, params, filtros = 
   deslizamiento, comisión y penalización de papel.
 - Stop dentro de la vela: si `low ≤ stop` sale a `min(open, stop)` (con hueco).
 - Trailing se actualiza al cierre y vale desde la vela siguiente.
-- Operación: `{ simbolo, entradaT, entradaPrecio, salidaT, salidaPrecio, cantidad, pnl, pnlPct, comisiones, barras, motivoSalida: 'señal'|'stop'|'fin' }`.
+- Operación: `{ simbolo, entradaT, entradaPrecio, salidaT, salidaPrecio, cantidad, pnl, pnlPct, comisiones, barras, motivoSalida: 'señal'|'stop'|'fin'|'hueco' }`.
+- **Hueco en los datos de un símbolo** (más de 4 velas y más de 5 días sin
+  ninguna, `comun.umbralHueco`; SOL en Alpaca, 6-jul-2023 → 26-ago-2024): al
+  ver la primera vela de después, la orden pendiente caduca, lo abierto se
+  vende al último cierre ANTERIOR al hueco (`motivoSalida: 'hueco'`) y el
+  símbolo no decide hasta que sus indicadores ya no miran nada de antes
+  (`comun.velasMemoria`). La primera vela de vuelta abre con el precio rancio
+  (SOL: 18,14 $ con SOL a 157,25 $). `compraYMantener` hace lo mismo: vende al
+  cierre anterior y vuelve a comprar en la apertura de la SEGUNDA vela de después.
+- Hora de la decisión (`t` de `decidir` y del contexto): el cierre de la vela.
+  En acciones diarias es el fin de la sesión (`regimen.cierreVelaDiaria`), no
+  `t + 1 día`: el contexto no puede ver lo que pasó entre el cierre de Nueva
+  York y la medianoche UTC.
 
 ### 4.6 Métricas (`src/backtest/metricas.js`)
 
@@ -306,11 +365,27 @@ entrenamiento (con ≥ 5 operaciones). La curva OOS se encadena.
 
 ```js
 validarHipotesis(h, { universo, familias }) → { ok, error }
-// h = { id, familia, marco, universo:[sim], filtros:[{id, parametro}], origen: 'leccion'|'exploracion', motivo }
-async evaluarHipotesis(h, { cargarVelas(sim, marco) → Vela[], contextoHistorico(t), ensayosPrevios, retornosMesasActivas: {mesaId: [{dia, r}]}, maxDDReferencia, costes, limites })
-  → { aprobada, criterios: [{ nombre, valor, umbral, ok }], walkforward, dsr, correlacionMax, informe /* texto con cifras */ }
-generarHipotesis({ mesas, pistas /* de postmortem.hipotesisDesdeLecciones */, semana }) → Hipotesis[]   // máx. 3
+// h = { id, familia, marco, universo:[sim], filtros:[{id, parametro}], params?, origen: 'leccion'|'exploracion', motivo }
+async evaluarHipotesis(h, { cargarVelas(sim, marco) → Vela[], contextoHistorico(t), ensayosPrevios, sharpesPrevios: number[],
+                            retornosMesasActivas: {mesaId: [{dia, r}]}, maxDDReferencia, costes, limites, pesoMesa })
+  → { aprobada, criterios: [{ nombre, valor, umbral, ok, … }], walkforward, dsr, correlacionMax, paramsFinales, informe /* texto con cifras */ }
+generarHipotesis({ mesas, pistas /* de postmortem.hipotesisDesdeLecciones */, semana, previas, ahora, diasSinRepetir = 90 }) → Hipotesis[]   // máx. 3
+firmaHipotesis(h) → string          // el CONTENIDO: familia, marco, universo, filtros y los params que fija al generarse
+describirHipotesis(h) → string
 ```
+- `maxDDReferencia`: un número, o una función del tramo fuera de muestra que
+  usará el walk-forward, `({ desde, hasta }) → número | { valor, mesaId }` (o su
+  promesa). El laboratorio pasa la caída del backtest de la mesa vigente de la
+  misma familia en ese mismo tramo; sin mesa de esa familia (o sin valor), la
+  referencia es comprar y mantener el mismo universo en ese tramo. El criterio
+  de caída lleva `referencia` y `fuenteReferencia` ('mesa <id>' o 'comprar y mantener').
+- `sharpesPrevios`: los Sharpe de todos los ensayos anteriores (el laboratorio
+  los guarda, como mucho 5.000). La varianza del DSR se calcula con ellos y los
+  de esta hipótesis, no solo con los de esta.
+- Sin repetir: `generarHipotesis` no propone una hipótesis cuya firma esté en
+  `previas` (`[{ h, t, firma? }]`: evaluadas, pendientes y aprobadas) de los
+  últimos `diasSinRepetir` días, ni la de una mesa viva (`mesa.firmaHipotesis`),
+  ni dos iguales en la misma semana. El id lleva la semana dentro; la firma, no.
 Criterios de aprobación (todos): Sharpe OOS ≥ 0,6; ≥ 3 de 4 (o 75 %) ventanas
 de prueba con rentabilidad > 0; DSR ≥ 0,90 con el contador de ensayos; ≥ 30
 operaciones OOS; maxDD OOS ≤ 1,5 × `maxDDReferencia`; correlación de retornos
@@ -362,7 +437,8 @@ Mayor → grave. Posición en bróker sin puesto → huérfana. Puesto sin posic
 ```js
 evaluarPropuesta(propuesta, ctx) → { decision: 'aprobar'|'reducir'|'vetar', nocional, cantidad, motivos: [{ limite, valor, maximo, texto }] }
 propuesta = { puestoId, mesaId, simbolo, clase, lado, tipo: 'apertura'|'aumento'|'reduccion'|'cierre'|'stop'|'kill'|'prueba', nocional, cantidad, precio, precioT, stop, precioDecision }
-ctx = { ahora, patrimonio, valoracion /* de libros.valorar */, nivel: 'normal'|'solo_cerrar'|'bloqueado', multiplicadorCaida,
+ctx = { ahora, patrimonio, valoracion /* libros.valorar con, por símbolo, el máximo frente al bróker (exposicionConBroker) */,
+        nivel: 'normal'|'solo_cerrar'|'bloqueado', multiplicadorCaida,
         directivas, ordenes: { ultimoMinuto, ultimaHoraPorMesa: {mesaId: n} }, mercadoAbierto: {accion: boolean}, limites }
 ```
 - `bloqueado`: veta todo salvo `kill`.
@@ -375,6 +451,10 @@ ctx = { ahora, patrimonio, valoracion /* de libros.valorar */, nivel: 'normal'|'
   `multiplicadorCaida` y la reducción del Megáfono. Si tras reducir queda <
   `minNocionalOrden` → vetar.
 - Cada motivo lleva texto con las cifras (lo lee la Jefa de riesgos en el chat).
+- `valoracion` es la de los libros, pero con la cantidad de cada símbolo
+  llevada al máximo entre libros y bróker: una posición del bróker sin puesto
+  (huérfana) cuenta para `maxPesoPorActivo`, las exposiciones y el número de
+  posiciones. La misma valoración la usan el comité y la cabecera (§7).
 
 ### 5.4 Vigilante (`src/riesgo/vigilante.js`)
 
@@ -414,7 +494,9 @@ Mensual. Base = paridad de riesgo (1/vol normalizado) entre titulares.
 Objetivo = base × clamp(1 + sharpeAjustado, 0,5, 2). Sin cambio con < 20
 operaciones o < 60 días. Peso nuevo = 0,7·actual + 0,3·objetivo; suelo 5 %,
 techo 40 %; incubación fija 2 %; titulares normalizados a 1 − Σ incubación.
-Despido (→ banquillo, peso 0, sigue en sombra): sharpeAjustado < −0,5 con ≥ 40
+Despido (→ banquillo, peso 0: cierra sus puestos reales y no abre nada nuevo,
+tampoco en la sombra «sin comité», que dimensiona con 0 $; lo que tenga
+abierto en sombra se cierra por su regla): sharpeAjustado < −0,5 con ≥ 40
 operaciones, o maxDD de la mesa > 25 %. Incubación ≥ 60 días: asciende si
 sharpe papel > sharpeBacktest − 1 y ≥ 10 operaciones; si no, se descarta.
 
@@ -452,7 +534,8 @@ class Bus extends EventEmitter {
   constructor({ reloj, ruta /* mensajes.jsonl */, agentes /* para deNombre/departamento */, maxMemoria = 500 })
   registrarAgente(agente)
   publicar({ de, para = 'todos', canal, tipo, texto, datos = null, importancia = 1, costeUsd = 0 }) → Mensaje
-  ultimos(n = 150, filtro?) → Mensaje[]
+  ultimos(n = 150, filtro? /* función, u objeto { canal, tipo, de, para, departamento, desde } */) → Mensaje[]
+  desde(t) → Mensaje[]            // t ≥ desde (INCLUSIVO), de los que hay en memoria
   // emite 'mensaje'
 }
 Mensaje = { id, t, de, deNombre, departamento, para, canal, tipo, texto, datos, importancia, costeUsd }
@@ -461,6 +544,10 @@ tipo  ∈ 'estado'|'nota'|'regimen'|'senal'|'propuesta'|'aprobacion'|'veto'|'ord
         |'comite'|'voto'|'decision'|'megafono'|'directiva'|'leccion'|'hipotesis'|'contratacion'|'despido'|'informe'|'sistema'|'descanso'
 ```
 `datos` es lo que leen otros agentes; `texto` es para el humano.
+`desde` es inclusivo: con el reloj acelerado muchos mensajes comparten
+instante, y quien pagina con el último `t` visto perdería los publicados
+después en ese mismo `t`. Los que ya tenía vuelven a llegar y se reconocen
+por su `id` (la interfaz deduplica por `id`).
 
 ### 6.3 LLM (`src/agentes/llm.js`, D)
 
@@ -471,6 +558,8 @@ crearLLM({ apiKey, modeloComite, modeloAgentes, presupuestoDiaUsd, reloj, rutaCo
     async pedirJSON({ uso: 'comite'|'agentes', proposito, sistema, entrada /* objeto */, instrucciones, esquema, maxTokens = 2000, esfuerzo })
       → { ok: true, datos, costeUsd, modelo, tokens } | { ok: false, motivo: 'sin_clave'|'presupuesto'|'rechazo'|'error'|'esquema', detalle },
     gastoHoy() → usd, estado() → { activo, modeloComite, modeloAgentes, gastoHoyUsd, presupuestoDiaUsd, llamadasHoy, ultimoError },
+    gastoDelDia(dia /* 'AAAA-MM-DD' UTC, de los últimos 8 */) → usd,   // día del DINERO (tiempo real), no el simulado
+    gastoEntre(desde, hasta) → usd,                                     // desde < t ≤ hasta, ms de tiempo real
     fijarModelos({ modeloComite, modeloAgentes }), fijarPresupuesto(usd),
   }
 ```
@@ -479,19 +568,31 @@ Forma de la petición (verificada contra la referencia de la API, 29-sep-2026):
   `client.beta.messages.create({ model, max_tokens, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default', output_config: { effort, format: { type: 'json_schema', schema } }, system: [{ type: 'text', text: sistema, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content }] })`.
   Sin `thinking`, sin `temperature`. Esfuerzo por defecto: comité `medium`, agentes `low`.
 - `claude-haiku-4-5` y cualquier otro: `client.messages.create({ model, max_tokens, output_config: { format }, system, messages })`, sin `effort` ni `fallbacks`.
-- `new Anthropic({ apiKey, timeout: 60000, maxRetries: 2 })`.
+- `new Anthropic({ apiKey, timeout: 60000, maxRetries: 2 })`, pero cada petición
+  lleva los suyos: `timeout` = maxTokens × 40 ms, entre 60 s y 600 s (un
+  no-streaming de 4.000 tokens tarda más de 60 s), y `maxRetries: 1`, porque
+  cada intento cortado puede haberse cobrado.
 - Mirar `stop_reason` antes de leer: `refusal` → `motivo: 'rechazo'`; `max_tokens` → error. Leer el primer bloque `text`, `JSON.parse`, validar contra el esquema (validador mínimo propio: tipos, required, enum, additionalProperties) → si falla, `motivo: 'esquema'`.
 - Errores con la cadena tipada del SDK: `AuthenticationError` (desactiva el LLM y lo dice), `RateLimitError`, `APIConnectionError`, `APIError`.
 - Coste con `usage` y la tabla por MTok (entrada/salida/lectura caché/escritura caché):
   opus-5-5 4/20/0,20/5 · sonnet-5-5 2/10/0,20/2,5 · haiku-4-5 1/5/0,10/1,25 · opus-5 5/25/0,50/6,25 · fable-5-1 10/50/0,25/12,5.
   Cada llamada se apunta en `llm-costes.jsonl`: `{ t, proposito, modelo, entrada, salida, cacheLectura, cacheEscritura, costeUsd, ok, motivo, ms }`.
 - Presupuesto diario (UTC): antes de llamar se estima el máximo (≈ caracteres/3 de entrada + `maxTokens` de salida); si no cabe, `motivo: 'presupuesto'`.
+  En los modelos con salvavidas del servidor la reserva incluye el segundo
+  intento en el destino más caro (`claude-opus-5` / `claude-opus-4-8`). Una
+  llamada cortada por timeout llegó al servidor y puede estar cobrada: se
+  apunta como gastado lo reservado × (1 + reintentos), con `estimado: true` en
+  `llm-costes.jsonl`. El resto de errores (401, 429, 5xx, sin conexión) cuentan 0.
 
 `src/agentes/cifras.js` (D): `verificarCifras(texto, entrada) → { ok, noEncontradas: [] }`. Extrae
 números del texto (formatos 1.234,56 · 1,234.56 · 12 % · 3,5 $) y los busca
 entre todos los números de `entrada` (aplanada; se aceptan redondeos a 0-2
-decimales y porcentajes ×100). Enteros 0-31 se aceptan siempre (conteos,
-días, horas).
+decimales y porcentajes ×100). Signo: un «+» o «−» escrito pegado al número
+tiene que coincidir con el del dato («+523,40 $» no pasa si el dato es
+−523,40); sin signo escrito se compara el valor absoluto. Enteros 0-31 sin
+unidad ni signo se aceptan siempre (conteos, días, horas); con unidad
+(«12 %», «5 $») o con signo («+3»), no: son cifras que hay que encontrar.
+Una hora de reloj (16:00) solo pasa si esa hora está en los datos.
 
 ### 6.4 Plantillas (`src/agentes/plantillas.js`, D)
 
@@ -501,9 +602,17 @@ Funciones puras que convierten datos en frases en español, usando
 `informeComite` (una por jefe), `decisionComite`, `directiva`, `leccion`,
 `hipotesis`, `resultadoHipotesis`, `contratacion`, `despido`, `informeDiario`,
 `informeSemanal`, `descanso`, `killSwitch`, `soloCerrar`, `reabrir`,
-`conciliacion`. Frases cortas (≤ 140 caracteres), con cifras, sin adjetivos
-vacíos. Las de estado imitan el vídeo: «Sin posición en SOL. Esperando a que
-SMA 7-25 dé LONG con filtro 200 (4H).»
+`conciliacion`. Firmas que no son obvias:
+`directiva(d, mesas?)` y `decisionComite(d, mesas?)` nombran las mesas por su
+nombre («Ruptura Donchian», no «ruptura») si reciben la lista de mesas;
+`informeDiario({ dia, desde?, hasta?, patrimonio, pnlDia, pnlDiaPct, operaciones, acierto, gastoLLMUsd })`
+dice el tramo real si el cierre no cubre 24 h (portátil apagado a las 00:05);
+`reabrir({ quien, patrimonio, pico })` dice con cifras cuánto está el fondo por
+debajo de su máximo histórico.
+
+Frases cortas (≤ 140 caracteres), con cifras, sin adjetivos vacíos. Las de
+estado imitan el vídeo: «Sin posición en SOL. Esperando a que SMA 7-25 dé
+LONG con filtro 200 (4H).»
 
 ### 6.5 Megáfono (`src/agentes/megafono.js`, D)
 
@@ -515,11 +624,17 @@ Lista CERRADA de directivas (solo aprietan; caducan):
 { tipo: 'reanudar_activo', simbolo }           { tipo: 'reanudar_mesa', mesaId }   // solo deshacen un apretón previo
 { tipo: 'sin_efecto', motivo }
 ```
-`async interpretar(texto, { llm, universo, mesas }) → { directivas, explicacion, fuente: 'llm'|'palabras_clave' }`,
+`async interpretar(texto, { llm, universo, mesas, directivas?, ahora?, horasPorDefecto = 4 }) → { directivas, explicacion, fuente: 'llm'|'palabras_clave' }`
+(`horasPorDefecto`: la duración si la orden no dice cuánto; el orquestador pasa
+`COMITE_HORAS`, hasta el comité siguiente. `directivas` y `ahora`: para que un
+«reanuda» solo deshaga una pausa del Megáfono vigente),
 `validarDirectiva(d, ctx)`, `aplicarDirectiva(directivas, d, ahora) → directivas`,
 `directivasVigentes(directivas, ahora)`. Sin LLM: palabras clave («pausa»,
 «para», «reduce», «baja», «solo cerrar», «no abras», «reanuda» + etiqueta o
-nombre de mesa). El humano confirma con «Aplicar» antes de que entre.
+nombre de mesa). El humano confirma con «Aplicar» antes de que entre. La
+explicación del LLM solo se enseña si sus cifras están en la orden o en las
+directivas; el motivo de un `sin_efecto` del LLM, solo si sus cifras están en
+la orden o en las reglas (si no, un motivo fijo).
 
 ### 6.6 Post-mortem (`src/agentes/postmortem.js`, D)
 
@@ -529,9 +644,17 @@ ganadora por regla → acierto_de_libro; ganadora por kill/riesgo → suerte;
 perdedora con régimen RISK-OFF en la entrada → contra_regimen; perdedora por
 stop en ≤ 2 velas → stop_estrecho; perdedora con deslizamiento > 0,5 % →
 ejecucion; resto → señal_falsa).
-`async lote({ operaciones, llm }) → [{ operacionId, categoria, leccion, fuente }]` (una
+`async lote({ operaciones, llm }) → [{ operacionId, mesaId, simbolo, motivoSalida, categoria, leccion, fuente: 'llm'|'reglas' }]` (una
 llamada al día; el LLM elige categoría del enum y escribe la lección; la
-lección pasa por `verificarCifras`). `hipotesisDesdeLecciones(lecciones30d) → [{ mesaId, categoria, n }]` con n ≥ 5.
+lección pasa por `verificarCifras` contra los datos de SU operación). La
+categoría del LLM tiene que cuadrar con el signo del P&L (una ganadora solo
+`acierto_de_libro` o `suerte`; una perdedora, pnl ≤ 0, el resto) y la lección
+no puede decir «ganó» en una perdedora ni «perdió» en una ganadora: si no, sale
+por reglas. `hipotesisDesdeLecciones(lecciones30d) → [{ mesaId, categoria, n }]`
+con n ≥ 5; no cuentan las operaciones cerradas por `kill`, `manual` o `prueba`
+(`SALIDAS_SIN_PISTA`): no las cerró la regla de la mesa. Las lecciones
+guardadas antes de llevar `motivoSalida` lo toman de su operación
+(`operacionId`) al sacar las pistas de la semana.
 
 ### 6.7 Flujo de una operación (F)
 
@@ -545,15 +668,39 @@ cierre de vela del marco de la mesa
  → libros.aplicarEjecucion()                           [bus: 'cierre' si se cierra]
  → (en paralelo, el puesto sombra «sin comité» hace lo mismo con multiplicador 1 y sin directivas, sin bróker)
 ```
-- `idCliente = mt-<mesaId>-<CLAVE>-<velaISO compacta>-<accion>-<n>` (≤ 128).
-  Al arrancar, toda orden en INTENCIÓN/ENVIADA sin estado final se consulta
-  por `idCliente` antes de nada. Una decisión por puesto y vela
-  (`ultimaVela` por mesa en el estado).
+- `idCliente = mt-<sal>-<mesaId>-<CLAVE>-<velaISO compacta>-<accion>-<n>` (≤ 128).
+  `sal` = `estado.creado` (instante en que se creó el estado.json de esa
+  carpeta) en segundos y base 36: el contador `n` solo conoce el
+  `ordenes.jsonl` de su carpeta, y otra carpeta sobre la misma cuenta paper
+  repetiría el id de una orden vieja (Alpaca devolvería la vieja como si fuera
+  la nueva). Un id nunca se reutiliza en la misma carpeta.
+  Al arrancar, toda orden en INTENCIÓN/ENVIADA/DESCONOCIDA sin estado final se
+  consulta por `idCliente` antes de nada; si el bróker no la conoce (404), no
+  llegó y se abandona (no se repite: la decisión ya es vieja). Una decisión por
+  puesto y vela (`ultimaVela` por mesa en el estado). Si se saltaron velas
+  (ordenador apagado o dormido), al volver se marcan una a una (barras
+  abiertas y trailing del stop), la decisión recibe `iAnterior` (§4.3) y la
+  mesa avisa de cuántas velas se saltó.
+- Un error de red al enviar NO es un rechazo: la orden pudo entrar. Queda en
+  vuelo como DESCONOCIDA, bloquea otras de ese símbolo y aplaza la conciliación
+  hasta saber por su idCliente si existe. Una orden en vuelo que lleva 60 s sin
+  estado final (cripto `gtc` llenada a medias fuera del collar) se cancela
+  (`cancelarOrden`): lo ejecutado se apunta y el resto lo vuelve a pedir quien
+  lo pidió.
 - Órdenes de un mismo símbolo, en serie (esperar la ejecución antes de la
   siguiente): evita el rechazo anti-lavado (ficha §0.6).
-- Ventas: `min(cantidad del puesto, disponible en el bróker)`.
+- Ventas: `min(cantidad del puesto, disponible en el bróker)`. Justo antes de
+  vender se concilia ese símbolo con la regla de §5.2 (si libros y bróker
+  difieren menos de la tolerancia, se escala): si no, una venta que llega
+  antes que la conciliación del latido (un stop, el kill, la prueba) dejaría
+  en los libros un resto fantasma.
 - Acciones con el mercado cerrado: la decisión queda pendiente y se envía en
-  la apertura + 5 min.
+  la apertura + 5 min. Una apertura pendiente se vuelve a dimensionar con el
+  capital de ese momento (los comités de la noche, el DEFENSIVO, una mesa que
+  pasó al banquillo, que ya no abre) y pasa por Riesgos con el precio de
+  entonces (el desvío frente a la decisión la puede vetar). El puesto sombra
+  tiene su propia cola (`estado.sombra.pendientes`) con la misma regla: si no,
+  la sombra «sin comité» no tendría nunca ETF.
 - Stops: el vigilante los mira en cada latido con el último precio; si saltan,
   venta a mercado con `tipo: 'stop'`. Aviso permanente en pantalla: con el
   ordenador apagado no hay stops (en cripto no existen órdenes stop simples).
@@ -578,46 +725,116 @@ La decisión: una llamada al LLM (`uso: 'comite'`) que devuelve
 plan por defecto = modo por mayoría de votos (en empate, el más prudente),
 multiplicadores 1, vetos los activos con evento grave de noticias. Las
 `intervenciones` sustituyen a las plantillas de los puntos 1-6 solo si pasan
-`verificarCifras`. Durante el comité, los jefes van a la sala de comité (evento `agente`).
+`verificarCifras` contra los datos de SU punto (`{ hora, [punto]: … }`, más
+los límites en el de Riesgos) y no nombran un voto o un régimen distinto del
+calculado. El voto publicado de Macro y Riesgos es siempre el del código. La
+`razon` del LLM solo sale si no hubo veto de Riesgos (con veto, el modo
+aplicado no es el que razonó) y no nombra otro modo. Durante el comité, los
+jefes van a la sala de comité (evento `agente`); las pausas entre puntos son
+solo de pantalla y `detener()` las corta.
 
 ### 6.9 Cadencias del orquestador (F: `src/orquestador.js`)
 
 En cada `paso()` (tiempo real: cada 60 s; sintético: cada 5 min simulados):
-precios → valorar → vigilante → conciliación (tiempo real: cada 60 s; con
-Alpaca, cada 5 min `relojMercado`) → mesas con vela nueva → emitir estado.
+precios (con Alpaca, cada 5 min `relojMercado`) → valorar → cierre diario (si
+toca) → vigilante → órdenes en vuelo → conciliación → macro y análisis
+(noticias en segundo plano) → comité (en segundo plano) → pendientes de la
+bolsa (real y sombra) → mesas con vela nueva → semanal y mensual → descansos →
+curva → estado.json → emitir estado. El cierre diario va ANTES que el
+vigilante: al despertar el portátil tras las 00:05, el vigilante mide ya con
+la referencia del día nuevo.
 - Analistas: con cada vela 1H cerrada, nota técnica (se publica si cambia el sesgo o cada 4 h).
 - Macro: régimen con cada vela 1H; mensaje si cambia o cada 4 h. Miedo y codicia cada hora.
 - Noticias (con claves y LLM): cada 4 h en lote → eventos graves bloquean aperturas 24 h en ese activo.
+  Solo se marcan vistas tras clasificarlas con éxito (si la llamada falla,
+  entran en el lote siguiente) y una noticia solo veta activos que menciona;
+  titular y resumen van al LLM como texto de terceros, nunca como instrucciones.
 - Comité: cada 4 h y a demanda.
 - Diario 00:05 UTC: cierre diario (patrimonio inicio de día, pico, curva diaria, sombras, métricas de mesa), post-mortem en lote, informe diario.
+  Si llega tarde (más de 15 min: portátil apagado o dormido), el día que se
+  cierra es el de la referencia (`diaInicio`), las operaciones van por ventana
+  desde el cierre anterior (`ultimoCierreT`, así cada una pasa una sola vez por
+  el Auditor), el informe dice el tramo real y el día nuevo arranca desde el
+  último patrimonio de la curva horaria ANTERIOR a las 00:00 (lo perdido de
+  noche cuenta para los límites del día). Con Alpaca, además, contrasta la
+  comisión estimada del día anterior con la real (CFEE) y avisa si difieren
+  más de un 5 % o si Alpaca no apuntó nada.
 - Semanal (lunes 00:10 UTC): laboratorio (≤ 3 hipótesis, en trozos con `setImmediate` para no bloquear), informe semanal (Sharpe 90 d del fondo contra sombras), alarma de deriva.
 - Mensual (día 1, 00:15 UTC): asignador → contrataciones (incubación 2 %), ascensos, despidos.
 - Descanso: un agente sin trabajo durante 2 h (simuladas) va 15 min a la sala de descanso. Nunca durante un comité ni con el fondo en alerta.
 
 ### 6.10 Estado persistido (`data/`)
 
-`estado.json` (atómico, cada latido): mesas y pesos, libros, `ultimaVela` por
-mesa, directivas, nivel del fondo, `patrimonioInicioDia`, `pico`, curva
-(muestras cada hora, máx. 2.000), sombras, laboratorio (hipótesis y contador
-de ensayos), lecciones (últimos 90 días), agentes (estado visual), próximas
-cadencias. `mensajes.jsonl`, `ordenes.jsonl`, `operaciones.jsonl`,
+`estado.json` (atómico y durable, cada latido): mesas y pesos, libros,
+`ultimaVela` por mesa, directivas, nivel del fondo, `patrimonioInicioDia`,
+`pico`, curva (muestras cada hora, máx. 2.000), sombras, laboratorio
+(hipótesis con su firma, `aprobadas`, contador de ensayos y `sharpesEnsayos`),
+lecciones (últimos 90 días, con `mesaId` y `motivoSalida`), agentes (estado
+visual), próximas cadencias. Campos añadidos después del primer contrato:
+- `ultimoCierreT`: instante del último cierre diario (ventana de operaciones).
+- `picoVigilancia`, `inicioDiaVigilancia`, `diaInicioVigilancia`: la
+  referencia del vigilante tras un REABRIR humano después de un kill (§7);
+  `pico` y `patrimonioInicioDia` siguen siendo los históricos.
+- `comisionesEstimadas`: `{ 'AAAA-MM-DD': usd }`, comisión cripto estimada por
+  día para contrastarla con la CFEE de Alpaca (10 días).
+- `sombra.pendientes`: aperturas de acciones del puesto sombra que esperan a la apertura.
+- `fondo.killReintento`: `{ n, proximo }` si tras el kill quedó algo en el bróker.
+- `macro.fgDias`: los últimos días de miedo y codicia (para `RETRASO_FG`).
+- `noticias.ultimaOk`: última clasificación de noticias que salió bien (las
+  noticias solo se marcan vistas tras clasificarlas).
+- `mesas[].nota`, `mesas[].firmaHipotesis` (las contratadas del laboratorio).
+Además `data/.proceso` (el bloqueo de la carpeta, con el pid), `mensajes.jsonl`,
+`ordenes.jsonl`, `operaciones.jsonl`, `operaciones-sombra.jsonl`,
 `llm-costes.jsonl`, `informes.jsonl`, `broker-simulado.json`, `cache/`.
-Arranque: cargar → si bloqueado, sigue bloqueado → resolver órdenes a medias
-→ conciliar → operar.
+
+Arranque (`src/index.js`), en este orden:
+1. HOST abierto a la red sin `PANEL_TOKEN` → no arranca.
+2. Bloqueo de la carpeta (`data/.proceso`) ANTES de construir nada: si su pid
+   vive, se niega con un mensaje claro; si murió, se toma.
+3. `listen()` ANTES de `orquestador.iniciar()`: con el puerto ocupado se para
+   ahí, sin haber resuelto órdenes, guardado estado ni publicado nada. Mientras
+   arranca, la API responde 503 y los estáticos ya se sirven.
+4. `iniciar()`: cargar (un estado.json que existe pero no se puede leer NO
+   arranca un fondo nuevo encima: se niega; uno de otro modo tampoco) → si
+   bloqueado, sigue bloqueado → resolver órdenes a medias → conciliar → operar.
 
 ---
 
 ## 7. API HTTP y eventos (F ↔ E)
 
 Servidor `node:http` en `127.0.0.1:8765` (variables `PUERTO`, `HOST`). Si hay
-`PANEL_TOKEN`, los POST y el SSE lo piden en la cabecera `x-panel-token` o en `?token=`.
+`PANEL_TOKEN`, todo `/api/*` (GET, POST y el SSE) lo pide en la cabecera
+`x-panel-token` o en `?token=` (EventSource no admite cabeceras); los
+estáticos se sirven sin token. Con `HOST` abierto a la red (0.0.0.0 o una IP
+de la wifi) y sin `PANEL_TOKEN`, la mesa no arranca.
+
+Defensas frente a otra web abierta en el mismo navegador (las palabras KILL,
+REABRIR o PRUEBA no protegen: la web atacante las mete en el cuerpo):
+- Los POST exigen `Content-Type: application/json` (si no, **415**): una web
+  ajena solo puede mandar text/plain o formularios sin pedir permiso antes.
+- **403** si `Origin` no es el del propio panel (también `Origin: null`) o si
+  `Sec-Fetch-Site` es `cross-site`, en toda `/api/*`, SSE incluido.
+- **421** si la cabecera `Host` no está en una lista FIJA (127.0.0.1, localhost
+  y [::1] con el puerto en que escucha, más el `HOST` configurado): así una
+  página que pasa a resolver a 127.0.0.1 (DNS rebinding) no llega. El `Origin`
+  se compara con esa misma lista, nunca con el `Host` que llega. Con el panel
+  abierto a la red no hay lista fija: ahí protege el token.
+- Como mucho **20** paneles SSE a la vez: el 21 recibe **503** («Ya hay 20
+  paneles conectados…», `Retry-After: 10`). Un panel que deja de leer (más de
+  1 MB sin vaciar o 60 s atascado) se corta; EventSource vuelve a conectar solo.
+- Mientras el orquestador arranca (el servidor escucha antes), `/api/*`
+  responde **503** «La mesa está arrancando: reintenta en unos segundos.»
+  (`Retry-After: 2`).
+- **401** con dos textos: «Falta el token del panel: abre la URL con ?token=…
+  (el valor de PANEL_TOKEN).» sin token, y «El token del panel no vale: revisa
+  el ?token=… de la URL (el de PANEL_TOKEN).» con uno malo.
 
 | Método y ruta | Qué |
 |---|---|
 | `GET /` y `/web/*` | estáticos de `web/` |
 | `GET /api/estado` | instantánea completa (abajo) |
 | `GET /api/eventos` | SSE: `estado` (instantánea, como mucho una cada 2 s reales), `mensaje` (Mensaje), `agente` ({ id, estado, sala, bocadillo }), `ejecucion` (Ejecucion), `ping` (cada 15 s) |
-| `GET /api/mensajes?desde=<t>` | mensajes desde `t` |
+| `GET /api/mensajes?desde=<t>` | mensajes con `t ≥ desde` (INCLUSIVO; se deduplican por `id`). Si `desde` es anterior a lo que hay en memoria (500), se completa con las últimas 5.000 líneas de `mensajes.jsonl` |
 | `GET /api/operaciones` | últimas 200 operaciones cerradas |
 | `GET /api/costes-llm` | gasto por día y por propósito |
 | `POST /api/comando/comite` | convoca comité ya |
@@ -625,11 +842,13 @@ Servidor `node:http` en `127.0.0.1:8765` (variables `PUERTO`, `HOST`). Si hay
 | `POST /api/comando/megafono-aplicar` `{id}` | aplica la propuesta |
 | `POST /api/comando/prueba` `{ordenMinima?: true, confirmacion?: 'PRUEBA'}` | comprobación de bróker, datos, F&G y LLM; con confirmación, compra y vende 15 $ de BTC |
 | `POST /api/comando/pausar` | solo cerrar hasta Reabrir |
-| `POST /api/comando/reabrir` `{confirmacion: 'REABRIR'}` | vuelve a normal si la conciliación está limpia |
-| `POST /api/comando/kill` `{confirmacion: 'KILL'}` | cancela todo, cierra todo, bloquea |
+| `POST /api/comando/reabrir` `{confirmacion: 'REABRIR'}` | vuelve a normal desde `pausado` o `bloqueado` si la conciliación está limpia. Desde `solo_cerrar` (pérdida del día) responde `ok: false` (HTTP 200): dura hasta las 00:00 UTC y se levanta solo. No borra el máximo histórico: el mensaje dice cuánto acumula el fondo desde él |
+| `POST /api/comando/kill` `{confirmacion: 'KILL'}` | bloquea al instante (y lo guarda), cancela todo y cierra todo. `ok: false` si algo queda sin vender: el fondo sigue bloqueado y se reintenta solo cada pocos minutos. Las acciones con la bolsa cerrada se venden a la apertura |
 | `GET/POST /api/comando/ajustes` | ver; cambiar `presupuestoDiaUsd`, `modeloComite`, `modeloAgentes`, `velocidad` (sintético). Los límites se ven, no se cambian. |
 
-Respuesta de comando: `{ ok, mensaje, datos? }` (HTTP 200; 400 si falta la confirmación).
+Respuesta de comando: `{ ok, mensaje, datos? }` (HTTP 200; 400 si falta la
+confirmación o el JSON no vale; 404 comando desconocido; 405 un comando por
+GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
 
 **Instantánea (`GET /api/estado` y evento `estado`)**:
 ```js
@@ -638,19 +857,30 @@ Respuesta de comando: `{ ok, mensaje, datos? }` (HTTP 200; 400 si falta la confi
   fondo: { nivel: 'normal'|'solo_cerrar'|'pausado'|'bloqueado', motivo, multiplicadorCaida },
   cabecera: { patrimonio, pnlDia, pnlDiaPct, caida, exposicionBrutaPct, exposicionCriptoPct, posiciones,
               regimen: { valor, detalle }, miedoCodicia: { valor, etiqueta, sintetico } | null,
-              proximoComite, modoComite: 'NORMAL'|'DEFENSIVO'|'SOLO_CERRAR' },
+              proximoComite, modoComite: 'NORMAL'|'DEFENSIVO'|'SOLO_CERRAR',
+              sinAsignar: { fraccion, usd },           // capital que ninguna mesa tiene (queda en efectivo)
+              vigilancia: { perdidaDiaPct | null, caidaPct, desdeReapertura } },
+  // pnlDia/pnlDiaPct: desde el inicio REAL del día (también tras reabrir); caida: desde el máximo HISTÓRICO.
+  // vigilancia: lo que mide el vigilante contra sus límites (tras un Reabrir humano después de un kill,
+  //   desde la reapertura); es la cercanía a los límites, no el resultado. perdidaDiaPct null antes del cierre diario.
+  // exposicion*Pct: la de los libros con, por símbolo, el máximo frente al bróker (una posición del bróker
+  //   sin puesto, huérfana, cuenta).
   llm: { activo, modeloComite, modeloAgentes, gastoHoyUsd, presupuestoDiaUsd },
   curva: [{ t, patrimonio }],                            // ≤ 500 puntos
-  cotizaciones: [{ simbolo, etiqueta, precio, var24hPct, t }],
+  cotizaciones: [{ simbolo, etiqueta, precio, var24hPct, t }],   // var24hPct: frente al precio de 24 h antes del DATO (t), no
+                                                                  //   del latido: con los datos parados no se mueve sola
   departamentos: DEPARTAMENTOS,
   agentes: [{ id, nombre, departamento, rol, queDecide, usaLLM, sala, estado: 'trabajando'|'reunion'|'descanso'|'de_pie'|'banquillo',
               bocadillo: { texto, hasta } | null, mesaId, simbolo, etiqueta, puestoId }],
   mesas: [{ id, nombre, familia, marco, estado, peso, capital, multiplicador, universo: [etiqueta], params,
-            metricas: { operaciones, acierto, factorBeneficio, sharpe, sharpeAjustado, maxDD, adherencia, pnlTotal }, pnlDia }],
+            metricas: { operaciones, acierto, factorBeneficio, sharpe, sharpeAjustado, maxDD, adherencia, pnlTotal }, pnlDia,
+            nota /* string | null: por qué está así (backtest de arranque, contratación, ascenso, despido) */ }],
   puestos: [{ id, mesaId, simbolo, etiqueta, agenteId,
               posicion: { cantidad, nocional, entrada, stop, objetivo, pnlAbierto, pnlAbiertoPct, abiertaT } | null,
               pnlDia, operaciones, acierto, factorBeneficio, adherencia, estadoTexto, ultimaSenal: { accion, t } | null,
               chispa: [number] /* últimos 16 cierres */ }],
+  // estadoTexto: con posición abierta se rehace con las cifras de ahora (las de `posicion`); tras un
+  //   cierre dice el cierre; sin posición, la espera de la estrategia en la última vela.
   posiciones: [{ simbolo, etiqueta, cantidad, precioMedio, precio, valor, pnl }],
   benchmarks: [{ id, nombre, valor, rentabilidad, sharpe90 }],        // incluye 'sin-comite'
   mejora: { sharpe90Fondo, sharpe90SinComite, sharpe90Btc, texto },
@@ -661,7 +891,13 @@ Respuesta de comando: `{ ok, mensaje, datos? }` (HTTP 200; 400 si falta la confi
   ejecuciones: [{ t, puestoId, simbolo, etiqueta, lado, cantidad, precio, nocional, comision, motivo }],   // últimas 30
   laboratorio: { ensayosTotales, hipotesis: [{ id, descripcion, estado: 'pendiente'|'evaluando'|'aprobada'|'rechazada', criterios, t }], proximaRevision },
   limites,
-  avisos: [texto]                                        // p. ej. 'Con el ordenador apagado no hay stops'
+  avisos: [texto]    // lo que bloquea o limita al fondo va delante (en el móvil se corta por el final): nivel
+                     // (bloqueado, pausa, solo cerrar), kill pendiente de reintento, solo cerrar del comité o del
+                     // Megáfono; con el fondo en normal, los activos vetados (Megáfono, comité, noticia grave) y las
+                     // mesas sin abrir (pausa del Megáfono o ×0 del comité), con quién y hasta cuándo; caída
+                     // histórica por encima del límite del kill tras reabrir, precios sin actualizar (> 3 min, fuera
+                     // del sintético), conciliación con incidencias, capital sin asignar; al final
+                     // 'Con el ordenador apagado no hay stops…' y el modo (sintético / bróker simulado)
 }
 ```
 
@@ -691,12 +927,31 @@ abra también desde `file://` en modo maqueta).
   `sala`. Bocadillos (máx. 5 a la vez, por importancia).
 - Clic en un puesto o agente → tarjeta de detalle (como la imagen 2):
   situación, nocional, cantidad, entrada, stop, objetivo, abierto, P&L del
-  día, operaciones, acierto, adherencia, factor, último mensaje; para agentes
-  no-puesto: rol, qué decide, si usa LLM, último mensaje.
-- Botonera: Comité, Megáfono (modal con texto → propuesta → Aplicar), Prueba,
-  Pausar todo, Reabrir (escribir REABRIR), Kill switch (rojo, escribir KILL),
-  Ajustes (modal). Controles de cámara y zoom; arrastrar para mover, rueda o
-  pellizco para zoom.
+  día, operaciones, acierto, adherencia, factor, último mensaje, y la mesa del
+  puesto con su estado (con tilde: titular, incubación, banquillo), su peso y
+  su `nota`; para agentes no-puesto: rol, qué decide, si usa LLM, último mensaje.
+- Clic en el rótulo de una mesa (encima de su fila) → ficha de la mesa: nota,
+  lo que la bloquea (pausa del Megáfono, ×0 del comité, vetos), estado, peso,
+  capital, multiplicador, P&L del día y total, operaciones, acierto, factor,
+  Sharpe, Sharpe ajustado, caída y adherencia, y sus puestos.
+- Teclado sobre el lienzo: flechas para mover, + y − para el zoom, 0 para
+  encuadrar; `n` / `p` (o AvPág / RePág) recorren puestos y agentes y `Intro`
+  (o espacio) abre la tarjeta del elegido; Escape cierra la tarjeta.
+- Botonera: Comité, Megáfono (modal con texto → propuesta → Aplicar),
+  Resultados, Prueba, Pausar todo, Reabrir (escribir REABRIR), Kill switch
+  (rojo, escribir KILL), Ajustes (modal). Controles de cámara y zoom; arrastrar
+  para mover, rueda o pellizco para zoom.
+- Resultados (modal ancho): el fondo frente a cada cartera sombra (valor,
+  rentabilidad, Sharpe 90 d y diferencia en dólares), incluida «mismas mesas
+  sin comité»; «¿Aporta algo el comité?» con el bloque `mejora`; las mesas con
+  estado, peso, Sharpe y P&L total, el capital sin asignar (queda en efectivo)
+  y la `nota` de cada mesa; y el laboratorio (ensayos acumulados, próxima
+  revisión y las hipótesis con sus criterios).
+- Barra de LÍMITES del fondo (pantalla del parqué): exposición bruta y cripto,
+  y la pérdida del día y la caída tal y como las mide el vigilante
+  (`cabecera.vigilancia`): tras reabrir un kill, desde la reapertura, y lo dice
+  («medido desde la reapertura»). La cabecera sigue enseñando el resultado
+  real (desde el inicio del día y el máximo histórico).
 - Móvil (< 768 px): barra compacta, panel lateral como hoja inferior, tarjeta
   a pantalla completa.
 - Cifras que cuentan hacia arriba (sin rebote) y respeto a
@@ -704,7 +959,20 @@ abra también desde `file://` en modo maqueta).
   pantalla; pausa con la pestaña oculta.
 - `?maqueta=1` (o abrir `index.html` como fichero): genera una instantánea y
   mensajes falsos con `maqueta.js` para poder trabajar la interfaz sin backend.
-- Sin conexión: franja «Sin conexión con la mesa, reintentando…» y reconexión SSE con espera creciente.
+- Franja de arriba. Roja sin conexión, con el motivo si se sabe y reconexión
+  SSE con espera creciente:
+  «Sin conexión con la mesa, reintentando en N s…» (red);
+  «Falta el token del panel: abre la URL con ?token=… (el valor de
+  PANEL_TOKEN).» (401 sin token); «El token del panel no vale: revisa el
+  ?token=… de la URL (tiene que ser el de PANEL_TOKEN).» (401 o 403 con token);
+  «Hay demasiados paneles abiertos contra la mesa: cierra alguna pestaña.»
+  (503 del SSE lleno); «La mesa está arrancando (histórico, órdenes a medias y
+  conciliación).» (503 mientras arranca; se distinguen por el `mensaje` del
+  503). Ámbar con conexión pero sin instantáneas nuevas desde hace más de 2,5
+  latidos (nunca menos de 20 s): «Cifras sin actualizar: el último dato de la
+  mesa llegó hace N min…», porque el `ping` mantiene viva una conexión cuyo
+  latido está colgado. Un precio más viejo que el límite de §5.3 lleva «hace
+  N min» en la pantalla gigante y en la tarjeta.
 
 ---
 

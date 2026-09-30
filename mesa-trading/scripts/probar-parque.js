@@ -86,5 +86,29 @@ const comprado = maqueta.comando('megafono', { texto: 'pausa SOL 6 h' });
 caso('Megáfono «pausa SOL 6 h»', comprado.datos.directivas, [{ tipo: 'pausar_activo', simbolo: 'SOL/USD', horas: 6 }]);
 caso('kill switch sin escribir KILL', maqueta.comando('kill', { confirmacion: 'kil' }).ok, false);
 
+// 8. Lo que la pantalla tiene que decir bien (revisión de la interfaz).
+caso('caída con el fondo en su máximo: sin signo', cifras.pct(-0), '0,00 %');
+caso('−2,83 $ sobre 100.000 $ en % con signo', cifras.pct(-0.0000283, { signo: true }), '0,00 %');
+caso('hora del feed en Madrid (19:44 UTC)', cifras.hora(Date.UTC(2026, 8, 29, 19, 44)), '21:44');
+caso('ejecución de hace 66 h con fecha', cifras.momento(Date.UTC(2026, 9, 5, 8, 0), Date.UTC(2026, 9, 8, 2, 10)), '5 oct 10:00');
+caso('estado de mesa con tilde', cifras.estadoMesa('incubacion'), 'Incubación');
+caso('modo del comité sin guion bajo', cifras.modoComite('SOLO_CERRAR'), 'SOLO CERRAR');
+const sa = cifras.sinAsignar(inst);
+caso('capital sin asignar en el arranque (1 − 0,02 − 0,40 − 0,02 − 0,40)', sa.fraccion, 0.16, 1e-12);
+const soloMeg = cifras.nivelEfectivo({ ...inst, directivas: { ...inst.directivas, soloCerrarHasta: T0 + 6 * 3600000 } }, T0);
+caso('«solo cerrar 6 h» del Megáfono con fondo normal', [soloMeg.nivel, soloMeg.origen], ['solo_cerrar', 'Megáfono']);
+const conMesas = n => {
+  const mesas = []; const puestos = [];
+  for (let k = 0; k < n; k++) {
+    const universo = ['BTC', 'ETH', 'SOL', 'LINK', 'AVAX'].slice(0, 2 + (k % 4));
+    mesas.push({ id: `m${k}`, nombre: `Mesa ${k}`, marco: '1Day', estado: 'titular', universo });
+    for (const e of universo) puestos.push({ id: `m${k}-${e}`, mesaId: `m${k}`, etiqueta: e });
+  }
+  return { mesas, puestos, agentes: [] };
+};
+// 12 mesas: se juntan hasta 6 filas; paso = (12,9 − 3,2) / 5 = 1,94 (la silla llega a fila + 1,85).
+const filas12 = Array.from(new Set(Array.from(mapa.construirMapa(conMesas(12)).puestos.values()).map(p => p.f0))).sort((a, b) => a - b);
+caso('12 mesas: filas del parqué', filas12, [3.2, 5.14, 7.08, 9.02, 10.96, 12.9]);
+
 console.log(fallos ? `\n${fallos} caso(s) con FALLO` : '\nTodos los casos cuadran.');
 process.exit(fallos ? 1 : 0);

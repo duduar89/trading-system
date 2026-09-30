@@ -11,26 +11,52 @@ const path = require('path');
 
 const RAIZ = path.resolve(__dirname, '..');
 
+// Node solo lee el proxy (NODE_USE_ENV_PROXY, --use-env-proxy y las
+// variables HTTP(S)_PROXY) AL ARRANCAR: ponerlas en el .env no hace nada, y
+// copiarlas a process.env haría creer a index.js que el proxy está activo.
+// Por eso se mira aquí, antes de cargar el .env, y esas claves no se copian.
+const CLAVES_PROXY = new Set(['NODE_USE_ENV_PROXY', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy']);
+const PROXY_ACTIVO = Boolean(process.env.NODE_USE_ENV_PROXY)
+  || process.execArgv.includes('--use-env-proxy')
+  || /(^|\s)--use-env-proxy\b/.test(process.env.NODE_OPTIONS || '');
+
 // Carga mínima de .env (sin dependencias). No pisa variables ya definidas.
+// Devuelve { ignoradas }: las claves de proxy que traía el .env (no valen ahí).
 function cargarEnv(ruta = path.join(RAIZ, '.env')) {
+  const ignoradas = [];
   let texto;
-  try { texto = fs.readFileSync(ruta, 'utf8'); } catch (_) { return; }
+  try { texto = fs.readFileSync(ruta, 'utf8'); } catch (_) { return { ignoradas }; }
   for (const linea of texto.split(/\r?\n/)) {
-    const m = linea.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    const m = linea.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*)\s*$/);
     if (!m || linea.trim().startsWith('#')) continue;
+    if (CLAVES_PROXY.has(m[1])) { ignoradas.push(m[1]); continue; }
     let valor = m[2];
     if ((valor.startsWith('"') && valor.endsWith('"')) || (valor.startsWith("'") && valor.endsWith("'"))) {
       valor = valor.slice(1, -1);
     }
     if (process.env[m[1]] === undefined) process.env[m[1]] = valor;
   }
+  return { ignoradas };
 }
 
+// Número de una variable de entorno. En español se escribe «0,5»: una sola
+// coma decimal se acepta. Lo que no es un número para el arranque con el
+// nombre de la variable (antes caía en silencio al valor por defecto: un tope
+// de 0,5 $ se convertía en 2 $). Vacío o solo espacios → valor por defecto.
 function num(nombre, porDefecto) {
   const v = process.env[nombre];
-  if (v === undefined || v === '') return porDefecto;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : porDefecto;
+  if (v === undefined || String(v).trim() === '') return porDefecto;
+  const limpio = String(v).trim().replace(/^(-?\d+),(\d+)$/, '$1.$2');
+  const n = Number(limpio);
+  if (!Number.isFinite(n)) throw new Error(`${nombre}=${v} no es un número (escribe 0.5 o 0,5; los miles sin punto: 100000)`);
+  return n;
+}
+
+// ¿El host solo escucha en esta máquina? 0.0.0.0, :: o una IP de la red abren
+// el panel a todo el que comparta la wifi.
+function esLoopback(host) {
+  const h = String(host || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
+  return h === 'localhost' || h === '::1' || /^127\./.test(h) || /^::ffff:127\./.test(h);
 }
 
 // Argumentos de línea de órdenes del tipo --modo=sintetico --velocidad=600
@@ -68,7 +94,7 @@ const LIMITES_DUROS = Object.freeze({
 });
 
 function crearConfig(args = leerArgs()) {
-  cargarEnv();
+  const { ignoradas } = cargarEnv();
   const alpacaId = process.env.ALPACA_API_KEY_ID || '';
   const alpacaSecreto = process.env.ALPACA_API_SECRET_KEY || '';
   const hayAlpaca = Boolean(alpacaId && alpacaSecreto);
@@ -107,7 +133,10 @@ function crearConfig(args = leerArgs()) {
       latidoMs: num('LATIDO_SEG', 60) * 1000,
       comiteHoras: num('COMITE_HORAS', 4),
     },
+    // Proxy: si está activo de verdad (se decide al arrancar Node) y qué claves
+    // de proxy traía el .env sin efecto, para que el arranque lo diga.
+    proxy: { activo: PROXY_ACTIVO, ignoradasEnEnv: ignoradas },
   };
 }
 
-module.exports = { crearConfig, cargarEnv, leerArgs, LIMITES_DUROS, RAIZ };
+module.exports = { crearConfig, cargarEnv, leerArgs, num, esLoopback, LIMITES_DUROS, RAIZ, PROXY_ACTIVO, CLAVES_PROXY };

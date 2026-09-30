@@ -34,35 +34,53 @@ Lo que dicen los datos públicos (fuentes en
 
 ## Lo que ha salido con nuestras estrategias y datos reales
 
-Velas reales de Alpaca de enero de 2021 a septiembre de 2026, con comisión de
-Alpaca (0,25 %), deslizamiento y una penalización extra de papel del 0,1 %.
-Cada mesa se simula con el 25 % del fondo y los límites de riesgo activos.
+Velas reales de Alpaca del 1 de enero de 2021 al 29 de septiembre de 2026, con
+comisión de Alpaca (0,25 %), deslizamiento y una penalización extra de papel
+del 0,1 %. Cada mesa se simula con el 25 % del fondo y los límites de riesgo
+activos (`node scripts/probar-backtest.js --real`). Comprar y mantener es el
+mismo universo a partes iguales desde la misma fecha y con los mismos costes.
 
-| Mesa | Rentabilidad | Sharpe | Caída máx. | Comprar y mantener: Sharpe / caída |
+| Mesa | Rentabilidad | Sharpe | Caída máx. | Comprar y mantener: rentabilidad / Sharpe / caída |
 |---|---|---|---|---|
-| Momentum cripto | +110 % | **0,79** | 28 % | 0,66 / 95 % |
-| Ruptura Donchian | +196 % | **0,67** | 36 % | 0,67 / 95 % |
-| Tendencia SMA 4H (la del vídeo) | −41 % | −0,51 | 54 % | 0,65 / 95 % |
-| Reversión RSI cripto | −10 % | −0,42 | 12 % | 0,54 / 77 % |
+| Momentum cripto | +120 % | **0,83** | 28 % | +167 % / 0,63 / 95 % |
+| Ruptura Donchian | +88 % | **0,64** | 36 % | +207 % / 0,66 / 95 % |
+| Tendencia SMA 4H (la del vídeo) | −41 % | −0,52 | 55 % | +121 % / 0,58 / 95 % |
+| Reversión RSI cripto | −10 % | −0,42 | 12 % | +114 % / 0,54 / 77 % |
 
 Cómo leerlo:
 
-- **En dinero, ninguna mesa se acerca a comprar y mantener** en estos cinco
-  años, que han sido muy alcistas para la cripto. Pasan la mayor parte del
-  tiempo en liquidez.
-- **Ajustado por riesgo**, momentum y ruptura igualan o mejoran a comprar y
-  mantener con menos de la mitad de caída. Esa es toda la ventaja posible, y
-  es modesta.
-- **La estrategia del vídeo pierde por comisiones:** hace 548 operaciones y se
-  deja 4.478 $ en comisiones sobre 10.000 $. Sin comisiones ganaría un 66 %;
-  con ellas pierde un 41 %.
+- **En dinero, ninguna mesa llega a comprar y mantener** en estos cinco
+  años, que han sido muy alcistas para la cripto: momentum hace +120 % frente
+  a +167 %, y ruptura +88 % frente a +207 %. Pasan la mayor parte del tiempo
+  en liquidez.
+- **Ajustado por riesgo, solo momentum mejora a comprar y mantener** (Sharpe
+  0,83 frente a 0,63) y con menos de un tercio de su caída (28 % frente a
+  95 %). Ruptura se queda justo por debajo (0,64 frente a 0,66), con algo más
+  de un tercio de la caída (36 % frente a 95 %). Esa es toda la ventaja
+  posible, y es modesta.
+- **La estrategia del vídeo pierde por costes:** hace 539 operaciones y se
+  deja 4.434 $ en comisiones sobre 10.000 $. Sin costes (ni comisión, ni
+  deslizamiento, ni penalización) ganaría un 63 %; con ellos pierde un 41 %.
 - **Fuera de muestra**, validando con datos que la estrategia no vio al
   diseñarse, ninguna mesa pasa el listón estadístico del laboratorio (Sharpe
-  deflactado ≥ 0,90; la mejor saca 0,49). Traducido: no hay pruebas
+  deflactado ≥ 0,90; la mejor saca 0,54). Traducido: no hay pruebas
   suficientes de que ninguna tenga ventaja real.
+- **El hueco de SOL.** Alpaca no tiene cotizaciones de SOL del 6 de julio de
+  2023 al 26 de agosto de 2024. La primera vela de vuelta abre a 18,14 $, el
+  precio de julio de 2023, y cierra a 157,25 $. Antes, una orden decidida
+  antes del hueco se llenaba a esa apertura y multiplicaba por más de ocho
+  con un precio que no existió: de ahí salía buena parte del +196 % de ruptura. Ahora el
+  backtest vende lo que tenga abierto de SOL al último cierre anterior al
+  hueco, no compra a la apertura de vuelta y no decide hasta recalentar los
+  indicadores. Comprar y mantener se mide igual: vende antes del hueco y
+  vuelve a comprar en la segunda vela de después. Así deja fuera la subida
+  real de SOL durante esos 13 meses (de 20 $ a 157 $), que ninguna mesa puede
+  operar sin datos; antes solo la sumaba comprar y mantener, que salía entre
+  +734 % y +1.252 %.
 
 Por eso Tendencia y Reversión arrancan en incubación con el 2 % y no como
-titulares.
+titulares. Que Ruptura siga de titular con un Sharpe por debajo del de
+comprar y mantener lo decides tú.
 
 ## ¿Aporta algo la IA?
 

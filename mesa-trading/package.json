@@ -7,6 +7,7 @@
   "engines": { "node": ">=20.6" },
   "scripts": {
     "start": "node src/index.js",
+    "start-proxy": "node --use-env-proxy src/index.js",
     "demo": "node src/index.js --modo=sintetico --velocidad=600",
     "demo-rapida": "node scripts/demo-acelerada.js",
     "test": "node --test \"test/*.test.js\"",

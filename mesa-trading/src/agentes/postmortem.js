@@ -16,23 +16,47 @@ const MAX_DESLIZAMIENTO = 0.005;          // 0,5 % en contra, en fracción (como
 const MIN_REPETICIONES_PISTA = 5;
 const MAX_OPERACIONES_LLM = 40;          // una llamada al día; el resto va por reglas
 // Categorías que no piden cambiar nada: no generan pistas para el laboratorio.
+// Son también las únicas de una ganadora (pnl > 0): el resto, de una perdedora.
 const SIN_PISTA = new Set(['acierto_de_libro', 'suerte']);
+// Salidas que no dicen nada de la regla de la mesa (las decide un humano, el
+// kill switch o la orden de prueba): se auditan, pero no generan pistas.
+const SALIDAS_SIN_PISTA = new Set(['kill', 'manual', 'prueba']);
 
 const etiquetaDe = s => String(s || '').split('/')[0] || 'el activo';
 const num = x => (typeof x === 'number' && Number.isFinite(x) ? x : null);
 
 function textoLeccion(categoria, op) {
   const e = etiquetaDe(op.simbolo);
-  const pnl = f.usd(num(op.pnl), { signo: true });
+  const p = num(op.pnl);
+  // Con signo solo en la frase neutra; detrás de «ganó»/«perdió» va el importe
+  // sin signo: «perdió -45,20 $» se leería como una ganancia.
+  const pnl = f.usd(p, { signo: true });
+  const monto = f.usd(p === null ? null : Math.abs(p));
   switch (categoria) {
     case 'acierto_de_libro': return `${e} salió por regla con ${pnl}: la regla funcionó como estaba escrita.`;
-    case 'suerte': return `${e} ganó ${pnl} pero salió por ${op.motivoSalida || 'otra causa'}, no por su regla.`;
-    case 'contra_regimen': return `${e} entró en RISK-OFF y perdió ${pnl}.`;
-    case 'stop_estrecho': return `${e} tocó el stop en ${f.numero(num(op.barras))} velas y perdió ${pnl}.`;
-    case 'ejecucion': return `${e} perdió ${pnl} con ${f.pct(num(op.deslizamiento))} de deslizamiento en contra.`;
-    case 'noticia': return `${e} perdió ${pnl} por un evento de noticias.`;
-    default: return `${e} perdió ${pnl}: la señal no se confirmó.`;
+    case 'suerte': return `${e} ganó ${monto} pero salió por ${op.motivoSalida || 'otra causa'}, no por su regla.`;
+    case 'contra_regimen': return `${e} entró en RISK-OFF y perdió ${monto}.`;
+    case 'stop_estrecho': return `${e} tocó el stop en ${f.numero(num(op.barras))} velas y perdió ${monto}.`;
+    case 'ejecucion': return `${e} perdió ${monto} con ${f.pct(num(op.deslizamiento))} de deslizamiento en contra.`;
+    case 'noticia': return `${e} perdió ${monto} por un evento de noticias.`;
+    default: return `${e} perdió ${monto}: la señal no se confirmó.`;
   }
+}
+
+// ¿La categoría cuadra con el signo del resultado? Una ganadora solo puede ser
+// acierto_de_libro o suerte, y una perdedora (pnl ≤ 0) solo el resto: si no,
+// una perdedora «de suerte» saldría del recuento de pistas.
+function categoriaCuadra(categoria, op) {
+  return SIN_PISTA.has(categoria) === ((num(op.pnl) ?? 0) > 0);
+}
+
+// Verbo que contradice el resultado («ganó» en una perdedora, «perdió» en una
+// ganadora): verificarCifras no lo ve si la cifra va sin signo.
+const RE_GANA = /(?<!\p{L})(gan[oó]|gana|ganancias?|beneficios?)(?!\p{L})/iu;
+const RE_PIERDE = /(?<!\p{L})(perdi[oó]|pierde|p[eé]rdidas?)(?!\p{L})/iu;
+function verboCuadra(texto, op) {
+  const gana = (num(op.pnl) ?? 0) > 0;
+  return gana ? !RE_PIERDE.test(texto) : !RE_GANA.test(texto);
 }
 
 // Reglas fijas, en el orden del contrato. pnl ≤ 0 cuenta como perdedora.
@@ -121,9 +145,12 @@ function esquemaLote(ids) {
 // con una cifra que no está en los datos, sale por reglas.
 async function lote({ operaciones = [], llm = null } = {}) {
   const ops = (operaciones || []).filter(o => o && o.id !== undefined && o.id !== null);
+  // motivoSalida viaja con la lección: hipotesisDesdeLecciones aparta las del
+  // kill, las manuales y las de prueba.
+  const cabeza = op => ({ operacionId: String(op.id), mesaId: op.mesaId ?? null, simbolo: op.simbolo ?? null, motivoSalida: op.motivoSalida ?? null });
   const porReglas = op => {
     const r = clasificarReglas(op);
-    return { operacionId: String(op.id), mesaId: op.mesaId ?? null, simbolo: op.simbolo ?? null, categoria: r.categoria, leccion: r.leccion, fuente: 'reglas' };
+    return { ...cabeza(op), categoria: r.categoria, leccion: r.leccion, fuente: 'reglas' };
   };
   if (!ops.length) return [];
   if (!llm || !llm.activo) return ops.map(porReglas);
@@ -146,23 +173,26 @@ async function lote({ operaciones = [], llm = null } = {}) {
   }
   return ops.map((op, i) => {
     const c = delLLM.get(String(op.id));
-    if (!c || !CATEGORIAS.includes(c.categoria)) return porReglas(op);
+    if (!c || !CATEGORIAS.includes(c.categoria) || !categoriaCuadra(c.categoria, op)) return porReglas(op);
     const texto = String(c.leccion || '').trim();
     // La lección se comprueba contra los datos de SU operación.
-    if (!texto || !verificarCifras(texto, datos[i]).ok) return porReglas(op);
-    return { operacionId: String(op.id), mesaId: op.mesaId ?? null, simbolo: op.simbolo ?? null, categoria: c.categoria, leccion: plantillas.frase(texto), fuente: 'llm' };
+    if (!texto || !verificarCifras(texto, datos[i]).ok || !verboCuadra(texto, op)) return porReglas(op);
+    return { ...cabeza(op), categoria: c.categoria, leccion: plantillas.frase(texto), fuente: 'llm' };
   });
 }
 
 // Pistas para el laboratorio: (mesa × categoría) repetida ≥ 5 veces en las
 // lecciones de los últimos 30 días que recibe. Cada lección necesita mesaId
-// (la de lote() lo trae; también vale { operacion: { mesaId } }).
+// (la de lote() lo trae; también vale { operacion: { mesaId } }). Las
+// operaciones cerradas por kill, a mano o de prueba no cuentan: no las cerró
+// la regla de la mesa.
 function hipotesisDesdeLecciones(lecciones30d = []) {
   const cuenta = new Map();
   for (const l of lecciones30d || []) {
     if (!l) continue;
     const mesaId = l.mesaId ?? (l.operacion && l.operacion.mesaId);
-    if (!mesaId || !CATEGORIAS.includes(l.categoria) || SIN_PISTA.has(l.categoria)) continue;
+    const salida = l.motivoSalida ?? (l.operacion && l.operacion.motivoSalida);
+    if (!mesaId || !CATEGORIAS.includes(l.categoria) || SIN_PISTA.has(l.categoria) || SALIDAS_SIN_PISTA.has(salida)) continue;
     const clave = JSON.stringify([String(mesaId), l.categoria]);
     cuenta.set(clave, (cuenta.get(clave) || 0) + 1);
   }
@@ -175,4 +205,4 @@ function hipotesisDesdeLecciones(lecciones30d = []) {
   return pistas.sort((a, b) => (b.n - a.n) || a.mesaId.localeCompare(b.mesaId) || a.categoria.localeCompare(b.categoria));
 }
 
-module.exports = { CATEGORIAS, clasificarReglas, lote, hipotesisDesdeLecciones, datosOperacion, MIN_REPETICIONES_PISTA };
+module.exports = { CATEGORIAS, clasificarReglas, lote, hipotesisDesdeLecciones, datosOperacion, MIN_REPETICIONES_PISTA, SALIDAS_SIN_PISTA };

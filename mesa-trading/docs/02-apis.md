@@ -34,8 +34,11 @@ LLM_PRESUPUESTO_DIA_USD=2
 
 Opcionales: `LLM_MODELO_COMITE` y `LLM_MODELO_AGENTES` (por defecto
 `claude-opus-5-5`; con `claude-haiku-4-5` en los agentes el gasto baja unas
-cuatro veces), `PUERTO` (8765), `PANEL_TOKEN` (si vas a abrir el panel desde
-otro ordenador), `COMITE_HORAS` (4).
+cuatro veces), `PUERTO` (8765), `HOST` (127.0.0.1: el panel solo se abre desde
+este ordenador), `PANEL_TOKEN`, `COMITE_HORAS` (4). Abrir el panel a la red
+(`HOST=0.0.0.0` o una IP de la wifi) exige un `PANEL_TOKEN` largo: sin él la
+mesa no arranca, porque cualquiera en la misma red podría pausar, reabrir o
+lanzar el kill. Con token, el panel se abre con `?token=…` en la URL.
 
 ## Límites que conviene saber
 

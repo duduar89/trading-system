@@ -2,9 +2,13 @@
 // Orquestador (§6.7-§6.10, §7): el latido de la mesa.
 //
 // En cada paso() (tiempo real: cada latido; sintético: cada 5 min simulados):
-//   precios → valorar → vigilante → conciliación → macro y análisis (1H) →
-//   comité (cada 4 h) → mesas con vela nueva → cadencias diaria, semanal y
-//   mensual → descansos → curva → estado.json → evento 'estado'.
+//   precios → valorar → cierre diario (si toca) → vigilante → conciliación →
+//   macro y análisis (1H) → comité (cada 4 h) → pendientes de la bolsa (real y
+//   sombra) → mesas con vela nueva → cadencias semanal y mensual → descansos
+//   → curva → estado.json → evento 'estado'.
+// El cierre diario va antes que el vigilante: al despertar el portátil tras
+// las 00:05, el vigilante mide ya con la referencia del día nuevo (si no,
+// perdidaDia es null en ese latido y una caída de la noche no se miraba).
 //
 // Reglas de la casa que se cumplen aquí:
 // - La hora es siempre la del reloj (nunca Date.now() en la lógica). El único
@@ -14,8 +18,14 @@
 //   reabrir esperan a que acabe el latido en curso (no se cruzan con él).
 // - Un error dentro de un departamento se captura, se publica como alerta en
 //   el canal sistema y no tumba el proceso.
-// - Arranque seguro (§6.10): cargar → si estaba bloqueado, sigue bloqueado →
-//   resolver órdenes a medias por idCliente → conciliar → operar.
+// - Arranque seguro (§6.10): un solo proceso por carpeta (data/.proceso) →
+//   cargar (un estado.json ilegible NO arranca un fondo nuevo) → si estaba
+//   bloqueado, sigue bloqueado → resolver órdenes a medias por idCliente →
+//   conciliar → operar.
+// - Reabrir tras un kill NO borra el máximo histórico ni el inicio real del
+//   día: la cabecera y los informes siguen midiendo desde ahí. El vigilante
+//   mide desde una referencia aparte (picoVigilancia, inicioDiaVigilancia) que
+//   solo pone un REABRIR humano, para no volver a disparar al instante.
 //
 // Eventos: 'estado' (instantánea, como mucho una cada intervaloEstadoMs de
 // pantalla), 'mensaje' (Mensaje del bus), 'agente' ({id, estado, sala,
@@ -26,9 +36,10 @@ const path = require('path');
 const universoMod = require('./mercado/universo');
 const calendario = require('./mercado/calendario');
 const { mesasIniciales } = require('./estrategias');
-const { reasignar } = require('./aprendizaje/asignador');
+const { reasignar, REGLAS: REGLAS_ASIGNADOR } = require('./aprendizaje/asignador');
 const { metricasMesa, sharpeRodante } = require('./aprendizaje/evaluador');
 const { crearBenchmarks, valorarBenchmarks } = require('./cartera/benchmarks');
+const { exposicionConBroker } = require('./cartera/conciliacion');
 const { Libros } = require('./cartera/libros');
 const { DEPARTAMENTOS, crearPlantilla, puestosDeMesa } = require('./agentes/registro');
 const megafono = require('./agentes/megafono');
@@ -44,6 +55,7 @@ const laboratorio = require('./agentes/departamentos/laboratorio');
 const direccion = require('./agentes/departamentos/direccion');
 const { EPS, etiqueta, puestoId, puestoSombraId, agenteDePuesto } = require('./agentes/departamentos/comun');
 const { leerJSON, escribirJSON, anadirJSONL, leerJSONL } = require('./util/almacen');
+const { tomarBloqueo, soltarBloqueo } = require('./util/proceso');
 const { inicioVela, diaUTC, MIN, HORA, DIA } = require('./util/reloj');
 const f = require('./util/formato');
 const log = require('./util/log').crear('orquestador');
@@ -62,6 +74,11 @@ const CADA_RELOJ_MERCADO = 5 * MIN;
 const JEFES = comite.JEFES;
 const CANAL_DE = { direccion: 'direccion', macro: 'macro', analisis: 'analisis', mesas: 'parque', riesgos: 'riesgo', operaciones: 'ejecucion', laboratorio: 'laboratorio' };
 const MODELOS_DISPONIBLES = Object.keys(TARIFAS).filter(m => m !== 'claude-opus-4-8');
+// Sin precios nuevos durante más de esto (fuera del sintético), la pantalla lo avisa.
+const PRECIOS_VIEJOS = 3 * MIN;
+// Una operación es la misma si coinciden id e instante de entrada: el id solo
+// se repite en un rearranque (nOperaciones vuelve atrás con estado.json).
+const claveOp = op => `${op.id}|${op.entradaT}`;
 
 function siguienteHora(t, hh, mm) {
   const d = inicioVela(t, DIA) + hh * HORA + mm * MIN;
@@ -98,7 +115,10 @@ class Orquestador extends EventEmitter {
     this.reloj = reloj;
     this.datos = datos;
     this.broker = broker;
-    this.llm = llm || { activo: false, estado: () => ({ activo: false, modeloComite: null, modeloAgentes: null, gastoHoyUsd: 0, presupuestoDiaUsd: 0 }), gastoHoy: () => 0 };
+    this.llm = llm || {
+      activo: false, estado: () => ({ activo: false, modeloComite: null, modeloAgentes: null, gastoHoyUsd: 0, presupuestoDiaUsd: 0 }),
+      gastoHoy: () => 0, gastoDelDia: () => 0, gastoEntre: () => 0,
+    };
     this.fg = fg || { actual: async () => null, historico: async () => [] };
     this.bus = bus;
     this.modo = modo || config.modo;
@@ -130,6 +150,7 @@ class Orquestador extends EventEmitter {
     };
     this.operaciones = [];
     this.operacionesSombra = [];
+    this._opsVistas = new Set();
     this.registroOrdenes = [];
     this.historialPrecios = {};
     this.ultimoMensaje = {};
@@ -144,16 +165,36 @@ class Orquestador extends EventEmitter {
     this._ultimoEstado = -Infinity;
     this._estadoProgramado = null;
     this._erroresVistos = {};
+    this._killPedido = false;
+    this._bloqueoTomado = false;
+    this._deteniendo = false;
+    this._pausas = new Set();
   }
 
   // ---------- Arranque ----------
 
+  // Crítico: un estado.json que existe pero no se puede leer (bloqueado por
+  // otro programa, a ceros tras un corte de luz) no se aparta ni se sustituye
+  // por un fondo nuevo: se niega a arrancar (lanza con un mensaje claro).
   static leerEstadoGuardado(carpeta) {
-    return leerJSON(path.join(carpeta, 'estado.json'), null);
+    return leerJSON(path.join(carpeta, 'estado.json'), null, { critico: true });
   }
 
   async iniciar() {
-    const guardado = leerJSON(this.rutas.estado, null);
+    // Un solo proceso por carpeta de datos, antes de tocar nada.
+    tomarBloqueo(this.carpeta);
+    this._bloqueoTomado = true;
+    try {
+      return await this._iniciar();
+    } catch (e) {
+      soltarBloqueo(this.carpeta);
+      this._bloqueoTomado = false;
+      throw e;
+    }
+  }
+
+  async _iniciar() {
+    const guardado = leerJSON(this.rutas.estado, null, { critico: true });
     // Un estado de la demo sintética no vale para el papel (ni al revés): sus
     // posiciones y su curva son de otros precios.
     if (guardado && guardado.modo && guardado.modo !== this.modo) {
@@ -176,6 +217,9 @@ class Orquestador extends EventEmitter {
     for (const m of this.estado.mesas) this._asegurarPuestos(m);
     this.operaciones = leerJSONL(this.rutas.operaciones);
     this.operacionesSombra = leerJSONL(this.rutas.operacionesSombra);
+    // Antes de resolverAlArrancar: una venta que se reaplica tras un corte ya
+    // está en operaciones.jsonl y no se vuelve a apuntar.
+    this._opsVistas = new Set([...this.operaciones, ...this.operacionesSombra].map(claveOp));
     const ahora = this.reloj.ahora();
     for (const a of this.plantilla) {
       const v = this.estado.agentes[a.id] || (this.estado.agentes[a.id] = {});
@@ -214,6 +258,7 @@ class Orquestador extends EventEmitter {
     const base = {
       ultimaVela: {}, comprobadoMesa: {}, curva: [], curvaDiaria: [], lecciones: [], agentes: {}, puestos: {}, inicioDiaPuestos: {},
       pendientes: [], ordenesEnVuelo: {}, ejecuciones: [], megafonoPendiente: null, riesgo: { alertasVistas: {} }, ajustes: {},
+      ultimoCierreT: null, picoVigilancia: null, inicioDiaVigilancia: null, diaInicioVigilancia: null, comisionesEstimadas: {},
       macro: { regimen: null, fg: null, ultimaHora: null, ultimoMensaje: null },
       analisis: { ultimaHora: null, porActivo: {} },
       noticias: { ultima: null, vistos: [], eventosGraves: [] },
@@ -223,6 +268,8 @@ class Orquestador extends EventEmitter {
     };
     const e2 = { ...base, ...e };
     for (const k of ['macro', 'analisis', 'noticias', 'comite', 'contadores', 'conciliacion']) e2[k] = { ...base[k], ...(e[k] || {}) };
+    if (e2.sombra && !Array.isArray(e2.sombra.pendientes)) e2.sombra.pendientes = [];
+    if (e2.fondo && e2.fondo.killReintento === undefined) e2.fondo.killReintento = null;
     e2.laboratorio = { ensayosTotales: 0, sharpesEnsayos: [], ensayos: [], hipotesis: [], aprobadas: [], proximaRevision: null, ...(e.laboratorio || {}) };
     for (const m of e2.mesas) {
       if (!Array.isArray(m.curvaDiaria)) m.curvaDiaria = [];
@@ -266,7 +313,7 @@ class Orquestador extends EventEmitter {
       pico: capital,
       curva: [{ t: ahora, patrimonio: capital }],
       sombras: { benchmarks, curvas: {} },
-      sombra: { efectivo: capital },
+      sombra: { efectivo: capital, pendientes: [] },
       cadencias: {
         proximoComite: inicioVela(ahora, comiteMs) + comiteMs,
         proximoDiario: siguienteHora(ahora, 0, 5),
@@ -418,7 +465,11 @@ class Orquestador extends EventEmitter {
     const simbolos = new Set(this.universo.map(a => a.simbolo));
     if (this.libros) for (const p of this.libros.listaPuestos()) if (p.cantidad > EPS) simbolos.add(p.simbolo);
     const r = await this.datos.ultimos([...simbolos]);
-    for (const [s, q] of Object.entries(r || {})) if (q && q.precio > 0) this.vivo.precios[s] = { precio: q.precio, t: q.t };
+    let alguno = false;
+    for (const [s, q] of Object.entries(r || {})) if (q && q.precio > 0) { this.vivo.precios[s] = { precio: q.precio, t: q.t }; alguno = true; }
+    // Última petición de precios que trajo algo (no la t de la cotización:
+    // con la red bien, DOGE ya llega con minutos de retraso).
+    if (alguno) this.vivo.preciosOkT = ahora;
     // Bolsa: con Alpaca manda su reloj (cada 5 min); si no, el calendario.
     if (this.hayAlpaca && typeof this.broker.relojMercado === 'function' && this.broker.nombre === 'alpaca-paper') {
       if (this.vivo.relojMercadoT === null || ahora - this.vivo.relojMercadoT >= CADA_RELOJ_MERCADO) {
@@ -430,10 +481,14 @@ class Orquestador extends EventEmitter {
       this.vivo.relojMercado = calendario.relojMercado(ahora);
       this.vivo.mercadoAbierto = { accion: this.vivo.relojMercado.abierto };
     }
+    // Historial para var24h, con el instante del DATO (q.t), no el del latido:
+    // un precio congelado (red o datos caídos) no suma muestras nuevas y su
+    // var24h no se mueve sola con el paso del tiempo.
     for (const [s, q] of Object.entries(this.vivo.precios)) {
       const h = this.historialPrecios[s] || (this.historialPrecios[s] = []);
-      if (!h.length || ahora - h[h.length - 1].t >= HORA) {
-        h.push({ t: ahora, precio: q.precio });
+      const tq = Number.isFinite(q.t) ? q.t : ahora;
+      if (!h.length || tq - h[h.length - 1].t >= HORA) {
+        h.push({ t: tq, precio: q.precio });
         if (h.length > 30) h.shift();
       }
     }
@@ -446,15 +501,28 @@ class Orquestador extends EventEmitter {
     if (!(s.pico >= this.vivo.patrimonioSombra)) s.pico = this.vivo.patrimonioSombra;
   }
 
+  // Único sitio que escribe vivo.valoracion. La exposición (por activo,
+  // cripto, bruta y nº de posiciones) es la de los libros con, por símbolo, el
+  // máximo frente al bróker: una posición del bróker sin puesto (huérfana)
+  // cuenta para los topes de Riesgos, para el comité y para la cabecera.
   async refrescarCartera() {
     const cuenta = await this.broker.cuenta();
     const posiciones = await this.broker.posiciones();
     this.vivo.cuenta = cuenta;
     this.vivo.posicionesBroker = posiciones;
     this.vivo.patrimonio = cuenta.patrimonio;
-    this.vivo.valoracion = this.libros.valorar(this.vivo.precios, { sombra: false });
+    this.vivo.valoracion = exposicionConBroker(this.libros.valorar(this.vivo.precios, { sombra: false }), posiciones);
+    this.vivo.carteraOkT = this.reloj.ahora();
+    this.vivo.carteraOkPaso = this.pasos;
     this.revalorarSombra();
     if (this.estado && cuenta.patrimonio > (this.estado.pico || 0)) this.estado.pico = cuenta.patrimonio;
+  }
+
+  // Valoración con lo que ya se sabe (sin pedir nada al bróker): tras una
+  // ejecución dentro del mismo latido, para que la siguiente propuesta del
+  // lote se evalúe contra los libros ya actualizados.
+  revalorarReal() {
+    this.vivo.valoracion = exposicionConBroker(this.libros.valorar(this.vivo.precios, { sombra: false }), this.vivo.posicionesBroker);
   }
 
   registrarEjecucion(ej) {
@@ -465,6 +533,12 @@ class Orquestador extends EventEmitter {
   }
 
   registrarOperacion(op) {
+    // Tras un corte entre una venta y el guardado de estado.json, al arrancar
+    // la venta se vuelve a aplicar a los libros (bien), pero ya está en el
+    // .jsonl: no se apunta dos veces (duplicaría métricas, tarjeta e informes).
+    const k = claveOp(op);
+    if (this._opsVistas.has(k)) { log.aviso(`operación ${op.id} ya apuntada; no se repite`); return; }
+    this._opsVistas.add(k);
     if (op.sombra) {
       this.operacionesSombra.push(op);
       try { anadirJSONL(this.rutas.operacionesSombra, op); } catch (e) { log.aviso(e.message); }
@@ -474,20 +548,26 @@ class Orquestador extends EventEmitter {
     try { anadirJSONL(this.rutas.operaciones, op); } catch (e) { log.aviso(e.message); }
     const mesa = this.mesaPorId(op.mesaId);
     const de = mesa ? agenteDePuesto(op.mesaId, op.simbolo) : 'ejecutor';
+    const texto = plantillas.cierre({ etiqueta: etiqueta(op.simbolo), pnl: op.pnl, pnlPct: op.pnlPct, motivoSalida: op.motivoSalida, barras: op.barras, rMultiple: op.rMultiple });
     this.bus.publicar({
-      de, canal: mesa ? 'parque' : 'ejecucion', tipo: 'cierre',
-      texto: plantillas.cierre({ etiqueta: etiqueta(op.simbolo), pnl: op.pnl, pnlPct: op.pnlPct, motivoSalida: op.motivoSalida, barras: op.barras, rMultiple: op.rMultiple }),
+      de, canal: mesa ? 'parque' : 'ejecucion', tipo: 'cierre', texto,
       datos: { puestoId: op.puestoId, operacionId: op.id, pnl: op.pnl, pnlPct: op.pnlPct, motivoSalida: op.motivoSalida, barras: op.barras },
       importancia: 2,
     });
+    // La tarjeta dice lo último que pasó, no el «Largo en…» de la última vela.
+    const aux = this.estado.puestos[op.puestoId];
+    if (aux) aux.estadoTexto = texto;
   }
 
   async killSwitch(motivo) {
     this.estado.contadores.kills = (this.estado.contadores.kills || 0) + 1;
-    const r = await operaciones.killSwitch(this, motivo);
-    this.guardar();
-    this._emitirEstado({ forzar: true });
-    return r;
+    try {
+      return await operaciones.killSwitch(this, motivo);
+    } finally {
+      // El bloqueo queda en disco aunque el kill lance a mitad.
+      this._seguroSinc('guardar', () => this.guardar());
+      this._emitirEstado({ forzar: true });
+    }
   }
 
   // ---------- Latido ----------
@@ -503,6 +583,7 @@ class Orquestador extends EventEmitter {
     this.pasos++;
     await this._seguro('precios', 'controller', () => this._actualizarPrecios(ahora));
     await this._seguro('valoración', 'controller', () => this.refrescarCartera());
+    await this._cadenciaDiaria(ahora);
     await this._seguro('vigilante', 'riesgos', () => this._vigilar(ahora));
     if (Object.keys(this.estado.ordenesEnVuelo).length) await this._seguro('órdenes en vuelo', 'ejecutor', () => this.ejecutor.resolverEnVuelo());
     await this._seguro('conciliación', 'controller', () => operaciones.conciliarCadaLatido(this));
@@ -511,6 +592,7 @@ class Orquestador extends EventEmitter {
     if (analisis.hayNoticias(this)) this.lanzar('noticias', () => analisis.noticias(this));
     await this._cadenciaComite(ahora);
     await this._seguro('pendientes de la bolsa', 'ejecutor', () => this.ejecutor.procesarPendientes(o => this._reevaluarPendiente(o)));
+    this._seguroSinc('pendientes de la bolsa (sombra)', () => mesasDep.procesarPendientesSombra(this));
     await this._seguro('mesas', 'mesas', () => mesasDep.procesar(this));
     await this._cadenciasLargas(ahora);
     this._seguroSinc('descansos', () => this._descansos(ahora));
@@ -532,6 +614,10 @@ class Orquestador extends EventEmitter {
         return r;
       }
     }
+    if (r.nivel === 'bloqueado') {
+      await this._reintentarKill(ahora);
+      return r;
+    }
     for (const a of r.acciones) {
       if (a.tipo !== 'stop') continue;
       if (a.sombra) { mesasDep.cerrarSombra(this, { puestoId: a.puestoId, motivo: 'stop' }); continue; }
@@ -543,19 +629,64 @@ class Orquestador extends EventEmitter {
     return r;
   }
 
+  // Con el fondo bloqueado, si el bróker aún tiene algo (el kill no pudo
+  // venderlo: red caída, una venta rechazada o a medias), se vuelve a intentar
+  // con esperas crecientes. Solo con la cartera leída en ESTE latido y sin
+  // órdenes en vuelo. Sirve también al arrancar bloqueado.
+  async _reintentarKill(ahora) {
+    const fo = this.estado.fondo;
+    if (this._killPedido || this.vivo.carteraOkPaso !== this.pasos || Object.keys(this.estado.ordenesEnVuelo).length) return null;
+    const quedan = operaciones.quedanEnBroker(this);
+    if (!quedan.length) {
+      if (fo.killReintento) {
+        fo.killReintento = null;
+        this.bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'nota', texto: 'Tras el kill el bróker ya no tiene nada que vender.' });
+      }
+      return null;
+    }
+    if (fo.killReintento && ahora < fo.killReintento.proximo) return null;
+    return operaciones.reintentarKill(this);
+  }
+
   // Una orden de acciones que esperaba a la bolsa vuelve a pasar por Riesgos
   // con el precio de ahora (el desvío frente a la decisión la puede vetar).
+  // Es el único punto por el que pasa una pendiente (procesarPendientes).
   async _reevaluarPendiente(o) {
+    // El kill vende TODO lo del bróker (el Ejecutor lo recorta al disponible) y
+    // lo reparte entre los puestos del símbolo que sigan abiertos; no depende
+    // de tener precio. Con la cantidad de un solo puesto quedaría la otra mitad.
+    if (o.lado === 'venta' && o.tipo === 'kill') {
+      const reparto = this.libros.listaPuestos({ sombra: false })
+        .filter(p => p.simbolo === o.simbolo && p.cantidad > EPS)
+        .map(p => ({ puestoId: p.puestoId, cantidad: p.cantidad }));
+      return { ...o, puestoId: reparto.length ? reparto[0].puestoId : o.puestoId, reparto };
+    }
     const q = this.vivo.precios[o.simbolo];
     if (!q) return null;
+    const p = this.libros.puesto(o.puestoId);
     if (o.lado === 'venta') {
-      const p = this.libros.puesto(o.puestoId);
       if (!p || !(p.cantidad > EPS)) return null;
       return { ...o, cantidad: p.cantidad, cantidadPuesto: p.cantidad };
     }
+    // Las mesas solo encolan aperturas con el puesto vacío: si ya tiene
+    // posición, esta compra ya se hizo (se envió antes de un corte y el
+    // estado.json guardado aún la tenía en la cola). No se repite.
+    if (p && p.cantidad > EPS) return null;
+    // Se vuelve a dimensionar con el capital de ahora (comités de la noche,
+    // banquillo) y se evalúa contra los libros con lo ya ejecutado en este lote.
+    const nocional = mesasDep.redimensionarPendiente(this, o, q.precio);
+    if (nocional === null) {
+      this.bus.publicar({
+        de: 'ejecutor', canal: 'ejecucion', tipo: 'nota',
+        texto: plantillas.frase(`La mesa ${(this.mesaPorId(o.mesaId) || {}).nombre || o.mesaId} ya no opera (banquillo): se descarta la compra de ${etiqueta(o.simbolo)} que esperaba a la apertura.`),
+        datos: { puestoId: o.puestoId, simbolo: o.simbolo },
+      });
+      return null;
+    }
+    this.revalorarReal();
     const propuesta = {
       puestoId: o.puestoId, mesaId: o.mesaId, simbolo: o.simbolo, clase: 'accion', lado: 'compra', tipo: 'apertura',
-      nocional: o.nocional, precio: q.precio, precioT: q.t, stop: o.stop, precioDecision: o.precioReferencia,
+      nocional, precio: q.precio, precioT: q.t, stop: o.stop, precioDecision: o.precioReferencia,
     };
     const r = riesgos.evaluar(this, propuesta);
     return r.decision === 'vetar' ? null : { ...o, nocional: r.nocional };
@@ -571,16 +702,19 @@ class Orquestador extends EventEmitter {
     else await this._seguro('comité', 'cio', celebrar);
   }
 
+  async _cadenciaDiaria(ahora) {
+    const c = this.estado.cadencias;
+    if (ahora < c.proximoDiario) return;
+    c.proximoDiario = siguienteHora(ahora, 0, 5);
+    const ops = await this._seguro('cierre diario', 'controller', () => operaciones.cierreDiario(this));
+    if (ops && ops.length) {
+      const auditar = () => laboratorio.auditoria(this, ops);
+      if (this.llm.activo) this.lanzar('auditor', auditar); else await this._seguro('auditor', 'auditor', auditar);
+    }
+  }
+
   async _cadenciasLargas(ahora) {
     const c = this.estado.cadencias;
-    if (ahora >= c.proximoDiario) {
-      c.proximoDiario = siguienteHora(ahora, 0, 5);
-      const ops = await this._seguro('cierre diario', 'controller', () => operaciones.cierreDiario(this));
-      if (ops && ops.length) {
-        const auditar = () => laboratorio.auditoria(this, ops);
-        if (this.llm.activo) this.lanzar('auditor', auditar); else await this._seguro('auditor', 'auditor', auditar);
-      }
-    }
     if (ahora >= c.proximoSemanal) {
       c.proximoSemanal = siguienteLunes(ahora, 0, 10);
       await this._seguro('informe semanal', 'controller', () => operaciones.informeSemanal(this));
@@ -646,15 +780,32 @@ class Orquestador extends EventEmitter {
     const ahora = this.reloj.ahora();
     this.estado.guardado = ahora;
     this.estado.ahora = ahora;
-    escribirJSON(this.rutas.estado, { ...this.estado, libros: this.libros.serializar() });
+    escribirJSON(this.rutas.estado, { ...this.estado, libros: this.libros.serializar() }, { durable: true });
+  }
+
+  // Pausa de PANTALLA (entre puntos del comité, para verlo en el panel).
+  // detener() las corta todas: un Ctrl+C no espera al orden del día.
+  pausaPantalla(ms) {
+    if (!(ms > 0) || this._deteniendo) return Promise.resolve();
+    return new Promise(resolver => {
+      const fin = () => { clearTimeout(t); this._pausas.delete(fin); resolver(); };
+      const t = setTimeout(fin, ms);
+      this._pausas.add(fin);
+    });
   }
 
   async detener() {
-    await this._cadena;
-    await this.esperarTareas();
-    this.guardar();
-    if (this._oyente) this.bus.off('mensaje', this._oyente);
-    if (this._estadoProgramado) clearTimeout(this._estadoProgramado);
+    this._deteniendo = true;
+    for (const fin of [...this._pausas]) fin();
+    try {
+      await this._cadena;
+      await this.esperarTareas();
+      this.guardar();
+    } finally {
+      if (this._oyente) this.bus.off('mensaje', this._oyente);
+      if (this._estadoProgramado) clearTimeout(this._estadoProgramado);
+      if (this._bloqueoTomado) { soltarBloqueo(this.carpeta); this._bloqueoTomado = false; }
+    }
   }
 
   // ---------- Estado para la interfaz ----------
@@ -679,10 +830,11 @@ class Orquestador extends EventEmitter {
     }
   }
 
-  _var24h(simbolo, precio, ahora) {
+  // Variación en 24 h medida desde el instante del dato (tDato = q.t).
+  _var24h(simbolo, precio, tDato) {
     const h = this.historialPrecios[simbolo] || [];
     let ref = null;
-    for (const x of h) if (x.t <= ahora - 24 * HORA + 30 * MIN) ref = x;
+    for (const x of h) if (x.t <= tDato - 24 * HORA + 30 * MIN) ref = x;
     return ref && ref.precio > 0 ? precio / ref.precio - 1 : null;
   }
 
@@ -705,6 +857,7 @@ class Orquestador extends EventEmitter {
     const reg = e.macro.regimen;
     const vigentes = megafono.directivasVigentes(e.directivas, ahora);
     const defensivo = e.directivas.modo === 'DEFENSIVO' ? 0.5 : 1;
+    const bloqueado = e.fondo.nivel === 'bloqueado';
 
     const opsPorPuesto = new Map();
     const opsPorMesa = new Map();
@@ -728,6 +881,10 @@ class Orquestador extends EventEmitter {
         const pnlDia = total - (e.inicioDiaPuestos[pid] ?? 0);
         pnlDiaMesa[m.id] = (pnlDiaMesa[m.id] || 0) + pnlDia;
         const aux = e.puestos[pid] || {};
+        // Con posición, el texto se rehace con las cifras de ahora (las mismas
+        // que la fila «Abierto»); el de la última vela podía tener un día y
+        // hasta el signo contrario.
+        const enVivo = abierta && !bloqueado && m.estado !== 'banquillo';
         puestos.push({
           id: pid, mesaId: m.id, simbolo: s, etiqueta: etiqueta(s), agenteId: agenteDePuesto(m.id, s),
           posicion: abierta ? {
@@ -736,7 +893,9 @@ class Orquestador extends EventEmitter {
           } : null,
           pnlDia,
           ...this._statsPuesto(opsPorPuesto.get(pid) || []),
-          estadoTexto: aux.estadoTexto || `Esperando la primera vela ${m.marco === '1Day' ? 'diaria' : 'de 4H'} para decidir ${etiqueta(s)}.`,
+          estadoTexto: enVivo
+            ? plantillas.estadoPuesto({ etiqueta: etiqueta(s), marco: m.marco, posicion: { cantidad: p.cantidad, entrada: p.costeMedio, stop: p.stop, pnlAbiertoPct: vp ? vp.pnlAbiertoPct : null } })
+            : (aux.estadoTexto || `Esperando la primera vela ${m.marco === '1Day' ? 'diaria' : 'de 4H'} para decidir ${etiqueta(s)}.`),
           ultimaSenal: aux.ultimaSenal || null,
           chispa: aux.chispa || [],
         });
@@ -762,7 +921,6 @@ class Orquestador extends EventEmitter {
       };
     });
 
-    const bloqueado = e.fondo.nivel === 'bloqueado';
     const agentes = this.plantilla.map(a => {
       const vis = e.agentes[a.id] || {};
       let estado = vis.estado || 'trabajando';
@@ -791,11 +949,9 @@ class Orquestador extends EventEmitter {
 
     const lab = e.laboratorio;
     const llm = this.llm.estado();
-    const avisos = ['Con el ordenador apagado no hay stops: en cripto no existen órdenes stop simples.'];
-    if (this.modo === 'sintetico') avisos.push('Precios sintéticos: la demo no usa el mercado real.');
-    else if (this.broker.nombre === 'simulado') avisos.push('Bróker simulado con precios reales de cripto (sin claves de Alpaca).');
-    if (bloqueado) avisos.push('Fondo bloqueado por el kill switch: solo sale con Reabrir.');
-    if (!e.conciliacion.limpia) avisos.push(plantillas.frase(`Conciliación con incidencias: ${e.conciliacion.resumen}`));
+    const sinAsignar = this._sinAsignar(patrimonio);
+    const vig = this._vigilancia(patrimonio, ahora);
+    const avisos = this._avisos({ ahora, patrimonio, vigentes, sinAsignar });
 
     return {
       version: 1,
@@ -808,7 +964,7 @@ class Orquestador extends EventEmitter {
         patrimonio,
         pnlDia: patrimonio - e.patrimonioInicioDia,
         pnlDiaPct: e.patrimonioInicioDia > 0 ? patrimonio / e.patrimonioInicioDia - 1 : 0,
-        caida: e.pico > 0 ? Math.min(0, patrimonio / e.pico - 1) : 0,
+        caida: e.pico > 0 ? Math.min(0, patrimonio / e.pico - 1) : 0,   // desde el máximo HISTÓRICO, también tras reabrir
         exposicionBrutaPct: patrimonio > 0 ? val.exposicionBruta / patrimonio : 0,
         exposicionCriptoPct: patrimonio > 0 ? val.exposicionCripto / patrimonio : 0,
         posiciones: (v.posicionesBroker || []).length,
@@ -816,12 +972,14 @@ class Orquestador extends EventEmitter {
         miedoCodicia: e.macro.fg ? { valor: e.macro.fg.valor, etiqueta: e.macro.fg.etiqueta, sintetico: Boolean(e.macro.fg.sintetico) } : null,
         proximoComite: e.cadencias.proximoComite,
         modoComite: e.directivas.modo || 'NORMAL',
+        sinAsignar,
+        vigilancia: vig,
       },
       llm: { activo: llm.activo, modeloComite: llm.modeloComite, modeloAgentes: llm.modeloAgentes, gastoHoyUsd: llm.gastoHoyUsd, presupuestoDiaUsd: llm.presupuestoDiaUsd },
       curva: e.curva.slice(-MAX_CURVA_INSTANTANEA).map(p => ({ t: p.t, patrimonio: p.patrimonio })),
       cotizaciones: this.universo.map(a => {
         const q = v.precios[a.simbolo];
-        return { simbolo: a.simbolo, etiqueta: a.etiqueta, precio: q ? q.precio : null, var24hPct: q ? this._var24h(a.simbolo, q.precio, ahora) : null, t: q ? q.t : null };
+        return { simbolo: a.simbolo, etiqueta: a.etiqueta, precio: q ? q.precio : null, var24hPct: q ? this._var24h(a.simbolo, q.precio, Number.isFinite(q.t) ? q.t : ahora) : null, t: q ? q.t : null };
       }),
       departamentos: DEPARTAMENTOS.map(d => ({ ...d })),
       agentes,
@@ -852,6 +1010,99 @@ class Orquestador extends EventEmitter {
       limites: { ...this.limites },
       avisos,
     };
+  }
+
+  // Capital que ninguna mesa tiene asignado: queda en efectivo (el techo del
+  // 40 % por mesa del asignador no deja repartirlo con solo dos titulares).
+  _sinAsignar(patrimonio) {
+    let asignado = 0;
+    for (const m of this.estado.mesas) if (m.estado !== 'banquillo' && m.peso > 0) asignado += m.peso;
+    const fraccion = Math.max(0, 1 - asignado);
+    return { fraccion, usd: patrimonio > 0 ? patrimonio * fraccion : 0 };
+  }
+
+  // Lo que mide el vigilante contra sus límites (tras una reapertura, desde
+  // la reapertura). La cabecera cuenta el resultado real; esto es la cercanía
+  // a los límites (para la barra de límites).
+  _vigilancia(patrimonio, ahora) {
+    const ref = riesgos.referenciasVigilancia(this.estado, ahora);
+    const perdidaDiaPct = ref.diaInicio === diaUTC(ahora) && ref.patrimonioInicioDia > 0 ? patrimonio / ref.patrimonioInicioDia - 1 : null;
+    const caidaPct = ref.pico > 0 && patrimonio > 0 ? Math.min(0, patrimonio / Math.max(ref.pico, patrimonio) - 1) : 0;
+    return { perdidaDiaPct, caidaPct, desdeReapertura: ref.desdeReapertura };
+  }
+
+  // Avisos de la pantalla: lo que bloquea o limita al fondo va delante (en el
+  // móvil cada aviso va en una línea y se corta por el final).
+  _avisos({ ahora, patrimonio, vigentes, sinAsignar }) {
+    const e = this.estado;
+    const L = this.limites;
+    const avisos = [];
+    const fo = e.fondo;
+    if (fo.nivel === 'bloqueado') avisos.push('Fondo bloqueado por el kill switch: solo sale con Reabrir.');
+    else if (fo.nivel === 'pausado') avisos.push('Fondo en pausa: solo cierra posiciones hasta Reabrir.');
+    else if (fo.nivel === 'solo_cerrar') {
+      avisos.push(`Solo cerrar hasta las 00:00 UTC${Number.isFinite(fo.soloCerrarHasta) ? ` (${f.hora(fo.soloCerrarHasta)} en Madrid)` : ''}: pérdida del día por encima del ${f.pct(L.perdidaDiariaSoloCerrar, { decimales: 0 })}; no se abre nada nuevo.`);
+    }
+    if (fo.killReintento) avisos.push(`Tras el kill siguen posiciones en el bróker: se reintenta venderlas solo (próximo intento a las ${f.hora(fo.killReintento.proximo)}).`);
+    if (fo.nivel !== 'bloqueado') {
+      if (vigentes.modo === 'SOLO_CERRAR') avisos.push('El comité ha puesto SOLO CERRAR: no se abre nada nuevo hasta el próximo comité.');
+      else if (vigentes.soloCerrarHasta && vigentes.soloCerrarHasta > ahora) avisos.push(`Solo cerrar por el Megáfono hasta las ${f.hora(vigentes.soloCerrarHasta)}: no se abre nada nuevo.`);
+      else if (fo.nivel === 'normal') avisos.push(...this._avisosAperturas(vigentes));   // con el fondo parado sobran
+    }
+    // Reabrir no borra el máximo histórico: mientras la caída desde él supere
+    // el límite del kill, se dice con cifras.
+    if (e.pico > 0 && patrimonio > 0) {
+      const caida = patrimonio / e.pico - 1;
+      if (caida <= -L.caidaKill + 1e-9) {
+        avisos.push(plantillas.frase(`El fondo sigue un ${f.pct(-caida, { decimales: 1 })} (${f.usd(e.pico - patrimonio)}) por debajo de su máximo histórico (${f.usd(e.pico)}), más que el límite de caída del ${f.pct(L.caidaKill, { decimales: 0 })}: tras reabrir, el vigilante mide desde la reapertura.`, 280));
+      }
+    }
+    if (this.modo !== 'sintetico' && Number.isFinite(this.vivo.preciosOkT) && ahora - this.vivo.preciosOkT > PRECIOS_VIEJOS) {
+      avisos.push(`Sin precios nuevos desde las ${f.hora(this.vivo.preciosOkT)}: stops y cifras van con el último precio conocido.`);
+    }
+    if (!e.conciliacion.limpia) avisos.push(plantillas.frase(`Conciliación con incidencias: ${e.conciliacion.resumen}`));
+    if (sinAsignar.fraccion > 0.0005) {
+      avisos.push(`${f.pct(sinAsignar.fraccion, { decimales: 0 })} del capital sin asignar: queda en efectivo (techo del ${f.pct(REGLAS_ASIGNADOR.techo, { decimales: 0 })} por mesa).`);
+    }
+    avisos.push('Con el ordenador apagado no hay stops: en cripto no existen órdenes stop simples.');
+    if (this.modo === 'sintetico') avisos.push('Precios sintéticos: la demo no usa el mercado real.');
+    else if (this.broker.nombre === 'simulado') avisos.push('Bróker simulado con precios reales de cripto (sin claves de Alpaca).');
+    return avisos;
+  }
+
+  // Lo que bloquea aperturas sin parar el fondo: activos vetados (Megáfono,
+  // comité, noticias) y mesas sin abrir (pausa del Megáfono o ×0 del comité).
+  // Una línea por tipo, con quién lo puso y hasta cuándo.
+  _avisosAperturas(vigentes) {
+    const out = [];
+    const hasta = h => (Number.isFinite(h) ? `, hasta las ${f.hora(h)}` : '');
+    const quien = o => (o === 'comite' ? 'comité' : o === 'noticias' ? 'noticia grave' : 'Megáfono');
+    const vetos = new Map();
+    for (const v of vigentes.activosVetados || []) {
+      const previo = vetos.get(v.simbolo);
+      if (!previo || (v.hasta ?? Infinity) > (previo.hasta ?? Infinity)) vetos.set(v.simbolo, v);
+    }
+    if (vetos.size) {
+      const partes = [...vetos.values()].map(v => `${etiqueta(v.simbolo)} (${quien(v.origen)}${hasta(v.hasta)})`);
+      out.push(plantillas.frase(`No se abre en ${partes.join(', ')}.`, 280));
+    }
+    const nombre = id => (this.mesaPorId(id) || {}).nombre || id;
+    const paradas = new Map();
+    for (const p of vigentes.mesasPausadas || []) paradas.set(p.mesaId, `${nombre(p.mesaId)} (Megáfono${hasta(p.hasta)})`);
+    for (const m of this.estado.mesas) {
+      if (m.estado === 'banquillo' || paradas.has(m.id)) continue;
+      if ((vigentes.multiplicadores || {})[m.id] === 0) paradas.set(m.id, `${nombre(m.id)} (comité ×0, hasta el próximo comité)`);
+    }
+    if (paradas.size) out.push(plantillas.frase(`Mesas sin abrir nada: ${[...paradas.values()].join(', ')}.`, 280));
+    return out;
+  }
+
+  // «Solo cerrar» que sigue vigente por el comité o el Megáfono: Reabrir no lo quita.
+  _soloCerrarVigente(ahora) {
+    const v = megafono.directivasVigentes(this.estado.directivas, ahora);
+    if (v.modo === 'SOLO_CERRAR') return ' Sigue vigente el SOLO CERRAR del comité hasta el próximo comité: Reabrir no lo quita.';
+    if (v.soloCerrarHasta && v.soloCerrarHasta > ahora) return ` Sigue vigente el solo cerrar del Megáfono hasta las ${f.hora(v.soloCerrarHasta)}: Reabrir no lo quita.`;
+    return '';
   }
 
   // ---------- Comandos (§7) ----------
@@ -886,7 +1137,11 @@ class Orquestador extends EventEmitter {
     if (!texto) return { ok: false, mensaje: 'Escribe qué quieres que haga la mesa.' };
     const ahora = this.reloj.ahora();
     this.bus.publicar({ de: 'humano', canal: 'megafono', tipo: 'megafono', texto: `«${texto}»`, datos: { texto }, importancia: 3 });
-    const r = await megafono.interpretar(texto, { llm: this.llm, universo: this.universo, mesas: this.estado.mesas, directivas: this.estado.directivas, ahora });
+    // Sin duración escrita, la orden dura hasta el comité siguiente (COMITE_HORAS).
+    const r = await megafono.interpretar(texto, {
+      llm: this.llm, universo: this.universo, mesas: this.estado.mesas, directivas: this.estado.directivas, ahora,
+      horasPorDefecto: this.config.cadencias.comiteHoras,
+    });
     this.estado.contadores.megafono = (this.estado.contadores.megafono || 0) + 1;
     const propuesta = { id: `mf-${ahora.toString(36)}-${this.estado.contadores.megafono}`, texto, directivas: r.directivas, explicacion: r.explicacion, fuente: r.fuente };
     this.estado.megafonoPendiente = propuesta;
@@ -903,7 +1158,7 @@ class Orquestador extends EventEmitter {
       if (dir.tipo === 'sin_efecto') continue;
       this.estado.directivas = megafono.aplicarDirectiva(this.estado.directivas, dir, ahora);
       aplicadas++;
-      this.bus.publicar({ de: 'cio', canal: 'megafono', tipo: 'directiva', texto: plantillas.directiva(dir), datos: { ...dir }, importancia: 3 });
+      this.bus.publicar({ de: 'cio', canal: 'megafono', tipo: 'directiva', texto: plantillas.directiva(dir, this.estado.mesas), datos: { ...dir }, importancia: 3 });
     }
     this.estado.megafonoPendiente = null;
     const vig = megafono.directivasVigentes(this.estado.directivas, ahora);
@@ -975,45 +1230,93 @@ class Orquestador extends EventEmitter {
     return { ok: true, mensaje: 'Pausado: solo cerrar hasta Reabrir.' };
   }
 
+  // Reabrir: solo sale de 'pausado' (botón o conciliación) y de 'bloqueado'
+  // (kill). El solo cerrar por la pérdida del día NO se reabre: dura hasta las
+  // 00:00 UTC y se levanta solo (reabrirlo volvería a saltar en el latido
+  // siguiente). Tras un kill no se borra el máximo histórico: el vigilante
+  // mide desde una referencia aparte que se pone aquí, y el mensaje dice con
+  // cifras cuánto acumula el fondo desde su máximo.
   async _cmdReabrir(d) {
     if (d.confirmacion !== 'REABRIR') return { ok: false, codigo: 400, mensaje: 'Para reabrir hay que escribir REABRIR.' };
     return this._exclusivo(async () => {
       const fo = this.estado.fondo;
-      if (fo.nivel === 'normal') return { ok: true, mensaje: 'El fondo ya estaba en nivel normal.' };
-      await this._actualizarPrecios(this.reloj.ahora());
-      await this.refrescarCartera();
+      const ahora = this.reloj.ahora();
+      const directivas = this._soloCerrarVigente(ahora);
+      if (fo.nivel === 'normal') return { ok: true, mensaje: `El fondo ya estaba en nivel normal.${directivas}` };
+      if (fo.nivel === 'solo_cerrar') {
+        const hasta = Number.isFinite(fo.soloCerrarHasta) ? ` (${f.hora(fo.soloCerrarHasta)} en Madrid)` : '';
+        return { ok: false, mensaje: `No se reabre: el solo cerrar por la pérdida del día dura hasta las 00:00 UTC${hasta} y se levanta solo. Mientras, se pueden cerrar posiciones; para parar del todo, usa Pausar o el kill switch.` };
+      }
+      try {
+        await this._actualizarPrecios(ahora);
+        await this.refrescarCartera();
+      } catch (e) {
+        return { ok: false, mensaje: plantillas.frase(`No se reabre: el bróker o los precios no responden (${e.message}).`, 280) };
+      }
       const c = operaciones.conciliarCadaLatido(this);
       if (!c.limpia) return { ok: false, mensaje: plantillas.frase(`No se reabre: la conciliación no está limpia. ${c.resumen}`, 280) };
       const venia = fo.nivel;
       fo.nivel = 'normal';
       fo.motivo = null;
       fo.soloCerrarHasta = null;
+      fo.killReintento = null;
       this.estado.conciliacion.gravesSeguidas = 0;
-      // Tras un kill, los límites de pérdida se miden desde aquí: con la
-      // referencia vieja el vigilante volvería a disparar en el latido siguiente.
+      const patrimonio = this.vivo.patrimonio;
       if (venia === 'bloqueado') {
-        this.estado.pico = this.vivo.patrimonio;
-        this.estado.patrimonioInicioDia = this.vivo.patrimonio;
-        this.estado.diaInicio = diaUTC(this.reloj.ahora());
+        // Referencia de vigilancia: el patrimonio de ahora. La contable (pico
+        // histórico, inicio real del día) no se toca.
+        this.estado.picoVigilancia = patrimonio < this.estado.pico ? patrimonio : null;
+        this.estado.inicioDiaVigilancia = patrimonio;
+        this.estado.diaInicioVigilancia = diaUTC(ahora);
       }
       this.estado.contadores.reaperturas = (this.estado.contadores.reaperturas || 0) + 1;
       for (const a of this.plantilla) {
         const m = a.mesaId ? this.mesaPorId(a.mesaId) : null;
         this.moverAgente(a.id, null, m && m.estado === 'banquillo' ? 'banquillo' : 'trabajando');
       }
-      this.bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'alerta', texto: plantillas.reabrir({ quien: 'un humano desde el panel' }), datos: { desde: venia }, importancia: 3 });
-      return { ok: true, mensaje: 'Reabierto: vuelta a nivel normal.' };
+      const texto = plantillas.reabrir({ quien: 'un humano desde el panel', patrimonio, pico: this.estado.pico });
+      this.bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'alerta', texto, datos: { desde: venia, patrimonio, pico: this.estado.pico }, importancia: 3 });
+      return { ok: true, mensaje: plantillas.frase(`Reabierto: vuelta a nivel normal. ${texto.replace(/^Reabierto por [^.]*\.\s*/, '')}${directivas}`, 400) };
     });
   }
 
+  // Kill manual: el fondo queda BLOQUEADO al instante (y en disco), antes de
+  // esperar al latido en curso o a la red; luego se cierra todo con los
+  // últimos precios si no hay otros. ok solo si no queda nada por vender.
   async _cmdKill(d) {
     if (d.confirmacion !== 'KILL') return { ok: false, codigo: 400, mensaje: 'Para el kill switch hay que escribir KILL.' };
-    return this._exclusivo(async () => {
-      await this._actualizarPrecios(this.reloj.ahora());
-      await this.refrescarCartera();
-      const r = await this.killSwitch('kill switch manual desde el panel');
-      return { ok: true, mensaje: `Kill switch: ${r.cerradas.length} posiciones cerradas, fondo bloqueado.`, datos: r };
-    });
+    const motivo = 'kill switch manual desde el panel';
+    const fo = this.estado.fondo;
+    this._killPedido = true;
+    if (fo.nivel !== 'bloqueado') {
+      fo.nivel = 'bloqueado';
+      fo.motivo = motivo;
+      fo.soloCerrarHasta = null;
+      this._seguroSinc('guardar', () => this.guardar());
+      this._emitirEstado({ forzar: true });
+    }
+    try {
+      return await this._exclusivo(async () => {
+        const ahora = this.reloj.ahora();
+        await this._seguro('precios', 'controller', () => this._actualizarPrecios(ahora));
+        await this._seguro('valoración', 'controller', () => this.refrescarCartera());
+        let r;
+        try {
+          r = await this.killSwitch(motivo);
+        } catch (err) {
+          return { ok: false, mensaje: plantillas.frase(`Fondo BLOQUEADO, pero el cierre falló (${err.message}): se reintenta solo cada pocos minutos.`, 280) };
+        }
+        const espera = r.esperanApertura.length ? ` ${r.esperanApertura.map(etiqueta).join(', ')} se vende${r.esperanApertura.length === 1 ? '' : 'n'} a la apertura (bolsa cerrada).` : '';
+        if (r.quedanEnBroker.length || r.errores.length) {
+          const quedan = r.quedanEnBroker.length ? `siguen abiertas ${r.quedanEnBroker.map(etiqueta).join(', ')}` : 'hubo errores';
+          const motivos = r.errores.map(x => x.motivo || x.mensaje).filter(Boolean).slice(0, 2).join('; ');
+          return { ok: false, mensaje: plantillas.frase(`Kill: ${r.cerradas.length} cerradas; ${quedan}${motivos ? ` (${motivos})` : ''}. Fondo bloqueado; se reintenta solo cada pocos minutos.${espera}`, 400), datos: r };
+        }
+        return { ok: true, mensaje: `Kill switch: ${r.cerradas.length} posiciones cerradas, fondo bloqueado.${espera}`, datos: r };
+      });
+    } finally {
+      this._killPedido = false;
+    }
   }
 
   _datosAjustes() {

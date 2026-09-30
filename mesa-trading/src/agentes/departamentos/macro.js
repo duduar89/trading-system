@@ -5,9 +5,18 @@
 
 const { calcularRegimen } = require('../../mercado/regimen');
 const plantillas = require('../plantillas');
-const { inicioVela, HORA, DIA } = require('../../util/reloj');
+const { inicioVela, diaUTC, HORA, DIA } = require('../../util/reloj');
 
 const CADA_MENSAJE = 4 * HORA;
+const DIAS_FG = 5;
+
+function anotarDia(m, punto) {
+  const lista = m.fgDias || (m.fgDias = []);
+  const k = lista.findIndex(x => x.dia === punto.dia);
+  if (k >= 0) lista[k] = punto; else lista.push(punto);
+  lista.sort((a, b) => (a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : 0));
+  if (lista.length > DIAS_FG) lista.splice(0, lista.length - DIAS_FG);
+}
 // SMA200 diaria + margen para fines de semana y huecos de datos.
 const DIAS_DIARIAS = 320;
 
@@ -30,6 +39,16 @@ async function actualizar(ctx, { forzar = false } = {}) {
   let fg = null;
   try { fg = await ctx.fg.actual(); } catch (_) { fg = m.fg; }
   m.fg = fg ? { valor: fg.valor, etiqueta: fg.etiqueta, sintetico: Boolean(fg.sintetico), t: fg.t ?? null } : m.fg;
+  // Los últimos días, para que las mesas usen el valor vigente en la hora de
+  // su decisión (valorEn(·, t − RETRASO_FG), como el backtest) y no el último
+  // leído: a las 00:00 aún vale el de ayer. En frío se siembra con el histórico.
+  if (!Array.isArray(m.fgDias) || !m.fgDias.length) {
+    try {
+      const hist = (await ctx.fg.historico()) || [];
+      m.fgDias = hist.filter(x => x && typeof x.dia === 'string' && Number.isFinite(x.valor)).map(x => ({ dia: x.dia, valor: x.valor })).slice(-DIAS_FG);
+    } catch (_) { m.fgDias = []; }
+  }
+  if (m.fg && Number.isFinite(m.fg.t) && Number.isFinite(m.fg.valor)) anotarDia(m, { dia: diaUTC(m.fg.t), valor: m.fg.valor });
   m.regimen = { valor: r.valor, puntos: r.puntos, detalle: r.detalle, t: r.t };
 
   const cambia = anterior !== null && anterior !== r.valor;
