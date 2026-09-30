@@ -125,7 +125,11 @@ test('el enlace: el oficial de la ficha (newReviewUri) si lo hay y es de Google;
   const oficial = 'https://search.google.com/local/writereview?placeid=ChIJB6Pn5d2FQQ0ReZ4Qoqe8gtg&source=g.page.m';
   assert.equal(R.enlaceParaResenar({ enlaceFicha: oficial, placeId: 'ChIJ123' }), oficial);
   assert.equal(R.enlaceParaResenar({ enlaceFicha: 'https://g.page/r/CXyz123/review', placeId: 'ChIJ123' }), 'https://g.page/r/CXyz123/review');
-  for (const malo of ['https://ejemplo.invalid/resena', 'http://search.google.com/local/writereview?placeid=x', 'https://google.com.ejemplo.invalid/x', 'javascript:alert(1)', 'no es un enlace']) {
+  // El de Places (writeAReviewUri) también es de Google.
+  assert.equal(R.esEnlaceDeGoogle('https://www.google.com/maps/place//data=!4m3!3m2!1s0x0:0x0!12e1'), true);
+  // Solo hosts de Google de una lista cerrada: un subdominio de otro («google.abc.io») lleva a otro sitio.
+  for (const malo of ['https://ejemplo.invalid/resena', 'http://search.google.com/local/writereview?placeid=x', 'https://google.com.ejemplo.invalid/x', 'javascript:alert(1)', 'no es un enlace',
+    'https://google.abc.io/opina', 'https://google.xyz.uk/r', 'https://usuario:clave@search.google.com/x', 'https://search.google.com:8443/x']) {
     assert.equal(R.enlaceParaResenar({ enlaceFicha: malo, placeId: 'ChIJ123' }), 'https://search.google.com/local/writereview?placeid=ChIJ123', malo);
   }
   assert.equal(R.enlaceParaResenar({}), null);
@@ -172,16 +176,27 @@ test('temas, sentimiento, el tema nuevo «seguimiento» y la alerta clínica', (
   assert.ok(R.analizar({ nota: 5, texto: 'Me llamaron al día siguiente para ver qué tal estaba. Un seguimiento de diez.' }).temas.includes('seguimiento'));
   assert.ok(R.analizar({ nota: 5, texto: 'Estuvieron pendientes de mí toda la semana' }).temas.includes('seguimiento'));
 
-  // Complicaciones y reclamaciones: alerta clínica (prioridad alta), sea cual sea la nota.
+  // Complicaciones y reclamaciones: alerta clínica (prioridad alta), con sus formas corrientes.
   const alertas = [
     ['Se me infectó la zona y nadie me llamó', 'infección'],
+    ['Se me infectaron los puntos, fatal', 'infección'],
     ['Me quemaron la piel con el aparato', 'quemadura'],
+    ['Me quemé con el láser', 'quemadura'],
     ['Tuve una complicación y tardaron en verme', 'complicación'],
     ['Acabé en urgencias esa misma noche', 'urgencias'],
-    ['Riesgo de necrosis, nadie me avisó', 'necrosis'],
+    ['Me salió una necrosis en la zona', 'necrosis'],
     ['Voy a poner una denuncia', 'denuncia'],
-    ['Ya lo tiene mi abogado', 'abogado'],
+    ['Voy a poner una demanda', 'denuncia'],
+    ['Lo llevaré a juicio', 'denuncia'],
+    ['He puesto una reclamación en Consumo', 'denuncia'],
     ['Pedí la hoja de reclamaciones', 'denuncia'],
+    ['Ya lo tiene mi abogado', 'abogado'],
+    ['Me dejaron una cicatriz horrible', 'cicatriz'],
+    ['Me salió un hematoma enorme y se me inflamó la cara', 'hematoma'],
+    ['Me salió un hematoma enorme y se me inflamó la cara', 'inflamación'],
+    ['Me quedó la cara paralizada', 'parálisis'],
+    // La frase se corta en la coma y en «pero»: lo de antes no niega lo de después.
+    ['Sin dolor, pero con una quemadura que aún tengo', 'quemadura'],
   ];
   for (const [texto, alerta] of alertas) {
     const r = R.analizar({ nota: 1, texto });
@@ -189,10 +204,27 @@ test('temas, sentimiento, el tema nuevo «seguimiento» y la alerta clínica', (
     assert.ok(r.alertas.includes(alerta), `${texto} → ${r.alertas}`);
     assert.equal(r.prioridad, 'alta');
   }
-  assert.equal(R.analizar({ nota: 5, texto: 'Todo perfecto, sin ninguna complicación' }).prioridad, 'alta', 'aunque sea de 5 estrellas la ve dirección médica');
+  // Negado o dicho de pasada no es una alerta: una reseña contenta no manda una tarea urgente a
+  // dirección médica ni le quita a marketing la respuesta.
+  for (const texto of ['Todo perfecto, sin ninguna complicación', 'Cero complicaciones, genial', 'No tuve ninguna infección', 'No hubo ni una sola complicación',
+    'Me explicaron las posibles complicaciones', 'Sin hematomas ni inflamación, estupendo', 'Me han mejorado muchísimo las cicatrices del acné',
+    'A mi juicio, los mejores', 'Tienen mucha demanda: cuesta conseguir cita', 'Qué hospitalidad', 'Todo desinfectado y limpísimo', 'Me ayudó a quemar grasa']) {
+    const r = R.analizar({ nota: 5, texto });
+    assert.deepEqual([r.alertaClinica, r.alertas], [false, []], texto);
+    assert.notEqual(r.prioridad, 'alta', texto);
+  }
+  // Lo de contexto (cicatriz, hematoma…) cuenta si la reseña no es de las contentas.
+  assert.deepEqual(R.analizar({ nota: 2, texto: 'Me quedó una cicatriz' }).alertas, ['cicatriz']);
+  assert.deepEqual(R.analizar({ nota: 5, texto: 'Me quedó una cicatriz pequeña, todo genial' }).alertas, []);
+  // Una contenta que cuenta una complicación de verdad, sí: la ve dirección médica.
+  assert.equal(R.analizar({ nota: 5, texto: 'Tuve una infección pero me la trataron enseguida, genial' }).alertaClinica, true);
   for (const texto of ['Trato excelente y resultados naturales', 'Muy atentos en recepción', 'Fui con miedo y salí encantada']) {
     assert.equal(R.analizar({ nota: 5, texto }).alertaClinica, false, texto);
   }
+  // El tono: «explicaron» no es «caro» ni «último» un «timo».
+  assert.equal(R.analizar({ nota: 5, texto: 'Me lo explicaron todo muy bien' }).sentimiento, 'positivo');
+  assert.equal(R.analizar({ nota: 5, texto: 'El último día me atendieron igual de bien' }).sentimiento, 'positivo');
+  assert.equal(R.analizar({ nota: 4, texto: 'Bien, pero algo caro' }).sentimiento, 'mixto');
 });
 
 test('las respuestas: breves, variadas, en neutro, sin tratamiento, fechas ni equipo, y sin confirmar que es paciente', () => {
@@ -241,6 +273,32 @@ test('las respuestas: breves, variadas, en neutro, sin tratamiento, fechas ni eq
   // Si la que tocaría ya salió hace poco, sale otra.
   const repetida = R.borradorRespuesta({ autor: 'Julia', nota: 5, texto: '' }, { indice: 0, recientes: ['¡Muchas gracias, Ana! Un saludo de todo el equipo de IEMEC.'] });
   assert.notEqual(R.huella(repetida.texto), R.huella('¡Muchas gracias, Ana! Un saludo de todo el equipo de IEMEC.'));
+});
+
+test('las respuestas no se agotan: cada clase tiene 120 o más distintas y el borrador salta las de la ventana de recientes', () => {
+  const clases = {
+    '5 ★ que habla del trato': { nota: 5, texto: 'Muy buen trato' },
+    '5 ★ sin texto': { nota: 5, texto: '' },
+    '5 ★ con texto y sin tema': { nota: 5, texto: 'Genial todo' },
+    '3 ★': { nota: 3, texto: 'Regular' },
+    '4 ★ con espera': { nota: 4, texto: 'Bien, pero una hora de retraso' },
+    'negativa': { nota: 1, texto: 'Muy mal' },
+    'alerta clínica': { nota: 1, texto: 'Me quemaron, voy a denunciar' },
+  };
+  for (const [clase, r] of Object.entries(clases)) {
+    const resena = { autor: 'Ana', ...r };
+    const distintas = new Set();
+    for (let i = 0; i < 400; i++) distintas.add(R.huella(R.borradorRespuesta(resena, { indice: i }).texto));
+    assert.equal(distintas.size, R.variedad(resena), clase);
+    assert.ok(distintas.size >= 120, `${clase}: ${distintas.size}`);
+    // Con las 60 recientes de la misma clase (y los 20 borradores del día), sale otra que no está.
+    const recientes = [];
+    for (let i = 0; i < 80; i++) recientes.push(R.borradorRespuesta({ ...resena, autor: ['Luis', 'Marta', 'Pablo'][i % 3] }, { indice: 7 * i, recientes }).texto);
+    assert.equal(new Set(recientes.map(R.huella)).size, 80, clase);
+    const otra = R.borradorRespuesta(resena, { indice: 3, recientes });
+    assert.ok(!recientes.map(R.huella).includes(R.huella(otra.texto)), clase);
+    assert.equal(R.revisarRespuesta(otra.texto, { resena, profesionales: EQUIPO, recientes }).ok, true, clase);
+  }
 });
 
 test('revisar una respuesta antes de publicarla: lo que no puede salir', () => {
@@ -312,10 +370,13 @@ test('los KPI de la ficha: respuesta, rechazadas, conversión, ritmo, nota de 90
     { nota: 3, con_texto: 1, temas: null, estado: 'historial', publicada_en: '2026-01-10T10:00:00Z', primera_respuesta_en: null },
   ];
   const peticiones = [
-    { enviada_en: '2026-10-18T12:00:00Z', pulsada_en: '2026-10-18T13:00:00Z', variante: '2h', recordatorio_enviado_en: null },
-    { enviada_en: '2026-10-10T12:00:00Z', pulsada_en: null, variante: 'tres_dias', recordatorio_enviado_en: '2026-10-17T12:00:00Z' },
-    { enviada_en: '2026-10-01T10:00:00Z', pulsada_en: '2026-10-08T12:00:00Z', variante: 'dia_siguiente', recordatorio_enviado_en: '2026-10-08T10:00:00Z' },
-    { enviada_en: '2026-06-01T10:00:00Z', pulsada_en: '2026-06-01T11:00:00Z', variante: '2h', recordatorio_enviado_en: null },
+    { estado: 'enviada', enviada_en: '2026-10-18T12:00:00Z', pulsada_en: '2026-10-18T13:00:00Z', variante: '2h', recordatorio_enviado_en: null },
+    { estado: 'enviada', enviada_en: '2026-10-10T12:00:00Z', pulsada_en: null, variante: 'tres_dias', recordatorio_estado: 'enviado', recordatorio_enviado_en: '2026-10-17T12:00:00Z' },
+    { estado: 'enviada', enviada_en: '2026-10-01T10:00:00Z', pulsada_en: '2026-10-08T12:00:00Z', variante: 'dia_siguiente', recordatorio_estado: 'enviado', recordatorio_enviado_en: '2026-10-08T10:00:00Z' },
+    { estado: 'enviada', enviada_en: '2026-06-01T10:00:00Z', pulsada_en: '2026-06-01T11:00:00Z', variante: '2h', recordatorio_enviado_en: null },
+    // Lo que no salió no cuenta: ni la petición fallida (aunque traiga fecha), ni un recordatorio fallido.
+    { estado: 'fallida', enviada_en: '2026-10-20T12:00:00Z', pulsada_en: null, variante: '2h', recordatorio_enviado_en: null },
+    { estado: 'enviada', enviada_en: '2026-10-19T12:00:00Z', pulsada_en: '2026-10-27T12:00:00Z', variante: '2h', recordatorio_estado: 'fallido', recordatorio_enviado_en: '2026-10-26T12:00:00Z' },
   ];
   const m = R.metricas({ resenas, peticiones, ahora });
   assert.equal(m.total, 5);
@@ -327,9 +388,10 @@ test('los KPI de la ficha: respuesta, rechazadas, conversión, ritmo, nota de 90
   assert.equal(m.horasRespuesta, 3, 'mediana de 4 h y 2 h');
   assert.equal(m.horasRespuestaNegativas, 2);
   assert.deepEqual([m.respuestas90, m.rechazadas, m.tasaRechazo], [2, 1, 50]);
-  assert.deepEqual(m.peticiones, { enviadas: 3, abiertas: 2, tasaApertura: 67, recordatorios: 2, abiertasTrasRecordatorio: 1, resenasNuevas: 2, porCada100: 67 });
+  // La fallida no cuenta, y el clic de después de un recordatorio que no salió no es del recordatorio.
+  assert.deepEqual(m.peticiones, { enviadas: 4, abiertas: 3, tasaApertura: 75, recordatorios: 2, abiertasTrasRecordatorio: 1, resenasNuevas: 2, porCada100: 50 });
   assert.deepEqual(m.variantes.map((v) => [v.variante, v.enviadas, v.abiertas, v.abiertasAntes, v.tasa]), [
-    ['2h', 1, 1, 1, 100], ['dia_siguiente', 1, 1, 0, 0], ['tres_dias', 1, 0, 0, 0],
+    ['2h', 2, 2, 2, 100], ['dia_siguiente', 1, 1, 0, 0], ['tres_dias', 1, 0, 0, 0],
   ]);
   assert.deepEqual(m.temasMes, [{ tema: 'precio', resenas: 1, pct: 50 }, { tema: 'trato', resenas: 1, pct: 50 }]);
   assert.equal(m.porSemana.length, 12);
@@ -338,6 +400,10 @@ test('los KPI de la ficha: respuesta, rechazadas, conversión, ritmo, nota de 90
   assert.deepEqual([m.porResponder, m.enHistorial], [2, 1]);
   // Los borradores del historial no cuentan como «por contestar»: van aparte, poco a poco.
   assert.equal(R.metricas({ resenas: [{ nota: 5, estado: 'borrador', historial: 1, publicada_en: '2025-02-01T10:00:00Z' }], ahora }).porResponder, 0);
+  // Una reseña que su autor cambió después de contestarla: sigue contestada (la respuesta se ve en
+  // Google) y a la vez está por contestar (espera otra).
+  const reabierta = R.metricas({ resenas: [{ nota: 1, estado: 'borrador', respondida: 1, publicada_en: '2026-10-25T10:00:00Z' }], ahora });
+  assert.deepEqual([reabierta.tasaRespuesta, reabierta.porResponder], [100, 1]);
   // Sin datos, sin cifras inventadas.
   const vacio = R.metricas({ ahora });
   assert.deepEqual([vacio.notaTotal, vacio.tasaRespuesta, vacio.horasRespuesta, vacio.peticiones.porCada100], [null, null, null, null]);

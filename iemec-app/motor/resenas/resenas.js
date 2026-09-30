@@ -26,6 +26,11 @@ const { telefonoLegible } = require('../entrada/leads');
 
 const HORA = 3600000;
 const DIA = 24 * HORA;
+// Lo que viene de Google (el texto y el autor de cada reseña, y lo que sale del texto: los temas) se
+// guarda como mucho 30 días (normas de la API). Se borra a los 29, en cada vuelta del cron: con un día
+// de margen, aunque el cron se pare unas horas nunca pasa de 30.
+const DIAS_CONTENIDO = 30;
+const DIAS_TEXTO = DIAS_CONTENIDO - 1;
 
 const REGLAS = {
   horasTrasCita: 2, diasEntrePeticiones: 120, horaDesde: '10:30', horaHasta: '20:00', diasMaxTrasCita: 2,
@@ -157,11 +162,16 @@ function enlaceResena(placeId) {
   return `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
 }
 
-// Solo se redirige a una dirección de Google (https): así el enlace corto nunca lleva a otro sitio.
+// Solo se redirige a una de estas direcciones de Google (https, sin usuario ni puerto): así el enlace
+// corto nunca lleva a otro sitio, aunque llegue un dato alterado o mal leído («google.abc.io» es de
+// otro). Son las del enlace para reseñar: newReviewUri (search.google.com), el de Places
+// (www.google.com/maps) y el de «Consigue más reseñas» (g.page).
+const HOSTS_DE_GOOGLE = new Set(['g.page', 'search.google.com', 'www.google.com', 'google.com', 'maps.google.com', 'www.google.es', 'google.es', 'maps.google.es']);
+
 function esEnlaceDeGoogle(uri) {
   try {
     const u = new URL(String(uri));
-    return u.protocol === 'https:' && (u.hostname === 'g.page' || /(^|\.)google\.[a-z]{2,3}(\.[a-z]{2})?$/.test(u.hostname));
+    return u.protocol === 'https:' && !u.username && !u.password && !u.port && HOSTS_DE_GOOGLE.has(u.hostname);
   } catch {
     return false;
   }
@@ -231,20 +241,50 @@ const TEMAS = {
   atencion_recepcion: /(recepcion|telefono|whatsapp|contestan|no cogen|no contestan|cita (online|facil))/,
   seguimiento: /(seguimiento|revisiones|me (llamaron|escribieron|llamasteis|escribisteis) (despues|luego|al dia siguiente|para (ver|saber|preguntar))|se (preocuparon|preocupan|interesaron) por|(estuvieron|estan|siempre) pendientes|pendientes de mi|post ?operatorio|despues del tratamiento|me acompanaron)/,
 };
-const NEGATIVO = /(\bmal\b|fatal|horrible|pesim|nunca mas|no volvere|no lo recomiendo|decepcion|estafa|timo|no contestan|no cogen|caro|carisim|retraso|queja|desastre|peor)/;
-const POSITIVO = /(genial|excelente|perfect|encantad|recomiendo|maravill|estupend|fenomenal|increible|contenta|contento|10|gracias)/;
+// Con los límites de palabra donde hacen falta: «expli-caro-n» no es caro ni «úl-timo» un timo.
+const NEGATIVO = /(\bmal\b|fatal|horrible|pesim|nunca mas|no volvere|no lo recomiendo|decepcion|estafa|\btimo\b|no contestan|no cogen|\bcar[oa]s?\b|carisim|retraso|queja|desastre|\bpeor\b)/;
+const POSITIVO = /(genial|excelente|perfect|encantad|recomiendo|maravill|estupend|fenomenal|increible|contenta|contento|\b(un|de) 10\b|\b10 ?\/ ?10\b|gracias)/;
 
-// Lo que dice una reseña de una posible complicación o de una reclamación: dirección médica.
+// Lo que dice una reseña de una posible complicación o de una reclamación: dirección médica. Con sus
+// formas corrientes («se me infectaron», «me quemé», «poner una demanda», «lo llevaré a juicio», «una
+// reclamación en Consumo»). Las de contexto (cicatriz, hematoma, inflamación, parálisis) también salen
+// en reseñas contentas («me han mejorado mucho las cicatrices»): solo cuentan si la reseña no lo es.
 const ALERTAS_CLINICAS = [
-  ['infección', /\b(infeccion(es)?|infectad[oa]s?|infecto)\b/],
-  ['quemadura', /\b(quemaduras?|quemad[oa]s?|me quem(o|aron)|quemazon)\b/],
+  ['infección', /\binfec\w*/],
+  ['quemadura', /\b(quemaduras?|quemad[oa]s?|quem[eo]|quemaron|quemazon)\b/],
   ['complicación', /\bcomplicacion(es)?\b/],
   ['necrosis', /\b(necrosis|necrosad[oa]s?)\b/],
   ['urgencias', /\b(urgencias|hospital(izad[oa]s?|izacion)?|ingresad[oa]s?|ambulancia)\b/],
-  ['reacción grave', /\b(reaccion alergica|anafila\w*|paralisis|hemorragia|embolia|trombosis|ceguera|perdida de (vision|vista))\b/],
-  ['denuncia', /\b(denuncia(s|do|da|r|re|remos)?|juzgados?|demandar(e|emos)?|negligencia|mala praxis|hoja de reclamaciones)\b/],
+  ['reacción grave', /\b(reaccion alergica|anafila\w*|hemorragia|embolia|trombosis|ceguera|perdida de (vision|vista))\b/],
+  ['denuncia', new RegExp(['\\b(denunci\\w*|juzgados?|negligencia|mala praxis|reclamacion(es)?|reclamare(mos)?|demandar\\w*|demandad[oa]s?',
+    '(poner|puesto|pondre|pondremos|interponer|interpuesto|presentar|presentado|presentare) (una )?demanda|demanda judicial',
+    'a juicio|en (el |un )?juicio|juicio (contra|por)|oficina de consumo|(en|a) consumo|omic)\\b'].join('|'))],
   ['abogado', /\b(abogad[oa]s?|bufete|via judicial|tribunales)\b/],
-];
+  ['cicatriz', /\bcicatri(z|ces)\b/, { contexto: true }],
+  ['hematoma', /\bhematomas?\b/, { contexto: true }],
+  ['inflamación', /\binflam\w*/, { contexto: true }],
+  ['parálisis', /\b(paralisis|paraliz\w*)\b/, { contexto: true }],
+].map(([nombre, rx, o = {}]) => [nombre, new RegExp(rx.source, 'g'), o]);
+
+// «Sin ninguna complicación», «cero complicaciones», «no tuve ninguna infección», «me explicaron las
+// posibles complicaciones»: el término no cuenta si una de las cuatro palabras de antes, en la misma
+// frase, lo niega o lo deja en el aire. La frase se corta en la puntuación y en «pero», «aunque»…: en
+// «sin dolor, pero con una quemadura», la quemadura cuenta.
+const NIEGAN = new Set(['sin', 'ningun', 'ninguna', 'ninguno', 'ningunas', 'ningunos', 'cero', 'ni', 'no', 'nada', 'nunca', 'jamas',
+  'posible', 'posibles', 'riesgo', 'riesgos', 'evitar', 'prevenir']);
+const CORTA_LA_FRASE = /[.,;:!?()\n]|\b(?:pero|aunque|sino|salvo|excepto)\b/;
+
+function negado(t, desde) {
+  const frase = t.slice(0, desde).split(CORTA_LA_FRASE).at(-1) || '';
+  return frase.split(/[^a-z0-9]+/).filter(Boolean).slice(-4).some((w) => NIEGAN.has(w));
+}
+
+// Las alertas de un texto ya normalizado: cada término cuenta si aparece al menos una vez sin negar.
+function alertasDe(t, { contento = false } = {}) {
+  return ALERTAS_CLINICAS
+    .filter(([, rx, o]) => !(o.contexto && contento) && [...t.matchAll(rx)].some((m) => !negado(t, m.index)))
+    .map(([nombre]) => nombre);
+}
 
 function sentimientoPorNota(nota) {
   return nota >= 4 ? 'positivo' : nota <= 2 ? 'negativo' : 'mixto';
@@ -256,7 +296,7 @@ function analizar(resena) {
   let sentimiento = sentimientoPorNota(resena.nota);
   if (resena.nota >= 4 && NEGATIVO.test(t) && !POSITIVO.test(t)) sentimiento = 'mixto';
   if (resena.nota === 3 && POSITIVO.test(t) && !NEGATIVO.test(t)) sentimiento = 'positivo';
-  const alertas = ALERTAS_CLINICAS.filter(([, rx]) => rx.test(t)).map(([k]) => k);
+  const alertas = alertasDe(t, { contento: resena.nota >= 4 && sentimiento === 'positivo' });
   const alertaClinica = alertas.length > 0;
   const prioridad = alertaClinica || resena.nota <= 2 ? 'alta' : resena.nota === 3 || sentimiento === 'mixto' ? 'media' : 'normal';
   return { temas, sentimiento, prioridad, alertaClinica, alertas };
@@ -265,11 +305,15 @@ function analizar(resena) {
 // ── Las respuestas ──────────────────────────────────────────────────────────────────────────
 // Frases en lenguaje neutro («que el trato haya estado a la altura», nunca «atendida»), sin nada que
 // no haya escrito la persona y sin confirmar que es paciente: sirven para quien ha venido y para
-// quien no. Cada parte rota con el índice: dos respuestas seguidas no se parecen.
+// quien no. Cada respuesta junta tres partes; con el índice se recorren TODAS sus combinaciones (el
+// producto de los largos, 120 o más en cada clase) antes de repetir una, y el borrador salta las que
+// ya salieron hace poco. Google rechaza las respuestas repetidas (REPETITIVE): el historial, 20 al día,
+// sale variado días y días.
 
 const APERTURAS = [
   '¡Muchas gracias, {n}!', 'Gracias de corazón, {n}.', '¡Qué alegría leerte, {n}!', 'Mil gracias por tus palabras, {n}.',
   'Gracias por dedicarnos este rato, {n}.', '¡Gracias por tu reseña, {n}!', 'Muchísimas gracias por escribirnos, {n}.', '¡Qué bonito leer esto, {n}!',
+  '¡Gracias por compartir tu opinión, {n}!', 'Te agradecemos mucho tus palabras, {n}.',
 ];
 const FRASES_TEMA = {
   trato: ['Nos alegra mucho que el trato haya estado a la altura.', 'Que el trato haya estado a la altura es lo que más nos importa.', 'Cuidar el trato con cada persona es algo que nos tomamos muy en serio.'],
@@ -281,48 +325,66 @@ const FRASES_TEMA = {
   seguimiento: ['Estar cerca de cada persona también después es parte de nuestra manera de trabajar.', 'Nos alegra que hayas notado ese acompañamiento.', 'Seguir pendientes de cada persona es parte de cómo trabajamos.'],
 };
 const FRASES_GENERALES = ['Nos alegra muchísimo leer tu opinión.', 'Comentarios como el tuyo nos animan a seguir.', 'Nos hace mucha ilusión leer algo así.', 'Gracias por tomarte el tiempo de contarlo.'];
+// Las que llegan sin texto (solo estrellas): a veces sin frase del medio.
+const SIN_TEXTO = ['', 'Nos hace mucha ilusión.', 'Tu opinión nos anima a seguir.', 'Nos alegra mucho que hayas querido dejarnos tu opinión.'];
 const CIERRES = [
   'Un saludo de todo el equipo de IEMEC.', 'Aquí nos tienes para lo que necesites.', 'Un abrazo de todo el equipo.',
   'Hasta pronto.', 'Un fuerte abrazo de parte de IEMEC.', 'Gracias de nuevo por escribirnos.',
 ];
-// Las partes de cada respuesta tienen largos distintos (4, 2 o 3, 3…): al rotar con el mismo índice
-// salen todas las combinaciones antes de repetir una.
-const MIXTAS_APERTURA = ['Gracias por tu opinión, {n}.', 'Gracias por contarnos tu experiencia, {n}.', 'Te agradecemos mucho el comentario, {n}.', 'Muchas gracias por escribirnos, {n}.'];
+const MIXTAS_APERTURA = [
+  'Gracias por tu opinión, {n}.', 'Gracias por contarnos tu experiencia, {n}.', 'Te agradecemos mucho el comentario, {n}.', 'Muchas gracias por escribirnos, {n}.',
+  'Gracias por dedicarnos tu tiempo, {n}.', 'Agradecemos mucho que nos lo cuentes, {n}.',
+];
 const MIXTAS_MEJORA = {
-  espera_puntualidad: ['Tomamos nota de lo que comentas sobre los tiempos de espera para mejorarlo.', 'Lo que cuentas de la espera nos ayuda a organizarnos mejor.'],
-  precio: ['Entendemos lo que comentas y queremos que siempre tengas claras todas las opciones.', 'Tomamos nota de tu comentario sobre el precio.'],
-  atencion_recepcion: ['Tomamos nota de lo que comentas sobre la atención por teléfono y mensajes para mejorarla.', 'Nos ayuda mucho saberlo para responder más rápido.'],
-  general: ['Tomamos nota de lo que nos cuentas para seguir mejorando.', 'Tu comentario nos ayuda a hacerlo cada día mejor.', 'Lo tendremos muy en cuenta.'],
+  espera_puntualidad: [
+    'Tomamos nota de lo que comentas sobre los tiempos de espera para mejorarlo.', 'Lo que cuentas de la espera nos ayuda a organizarnos mejor.',
+    'Cuidar la puntualidad es algo en lo que seguimos trabajando.', 'Revisaremos cómo organizamos los tiempos para que la espera sea menor.',
+  ],
+  precio: [
+    'Entendemos lo que comentas y queremos que siempre tengas claras todas las opciones.', 'Tomamos nota de tu comentario sobre el precio.',
+    'Queremos que los precios queden siempre claros desde el principio.', 'Gracias por contarnos cómo lo has vivido: lo tendremos en cuenta.',
+  ],
+  atencion_recepcion: [
+    'Tomamos nota de lo que comentas sobre la atención por teléfono y mensajes para mejorarla.', 'Nos ayuda mucho saberlo para responder más rápido.',
+    'Queremos que contactar con nosotros sea siempre fácil.', 'Revisaremos cómo atendemos el teléfono y los mensajes.',
+  ],
+  general: ['Tomamos nota de lo que nos cuentas para seguir mejorando.', 'Tu comentario nos ayuda a hacerlo cada día mejor.', 'Lo tendremos muy en cuenta.', 'Nos ayuda mucho saber qué podemos mejorar.'],
 };
 const MIXTAS_CIERRE = [
   'Si quieres comentarlo con nosotros, estamos en el {tel}.', 'Si te apetece contárnoslo con más calma, llámanos o escríbenos al {tel}.',
-  'Nos encantará saber más: estamos en el {tel}.',
+  'Nos encantará saber más: estamos en el {tel}.', 'Si quieres, escríbenos o llámanos al {tel} y lo hablamos.', 'Aquí nos tienes, en el {tel}, para lo que necesites.',
 ];
 // Las negativas: disculpa, invitación a hablarlo en privado con el teléfono de la ficha y, a veces,
-// un cierre. Tres partes que rotan: un día de historial con diez negativas no repite ninguna.
+// un cierre.
 const NEGATIVAS = {
   disculpa: [
     'sentimos mucho que tu experiencia no haya sido la que esperabas.', 'lamentamos de verdad lo que nos cuentas.',
     'gracias por decírnoslo, y sentimos que no haya estado a la altura.', 'sentimos mucho que te hayas llevado esta impresión.',
-    'nos apena leer esto y te agradecemos que nos lo cuentes.',
+    'nos apena leer esto y te agradecemos que nos lo cuentes.', 'lamentamos mucho leer esto.',
   ],
   invitacion: [
     'Nos gustaría entender qué ha pasado y ayudarte: escríbenos o llámanos al {tel} y lo hablamos con calma, en privado.',
     'Queremos escucharte y ver cómo ayudarte: si te parece, llámanos o escríbenos al {tel} y lo vemos en privado.',
     'Nos encantaría hablarlo directamente: estamos en el {tel} para verlo en privado.',
     'Tu opinión nos importa y queremos entenderla bien: escríbenos o llámanos al {tel} y lo hablamos en privado.',
+    'Si te parece bien, llámanos o escríbenos al {tel} y lo vemos juntos en privado.',
   ],
-  cierre: ['', 'Gracias por contárnoslo.', 'Un saludo del equipo de IEMEC.'],
+  cierre: ['', 'Quedamos a tu disposición.', 'Un saludo del equipo de IEMEC.', 'Gracias por tu tiempo.'],
 };
 // Alerta clínica: ni un detalle en público; que llame, y lo lleva dirección médica.
 const ALERTA = {
-  disculpa: ['gracias por escribirnos.', 'sentimos mucho lo que nos cuentas.', 'gracias por contárnoslo.', 'te agradecemos que nos lo hayas contado.'],
+  disculpa: [
+    'gracias por escribirnos.', 'sentimos mucho lo que nos cuentas.', 'gracias por contárnoslo.', 'te agradecemos que nos lo hayas contado.',
+    'lamentamos lo que nos cuentas.', 'gracias por decírnoslo.',
+  ],
   invitacion: [
     'Queremos hablarlo directamente y cuanto antes: llámanos o escríbenos al {tel} y lo vemos en privado.',
     'Queremos ocuparnos personalmente: por favor, llámanos o escríbenos al {tel} para hablarlo en privado.',
     'Nos gustaría hablarlo contigo cuanto antes, en privado: estamos en el {tel}.',
+    'Por favor, escríbenos o llámanos al {tel}: queremos hablarlo contigo en privado.',
+    'Nos gustaría ocuparnos cuanto antes: llámanos o escríbenos al {tel} y lo hablamos en privado.',
   ],
-  cierre: [''],
+  cierre: ['', 'Un saludo.', 'Quedamos a la espera.', 'Quedamos a tu disposición.'],
 };
 
 // Lo que no es un nombre de pila para saludar («Usuario de Google», «Anónimo», iniciales…).
@@ -334,25 +396,41 @@ function primerNombre(autor = '') {
   return n === n.toUpperCase() || n === n.toLowerCase() ? n.charAt(0).toUpperCase() + n.slice(1).toLowerCase() : n;
 }
 
-const rota = (lista, i) => lista[((i % lista.length) + lista.length) % lista.length];
 const conNombre = (frase, n) => frase.replace(', {n}', n ? `, ${n}` : '').replace('{n}', n);
 const hola = (n) => (n ? `Hola ${n}, ` : 'Hola, ');
 
-// «Hola Laura, sentimos… Llámanos al 722 83 32 85… Gracias por contárnoslo.»
-const enPrivado = (partes, { n, i, tel }) => [hola(n) + rota(partes.disculpa, i), tel(rota(partes.invitacion, i)), rota(partes.cierre, i)].filter(Boolean).join(' ');
+// La combinación número i de unas listas, como un número de base mixta: la primera parte cambia en
+// cada respuesta, la segunda cada largo(primera), la tercera cada largo(primera) × largo(segunda). Así
+// salen todas (el producto) antes de repetir ninguna.
+const combinaciones = (listas) => listas.reduce((p, l) => p * l.length, 1);
+function combinacion(listas, i) {
+  let k = ((i % combinaciones(listas)) + combinaciones(listas)) % combinaciones(listas);
+  return listas.map((l) => {
+    const parte = l[k % l.length];
+    k = Math.floor(k / l.length);
+    return parte;
+  });
+}
 
-function componer(resena, a, { n, i, telefono }) {
-  const tel = (s) => s.replace('{tel}', telefono);
-  if (a.alertaClinica && resena.nota <= 3) return enPrivado(ALERTA, { n, i, tel });
-  if (resena.nota <= 2 || a.sentimiento === 'negativo') return enPrivado(NEGATIVAS, { n, i, tel });
+// Las partes de la respuesta que le toca a una reseña (según su nota, su sentimiento, sus temas y si
+// es una alerta clínica) y cómo se juntan.
+function partesDe(resena, a, n) {
+  // «Hola Laura, sentimos… Llámanos al 722 83 32 85… Quedamos a tu disposición.»
+  const enPrivado = (p) => ({ listas: [p.disculpa, p.invitacion, p.cierre], juntar: ([d, i, c]) => [hola(n) + d, i, c] });
+  const conSaludo = (listas) => ({ listas, juntar: ([s, m, c]) => [conNombre(s, n), m, c] });
+  if (a.alertaClinica && resena.nota <= 3) return enPrivado(ALERTA);
+  if (resena.nota <= 2 || a.sentimiento === 'negativo') return enPrivado(NEGATIVAS);
   if (a.sentimiento === 'mixto' || resena.nota === 3) {
     const tema = ['espera_puntualidad', 'precio', 'atencion_recepcion'].find((x) => a.temas.includes(x)) || 'general';
-    return [conNombre(rota(MIXTAS_APERTURA, i), n), rota(MIXTAS_MEJORA[tema], i), tel(rota(MIXTAS_CIERRE, i))].join(' ');
+    return conSaludo([MIXTAS_APERTURA, MIXTAS_MEJORA[tema], MIXTAS_CIERRE]);
   }
   const tema = a.temas.find((x) => FRASES_TEMA[x]);
   const conTexto = Boolean(String(resena.texto || '').trim());
-  const medio = tema ? rota(FRASES_TEMA[tema], i) : conTexto ? rota(FRASES_GENERALES, i) : null;
-  return [conNombre(rota(APERTURAS, i), n), medio, rota(CIERRES, i)].filter(Boolean).join(' ');
+  return conSaludo([APERTURAS, tema ? FRASES_TEMA[tema] : conTexto ? FRASES_GENERALES : SIN_TEXTO, CIERRES]);
+}
+
+function componer(partes, i, telefono) {
+  return partes.juntar(combinacion(partes.listas, i)).filter(Boolean).join(' ').split('{tel}').join(telefono);
 }
 
 // Huella de una respuesta sin el nombre de quien la escribió: dos con la misma huella son iguales
@@ -362,21 +440,23 @@ function huella(texto) {
     .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// Cuántas respuestas distintas puede tener una reseña (las combinaciones de su clase).
+function variedad(resena) {
+  return combinaciones(partesDe(resena, analizar(resena), primerNombre(resena.autor)).listas);
+}
+
 /**
  * Borrador de respuesta: breve, variado, en neutro, sin datos de salud ni del equipo. Lo aprueba una
  * persona antes de publicarlo.
  * @param {object} o { indice (para variar), telefono (el de la ficha), recientes (textos de otras
- *                   respuestas: nunca sale una igual) }
+ *                   respuestas: nunca sale una igual mientras quede alguna combinación libre) }
  */
 function borradorRespuesta(resena, { indice = 0, telefono = TELEFONO, recientes = [] } = {}) {
   const a = analizar(resena);
-  const n = primerNombre(resena.autor);
+  const partes = partesDe(resena, a, primerNombre(resena.autor));
   const usadas = new Set(recientes.filter(Boolean).map(huella));
-  let texto = '';
-  for (let k = 0; k < 48; k++) {
-    texto = componer(resena, a, { n, i: indice + k, telefono });
-    if (!usadas.has(huella(texto))) break;
-  }
+  let texto = componer(partes, indice, telefono);
+  for (let k = 1; k < combinaciones(partes.listas) && usadas.has(huella(texto)); k++) texto = componer(partes, indice + k, telefono);
   const legal = revisar(texto, { tipo: 'conversacion' });
   return { texto, analisis: a, requiereAprobacion: true, avisos: legal.avisos, ok: legal.ok };
 }
@@ -536,10 +616,11 @@ const inicioSemana = (f) => T.sumarDias(f, 1 - T.diaSemana(f));
  * Los KPI de la ficha: respuesta (tasa y tiempo), respuestas rechazadas por Google, conversión de las
  * peticiones, ritmo (14 y 90 días, por semana), nota de 90 días frente al total, temas del mes y la
  * prueba del momento de pedir.
- * @param {object} p { resenas: filas de resenas (nota, estado, con_texto, temas, publicada_en,
- *                     primera_respuesta_en, respuesta_estado, respuestas_rechazadas), peticiones:
- *                     filas de peticiones_resena (enviada_en, pulsada_en, variante,
- *                     recordatorio_enviado_en), ahora }
+ * @param {object} p { resenas: filas de resenas (nota, estado, historial, con_texto, temas,
+ *                     publicada_en, primera_respuesta_en, respuesta_estado, respuestas_rechazadas y
+ *                     respondida: si tiene una respuesta nuestra que se ve en Google), peticiones: filas
+ *                     de peticiones_resena (estado, enviada_en, pulsada_en, variante,
+ *                     recordatorio_estado, recordatorio_enviado_en), ahora }
  */
 function metricas({ resenas = [], peticiones = [], ahora = new Date() } = {}) {
   const ms = (d) => (d ? new Date(d).getTime() : NaN);
@@ -553,8 +634,9 @@ function metricas({ resenas = [], peticiones = [], ahora = new Date() } = {}) {
     const m = Math.floor(s.length / 2);
     return Math.round((s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) * 10) / 10;
   };
-  // Contestada es con la respuesta publicada (la que Google rechaza no se ve: vuelve a la bandeja).
-  const respondida = (r) => r.estado === 'publicada';
+  // Contestada es con una respuesta nuestra que se ve en Google: la publicada, y la de una reseña que
+  // su autor cambió después y espera otra (la que Google rechaza no se ve: vuelve a la bandeja).
+  const respondida = (r) => (r.respondida != null ? si(r.respondida) : r.estado === 'publicada');
   // De la reseña a nuestra primera publicación (nuestra hora: el updateTime de Google cambia al editar).
   const horas = (lista) => mediana(lista.filter((r) => r.primera_respuesta_en)
     .map((r) => (ms(r.primera_respuesta_en) - ms(r.publicada_en)) / HORA).filter((h) => h >= 0));
@@ -565,9 +647,12 @@ function metricas({ resenas = [], peticiones = [], ahora = new Date() } = {}) {
   const rechazadas = nuestras.filter((r) => Number(r.respuestas_rechazadas) > 0 || r.respuesta_estado === 'rechazada');
 
   // Peticiones → clics → reseñas nuevas en los 14 días siguientes a alguna petición. En total: no se
-  // atribuye cada reseña a un paciente.
-  const p90 = peticiones.filter((p) => enLosUltimos(p.enviada_en, 90));
-  const trasRecordatorio = (p) => p.pulsada_en && p.recordatorio_enviado_en && ms(p.pulsada_en) >= ms(p.recordatorio_enviado_en);
+  // atribuye cada reseña a un paciente. Solo cuenta lo que salió de verdad: una petición o un
+  // recordatorio que no llegó a salir (sin plantilla válida, sin teléfono, WhatsApp no lo aceptó) no es
+  // un envío, y el clic de después no es del recordatorio.
+  const p90 = peticiones.filter((p) => (!p.estado || p.estado === 'enviada') && enLosUltimos(p.enviada_en, 90));
+  const recordada = (p) => p.recordatorio_enviado_en && (!p.recordatorio_estado || p.recordatorio_estado === 'enviado');
+  const trasRecordatorio = (p) => p.pulsada_en && recordada(p) && ms(p.pulsada_en) >= ms(p.recordatorio_enviado_en);
   const tramos = unirTramos(p90.map((p) => [ms(p.enviada_en), Math.min(ms(p.enviada_en) + 14 * DIA, ya)]));
   const nuevas = resenas.filter((r) => tramos.some(([a, b]) => ms(r.publicada_en) >= a && ms(r.publicada_en) <= b)).length;
 
@@ -579,8 +664,8 @@ function metricas({ resenas = [], peticiones = [], ahora = new Date() } = {}) {
     if (porSemana.has(s) && ms(r.publicada_en) <= ya) porSemana.set(s, porSemana.get(s) + 1);
   }
 
-  // Temas del mes: los últimos 30 días (el texto solo se guarda 30 días).
-  const mes = resenas.filter((r) => enLosUltimos(r.publicada_en, 30));
+  // Temas del mes: los de los días en que aún se guarda el texto (los temas se borran con él).
+  const mes = resenas.filter((r) => enLosUltimos(r.publicada_en, DIAS_TEXTO));
   const conTextoMes = mes.filter((r) => si(r.con_texto) || temasDe(r).length);
   const temas = {};
   for (const r of mes) for (const t of temasDe(r)) temas[t] = (temas[t] || 0) + 1;
@@ -603,7 +688,7 @@ function metricas({ resenas = [], peticiones = [], ahora = new Date() } = {}) {
       enviadas: p90.length,
       abiertas: p90.filter((p) => p.pulsada_en).length,
       tasaApertura: pct(p90.filter((p) => p.pulsada_en).length, p90.length),
-      recordatorios: p90.filter((p) => p.recordatorio_enviado_en).length,
+      recordatorios: p90.filter(recordada).length,
       abiertasTrasRecordatorio: p90.filter(trasRecordatorio).length,
       resenasNuevas: nuevas,
       porCada100: p90.length ? Math.round((nuevas / p90.length) * 100) : null,
@@ -626,9 +711,9 @@ function metricas({ resenas = [], peticiones = [], ahora = new Date() } = {}) {
 }
 
 module.exports = {
-  REGLAS, VARIANTES, NOMBRE_VARIANTE, OTRA_EN_CAMINO, DE_BAJA, TELEFONO, TEMAS, ALERTAS_CLINICAS,
+  REGLAS, VARIANTES, NOMBRE_VARIANTE, OTRA_EN_CAMINO, DE_BAJA, TELEFONO, TEMAS, ALERTAS_CLINICAS, DIAS_CONTENIDO, DIAS_TEXTO,
   motivoParaNoPedir, enHorarioDeEnvio, elegirVariante, pedirResena, momentoRecordatorio, limiteRecordatorio, motivoParaNoRecordar,
   enlaceResena, esEnlaceDeGoogle, enlaceParaResenar, revisarPeticion, nombresDelEquipo,
-  analizar, sentimientoPorNota, primerNombre, huella, borradorRespuesta, revisarRespuesta,
+  analizar, sentimientoPorNota, primerNombre, huella, variedad, borradorRespuesta, revisarRespuesta,
   normalizarResena, estadoModeracion, metricas,
 };

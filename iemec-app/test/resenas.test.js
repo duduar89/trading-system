@@ -1,15 +1,17 @@
 'use strict';
 // Reseñas de Google con la base: se piden a todos (también a quien se ha quejado) con su variante del
 // momento y un solo recordatorio; el enlace oficial de la ficha y su clic; la alerta clínica para
-// dirección médica; respuestas sin datos personales ni de salud y con aprobación; la moderación de
-// Google; el borrado a los 30 días; el historial poco a poco por la cola, y la pantalla del panel.
-// Pacientes, reseñas y textos inventados.
+// dirección médica; respuestas sin datos personales ni de salud, variadas y con aprobación; la
+// moderación de Google; lo que su autor cambia o Google retira; el borrado a los 29 días; el historial
+// poco a poco por la cola (sin atascarse); las cifras de lo que salió de verdad; de qué paciente es, y
+// la pantalla del panel. Pacientes, reseñas y textos inventados.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
 const express = require('express');
 const { prepararBdDePrueba } = require('./ayuda-bd');
 const S = require('../servidor/resenas');
+const M = require('../servidor/repesca/motor');
 const R = require('../motor/resenas/resenas');
 const { rutasPanel } = require('../servidor/rutas/panel');
 const { crearApp } = require('../servidor/index');
@@ -72,18 +74,31 @@ async function textos(pool, telefono) {
 const resena = async (pool, googleId) => (await pool.query('SELECT * FROM resenas WHERE google_id = ?', [googleId]))[0][0];
 
 // Un adaptador de Google falso con la interfaz del de servidor/integraciones/google.js (listarResenas
-// y responderResena) y lo que dará el real: el estado de moderación al responder y, si se pide, la
-// ficha con su enlace oficial para reseñar (obtenerFicha). No sale nada a internet.
-function googleFalso({ resenas = [], ficha = null, estado = 'PENDING' } = {}) {
+// y responderResena) y lo que da el real: el estado de moderación al responder, sus errores (fallo) y,
+// si se pide, la ficha con su enlace oficial para reseñar (obtenerFicha). modo 'real' para lo que solo
+// se hace con el adaptador real (vueltaGoogle). No sale nada a internet.
+function googleFalso({ resenas = [], ficha = null, estado = 'PENDING', modo = 'simulado', capacidades = undefined } = {}) {
   const publicadas = [];
   return {
-    modo: 'simulado',
+    modo,
     publicadas,
+    llamadas: 0,
+    fallo: null,
+    ...(capacidades ? { capacidades } : {}),
     async listarResenas() { return resenas; },
-    async responderResena(googleId, texto) { publicadas.push({ googleId, texto }); return { ok: true, estado }; },
+    async responderResena(googleId, texto) {
+      this.llamadas++;
+      if (this.fallo) throw this.fallo;
+      publicadas.push({ googleId, texto });
+      return { ok: true, estado };
+    },
     ...(ficha ? { async obtenerFicha() { return ficha; } } : {}),
   };
 }
+// Un error de Google como los del adaptador real (servidor/integraciones/llamadas.js): estado HTTP y si
+// tiene arreglo reintentando.
+const errorGoogle = (mensaje, { estado = 500, permanente = false } = {}) => Object.assign(new Error(mensaje), { estado, permanente });
+const vueltas = async (fn, desde, minutos, veces) => { for (let i = 0; i < veces; i++) await fn(new Date(desde.getTime() + i * minutos * 60000)); };
 
 test('pedir la reseña: a todos y a su hora, con el enlace y su token; una queja no la para, la baja (también por teléfono) sí', async (t) => {
   const pool = await prepararBdDePrueba(t);
@@ -274,20 +289,36 @@ test('el enlace corto lleva al enlace oficial de la ficha (newReviewUri) si se h
     await S.programarPeticion(pool, c, { variante: '2h' });
     const { token } = await peticion(pool, c);
     // Sin la ficha leída: el formato writereview con el place_id de la clínica (la reserva).
-    assert.equal(await S.abrirEnlace(pool, 'noexiste00000000000000', null), 'https://search.google.com/local/writereview?placeid=ChIJiemec');
-    assert.deepEqual(await S.actualizarFicha(pool, googleFalso()), { leida: false }, 'si el adaptador aún no tiene obtenerFicha');
+    const reserva = 'https://search.google.com/local/writereview?placeid=ChIJiemec';
+    assert.equal(await S.abrirEnlace(pool, 'noexiste00000000000000', null), reserva);
+    assert.deepEqual(await S.actualizarFicha(pool, null), { leida: false }, 'sin ficha (el adaptador aún no la da)');
 
+    // La ficha de Business Profile (lo que da obtenerFicha): su newReviewUri se guarda con su fecha. (Con
+    // la hora de ahora: la ruta pública de abajo mira el reloj.)
     const oficial = 'https://g.page/r/CEjemploResena/review';
-    assert.deepEqual(await S.actualizarFicha(pool, googleFalso({ ficha: { placeId: 'ChIJotro0000000', newReviewUri: oficial } }), { ahora: en('2026-10-06', '08:00') }),
-      { leida: true, enlace: true });
+    const leida = new Date();
+    const tras = (dias) => new Date(leida.getTime() + dias * DIA);
+    assert.deepEqual(await S.actualizarFicha(pool, { origen: 'perfil', placeId: 'ChIJotro0000000', newReviewUri: oficial }, { ahora: leida }), { leida: true, enlace: true });
     const [[cl]] = await pool.query('SELECT google_enlace_resena, google_place_id, google_ficha_leida_en FROM clinica');
-    assert.deepEqual([cl.google_enlace_resena, cl.google_place_id, madrid(cl.google_ficha_leida_en)], [oficial, 'ChIJiemec', '2026-10-06 08:00'], 'el place_id que ya había no se toca');
-    assert.equal(await S.abrirEnlace(pool, token, 'ChIJiemec', en('2026-10-06', '15:00')), oficial);
-    await S.abrirEnlace(pool, token, 'ChIJiemec', en('2026-10-07', '10:00'));
-    assert.equal(madrid((await peticion(pool, c)).pulsada_en), '2026-10-06 15:00', 'cuenta el primer clic');
-    // Un enlace que no es de Google no se guarda (el de antes sigue).
-    await S.actualizarFicha(pool, googleFalso({ ficha: { placeId: 'ChIJiemec', newReviewUri: 'https://ejemplo.invalid/opina' } }));
+    assert.deepEqual([cl.google_enlace_resena, cl.google_place_id], [oficial, 'ChIJiemec'], 'el place_id que ya había no se toca');
+    assert.equal(await S.abrirEnlace(pool, token, 'ChIJiemec', tras(0.1)), oficial);
+    assert.equal(await S.abrirEnlace(pool, token, 'ChIJiemec', tras(31)), reserva, 'pasados 30 días ya no vale');
+    assert.equal(madrid((await peticion(pool, c)).pulsada_en), madrid(tras(0.1)), 'cuenta el primer clic');
+    // Y a los 29 días se borra, con el resto de lo que viene de Google.
+    await S.purgarContenido(pool, { ahora: tras(28.9) });
     assert.equal((await pool.query('SELECT google_enlace_resena AS e FROM clinica'))[0][0].e, oficial);
+    await S.purgarContenido(pool, { ahora: tras(29) });
+    assert.equal((await pool.query('SELECT google_enlace_resena AS e FROM clinica'))[0][0].e, null);
+
+    // El de Places (writeAReviewUri) no se guarda: de Places solo se puede guardar el place_id.
+    assert.deepEqual(await S.actualizarFicha(pool, { origen: 'places', placeId: 'ChIJiemec0000', newReviewUri: 'https://www.google.com/maps/place//data=!4m3!3m2' }, { ahora: leida }),
+      { leida: true, enlace: false });
+    assert.equal((await pool.query('SELECT google_enlace_resena AS e FROM clinica'))[0][0].e, null);
+    // Uno que no es de Google tampoco; y una ficha sin enlace quita el de antes.
+    await S.actualizarFicha(pool, { placeId: 'ChIJiemec', newReviewUri: oficial }, { ahora: leida });
+    await S.actualizarFicha(pool, { placeId: 'ChIJiemec', newReviewUri: 'https://google.abc.io/opina' }, { ahora: leida });
+    assert.equal((await pool.query('SELECT google_enlace_resena AS e FROM clinica'))[0][0].e, null);
+    await S.actualizarFicha(pool, { placeId: 'ChIJiemec', newReviewUri: oficial }, { ahora: leida });
 
     // Y por la ruta pública /r/:token, tal como lo abre el paciente.
     const s = crearApp({ pool }).listen(0);
@@ -313,7 +344,7 @@ test('reseñas de Google: análisis y alerta clínica, respuestas sin datos pers
     { googleId: 'g2', autor: 'Pedro', nota: 1, texto: 'Fatal, no contestan al teléfono', publicadaEn: '2026-10-07T09:00:00Z', actualizadaEn: '2026-10-07T09:00:00Z' },
     { googleId: 'g3', autor: 'Carmen', nota: 1, texto: 'Se me infectó la zona y acabé en urgencias', publicadaEn: '2026-10-07T18:00:00Z', actualizadaEn: '2026-10-07T18:00:00Z' },
     // Del historial: una ya contestada que habla de una complicación (solo se marca) y otra sin contestar (tarea, sin prisa).
-    { googleId: 'g4', autor: 'Marta', nota: 5, texto: 'Ninguna complicación, perfecto', publicadaEn: '2025-01-10T10:00:00Z', respuesta: '¡Gracias, Marta!', respondidaEn: '2025-01-11T10:00:00Z' },
+    { googleId: 'g4', autor: 'Marta', nota: 5, texto: 'Tuve una complicación, pero me la resolvieron enseguida', publicadaEn: '2025-01-10T10:00:00Z', respuesta: '¡Gracias, Marta!', respondidaEn: '2025-01-11T10:00:00Z' },
     { googleId: 'g5', autor: 'Luis', nota: 4, texto: 'Muy profesionales', publicadaEn: '2025-02-10T10:00:00Z' },
     { googleId: 'g6', autor: 'Irene', nota: 2, texto: 'Tuve una complicación y tardaron en llamarme', publicadaEn: '2025-03-10T10:00:00Z' },
   ];
@@ -407,8 +438,13 @@ test('reseñas de Google: análisis y alerta clínica, respuestas sin datos pers
     await t.test('la pantalla «Reseñas»: KPI, las alertas lo primero, el historial y la ficha', async () => {
       const app = express();
       app.use(express.json());
-      // La sesión, como la pondría el panel: el rol de quien aprueba (cabecera de la prueba).
-      app.use((req, _res, next) => { req.ahora = new Date(ahora.getTime() + 3 * 3600000); req.usuario = { email: 'prueba@ejemplo.invalid', rol: req.get('x-rol') || 'direccion' }; next(); });
+      // La sesión, como la pondría el panel: el rol de quien aprueba (cabecera de la prueba; vacía, sin rol).
+      app.use((req, _res, next) => {
+        const rol = req.get('x-rol');
+        req.ahora = new Date(ahora.getTime() + 3 * 3600000);
+        req.usuario = { email: 'prueba@ejemplo.invalid', rol: rol === undefined ? 'direccion' : rol || null };
+        next();
+      });
       app.use('/api/panel', rutasPanel({ pool, deps: { pool, google } }));
       const s = app.listen(0);
       await new Promise((r) => s.once('listening', r));
@@ -429,11 +465,18 @@ test('reseñas de Google: análisis y alerta clínica, respuestas sin datos pers
         const mal = await fetch(`${base}/${g3.id}/publicar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: 'Sentimos lo de la infección' }) });
         assert.equal(mal.status, 400);
         assert.match((await mal.json()).error, /salud/);
-        // La alerta clínica la contesta dirección médica, no marketing.
-        const marketing = await fetch(`${base}/${g3.id}/publicar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-rol': 'marketing' }, body: JSON.stringify({}) });
-        assert.equal(marketing.status, 400);
-        assert.match((await marketing.json()).error, /alerta clínica: la contesta dirección médica/);
-        const bien = await fetch(`${base}/${g3.id}/publicar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        // La alerta clínica la contesta dirección médica (dirección o médico): ni marketing, ni
+        // administración, ni nadie sin rol (falla cerrado). La pantalla lo sabe y no enseña el botón.
+        const comoRol = async (rol) => (await (await fetch(base, { headers: { 'x-rol': rol } })).json()).resenas.find((x) => x.id === g3.id).puedeContestar;
+        assert.deepEqual([await comoRol('direccion'), await comoRol('medico'), await comoRol('marketing'), await comoRol('admin'), await comoRol('')], [true, true, false, false, false]);
+        assert.equal(d.resenas.find((x) => x.id !== g3.id && !x.alerta).puedeContestar, true, 'las demás, cualquiera');
+        for (const rol of ['marketing', 'admin', 'recepcion', '']) {
+          const no = await fetch(`${base}/${g3.id}/publicar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-rol': rol }, body: JSON.stringify({}) });
+          assert.equal(no.status, 400, rol);
+          assert.match((await no.json()).error, /alerta clínica: la contesta dirección médica/, rol);
+        }
+        await assert.rejects(S.aprobarYPublicar(pool, google, { resenaId: g3.id, aprobadaPor: 'x', ahora }), /alerta clínica/, 'sin rol, tampoco llamándolo directamente');
+        const bien = await fetch(`${base}/${g3.id}/publicar`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-rol': 'medico' }, body: JSON.stringify({}) });
         assert.deepEqual(await bien.json(), { ok: true, estado: 'publicada', avisos: [] });
       } finally {
         s.close();
@@ -444,7 +487,7 @@ test('reseñas de Google: análisis y alerta clínica, respuestas sin datos pers
   }
 });
 
-test('a los 30 días se borran el texto y el autor; se quedan el id, las estrellas, las fechas, los estados y nuestras respuestas', async (t) => {
+test('a los 29 días se borran el texto y el autor; se quedan el id, las estrellas, las fechas, los estados y nuestras respuestas', async (t) => {
   const pool = await prepararBdDePrueba(t);
   if (!pool) return;
   const t0 = en('2026-10-08', '10:00');
@@ -460,13 +503,13 @@ test('a los 30 días se borran el texto y el autor; se quedan el id, las estrell
     await S.aprobarYPublicar(pool, google, { resenaId: g1.id, aprobadaPor: 'recepcion@iemec', ahora: new Date(t0.getTime() + 3600000) });
     assert.match((await resena(pool, 'g2')).borrador_respuesta, /Marta/);
 
-    assert.deepEqual(await S.purgarContenido(pool, { ahora: new Date(t0.getTime() + 29 * DIA) }), { borradas: 0 });
-    const t30 = new Date(t0.getTime() + 30 * DIA + 60000);
-    assert.deepEqual(await S.purgarContenido(pool, { ahora: t30 }), { borradas: 2 });
+    assert.deepEqual(await S.purgarContenido(pool, { ahora: new Date(t0.getTime() + 29 * DIA - 60000) }), { borradas: 0 });
+    const t29 = new Date(t0.getTime() + 29 * DIA);
+    assert.deepEqual(await S.purgarContenido(pool, { ahora: t29 }), { borradas: 2 });
     const [a, b] = [await resena(pool, 'g1'), await resena(pool, 'g2')];
     for (const r of [a, b]) {
       assert.deepEqual([r.texto, r.autor, r.temas], [null, null, null]);
-      assert.equal(madrid(r.contenido_borrado_en), madrid(t30));
+      assert.equal(madrid(r.contenido_borrado_en), madrid(t29));
       assert.equal(r.con_texto, 1, 'se sabe que tenía texto');
     }
     // Se quedan el id, las estrellas, las fechas, los estados y nuestra respuesta (con su saludo).
@@ -475,18 +518,52 @@ test('a los 30 días se borran el texto y el autor; se quedan el id, las estrell
     // El borrador que aún no se ha aprobado llevaba su nombre: ahora, otro sin nada de la reseña.
     assert.equal(b.estado, 'borrador');
     assert.doesNotMatch(b.borrador_respuesta, /Marta|espera/i);
-    assert.deepEqual(await S.purgarContenido(pool, { ahora: new Date(t30.getTime() + DIA) }), { borradas: 0 });
+    assert.deepEqual(await S.purgarContenido(pool, { ahora: new Date(t29.getTime() + DIA) }), { borradas: 0 });
 
     // Volver a leerlas de Google no vuelve a guardar lo borrado…
-    await S.importarResenas(pool, google, { ahora: new Date(t30.getTime() + DIA) });
+    await S.importarResenas(pool, google, { ahora: new Date(t29.getTime() + DIA) });
     assert.deepEqual([(await resena(pool, 'g1')).texto, (await resena(pool, 'g2')).autor], [null, null]);
-    // …salvo que la persona haya editado su reseña: contenido nuevo, con sus 30 días.
-    Object.assign(lista[1], { texto: 'Lo he pensado mejor: muy contenta', nota: 5, actualizadaEn: new Date(t30.getTime() + 2 * DIA).toISOString() });
-    const t32 = new Date(t30.getTime() + 2 * DIA + 3600000);
-    assert.equal((await S.importarResenas(pool, google, { ahora: t32 })).editadas, 1);
+    // …salvo que la persona haya editado su reseña: contenido nuevo, con sus días.
+    Object.assign(lista[1], { texto: 'Lo he pensado mejor: muy contenta', nota: 5, actualizadaEn: new Date(t29.getTime() + 2 * DIA).toISOString() });
+    const t31 = new Date(t29.getTime() + 2 * DIA + 3600000);
+    assert.equal((await S.importarResenas(pool, google, { ahora: t31 })).editadas, 1);
     const g2 = await resena(pool, 'g2');
-    assert.deepEqual([g2.texto, g2.autor, g2.nota, g2.contenido_borrado_en, madrid(g2.contenido_leido_en)], ['Lo he pensado mejor: muy contenta', 'Marta', 5, null, madrid(t32)]);
+    assert.deepEqual([g2.texto, g2.autor, g2.nota, g2.contenido_borrado_en, madrid(g2.contenido_leido_en)], ['Lo he pensado mejor: muy contenta', 'Marta', 5, null, madrid(t31)]);
     assert.match(g2.borrador_respuesta, /Marta/);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('el borrado va en cada vuelta del cron: lo leído a cualquier hora (un reintento, un aviso de Pub/Sub) nunca pasa de 30 días', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const deps = { pool, whatsapp: crearWhatsApp('simulado') };
+  try {
+    await sembrar(pool);
+    // Google falla a las 8:00, la cola lo reintenta y la reseña se lee a las 8:01; otra llega por un
+    // aviso a las 14:00.
+    const leer = (googleId, ahora) => S.importarResenas(pool, googleFalso({ resenas: [{ googleId, autor: 'Laura G.', nota: 5, texto: 'Trato encantador', publicadaEn: '2026-08-31T10:00:00Z' }] }), { ahora });
+    await leer('p1', en('2026-09-01', '08:01'));
+    await leer('p2', en('2026-09-01', '14:00'));
+    const guardado = async (id) => Boolean((await resena(pool, id)).texto);
+    // El día 29, a la vuelta de cada minuto: sigue hasta que cumple 29 días, y ni un minuto más.
+    await S.vuelta(deps, { ahora: en('2026-09-30', '08:00') });
+    assert.deepEqual([await guardado('p1'), await guardado('p2')], [true, true]);
+    await S.vuelta(deps, { ahora: en('2026-09-30', '08:01') });
+    assert.deepEqual([await guardado('p1'), await guardado('p2')], [false, true]);
+    await S.vuelta(deps, { ahora: en('2026-09-30', '14:00') });
+    assert.deepEqual([await guardado('p1'), await guardado('p2')], [false, false]);
+    for (const id of ['p1', 'p2']) {
+      const r = await resena(pool, id);
+      assert.ok(new Date(r.contenido_borrado_en) - new Date(r.contenido_leido_en) < 30 * DIA, id);
+    }
+    // Aunque el cron se pare casi un día, tampoco pasa de 30.
+    await leer('p3', en('2026-09-02', '12:00'));
+    await S.vuelta(deps, { ahora: en('2026-10-02', '11:00') });
+    const p3 = await resena(pool, 'p3');
+    assert.equal(p3.texto, null);
+    assert.ok(new Date(p3.contenido_borrado_en) - new Date(p3.contenido_leido_en) < 30 * DIA);
   } finally {
     await pool.end();
   }
@@ -532,19 +609,26 @@ test('el historial se contesta poco a poco: 20 al día en la bandeja, variadas, 
     const [[otra]] = await pool.query("SELECT id FROM resenas WHERE historial AND estado = 'borrador' ORDER BY id LIMIT 1");
     assert.equal(madrid((await S.aprobarYPublicar(pool, google, { resenaId: otra.id, aprobadaPor: 'recepcion@iemec', ahora })).publicarEn), '2026-10-07 10:30');
 
-    // La cola las publica cuando les toca.
-    await S.vuelta(deps, { ahora: en('2026-10-06', '10:29') });
-    assert.equal(google.publicadas.length, 0);
+    // La vuelta de cada minuto no llama a Google, y con el adaptador simulado no se publica nada.
     await S.vuelta(deps, { ahora: en('2026-10-06', '10:30') });
+    assert.equal(await S.vueltaGoogle(deps, { ahora: en('2026-10-06', '10:30') }), null);
+    assert.equal(google.llamadas, 0);
+    // Con el real, la cola las publica cuando les toca (en la vuelta de Google, con su tiempo tasado).
+    google.modo = 'real';
+    await S.vueltaGoogle(deps, { ahora: en('2026-10-06', '10:29') });
+    assert.equal(google.publicadas.length, 0);
+    await S.vueltaGoogle(deps, { ahora: en('2026-10-06', '10:30') });
     assert.equal(google.publicadas.length, 1);
-    await S.vuelta(deps, { ahora: en('2026-10-06', '10:54') });
+    await S.vueltaGoogle(deps, { ahora: en('2026-10-06', '10:54') });
     assert.equal(google.publicadas.length, 1);
-    await S.vuelta(deps, { ahora: en('2026-10-06', '10:55') });
+    await S.vueltaGoogle(deps, { ahora: en('2026-10-06', '10:55') });
     assert.equal(google.publicadas.length, 2);
-    for (let i = 0; i < 3; i++) await S.vuelta(deps, { ahora: en('2026-10-06', '19:00') });
+    assert.deepEqual(await S.vueltaGoogle(deps, { ahora: en('2026-10-06', '19:00'), cortarEn: Date.now() }), { hechos: 0, reintentos: 0, fallidos: 0, aplazados: 5 },
+      'sin tiempo, no empieza ninguna (quedan para la siguiente)');
+    for (let i = 0; i < 4; i++) await S.vueltaGoogle(deps, { ahora: en('2026-10-06', '19:00') });
     assert.equal(google.publicadas.length, 20, 'las del martes');
     assert.equal(new Set(google.publicadas.map((p) => R.huella(p.texto))).size, 20);
-    await S.vuelta(deps, { ahora: en('2026-10-07', '10:30') });
+    await S.vueltaGoogle(deps, { ahora: en('2026-10-07', '10:30') });
     assert.equal(google.publicadas.length, 21);
     const [[pub]] = await pool.query("SELECT COUNT(*) AS n FROM resenas WHERE historial AND estado = 'publicada' AND primera_respuesta_en IS NOT NULL");
     assert.equal(pub.n, 21);
@@ -553,13 +637,14 @@ test('el historial se contesta poco a poco: 20 al día en la bandeja, variadas, 
   }
 });
 
-test('la tarea diaria va por la cola, una vez al día desde las 8:00: ficha y reseñas de Google, borrado a los 30 días e historial', async (t) => {
+test('cada minuto, solo la base: el historial del día por la cola, una vez al día desde las 8:00; lo de Google, aparte y solo con el adaptador real', async (t) => {
   const pool = await prepararBdDePrueba(t);
   if (!pool) return;
-  const google = googleFalso({
-    ficha: { placeId: 'ChIJiemec', newReviewUri: 'https://g.page/r/CEjemploResena/review' },
-    resenas: [{ googleId: 'g1', autor: 'Laura G.', nota: 5, texto: 'Trato encantador', publicadaEn: '2026-10-05T15:00:00Z' }],
-  });
+  const oficial = 'https://g.page/r/CEjemploResena/review';
+  // Un adaptador que falla si alguien le pide las reseñas: la vuelta de cada minuto no le llama nunca
+  // (las reseñas las trae la sincronización de la ficha de Google, con su candado).
+  const google = googleFalso({ ficha: { origen: 'perfil', placeId: 'ChIJiemec', newReviewUri: oficial } });
+  google.listarResenas = async () => { throw new Error('la vuelta de cada minuto no llama a Google'); };
   const deps = { pool, whatsapp: crearWhatsApp('simulado'), google };
   const trabajos = async () => (await pool.query("SELECT tipo, estado FROM cola WHERE tipo LIKE 'resenas\\_%' ORDER BY id"))[0].map((x) => `${x.tipo}:${x.estado}`);
   try {
@@ -567,23 +652,348 @@ test('la tarea diaria va por la cola, una vez al día desde las 8:00: ficha y re
     await S.vuelta(deps, { ahora: en('2026-10-06', '07:59') });
     assert.deepEqual(await trabajos(), []);
     const r = await S.vuelta(deps, { ahora: en('2026-10-06', '08:00') });
-    assert.deepEqual(r.trabajos, { hechos: 3, reintentos: 0, fallidos: 0, aplazados: 0 });
-    assert.deepEqual(await trabajos(), ['resenas_google:hecho', 'resenas_purgar:hecho', 'resenas_historial:hecho']);
-    assert.equal((await pool.query('SELECT google_enlace_resena AS e FROM clinica'))[0][0].e, 'https://g.page/r/CEjemploResena/review');
-    assert.equal((await resena(pool, 'g1')).estado, 'borrador');
+    assert.deepEqual(r, { recordatorios: 0, borradas: 0, trabajos: { hechos: 1, reintentos: 0, fallidos: 0, aplazados: 0 } });
+    assert.deepEqual(await trabajos(), ['resenas_historial:hecho']);
     await S.vuelta(deps, { ahora: en('2026-10-06', '12:00') });
-    assert.equal((await trabajos()).length, 3, 'una vez al día');
+    assert.equal((await trabajos()).length, 1, 'una vez al día');
+    assert.equal(google.llamadas, 0);
 
-    // Un día que Google falla: lo suyo se reintenta; el borrado y el historial salen igual.
-    google.listarResenas = async () => { throw new Error('Google no responde'); };
-    const r2 = await S.vuelta(deps, { ahora: en('2026-10-07', '08:00') });
-    assert.deepEqual(r2.trabajos, { hechos: 2, reintentos: 1, fallidos: 0, aplazados: 0 });
-    const [[fallo]] = await pool.query("SELECT estado, ultimo_error FROM cola WHERE clave_unica = 'resenas_google-2026-10-07'");
-    assert.deepEqual({ ...fallo }, { estado: 'pendiente', ultimo_error: 'Google no responde' });
-    // Y a los 30 días de leerla, el texto y el autor se borran solos.
-    await S.vuelta(deps, { ahora: en('2026-11-05', '08:00') });
-    const g1 = await resena(pool, 'g1');
-    assert.deepEqual([g1.texto, g1.autor, g1.nota], [null, null, 5]);
+    // Lo de Google: con el adaptador simulado, nada (ni se lee la ficha ni se publica).
+    assert.equal(await S.vueltaGoogle(deps, { ahora: en('2026-10-06', '12:00') }), null);
+    assert.equal(await S.vueltaGoogle({ pool }, { ahora: en('2026-10-06', '12:00') }), null, 'ni sin adaptador');
+    // Con el real: el enlace de la ficha, una vez al día desde las 8:00.
+    google.modo = 'real';
+    assert.deepEqual(await S.vueltaGoogle(deps, { ahora: en('2026-10-06', '12:00') }), { hechos: 1, reintentos: 0, fallidos: 0, aplazados: 0 });
+    assert.equal((await pool.query('SELECT google_enlace_resena AS e FROM clinica'))[0][0].e, oficial);
+    await S.vueltaGoogle(deps, { ahora: en('2026-10-06', '12:01') });
+    assert.deepEqual(await trabajos(), ['resenas_historial:hecho', 'resenas_ficha:hecho']);
+    // Solo con Places (sin Business Profile): ni la ficha (su enlace no se puede guardar) ni publicar.
+    const soloPlaces = { ...google, capacidades: { perfil: false, ficha: false, places: true } };
+    assert.deepEqual(await S.vueltaGoogle({ pool, google: soloPlaces }, { ahora: en('2026-10-07', '12:00') }), { sinPerfil: true });
+    assert.deepEqual(await trabajos(), ['resenas_historial:hecho', 'resenas_ficha:hecho']);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('el historial de días seguidos sale variado: los 20 borradores de cada día se aprueban sin una sola «repetida»', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  // Lo más habitual en la ficha: 5 estrellas que hablan del trato.
+  const NOMBRES = ['Ana', 'Luis', 'Marta', 'Pablo', 'Irene', 'Diego', 'Nuria', 'Sergio', 'Alba', 'Rosa'];
+  const viejas = Array.from({ length: 60 }, (_, i) => ({
+    googleId: `v${i + 1}`, autor: `${NOMBRES[i % 10]} ${String.fromCharCode(65 + (i % 26))}.`, nota: 5,
+    texto: ['Trato exquisito', 'Un trato muy cercano', 'Muy amables todos'][i % 3], publicadaEn: new Date(Date.UTC(2025, i % 12, 1 + (i % 27), 10)).toISOString(),
+  }));
+  const google = googleFalso({ resenas: viejas, modo: 'real' });
+  const deps = { pool, whatsapp: crearWhatsApp('simulado'), google };
+  try {
+    await sembrar(pool);
+    await S.importarResenas(pool, google, { ahora: en('2026-10-05', '09:00') });
+    const repetidas = [];
+    for (const dia of ['2026-10-06', '2026-10-07', '2026-10-08']) {
+      assert.deepEqual(await S.liberarHistorial(pool, { ahora: en(dia, '09:00') }), { liberadas: 20 }, dia);
+      const [bandeja] = await pool.query("SELECT id FROM resenas WHERE historial AND estado = 'borrador' ORDER BY id");
+      for (const r of bandeja) {
+        try {
+          await S.aprobarYPublicar(pool, google, { resenaId: r.id, aprobadaPor: 'recepcion@iemec', ahora: en(dia, '09:30') });
+        } catch (err) {
+          repetidas.push(`${dia}: ${err.message}`);
+        }
+      }
+      await vueltas((ahora) => S.vueltaGoogle(deps, { ahora }), en(dia, '10:30'), 25, 20);
+    }
+    assert.deepEqual(repetidas, [], 'ninguna rechazada por repetida');
+    assert.equal(google.publicadas.length, 60);
+    assert.equal(new Set(google.publicadas.map((p) => R.huella(p.texto))).size, 60, 'las 60, distintas');
+  } finally {
+    await pool.end();
+  }
+});
+
+test('las cifras solo cuentan las peticiones que salieron: las fallidas, aparte y con su motivo', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const whatsapp = crearWhatsApp('simulado');
+  const deps = { pool, ia: crearIa('simulado'), whatsapp };
+  try {
+    await sembrar(pool, { momentos: '2h' });
+    // Es lo que pasa al desplegar si Meta aún no ha aprobado la plantilla nueva: la antigua, sin la baja.
+    await pool.query("UPDATE plantillas SET cuerpo = 'Hola {{1}}, gracias por tu visita a IEMEC. ¿Nos cuentas qué tal tu experiencia? Tu opinión en Google nos ayuda mucho.' WHERE uso = 'resena'");
+    for (const nombre of ['Ana', 'Bea', 'Carla', 'Dani']) await S.programarPeticion(pool, await citaCompletada(pool, (await paciente(pool, nombre)).id, '2026-10-06', '11:00'));
+    await S.enviarPeticionesPendientes(deps, { ahora: en('2026-10-06', '14:00') });
+    assert.equal(whatsapp.enviados.length, 0);
+    const [filas] = await pool.query('SELECT estado, enviada_en FROM peticiones_resena');
+    assert.deepEqual(filas.map((f) => [f.estado, f.enviada_en]), Array(4).fill(['fallida', null]), 'sin fecha de envío: no salieron');
+    let d = await S.datosPanel(pool, { ahora: en('2026-10-07', '10:00') });
+    assert.deepEqual([d.metricas.peticiones.enviadas, d.metricas.peticiones.porCada100], [0, null]);
+    assert.deepEqual(d.metricas.variantes.map((v) => v.enviadas), [0, 0, 0], 'la prueba del momento, sin envíos que no llegaron');
+    assert.equal(d.peticionesFallidas.n, 4);
+    assert.match(d.peticionesFallidas.motivo, /no cumple las normas de Google/);
+
+    // Con la plantilla buena salen; si WhatsApp no acepta el recordatorio, no cuenta como recordatorio.
+    await pool.query('UPDATE plantillas SET cuerpo = ? WHERE uso = ?', [BIBLIOTECA.find((p) => p.uso === 'resena').cuerpo, 'resena']);
+    const eva = await paciente(pool, 'Eva');
+    const ce = await citaCompletada(pool, eva.id, '2026-10-07', '11:00');
+    await S.programarPeticion(pool, ce);
+    await S.enviarPeticionesPendientes(deps, { ahora: en('2026-10-07', '14:00') });
+    const enviarPlantilla = whatsapp.enviarPlantilla;
+    whatsapp.enviarPlantilla = async () => { throw new Error('131026: mensaje no entregable'); };
+    await S.enviarRecordatorios(deps, { ahora: en('2026-10-14', '14:00') });
+    whatsapp.enviarPlantilla = enviarPlantilla;
+    const pe = await peticion(pool, ce);
+    assert.deepEqual([pe.estado, pe.recordatorio_estado, pe.recordatorio_enviado_en, pe.recordatorio_motivo], ['enviada', 'fallido', null, 'WhatsApp no lo aceptó']);
+    await S.abrirEnlace(pool, pe.token, null, en('2026-10-14', '18:00'));
+    d = await S.datosPanel(pool, { ahora: en('2026-10-15', '10:00') });
+    assert.deepEqual([d.metricas.peticiones.enviadas, d.metricas.peticiones.abiertas, d.metricas.peticiones.recordatorios, d.metricas.peticiones.abiertasTrasRecordatorio], [1, 1, 0, 0]);
+    // Y si WhatsApp no acepta la petición, tampoco es un envío.
+    const fran = await paciente(pool, 'Fran');
+    const cf = await citaCompletada(pool, fran.id, '2026-10-08', '11:00');
+    await S.programarPeticion(pool, cf);
+    whatsapp.enviarPlantilla = async () => { throw new Error('131026: mensaje no entregable'); };
+    await S.enviarPeticionesPendientes(deps, { ahora: en('2026-10-08', '14:00') });
+    whatsapp.enviarPlantilla = enviarPlantilla;
+    assert.deepEqual([(await peticion(pool, cf)).estado, (await peticion(pool, cf)).enviada_en], ['fallida', null]);
+    d = await S.datosPanel(pool, { ahora: en('2026-10-15', '10:00') });
+    assert.deepEqual([d.metricas.peticiones.enviadas, d.peticionesFallidas.n, d.peticionesFallidas.motivo], [1, 5, 'WhatsApp no lo aceptó']);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('una respuesta del historial aprobada nunca se queda atascada: Google falla → se reintenta → vuelve a la bandeja', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const google = googleFalso({
+    modo: 'real',
+    resenas: ['Luis', 'Marta', 'Pablo', 'Irene'].map((autor, i) => ({ googleId: `h${i + 1}`, autor, nota: 5, texto: 'Muy profesionales', publicadaEn: `2025-0${i + 2}-10T10:00:00Z` })),
+  });
+  const deps = { pool, whatsapp: crearWhatsApp('simulado'), google };
+  const ahora = en('2026-10-06', '09:00');
+  const cola = async (id) => (await pool.query("SELECT estado, intentos FROM cola WHERE tipo = 'resenas_publicar' AND JSON_VALUE(carga, '$.resenaId') = ? ORDER BY id DESC LIMIT 1", [id]))[0][0];
+  try {
+    await sembrar(pool);
+    await S.importarResenas(pool, google, { ahora });
+    await S.liberarHistorial(pool, { ahora });
+    const [[h1], [h2]] = [await pool.query("SELECT * FROM resenas WHERE google_id = 'h1'"), await pool.query("SELECT * FROM resenas WHERE google_id = 'h2'")].map((x) => x[0]);
+    await S.aprobarYPublicar(pool, google, { resenaId: h1.id, aprobadaPor: 'recepcion@iemec', ahora });
+
+    // El token de refresco caduca: la cola lo reintenta (1, 2, 4 y 8 minutos) y en el último intento
+    // vuelve a la bandeja con su texto y el motivo, para aprobarla otra vez.
+    google.fallo = errorGoogle('Google: el token de refresco ha caducado');
+    await vueltas((m) => S.vueltaGoogle(deps, { ahora: m }), en('2026-10-06', '10:30'), 5, 12);
+    assert.deepEqual({ ...(await cola(h1.id)) }, { estado: 'fallido', intentos: 5 });
+    let r = await resena(pool, 'h1');
+    assert.deepEqual([r.estado, r.respuesta, r.publicar_en], ['borrador', null, null]);
+    assert.equal(r.borrador_respuesta, h1.borrador_respuesta, 'con el texto que se aprobó');
+    assert.match(r.error_publicar, /token de refresco ha caducado/);
+    let d = await S.datosPanel(pool, { ahora: en('2026-10-06', '12:00') });
+    assert.deepEqual(d.resenas.filter((x) => x.id === h1.id).map((x) => [x.estado, x.historial, x.errorPublicar !== null]), [['borrador', true, true]], 'en la bandeja, con el motivo');
+    // Google vuelve: se aprueba otra vez y sale.
+    google.fallo = null;
+    assert.equal((await S.aprobarYPublicar(pool, google, { resenaId: h1.id, aprobadaPor: 'recepcion@iemec', ahora: en('2026-10-06', '12:00') })).estado, 'aprobada');
+    await vueltas((m) => S.vueltaGoogle(deps, { ahora: m }), en('2026-10-06', '12:00'), 30, 2);
+    assert.deepEqual([(await resena(pool, 'h1')).estado, google.publicadas.length], ['publicada', 1]);
+
+    // Un error sin arreglo (p. ej., la respuesta no cabe) no espera a los reintentos. Mientras, la
+    // pantalla deja volver a aprobarla (con otro texto): la aprobada con error se puede reintentar.
+    await S.aprobarYPublicar(pool, google, { resenaId: h2.id, aprobadaPor: 'recepcion@iemec', ahora: en('2026-10-06', '13:00') });
+    const [[h2a]] = await pool.query('SELECT publicar_en FROM resenas WHERE id = ?', [h2.id]);
+    google.fallo = errorGoogle('Google 503 Service Unavailable');
+    await S.vueltaGoogle(deps, { ahora: new Date(h2a.publicar_en) });
+    d = await S.datosPanel(pool, { ahora: new Date(h2a.publicar_en) });
+    assert.deepEqual(d.resenas.filter((x) => x.id === h2.id).map((x) => [x.estado, x.reintentar]), [['aprobada', true]]);
+    google.fallo = errorGoogle('La respuesta ocupa 5000 bytes y Google admite 4096', { estado: 400, permanente: true });
+    await S.vueltaGoogle(deps, { ahora: new Date(new Date(h2a.publicar_en).getTime() + 60000) });
+    assert.deepEqual([(await resena(pool, 'h2')).estado, (await cola(h2.id)).estado], ['borrador', 'hecho'], 'a la bandeja ya, sin reintentos');
+    assert.match((await resena(pool, 'h2')).error_publicar, /4096/);
+
+    // Sin Google real conectado no se publica nada: la aprobada que un día después no ha salido vuelve
+    // a la bandeja con la tarea del historial del día.
+    google.fallo = null;
+    const [[h3]] = await pool.query("SELECT id FROM resenas WHERE google_id = 'h3'");
+    await S.aprobarYPublicar(pool, google, { resenaId: h3.id, aprobadaPor: 'recepcion@iemec', ahora: en('2026-10-06', '14:00') });
+    google.modo = 'simulado';
+    await vueltas((m) => S.vueltaGoogle(deps, { ahora: m }), en('2026-10-06', '14:00'), 60, 6);
+    await S.vuelta(deps, { ahora: en('2026-10-07', '08:00') });
+    assert.equal((await resena(pool, 'h3')).estado, 'aprobada', 'aún no ha pasado un día');
+    await S.vuelta(deps, { ahora: en('2026-10-08', '08:00') });
+    r = await resena(pool, 'h3');
+    assert.deepEqual([r.estado, r.respuesta], ['borrador', null]);
+    assert.match(r.error_publicar, /No salió a su hora/);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('si la persona cambia su reseña después de contestarla, vuelve a la bandeja; la respuesta nueva sustituye a la de antes', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const lista = [
+    { googleId: 'e1', autor: 'Laura G.', nota: 5, texto: 'Genial, trato encantador', publicadaEn: '2026-10-06T10:00:00Z', actualizadaEn: '2026-10-06T10:00:00Z' },
+    { googleId: 'e2', autor: 'Pedro', nota: 5, texto: 'Muy profesionales', publicadaEn: '2026-10-06T11:00:00Z', actualizadaEn: '2026-10-06T11:00:00Z' },
+  ];
+  const google = googleFalso({ resenas: lista });
+  try {
+    await sembrar(pool);
+    await S.importarResenas(pool, google, { ahora: en('2026-10-06', '14:00') });
+    for (const id of ['e1', 'e2']) await S.aprobarYPublicar(pool, google, { resenaId: (await resena(pool, id)).id, aprobadaPor: 'recepcion@iemec', ahora: en('2026-10-06', '14:05') });
+    const antes = await resena(pool, 'e1');
+    // Tres días después la cambia a 1 estrella y cuenta una complicación.
+    Object.assign(lista[0], { nota: 1, texto: 'Se me infectó la zona y acabé en urgencias', actualizadaEn: '2026-10-09T09:00:00Z', respuesta: antes.respuesta, respondidaEn: '2026-10-06T12:05:00Z', estadoRespuesta: 'APPROVED' });
+    // Y Pedro solo corrige una letra: sigue como estaba.
+    Object.assign(lista[1], { texto: 'Muy profesionales.', actualizadaEn: '2026-10-09T09:30:00Z', respuesta: (await resena(pool, 'e2')).respuesta, estadoRespuesta: 'APPROVED' });
+    assert.deepEqual(await S.importarResenas(pool, google, { ahora: en('2026-10-09', '13:00') }), { leidas: 2, nuevas: 0, editadas: 2, alertas: 1, rechazadas: 0 });
+    let e1 = await resena(pool, 'e1');
+    assert.deepEqual([e1.estado, e1.nota, e1.alerta_clinica, e1.historial, e1.respuesta], ['borrador', 1, 1, 0, antes.respuesta], 'a la bandeja; la de antes sigue en Google');
+    assert.match(e1.borrador_respuesta, /en privado/, 'con un borrador nuevo: que llame');
+    assert.equal((await resena(pool, 'e2')).estado, 'publicada');
+    // Leerla otra vez no la da por contestada con la respuesta de antes.
+    await S.importarResenas(pool, google, { ahora: en('2026-10-09', '13:30') });
+    assert.equal((await resena(pool, 'e1')).estado, 'borrador');
+    // En el panel: con alerta, arriba, y con la respuesta de antes a la vista; sigue contando como contestada.
+    const d = await S.datosPanel(pool, { ahora: en('2026-10-09', '14:00'), rol: 'medico' });
+    const tarjeta = d.resenas[0];
+    assert.deepEqual([tarjeta.id, tarjeta.alertaAbierta, tarjeta.estado, tarjeta.respuestaPublica, tarjeta.respuesta, tarjeta.puedeContestar], [e1.id, true, 'borrador', true, antes.respuesta, true]);
+    assert.deepEqual([d.metricas.tasaRespuesta, d.metricas.porResponder], [100, 1]);
+    // Dirección médica aprueba otra: sustituye a la de antes (la API la cambia) y la primera respuesta no se mueve.
+    await assert.rejects(S.aprobarYPublicar(pool, google, { resenaId: e1.id, aprobadaPor: 'marketing@iemec', rol: 'marketing', ahora: en('2026-10-09', '14:00') }), /alerta clínica/);
+    await S.aprobarYPublicar(pool, google, { resenaId: e1.id, aprobadaPor: 'direccion@iemec', rol: 'direccion', ahora: en('2026-10-09', '14:10') });
+    e1 = await resena(pool, 'e1');
+    assert.deepEqual([e1.estado, e1.respuesta, madrid(e1.primera_respuesta_en), madrid(e1.respondida_en)], ['publicada', e1.borrador_respuesta, '2026-10-06 14:05', '2026-10-09 14:10']);
+    assert.deepEqual(google.publicadas.map((p) => p.googleId), ['e1', 'e2', 'e1']);
+    // Si alguien cambia nuestra respuesta desde la ficha, se guarda la que se ve en Google.
+    Object.assign(lista[0], { respuesta: 'Hola Laura, llámanos al 722 83 32 85 y lo vemos en privado.', respondidaEn: '2026-10-09T15:00:00Z' });
+    await S.importarResenas(pool, google, { ahora: en('2026-10-09', '18:00') });
+    e1 = await resena(pool, 'e1');
+    assert.deepEqual([e1.estado, e1.respuesta, madrid(e1.respondida_en)], ['publicada', 'Hola Laura, llámanos al 722 83 32 85 y lo vemos en privado.', '2026-10-09 17:00']);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('contestar a la petición no cae en una pregunta de otra conversación («¿Te busco otro momento?»)', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const whatsapp = crearWhatsApp('simulado');
+  const deps = { pool, ia: crearIa('simulado'), whatsapp };
+  try {
+    await sembrar(pool, { momentos: '2h' });
+    const elena = await paciente(pool, 'Elena');
+    const hecha = await citaCompletada(pool, elena.id, '2026-10-06', '11:00');
+    // Su cita del día 19, que cancela por WhatsApp a las 9:00: se le pregunta si quiere otro momento.
+    const inicio = en('2026-10-19', '12:00');
+    await pool.query(`INSERT INTO citas (paciente_id, tratamiento_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token)
+      VALUES (?, 'limpieza-facial', ?, ?, ?, ?, ?, ?, 'confirmada', ?)`,
+    [elena.id, inicio, new Date(inicio.getTime() + 3600000), inicio, new Date(inicio.getTime() + 3600000), inicio, new Date(inicio.getTime() + 3600000), crypto.randomBytes(32).toString('base64url')]);
+    const r1 = await M.procesarEntrante(deps, { telefono: elena.telefono, texto: 'Hola, quiero cancelar la cita', ahora: en('2026-10-06', '08:55') });
+    const r2 = await M.procesarEntrante(deps, { telefono: elena.telefono, texto: 'Sí, cancélala', ahora: en('2026-10-06', '09:00') });
+    assert.match(r2.respuesta, /¿Quieres que te busque otro momento más adelante\?$/);
+    const [[antes]] = await pool.query('SELECT estado, pregunta_pendiente IS NOT NULL AS pregunta FROM conversaciones WHERE id = ?', [r1.conversacionId]);
+    assert.deepEqual({ ...antes }, { estado: 'cerrada', pregunta: 1 });
+    // A las 14:10 le llega la petición de reseña (en una conversación nueva, que se cierra).
+    await S.programarPeticion(pool, hecha);
+    assert.equal((await S.enviarPeticionesPendientes(deps, { ahora: en('2026-10-06', '14:10') })).length, 1);
+    const [[pregunta]] = await pool.query('SELECT pregunta_pendiente FROM conversaciones WHERE id = ?', [r1.conversacionId]);
+    assert.equal(pregunta.pregunta_pendiente, null, 'lo último que ha leído es la petición: la pregunta de antes ya no está en el aire');
+    // Contesta «Sí, claro» a la petición: no es un «sí» a buscarle otro momento. La conversación de la
+    // cancelación no se reabre ni le ofrece huecos (antes le ofrecía huecos o apuntarla a la lista de
+    // espera); lo que diga va a otra.
+    const r3 = await M.procesarEntrante(deps, { telefono: elena.telefono, texto: 'Sí, claro', ahora: en('2026-10-06', '14:20') });
+    assert.notEqual(r3.conversacionId, r1.conversacionId);
+    const [[cancelacion]] = await pool.query('SELECT estado, motivo_cierre, pregunta_pendiente FROM conversaciones WHERE id = ?', [r1.conversacionId]);
+    assert.deepEqual({ ...cancelacion }, { estado: 'cerrada', motivo_cierre: 'cancelada', pregunta_pendiente: null });
+    assert.equal(r3.eleccion, undefined);
+    assert.equal(r3.listaEspera, undefined);
+    assert.doesNotMatch(r3.respuesta || '', /te puedo ofrecer|te avise si se libera/i);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('de qué paciente es: recepción la asocia a uno de los que se le pidió y ya no se le vuelve a pedir', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const whatsapp = crearWhatsApp('simulado');
+  const deps = { pool, ia: crearIa('simulado'), whatsapp };
+  try {
+    await sembrar(pool, { momentos: '2h' });
+    const laura = await paciente(pool, 'Laura');
+    const otraLaura = await paciente(pool, 'Laura');
+    const marta = await paciente(pool, 'Marta');
+    const citas = [await citaCompletada(pool, laura.id, '2026-10-06', '11:00'), await citaCompletada(pool, otraLaura.id, '2026-10-06', '11:00'), await citaCompletada(pool, marta.id, '2026-10-06', '11:00')];
+    for (const c of citas) await S.programarPeticion(pool, c);
+    await S.enviarPeticionesPendientes(deps, { ahora: en('2026-10-06', '14:00') });
+    await S.abrirEnlace(pool, (await peticion(pool, citas[0])).token, null, en('2026-10-06', '15:00'));
+    // Llega la reseña de «Laura G.» el día 7.
+    const google = googleFalso({ resenas: [{ googleId: 'r1', autor: 'Laura G.', nota: 5, texto: 'Trato encantador', publicadaEn: '2026-10-07T10:00:00Z' }] });
+    await S.importarResenas(pool, google, { ahora: en('2026-10-07', '13:00') });
+    const d = await S.datosPanel(pool, { ahora: en('2026-10-07', '13:00') });
+    const r1 = d.resenas.find((x) => x.autor === 'Laura G.');
+    assert.deepEqual(r1.candidatos.map((c) => [c.id, c.nombre, c.cita, c.abrioEnlace]), [[laura.id, 'Laura E.', '2026-10-06', true], [otraLaura.id, 'Laura E.', '2026-10-06', false]],
+      'las Lauras a las que se les pidió (primero la que abrió el enlace); Marta, no');
+    await assert.rejects(S.asociarPaciente(pool, { resenaId: r1.id, pacienteId: marta.id }), /no es uno de los que pudieron escribirla/);
+    // Recepción sabe que es la segunda Laura (la reconoce por el texto, la llamó…).
+    assert.deepEqual(await S.asociarPaciente(pool, { resenaId: r1.id, pacienteId: otraLaura.id, por: 'recepcion@iemec' }), { ok: true });
+    assert.equal((await peticion(pool, citas[1])).resena_id, r1.id);
+    await assert.rejects(S.asociarPaciente(pool, { resenaId: r1.id, pacienteId: laura.id }), /ya está asociada/);
+    const tras = await S.datosPanel(pool, { ahora: en('2026-10-07', '13:00') });
+    assert.deepEqual(tras.resenas.filter((x) => x.id === r1.id).map((x) => [x.dePaciente, x.candidatos.length]), [[true, 0]]);
+    // Ya dejó su reseña: ni recordatorio, ni otra petición aunque pasen los 120 días.
+    await S.enviarRecordatorios(deps, { ahora: en('2026-10-13', '14:00') });
+    const recordatorio = async (c) => { const p = await peticion(pool, c); return [p.recordatorio_estado, p.recordatorio_motivo]; };
+    assert.deepEqual(await recordatorio(citas[1]), ['omitido', 'ya dejó una reseña']);
+    assert.deepEqual(await recordatorio(citas[0]), ['omitido', 'ya abrió el enlace']);
+    assert.deepEqual(await recordatorio(citas[2]), ['enviado', null], 'a Marta, sí');
+    const nueva = await citaCompletada(pool, otraLaura.id, '2027-03-02', '11:00');
+    assert.deepEqual(await S.programarPeticion(pool, nueva), { pedir: false, motivo: 'ya dejó una reseña' });
+  } finally {
+    await pool.end();
+  }
+});
+
+test('lo que Google ya no da (la borró su autor o la retiró Google) sale de la bandeja y de las cifras, y vuelve si reaparece', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const lista = [
+    { googleId: 'x1', autor: 'Ana', nota: 5, texto: 'Genial', publicadaEn: '2026-10-05T10:00:00Z' },
+    { googleId: 'x2', autor: 'Falso', nota: 1, texto: 'Horrible', publicadaEn: '2026-10-05T11:00:00Z' },
+    { googleId: 'x3', autor: 'Luis', nota: 4, texto: 'Muy bien', publicadaEn: '2025-03-05T11:00:00Z' },
+  ];
+  const google = googleFalso({ resenas: lista, modo: 'real' });
+  const ahora = en('2026-10-06', '10:00');
+  try {
+    await sembrar(pool);
+    await S.importarResenas(pool, google, { ahora });
+    // La lectura diaria (solo lo tocado últimamente) no retira nada; la completa sí.
+    const x2 = lista.splice(1, 1)[0];
+    assert.equal((await S.importarResenas(pool, google, { ahora })).retiradas, undefined);
+    assert.equal((await S.importarResenas(pool, google, { ahora, completa: true })).retiradas, 1);
+    let d = await S.datosPanel(pool, { ahora });
+    assert.deepEqual([d.metricas.total, d.metricas.notaTotal, d.resenas.map((x) => x.autor).sort()], [2, 4.5, ['Ana']]);
+    await assert.rejects(S.aprobarYPublicar(pool, google, { resenaId: (await resena(pool, 'x2')).id, aprobadaPor: 'x', ahora }), /Google ya no muestra esta reseña/);
+    // Una lectura completa vacía es un fallo, no 533 reseñas borradas.
+    assert.equal((await S.importarResenas(pool, googleFalso(), { ahora, completa: true })).retiradas, 0);
+    // Vuelve a aparecer (el filtro de spam la había quitado): vuelve como estaba.
+    lista.push(x2);
+    await S.importarResenas(pool, google, { ahora, completa: true });
+    d = await S.datosPanel(pool, { ahora });
+    assert.equal(d.metricas.total, 3);
+    assert.equal((await resena(pool, 'x2')).estado, 'borrador');
+    // Al contestarla, Google dice que no existe (404): se marca retirada y sale de la bandeja.
+    google.fallo = errorGoogle('Google 404 NOT_FOUND', { estado: 404, permanente: true });
+    await assert.rejects(S.aprobarYPublicar(pool, google, { resenaId: (await resena(pool, 'x1')).id, aprobadaPor: 'x', ahora }), /Google ya no muestra esta reseña/);
+    assert.ok((await resena(pool, 'x1')).retirada_en);
+    // Y la del historial que ya estaba aprobada: la cola no la reintenta, vuelve a la bandeja retirada.
+    google.fallo = null;
+    await S.liberarHistorial(pool, { ahora });
+    const x3 = await resena(pool, 'x3');
+    await S.aprobarYPublicar(pool, google, { resenaId: x3.id, aprobadaPor: 'x', ahora });
+    google.fallo = errorGoogle('Google 404 NOT_FOUND', { estado: 404, permanente: true });
+    await S.vueltaGoogle({ pool, google }, { ahora: en('2026-10-06', '11:00') });
+    const r3 = await resena(pool, 'x3');
+    assert.deepEqual([r3.estado, Boolean(r3.retirada_en)], ['borrador', true]);
+    assert.equal((await pool.query("SELECT estado FROM cola WHERE tipo = 'resenas_publicar'"))[0][0].estado, 'hecho');
   } finally {
     await pool.end();
   }

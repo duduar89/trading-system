@@ -365,14 +365,15 @@ function rutasPanel({ pool, deps = null }) {
   }));
 
   // ── Reseñas ───────────────────────────────────────────────────────────────────────────────
-  // Los KPI de la ficha, las reseñas que piden algo y el historial (servidor/resenas.js).
+  // Los KPI de la ficha, las reseñas que piden algo y el historial (servidor/resenas.js). Con el rol de
+  // la sesión: una alerta clínica solo la contesta dirección médica.
   r.get('/resenas', envolver(async (req, res) => {
     const ahora = req.ahora || new Date();
     // Ideas para la ficha de Google: solo lo que se reserva (ni agrupadores ni retirados).
     const [trats] = await p().query('SELECT id, nombre, familia, descripcion, publicidad_restringida, activo FROM tratamientos WHERE activo = TRUE ORDER BY id');
     const mes = Number(T.fechaMadrid(ahora).slice(5, 7));
     res.json({
-      ...(await resenasSrv.datosPanel(p(), { ahora })),
+      ...(await resenasSrv.datosPanel(p(), { ahora, rol: req.usuario?.rol || null })),
       publicaciones: ideasDelMes({ mes, tratamientos: trats.map((t) => ({ ...t, publicidad_restringida: Boolean(t.publicidad_restringida) })) }),
     });
   }));
@@ -384,6 +385,15 @@ function rutasPanel({ pool, deps = null }) {
         resenaId: Number(req.params.id), texto: req.body?.texto || null, aprobadaPor: req.usuario?.email || 'panel', rol: req.usuario?.rol || null, ahora: req.ahora || new Date(),
       });
       res.json({ ok: true, ...hecho });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  }));
+
+  // Recepción dice de qué paciente es una reseña (uno de los que se le pidió): no se le vuelve a pedir.
+  r.post('/resenas/:id/paciente', envolver(async (req, res) => {
+    try {
+      res.json(await resenasSrv.asociarPaciente(p(), { resenaId: Number(req.params.id), pacienteId: Number(req.body?.pacienteId), por: req.usuario?.email || 'panel' }));
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

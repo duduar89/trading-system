@@ -1,12 +1,15 @@
 -- 011 · Reseñas con las normas de Google y la ley:
---   · el enlace oficial para reseñar de la ficha (newReviewUri), que se lee cada día;
+--   · el enlace oficial para reseñar de la ficha (newReviewUri), que se lee cada día y vale 30 días;
 --   · la prueba del momento de pedir la reseña (2 horas después, al día siguiente a las 11:00 o a los
 --     3 días), elegida por cita y guardada para medirla, y un solo recordatorio a los 7-9 días si no
 --     abrió el enlace;
---   · el texto y el autor que vienen de Google se borran a los 30 días de leerlos (se quedan el id,
---     las estrellas, las fechas, los estados y nuestras respuestas);
+--   · el texto y el autor que vienen de Google se borran a los 29 días de leerlos, un día antes de los
+--     30 de las normas de la API (se quedan el id, las estrellas, las fechas, los estados y nuestras
+--     respuestas);
 --   · la alerta clínica (con su tarea para dirección médica), el historial que se contesta poco a
---     poco y la moderación de nuestras respuestas (reviewReplyState y policyViolation).
+--     poco y la moderación de nuestras respuestas (reviewReplyState y policyViolation);
+--   · las reseñas que Google ya no da (las borró quien las escribió o las retiró Google): fuera de la
+--     bandeja y de las cifras, y vuelven si reaparecen.
 -- Los valores nuevos de los ENUM van al final. Todo con IF NOT EXISTS: se puede repetir.
 
 -- La ficha: su enlace para reseñar, cuándo se leyó y qué momentos de la prueba están en marcha
@@ -29,7 +32,7 @@ ALTER TABLE peticiones_resena
 -- Las reseñas:
 --   con_texto               si la reseña traía texto (se sabe aunque el texto ya se haya borrado)
 --   actualizada_en          el updateTime de Google (si cambia, la persona la ha editado)
---   contenido_leido_en      cuándo se leyeron de Google el texto y el autor; a los 30 días se borran
+--   contenido_leido_en      cuándo se leyeron de Google el texto y el autor; a los 29 días se borran
 --   historial               llegó con días y sin respuesta: se contesta poco a poco
 --   liberada_en             cuándo pasó del historial a la bandeja, con su borrador
 --   alerta_clinica          habla de una posible complicación o de una reclamación: dirección médica
@@ -38,6 +41,7 @@ ALTER TABLE peticiones_resena
 --   respuesta_estado        la moderación de Google de nuestra respuesta (reviewReplyState)
 --   respuesta_motivo_rechazo  el policyViolation si la rechaza
 --   respuestas_rechazadas   cuántas veces nos ha rechazado Google una respuesta a esta reseña
+--   retirada_en             Google ya no la da (una lectura completa sin ella, o un 404 al contestarla)
 ALTER TABLE resenas
   MODIFY COLUMN estado ENUM('nueva','borrador','aprobada','publicada','ignorada','historial') NOT NULL DEFAULT 'nueva',
   ADD COLUMN IF NOT EXISTS con_texto BOOLEAN NOT NULL DEFAULT FALSE AFTER texto,
@@ -55,6 +59,7 @@ ALTER TABLE resenas
   ADD COLUMN IF NOT EXISTS respuesta_revisada_en DATETIME NULL AFTER respuesta_motivo_rechazo,
   ADD COLUMN IF NOT EXISTS respuestas_rechazadas TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER respuesta_revisada_en,
   ADD COLUMN IF NOT EXISTS error_publicar VARCHAR(255) NULL AFTER respuestas_rechazadas,
+  ADD COLUMN IF NOT EXISTS retirada_en DATETIME NULL AFTER error_publicar,
   ADD KEY IF NOT EXISTS resena_contenido (contenido_borrado_en, contenido_leido_en),
   ADD KEY IF NOT EXISTS resena_publicada (publicada_en),
   ADD KEY IF NOT EXISTS resena_historial (historial, estado, publicar_en);
