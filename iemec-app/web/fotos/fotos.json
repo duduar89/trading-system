@@ -22,22 +22,31 @@
     "clinica-fachada": {
       "origen": "fotos-origen/clinica-fachada.png",
       "derechos": "propia",
-      "usar": true,
+      "usar": false,
       "alt": "Fachada de IEMEC en la avenida Siglo XXI de Boadilla del Monte",
+      "nota": "El escaparate enumera servicios pendientes de autorización (nutrición y dietética) y es texto dentro de la imagen: en su lugar, «clinica-fachada-entrada» (el mismo original, recortado a la entrada y al logotipo)."
+    },
+    "clinica-fachada-entrada": {
+      "origen": "fotos-origen/clinica-fachada.png",
+      "derechos": "propia",
+      "usar": true,
+      "recorte": [
+        0,
+        0,
+        740,
+        810
+      ],
+      "alt": "Entrada de IEMEC en la avenida Siglo XXI de Boadilla del Monte, con el logotipo sobre la puerta",
+      "nota": "Recorte de la fachada sin el escaparate. Pedir a la clínica una foto de la entrada en alta resolución.",
       "salidas": [
         {
-          "archivo": "clinica-fachada-480.webp",
+          "archivo": "clinica-fachada-entrada-480.webp",
           "ancho": 480,
-          "alto": 270
+          "alto": 525
         },
         {
-          "archivo": "clinica-fachada-960.webp",
-          "ancho": 960,
-          "alto": 540
-        },
-        {
-          "archivo": "clinica-fachada-1440.webp",
-          "ancho": 1440,
+          "archivo": "clinica-fachada-entrada-740.webp",
+          "ancho": 740,
           "alto": 810
         }
       ]

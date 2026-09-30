@@ -187,6 +187,16 @@ test('revisión legal final: peso en borrador, sin nota de Google, avisos que cu
     assert.match(t, /Solo para mayores de edad \[PENDIENTE/, r);
   }
   assert.ok(!/cirujano plástico/i.test(visible('/cirugia-estetica/otoplastia/')));
+  // …también en la ficha y en la consulta con el cirujano (que no lleva recuadro); y, donde no consta
+  // quién lo hace, el hueco en vez de un «equipo» sin confirmar.
+  const fichaDe = (r) => R.textoVisible((PAGINAS.get(r).match(/<div class="ficha">[\s\S]*?<\/dl>/) || [''])[0]);
+  for (const r of ['/cirugia-estetica/consulta-de-cirugia-plastica/', '/cirugia-estetica/otoplastia/', '/cirugia-capilar/reparacion-de-injertos-capilares/']) {
+    assert.match(fichaDe(r), /Lo realiza Cirujano \[PENDIENTE: nombre, especialidad oficial y n\.º de colegiado\]/, r);
+  }
+  for (const r of ['/cirugia-capilar/cicatrices-en-el-cuero-cabelludo/', '/medicina-capilar/microneedling-capilar/']) {
+    assert.match(fichaDe(r), /Lo realiza \[PENDIENTE: /, r);
+  }
+  assert.match(visible('/cirugia-capilar/cicatrices-en-el-cuero-cabelludo/'), /Si el plan incluye una intervención, antes firmas el consentimiento informado por escrito/);
   // 8 · El aviso no contradice la página: sin «el médico» donde lo hace estética con el régimen sin
   // confirmar, y sin aviso en la propia consulta de valoración.
   const bb = visible('/medicina-estetica-facial/bb-lips/');
@@ -475,7 +485,13 @@ test('CSP: sin scripts en línea (salvo datos) ni estilos en línea; recursos co
   assert.ok(fuentes.includes('LICENCIA-montserrat.txt') && fuentes.includes('LICENCIA-playfair-display.txt'));
   const inicio = PAGINAS.get('/');
   assert.equal((inicio.match(/<link rel="preload"[^>]*as="font"/g) || []).length, 2);
-  assert.match(fs.readFileSync(path.join(SALIDA, 'recursos', css), 'utf8'), /font-display:swap/);
+  const hoja = fs.readFileSync(path.join(SALIDA, 'recursos', css), 'utf8');
+  assert.match(hoja, /font-display:swap/);
+  // Al imprimir sale todo, también lo que aún no había «aparecido» (y sin la transición a medias).
+  assert.match(hoja, /@media print\{[^@]*\.espera\{opacity:1 ?!important;transform:none ?!important;transition:none ?!important\}/);
+  // El brillo del filete no es infinito, y el foco no se esconde bajo la barra de abajo.
+  assert.ok(!/animation:[^;}]*infinite/.test(hoja));
+  assert.match(hoja, /scroll-padding-bottom:calc\(var\(--barra\)/);
 });
 
 test('imágenes: texto alternativo, ancho y alto, y carga diferida salvo la primera', () => {

@@ -10,6 +10,8 @@
       "titulo_seo": "Medicina estética facial en Boadilla del Monte · IEMEC",
       "descripcion_seo": "Tratamientos faciales médicos y de cabina en IEMEC, Boadilla del Monte: arrugas, flacidez, manchas, acné y calidad de la piel, con valoración previa.",
       "resumen": "Arrugas, flacidez, manchas, acné y luminosidad: tratamientos médicos y de cabina para tu rostro.",
+      "foto": "clinica-sala-de-procedimientos",
+      "foto_pie": "La sala de procedimientos de IEMEC.",
       "entradilla": "Cuidamos la piel y los rasgos de tu rostro con tratamientos médicos y de cabina. Empezamos por entender qué te preocupa y te proponemos solo lo que encaja contigo.",
       "texto": [
         "Los tratamientos médicos, como los rellenos o la bioestimulación, los hace siempre un médico tras una valoración médica. Los de cabina, como las limpiezas, los peelings superficiales o los masajes faciales, los hace el equipo de estética, con el mismo cuidado.",
@@ -30,6 +32,8 @@
       "titulo_seo": "Medicina estética corporal en Boadilla del Monte · IEMEC",
       "descripcion_seo": "Grasa localizada, celulitis, flacidez, retención de líquidos y vello: tratamientos médicos, aparatología y masajes en IEMEC, Boadilla del Monte.",
       "resumen": "Grasa localizada, celulitis, flacidez, retención de líquidos y vello: tecnología y medicina para el cuerpo.",
+      "foto": "clinica-cabina-tratamientos",
+      "foto_pie": "Una de las cabinas de tratamiento de IEMEC.",
       "entradilla": "Tratamientos médicos, aparatología y masajes para trabajar zonas concretas del cuerpo. Te valoramos antes de empezar y te acompañamos durante todo el plan.",
       "texto": [
         "Cada cuerpo responde de una forma distinta, por eso empezamos con una valoración: vemos la zona, hablamos de tus hábitos y de lo que te gustaría mejorar, y te proponemos un plan realista.",
@@ -72,6 +76,8 @@
       "titulo_seo": "Medicina capilar y head spa en Boadilla del Monte · IEMEC",
       "descripcion_seo": "Diagnóstico capilar, tratamiento médico de la caída del cabello y head spa en IEMEC, Boadilla del Monte. Primero entendemos por qué se cae el pelo.",
       "resumen": "Diagnóstico del cuero cabelludo, tratamiento médico de la caída del cabello y head spa.",
+      "foto": "clinica-consulta",
+      "foto_pie": "La consulta de IEMEC, donde empieza el diagnóstico.",
       "entradilla": "Si notas más caída o menos densidad, lo primero es entender por qué. Empezamos con un diagnóstico capilar y, a partir de ahí, te proponemos un plan. Y para cuidarte, el head spa.",
       "texto": [
         "La caída del cabello tiene causas muy distintas: hormonales, genéticas, por estrés, por carencias o por otras enfermedades. Por eso el primer paso es un diagnóstico del cuero cabelludo, que nos dice qué está pasando y qué opciones tienes.",
@@ -92,6 +98,8 @@
       "titulo_seo": "Injerto capilar en Boadilla del Monte · IEMEC",
       "descripcion_seo": "Injerto capilar FUE, microinjerto de cejas y de barba, línea frontal y reparación de injertos previos en IEMEC, Boadilla del Monte, con valoración previa.",
       "resumen": "Injerto capilar FUE, cejas, barba, línea frontal y reparación de injertos previos.",
+      "foto": "clinica-consulta",
+      "foto_pie": "La consulta de IEMEC, donde empieza la valoración.",
       "entradilla": "El injerto capilar lleva tu propio pelo desde la zona donante a las zonas con menos densidad. Empieza por una valoración para saber si es una buena opción en tu caso.",
       "texto": [
         "No todo el mundo es candidato a un injerto: depende de la zona donante, del tipo de caída y de tu salud. En la valoración estudiamos tu caso y, si el injerto no es lo más adecuado, te lo decimos y te orientamos hacia otras opciones.",
@@ -113,6 +121,8 @@
       "titulo_seo": "Estética íntima femenina en Boadilla del Monte · IEMEC",
       "descripcion_seo": "Cirugía íntima y tratamientos de la zona íntima externa en IEMEC, Boadilla del Monte, con valoración médica, lenguaje claro y total discreción.",
       "resumen": "Cirugía íntima y tratamientos de la zona íntima externa, con valoración médica y discreción.",
+      "foto": "clinica-consulta",
+      "foto_pie": "La consulta de IEMEC.",
       "entradilla": "Una consulta confidencial para hablar de lo que te preocupa de la zona íntima. Te explicamos las opciones con un lenguaje claro y sin prisas.",
       "texto": [
         "Puedes contárnoslo con tranquilidad: la consulta es confidencial. El médico te escucha, te explora si hace falta y te explica las opciones, sus riesgos y lo que puedes esperar.",
@@ -133,6 +143,8 @@
       "titulo_seo": "Cirugía estética en Boadilla del Monte · IEMEC",
       "descripcion_seo": "Cirugía de mama, contorno corporal y cirugía facial en IEMEC, Boadilla del Monte: cada intervención empieza con una consulta con el cirujano.",
       "resumen": "Cirugía de mama, contorno corporal y cirugía facial, siempre con consulta previa con el cirujano.",
+      "foto": "clinica-consulta",
+      "foto_pie": "La consulta de IEMEC, donde empieza cada cirugía.",
       "entradilla": "Cada intervención empieza con una consulta con el cirujano: te explica la técnica, la anestesia, la recuperación y los riesgos, y resuelve tus dudas antes de decidir.",
       "texto": [
         "Una cirugía es una decisión importante. En la consulta, el cirujano valora tu caso, te explica qué se puede hacer y qué no, y te da por escrito la información y el presupuesto.",
@@ -155,6 +167,8 @@
       "titulo_seo": "Estética íntima masculina en Boadilla del Monte · IEMEC",
       "descripcion_seo": "Tratamientos de la zona íntima masculina en IEMEC, Boadilla del Monte, con valoración médica previa, información clara y total discreción.",
       "resumen": "Tratamientos de la zona íntima masculina con valoración médica y total discreción.",
+      "foto": "clinica-consulta",
+      "foto_pie": "La consulta de IEMEC.",
       "entradilla": "Una consulta médica confidencial para valorar lo que te preocupa y explicarte las opciones, sus riesgos y lo que puedes esperar.",
       "texto": [
         "Puedes contárnoslo con tranquilidad: la consulta es confidencial. El médico valora tu caso y te explica si el tratamiento es adecuado para ti, sus riesgos y sus alternativas.",

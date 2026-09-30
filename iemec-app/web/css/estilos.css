@@ -344,6 +344,12 @@ main { display: block; padding-top: var(--cabecera); outline: none; }
 .tarjeta-tratamiento .ficha-mini { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 14px; font-size: .8rem; color: var(--suave); }
 .tarjeta-tratamiento .ficha-mini li { display: inline-flex; align-items: center; gap: 6px; }
 .tarjeta-tratamiento .ficha-mini .icono { width: 1.2em; height: 1.2em; color: var(--oro-texto); }
+.tarjeta.tarjeta-todas { background: linear-gradient(160deg, #134442 0%, #0b2b2a 100%); border-color: rgba(201, 164, 92, .5); }
+.tarjeta-todas :is(h3, .mas) { color: var(--blanco); }
+.tarjeta-todas p { color: var(--sobre-oscuro-suave); }
+.tarjeta-todas .tarjeta-icono { background: rgba(217, 191, 143, .12); color: var(--champan); }
+.tarjeta-todas :focus-visible { outline-color: var(--champan); }
+.ubicacion .preguntas-especialidad { margin-top: 32px; }
 .subgrupo + .subgrupo { margin-top: 44px; }
 .subgrupo > h3 { font-family: var(--sans); font-size: .76rem; font-weight: 500; letter-spacing: .22em; text-transform: uppercase; color: var(--oro-texto); margin: 0 0 16px; }
 /* En el móvil, listas compactas: la tarjeta entera es el enlace. */
@@ -399,6 +405,7 @@ main { display: block; padding-top: var(--cabecera); outline: none; }
 
 /* ── Dónde estamos ───────────────────────────────────────────────────────────────────────── */
 .ubicacion { display: grid; gap: 32px; align-items: center; }
+.ubicacion.arriba { align-items: start; }
 @media (min-width: 900px) { .ubicacion { grid-template-columns: .9fr 1.1fr; gap: 56px; } }
 .datos-contacto { list-style: none; display: grid; gap: 14px; margin: 24px 0 8px; }
 .datos-contacto li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; }
@@ -409,6 +416,8 @@ main { display: block; padding-top: var(--cabecera); outline: none; }
 .horario td { padding: 4px 0; font-variant-numeric: tabular-nums; }
 .foto-marco { margin: 0; }
 .foto-marco .marco-dorado { aspect-ratio: 16 / 10; }
+.foto-entrada { justify-self: center; width: min(100%, 460px); }
+.foto-entrada .marco-dorado { aspect-ratio: 9 / 10; }
 .foto-marco figcaption { font-size: .8rem; color: #3a4543; margin-top: 18px; }
 
 /* ── Llamada final ───────────────────────────────────────────────────────────────────────── */
@@ -653,7 +662,7 @@ mark.pendiente { background: #fff1c2; color: #5a3f00; border: 1px dashed #b88a1a
 }
 @media print {
   .cabecera, .barra-movil, .menu-movil, .plegable, .acciones { display: none !important; }
-  .espera { opacity: 1 !important; transform: none !important; }
+  .espera { opacity: 1 !important; transform: none !important; transition: none !important; }
   main { padding-top: 0; }
   body { padding-bottom: 0; }
 }

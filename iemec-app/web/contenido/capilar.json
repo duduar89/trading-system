@@ -218,7 +218,7 @@
     "sesiones": "Entre 4 y 6, una al mes",
     "anestesia": "Crema anestésica",
     "recuperacion": "Enrojecimiento leve que suele pasar en unas 24 horas",
-    "profesional": "Equipo de medicina capilar"
+    "profesional": "[PENDIENTE: profesión y titulación de quien lo hace]"
    },
    "variantes": [],
    "resultados": "La respuesta es gradual y se valora a lo largo del ciclo de sesiones; varía según cada persona.",
@@ -918,14 +918,14 @@
    "texto": [
     "Una cicatriz en el cuero cabelludo puede tener muchos orígenes: una cirugía, un accidente, una quemadura o una afección de la piel. Además de la marca, a menudo deja una zona donde el pelo no crece y que se nota al peinarte o con el pelo corto.",
     "No todas las cicatrices se tratan igual: influyen su tamaño, su antigüedad y el estado de la piel. Por eso empezamos con una valoración médica: estudiamos la cicatriz y la zona de alrededor y te proponemos un plan personalizado para atenuarla y mejorar su aspecto.",
-    "Te explicamos qué opciones hay en tu caso, cuántas sesiones o intervenciones harían falta, sus riesgos y qué es realista esperar: una cicatriz puede atenuarse, pero no siempre se consigue que deje de notarse. El resultado varía según cada persona."
+    "Te explicamos qué opciones hay en tu caso, cuántas sesiones o intervenciones harían falta, sus riesgos y qué es realista esperar: una cicatriz puede atenuarse, pero no siempre se consigue que deje de notarse. Si el plan incluye una intervención, antes firmas el consentimiento informado por escrito. El resultado varía según cada persona."
    ],
    "sesion": {
     "duracion": "Valoración de unos 30 minutos",
     "sesiones": "Según el plan",
     "anestesia": null,
     "recuperacion": null,
-    "profesional": "Equipo de cirugía capilar"
+    "profesional": "[PENDIENTE: quién lo hace]"
    },
    "variantes": [],
    "resultados": "La mejora depende del tipo de cicatriz y de la técnica que se elija; es gradual y varía según cada persona.",

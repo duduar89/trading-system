@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // Revisión de la web en un Chromium de verdad, sobre el sitio servido en local (puerto 4321):
 //   node web/revisar.mjs [--capturas <carpeta>] [--rapido] [--puerto 4321]
-// Mira todas las páginas del sitemap (y la 404) de 320 a 1440 px: que nada desborde a lo ancho, que no
+// Mira todas las páginas del sitemap (y la 404) de 320 a 1440 px: que ninguna caja se salga por los
+// lados (por su rectángulo: con overflow-x: clip no hay barra horizontal que avise), que no
 // haya errores de consola ni imágenes rotas y que las zonas de toque midan al menos 44 px. Prueba el
 // menú del móvil (abre, atrapa el foco, se cierra con Escape) y guarda capturas a página completa de
 // las cinco páginas clave en móvil (390 × 844) y escritorio (1440 × 900).
 // Si no hay nada escuchando en el puerto, arranca web/servir.js y lo para al acabar (por su PID).
-/* global window, document, getComputedStyle -- lo de pagina.evaluate corre en el navegador */
+/* global document, getComputedStyle -- lo de pagina.evaluate corre en el navegador */
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -46,18 +47,27 @@ async function lanzar() {
 
 // ── Dentro de la página ─────────────────────────────────────────────────────────────────────
 function medir() {
-  const ancho = window.innerWidth;
+  const ancho = document.documentElement.clientWidth;
   const desbordes = [];
-  if (document.documentElement.scrollWidth > ancho + 1) {
-    for (const el of document.querySelectorAll('body *')) {
-      const r = el.getBoundingClientRect();
-      if (r.width && r.right > ancho + 1 && getComputedStyle(el).position !== 'fixed' && !el.closest('.chips, .sprite, .trampa, .solo-lector, [hidden]')) {
-        desbordes.push(`${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? `.${el.className.split(' ').join('.')}` : ''} (${Math.round(r.right)} px)`);
-        if (desbordes.length > 5) break;
-      }
+  // Con body { overflow-x: clip } nunca sale barra horizontal: scrollWidth no avisa de nada. Se mira
+  // cada caja (su rectángulo), salvo lo que está dentro de algo que se desplaza a propósito (los
+  // chips, las tarjetas que se deslizan), lo decorativo y lo oculto. Lo que una sección recorta con
+  // overflow: hidden sí cuenta: un título partido por el borde es un desborde.
+  const seDesplazaDentro = (el) => {
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const o = getComputedStyle(p).overflowX;
+      if (o === 'auto' || o === 'scroll') return true;
     }
-    if (!desbordes.length) desbordes.push(`scrollWidth ${document.documentElement.scrollWidth} > ${ancho}`);
+    return false;
+  };
+  for (const el of document.querySelectorAll('body *')) {
+    const r = el.getBoundingClientRect();
+    if (!r.width || (r.right <= ancho + 1 && r.left >= -1)) continue;
+    if (getComputedStyle(el).position === 'fixed' || el.closest('.sprite, .trampa, .solo-lector, [hidden], [aria-hidden="true"]') || seDesplazaDentro(el)) continue;
+    desbordes.push(`${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? `.${el.className.split(' ').join('.')}` : ''} (${Math.round(r.left)}–${Math.round(r.right)} px)`);
+    if (desbordes.length > 5) break;
   }
+  if (!desbordes.length && document.documentElement.scrollWidth > ancho + 1) desbordes.push(`scrollWidth ${document.documentElement.scrollWidth} > ${ancho}`);
   const rotas = [...document.images].filter((i) => i.complete && i.naturalWidth === 0).map((i) => i.currentSrc || i.src);
   const pequenas = [];
   const visibles = (el) => { const s = getComputedStyle(el); const r = el.getBoundingClientRect(); return s.visibility !== 'hidden' && s.display !== 'none' && r.width > 0 && r.height > 0; };

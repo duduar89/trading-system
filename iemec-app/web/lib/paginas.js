@@ -129,8 +129,13 @@ ${recepcion ? html`<figure class="portada-foto"><div class="marco-dorado">${B.im
 <h2 id="t-especialidades">Todo lo que hacemos, <em>en un mismo lugar</em></h2>
 <p class="entrada">Medicina estética, medicina y cirugía capilar y cirugía estética, cada una con su equipo.</p>
 </div>
-<div class="rejilla rejilla-4">${ctx.especialidades.map((e) => tarjetaEspecialidad(e))}</div>
-<p><a class="enlace-flecha" href="/tratamientos/">Ver todos los tratamientos ${icono('flecha')}</a></p>
+<div class="rejilla rejilla-4">${ctx.especialidades.map((e) => tarjetaEspecialidad(e))}
+<article class="tarjeta tarjeta-especialidad tarjeta-todas">
+<span class="tarjeta-icono">${icono('buscar')}</span>
+<h3><a href="/tratamientos/">Todos los tratamientos</a></h3>
+<p>Búscalos por nombre, por especialidad o por lo que te preocupa.</p>
+<span class="mas">Ver los ${ctx.especialidades.reduce((n, e) => n + e.paginas.length, 0)} tratamientos ${icono('flecha')}</span>
+</article></div>
 </div>
 </section>
 <section class="seccion terciopelo" aria-labelledby="t-como" data-aparece>
@@ -185,7 +190,7 @@ ${titulo ? html`<h2 id="t-donde">Te esperamos en <em>Boadilla del Monte</em></h2
 ${ficha ? html`<p class="ficha-google"><a class="enlace-flecha" href="${s.google.ficha}" rel="noopener">Nuestra ficha en Google ${icono('flecha')}</a></p>` : ''}
 ${titulo ? '' : html`<p class="nota-mapa">No cargamos ningún mapa al abrir la página: los enlaces abren Google Maps o Apple Maps solo si los pulsas.</p>`}
 </div>
-${ctx.foto('clinica-fachada') ? html`<figure class="foto-marco"><div class="marco-dorado">${B.imagen(ctx, 'clinica-fachada', { tamanos: '(min-width: 900px) 560px, 92vw' })}</div><figcaption>La entrada de IEMEC, en la avenida Siglo XXI 13.</figcaption></figure>` : ''}
+${ctx.foto('clinica-fachada-entrada') ? html`<figure class="foto-marco foto-entrada"><div class="marco-dorado">${B.imagen(ctx, 'clinica-fachada-entrada', { tamanos: '(min-width: 900px) 460px, 92vw' })}</div><figcaption>La entrada de IEMEC, en la avenida Siglo XXI 13.</figcaption></figure>` : ''}
 </div>
 </section>`;
 }
@@ -200,6 +205,12 @@ function especialidad(ctx, e) {
   const separar = e.paginas.length > 8 && medicas.length && cabina.length;
   const columnas = (n) => (n === 1 ? 'rejilla-1' : n === 2 || n === 4 ? 'rejilla-2' : 'rejilla-3');
   const rejilla = (lista, nivel) => html`<div class="rejilla ${columnas(lista.length)} rejilla-tratamientos">${lista.map((p) => tarjetaTratamiento(p, nivel, { agrupada: nivel === 4 }))}</div>`;
+  // «Cómo lo hacemos»: con foto, la foto a la derecha y las preguntas bajo el texto (en el móvil,
+  // texto, preguntas y foto); sin foto, las preguntas a la derecha.
+  const fotoEsp = e.foto && ctx.foto(e.foto)
+    ? html`<figure class="foto-marco foto-especialidad"><div class="marco-dorado">${B.imagen(ctx, e.foto, { tamanos: '(min-width: 1180px) 610px, (min-width: 900px) 52vw, 92vw' })}</div><figcaption>${e.foto_pie}</figcaption></figure>`
+    : null;
+  const preguntasEsp = html`<div class="preguntas-especialidad"><h2 class="solo-lector">Preguntas frecuentes</h2>${B.preguntas(e.preguntas)}</div>`;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: 'Especialidad', titulo: e.titulo, entradilla: e.entradilla, adorno: e.slug,
     extra: e.pendiente ? html`<p class="entrada">${pendiente(e.pendiente)}</p>` : '',
@@ -217,16 +228,14 @@ ${separar
 </div>
 </section>
 <section class="seccion seccion-blanca" aria-labelledby="t-como-esp" data-aparece>
-<div class="contenedor ubicacion">
+<div class="contenedor ubicacion arriba">
 <div>
 <p class="etiqueta">Cómo lo hacemos</p>
 <h2 id="t-como-esp">Antes de nada, <em>una valoración</em></h2>
 ${e.texto.map((t) => html`<p>${texto(t)}</p>`)}
+${fotoEsp ? preguntasEsp : ''}
 </div>
-<div>
-<h2 class="solo-lector">Preguntas frecuentes</h2>
-${B.preguntas(e.preguntas)}
-</div>
+${fotoEsp || preguntasEsp}
 </div>
 </section>
 ${llamadaFinal(ctx, { whatsapp: wa })}`;
@@ -279,7 +288,8 @@ function tratamiento(ctx, p) {
   const s = p.sesion || {};
   const ficha = [
     ['reloj', 'Duración', s.duracion], ['calendario', 'Sesiones', s.sesiones], ['tratamiento', 'Anestesia', s.anestesia],
-    ['seguimiento', 'Recuperación', s.recuperacion], ['medico', 'Lo realiza', p.profesional],
+    // En la cirugía y en la consulta con el cirujano, «Lo realiza» lleva el hueco del cirujano.
+    ['seguimiento', 'Recuperación', s.recuperacion], ['medico', 'Lo realiza', p.cirugia || /cirujan/i.test(p.profesional || '') ? quienOpera(p) : p.profesional],
     ['pin', 'Dónde', p.cirugia ? dondeOpera(p) : s.donde],
   ].filter(([, , v]) => v);
   const rapidos = [];
@@ -546,7 +556,7 @@ ${botonWhatsapp(wa, 'Escribir por WhatsApp', 'boton-oscuro')}
 <article class="tarjeta">
 <span class="tarjeta-icono">${icono('calendario')}</span>
 <h3>Te llamamos</h3>
-<p>Déjanos tu nombre y tu teléfono y te contactamos nosotros, por WhatsApp o por teléfono.</p>
+<p>Déjanos tu nombre y tu teléfono y te contactamos nosotros como prefieras: por WhatsApp, por teléfono o por correo.</p>
 <a class="boton boton-linea" href="#formulario">Rellenar el formulario</a>
 </article>
 </div>

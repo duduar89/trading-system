@@ -33,13 +33,15 @@ async function lanzar() {
 
 const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 
-// Dentro de la página: carga la imagen, recorta el margen transparente si se pide y la reescala.
-async function convertir(pagina, dataUrl, anchos, { recortar, calidad }) {
-  return pagina.evaluate(async ({ dataUrl, anchos, recortar, calidad }) => {
+// Dentro de la página: carga la imagen, recorta el margen transparente si se pide (o la caja
+// «recorte»: [x, y, ancho, alto] del original) y la reescala.
+async function convertir(pagina, dataUrl, anchos, { recortar, calidad, caja = null }) {
+  return pagina.evaluate(async ({ dataUrl, anchos, recortar, calidad, caja }) => {
     const img = new Image();
     img.src = dataUrl;
     await img.decode();
     let sx = 0; let sy = 0; let sw = img.naturalWidth; let sh = img.naturalHeight;
+    if (caja) { [sx, sy, sw, sh] = caja; }
     if (recortar) {
       const c = document.createElement('canvas');
       c.width = sw; c.height = sh;
@@ -79,7 +81,7 @@ async function convertir(pagina, dataUrl, anchos, { recortar, calidad }) {
       salidas.push({ ancho, alto, datos: c.toDataURL('image/webp', calidad) });
     }
     return salidas;
-  }, { dataUrl, anchos, recortar, calidad });
+  }, { dataUrl, anchos, recortar, calidad, caja });
 }
 
 function fuenteBase64(nombre) {
@@ -133,7 +135,7 @@ async function main() {
     if (!f.usar || !esPropia) continue;
     if (!fs.existsSync(archivo)) { console.warn(`Falta ${archivo}: se salta ${clave}.`); continue; }
     const dataUrl = `data:${MIME[path.extname(archivo).toLowerCase()] || 'image/png'};base64,${fs.readFileSync(archivo).toString('base64')}`;
-    const salidas = await convertir(pagina, dataUrl, f.anchos || ANCHOS, { recortar: !!f.logotipo, calidad: f.logotipo ? 0.92 : 0.82 });
+    const salidas = await convertir(pagina, dataUrl, f.anchos || ANCHOS, { recortar: !!f.logotipo, calidad: f.logotipo ? 0.92 : 0.82, caja: f.recorte || null });
     f.salidas = salidas.map((s) => {
       const nombre = `${clave}-${s.ancho}.webp`;
       fs.writeFileSync(path.join(WEB, 'fotos', nombre), Buffer.from(s.datos.split(',')[1], 'base64'));
