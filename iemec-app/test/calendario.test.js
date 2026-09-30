@@ -410,6 +410,77 @@ test('la víspera: sus dos respuestas rápidas llegan por el webhook y se entien
   }
 });
 
+test('tras cualquier mensaje de su cita, un «sí» a secas la confirma: no se lo lleva la repesca, que le daría otra cita', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const whatsapp = crearWhatsApp('simulado');
+  const deps = { pool, ia: crearIa('simulado'), whatsapp };
+  try {
+    await sembrar(pool);
+    const dada = new Date('2026-10-09T08:00:00Z'); // viernes 10:00
+    const conCita = async (nombre, fecha, hora, { confirmada = true } = {}) => {
+      const p = await paciente(pool, nombre);
+      const cita = await agenda.reservar(pool, { pacienteId: p.id, tratamientoId: 'laser-intimo', fecha, hora, origen: 'recepcion', ahora: dada });
+      if (confirmada) await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [dada, cita.id]); // ya se le confirmó
+      return { ...p, cita };
+    };
+    const enPie = async (pacienteId) => Number((await pool.query("SELECT COUNT(*) AS n FROM citas WHERE paciente_id = ? AND estado IN ('confirmada','retenida')", [pacienteId]))[0][0].n);
+    const confirmo = async (citaId) => Number((await pool.query("SELECT COUNT(*) AS n FROM eventos WHERE tipo = 'cita_confirmada_paciente' AND entidad_id = ?", [String(citaId)]))[0][0].n);
+    const huecos = async (convId) => (await pool.query('SELECT huecos_ofrecidos FROM conversaciones WHERE id = ?', [convId]))[0][0].huecos_ofrecidos;
+    const de = (citaId) => (x) => x.citaId === citaId;
+
+    await t.test('la víspera sin contestar, el aviso de 2 horas (que la sustituye) y «Sí»', async () => {
+      const ana = await conCita('Ana', '2026-10-15', '17:00');
+      assert.deepEqual((await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-14T08:05:00Z') })).filter(de(ana.cita.id)).map((x) => x.tipo), ['vispera']);
+      assert.deepEqual((await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-15T13:05:00Z') })).filter(de(ana.cita.id)).map((x) => x.tipo), ['dos_horas']);
+      const r = await R.procesarEntrante(deps, { telefono: ana.telefono, texto: 'Sí', ahora: new Date('2026-10-15T13:07:00Z') });
+      assert.equal(r.respuesta, '¡Perfecto, Ana! Queda confirmada: te esperamos el jueves 15 de octubre a las 17:00.', 'y no «Tengo estos huecos para ti…»');
+      assert.equal(await confirmo(ana.cita.id), 1);
+      assert.equal(await huecos(r.conversacionId), null);
+      assert.equal(await enPie(ana.id), 1, 'sigue con una sola cita');
+    });
+
+    await t.test('la confirmación por plantilla y «Sí, gracias» o «Si»', async () => {
+      const bea = await conCita('Bea', '2026-10-16', '17:00', { confirmada: false });
+      const carla = await conCita('Carla', '2026-10-16', '12:00', { confirmada: false });
+      const r = await avisos.enviarPendientes(deps, { ahora: mas(dada, 3) });
+      for (const x of [bea, carla]) assert.deepEqual(r.filter(de(x.cita.id)).map((y) => y.envio?.estado), ['enviado']);
+      const b = await R.procesarEntrante(deps, { telefono: bea.telefono, texto: 'Sí, gracias', ahora: mas(dada, 10) });
+      assert.equal(b.respuesta, '¡Perfecto, Bea! Queda confirmada: te esperamos el viernes 16 de octubre a las 17:00.');
+      const c = await R.procesarEntrante(deps, { telefono: carla.telefono, texto: 'Si', ahora: mas(dada, 12) });
+      assert.equal(c.respuesta, '¡Perfecto, Carla! Queda confirmada: te esperamos el viernes 16 de octubre a las 12:00.');
+      for (const x of [bea, carla]) assert.equal(await enPie(x.id), 1);
+    });
+
+    await t.test('la cita que le acaba de dar la IA y «Sí, gracias»', async () => {
+      const dora = await paciente(pool, 'Dora');
+      await pool.query(
+        `INSERT INTO conversaciones (telefono, paciente_id, contexto, estado, huecos_ofrecidos, huecos_tratamiento_id, huecos_ofrecidos_en, ventana_hasta)
+         VALUES (?, ?, 'general', 'esperando_paciente', ?, 'laser-intimo', ?, ?)`,
+        [dora.telefono, dora.id, JSON.stringify([{ fecha: '2026-10-20', hora: '12:00' }, { fecha: '2026-10-20', hora: '17:00' }]), dada, mas(dada, 24 * 60)]);
+      const r1 = await R.procesarEntrante(deps, { telefono: dora.telefono, texto: 'La primera', ahora: mas(dada, 5) });
+      assert.equal(r1.eleccion, 'reservada');
+      assert.match(r1.respuesta, /^Soy el asistente virtual de IEMEC\. ¡Hecho, Dora! Te esperamos el martes 20 de octubre a las 12:00 /);
+      const r2 = await R.procesarEntrante(deps, { telefono: dora.telefono, texto: 'Sí, gracias', ahora: mas(dada, 7) });
+      assert.equal(r2.respuesta, '¡Perfecto, Dora! Queda confirmada: te esperamos el martes 20 de octubre a las 12:00.');
+      assert.equal(await huecos(r2.conversacionId), null);
+      assert.equal(await enPie(dora.id), 1);
+    });
+
+    await t.test('«la dejamos como está» y «Sí, gracias»', async () => {
+      const elena = await conCita('Elena', '2026-10-21', '12:00');
+      assert.equal((await R.procesarEntrante(deps, { telefono: elena.telefono, texto: 'Necesito cambiarla', ahora: mas(dada, 20) })).sobreCita, 'cambiar');
+      assert.equal((await R.procesarEntrante(deps, { telefono: elena.telefono, texto: 'Mejor la dejo como está', ahora: mas(dada, 22) })).sobreCita, 'mantiene');
+      const r = await R.procesarEntrante(deps, { telefono: elena.telefono, texto: 'Sí, gracias', ahora: mas(dada, 24) });
+      assert.equal(r.respuesta, '¡Perfecto, Elena! Queda confirmada: te esperamos el miércoles 21 de octubre a las 12:00.');
+      assert.equal(await huecos(r.conversacionId), null);
+      assert.equal(await enPie(elena.id), 1);
+    });
+  } finally {
+    await pool.end();
+  }
+});
+
 test('su «sí» a la víspera (o su «gracias») en una conversación con algo pendiente no la cierra: el seguimiento sale a su hora', async (t) => {
   const pool = await prepararBdDePrueba(t);
   if (!pool) return;

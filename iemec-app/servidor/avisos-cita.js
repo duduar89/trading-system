@@ -139,8 +139,9 @@ async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
   // Un aviso no deja trabajo en la bandeja: si la conversación no tiene nada más en marcha, se
   // cierra «con cita». Si contesta, se reabre (ver conversacionPara).
   await R.cerrarConCita(pool, conv.id, c.inicio);
-  // La víspera le pregunta si viene: su «sí» a secas (o su «no») contesta a eso.
-  if (tipo === 'vispera' && envio.estado === 'enviado') {
+  // Lo último que ha leído es su cita (la víspera, además, le pregunta si viene): su «sí» a secas (o su
+  // «no») contesta a eso. Si no, lo leería la repesca como «acepta» y le ofrecería huecos para otra cita.
+  if (envio.estado === 'enviado') {
     await R.ponerPregunta(pool, conv.id, { tipo: 'confirmar_cita', citaId, mensajeId: envio.mensajeId }, ahora);
   }
   await registrar(pool, {

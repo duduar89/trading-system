@@ -583,6 +583,18 @@ function textoCitaReservada(c, { nombre, hola = '', antes = null }) {
     + enlacesCita(c);
 }
 
+// Le manda la cita que le acaba de quedar (textoCitaReservada). Es su confirmación: el aviso de
+// confirmación ya no sale. Y, como tras cualquier aviso de su cita, su «sí» a secas (o su «no») contesta
+// a eso y no a la repesca, que le ofrecería huecos para otra cita.
+async function mandarCitaReservada(deps, conv, citaId, respuesta, ahora) {
+  const envio = await enviar(deps, conv, { texto: respuesta, autor: 'ia', ahora });
+  if (envio.estado === 'enviado') {
+    await deps.pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [ahora, citaId]);
+    await ponerPregunta(deps.pool, conv.id, { tipo: 'confirmar_cita', citaId, mensajeId: envio.mensajeId }, ahora);
+  }
+  return envio;
+}
+
 async function enTransaccion(pool, fn) {
   const con = await pool.getConnection();
   try {
@@ -619,8 +631,7 @@ async function reservarElegido(deps, conv, { fecha, hora, tratamientoId }, { aho
     await aplicarDecision(con, fresca, decision, { ahora, texto: frase, datos });
   });
   const respuesta = textoCitaReservada(await datosCita(pool, cita.id), { nombre: nombre || pac?.nombre, hola, antes: cita.reprograma ? reprograma : null });
-  const envio = await enviar(deps, conv, { texto: respuesta, autor: 'ia', ahora });
-  if (envio.estado === 'enviado') await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [ahora, cita.id]);
+  const envio = await mandarCitaReservada(deps, conv, cita.id, respuesta, ahora);
   return { conversacionId: conv.id, eleccion: 'reservada', cita, decision, respuesta, envio };
 }
 
@@ -901,7 +912,9 @@ async function dejarComoEsta(deps, conv, c, { ahora, nombre, hola = '' }) {
   await pool.query(`UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cita', proximo_paso = 'cita', proximo_paso_en = ?,
                       reprograma_cita_id = NULL, huecos_ofrecidos = NULL, huecos_ofrecidos_en = NULL WHERE id = ?`, [c.inicio, conv.id]);
   await anotar(pool, conv, 'cita', [{ tipo: 'mantener_cita', citaId: c.id }], 'cita');
-  return contestar(deps, conv, `${hola}Perfecto${nombre ? `, ${nombre}` : ''}, la dejamos como está: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`, ahora, { sobreCita: 'mantiene' });
+  // Su «sí, gracias» a esto confirma la cita (como tras un aviso): no se lo lleva la repesca.
+  return preguntar(deps, conv, `${hola}Perfecto${nombre ? `, ${nombre}` : ''}, la dejamos como está: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`,
+    { tipo: 'confirmar_cita', citaId: c.id }, ahora, { sobreCita: 'mantiene' });
 }
 
 // «Cancela mi cita»: se le pregunta una vez antes de hacerlo (y se le ofrece cambiarla). Si contesta
@@ -949,9 +962,11 @@ async function atenderPregunta(deps, conv, pregunta, { texto, ahora, datos, regl
   const no = NO.test(t);
 
   if (pregunta.tipo === 'confirmar_cita') {
-    // «¿Nos confirmas que vienes?» (la víspera). Cambiarla o cancelarla lo entiende atenderSobreCita.
-    // Un «sí» (o «Sí, allí estaré», el botón) confirma; si añade algo («sí, pero llegaré tarde», «sí,
-    // ¿se puede aparcar?»), confirma igual y lo lee una persona. Un «no», se le pregunta si la cancela.
+    // Lo último que le dijimos es su cita: «¿Nos confirmas que vienes?» (la víspera), cualquier otro aviso
+    // de la cita (la confirmación, el de 2 horas), la que le acaba de quedar o «la dejamos como está».
+    // Cambiarla o cancelarla lo entiende atenderSobreCita. Un «sí» (o «Sí, allí estaré», el botón)
+    // confirma; si añade algo («sí, pero llegaré tarde», «sí, ¿se puede aparcar?»), confirma igual y lo
+    // lee una persona. Un «no», se le pregunta si la cancela.
     const c = await citaEnPie(pool, pregunta.citaId, ahora);
     if (!c || CAMBIO.test(t) || CANCELAR.test(t)) return null;
     if (si || CONFIRMA.test(t)) {
@@ -1216,9 +1231,7 @@ async function aceptarOferta(deps, conv, oferta, { texto, ahora, datos, nombre, 
   });
   const antes = r.reprograma ? await datosCita(pool, r.reprograma) : null;
   const respuesta = textoCitaReservada(await datosCita(pool, r.citaId), { nombre, hola, antes });
-  const envio = await enviar(deps, conv, { texto: respuesta, autor: 'ia', ahora });
-  // La confirmación ya le ha llegado aquí: el aviso de confirmación no se repite.
-  if (envio.estado === 'enviado') await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [ahora, r.citaId]);
+  const envio = await mandarCitaReservada(deps, conv, r.citaId, respuesta, ahora);
   return { conversacionId: conv.id, listaEspera: 'aceptada', citaId: r.citaId, reprograma: r.reprograma, decision, respuesta, envio };
 }
 
