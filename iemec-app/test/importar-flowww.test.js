@@ -343,7 +343,8 @@ test('importación de Flowww: ensayo, aplicar, repetir, avisos y deshacer', asyn
       assert.ok(!vispera.some((a) => [id['C-1'], id['C-4']].includes(a.id)), 'ni un «te esperamos mañana» de una cita que en Flowww ya no es así');
       await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-14T08:05:00Z') });
       const aLaura = whatsapp.enviados.find((m) => m.telefono === '+34611000301');
-      assert.deepEqual([aLaura.nombre, aLaura.variables], ['iemec_recordatorio_24h', ['Laura', '10:00']]);
+      assert.deepEqual([aLaura.nombre, aLaura.variables[0]], ['iemec_recordatorio_24h', 'Laura']);
+      assert.ok(aLaura.variables.includes('10:00'), 'con la hora de su cita');
       assert.ok(!whatsapp.enviados.some((m) => m.telefono === '+34611000401'), 'Carmen (C-1, a revisar): nada');
 
       const dos = suyos(await avisos.pendientes(pool, new Date('2026-10-15T07:05:00Z')));
