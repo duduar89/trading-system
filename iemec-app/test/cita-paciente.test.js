@@ -92,7 +92,7 @@ test('la cita llega al paciente', async (t) => {
       assert.ok(!(await avisos.pendientes(pool, mas(martes, 40))).some((a) => a.id === cita.id && a.tipo === 'confirmacion'));
     });
 
-    await t.test('después: «gracias» se contesta una vez, en la misma conversación; «necesito cambiarla» va a una persona', async () => {
+    await t.test('después: «gracias» se contesta una vez, en la misma conversación; «necesito cambiarla» le propone otros huecos', async () => {
       const [[antes]] = await pool.query("SELECT id FROM conversaciones WHERE telefono = '+34611000101'");
       const g = await R.procesarEntrante(deps, { telefono: '+34611000101', texto: '¡Muchas gracias!', ahora: mas(martes, 35) });
       assert.equal(g.conversacionId, antes.id);
@@ -103,14 +103,15 @@ test('la cita llega al paciente', async (t) => {
       assert.equal(g2.respuesta, null, 'al «gracias» del «gracias» no se contesta');
       assert.equal(whatsapp.enviados.length, enviados);
 
+      // Ya no espera a nadie: se le proponen huecos (el cambio de punta a punta, en reprogramar.test.js).
       const c = await R.procesarEntrante(deps, { telefono: '+34611000101', texto: 'Uy, me ha surgido algo, necesito cambiarla', ahora: mas(martes, 120) });
+      assert.equal(c.conversacionId, antes.id);
       assert.equal(c.sobreCita, 'cambiar');
-      assert.match(c.respuesta, /Una persona del equipo te ayuda/);
-      assert.match(c.respuesta, /\/c\/[\w-]{43}$/);
-      const [[conv]] = await pool.query('SELECT estado FROM conversaciones WHERE id = ?', [antes.id]);
-      assert.equal(conv.estado, 'espera_persona');
-      const [[tarea]] = await pool.query("SELECT titulo FROM tareas WHERE conversacion_id = ? AND estado = 'abierta'", [antes.id]);
-      assert.match(tarea.titulo, /cambiar o cancelar su cita/);
+      assert.match(c.respuesta, /^Sin problema, Alba\. Te cambio la cita del .+: te puedo ofrecer .+¿Cuál te viene mejor\?/);
+      assert.equal(c.huecos.length, 3);
+      const [[conv]] = await pool.query('SELECT estado, reprograma_cita_id FROM conversaciones WHERE id = ?', [antes.id]);
+      assert.equal(conv.estado, 'esperando_paciente');
+      assert.ok(conv.reprograma_cita_id);
     });
 
     await t.test('«vale» con tres huecos: pregunta cuál; «el último» lo reserva', async () => {

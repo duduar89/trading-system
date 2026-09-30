@@ -8,6 +8,7 @@ const ACCION = {
   proponer_huecos: 'proponer huecos', programar_seguimiento: 'volver a escribir', pasar_a_persona: 'pasar a una persona',
   cita_reservada: 'cita reservada', ofrecer: 'ofrecer una opción del catálogo', baja: 'dar de baja', cerrar: 'cerrar',
   preguntar_cuando: 'preguntar cuándo', tarea_llamar: 'llamarle', responder: 'responder', ofrecer_valoracion: 'ofrecer valoración',
+  preguntar_si_cancela: 'preguntar si cancela', cancelar_cita: 'cancelar la cita', mantener_cita: 'mantener la cita', apuntar_lista_espera: 'apuntar en la lista de espera', salir_lista_espera: 'sacar de la lista de espera',
 };
 const proximo = (c) => (c.proximoPaso === 'cita' && c.proximoPasoEn ? `Cita ${fechaHora(c.proximoPasoEn)}` : PASO[c.proximoPaso]);
 // Lo que dice WhatsApp de cada mensaje nuestro; si no llegó, por qué (p. ej., el límite de marketing de Meta).

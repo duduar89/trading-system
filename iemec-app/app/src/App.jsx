@@ -3,6 +3,7 @@ import { api } from './api.js';
 import Hoy from './pantallas/Hoy.jsx';
 import Tareas from './pantallas/Tareas.jsx';
 import Agenda from './pantallas/Agenda.jsx';
+import Espera from './pantallas/Espera.jsx';
 import Bandeja from './pantallas/Bandeja.jsx';
 import Seguimientos from './pantallas/Seguimientos.jsx';
 import Repesca from './pantallas/Repesca.jsx';
@@ -15,6 +16,7 @@ const SECCIONES = [
   { id: 'hoy', nombre: 'Hoy', Pantalla: Hoy },
   { id: 'tareas', nombre: 'Tareas', Pantalla: Tareas },
   { id: 'agenda', nombre: 'Agenda', Pantalla: Agenda },
+  { id: 'espera', nombre: 'Lista de espera', Pantalla: Espera },
   { id: 'conversaciones', nombre: 'Conversaciones', Pantalla: Bandeja },
   { id: 'seguimientos', nombre: 'Seguimientos', Pantalla: Seguimientos },
   { id: 'repesca', nombre: 'Repesca', Pantalla: Repesca },

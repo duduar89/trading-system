@@ -176,6 +176,13 @@ test('proponer: tres huecos repartidos y, si prefiere tardes, por la tarde', () 
   assert.ok(tardes.every((x) => x.inicio >= h('15:00')));
 });
 
+test('proponer estricta: sin huecos en su franja, no se rellena con otras horas', () => {
+  const mananas = [h('11:00'), h('12:00'), h('13:00'), h('15:30')].map((inicio) => ({ inicio }));
+  assert.deepEqual(proponer(mananas, { preferencia: 'tarde' }).map((x) => x.inicio), [h('11:00'), h('12:00'), h('15:30')], 'sin estricta, rellena');
+  assert.deepEqual(proponer(mananas, { preferencia: 'tarde', estricta: true }).map((x) => x.inicio), [h('15:30')]);
+  assert.deepEqual(proponer(mananas.slice(0, 3), { preferencia: 'tarde', estricta: true }), []);
+});
+
 test('proponer: a igualdad, horas redondas (13:00 antes que 12:50)', () => {
   const lista = [h('12:50'), h('12:55'), h('13:00'), h('13:05'), h('16:10'), h('16:15'), h('16:30'), h('17:45')].map((inicio) => ({ inicio }));
   assert.deepEqual(proponer(lista, { n: 2, separacionMin: 180 }).map((x) => x.inicio), [h('13:00'), h('16:30')]);

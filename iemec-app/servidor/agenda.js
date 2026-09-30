@@ -3,6 +3,10 @@
 // de las salas, profesionales y aparatos candidatos (siempre en el mismo orden, para no
 // interbloquearse), vuelve a calcular los huecos con lo último que hay en la base y solo entonces
 // inserta. Dos reservas a la vez del mismo hueco: entra una y la otra recibe HUECO_OCUPADO.
+//
+// Cambiar una cita de día es reservar la nueva «reprogramando» la antigua, todo en la misma
+// transacción: la antigua no cuenta como ocupada (se puede mover a un hueco que la pise), queda
+// «reprogramada» apuntando a la nueva y su .ics sube de versión (sale anulado en el calendario).
 const crypto = require('crypto');
 const T = require('../motor/tiempo');
 const { prepararDia, huecoAInstantes, tratamientoParaMotor } = require('../motor/agenda/dia');
@@ -12,6 +16,30 @@ const { registrar } = require('./eventos');
 
 class ErrorAgenda extends Error {
   constructor(codigo, mensaje) { super(mensaje); this.codigo = codigo; }
+}
+
+// Una cita que todavía vale: confirmada o retenida a tiempo, y que no ha empezado.
+function sigueEnPie(c, ahora = new Date()) {
+  if (!c || !['retenida', 'confirmada'].includes(c.estado) || new Date(c.inicio) <= ahora) return false;
+  return !(c.estado === 'retenida' && c.retenida_hasta && new Date(c.retenida_hasta) <= ahora);
+}
+
+// La antigua pasa a «reprogramada», apunta a la nueva y deja libre su hueco (cancelada_en dice desde
+// cuándo, para la lista de espera). Dentro de la transacción de quien la llama.
+async function marcarReprogramada(con, vieja, nuevaId, { ahora, actor = 'paciente', por = 'paciente' }) {
+  await con.query(
+    `UPDATE citas SET estado = 'reprogramada', reprograma_a_id = ?, secuencia_ics = secuencia_ics + 1, retenida_hasta = NULL,
+            cancelada_en = ?, cancelada_por = ?, motivo_cancelacion = 'cambiada a otra cita' WHERE id = ?`,
+    [nuevaId, ahora, por, vieja.id]);
+  await registrar(con, { tipo: 'cita_reprogramada', entidad: 'cita', entidadId: vieja.id, actor, datos: { de: vieja.estado, a: nuevaId } });
+}
+
+// Con cita, se acaban sus secuencias de captación y los seguimientos de repesca.
+async function terminarSecuencias(con, { pacienteId, leadId = null }) {
+  await con.query(
+    `UPDATE inscripciones SET estado = 'terminada', motivo_fin = 'cita' WHERE estado IN ('activa','pausada')
+        AND secuencia IN ('lead','cancelacion','toca_repetir','dormido','vale_regalo')
+        AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?))`, [pacienteId, leadId || null]);
 }
 
 async function cargarTratamiento(con, id) {
@@ -28,7 +56,8 @@ async function cargarTratamiento(con, id) {
   };
 }
 
-async function cargarDia(con, fecha, { ahora = new Date(), antelacionMin = 60 } = {}) {
+// ignorarCitaId: la cita que se está cambiando no ocupa (el paciente puede moverla a un hueco que la pise).
+async function cargarDia(con, fecha, { ahora = new Date(), antelacionMin = 60, ignorarCitaId = null } = {}) {
   const desde = T.desdeMadrid(fecha, '00:00');
   const hasta = T.desdeMadrid(T.sumarDias(fecha, 1), '00:00');
   const q = async (sql, p = []) => (await con.query(sql, p))[0];
@@ -47,7 +76,7 @@ async function cargarDia(con, fecha, { ahora = new Date(), antelacionMin = 60 } 
     ausencias: await q('SELECT profesional_id, desde, hasta FROM profesional_ausencias WHERE desde < ? AND hasta > ?', [hasta, desde]),
     pausas: await q('SELECT profesional_id, modo, dia_semana, ventana_inicio, ventana_fin, duracion_min FROM pausas'),
     citas: await q(`SELECT sala_id, profesional_id, equipo_id, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, retenida_hasta
-                      FROM citas WHERE sala_desde < ? AND sala_hasta > ?`, [hasta, desde]),
+                      FROM citas WHERE sala_desde < ? AND sala_hasta > ? AND id <> ?`, [hasta, desde, ignorarCitaId || 0]),
   });
 }
 
@@ -58,11 +87,11 @@ function fechaSql(v) {
   return String(v).slice(0, 10);
 }
 
-async function huecos(pool, { fecha, tratamientoId, ahora = new Date(), antelacionMin = 60 }) {
+async function huecos(pool, { fecha, tratamientoId, ahora = new Date(), antelacionMin = 60, ignorarCitaId = null }) {
   const con = await pool.getConnection();
   try {
     const t = await cargarTratamiento(con, tratamientoId);
-    const dia = await cargarDia(con, fecha, { ahora, antelacionMin });
+    const dia = await cargarDia(con, fecha, { ahora, antelacionMin, ignorarCitaId });
     return buscarHuecos(dia, t.motor).map((h) => ({ ...h, hora: T.hhmm(h.inicio), fecha }));
   } finally {
     con.release();
@@ -72,13 +101,14 @@ async function huecos(pool, { fecha, tratamientoId, ahora = new Date(), antelaci
 // Huecos de los próximos días (para proponer al paciente).
 // Huecos para proponer al paciente: repartidos en varios días (como mucho `porDia` en cada uno,
 // uno de mañana y otro de tarde si se puede), para que tenga dónde elegir.
-async function proximosHuecos(pool, { tratamientoId, desdeFecha, dias = 14, n = 3, porDia = 2, preferencia = null, ahora = new Date() }) {
+// estricta: solo en su franja (sin rellenar con otras horas los días que no la tienen).
+async function proximosHuecos(pool, { tratamientoId, desdeFecha, dias = 14, n = 3, porDia = 2, preferencia = null, estricta = false, ahora = new Date(), ignorarCitaId = null }) {
   const salida = [];
   for (let i = 0; i < dias && salida.length < n; i++) {
     const fecha = T.sumarDias(desdeFecha, i);
-    const lista = await huecos(pool, { fecha, tratamientoId, ahora });
+    const lista = await huecos(pool, { fecha, tratamientoId, ahora, ignorarCitaId });
     const cuantos = Math.min(porDia, n - salida.length);
-    for (const h of proponer(lista, { n: cuantos, preferencia, separacionMin: 180 })) salida.push(h);
+    for (const h of proponer(lista, { n: cuantos, preferencia, estricta, separacionMin: 180 })) salida.push(h);
   }
   return salida;
 }
@@ -101,8 +131,10 @@ async function bloquearRecursos(con, t) {
 /**
  * Reserva (o retiene) una cita.
  * @param {object} p pacienteId, tratamientoId, fecha 'AAAA-MM-DD', hora 'HH:MM', profesionalId?, salaId?,
- *   origen, retener (deja la cita «retenida» unos minutos hasta que el paciente confirme), actor,
- *   leadId?, conversacionId? (la conversación de WhatsApp de la que sale)
+ *   origen, retener (deja la cita «retenida» unos minutos hasta que el paciente confirme; retenerMin
+ *   cambia los minutos de la clínica), actor, leadId?, conversacionId? (la conversación de WhatsApp de
+ *   la que sale), reprograma? (id de la cita que esta sustituye: queda «reprogramada»; si ya no está
+ *   en pie, se reserva igual sin tocarla)
  */
 async function reservar(pool, p) {
   const ahora = p.ahora || new Date();
@@ -112,7 +144,12 @@ async function reservar(pool, p) {
     await con.beginTransaction();
     const t = await cargarTratamiento(con, p.tratamientoId);
     await bloquearRecursos(con, t.motor);
-    const dia = await cargarDia(con, p.fecha, { ahora, antelacionMin: p.antelacionMin ?? 0 });
+    let vieja = null;
+    if (p.reprograma) {
+      const [[c]] = await con.query('SELECT * FROM citas WHERE id = ? FOR UPDATE', [p.reprograma]);
+      if (sigueEnPie(c, ahora)) vieja = c;
+    }
+    const dia = await cargarDia(con, p.fecha, { ahora, antelacionMin: p.antelacionMin ?? 0, ignorarCitaId: vieja?.id });
     const minuto = T.minutosDe(p.hora);
     const candidatos = buscarHuecos(dia, t.motor, { desde: minuto, hasta: minuto + 1 })
       .filter((h) => h.inicio === minuto);
@@ -130,8 +167,10 @@ async function reservar(pool, p) {
 
     const inst = huecoAInstantes(p.fecha, hueco, t.motor);
     const [[clinica]] = await con.query('SELECT retencion_hueco_min FROM clinica WHERE id = 1');
-    const retenidaHasta = p.retener ? new Date(ahora.getTime() + (clinica?.retencion_hueco_min || 15) * 60000) : null;
+    const retenidaHasta = p.retener ? new Date(ahora.getTime() + (p.retenerMin || clinica?.retencion_hueco_min || 15) * 60000) : null;
     const token = crypto.randomBytes(32).toString('base64url');
+    // La cita cambiada conserva de dónde vino y si era primera visita (una reserva de recepción que
+    // el paciente mueve por WhatsApp no es una cita nueva recuperada por la IA).
     const [r] = await con.query(
       `INSERT INTO citas (paciente_id, tratamiento_id, profesional_id, sala_id, equipo_id, inicio, fin,
          sala_desde, sala_hasta, prof_desde, prof_hasta, estado, retenida_hasta, origen, conversacion_id, primera_visita,
@@ -139,14 +178,17 @@ async function reservar(pool, p) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [p.pacienteId, t.fila.id, hueco.profesionalId, hueco.salaId, hueco.equipoId, inst.inicio, inst.fin,
         inst.sala_desde, inst.sala_hasta, inst.prof_desde, inst.prof_hasta,
-        p.retener ? 'retenida' : 'confirmada', retenidaHasta, p.origen || 'recepcion', p.conversacionId || null, Boolean(p.primeraVisita),
+        p.retener ? 'retenida' : 'confirmada', retenidaHasta, vieja ? vieja.origen : p.origen || 'recepcion', p.conversacionId || null,
+        vieja ? Boolean(vieja.primera_visita) : Boolean(p.primeraVisita),
         token, p.actor || 'sistema', p.retener ? null : ahora, ahora]);
+    if (vieja) await marcarReprogramada(con, vieja, r.insertId, { ahora, actor: p.actor || 'paciente' });
     if (p.leadId) await con.query("UPDATE leads SET etapa = 'cita', cita_id = ? WHERE id = ?", [r.insertId, p.leadId]);
-    // Con cita, se acaban sus secuencias de captación y los seguimientos de repesca.
-    await con.query("UPDATE inscripciones SET estado = 'terminada', motivo_fin = 'cita' WHERE estado IN ('activa','pausada') AND secuencia IN ('lead','cancelacion','toca_repetir','dormido','vale_regalo') AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?))", [p.pacienteId, p.leadId || null]);
-    await registrar(con, { tipo: p.retener ? 'cita_retenida' : 'cita_reservada', entidad: 'cita', entidadId: r.insertId, actor: p.actor, datos: { fecha: p.fecha, hora: p.hora, tratamiento: t.fila.id, profesional: hueco.profesionalId, sala: hueco.salaId } });
+    // Un hueco que solo se le guarda (la lista de espera) aún no es una cita: sus secuencias siguen
+    // hasta que diga que sí (confirmarRetenida).
+    if (!p.retener) await terminarSecuencias(con, { pacienteId: p.pacienteId, leadId: p.leadId });
+    await registrar(con, { tipo: p.retener ? 'cita_retenida' : 'cita_reservada', entidad: 'cita', entidadId: r.insertId, actor: p.actor, datos: { fecha: p.fecha, hora: p.hora, tratamiento: t.fila.id, profesional: hueco.profesionalId, sala: hueco.salaId, reprograma: vieja?.id } });
     await con.commit();
-    return { id: r.insertId, token, estado: p.retener ? 'retenida' : 'confirmada', retenidaHasta, ...inst, profesionalId: hueco.profesionalId, salaId: hueco.salaId, equipoId: hueco.equipoId };
+    return { id: r.insertId, token, estado: p.retener ? 'retenida' : 'confirmada', retenidaHasta, reprograma: vieja ? vieja.id : null, ...inst, profesionalId: hueco.profesionalId, salaId: hueco.salaId, equipoId: hueco.equipoId };
   } catch (err) {
     await con.rollback().catch(() => {});
     throw err;
@@ -241,6 +283,44 @@ async function deshacerEstado(pool, { id, de = null, actor = 'sistema', ahora = 
 const confirmar = (pool, o) => cambiarEstado(pool, { ...o, a: 'confirmada' });
 const cancelar = (pool, o) => cambiarEstado(pool, { ...o, a: 'cancelada' });
 
+/**
+ * Dice que sí al hueco que se le guardaba: la cita retenida queda confirmada y, si sustituye a otra
+ * (acepta un hueco antes de la lista de espera), la que tenía queda «reprogramada» apuntando a ella,
+ * todo en la misma transacción. Con cita, se acaban sus secuencias (al retenerla, aún no).
+ * @param {object} p id (la retenida), reprograma? (la que sustituye), actor, ahora
+ */
+async function confirmarRetenida(pool, { id, reprograma = null, actor = 'paciente', ahora = new Date() }) {
+  const con = await pool.getConnection();
+  try {
+    await con.beginTransaction();
+    const [[cita]] = await con.query('SELECT * FROM citas WHERE id = ? FOR UPDATE', [id]);
+    if (!cita) throw new ErrorAgenda('CITA_DESCONOCIDA', 'No existe esa cita');
+    if (!sigueEnPie(cita, ahora)) {
+      throw cita.estado === 'retenida'
+        ? new ErrorAgenda('RETENCION_CADUCADA', 'El hueco se ha liberado: hay que elegir otro')
+        : new ErrorAgenda('ESTADO_NO_VALIDO', `La cita está ${cita.estado}`);
+    }
+    await con.query("UPDATE citas SET estado = 'confirmada', confirmada_en = ?, retenida_hasta = NULL WHERE id = ?", [ahora, cita.id]);
+    await registrar(con, { tipo: 'cita_confirmada', entidad: 'cita', entidadId: cita.id, actor, datos: { de: cita.estado } });
+    let reprogramada = null;
+    if (reprograma && reprograma !== cita.id) {
+      const [[vieja]] = await con.query('SELECT * FROM citas WHERE id = ? FOR UPDATE', [reprograma]);
+      if (sigueEnPie(vieja, ahora)) {
+        await marcarReprogramada(con, vieja, cita.id, { ahora, actor });
+        reprogramada = vieja.id;
+      }
+    }
+    await terminarSecuencias(con, { pacienteId: cita.paciente_id });
+    await con.commit();
+    return { ...cita, estado: 'confirmada', confirmada_en: ahora, retenida_hasta: null, reprograma: reprogramada };
+  } catch (err) {
+    await con.rollback().catch(() => {});
+    throw err;
+  } finally {
+    con.release();
+  }
+}
+
 // Libera las retenciones caducadas (lo llama el cron cada minuto).
 async function caducarRetenciones(pool, ahora = new Date()) {
   const [r] = await pool.query(
@@ -249,4 +329,7 @@ async function caducarRetenciones(pool, ahora = new Date()) {
   return r.affectedRows;
 }
 
-module.exports = { huecos, proximosHuecos, reservar, cambiarEstado, deshacerEstado, ultimoCambio, confirmar, cancelar, caducarRetenciones, cargarDia, ErrorAgenda };
+module.exports = {
+  huecos, proximosHuecos, reservar, cambiarEstado, deshacerEstado, ultimoCambio, confirmar, cancelar, confirmarRetenida,
+  caducarRetenciones, cargarDia, sigueEnPie, ErrorAgenda,
+};

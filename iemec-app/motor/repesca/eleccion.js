@@ -2,7 +2,8 @@
 // El paciente contesta a los huecos que le hemos propuesto. ¿Cuál ha elegido?
 //
 //   «el martes a las 11», «la de las 14:00», «la primera», «vale» (si solo había uno)
-//        → { tipo: 'elegido', hueco }             se reserva y le llega su cita
+//        → { tipo: 'elegido', hueco }             se reserva y le llega su cita (con un «vale» o un
+//                                                  «sí» a secas, porAcepta: no ha nombrado ninguno)
 //   «el martes» con dos huecos ese día
 //        → { tipo: 'dudoso', candidatos }         se le pregunta cuál de ellos
 //   «ninguno me viene bien», «otro día», «el martes no puedo»
@@ -63,7 +64,8 @@ function leerDia(t, hoy) {
   if ((m = new RegExp(`\\b(\\d{1,2}) de (${Object.keys(MESES).join('|')})\\b`).exec(t))) {
     salida.diaMes = Number(m[1]);
     salida.mes = MESES[m[2]];
-  } else if ((m = /\b(?:el|dia|el dia) (\d{1,2})\b(?!\s*(?:[:.h]\d|h\b|horas?\b|de la (?:manana|tarde)|y (?:media|cuarto)))/.exec(t))) {
+  } else if ((m = /\b(?:el|dia|el dia|lunes|martes|miercoles|jueves|viernes|sabado|domingo) (\d{1,2})\b(?!\s*(?:[:.h]\d|h\b|horas?\b|de la (?:manana|tarde)|y (?:media|cuarto)))/.exec(t))) {
+    // «el 7», «el día 7» o «el miércoles 7»
     if (Number(m[1]) >= 1 && Number(m[1]) <= 31) salida.diaMes = Number(m[1]);
   }
   if ((m = /\b(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b/.exec(t))) salida.diaSemana = DIAS[m[1]];
@@ -137,7 +139,8 @@ function elegirHueco(texto, huecos, { hoy }) {
 
   if (!dia && !hora && !franja) {
     if (!ACEPTA.test(t) || !lista.length) return null;
-    return lista.length === 1 ? { tipo: 'elegido', hueco: lista[0] } : { tipo: 'dudoso', candidatos: lista };
+    // Solo un «sí» o un «vale»: vale como elección si le propusimos uno, pero no lo ha nombrado.
+    return lista.length === 1 ? { tipo: 'elegido', hueco: lista[0], porAcepta: true } : { tipo: 'dudoso', candidatos: lista, porAcepta: true };
   }
 
   const candidatos = lista.filter((h) => encaja(h, { ...(dia || {}), hora, franja }));

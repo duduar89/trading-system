@@ -38,6 +38,12 @@ test('cron de cada minuto', async (t) => {
       const i = await vuelta({ pool, deps, ahora: new Date('2026-10-06T10:00:00Z') });
       assert.equal(i.sinProximoPaso, undefined);
     });
+    await t.test('la lista de espera va después de liberar las retenciones caducadas (y de leer lo que ha llegado)', async () => {
+      const i = await vuelta({ pool, deps, ahora: new Date('2026-10-06T10:01:00Z') });
+      assert.deepEqual(i.listaEspera, { caducadas: 0, fueraDePlazo: 0, conPersona: 0, ofrecidas: 0 });
+      const orden = Object.keys(i);
+      assert.ok(orden.indexOf('listaEspera') > orden.indexOf('retencionesCaducadas'), orden.join(' → '));
+    });
   } finally {
     await pool.end();
   }
