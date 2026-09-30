@@ -1,0 +1,13 @@
+{
+  "_nota": "Mapa de prueba con datos inventados: qué es en la app cada servicio, profesional y estado de Flowww que no casa solo.",
+  "tratamientos": {
+    "Botox 3 zonas": "toxina-3-zonas",
+    "Pack novia": "ignorar"
+  },
+  "profesionales": {
+    "Rocío": "estetica-dos"
+  },
+  "estados": {
+    "En espera": "importar"
+  }
+}

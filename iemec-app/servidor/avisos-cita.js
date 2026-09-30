@@ -16,8 +16,14 @@ const R = require('./repesca/motor');
 
 const MIN = 60000;
 const HORA = 60 * MIN;
-// Treatwell manda sus propios avisos y lo importado ya pasó por otro sistema.
-const ORIGENES_SIN_AVISO = ['treatwell', 'importacion'];
+// Treatwell manda sus propios avisos. Lo que se trajo de Flowww (flowww_id) ya se dio y se confirmó
+// allí: entra con la confirmación dada (aviso_confirmacion_en) y recibe los recordatorios (salvo que se
+// importara sin ellos: columna recordatorios). Se mira flowww_id y no el origen: una cita que sale de
+// mover una importada (reprogramar, lista de espera) hereda el origen, pero la acaba de dar la app y
+// lleva su confirmación como cualquier otra.
+const ORIGENES_SIN_AVISO = ['treatwell'];
+// A lo que se trajo de Flowww no se le aplica «la reservó hace nada»: la pidió hace tiempo, en Flowww.
+const reciente = (f, ahora, horas) => !f.flowww_id && ahora - new Date(f.creado_en) <= horas * HORA;
 
 const USOS = {
   confirmacion: { columna: 'aviso_confirmacion_en', uso: 'cita_confirmacion' },
@@ -109,21 +115,21 @@ async function pendientes(pool, ahora = new Date()) {
 
   if (p.minutos >= 10 * 60 && p.minutos < 21 * 60) {
     const [vispera] = await pool.query(
-      `SELECT id, inicio, creado_en FROM citas WHERE estado = 'confirmada' AND aviso_24h_en IS NULL AND inicio > ? AND inicio < ?
-          AND origen NOT IN (?) ORDER BY inicio LIMIT 100`,
+      `SELECT id, inicio, creado_en, flowww_id FROM citas WHERE estado = 'confirmada' AND aviso_24h_en IS NULL AND inicio > ? AND inicio < ?
+          AND origen NOT IN (?) AND recordatorios ORDER BY inicio LIMIT 100`,
       [ahora, new Date(ahora.getTime() + 40 * HORA), ORIGENES_SIN_AVISO]);
     for (const f of vispera) {
       // Si la reservó hace menos de 12 horas, la confirmación está reciente: no hace falta.
-      if (T.fechaMadrid(new Date(f.inicio)) === manana && ahora - new Date(f.creado_en) > 12 * HORA) salida.push({ id: f.id, tipo: 'vispera' });
+      if (T.fechaMadrid(new Date(f.inicio)) === manana && !reciente(f, ahora, 12)) salida.push({ id: f.id, tipo: 'vispera' });
     }
   }
 
   if (p.minutos >= 9 * 60) {
     const [pronto] = await pool.query(
-      `SELECT id, creado_en FROM citas WHERE estado = 'confirmada' AND aviso_2h_en IS NULL AND inicio > ? AND inicio <= ?
-          AND origen NOT IN (?) ORDER BY inicio LIMIT 50`,
+      `SELECT id, creado_en, flowww_id FROM citas WHERE estado = 'confirmada' AND aviso_2h_en IS NULL AND inicio > ? AND inicio <= ?
+          AND origen NOT IN (?) AND recordatorios ORDER BY inicio LIMIT 50`,
       [new Date(ahora.getTime() + 30 * MIN), new Date(ahora.getTime() + 2 * HORA), ORIGENES_SIN_AVISO]);
-    for (const f of pronto) if (ahora - new Date(f.creado_en) > 3 * HORA) salida.push({ id: f.id, tipo: 'dos_horas' });
+    for (const f of pronto) if (!reciente(f, ahora, 3)) salida.push({ id: f.id, tipo: 'dos_horas' });
   }
   return salida;
 }
