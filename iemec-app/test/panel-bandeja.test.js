@@ -130,7 +130,7 @@ test('la bandeja escribe: texto con la ventana abierta y plantilla completa con 
         const antes = whatsapp.enviados.length;
         // Paciente con la baja en su ficha: el panel no le ofrece las comerciales y la API no las manda.
         const pablo = await ver(conBaja);
-        assert.deepEqual(pablo.comercial, { puede: false, baja: true, motivo: 'pidió la baja de los mensajes comerciales', aviso: null });
+        assert.deepEqual(pablo.comercial, { puede: false, baja: true, motivo: 'pidió la baja de los mensajes comerciales', aviso: null, seguimiento: [] });
         const dormido = await post(`/conversaciones/${conBaja}/enviar`, { plantillaId: plantilla.paciente_dormido, variables: ['Pablo'] });
         assert.deepEqual([dormido.status, dormido.cuerpo.codigo], [409, 'SIN_PERMISO_COMERCIAL']);
         assert.equal(dormido.cuerpo.error, 'No se le puede mandar una plantilla comercial: pidió la baja de los mensajes comerciales');
@@ -153,7 +153,7 @@ test('la bandeja escribe: texto con la ventana abierta y plantilla completa con 
       });
 
       await t.test('los topes de mensajes comerciales avisan, pero lo decide la persona', async () => {
-        assert.deepEqual((await ver(cerrada)).comercial, { puede: true, baja: false, motivo: null, aviso: null });
+        assert.deepEqual((await ver(cerrada)).comercial, { puede: true, baja: false, motivo: null, aviso: null, seguimiento: [] });
         const otro = await post(`/conversaciones/${cerrada}/enviar`, { plantillaId: plantilla.presupuesto_2d, variables: ['Sara', 'medicina capilar'] });
         assert.equal(otro.status, 200, JSON.stringify(otro.cuerpo));
         const sara = await ver(cerrada);

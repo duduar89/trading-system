@@ -62,10 +62,11 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
    | `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (o `WHATSAPP_WEBHOOK_CLAVE`), `WHATSAPP_NUMERO_ID` | webhook de WhatsApp: ver [`WHATSAPP-Y-LEADS.md`](WHATSAPP-Y-LEADS.md) |
    | `META_VERIFY_TOKEN`, `META_APP_SECRET`, `META_TOKEN_PAGINA`, `META_PAGINA_ID` | leads de los formularios de Meta: ídem |
    | `LEADS_CLAVE` | alta de leads de GHL u otra herramienta (`POST /api/leads`), 16 caracteres o más |
-   | `WEB_DOMINIO`, `WEB_ORIGENES` | la web pública (por defecto `https://iemec-clinic.com`): el origen que puede mandar el formulario «Te llamamos» (`POST /web/contacto`) y adónde vuelve quien lo envía sin JavaScript; `WEB_ORIGENES`, otros orígenes separados por comas (un subdominio de prueba) |
+   | `WEB_DOMINIO`, `WEB_ORIGENES` | la web pública (por defecto `https://iemec-clinic.com`): el origen que puede mandar el formulario «Te llamamos» (`POST /web/contacto`) y adónde vuelve quien lo envía sin JavaScript; `WEB_ORIGENES`, otros orígenes separados por comas (un subdominio de prueba). Lo que manda otra web se contesta como recibido y no se guarda |
+   | `RETENCION_LEADS_MESES` | opcional (12 por defecto): meses que se guarda un lead de la web o de su WhatsApp que no llega a tener cita, desde su último contacto; lo borra el cron cada día (`servidor/retencion.js`), como promete la política de privacidad de la web |
    | `IA_PROVEEDOR`, `IA_PROYECTO_GCP`, `IA_REGION`, `IA_MODELO`, `IA_MODELO_RESPALDO` | IA real: Claude por Google Vertex en la UE (`vertex`, el proyecto, `eu`, el modelo elegido y el de respaldo si el principal se niega) |
 
-   **Mejor todo en el `.env`:** el cron (paso 4) y el primer enlace (paso 7) son otros procesos,
+   **Mejor todo en el `.env`:** el cron (paso 4) y el primer enlace (paso 8) son otros procesos,
    lanzados desde la terminal, y no ven las variables de «Setup Node.js App»; solo leen el `.env`
    (`servidor/config.js`). Es el cron el que procesa lo que llega de WhatsApp y de Meta: con
    `MODO_META` sin poner en su `.env`, cada lead de Meta acaba en una tarea para recepción en vez de
@@ -84,10 +85,33 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
    de la app) y `COPIA_DESTINO` (un remoto de rclone en otro proveedor de la UE).
 5. **Monitor externo** (UptimeRobot o similar) contra `https://agenda.iemec-clinic.com/api/salud`
    cada 5 minutos: mantiene la app despierta y avisa si cae.
-6. **Secretos para desplegar:** desde tu terminal, `bash scripts/secretos-despliegue.sh`. Crea una
+   **Comprobar la IP del visitante** (los límites de intentos del formulario de la web, de entrar con
+   passkey y de la clave de emergencia van por IP). La app solo cree el `X-Forwarded-For` que añade el
+   servidor web de la propia máquina (LiteSpeed con lsnode en LucusHost, o el nginx del VPS), que le
+   habla por `127.0.0.1` o por un socket Unix (`servidor/seguridad.js`, `confiarEnProxyLocal`).
+   Nadie lo ha probado aún en LucusHost: con la app ya arriba, manda desde tu ordenador dos veces el
+   formulario con una IP inventada distinta cada vez y mira `limites_acceso`:
+
+   ```bash
+   for ip in 10.1.1.1 10.2.2.2; do curl -s -o /dev/null -w '%{http_code}\n' -X POST https://agenda.iemec-clinic.com/web/contacto \
+     -H 'Origin: https://iemec-clinic.com' -H 'Accept: application/json' -H "X-Forwarded-For: $ip" \
+     --data 'nombre=Prueba&telefono=&privacidad=si&preferencia=llamada&tratamiento=otra&t=9000'; done
+   ```
+
+   Contestan 422 (falta el teléfono: no se guarda nada), pero cuentan. En la base, las dos tienen que
+   haber sumado en **la misma** fila `web:…` (la de tu IP de verdad): si salen dos filas, el proxy deja
+   pasar la cabecera tal cual y cualquiera se salta el límite cambiándola; si en el registro de la app
+   sale «la petición llega sin IP», el proxy no manda la cabecera y todos los visitantes comparten el
+   límite. En los dos casos, hay que ajustarlo (con LucusHost) antes de publicar la web. Después,
+   `DELETE FROM limites_acceso WHERE clave LIKE 'web%';`.
+6. **Plantilla de confirmación de la web:** `iemec_solicitud_web` (utilidad, sin variables, botones «Sí,
+   fui yo» y «No fui yo») tiene que estar aprobada en Meta antes de publicar el formulario: es lo
+   primero que recibe quien pide WhatsApp (ver [`WHATSAPP-Y-LEADS.md`](WHATSAPP-Y-LEADS.md)).
+   Mientras no lo esté, cada solicitud con WhatsApp sale como tarea «llamar y preguntar si la pidió».
+7. **Secretos para desplegar:** desde tu terminal, `bash scripts/secretos-despliegue.sh`. Crea una
    clave SSH solo para esto, te dice cómo autorizarla en cPanel y guarda los secretos en GitHub
    (`IEMEC_SSH_KEY`, `IEMEC_SSH_HOST`, `IEMEC_SSH_USER`, `IEMEC_KNOWN_HOSTS`, `IEMEC_DOMINIO`).
-7. **Primer acceso al panel:** por SSH, con el Node de la app (como el cron del paso 4; sin activarlo,
+8. **Primer acceso al panel:** por SSH, con el Node de la app (como el cron del paso 4; sin activarlo,
    la terminal puede no tener `node` o tener uno antiguo que no lee el `.env`):
 
    ```bash

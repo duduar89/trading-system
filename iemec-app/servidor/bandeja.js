@@ -27,17 +27,20 @@ async function saludo(q, c) {
     || nombrePila(lead?.nombre) || nombrePila(c.nombre_whatsapp) || null;
 }
 
-// ¿Se le puede mandar una plantilla comercial? Lo que miran las secuencias (permisoComercial) y, además,
-// la lista de bajas por el teléfono de la conversación. La baja y la falta de consentimiento no se las
-// salta nadie (LSSI art. 21 y 22, RGPD art. 21); los topes de mensajes comerciales y el silencio que
-// pidió el paciente quedan en aviso: lo decide la persona. → { puede, baja, motivo, aviso }
-async function permisoComercial(q, c, ahora) {
-  if (await tieneBaja(q, c.telefono)) return { puede: false, baja: true, motivo: 'pidió la baja de los mensajes comerciales', aviso: null };
-  const p = await repesca.permisoComercial(q, { paciente_id: c.paciente_id, lead_id: c.lead_id }, ahora);
-  if (p.ok) return { puede: true, baja: false, motivo: null, aviso: null };
-  if (/baja/.test(p.motivo)) return { puede: false, baja: true, motivo: 'pidió la baja de los mensajes comerciales', aviso: null };
-  if (/consentimiento/.test(p.motivo)) return { puede: false, baja: false, motivo: p.motivo, aviso: null };
-  return { puede: true, baja: false, motivo: null, aviso: p.motivo };
+// ¿Se le puede mandar una plantilla comercial (la de ese uso; sin él, cualquiera)? Lo que miran las
+// secuencias (permisoComercial) y, además, la lista de bajas por el teléfono de la conversación. La baja
+// y la falta de consentimiento no se las salta nadie (LSSI art. 21 y 22, RGPD art. 21); los topes de
+// mensajes comerciales y el silencio que pidió el paciente quedan en aviso: lo decide la persona. A un
+// lead sin casilla comercial solo se le contesta a lo que pidió, mientras siga en curso: «seguimiento»
+// dice qué plantillas son esas. → { puede, baja, motivo, aviso, seguimiento }
+async function permisoComercial(q, c, ahora, { uso = null } = {}) {
+  if (await tieneBaja(q, c.telefono)) return { puede: false, baja: true, motivo: 'pidió la baja de los mensajes comerciales', aviso: null, seguimiento: [] };
+  const p = await repesca.permisoComercial(q, { paciente_id: c.paciente_id, lead_id: c.lead_id }, ahora, { uso });
+  const seguimiento = p.seguimiento || [];
+  if (p.ok) return { puede: true, baja: false, motivo: null, aviso: null, seguimiento };
+  if (/baja/.test(p.motivo)) return { puede: false, baja: true, motivo: 'pidió la baja de los mensajes comerciales', aviso: null, seguimiento: [] };
+  if (/consentimiento/.test(p.motivo)) return { puede: false, baja: false, motivo: p.motivo, aviso: null, seguimiento };
+  return { puede: true, baja: false, motivo: null, aviso: p.motivo, seguimiento };
 }
 
 /**
@@ -51,7 +54,7 @@ async function comprobarEnvio(q, c, pl, valores, ahora) {
   }
   const comercial = pl.categoria === 'marketing';
   if (comercial) {
-    const permiso = await permisoComercial(q, c, ahora);
+    const permiso = await permisoComercial(q, c, ahora, { uso: pl.uso });
     if (!permiso.puede) return { status: 409, codigo: 'SIN_PERMISO_COMERCIAL', error: `No se le puede mandar una plantilla comercial: ${permiso.motivo}` };
   }
   // Sin saltos de línea ni espacios de más: Meta no los admite en una variable. Y ninguna vacía: Meta

@@ -17,8 +17,9 @@ cron de cada minuto ◀───────────────────
       si Meta no deja leerlo → tarea para recepción
 
 GHL u otra herramienta ──POST con X-Clave──▶ /api/leads → alta → secuencia «lead» (en la misma petición)
-La web pública (navegador) ──POST sin clave──▶ /web/contacto → alta con la prueba de los
-      consentimientos → secuencia «lead» si pide WhatsApp; tarea si pide llamada o correo
+La web pública (navegador) ──POST sin clave──▶ /web/contacto → lead SIN VERIFICAR con la prueba de
+      los consentimientos → si pide WhatsApp, uno neutro de confirmación («¿Has sido tú?»); si pide
+      llamada o correo, tarea para recepción. Con su «Sí, fui yo», la conversación sigue
 ```
 
 La ruta nunca procesa nada: comprueba la firma, guarda el cuerpo tal cual (cifrado, como los
@@ -223,6 +224,16 @@ Formularios de Meta, anuncios que abren WhatsApp, la web y GHL pasan por `servid
   lead, su conversación y su teléfono en el título.
 - **Lo que escribió en el formulario** va cifrado (`leads.respuestas_cifradas`), como los mensajes,
   y la bandeja lo enseña en la ficha del lead.
+- **Lo comercial, solo con su consentimiento** (LSSI, art. 21). Pedir información no es aceptar
+  publicidad: a un lead se le puede mandar, sin más, el seguimiento de su propia solicitud (la
+  bienvenida, «¿te buscamos hueco?», el último intento y el «como quedamos») mientras siga en curso
+  (sin cita ni «no, gracias»). Todo lo demás («te echamos de menos», «toca repetir»…) solo con su
+  casilla comercial de la web, verificada, o, si es paciente, con su consentimiento en la ficha o
+  siendo cliente (`permisoComercial` en `servidor/repesca/motor.js`, con el uso de la plantilla; la
+  bandeja ofrece solo esas). La casilla verificada pasa a su ficha (`consentimientos`, fuente «web»,
+  con la prueba y la versión de los textos) cuando la tiene o al reservar
+  (`servidor/consentimiento-web.js`), y el panel la enseña: «Comunicaciones comerciales: sí (web,
+  fecha, versión)».
 - Un tratamiento con publicidad restringida (medicamento con receta, producto sanitario) se guarda
   como interés, pero las plantillas comerciales no lo nombran: dicen su familia («medicina estética
   facial»).
@@ -279,35 +290,96 @@ Cada botón de WhatsApp de la web (`web/`) abre el chat con el primer mensaje es
 de la página al final: «Hola, vengo de la web y me interesa: Lipoláser. (ref. web-lipolaser)». Si la
 visita llegó por una campaña (`?utm_campaign=…`), va también la huella corta de la campaña, nunca su
 nombre: «(ref. web-lipolaser · c-1x2y3z)». En lo íntimo el texto es neutro («Salud íntima femenina»)
-y la referencia es un código (`web-intima-f-…`).
+y la referencia es **la de su especialidad** (`web-intima-f-…`), la misma en todas sus páginas: el
+mensaje se lee en la pantalla del móvil y pasa por Meta, y el código de cada página se podría buscar
+(la tabla de referencias está en el repositorio). Lo concreto lo pregunta la conversación.
 
 Cuando llega un texto con esa referencia, antes de pasarlo a la repesca, `servidor/entrada.js` da de
 alta un lead `web_whatsapp` («Web (botón WhatsApp)» en el panel) con `codigo_web` = la referencia, el
 tratamiento que le toca según `semillas/iemec/referencias-web.json` (la genera `npm run web`) y la
-huella de la campaña en `utm.clave_campana`, y la conversación pasa a ser la del lead, como con los
-anuncios. Sin secuencia: ya está hablando con la IA. Si ya tenía un lead en marcha, no se duplica.
-Una referencia que no está en el archivo (una página que ya no existe) da el lead sin tratamiento.
+campaña (si su huella es la de una que conocemos, de los formularios o del mapeo, su nombre; si no,
+la huella en `utm.clave_campana`, que el panel enseña), y la conversación pasa a ser la del lead, como
+con los anuncios. Sin secuencia: ya está hablando con la IA. Si ya tenía un lead en marcha, no se
+duplica. Una referencia que no está en el archivo (una página que ya no existe) da el lead sin
+tratamiento.
+
+Ese primer mensaje **es una petición de información de esa página**: se le contesta como a «quiero
+información» (lo aprobado, una valoración y, si la IA puede darle cita, huecos), sin la «(ref. …)»
+(no la escribió él: ni las reglas, ni la IA, ni su historial la ven; en la conversación se guarda
+entero) y sin volver a sacar del texto lo que le interesa, que ya dijo la referencia («Diagnóstico de
+lipoláser» nombra el lipoláser, pero su página es la del diagnóstico). Los de las tarjetas regalo
+(comprar una de 45 €, canjearla…) pasan a una persona con su tarea. Una baja, algo de salud o una
+queja mandan igual.
 
 ## POST /web/contacto (el formulario de la web pública)
 
 La web nueva es estática (`web/`, en otro dominio): su formulario «Te llamamos» manda un `POST`
-`application/x-www-form-urlencoded` directamente desde el navegador, sin clave. Lo que protege la
-entrada: CORS solo para `WEB_DOMINIO` (y `WEB_ORIGENES`), una trampa para robots, el tiempo de
-rellenado (`t`, en ms; vacío = sin JavaScript, no se descarta), y un límite de 8 envíos por IP cada
-15 minutos y 3 por teléfono al día (`limites_acceso`). Los campos y las respuestas están en
-[`web/README.md`](../web/README.md). Lo que hace:
+`application/x-www-form-urlencoded` directamente desde el navegador, sin clave. Los campos y las
+respuestas están en [`web/README.md`](../web/README.md).
 
-- valida como la web (los mismos mensajes, en `motor/entrada/web.js`): sin JavaScript contesta
-  `303` a `WEB_DOMINIO/gracias/` o una página sencilla con los errores; con él, `200 {ok: true}`,
+**Es anónimo y el teléfono no se comprueba:** cualquiera puede escribir el de otra persona, con el
+nombre y el tratamiento que quiera, y hacerlo con un programa. CORS no lo impide (solo que otra web
+lea la respuesta), y la trampa y el tiempo de rellenado (`t`, que pone el navegador) solo paran a los
+robots torpes. Por eso, lo que llega por aquí **no escribe a nadie con lo que puso quien lo envió ni
+se une a los datos de otro**:
+
+- **Lead sin verificar** (`leads.sin_verificar`): no se une a la conversación abierta de ese teléfono,
+  ni a su ficha de paciente, ni a los datos de otro lead (si ya había uno en marcha con ese teléfono,
+  no se le toca el nombre, el correo ni el interés: lo nuevo va en su solicitud, en el evento y en la
+  tarea). Su casilla comercial no cuenta.
+- **Quien pide WhatsApp** recibe primero la plantilla de utilidad `iemec_solicitud_web` (secuencia
+  «confirmar_web», en horario de envío), sin nombre ni tratamiento: «Hola, hemos recibido en la web de
+  IEMEC una solicitud de información con este número de teléfono. ¿Has sido tú? …», con los botones «Sí,
+  fui yo» y «No fui yo». Una sola por teléfono y semana. No es publicidad: le llega también a quien
+  tiene la baja comercial. Si ese teléfono ya tiene una conversación abierta, en vez de la plantilla,
+  tarea para quien la lleva («comprobar que lo pidió antes de hablarle de ello»).
+- **«Sí, fui yo»** (o «sí», «soy yo»…, durante una semana y mientras no le escribamos otra cosa): la
+  solicitud queda verificada (`verificarSolicitudWeb`): el lead se une a su ficha (si la tiene) y a su
+  conversación, su casilla comercial cuenta (y pasa a su ficha; si la marcó después de darse de baja,
+  una tarea lo dice: la baja la quita dirección) y la conversación le contesta a lo que pidió, como a
+  «quiero información». **«No fui yo»**: se borra lo que escribió el otro (nombre, correo, lo pedido), se
+  cancelan sus tareas, se le piden disculpas y no se le manda otra confirmación en 90 días. A otra cosa
+  se le explica una vez por qué le escribimos.
+- **Quien pide llamada o correo:** tarea para recepción, con «(formulario de la web, sin verificar)»;
+  si el teléfono es de una paciente o de otro lead, lo primero del título lo dice (y, si el correo no es
+  el de su ficha, que no le mande nada suyo a ese correo). En **Tareas**, lo que escribió y el botón
+  «Confirmado: lo pidió» (`POST /api/panel/leads/:id/verificar`), para cuando recepción le ha llamado.
+- **Vuelve a enviarlo** con llamada o correo: su tarea sale siempre y su WhatsApp automático (la
+  confirmación o la secuencia «lead») se para. Lo que escribe cada vez queda en su solicitud, cifrado,
+  y el panel lo enseña.
+
+Además:
+
+- lo que manda otra web (cabecera `Origin` que no es la de la web, o `Sec-Fetch-Site: cross-site`) o
+  un robot torpe (la trampa rellena, un envío en menos de 2,5 s) recibe «recibido» y no se guarda nada;
+- límites en `limites_acceso` (con huellas, nunca la IP ni el teléfono): 8 envíos por IP cada 15
+  minutos y 20 al día (`429`), y 3 por teléfono al día **en silencio** (se contesta como a un envío
+  bueno y no se guarda nada: un `429` diría si otra persona ha pedido información hoy con ese número);
+- un tope entre todos de lo que se pone en marcha solo (20 confirmaciones o tareas por hora): pasado,
+  se guarda sin escribir a nadie ni crear tareas, y una sola tarea urgente lo avisa («Formulario de la
+  web: más solicitudes de las normales…»);
+- valida como la web (los mismos mensajes, en `motor/entrada/web.js`): sin JavaScript contesta `303` a
+  `WEB_DOMINIO/gracias/` o una página sencilla con los errores; con él, `200 {ok: true}`,
   `422 {ok: false, errores}` o `429`;
 - traduce el «¿Qué te interesa?» y la referencia de la página («web-lipolaser», o el código de lo
-  íntimo) con `semillas/iemec/referencias-web.json`, que genera `npm run web`: nunca llega un id del
-  catálogo;
-- da de alta el lead (`origen` web, `codigo_web` = la referencia, el mensaje cifrado) y guarda en
-  `solicitudes_web` la prueba de los dos consentimientos por separado, con la fecha, la versión de
-  los textos, la página y la preferencia (RGPD, art. 7.1). Un reintento del mismo envío no duplica;
-- quien pide WhatsApp entra en la secuencia «lead» (el seguimiento de su solicitud); quien pide
-  llamada o correo, no: tarea para recepción («Llamar a…», «Escribir a…»).
+  íntimo) con `semillas/iemec/referencias-web.json`: nunca llega un id del catálogo. Una referencia bien
+  formada que aún no está en el archivo (una página publicada antes que la app) vale como interés sin
+  tratamiento;
+- guarda en `solicitudes_web` la prueba de los dos consentimientos por separado (RGPD, art. 7.1), con
+  la fecha, la preferencia, la versión de los textos y si es una de las que publicó la web
+  (`semillas/iemec/textos-formulario.json`, que genera `npm run web` con cada versión y sus textos
+  exactos: una versión desconocida se guarda marcada y su casilla comercial no cuenta). Lo que pidió
+  (la página, la referencia, el tratamiento, el interés, lo que escribió) va cifrado. La huella del
+  envío es un HMAC con el secreto del servidor (sin él no se puede comprobar un mensaje adivinado): con
+  JavaScript, del identificador al azar del formulario (`envio`), así un reintento no duplica.
+
+**Cuánto se guarda** (`servidor/retencion.js`, cada día en el cron): la solicitud que nadie confirma
+caduca a la semana y, como la rechazada, se borra al mes; el lead de la web o de su WhatsApp sin cita ni
+actividad en 12 meses (`RETENCION_LEADS_MESES`) se borra con sus tareas, seguimientos y secuencias, y sus
+conversaciones si ese teléfono no es de un paciente; de sus eventos se quita el tratamiento. De sus
+solicitudes solo queda la prueba de un consentimiento comercial verificado, 3 años y sin lo pedido.
+Para una petición de supresión: `node scripts/suprimir-telefono.js <teléfono>` (dice qué borraría) y
+con `--confirmar` lo borra y lo pone en la lista de bajas; a un paciente no lo toca.
 
 ## POST /api/leads (GHL y otras herramientas)
 
@@ -341,6 +413,10 @@ vez (`repetido`), **400** faltan datos, **401** clave mala, **503** sin `LEADS_C
 
 ## Pruebas
 
+- `test/web-contacto.test.js` y `test/web-verificar.test.js`: el formulario de la web (validación,
+  otras webs, límites, tope, la prueba cifrada, la huella) y, con la demo, la confirmación por
+  WhatsApp, el teléfono de otra persona, la casilla comercial hasta la ficha, quien vuelve con otra
+  preferencia, el primer WhatsApp de cada botón de la web, las bajas, la campaña y el borrado.
 - `test/webhooks.test.js`: peticiones reales al puerto (verificación, firmas, duplicados, cada tipo
   de mensaje, referral, estados y el panel, 131050, formularios con mapeo y el cron en una vuelta,
   bajas, medicamentos con receta y `/api/leads`) y, con su propia base, lo que encontró la revisión:
@@ -356,7 +432,9 @@ vez (`repetido`), **400** faltan datos, **401** clave mala, **503** sin `LEADS_C
 ## Pendiente
 
 - Envío real (`servidor/integraciones/whatsapp.js` en modo `real`): hoy solo entra.
-- Sacar a alguien de la lista de bajas si vuelve a dar su consentimiento (hoy, a mano en la base).
+- Sacar a alguien de la lista de bajas si vuelve a dar su consentimiento (hoy, a mano en la base; si
+  lo marca en la web después de su baja, una tarea lo dice).
+- Aprobar en Meta la plantilla `iemec_solicitud_web` antes de publicar el formulario de la web.
 - Estados de las plantillas (`message_template_status_update`, calidad) y, con coexistencia, los
   mensajes que manda el equipo desde el móvil (`smb_message_echoes`): se guardan, pero aún no se
   procesan.

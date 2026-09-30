@@ -19,6 +19,15 @@ const entrega = (m) => {
   return ENTREGA[m.estado] ? ` · ${ENTREGA[m.estado]}` : '';
 };
 
+// Si quiere comunicaciones comerciales: su ficha, o la casilla de la web (que solo cuenta verificada).
+const PREFERENCIA = { whatsapp: 'WhatsApp', llamada: 'llamada', correo: 'correo' };
+function textoComercial(c) {
+  if (!c || c.valor == null) return 'no consta';
+  const de = [c.fuente === 'web' ? 'web' : c.fuente, c.en && fechaHora(c.en), c.version && `versión ${c.version}`].filter(Boolean).join(', ');
+  if (c.valor) return `sí (${de})`;
+  return c.marcada && !c.verificada ? `marcó la casilla en la web, sin verificar (${de})` : `no (${de})`;
+}
+
 // Las variables de una plantilla ({{1}}, {{2}}…) y cómo le llega con los valores puestos.
 const variables = (cuerpo) => [...new Set([...String(cuerpo).matchAll(/\{\{(\d+)\}\}/g)].map((m) => Number(m[1])))].sort((a, b) => a - b);
 const rellenar = (cuerpo, valores) => String(cuerpo).replace(/\{\{(\d+)\}\}/g, (v, n) => valores[Number(n) - 1]?.trim() || v);
@@ -92,10 +101,11 @@ function Detalle({ id, alCambiar }) {
   const ventana = c.ventanaHasta && new Date(c.ventanaHasta) > new Date();
   // Con la ventana cerrada, solo plantillas aprobadas, y no las que manda la app sola (las del enlace de
   // una cita o de una reseña, la del hueco de la lista de espera). Las comerciales, solo si se le puede
-  // mandar algo comercial (sin baja y con consentimiento). Cada variable lleva su valor ({{1}}, el
-  // nombre con que se le saluda).
+  // mandar algo comercial (sin baja y con consentimiento); a un lead sin su casilla comercial, solo las
+  // que siguen su solicitud. Cada variable lleva su valor ({{1}}, el nombre con que se le saluda).
   const comercial = d.comercial || { puede: true };
-  const aMano = (plantillas.datos || []).filter((p) => p.estado === 'aprobada' && p.aMano && (comercial.puede || p.categoria !== 'marketing'));
+  const seguimiento = comercial.seguimiento || [];
+  const aMano = (plantillas.datos || []).filter((p) => p.estado === 'aprobada' && p.aMano && (comercial.puede || p.categoria !== 'marketing' || seguimiento.includes(p.uso)));
   const elegida = aMano.find((p) => String(p.id) === plantilla);
   const campos = elegida ? variables(elegida.cuerpo) : [];
   const completa = Boolean(elegida) && campos.every((n) => valores[n - 1]?.trim());
@@ -160,7 +170,7 @@ function Detalle({ id, alCambiar }) {
                   {aMano.map((p) => <option key={p.id} value={p.id}>{p.uso.replaceAll('_', ' ')}</option>)}
                 </select>
               </div>
-              {!comercial.puede && <p className="text-xs text-rosa">Solo plantillas de servicio: {comercial.motivo}.</p>}
+              {!comercial.puede && <p className="text-xs text-rosa">{seguimiento.length ? 'Solo plantillas de servicio y las que siguen su solicitud' : 'Solo plantillas de servicio'}: {comercial.motivo}.</p>}
               {elegida?.categoria === 'marketing' && comercial.aviso && <p className="text-xs text-rosa">Ojo: {comercial.aviso}.</p>}
               {elegida && campos.map((n) => (
                 <label key={n} className="grid min-w-0 gap-1 text-sm">
@@ -202,12 +212,18 @@ function Detalle({ id, alCambiar }) {
             </ul>
           ) : d.lead ? (
             <ul className="mt-2 space-y-1 text-sm">
-              <li>Lead · {d.lead.etapa}</li>
+              <li>Lead · {d.lead.etapa}{d.lead.verificado === false && <span className="text-rosa"> · sin verificar</span>}</li>
               {d.lead.tratamiento && <li style={{ color: 'var(--texto-suave)' }}>Interés: {d.lead.tratamiento}</li>}
-              <li style={{ color: 'var(--texto-suave)' }}>Origen: {d.lead.origen?.replaceAll('_', ' ')}{d.lead.campana ? ` · ${d.lead.campana}` : ''}{d.lead.anuncio ? ` · ${d.lead.anuncio}` : ''}</li>
+              <li style={{ color: 'var(--texto-suave)' }}>Origen: {d.lead.origen?.replaceAll('_', ' ')}{d.lead.campana ? ` · ${d.lead.campana}` : d.lead.claveCampana ? ` · campaña ${d.lead.claveCampana} (sin identificar)` : ''}{d.lead.anuncio ? ` · ${d.lead.anuncio}` : ''}</li>
               {(d.lead.respuestas || []).map((r) => <li key={r.pregunta} style={{ color: 'var(--texto-suave)' }}>{r.pregunta}: {r.valor}</li>)}
+              {(d.lead.origen === 'web' ? (d.lead.solicitudesWeb || []).slice(0, -1) : d.lead.solicitudesWeb || []).map((sw) => (
+                <li key={sw.id} style={{ color: 'var(--texto-suave)' }}>
+                  Otra solicitud en la web ({fechaHora(sw.en)}{sw.verificada ? '' : ', sin verificar'}): {PREFERENCIA[sw.preferencia] || sw.preferencia}{sw.mensaje ? ` · «${sw.mensaje}»` : ''}
+                </li>
+              ))}
             </ul>
           ) : <p className="mt-2 text-sm" style={{ color: 'var(--texto-suave)' }}>Contacto sin ficha todavía.</p>}
+          <p className="mt-2 text-sm" style={{ color: 'var(--texto-suave)' }}>Comunicaciones comerciales: {textoComercial(d.consentimientoComercial)}</p>
           {/* La baja, sea paciente, lead o contacto sin ficha (la de su ficha o la de la lista de bajas). */}
           {comercial.baja && <p className="mt-2 text-sm text-rosa">Baja de mensajes comerciales</p>}
         </div>
