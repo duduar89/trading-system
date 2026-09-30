@@ -19,10 +19,10 @@ const PERMISOS = {
   'tareas.cerrar': { roles: TODOS, que: 'cerrar tareas' },
   'seguimientos.editar': { roles: TODOS, que: 'cambiar seguimientos' },
   'resenas.aprobar': { roles: ['direccion', 'marketing'], que: 'aprobar y publicar respuestas a reseñas' },
-  'salas.editar': { roles: ['direccion', 'admin'], que: 'cambiar qué tratamiento va en cada sala' },
-  'tratamientos.editar': { roles: ['direccion', 'admin'], que: 'cambiar el catálogo de tratamientos' },
+  'salas.editar': { roles: ['direccion', 'admin'], que: 'cambiar las salas y los tratamientos' },
+  // Para cuando haya pantalla de ofertas: su ruta tiene que llevar exige('ofertas.gestionar').
   'ofertas.gestionar': { roles: ['direccion', 'admin'], que: 'gestionar las ofertas' },
-  'plantillas.gestionar': { roles: ['direccion', 'marketing', 'admin'], que: 'gestionar las plantillas de WhatsApp' },
+  // A quien es de dirección (y el rol de dirección) solo lo gestiona dirección: servidor/acceso.js.
   'usuarios.gestionar': { roles: ['direccion', 'admin'], que: 'gestionar el equipo y sus accesos' },
 };
 

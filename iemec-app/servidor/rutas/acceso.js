@@ -55,9 +55,15 @@ function rutasAcceso({ pool }) {
   return r;
 }
 
-// Errores de acceso: su estado y su mensaje, y en las rutas sin sesión cada uno cuenta como fallo para
-// el límite de la IP. Una passkey desconocida lleva el RP ID: el panel se lo dice al navegador para que
-// deje de ofrecerla. El motivo técnico solo sale en el registro del servidor.
+// Los que cuentan para el límite de fallos de la IP: lo que parece un intento de colarse (un enlace que
+// no existe, una firma o una clave que no cuadran, una respuesta repetida). No cuentan un enlace viejo,
+// una passkey borrada que el navegador aún ofrece ni tardar más de la cuenta: toda la clínica sale con la
+// misma IP y no puede quedarse fuera por eso.
+const CUENTAN = new Set(['INVITACION_NO_VALE', 'RETO_NO_VALE', 'PASSKEY_NO_VALE', 'PASSKEY_DE_OTRO', 'CONTADOR', 'CLAVE_INCORRECTA']);
+
+// Errores de acceso: su estado y su mensaje (y, en las rutas sin sesión, si cuenta como fallo). Una
+// passkey desconocida lleva el RP ID: el panel se lo dice al navegador para que deje de ofrecerla. El
+// motivo técnico solo sale en el registro del servidor.
 function errores(p, donde, { cuentaFallo = true } = {}) {
   return async (err, req, res, _next) => {
     if (!(err instanceof acceso.ErrorAcceso)) {
@@ -65,7 +71,7 @@ function errores(p, donde, { cuentaFallo = true } = {}) {
       return res.status(500).json({ error: 'Algo ha fallado en el servidor' });
     }
     if (err.causa && !process.env.NODE_TEST_CONTEXT) console.warn(`${donde}: ${err.codigo} (${err.causa})`);
-    if (cuentaFallo && err.codigo !== 'EMERGENCIA_NO_CONFIGURADA') await sumarFallo(p(), req).catch(() => {});
+    if (cuentaFallo && CUENTAN.has(err.codigo)) await sumarFallo(p(), req).catch(() => {});
     res.status(err.estado).json({ error: err.message, codigo: err.codigo, ...(err.codigo === 'CREDENCIAL_DESCONOCIDA' ? { rpID: acceso.rp().id } : {}) });
   };
 }

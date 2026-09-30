@@ -129,5 +129,5 @@ async function purgarLimites(pool, ahora = new Date()) {
 }
 
 module.exports = {
-  origenesPermitidos, CSP_PANEL, cabeceras, mismoOrigen, igualesSeguro, LIMITES, contar, frenar, sumarFallo, purgarLimites,
+  origenesPermitidos, CSP_PANEL, cabeceras, mismoOrigen, igualesSeguro, huellaIp, LIMITES, contar, frenar, sumarFallo, purgarLimites,
 };

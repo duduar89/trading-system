@@ -20,7 +20,6 @@ test('la tabla de permisos', () => {
   assert.deepEqual(quien('ofertas.gestionar'), ['direccion', 'admin']);
   assert.deepEqual(quien('resenas.aprobar'), ['direccion', 'marketing']);
   assert.deepEqual(quien('salas.editar'), ['direccion', 'admin']);
-  assert.deepEqual(quien('tratamientos.editar'), ['direccion', 'admin']);
   for (const deTodos of ['citas.estado', 'conversaciones.atender']) assert.deepEqual(quien(deTodos), ROLES, deTodos);
   assert.equal(puede(undefined, 'citas.estado'), false, 'sin rol, nada');
   assert.equal(puede('direccion', 'no.existe'), false);
@@ -96,6 +95,8 @@ test('permisos por rol en las rutas del panel y gestión del equipo', async (t) 
         assert.match(r.json.enlace, /^http:\/\/localhost:3004\/#alta\/[A-Za-z0-9_-]{43}$/);
         assert.deepEqual([r.json.usuario.email, r.json.usuario.nombre], ['nueva@ejemplo.com', 'Nueva Recepcionista']);
         const lista = await dir.pedir('/api/panel/equipo');
+        assert.deepEqual(lista.json.roles.map((r) => r.nombre), ['dirección', 'recepción', 'médico', 'estética', 'marketing', 'administración']);
+        assert.ok(lista.json.permisos.some((p) => p.id === 'ofertas.gestionar' && p.roles.join() === 'direccion,admin'));
         const nueva = lista.json.usuarios.find((u) => u.email === 'nueva@ejemplo.com');
         assert.equal(new Date(nueva.invitacionHasta).getTime(), T0.getTime() + 24 * 3600000, 'enlace pendiente hasta mañana');
         assert.deepEqual(nueva.passkeys, []);
@@ -115,26 +116,41 @@ test('permisos por rol en las rutas del panel y gestión del equipo', async (t) 
         assert.equal((await dir.pedir(`/api/panel/equipo/${nueva.id}`, { metodo: 'PATCH', cuerpo: { rol: 'jefe' } })).json.codigo, 'ROL_DESCONOCIDO');
       });
 
-      await t.test('nadie se desactiva a sí mismo y siempre queda alguien que gestione el equipo', async () => {
+      await t.test('a dirección solo la gestiona dirección, nadie se desactiva a sí mismo y siempre queda alguien de dirección', async () => {
         const dir = equipo.direccion;
         const adm = equipo.admin;
         const cambiar = (c, u, cuerpo) => c.pedir(`/api/panel/equipo/${u.usuario.id}`, { metodo: 'PATCH', cuerpo });
         assert.equal((await cambiar(dir.c, dir, { activo: false })).json.codigo, 'NO_A_TI_MISMO');
-        // Dirección desactiva a admin: queda dirección. Luego no puede dejar de ser de dirección.
-        assert.equal((await cambiar(dir.c, adm, { activo: false })).status, 200);
+        // La única de dirección no deja de serlo, aunque administración siga activa.
         const bajar = await cambiar(dir.c, dir, { rol: 'recepcion' });
-        assert.deepEqual([bajar.status, bajar.json.codigo], [409, 'ULTIMO_GESTOR']);
-        assert.equal((await dir.c.pedir('/api/sesion')).json.rol, 'direccion');
-        // Con admin otra vez activa (su sesión de antes ya no vale: vuelve a entrar), sí.
-        assert.equal((await cambiar(dir.c, adm, { activo: true })).status, 200);
+        assert.deepEqual([bajar.status, bajar.json.codigo], [409, 'ULTIMA_DIRECCION']);
+        // Administración no toca a dirección (ni rol, ni desactivarla, ni enlace nuevo, ni sus passkeys, ni
+        // sus sesiones) ni da ese rol, tampoco a sí misma: sería quedarse con la cuenta de dirección.
+        const [[pkDir]] = await pool.query('SELECT id FROM passkeys WHERE usuario_id = ?', [dir.usuario.id]);
+        const intentos = [
+          await cambiar(adm.c, dir, { activo: false }),
+          await cambiar(adm.c, dir, { rol: 'recepcion' }),
+          await cambiar(adm.c, adm, { rol: 'direccion' }),
+          await adm.c.pedir(`/api/panel/equipo/${dir.usuario.id}/invitacion`, { metodo: 'POST' }),
+          await adm.c.pedir(`/api/panel/equipo/${dir.usuario.id}/passkeys/${pkDir.id}`, { metodo: 'DELETE' }),
+          await adm.c.pedir(`/api/panel/equipo/${dir.usuario.id}/cerrar-sesiones`, { metodo: 'POST' }),
+          await adm.c.pedir('/api/panel/equipo', { metodo: 'POST', cuerpo: { email: 'otra.direccion@ejemplo.com', nombre: 'Otra Dirección', rol: 'direccion' } }),
+        ];
+        for (const r of intentos) assert.deepEqual([r.status, r.json.codigo], [403, 'SOLO_DIRECCION']);
+        assert.equal(intentos[0].json.error, 'A las personas de dirección, y el rol de dirección, solo los gestiona dirección.');
+        assert.equal((await dir.c.pedir('/api/panel/hoy')).status, 200, 'dirección sigue dentro, con su passkey');
+        assert.equal((await adm.c.pedir('/api/sesion')).json.rol, 'admin');
+        // Dirección sí gestiona a administración: la desactiva (su sesión se acaba) y la reactiva (vuelve a entrar).
+        assert.equal((await cambiar(dir.c, adm, { activo: false })).status, 200);
         assert.equal((await adm.c.pedir('/api/panel/hoy')).status, 401);
+        assert.equal((await cambiar(dir.c, adm, { activo: true })).status, 200);
         assert.equal((await entrar(adm.c, adm.aut)).status, 200);
+        // Con otra persona de dirección, la primera ya puede dejar de serlo (y deja de gestionar el equipo).
+        assert.equal((await dir.c.pedir('/api/panel/equipo', { metodo: 'POST', cuerpo: { email: 'segunda.direccion@ejemplo.com', nombre: 'Segunda Dirección', rol: 'direccion' } })).status, 201);
         assert.equal((await cambiar(dir.c, dir, { rol: 'recepcion' })).status, 200);
-        const ahora = await dir.c.pedir('/api/sesion');
-        assert.equal(ahora.json.rol, 'recepcion');
-        assert.equal((await dir.c.pedir('/api/panel/equipo')).status, 403, 'y ya no gestiona el equipo');
-        assert.equal((await cambiar(adm.c, dir, { rol: 'direccion' })).status, 200);
-        // Cerrar las sesiones de otra persona: la suya se acaba, la de quien lo hace sigue.
+        assert.equal((await dir.c.pedir('/api/sesion')).json.rol, 'recepcion');
+        assert.equal((await dir.c.pedir('/api/panel/equipo')).status, 403);
+        // Administración, con quien no es de dirección, sí: cerrar sus sesiones.
         const med = equipo.medico;
         assert.equal((await adm.c.pedir(`/api/panel/equipo/${med.usuario.id}/cerrar-sesiones`, { metodo: 'POST' })).status, 200);
         assert.equal((await med.c.pedir('/api/panel/hoy')).status, 401);

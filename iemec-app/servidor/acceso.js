@@ -7,7 +7,9 @@
 //     hay que escribir el correo, así que tampoco se puede averiguar si un correo existe). Se comprueba
 //     la firma con la clave pública guardada, que la passkey sea de esa persona y que el contador
 //     avance.
-//   · Varias passkeys por persona, borrar una perdida y desactivar usuarios.
+//   · Varias passkeys por persona, borrar una perdida y desactivar usuarios. Administración gestiona
+//     el equipo, pero a quien es de dirección (y el rol de dirección) solo lo toca dirección: un enlace
+//     nuevo o una passkey borrada serían quedarse con su cuenta. Siempre queda alguien de dirección.
 //   · PANEL_CLAVE: solo acceso de emergencia de dirección, con cada uso en eventos.
 // El RP ID y el origen salen de URL_PUBLICA. Los retos se guardan en la base, caducan a los 5 minutos y
 // se gastan al usarlos. userVerification «preferred» y sin atestación: no se pide ni se guarda qué
@@ -17,8 +19,8 @@ const W = require('@simplewebauthn/server');
 const config = require('./config');
 const { transaccion } = require('./db');
 const { registrar } = require('./eventos');
-const { ROLES, puede } = require('./permisos');
-const { origenesPermitidos, igualesSeguro, purgarLimites } = require('./seguridad');
+const { ROLES, NOMBRE_ROL } = require('./permisos');
+const { origenesPermitidos, igualesSeguro, huellaIp, purgarLimites } = require('./seguridad');
 
 const INVITACION_MS = 24 * 3600 * 1000;
 const RETO_MS = 5 * 60 * 1000;
@@ -27,7 +29,6 @@ const ALGORITMOS = [-8, -7, -257]; // EdDSA, ES256 y RS256: los de todos los aut
 const TRANSPORTES = ['ble', 'cable', 'hybrid', 'internal', 'nfc', 'smart-card', 'usb'];
 const LARGO_MINIMO_CLAVE = 16;
 const EMAIL = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
-const GESTORES = ROLES.filter((r) => puede(r, 'usuarios.gestionar'));
 
 const MOTIVOS = {
   EMAIL_NO_VALIDO: [400, 'Ese correo no parece válido.'],
@@ -37,7 +38,8 @@ const MOTIVOS = {
   USUARIO_DESCONOCIDO: [404, 'No existe esa persona en el equipo.'],
   USUARIO_INACTIVO: [409, 'Esa persona está desactivada: reactívala antes de mandarle un enlace.'],
   NO_A_TI_MISMO: [409, 'No puedes desactivarte a ti mismo.'],
-  ULTIMO_GESTOR: [409, 'Tiene que quedar al menos una persona activa de dirección o administración.'],
+  ULTIMA_DIRECCION: [409, 'Tiene que quedar al menos una persona activa de dirección.'],
+  SOLO_DIRECCION: [403, 'A las personas de dirección, y el rol de dirección, solo los gestiona dirección.'],
   INVITACION_NO_VALE: [410, 'Este enlace no es válido. Pide uno nuevo a dirección.'],
   INVITACION_USADA: [410, 'Este enlace ya se ha usado. Si necesitas otra passkey, pide un enlace nuevo a dirección.'],
   INVITACION_CADUCADA: [410, 'Este enlace ha caducado (dura 24 horas). Pide uno nuevo a dirección.'],
@@ -62,6 +64,12 @@ class ErrorAcceso extends Error {
   }
 }
 const fallo = (codigo, causa) => new ErrorAcceso(codigo, causa);
+
+// actorRol: el rol de quien lo hace desde el panel; sin él, la consola del servidor (scripts/invitar.js),
+// que puede con todo.
+function soloDireccion(actorRol, ...roles) {
+  if (actorRol && actorRol !== 'direccion' && roles.includes('direccion')) throw fallo('SOLO_DIRECCION');
+}
 
 // ── Utilidades ──────────────────────────────────────────────────────────────────────────────
 const huella = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
@@ -125,12 +133,13 @@ async function nuevaInvitacion(con, { usuarioId, actor, ahora }) {
 }
 
 // Da de alta a una persona del equipo y devuelve su enlace (el token solo sale aquí, una vez).
-async function crearUsuario(pool, { email, nombre, rol, actor, ahora = new Date() }) {
+async function crearUsuario(pool, { email, nombre, rol, actor, actorRol = null, ahora = new Date() }) {
   const e = normalizarEmail(email);
   const n = String(nombre ?? '').replace(/\s+/g, ' ').trim();
   if (!EMAIL.test(e) || e.length > 160) throw fallo('EMAIL_NO_VALIDO');
   if (!n || n.length > 120) throw fallo('NOMBRE_VACIO');
   if (!ROLES.includes(rol)) throw fallo('ROL_DESCONOCIDO');
+  soloDireccion(actorRol, rol);
   return transaccion(async (con) => {
     let id;
     try {
@@ -148,10 +157,11 @@ async function crearUsuario(pool, { email, nombre, rol, actor, ahora = new Date(
 
 // Un enlace nuevo para alguien que ya está (perdió sus passkeys o no llegó a usar el primero). Anula el
 // anterior.
-async function invitar(pool, { usuarioId, actor, ahora = new Date() }) {
+async function invitar(pool, { usuarioId, actor, actorRol = null, ahora = new Date() }) {
   return transaccion(async (con) => {
-    const [[u]] = await con.query('SELECT id, activo FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
+    const [[u]] = await con.query('SELECT id, rol, activo FROM usuarios WHERE id = ? FOR UPDATE', [usuarioId]);
     if (!u) throw fallo('USUARIO_DESCONOCIDO');
+    soloDireccion(actorRol, u.rol);
     if (!u.activo) throw fallo('USUARIO_INACTIVO');
     return nuevaInvitacion(con, { usuarioId: u.id, actor, ahora });
   }, pool);
@@ -171,7 +181,7 @@ async function leerInvitacion(con, token, ahora, { bloquear = false } = {}) {
 // Lo que ve quien abre el enlace, si todavía vale.
 async function verInvitacion(pool, { token, ahora = new Date() }) {
   const i = await leerInvitacion(pool, token, ahora);
-  return { nombre: i.nombre, email: i.email, rol: i.rol, caduca: i.caduca_en };
+  return { nombre: i.nombre, email: i.email, rol: i.rol, rolNombre: NOMBRE_ROL[i.rol], caduca: i.caduca_en };
 }
 
 // El usuario con su identificador de WebAuthn (los de antes de la 013 no lo tienen: se le pone uno).
@@ -200,20 +210,21 @@ const passkeyPublica = (p) => ({ id: p.id, dispositivo: p.dispositivo, sincroniz
 
 /**
  * Cambia el rol de alguien o lo desactiva (o reactiva). Desactivar corta al momento sus sesiones y
- * anula su enlace pendiente. Nadie se desactiva a sí mismo y siempre queda alguien activo que puede
- * gestionar el equipo.
+ * anula su enlace pendiente. Nadie se desactiva a sí mismo y siempre queda alguien activo de dirección
+ * (que es quien puede con todo el equipo).
  */
-async function cambiarUsuario(pool, { id, rol, activo, actor, actorId = null, ahora = new Date() }) {
+async function cambiarUsuario(pool, { id, rol, activo, actor, actorId = null, actorRol = null, ahora = new Date() }) {
   return transaccion(async (con) => {
     const [[u]] = await con.query('SELECT id, rol, activo FROM usuarios WHERE id = ? FOR UPDATE', [id]);
     if (!u) throw fallo('USUARIO_DESCONOCIDO');
     const nuevoRol = rol === undefined ? u.rol : rol;
     const nuevoActivo = activo === undefined ? Boolean(u.activo) : Boolean(activo);
     if (!ROLES.includes(nuevoRol)) throw fallo('ROL_DESCONOCIDO');
+    soloDireccion(actorRol, u.rol, nuevoRol);
     if (actorId === u.id && !nuevoActivo) throw fallo('NO_A_TI_MISMO');
-    if (u.activo && GESTORES.includes(u.rol) && !(nuevoActivo && GESTORES.includes(nuevoRol))) {
-      const [[otros]] = await con.query('SELECT COUNT(*) AS n FROM usuarios WHERE activo AND rol IN (?) AND id <> ? FOR UPDATE', [GESTORES, u.id]);
-      if (!Number(otros.n)) throw fallo('ULTIMO_GESTOR');
+    if (u.activo && u.rol === 'direccion' && !(nuevoActivo && nuevoRol === 'direccion')) {
+      const [[otros]] = await con.query("SELECT COUNT(*) AS n FROM usuarios WHERE activo AND rol = 'direccion' AND id <> ? FOR UPDATE", [u.id]);
+      if (!Number(otros.n)) throw fallo('ULTIMA_DIRECCION');
     }
     if (nuevoRol !== u.rol) {
       await con.query('UPDATE usuarios SET rol = ? WHERE id = ?', [nuevoRol, u.id]);
@@ -235,9 +246,11 @@ async function cambiarUsuario(pool, { id, rol, activo, actor, actorId = null, ah
 
 // Todas sus sesiones dejan de valer (la versión de la cookie ya no cuadra). Devuelve el usuario con la
 // versión nueva, por si hay que dar una cookie nueva a quien lo ha pedido.
-async function cerrarSesiones(pool, { id, actor }) {
-  const [r] = await pool.query('UPDATE usuarios SET sesion_version = sesion_version + 1 WHERE id = ?', [id]);
-  if (!r.affectedRows) throw fallo('USUARIO_DESCONOCIDO');
+async function cerrarSesiones(pool, { id, actor, actorRol = null }) {
+  const [[antes]] = await pool.query('SELECT rol FROM usuarios WHERE id = ?', [id]);
+  if (!antes) throw fallo('USUARIO_DESCONOCIDO');
+  soloDireccion(actorRol, antes.rol);
+  await pool.query('UPDATE usuarios SET sesion_version = sesion_version + 1 WHERE id = ?', [id]);
   await registrar(pool, { tipo: 'sesiones_cerradas', entidad: 'usuario', entidadId: id, actor });
   const [[u]] = await pool.query('SELECT id, email, nombre, rol, sesion_version FROM usuarios WHERE id = ?', [id]);
   return u;
@@ -334,12 +347,15 @@ async function passkeysDe(pool, usuarioId) {
   return filas.map(passkeyPublica);
 }
 
-// usuarioId: solo si es suya (desde «Mis passkeys»); sin él, cualquiera (quien gestiona el equipo).
-async function borrarPasskey(pool, { id, usuarioId = null, actor }) {
+// usuarioId: solo si es de esa persona (la suya, desde «Mis passkeys», o la de quien se elige en
+// «Equipo»); sin él, cualquiera.
+async function borrarPasskey(pool, { id, usuarioId = null, actor, actorRol = null }) {
   return transaccion(async (con) => {
-    const [[p]] = await con.query(`SELECT id, usuario_id, dispositivo FROM passkeys WHERE id = ?${usuarioId == null ? '' : ' AND usuario_id = ?'} FOR UPDATE`,
-      usuarioId == null ? [id] : [id, usuarioId]);
+    const [[p]] = await con.query(
+      `SELECT p.id, p.usuario_id, p.dispositivo, u.rol FROM passkeys p JOIN usuarios u ON u.id = p.usuario_id
+        WHERE p.id = ?${usuarioId == null ? '' : ' AND p.usuario_id = ?'} FOR UPDATE`, usuarioId == null ? [id] : [id, usuarioId]);
     if (!p) throw fallo('PASSKEY_DESCONOCIDA');
+    soloDireccion(actorRol, p.rol);
     await con.query('DELETE FROM passkeys WHERE id = ?', [p.id]);
     await registrar(con, { tipo: 'passkey_borrada', entidad: 'usuario', entidadId: p.usuario_id, actor, datos: { passkey: p.id, dispositivo: p.dispositivo } });
     return { id: p.id, usuarioId: p.usuario_id };
@@ -387,8 +403,15 @@ async function verificarEntrada(pool, { respuesta, ahora = new Date() }) {
     await registrar(pool, { tipo: 'acceso_desactivado', entidad: 'usuario', entidadId: pk.usuario_id, actor: pk.email, datos: { passkey: pk.id } });
     throw fallo('ACCESO_DESACTIVADO');
   }
+  // Y otra vez al guardarlo, en la misma sentencia: dos entradas a la vez con el mismo contador (la
+  // passkey y su copia) no pasan las dos.
+  const [avanza] = await pool.query('UPDATE passkeys SET contador = ?, ultimo_uso_en = ? WHERE id = ? AND (contador < ? OR (contador = 0 AND ? = 0))',
+    [nuevo, ahora, pk.id, nuevo, nuevo]);
+  if (!avanza.affectedRows) {
+    await registrar(pool, { tipo: 'passkey_contador_no_avanza', entidad: 'usuario', entidadId: pk.usuario_id, actor: pk.email, datos: { passkey: pk.id, guardado: pk.contador, recibido: nuevo, aLaVez: true } });
+    throw fallo('CONTADOR');
+  }
   await transaccion(async (con) => {
-    await con.query('UPDATE passkeys SET contador = GREATEST(contador, ?), ultimo_uso_en = ? WHERE id = ?', [nuevo, ahora, pk.id]);
     await con.query('UPDATE usuarios SET ultimo_acceso_en = ? WHERE id = ?', [ahora, pk.usuario_id]);
     await registrar(con, { tipo: 'sesion_iniciada', entidad: 'usuario', entidadId: pk.usuario_id, actor: pk.email, datos: { passkey: pk.id } });
   }, pool);
@@ -401,21 +424,23 @@ const claveEmergencia = () => {
   return c.length >= LARGO_MINIMO_CLAVE ? c : null;
 };
 
-// Solo dirección, con la clave del servidor. Cada uso (y cada intento fallido) queda en eventos. La
-// respuesta es la misma si el correo no existe, si no es de dirección o si la clave no cuadra.
+// Solo dirección, con la clave del servidor. Cada uso (y cada intento fallido) queda en eventos, con la
+// huella de la IP (no la IP) para ver qué intentos vienen del mismo sitio. La respuesta es la misma si
+// el correo no existe, si no es de dirección o si la clave no cuadra.
 async function entrarConClave(pool, { email, clave, ip = null, ahora = new Date() }) {
   const buena = claveEmergencia();
   if (!buena) throw fallo('EMERGENCIA_NO_CONFIGURADA');
   const e = normalizarEmail(email).slice(0, 160);
   const claveOk = typeof clave === 'string' && igualesSeguro(clave, buena);
   const [[u]] = await pool.query('SELECT id, email, nombre, rol, activo, sesion_version FROM usuarios WHERE email = ?', [e]);
-  if (!claveOk || !u || !u.activo || u.rol !== 'direccion') {
-    await registrar(pool, { tipo: 'acceso_emergencia_fallido', entidad: 'usuario', entidadId: u?.id ?? null, actor: 'desconocido', datos: { email: e, ip } });
+  const motivo = !claveOk ? 'clave' : !u ? 'correo' : !u.activo ? 'desactivado' : u.rol !== 'direccion' ? 'rol' : null;
+  if (motivo) {
+    await registrar(pool, { tipo: 'acceso_emergencia_fallido', entidad: 'usuario', entidadId: u?.id ?? null, actor: 'desconocido', datos: { motivo, ip: huellaIp(ip) } });
     throw fallo('CLAVE_INCORRECTA');
   }
   await transaccion(async (con) => {
     await con.query('UPDATE usuarios SET ultimo_acceso_en = ? WHERE id = ?', [ahora, u.id]);
-    await registrar(con, { tipo: 'acceso_emergencia', entidad: 'usuario', entidadId: u.id, actor: u.email, datos: { ip } });
+    await registrar(con, { tipo: 'acceso_emergencia', entidad: 'usuario', entidadId: u.id, actor: u.email, datos: { ip: huellaIp(ip) } });
   }, pool);
   return { usuario: u };
 }

@@ -13,7 +13,12 @@ const { prepararBdDePrueba } = require('./ayuda-bd');
 const acceso = require('../servidor/acceso');
 const { crearApp } = require('../servidor/index');
 const { CSP_PANEL } = require('../servidor/seguridad');
-const { ORIGEN, ENTORNO, ponerEntorno, conServidor, appConReloj, cliente, personaConSesion, entrar } = require('./ayuda-acceso');
+const mysql = require('mysql2/promise');
+const { migrar, listar } = require('../servidor/migraciones');
+const { BD_PRUEBAS } = require('./ayuda-bd');
+const {
+  ORIGEN, ENTORNO, ponerEntorno, conServidor, appConReloj, cliente, personaConSesion, entrar, darDeAlta, tokenDe, Autenticador,
+} = require('./ayuda-acceso');
 
 const T0 = new Date('2026-10-06T08:00:00Z');
 const mas = (min) => new Date(T0.getTime() + min * 60000);
@@ -47,6 +52,35 @@ test('el servidor avisa al arrancar en producción si PANEL_CLAVE está puesta',
   } finally { hijo.kill(); }
   assert.match(salida, /⚠ PANEL_CLAVE está puesta/);
   assert.doesNotMatch(salida, new RegExp(CLAVE), 'la clave no sale en el registro');
+});
+
+// Quien entró con la clave compartida antes de las passkeys (cualquier rol) no sigue dentro: la 013 sube
+// la versión de las sesiones de los usuarios que ya había.
+test('la migración 013 cierra las sesiones de antes de las passkeys', async (t) => {
+  let conexion;
+  try {
+    conexion = await mysql.createConnection({ ...BD_PRUEBAS, database: undefined });
+  } catch (err) {
+    if (process.env.IEMEC_EXIGIR_BD === '1') throw err;
+    t.skip(`sin MariaDB (${err.code || err.message})`);
+    return;
+  }
+  const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'iemec-sql-'));
+  try {
+    await conexion.query(`DROP DATABASE IF EXISTS \`${BD_PRUEBAS.database}\``);
+    await conexion.query(`CREATE DATABASE \`${BD_PRUEBAS.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    const todas = listar();
+    const antes = todas.filter((m) => m.nombre < '013');
+    for (const m of antes) fs.writeFileSync(path.join(carpeta, m.nombre), m.sql);
+    await migrar({ bd: BD_PRUEBAS, carpeta, log: () => {} });
+    await conexion.query(`INSERT INTO \`${BD_PRUEBAS.database}\`.usuarios (email, nombre, rol) VALUES ('antes@ejemplo.com', 'De Antes', 'recepcion')`);
+    await migrar({ bd: BD_PRUEBAS, log: () => {} });
+    const [[u]] = await conexion.query(`SELECT sesion_version FROM \`${BD_PRUEBAS.database}\`.usuarios WHERE email = 'antes@ejemplo.com'`);
+    assert.equal(u.sesion_version, 1, 'la cookie de antes (versión 0) ya no cuadra');
+  } finally {
+    fs.rmSync(carpeta, { recursive: true, force: true });
+    await conexion.end();
+  }
 });
 
 test('seguridad del acceso', async (t) => {
@@ -84,8 +118,9 @@ test('seguridad del acceso', async (t) => {
           const s = await c.pedir('/api/sesion');
           assert.deepEqual([s.status, s.json.emergencia], [200, true]);
           const [ev] = await q("SELECT * FROM eventos WHERE tipo = 'acceso_emergencia'");
-          assert.deepEqual([ev.actor, ev.entidad_id, json(ev.datos).ip], ['direccion@ejemplo.com', String(dir.usuario.id), '203.0.113.11']);
-          assert.ok(!JSON.stringify(ev).includes(CLAVE), 'la clave no se guarda');
+          assert.deepEqual([ev.actor, ev.entidad_id], ['direccion@ejemplo.com', String(dir.usuario.id)]);
+          assert.match(json(ev.datos).ip, /^[A-Za-z0-9_-]{32}$/, 'la huella de la IP, no la IP');
+          assert.ok(!JSON.stringify(ev).includes(CLAVE) && !JSON.stringify(ev).includes('203.0.113'), 'ni la clave ni la IP se guardan');
           // Una hora como mucho, aunque se use.
           for (const min of [20, 40, 59]) { reloj.ahora = mas(min); assert.equal((await c.pedir('/api/panel/hoy')).status, 200); }
           reloj.ahora = mas(61);
@@ -107,8 +142,9 @@ test('seguridad del acceso', async (t) => {
             assert.deepEqual([m.status, m.json], [401, { error: 'Correo o clave incorrectos.', codigo: 'CLAVE_INCORRECTA' }], JSON.stringify(cuerpo));
           }
           const fallidos = await q("SELECT actor, entidad_id, datos FROM eventos WHERE tipo = 'acceso_emergencia_fallido' ORDER BY id");
-          assert.deepEqual(fallidos.map((e) => json(e.datos).email), ['recepcion@ejemplo.com', 'nadie@ejemplo.com', 'direccion@ejemplo.com', 'direccion@ejemplo.com']);
-          assert.ok(fallidos.every((e) => e.actor === 'desconocido'));
+          assert.deepEqual(fallidos.map((e) => json(e.datos).motivo), ['rol', 'correo', 'clave', 'clave']);
+          assert.deepEqual(fallidos.map((e) => e.entidad_id), [String(rec.usuario.id), null, String(dir.usuario.id), String(dir.usuario.id)], 'a qué cuenta se intentó entrar');
+          assert.ok(fallidos.every((e) => e.actor === 'desconocido' && !JSON.stringify(e).includes('nadie@')), 'lo que se escribe no se guarda');
           // Dirección desactivada tampoco entra con la clave.
           await pool.query('UPDATE usuarios SET activo = FALSE WHERE id = ?', [dir.usuario.id]);
           assert.equal((await cliente(base, { ip: '203.0.113.30' }).pedir('/api/acceso/emergencia', { metodo: 'POST', cuerpo: { email: 'direccion@ejemplo.com', clave: CLAVE } })).status, 401);
@@ -209,6 +245,19 @@ test('seguridad del acceso', async (t) => {
         assert.ok(claves.every((f) => !f.clave.includes('203.0.113')), 'de la IP solo se guarda una huella');
         reloj.ahora = mas(16);
         assert.equal((await entrar(cliente(base, { ip }), dir.aut)).status, 200, 'pasado el cuarto de hora, vuelve a entrar');
+        // Lo que le pasa a alguien del equipo (un enlace ya usado, una passkey borrada que el navegador aún
+        // ofrece) no cuenta: la clínica entera sale con la misma IP.
+        const oficina = '203.0.113.53';
+        const usado = await acceso.crearUsuario(pool, { email: 'usado@ejemplo.com', nombre: 'Enlace Usado', rol: 'medico', actor: 'pruebas', ahora: reloj.ahora });
+        const autUsado = new Autenticador({ origen: ORIGEN });
+        assert.equal((await darDeAlta(cliente(base, { ip: oficina }), autUsado, tokenDe(usado.enlace))).status, 201);
+        const borrada = new Autenticador({ origen: ORIGEN });
+        borrada.registrar({ challenge: 'z'.repeat(43), rp: { id: 'localhost' }, user: { id: 'w'.repeat(22) } });
+        for (let i = 0; i < 25; i++) {
+          assert.equal((await cliente(base, { ip: oficina }).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: tokenDe(usado.enlace) } })).json.codigo, 'INVITACION_USADA');
+          if (i < 10) assert.equal((await entrar(cliente(base, { ip: oficina }), borrada)).json.codigo, 'CREDENCIAL_DESCONOCIDA');
+        }
+        assert.equal((await entrar(cliente(base, { ip: oficina }), dir.aut)).status, 200, 'la oficina sigue entrando');
         // Retos: sesenta por IP y cuarto de hora.
         const glotona = cliente(base, { ip: '203.0.113.52' });
         for (let i = 0; i < 60; i++) assert.equal((await glotona.pedir('/api/acceso/entrar/opciones', { metodo: 'POST', cuerpo: {} })).status, 200);

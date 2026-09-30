@@ -15,6 +15,10 @@ ALTER TABLE usuarios
   ADD COLUMN IF NOT EXISTS creado_por VARCHAR(160) NULL AFTER creado_en,
   ADD UNIQUE KEY IF NOT EXISTS usuario_webauthn (id_webauthn);
 
+-- Las sesiones abiertas antes de las passkeys (con la clave compartida, fuera cual fuera el rol) dejan
+-- de valer: cada persona vuelve a entrar con su passkey o, dirección, con la clave de emergencia.
+UPDATE usuarios SET sesion_version = sesion_version + 1;
+
 -- Las passkeys de cada persona. La clave privada nunca sale de su dispositivo: aquí solo está la
 -- pública (COSE) y el contador de firmas, que tiene que avanzar (si no, puede ser una copia).
 CREATE TABLE IF NOT EXISTS passkeys (

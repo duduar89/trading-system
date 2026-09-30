@@ -166,6 +166,12 @@ test('passkeys del personal', async (t) => {
         assert.equal((await eventos('passkey_contador_no_avanza')).length, 2);
         assert.equal(c.cookie, null);
         assert.equal((await entrar(c, dir.aut, { contador: antes.contador + 5 })).status, 200, 'si avanza, entra');
+        // La passkey y su copia a la vez, con el mismo contador (y cada una con su reto): solo entra una.
+        const [ahora] = await q('SELECT contador FROM passkeys WHERE id = ?', [antes.id]);
+        const [o1, o2] = [await c.pedir('/api/acceso/entrar/opciones', { metodo: 'POST', cuerpo: {} }), await c.pedir('/api/acceso/entrar/opciones', { metodo: 'POST', cuerpo: {} })];
+        const [r1, r2] = [dir.aut.firmar(o1.json, { contador: ahora.contador + 1 }), dir.aut.firmar(o2.json, { contador: ahora.contador + 1 })];
+        const dos = await Promise.all([r1, r2].map((respuesta) => cliente(base).pedir('/api/acceso/entrar', { metodo: 'POST', cuerpo: { respuesta } })));
+        assert.deepEqual(dos.map((r) => r.json.codigo || r.status).sort(), [200, 'CONTADOR']);
       });
 
       await t.test('las passkeys sincronizadas (contador siempre 0) entran siempre', async () => {

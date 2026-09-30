@@ -143,6 +143,24 @@ test('passkeys de punta a punta en Chromium', { timeout: 180000 }, async (t) => 
       await r.getByRole('alert').filter({ hasText: 'Tu acceso al panel está desactivado' }).waitFor();
     });
 
+    await t.test('administración gestiona el equipo, pero a dirección no la toca', async () => {
+      const alta2 = await acceso.crearUsuario(pool, { email: 'admin@ejemplo.com', nombre: 'Admin Prueba', rol: 'admin', actor: 'pruebas' });
+      const adm = await contextoConAutenticador(navegador);
+      const a = adm.pagina;
+      await a.goto(alta2.enlace);
+      await a.getByRole('button', { name: 'Crear mi passkey' }).click();
+      await enlaceDeLaSeccion(a, 'Equipo').click();
+      const direccion = a.getByRole('listitem').filter({ hasText: 'direccion@ejemplo.com' });
+      await direccion.getByText('A las personas de dirección solo las gestiona dirección.').waitFor();
+      assert.equal(await direccion.getByRole('button').count(), 0, 'sin botones sobre dirección');
+      assert.equal(await direccion.getByLabel('Rol de Dirección Prueba').isDisabled(), true);
+      const opciones = await a.getByLabel('Rol', { exact: true }).locator('option').allTextContents();
+      assert.ok(!opciones.includes('Dirección') && opciones.includes('Recepción'), 'no puede dar el rol de dirección');
+      const recepcion = a.getByRole('listitem').filter({ hasText: 'recepcion@ejemplo.com' });
+      await recepcion.getByRole('button', { name: 'Reactivar' }).waitFor();
+      await adm.contexto.close();
+    });
+
     await dir.contexto.close();
     await rec.contexto.close();
   } finally {

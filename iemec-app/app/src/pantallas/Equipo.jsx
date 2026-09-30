@@ -5,7 +5,7 @@ import { IconoPasskey } from '../componentes/Acceso.jsx';
 import { useSesion, usePuede } from '../sesion.js';
 import { anadirPasskey, hayPasskeys, nombreDeEsteDispositivo } from '../passkeys.js';
 
-const ROLES = [['direccion', 'Dirección'], ['recepcion', 'Recepción'], ['medico', 'Médico'], ['estetica', 'Estética'], ['marketing', 'Marketing'], ['admin', 'Administración']];
+const mayuscula = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const campo = 'w-full rounded-full border border-[var(--borde)] bg-transparent px-4 py-2 text-sm';
 const suave = { color: 'var(--texto-suave)' };
 // Si la persona se cambia a sí misma (el rol), el panel vuelve a leer su sesión y sus permisos.
@@ -118,8 +118,11 @@ function ElEquipo() {
   const { datos, error, recargar } = useDatos('/panel/equipo');
   const [enlace, setEnlace] = useState(null);
   const [fallo, setFallo] = useState('');
+  // Administración gestiona el equipo, pero a quien es de dirección (y ese rol) solo lo toca dirección.
+  const deDireccion = useSesion()?.rol === 'direccion';
   if (error) return <Error texto={error} />;
   if (!datos) return null;
+  const asignables = deDireccion ? datos.roles : datos.roles.filter((r) => r.id !== 'direccion');
   // Cada acción: el error, si lo hay, arriba; y la lista, siempre recargada (un rol que no se pudo
   // cambiar vuelve a su sitio).
   const hacer = async (fn) => {
@@ -130,21 +133,22 @@ function ElEquipo() {
     <>
     <section aria-labelledby="equipo-titulo" className="min-w-0 space-y-4 xl:col-start-1 xl:row-start-1">
       <h2 id="equipo-titulo" className="sr-only">Personas del equipo</h2>
-      <AltaPersona alCrear={(r) => { setEnlace({ para: r.usuario.nombre, enlace: r.enlace, caduca: r.caduca }); recargar(); }} />
+      <AltaPersona roles={asignables} alCrear={(r) => { setEnlace({ para: r.usuario.nombre, enlace: r.enlace, caduca: r.caduca }); recargar(); }} />
       {enlace && <EnlaceNuevo {...enlace} alCerrar={() => setEnlace(null)} />}
       {fallo && <Error texto={fallo} />}
       <ul className="space-y-3">
         {datos.usuarios.map((u) => (
-          <Persona key={u.id} u={u} yo={datos.yo} hacer={hacer} alEnlace={(r) => setEnlace({ para: u.nombre, enlace: r.enlace, caduca: r.caduca })} />
+          <Persona key={u.id} u={u} yo={datos.yo} roles={deDireccion || u.rol === 'direccion' ? datos.roles : asignables} tocable={deDireccion || u.rol !== 'direccion'}
+            hacer={hacer} alEnlace={(r) => setEnlace({ para: u.nombre, enlace: r.enlace, caduca: r.caduca })} />
         ))}
       </ul>
     </section>
-    <QuePuedeCadaRol permisos={datos.permisos} />
+    <QuePuedeCadaRol roles={datos.roles} permisos={datos.permisos} />
     </>
   );
 }
 
-function AltaPersona({ alCrear }) {
+function AltaPersona({ roles, alCrear }) {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [rol, setRol] = useState('recepcion');
@@ -176,7 +180,7 @@ function AltaPersona({ alCrear }) {
         <div>
           <label htmlFor="alta-rol" className="etiqueta">Rol</label>
           <select id="alta-rol" value={rol} onChange={(e) => setRol(e.target.value)} className={`${campo} mt-1 bg-[var(--superficie)]`}>
-            {ROLES.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+            {roles.map((r) => <option key={r.id} value={r.id}>{mayuscula(r.nombre)}</option>)}
           </select>
         </div>
         <div className="sm:justify-self-start"><Boton type="submit" variante="lleno" disabled={ocupado}>Crear enlace</Boton></div>
@@ -214,7 +218,7 @@ function EnlaceNuevo({ para, enlace, caduca, alCerrar }) {
   );
 }
 
-function Persona({ u, yo, hacer, alEnlace }) {
+function Persona({ u, yo, roles, tocable, hacer, alEnlace }) {
   const soyYo = u.id === yo;
   const [texto, clase] = !u.activo ? ['Desactivada', 'bg-[var(--superficie-2)] text-[var(--texto-suave)]']
     : u.invitacionHasta ? [`Enlace pendiente hasta ${fechaHora(u.invitacionHasta)}`, 'bg-oro/20 text-[#7a5a1f] dark:text-champan']
@@ -251,9 +255,9 @@ function Persona({ u, yo, hacer, alEnlace }) {
         </div>
         <div>
           <label htmlFor={`rol-${u.id}`} className="sr-only">Rol de {u.nombre}</label>
-          <select id={`rol-${u.id}`} value={u.rol} disabled={!u.activo} onChange={(e) => cambiar({ rol: e.target.value })}
+          <select id={`rol-${u.id}`} value={u.rol} disabled={!u.activo || !tocable} onChange={(e) => cambiar({ rol: e.target.value })}
             className="rounded-full border border-[var(--borde)] bg-[var(--superficie)] px-3 py-1.5 text-sm disabled:opacity-50">
-            {ROLES.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+            {roles.map((r) => <option key={r.id} value={r.id}>{mayuscula(r.nombre)}</option>)}
           </select>
         </div>
       </div>
@@ -266,23 +270,27 @@ function Persona({ u, yo, hacer, alEnlace }) {
                 <span className="break-words">{p.dispositivo}</span>
                 <span className="text-xs" style={suave}>· {p.ultimoUso ? `usada ${fechaHora(p.ultimoUso)}` : 'sin usar'}</span>
               </span>
-              <button type="button" onClick={() => borrar(p)} aria-label={`Borrar la passkey ${p.dispositivo} de ${u.nombre}`}
-                className="rounded-full px-2 py-0.5 text-xs underline underline-offset-2 hover:text-rosa cursor-pointer">Borrar</button>
+              {tocable && (
+                <button type="button" onClick={() => borrar(p)} aria-label={`Borrar la passkey ${p.dispositivo} de ${u.nombre}`}
+                  className="rounded-full px-2 py-0.5 text-xs underline underline-offset-2 hover:text-rosa cursor-pointer">Borrar</button>
+              )}
             </li>
           ))}
         </ul>
       )}
-      <div className="mt-4 flex flex-wrap gap-2">
-        {u.activo && <Boton onClick={enlaceNuevo}>{u.passkeys.length ? 'Enlace para otra passkey' : 'Enlace nuevo'}</Boton>}
-        {u.activo && !soyYo && <Boton onClick={() => hacer(() => api(`/panel/equipo/${u.id}/cerrar-sesiones`, { metodo: 'POST' }))}>Cerrar sus sesiones</Boton>}
-        {!soyYo && <Boton onClick={desactivar}>{u.activo ? 'Desactivar' : 'Reactivar'}</Boton>}
-      </div>
+      {tocable ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {u.activo && <Boton onClick={enlaceNuevo}>{u.passkeys.length ? 'Enlace para otra passkey' : 'Enlace nuevo'}</Boton>}
+          {u.activo && !soyYo && <Boton onClick={() => hacer(() => api(`/panel/equipo/${u.id}/cerrar-sesiones`, { metodo: 'POST' }))}>Cerrar sus sesiones</Boton>}
+          {!soyYo && <Boton onClick={desactivar}>{u.activo ? 'Desactivar' : 'Reactivar'}</Boton>}
+        </div>
+      ) : <p className="mt-3 text-xs" style={suave}>A las personas de dirección solo las gestiona dirección.</p>}
     </li>
   );
 }
 
 // La tabla de permisos del servidor (servidor/permisos.js), para verla de un vistazo.
-function QuePuedeCadaRol({ permisos = [] }) {
+function QuePuedeCadaRol({ roles, permisos }) {
   return (
     <details className="tarjeta p-5 xl:col-span-2">
       <summary className="cursor-pointer font-medium">Qué puede hacer cada rol</summary>
@@ -291,16 +299,16 @@ function QuePuedeCadaRol({ permisos = [] }) {
           <thead>
             <tr className="border-b border-[var(--borde)]">
               <th scope="col" className="w-2/5 py-2 pr-3 text-left etiqueta">Permiso</th>
-              {ROLES.map(([v, n]) => <th key={v} scope="col" className="px-2 py-2 text-center etiqueta">{n}</th>)}
+              {roles.map((r) => <th key={r.id} scope="col" className="px-2 py-2 text-center etiqueta">{r.nombre}</th>)}
             </tr>
           </thead>
           <tbody>
             {permisos.map((p) => (
               <tr key={p.id} className="border-b border-[var(--borde)] last:border-0">
                 <th scope="row" className="py-2 pr-3 text-left font-normal first-letter:uppercase">{p.que}</th>
-                {ROLES.map(([v, n]) => (
-                  <td key={v} className="px-2 py-2 text-center">
-                    {p.roles.includes(v) ? <span className="text-oro" role="img" aria-label={`${n}: sí`}>●</span> : <span className="opacity-30" role="img" aria-label={`${n}: no`}>·</span>}
+                {roles.map((r) => (
+                  <td key={r.id} className="px-2 py-2 text-center">
+                    {p.roles.includes(r.id) ? <span className="text-oro" role="img" aria-label={`${r.nombre}: sí`}>●</span> : <span className="opacity-30" role="img" aria-label={`${r.nombre}: no`}>·</span>}
                   </td>
                 ))}
               </tr>

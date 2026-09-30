@@ -1,12 +1,13 @@
 'use strict';
 // Equipo y accesos, dentro del panel (con sesión):
 //   /api/panel/equipo…   dar de alta, cambiar el rol, desactivar, enlace nuevo, cerrar sesiones y borrar
-//                        passkeys de cualquiera: solo quien puede gestionar el equipo (dirección, admin).
+//                        passkeys de cualquiera: solo quien puede gestionar el equipo (dirección, admin; a
+//                        quien es de dirección, solo dirección).
 //   /api/panel/passkeys… las passkeys propias: verlas, añadir la de este aparato y borrar una perdida.
 //   /api/panel/sesiones/cerrar-otras   cierra las sesiones de los demás aparatos (esta sigue).
 const express = require('express');
 const acceso = require('../acceso');
-const { exige, PERMISOS } = require('../permisos');
+const { exige, PERMISOS, ROLES, NOMBRE_ROL } = require('../permisos');
 const { emitir, cerrarCookie } = require('../sesion');
 const { contar } = require('../seguridad');
 const { errores } = require('./acceso');
@@ -19,6 +20,7 @@ function rutasEquipo({ pool }) {
   const p = () => (typeof pool === 'function' ? pool() : pool);
   const ahoraDe = (req) => req.ahora || new Date();
   const actor = (req) => req.usuario?.email || 'panel';
+  const actorRol = (req) => req.usuario?.rol;
   const gestionar = exige('usuarios.gestionar');
   // Lo propio necesita un usuario de verdad (el de la demostración no tiene passkeys).
   const conUsuario = (req, res, next) => (req.usuario?.id ? next()
@@ -27,10 +29,11 @@ function rutasEquipo({ pool }) {
   const seguirDentro = (req, res, u) => emitir(res, u, { inicio: req.usuario.inicio ?? ahoraDe(req).getTime(), passkeyId: req.usuario.passkeyId, emergencia: req.usuario.emergencia, ahora: ahoraDe(req) });
 
   // ── El equipo ─────────────────────────────────────────────────────────────────────────────
-  // Con la tabla de permisos, para que se vea qué puede hacer cada rol.
+  // Con los roles y la tabla de permisos, para que se vea qué puede hacer cada rol.
   r.get('/equipo', gestionar, envolver(async (req, res) => {
     res.json({
       usuarios: await acceso.equipo(p(), { ahora: ahoraDe(req) }), yo: req.usuario.id ?? null,
+      roles: ROLES.map((id) => ({ id, nombre: NOMBRE_ROL[id] })),
       permisos: Object.entries(PERMISOS).map(([id, { roles, que }]) => ({ id, roles, que })),
     });
   }));
@@ -38,7 +41,7 @@ function rutasEquipo({ pool }) {
   // Cuerpo: { email, nombre, rol }. Devuelve el enlace de alta: solo se ve esta vez.
   r.post('/equipo', gestionar, envolver(async (req, res) => {
     const { email, nombre, rol } = req.body || {};
-    res.status(201).json(await acceso.crearUsuario(p(), { email, nombre, rol, actor: actor(req), ahora: ahoraDe(req) }));
+    res.status(201).json(await acceso.crearUsuario(p(), { email, nombre, rol, actor: actor(req), actorRol: actorRol(req), ahora: ahoraDe(req) }));
   }));
 
   // Cuerpo: { rol } y/o { activo }.
@@ -46,19 +49,21 @@ function rutasEquipo({ pool }) {
     const id = idDe(req.params.id);
     if (!id) return res.status(404).json({ error: 'No existe esa persona en el equipo', codigo: 'USUARIO_DESCONOCIDO' });
     const { rol, activo } = req.body || {};
-    res.json(await acceso.cambiarUsuario(p(), { id, rol, activo: activo === undefined ? undefined : Boolean(activo), actor: actor(req), actorId: req.usuario.id, ahora: ahoraDe(req) }));
+    res.json(await acceso.cambiarUsuario(p(), {
+      id, rol, activo: activo === undefined ? undefined : Boolean(activo), actor: actor(req), actorId: req.usuario.id, actorRol: actorRol(req), ahora: ahoraDe(req),
+    }));
   }));
 
   r.post('/equipo/:id/invitacion', gestionar, envolver(async (req, res) => {
     const id = idDe(req.params.id);
     if (!id) return res.status(404).json({ error: 'No existe esa persona en el equipo', codigo: 'USUARIO_DESCONOCIDO' });
-    res.status(201).json(await acceso.invitar(p(), { usuarioId: id, actor: actor(req), ahora: ahoraDe(req) }));
+    res.status(201).json(await acceso.invitar(p(), { usuarioId: id, actor: actor(req), actorRol: actorRol(req), ahora: ahoraDe(req) }));
   }));
 
   r.post('/equipo/:id/cerrar-sesiones', gestionar, envolver(async (req, res) => {
     const id = idDe(req.params.id);
     if (!id) return res.status(404).json({ error: 'No existe esa persona en el equipo', codigo: 'USUARIO_DESCONOCIDO' });
-    const u = await acceso.cerrarSesiones(p(), { id, actor: actor(req) });
+    const u = await acceso.cerrarSesiones(p(), { id, actor: actor(req), actorRol: actorRol(req) });
     if (id === req.usuario.id) seguirDentro(req, res, u);
     res.json({ ok: true });
   }));
@@ -67,7 +72,7 @@ function rutasEquipo({ pool }) {
   r.delete('/equipo/:id/passkeys/:pk', gestionar, envolver(async (req, res) => {
     const [id, pk] = [idDe(req.params.id), idDe(req.params.pk)];
     if (!id || !pk) return res.status(404).json({ error: 'No existe esa passkey', codigo: 'PASSKEY_DESCONOCIDA' });
-    await acceso.borrarPasskey(p(), { id: pk, usuarioId: id, actor: actor(req) });
+    await acceso.borrarPasskey(p(), { id: pk, usuarioId: id, actor: actor(req), actorRol: actorRol(req) });
     const cerrada = pk === req.usuario.passkeyId;
     if (cerrada) cerrarCookie(res);
     res.json({ ok: true, sesionCerrada: cerrada });

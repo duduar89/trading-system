@@ -3,8 +3,6 @@ import { api, fechaHora } from '../api.js';
 import { crearPasskeyConEnlace, motivoSinPasskeys, nombreDeEsteDispositivo } from '../passkeys.js';
 import { Marco, IconoPasskey } from '../componentes/Acceso.jsx';
 
-const ROL = { direccion: 'dirección', recepcion: 'recepción', medico: 'médico', estetica: 'estética', marketing: 'marketing', admin: 'administración' };
-
 // Lo que ve quien abre el enlace de alta (#alta/<token>): quién es, el nombre del dispositivo y el botón
 // para crear su passkey. Al crearla ya está dentro.
 export default function Alta({ token, alEntrar, alSalir }) {
@@ -35,7 +33,7 @@ export default function Alta({ token, alEntrar, alSalir }) {
       {invitacion ? (
         <form onSubmit={crear}>
           <p className="mt-6 text-center text-sm leading-relaxed text-white/75">
-            Te han dado de alta en el panel de IEMEC con el rol de {ROL[invitacion.rol] || invitacion.rol}. Crea tu passkey: entrarás con la huella, la cara o el PIN de este dispositivo, sin contraseñas.
+            Te han dado de alta en el panel de IEMEC con el rol de {invitacion.rolNombre || invitacion.rol}. Crea tu passkey: entrarás con la huella, la cara o el PIN de este dispositivo, sin contraseñas.
           </p>
           <p className="mt-3 text-center text-xs text-white/65">{invitacion.email}</p>
           <label className="mt-6 block text-xs uppercase tracking-[.16em] text-white/60" htmlFor="dispositivo">Nombre de este dispositivo</label>
