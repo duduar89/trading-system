@@ -1,11 +1,18 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { api } from '../api.js';
 
-// Carga datos de la API y los refresca cada cierto tiempo (el panel de cabinas, cada 15 s).
+// Carga datos de la API y los refresca cada cierto tiempo (el panel de cabinas, cada 15 s). Solo
+// vale la respuesta de la última petición: una más vieja que llegue tarde no pisa lo nuevo.
 export function useDatos(ruta, { cadaMs = 0 } = {}) {
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState(null);
-  const cargar = useCallback(() => api(ruta).then((d) => { setDatos(d); setError(null); }).catch((e) => setError(e.message)), [ruta]);
+  const ultima = useRef(0);
+  const cargar = useCallback(() => {
+    const n = ++ultima.current;
+    return api(ruta)
+      .then((d) => { if (n === ultima.current) { setDatos(d); setError(null); } })
+      .catch((e) => { if (n === ultima.current) setError(e.message); });
+  }, [ruta]);
   useEffect(() => {
     cargar();
     if (!cadaMs) return undefined;

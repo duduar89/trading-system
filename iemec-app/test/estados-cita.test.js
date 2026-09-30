@@ -100,6 +100,8 @@ test('recepción marca qué pasa con cada cita y eso mueve el resto de la app', 
     await t.test('«Completada»: reseña 2 h después del fin, pasa a cliente, su lead a «asistio» y entra en «toca repetir»', async () => {
       const p = await paciente(pool, { nombre: 'Clara' });
       const [l] = await pool.query("INSERT INTO leads (paciente_id, telefono, nombre, origen, tratamiento_interes_id, etapa) VALUES (?, ?, 'Clara Ejemplo', 'meta_formulario', 'hidratacion-facial', 'conversando')", [p.id, p.telefono]);
+      // Otra consulta suya, por otro tratamiento: esa sigue abierta.
+      const [otro] = await pool.query("INSERT INTO leads (paciente_id, telefono, nombre, origen, tratamiento_interes_id, etapa) VALUES (?, ?, 'Clara Ejemplo', 'web_whatsapp', 'limpieza-facial', 'nuevo')", [p.id, p.telefono]);
       const c = await citaDe(pool, p.id, 'hidratacion-facial', '2026-10-06', '13:00', { leadId: l.insertId });
       Object.assign(clara, { ...p, citaId: c.id, leadId: l.insertId });
       await rechaza(estados.marcar(pool, { id: c.id, estado: 'completada', ahora: en('2026-10-06', '12:59') }), 'FUERA_DE_HORA');
@@ -115,6 +117,8 @@ test('recepción marca qué pasa con cada cita y eso mueve el resto de la app', 
       assert.equal(pac.es_cliente, 1);
       const [[lead]] = await pool.query('SELECT etapa FROM leads WHERE id = ?', [l.insertId]);
       assert.equal(lead.etapa, 'asistio');
+      const [[otraConsulta]] = await pool.query('SELECT etapa FROM leads WHERE id = ?', [otro.insertId]);
+      assert.equal(otraConsulta.etapa, 'nuevo', 'la consulta por otro tratamiento no se da por atendida');
       // Toca repetir: 6-oct + 120 días = miércoles 3-feb-2027; se le avisa 12 días antes, el viernes 22-ene.
       const [[ins]] = await pool.query("SELECT * FROM inscripciones WHERE cita_id = ? AND secuencia = 'toca_repetir'", [c.id]);
       assert.deepEqual([ins.estado, ins.paciente_id, madrid(ins.siguiente_en)], ['activa', p.id, '2027-01-22 11:30']);
@@ -168,6 +172,37 @@ test('recepción marca qué pasa con cada cita y eso mueve el resto de la app', 
       const vieja = await citaDe(pool, p.id, 'limpieza-facial', '2026-10-02', '12:00');
       const rv = await estados.marcar(pool, { id: vieja.id, estado: 'completada', ahora: en('2026-10-07', '17:40') });
       assert.deepEqual([rv.efectos.resena.estado, rv.efectos.resena.motivo], ['omitida', 'la cita se marcó como completada días después']);
+    });
+
+    await t.test('marcada tarde, «toca repetir» tampoco sale mientras se puede deshacer', async () => {
+      const p = await paciente(pool, { nombre: 'Noelia' });
+      const c = await citaDe(pool, p.id, 'hidratacion-facial', '2026-05-05', '11:00', { ahora: new Date('2026-05-01T08:00:00Z') });
+      // 5-may + 120 días − 12 = 21-ago: ya pasó. El aviso sale cuando acaba el rato para deshacer.
+      const r = await estados.marcar(pool, { id: c.id, estado: 'completada', ahora: en('2026-10-07', '17:45') });
+      assert.equal(madrid(r.efectos.tocaRepetir.primerMensaje), '2026-10-07 18:15');
+      await R.avanzarSecuencias(deps, { ahora: en('2026-10-07', '17:46') }); // el cron del minuto siguiente
+      assert.deepEqual(alTelefono(whatsapp, p.telefono), [], 'mientras se puede deshacer, no sale');
+      await estados.deshacer(pool, { id: c.id, ahora: en('2026-10-07', '17:50') });
+      await R.avanzarSecuencias(deps, { ahora: en('2026-10-07', '18:16') });
+      assert.deepEqual(alTelefono(whatsapp, p.telefono), [], 'deshecho a tiempo: no le llega nada');
+    });
+
+    await t.test('deshacer devuelve el lead aunque viniera a otra cita antes de ser lead (y sigue siendo cliente)', async () => {
+      const p = await paciente(pool, { nombre: 'Julia' });
+      await pool.query('UPDATE pacientes SET es_cliente = TRUE WHERE id = ?', [p.id]);
+      await pool.query(`INSERT INTO citas (paciente_id, tratamiento_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token)
+        VALUES (?, 'limpieza-facial', '2026-03-03 10:00', '2026-03-03 11:00', '2026-03-03 10:00', '2026-03-03 11:10', '2026-03-03 10:00', '2026-03-03 11:00', 'completada', REPEAT('j', 43))`, [p.id]);
+      const [l] = await pool.query("INSERT INTO leads (paciente_id, telefono, nombre, origen, tratamiento_interes_id, etapa, creado_en) VALUES (?, ?, 'Julia Ejemplo', 'meta_formulario', 'hidratacion-facial', 'conversando', '2026-09-01 10:00')", [p.id, p.telefono]);
+      const c = await citaDe(pool, p.id, 'hidratacion-facial', '2026-10-09', '16:00');
+      const r = await estados.marcar(pool, { id: c.id, estado: 'completada', ahora: en('2026-10-09', '17:05') });
+      assert.equal(r.efectos.esCliente, undefined, 'ya era cliente');
+      assert.deepEqual(r.efectos.leads, [{ id: l.insertId, etapa: 'conversando' }]);
+      const d = await estados.deshacer(pool, { id: c.id, ahora: en('2026-10-09', '17:10') });
+      assert.equal(d.anulado.leads, 1);
+      const [[lead]] = await pool.query('SELECT etapa FROM leads WHERE id = ?', [l.insertId]);
+      assert.equal(lead.etapa, 'conversando');
+      const [[pac]] = await pool.query('SELECT es_cliente FROM pacientes WHERE id = ?', [p.id]);
+      assert.equal(pac.es_cliente, 1);
     });
 
     await t.test('si ya tiene otra cita de ese tratamiento, no entra en «toca repetir»', async () => {
@@ -226,16 +261,25 @@ test('recepción marca qué pasa con cada cita y eso mueve el resto de la app', 
       const p2 = await paciente(pool, { nombre: 'Rocío', consentimiento: true });
       const c2 = await citaDe(pool, p2.id, 'botox-expres', '2026-10-09', '13:00');
       await estados.marcar(pool, { id: c2.id, estado: 'no_presentada', ahora: en('2026-10-09', '13:20') });
+      // Una «cancelación» sin cita (solo con su lead): su conversación no toma el id del lead por una cita.
+      const [soloLead] = await pool.query("INSERT INTO leads (telefono, nombre, origen) VALUES ('+34611009999', 'Vera Ejemplo', 'telefono')");
+      await R.inscribir(pool, { secuencia: 'cancelacion', leadId: soloLead.insertId, inicio: en('2026-10-09', '10:00') });
 
       const hechos = await R.avanzarSecuencias(deps, { ahora: en('2026-10-13', '11:01') });
+      const [[convLead]] = await pool.query("SELECT contexto, contexto_id FROM conversaciones WHERE telefono = '+34611009999'");
+      assert.deepEqual({ ...convLead }, { contexto: 'cancelacion', contexto_id: null });
       const [m] = alTelefono(whatsapp, p.telefono);
       assert.equal(m.nombre, 'iemec_cancelacion_nuevo_hueco');
       assert.deepEqual(m.variables, ['Sara', 'medicina estética facial']);
       assert.ok(!JSON.stringify(m).toLowerCase().includes('toxina'));
+      const [[conv]] = await pool.query('SELECT contexto, contexto_id FROM conversaciones WHERE telefono = ?', [p.telefono]);
+      assert.deepEqual({ ...conv }, { contexto: 'cancelacion', contexto_id: c.id });
       assert.deepEqual(alTelefono(whatsapp, p2.telefono), [], 'el mal clasificado no sale');
       assert.ok(hechos.some((x) => x.bloqueado === 'filtro legal'));
-      const [[tarea]] = await pool.query("SELECT titulo FROM tareas WHERE paciente_id = ? AND tipo = 'revisar_ia'", [p2.id]);
+      // Lo escribe una persona desde su conversación.
+      const [[tarea]] = await pool.query("SELECT t.titulo, c.estado FROM tareas t JOIN conversaciones c ON c.id = t.conversacion_id WHERE t.paciente_id = ? AND t.tipo = 'revisar_ia'", [p2.id]);
       assert.match(tarea.titulo, /no pasa el filtro de publicidad sanitaria/);
+      assert.equal(tarea.estado, 'espera_persona');
     });
 
     await t.test('lo que no vale no cambia nada: cancelada, retenida, desconocida', async () => {

@@ -799,7 +799,9 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
     let conv;
     try {
       await con3.beginTransaction();
-      conv = await conversacionPara(con3, { telefono, pacienteId: ins.paciente_id, leadId: ins.lead_id, contexto: contextoDe(ins.secuencia), contextoId: ins.presupuesto_id || ins.cita_id || ins.lead_id });
+      // En «cancelación» y «toca repetir», contexto_id es siempre la cita (o nada): nunca un lead.
+      const contextoId = ['cancelacion', 'toca_repetir'].includes(ins.secuencia) ? ins.cita_id : ins.presupuesto_id || ins.cita_id || ins.lead_id;
+      conv = await conversacionPara(con3, { telefono, pacienteId: ins.paciente_id, leadId: ins.lead_id, contexto: contextoDe(ins.secuencia), contextoId });
       await con3.commit();
     } finally {
       con3.release();
@@ -807,10 +809,12 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
     const nombre = await nombreDe(pool, ins);
     const variables = [nombre, await nombreTratamiento(pool, conv)].slice(0, (p.cuerpo.match(/\{\{\d+\}\}/g) || []).length);
     // Última red: un mensaje comercial no sale si, ya relleno, no pasa el filtro de publicidad
-    // sanitaria (la baja ya se comprobó al aprobar la plantilla; aquí cuenta lo que ponen las variables).
+    // sanitaria (la baja ya se comprobó al aprobar la plantilla; aquí cuenta lo que ponen las
+    // variables). Lo escribe una persona desde su conversación.
     if (comercial && !revisar(rellenar(p, variables), { tipo: 'marketing', tieneBaja: true }).ok) {
-      await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, vence_en) VALUES ('revisar_ia', ?, ?, ?)",
-        [`El mensaje «${paso.uso}» no pasa el filtro de publicidad sanitaria: escribir a mano`, ins.paciente_id, new Date(ahora.getTime() + 3600000)]);
+      await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, conversacion_id, vence_en) VALUES ('revisar_ia', ?, ?, ?, ?)",
+        [`El mensaje «${paso.uso}» no pasa el filtro de publicidad sanitaria: escribir a mano`, ins.paciente_id, conv.id, new Date(ahora.getTime() + 3600000)]);
+      await pool.query("UPDATE conversaciones SET estado = 'espera_persona' WHERE id = ?", [conv.id]);
       await avanzar({ bloqueado: 'filtro legal' });
       continue;
     }

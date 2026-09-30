@@ -8,7 +8,8 @@ const TONOS = {
   perdida_peso: '#8fb8a8', ginecoestetica: '#b7a1c9', sexualidad_masculina: '#6f7fa8', cirugia_estetica: '#1d5b58', estetica_avanzada: '#e3c9a8',
 };
 
-// Lo que recepción marca de cada cita. Qué botones tocan lo dice el servidor (según estado y hora).
+// Cómo se llama cada estado en las tarjetas (el detalle ya trae sus etiquetas del servidor, y qué
+// botones tocan según el estado y la hora también lo dice el servidor).
 const ESTADO_CITA = {
   retenida: 'Hueco retenido', confirmada: 'Confirmada', llegada: 'Ha llegado', en_curso: 'En cabina',
   completada: 'Completada', no_presentada: 'No vino',
@@ -207,7 +208,7 @@ function resumen(r) {
   if (r.anulado) {
     const a = r.anulado;
     return [
-      `Deshecho: la cita vuelve a «${ESTADO_CITA[r.estado] || r.estado}».`,
+      `Deshecho: la cita vuelve a «${r.etiqueta}».`,
       a.resena?.anuladas ? 'La petición de reseña queda anulada.' : '',
       a.resena?.yaEnviada ? 'La petición de reseña ya había salido.' : '',
       a.secuencia === 'toca_repetir' ? 'Ya no se le avisará para repetir.' : '',
@@ -216,7 +217,7 @@ function resumen(r) {
   }
   const e = r.efectos || {};
   return [
-    `Marcada como «${ESTADO_CITA[r.estado] || r.estado}».`,
+    `Marcada como «${r.etiqueta}».`,
     e.resena?.estado === 'programada' ? `Le pediremos su opinión ${cuando(e.resena.cuando)}.` : '',
     e.resena?.estado === 'omitida' ? `No se le pide reseña: ${e.resena.motivo}.` : '',
     e.resena?.error ? `No se pudo programar la reseña: ${e.resena.error}.` : '',
@@ -303,7 +304,7 @@ function DetalleCita({ id, alCerrar, alCambiar }) {
             <dt style={suave}>Estado</dt>
             <dd className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${PASTILLA[d.estado] || ''}`}>
-                <MarcaEstado estado={d.estado} />{ESTADO_CITA[d.estado] || d.estado}
+                <MarcaEstado estado={d.estado} />{d.etiqueta}
               </span>
               <span className="text-xs" style={suave}>{detalleEstado(d)}</span>
             </dd>

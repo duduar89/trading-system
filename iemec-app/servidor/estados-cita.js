@@ -2,15 +2,16 @@
 // Lo que recepción marca de cada cita desde el panel y lo que eso mueve en el resto de la app:
 //
 //   ha llegado   se anota la hora
-//   completada   petición de reseña 2 h después del fin (en horario de envío y nunca mientras aún
-//                se pueda deshacer); el paciente pasa a cliente y su lead a «asistio»; y si el
-//                tratamiento se repite cada cierto tiempo, entra en «toca repetir» para esa fecha
-//                (salvo que ya tenga otra cita de ese tratamiento)
-//   no vino      entra en la secuencia para recuperar la cita (salvo que ya tenga otra cita)
+//   completada   petición de reseña 2 h después del fin (en horario de envío); el paciente pasa a
+//                cliente y su lead a «asistio»; y si el tratamiento se repite cada cierto tiempo,
+//                entra en «toca repetir» para esa fecha menos un margen (salvo que ya tenga otra
+//                cita de ese tratamiento después de esta)
+//   no vino      entra en la secuencia para recuperar la cita (salvo que ya tenga otra después)
 //   deshacer     vuelve al estado anterior y anula lo que se había programado
 //
-// Todo va en la misma transacción que el cambio de estado (servidor/agenda.js → cambiarEstado), y
-// lo que se movió queda en el evento de la cita: con eso se deshace.
+// Nada de lo programado sale mientras aún se puede deshacer. Todo va en la misma transacción que
+// el cambio de estado (servidor/agenda.js → cambiarEstado), y lo que se movió queda en el evento
+// de la cita: con eso se deshace.
 const T = require('../motor/tiempo');
 const E = require('../motor/agenda/estados');
 const agenda = require('./agenda');
@@ -51,15 +52,19 @@ async function sinRomper(fn) {
   }
 }
 
-// ¿Tiene otra cita en pie más adelante (de ese tratamiento, si se pide)?
-async function otraCitaFutura(con, cita, ahora, { mismoTratamiento = false } = {}) {
+// ¿Tiene otra cita después de esta (de ese tratamiento, si se pide), en pie o ya hecha? Así, si
+// recepción marca tarde una cita vieja, tampoco se le escribe por algo que ya está resuelto.
+async function otraCitaDespues(con, cita, ahora, { mismoTratamiento = false } = {}) {
   const [[otra]] = await con.query(
     `SELECT id FROM citas WHERE paciente_id = ? AND id <> ? AND inicio > ?
-        AND (estado IN ('confirmada','llegada','en_curso') OR (estado = 'retenida' AND retenida_hasta > ?))
+        AND (estado IN ('confirmada','llegada','en_curso','completada') OR (estado = 'retenida' AND retenida_hasta > ?))
         ${mismoTratamiento ? 'AND tratamiento_id = ?' : ''} LIMIT 1`,
-    [cita.paciente_id, cita.id, ahora, ahora, ...(mismoTratamiento ? [cita.tratamiento_id] : [])]);
+    [cita.paciente_id, cita.id, cita.inicio, ahora, ...(mismoTratamiento ? [cita.tratamiento_id] : [])]);
   return Boolean(otra);
 }
+
+// Lo que se programa al marcar no sale mientras aún se puede deshacer.
+const trasElRato = (ahora) => new Date(ahora.getTime() + E.VENTANA_DESHACER_MIN * 60000);
 
 async function inscribir(con, datos) {
   const id = await repesca.inscribir(con, datos);
@@ -72,7 +77,7 @@ async function alCompletar(con, cita, ahora) {
   // Petición de reseña: 2 h después del fin y en horario de envío, pero nunca antes de que acabe el
   // rato para deshacer (si recepción la marca tarde, sale un poco después; nunca antes).
   ef.resena = await sinRomper(async () => {
-    await resenas.programarPeticion(con, cita.id, { noAntesDe: new Date(ahora.getTime() + E.VENTANA_DESHACER_MIN * 60000) });
+    await resenas.programarPeticion(con, cita.id, { noAntesDe: trasElRato(ahora) });
     const [[pr]] = await con.query('SELECT estado, programada_para, motivo FROM peticiones_resena WHERE cita_id = ?', [cita.id]);
     return { estado: pr.estado, cuando: pr.programada_para, motivo: pr.motivo };
   });
@@ -84,25 +89,28 @@ async function alCompletar(con, cita, ahora) {
     ef.esCliente = true;
   }
 
-  // Su lead vino: el de esta cita y el que aún no había pasado de «cita» (por ficha o por teléfono).
+  // Su lead vino: el de esta cita y los suyos (por ficha o por teléfono) que preguntaban por este
+  // tratamiento o por ninguno en concreto. Si preguntó por otro, esa consulta sigue abierta.
   const [leads] = await con.query(
     `SELECT id, etapa FROM leads WHERE etapa IN ('nuevo','contactado','conversando','cita')
-        AND (cita_id = ? OR paciente_id = ? OR (paciente_id IS NULL AND telefono = ?))`,
-    [cita.id, cita.paciente_id, paciente?.telefono || null]);
+        AND (cita_id = ? OR ((paciente_id = ? OR (paciente_id IS NULL AND telefono = ?))
+             AND (tratamiento_interes_id IS NULL OR tratamiento_interes_id = ?)))`,
+    [cita.id, cita.paciente_id, paciente?.telefono || null, cita.tratamiento_id]);
   if (leads.length) {
     await con.query("UPDATE leads SET etapa = 'asistio' WHERE id IN (?)", [leads.map((l) => l.id)]);
     ef.leads = leads.map((l) => ({ id: l.id, etapa: l.etapa }));
   }
 
   // Toca repetir: entra en la secuencia para esa fecha (menos el margen), salvo que ya tenga otra
-  // cita de ese tratamiento.
+  // cita de ese tratamiento. Si la fecha ya pasó (se marcó tarde), el aviso sale al acabar el rato.
   const [[t]] = await con.query('SELECT repetir_cada_dias FROM tratamientos WHERE id = ?', [cita.tratamiento_id]);
   const r = E.avisoRepetir(T.fechaMadrid(new Date(cita.inicio)), t?.repetir_cada_dias);
   if (r) {
-    ef.tocaRepetir = await otraCitaFutura(con, cita, ahora, { mismoTratamiento: true })
+    const inicio = new Date(Math.max(T.desdeMadrid(r.aviso, E.HORA_AVISO_REPETIR).getTime(), trasElRato(ahora).getTime()));
+    ef.tocaRepetir = await otraCitaDespues(con, cita, ahora, { mismoTratamiento: true })
       ? { omitido: 'ya tiene otra cita de ese tratamiento' }
       : await sinRomper(async () => ({
-        ...(await inscribir(con, { secuencia: 'toca_repetir', pacienteId: cita.paciente_id, citaId: cita.id, inicio: T.desdeMadrid(r.aviso, E.HORA_AVISO_REPETIR) })),
+        ...(await inscribir(con, { secuencia: 'toca_repetir', pacienteId: cita.paciente_id, citaId: cita.id, inicio })),
         toca: r.toca,
       }));
   }
@@ -110,7 +118,7 @@ async function alCompletar(con, cita, ahora) {
 }
 
 async function alNoVenir(con, cita, ahora) {
-  if (await otraCitaFutura(con, cita, ahora)) return { recuperar: { omitido: 'ya tiene otra cita' } };
+  if (await otraCitaDespues(con, cita, ahora)) return { recuperar: { omitido: 'ya tiene otra cita' } };
   const [[ya]] = await con.query("SELECT id FROM inscripciones WHERE paciente_id = ? AND secuencia = 'cancelacion' AND estado IN ('activa','pausada') LIMIT 1", [cita.paciente_id]);
   if (ya) return { recuperar: { omitido: 'ya está en la secuencia para recuperar una cita' } };
   return { recuperar: await sinRomper(() => inscribir(con, { secuencia: 'cancelacion', pacienteId: cita.paciente_id, citaId: cita.id, inicio: ahora })) };
@@ -127,16 +135,22 @@ async function anular(con, cita, { deshecho, efectos: ef }) {
   }
   if (deshecho === 'completada') {
     hecho.resena = await resenas.anularPeticion(con, cita.id);
-    // Cliente y lead vuelven a como estaban, salvo que otra cita completada los sostenga.
+    // Deja de ser cliente si no tiene otra cita completada.
     const [[otra]] = await con.query("SELECT COUNT(*) AS n FROM citas WHERE paciente_id = ? AND estado = 'completada'", [cita.paciente_id]);
-    if (!otra.n) {
-      if (ef.esCliente) {
-        await con.query('UPDATE pacientes SET es_cliente = FALSE WHERE id = ?', [cita.paciente_id]);
-        hecho.esCliente = false;
-      }
-      for (const l of ef.leads || []) await con.query("UPDATE leads SET etapa = ? WHERE id = ? AND etapa = 'asistio'", [l.etapa, l.id]);
-      if (ef.leads?.length) hecho.leads = ef.leads.length;
+    if (ef.esCliente && !otra.n) {
+      await con.query('UPDATE pacientes SET es_cliente = FALSE WHERE id = ?', [cita.paciente_id]);
+      hecho.esCliente = false;
     }
+    // Cada lead vuelve a su etapa, salvo que haya venido a otra cita desde que entró ese lead.
+    let leads = 0;
+    for (const l of ef.leads || []) {
+      const [r] = await con.query(
+        `UPDATE leads l SET l.etapa = ? WHERE l.id = ? AND l.etapa = 'asistio'
+            AND NOT EXISTS (SELECT 1 FROM citas c WHERE c.paciente_id = ? AND c.estado = 'completada' AND c.inicio >= l.creado_en)`,
+        [l.etapa, l.id, cita.paciente_id]);
+      leads += r.affectedRows;
+    }
+    if (leads) hecho.leads = leads;
   }
   return hecho;
 }
