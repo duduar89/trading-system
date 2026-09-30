@@ -72,8 +72,9 @@ async function main() {
 
   // Conversaciones de repesca con la IA simulada.
   const deps = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
-  const [[facial]] = await pool.query("SELECT id FROM tratamientos WHERE familia = 'facial' AND regimen_legal IN ('cosmetico','aparatologia','servicio') ORDER BY precio_eur IS NULL, precio_eur LIMIT 1");
-  const [[capilar]] = await pool.query("SELECT id FROM tratamientos WHERE familia IN ('medicina_capilar','cirugia_capilar') ORDER BY id LIMIT 1");
+  // Un facial de pago que la IA puede reservar sola y, para lo capilar, el diagnóstico gratuito.
+  const [[facial]] = await pool.query("SELECT id FROM tratamientos WHERE familia = 'facial' AND activo AND reservable_ia AND precio_eur > 0 AND regimen_legal IN ('cosmetico','aparatologia','servicio') ORDER BY precio_eur, id LIMIT 1");
+  const [[capilar]] = await pool.query("SELECT id FROM tratamientos WHERE familia IN ('medicina_capilar','cirugia_capilar') AND activo ORDER BY reservable_ia DESC, precio_eur IS NULL, precio_eur, id LIMIT 1");
   // Cada guion: lo que va contestando el paciente (la IA contesta entre medias).
   const guiones = [
     ['Rocío', ['Bueno, pero el mes que viene me viene mejor'], facial?.id],
