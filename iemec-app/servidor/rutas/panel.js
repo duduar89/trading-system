@@ -6,7 +6,6 @@ const express = require('express');
 const T = require('../../motor/tiempo');
 const { descifrar } = require('../cripto');
 const { comprobarPlantilla } = require('../../motor/repesca/plantillas');
-const R = require('../../motor/resenas/resenas');
 const { ideasDelMes } = require('../../motor/resenas/publicaciones');
 const agenda = require('../agenda');
 const listaEspera = require('../lista-espera');
@@ -366,15 +365,14 @@ function rutasPanel({ pool, deps = null }) {
   }));
 
   // ── Reseñas ───────────────────────────────────────────────────────────────────────────────
+  // Los KPI de la ficha, las reseñas que piden algo y el historial (servidor/resenas.js).
   r.get('/resenas', envolver(async (req, res) => {
-    const [resenas] = await p().query('SELECT * FROM resenas ORDER BY publicada_en DESC LIMIT 200');
-    const [peticiones] = await p().query('SELECT enviada_en, pulsada_en, resena_id FROM peticiones_resena WHERE enviada_en IS NOT NULL');
+    const ahora = req.ahora || new Date();
     // Ideas para la ficha de Google: solo lo que se reserva (ni agrupadores ni retirados).
     const [trats] = await p().query('SELECT id, nombre, familia, descripcion, publicidad_restringida, activo FROM tratamientos WHERE activo = TRUE ORDER BY id');
-    const mes = Number(T.fechaMadrid(req.ahora || new Date()).slice(5, 7));
+    const mes = Number(T.fechaMadrid(ahora).slice(5, 7));
     res.json({
-      metricas: R.metricas({ resenas, peticiones }),
-      resenas: resenas.map((x) => ({ id: x.id, autor: x.autor, nota: x.nota, texto: x.texto, publicada: x.publicada_en, sentimiento: x.sentimiento, prioridad: x.prioridad, temas: typeof x.temas === 'string' ? JSON.parse(x.temas) : x.temas, borrador: x.borrador_respuesta, respuesta: x.respuesta, estado: x.estado })),
+      ...(await resenasSrv.datosPanel(p(), { ahora })),
       publicaciones: ideasDelMes({ mes, tratamientos: trats.map((t) => ({ ...t, publicidad_restringida: Boolean(t.publicidad_restringida) })) }),
     });
   }));
@@ -382,8 +380,10 @@ function rutasPanel({ pool, deps = null }) {
   r.post('/resenas/:id/publicar', envolver(async (req, res) => {
     if (!deps?.google) return res.status(503).json({ error: 'Google no configurado' });
     try {
-      await resenasSrv.aprobarYPublicar(p(), deps.google, { resenaId: Number(req.params.id), texto: req.body?.texto || null, aprobadaPor: req.usuario?.email || 'panel' });
-      res.json({ ok: true });
+      const hecho = await resenasSrv.aprobarYPublicar(p(), deps.google, {
+        resenaId: Number(req.params.id), texto: req.body?.texto || null, aprobadaPor: req.usuario?.email || 'panel', ahora: req.ahora || new Date(),
+      });
+      res.json({ ok: true, ...hecho });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

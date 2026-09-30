@@ -35,6 +35,9 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
     secuencias: (await repesca.avanzarSecuencias(d, { ahora })).length,
     avisosCita: (await avisos.enviarPendientes(d, { ahora })).length,
     peticionesResena: (await resenas.enviarPeticionesPendientes(d, { ahora })).length,
+    // Recordatorios de reseña y sus trabajos de la cola: la tarea diaria (ficha y reseñas de Google,
+    // borrar lo de más de 30 días, el historial del día) y las respuestas del historial, poco a poco.
+    resenas: await resenas.vuelta(d, { ahora }),
     cola: await cola.procesar(pool, {}, { ahora }),
   }), { ahora });
   Object.assign(informe, r.ejecutado ? r.resultado : { saltado: 'otro cron en marcha' });
