@@ -17,8 +17,10 @@ cron de cada minuto ◀───────────────────
 La web / GHL ──POST con X-Clave──▶ /api/leads → alta → secuencia «lead» (en la misma petición)
 ```
 
-La ruta nunca procesa nada: comprueba la firma, guarda el cuerpo tal cual y contesta 200 en
-milisegundos (Meta reintenta lo que tarda). Lo procesa el cron, con la cola en MariaDB: si algo
+La ruta nunca procesa nada: comprueba la firma, guarda el cuerpo tal cual (cifrado, como los
+mensajes: trae lo que escribe el paciente) y contesta 200 en milisegundos (Meta reintenta lo que
+tarda). Para leer uno a mano: `require('./servidor/entrada').descifrarCuerpo(cuerpo)` con la
+`CLAVE_CIFRADO` del servidor. Lo procesa el cron, con la cola en MariaDB: si algo
 falla, se reintenta (1, 2, 4, 8 minutos) y el error queda en `webhooks.error` y `cola.ultimo_error`.
 Lo que ya se hizo no se repite: los mensajes van por su `wamid` y los leads por su identificador de
 Meta, así que un aviso repetido no duplica nada.

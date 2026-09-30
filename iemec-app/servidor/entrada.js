@@ -17,7 +17,7 @@ const config = require('./config');
 const R = require('./repesca/motor');
 const { altaLead } = require('./leads');
 const { crearMeta } = require('./integraciones/meta');
-const { cifrar } = require('./cripto');
+const { cifrar, descifrar } = require('./cripto');
 const { registrar } = require('./eventos');
 const W = require('../motor/entrada/whatsapp');
 const E = require('../motor/entrada/leads');
@@ -46,13 +46,26 @@ async function enTransaccion(pool, fn) {
 
 // ── Guardar y encolar (lo llama la ruta) ─────────────────────────────────────────────────────
 
+// El cuerpo se guarda tal cual llegó, pero cifrado como los mensajes: trae lo que escribió el
+// paciente y su nombre. «aes:iv:tag:datos», en base64.
+function cifrarCuerpo(texto) {
+  const c = cifrar(texto);
+  return `aes:${c.iv.toString('base64')}:${c.tag.toString('base64')}:${c.cifrado.toString('base64')}`;
+}
+
+function descifrarCuerpo(guardado) {
+  if (!String(guardado).startsWith('aes:')) return guardado;
+  const [, iv, tag, datos] = guardado.split(':');
+  return descifrar(Buffer.from(datos, 'base64'), Buffer.from(iv, 'base64'), Buffer.from(tag, 'base64'));
+}
+
 // El cuerpo y su trabajo van en la misma transacción: lo que se ha contestado con un 200 ya no se
 // pierde. Si Meta repite el aviso (mismo identificador), ni se guarda ni se encola otra vez.
 async function guardarWebhook(pool, { proveedor, trabajo = TRABAJOS[proveedor], evento = null, idExterno = null, cuerpo, firmaOk = null }) {
   try {
     return await enTransaccion(pool, async (con) => {
       const [r] = await con.query('INSERT INTO webhooks (proveedor, evento, id_externo, cuerpo, firma_ok) VALUES (?, ?, ?, ?, ?)',
-        [proveedor, evento ? String(evento).slice(0, 60) : null, idExterno, cuerpo, firmaOk]);
+        [proveedor, evento ? String(evento).slice(0, 60) : null, idExterno, cifrarCuerpo(cuerpo), firmaOk]);
       await cola.encolar(con, trabajo, { webhookId: r.insertId }, { claveUnica: `webhook-${r.insertId}` });
       return { id: r.insertId, duplicado: false };
     });
@@ -83,7 +96,7 @@ async function conWebhook(pool, id, ahora, fn) {
   const [[w]] = await pool.query('SELECT id, cuerpo, procesado_en FROM webhooks WHERE id = ?', [id]);
   if (!w || w.procesado_en) return { omitido: true };
   try {
-    const r = await fn(JSON.parse(w.cuerpo));
+    const r = await fn(JSON.parse(descifrarCuerpo(w.cuerpo)));
     await pool.query('UPDATE webhooks SET procesado_en = ?, error = NULL WHERE id = ?', [ahora, id]);
     return r;
   } catch (err) {
@@ -345,4 +358,4 @@ async function procesarMeta(deps, webhookId, { ahora = new Date() } = {}) {
   });
 }
 
-module.exports = { TRABAJOS, guardarWebhook, procesarPendientes, procesarWhatsApp, procesarMeta, atenderMensaje, aplicarEstado };
+module.exports = { TRABAJOS, guardarWebhook, descifrarCuerpo, procesarPendientes, procesarWhatsApp, procesarMeta, atenderMensaje, aplicarEstado };

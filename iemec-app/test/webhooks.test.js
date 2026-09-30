@@ -185,9 +185,11 @@ test('entrada de WhatsApp y de leads', async (t) => {
         assert.equal(whatsapp.enviados.at(-1).telefono, '+34611000501');
         assert.ok(conv.ventana_hasta > martes, 'se abre la ventana de 24 h');
         assert.equal(conv.nombre_whatsapp, 'Lucía Prueba', 'y la bandeja lo ve por su nombre');
-        const w = await uno("SELECT procesado_en, error FROM webhooks WHERE id_externo = ?", [msgs[0].wa_id]);
+        const w = await uno('SELECT cuerpo, procesado_en, error FROM webhooks WHERE id_externo = ?', [msgs[0].wa_id]);
         assert.ok(w.procesado_en);
         assert.equal(w.error, null);
+        assert.doesNotMatch(w.cuerpo, /quiero información|Lucía|lucía/, 'el cuerpo guardado va cifrado');
+        assert.match(entrada.descifrarCuerpo(w.cuerpo), /"body":"Hola, quiero información"/, 'y se puede leer tal cual llegó');
       });
 
       await t.test('el mismo wamid dos veces → un solo mensaje', async () => {

@@ -5,7 +5,7 @@
 //   POST     /api/leads           la web y otras herramientas (GHL mientras exista), con clave
 // El GET es la verificación de Meta al dar de alta el webhook (hub.challenge). El POST va firmado:
 // X-Hub-Signature-256 = HMAC-SHA256 del cuerpo TAL CUAL llega con el secreto de la app. Se comprueba,
-// se guarda, se encola y se contesta 200 al momento; lo procesa el cron (servidor/entrada.js).
+// se guarda (cifrado), se encola y se contesta 200 al momento; lo procesa el cron (servidor/entrada.js).
 // Por eso estas rutas van antes del lector de JSON de la app: la firma se calcula sobre los bytes.
 const crypto = require('crypto');
 const express = require('express');
