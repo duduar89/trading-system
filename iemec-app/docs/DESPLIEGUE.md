@@ -37,6 +37,11 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
    Para tocar el panel con recarga al vuelo: `npm run dev:servidor` en una terminal y `npm run dev`
    en otra (http://localhost:5174).
 
+   Sin `MODO_DEMO`, se entra con passkey. La primera persona se da de alta desde la terminal:
+   `npm run invitar -- --email tu@correo --nombre "Tu nombre" --rol direccion` imprime un enlace de un
+   solo uso (24 h); ábrelo y crea la passkey (en `localhost` funcionan sin https). El resto del
+   equipo, desde «Equipo» en el panel.
+
 ## 2. En cPanel (LucusHost), una vez
 
 1. **Subdominio**, por ejemplo `agenda.iemec-clinic.com`, con SSL (AutoSSL).
@@ -48,11 +53,11 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
    | Variable | Valor |
    |---|---|
    | `NODE_ENV` | `production` |
-   | `URL_PUBLICA` | `https://agenda.iemec-clinic.com` |
+   | `URL_PUBLICA` | `https://agenda.iemec-clinic.com` (https: de aquí salen el dominio y el origen de las passkeys; si cambia, las passkeys hay que crearlas otra vez) |
    | `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | los de la base del paso 2 |
    | `CLAVE_CIFRADO` | `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
    | `SESION_SECRETO` | otra cadena aleatoria de 32 caracteres o más |
-   | `PANEL_CLAVE` | clave de acceso del personal (12+ caracteres) hasta que lleguen las passkeys |
+   | `PANEL_CLAVE` | opcional: acceso de emergencia de dirección (16+ caracteres; sesión de una hora). Cada uso queda en eventos y el servidor avisa al arrancar mientras esté puesta: quítala cuando todo el equipo tenga su passkey |
    | `MODO_WHATSAPP`, `MODO_IA`, `MODO_GOOGLE`, `MODO_META` | `simulado` hasta tener cuentas; luego `real` |
    | `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET` (o `WHATSAPP_WEBHOOK_CLAVE`), `WHATSAPP_NUMERO_ID` | webhook de WhatsApp: ver [`WHATSAPP-Y-LEADS.md`](WHATSAPP-Y-LEADS.md) |
    | `META_VERIFY_TOKEN`, `META_APP_SECRET`, `META_TOKEN_PAGINA`, `META_PAGINA_ID` | leads de los formularios de Meta: ídem |
@@ -79,6 +84,11 @@ Hace falta Node 22 o superior y una MariaDB 10.6 o superior.
 6. **Secretos para desplegar:** desde tu terminal, `bash scripts/secretos-despliegue.sh`. Crea una
    clave SSH solo para esto, te dice cómo autorizarla en cPanel y guarda los secretos en GitHub
    (`IEMEC_SSH_KEY`, `IEMEC_SSH_HOST`, `IEMEC_SSH_USER`, `IEMEC_KNOWN_HOSTS`, `IEMEC_DOMINIO`).
+7. **Primer acceso al panel:** por SSH, en `~/iemec-app`,
+   `node scripts/invitar.js --email direccion@… --nombre "…" --rol direccion` imprime un enlace de un
+   solo uso que caduca a las 24 h. Se abre en el móvil de dirección y se crea la passkey. A partir de
+   ahí, el resto del equipo se da de alta desde «Equipo» (cada uno con su rol) y, si alguien pierde
+   todas sus passkeys, dirección le manda un enlace nuevo desde ahí (o se repite este paso).
 
 ## 3. Cada vez que se sube
 

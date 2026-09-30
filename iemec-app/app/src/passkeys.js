@@ -4,7 +4,14 @@ import { api } from './api.js';
 // Passkeys desde el navegador (con @simplewebauthn/browser): el servidor da las opciones y el reto,
 // el dispositivo pide la huella, la cara o el PIN, y la respuesta firmada vuelve al servidor.
 
-export const hayPasskeys = () => browserSupportsWebAuthn();
+// Por qué aquí no se pueden usar passkeys, o null si se puede. Sin https (salvo en localhost) el
+// navegador ni siquiera ofrece WebAuthn: pasa si se abre el panel por la IP de la red de la clínica.
+export function motivoSinPasskeys() {
+  if (!window.isSecureContext) return 'Las passkeys solo funcionan en la dirección segura del panel (https).';
+  if (!browserSupportsWebAuthn()) return 'Este navegador no admite passkeys. Usa Safari, Chrome o Edge actualizados.';
+  return null;
+}
+export const hayPasskeys = () => !motivoSinPasskeys();
 
 // Un nombre para reconocer la passkey en «Equipo» («iPhone», «Mac»…). La persona lo puede cambiar.
 export function nombreDeEsteDispositivo() {

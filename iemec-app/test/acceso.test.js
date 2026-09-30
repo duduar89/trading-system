@@ -6,7 +6,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
-const { prepararBdDePrueba } = require('./ayuda-bd');
+const path = require('path');
+const { execFileSync } = require('child_process');
+const { prepararBdDePrueba, BD_PRUEBAS } = require('./ayuda-bd');
 const acceso = require('../servidor/acceso');
 const { firmar } = require('../servidor/sesion');
 const {
@@ -342,6 +344,45 @@ test('passkeys del personal', async (t) => {
         assert.deepEqual([ahora.json.rol, ahora.renovada], ['marketing', true], 'la cookie se rehace con el rol nuevo');
         assert.ok(ahora.json.permisos.includes('resenas.aprobar'));
         assert.deepEqual(json((await eventos('usuario_rol_cambiado')).at(-1).datos), { de: 'recepcion', a: 'marketing' });
+      });
+
+      await t.test('a la vez: el mismo enlace en dos pestañas o la misma respuesta dos veces, solo una vale', async () => {
+        const a = await acceso.crearUsuario(pool, { email: 'pestanas@ejemplo.com', nombre: 'Pestañas Prueba', rol: 'recepcion', actor: 'pruebas', ahora: T0 });
+        const token = tokenDe(a.enlace);
+        const [c1, c2] = [cliente(base), cliente(base)];
+        const [o1, o2] = [await c1.pedir('/api/acceso/alta/opciones', { metodo: 'POST', cuerpo: { token } }), await c2.pedir('/api/acceso/alta/opciones', { metodo: 'POST', cuerpo: { token } })];
+        const [aut1, aut2] = [new Autenticador({ origen: ORIGEN }), new Autenticador({ origen: ORIGEN })];
+        const altas = await Promise.all([
+          c1.pedir('/api/acceso/alta', { metodo: 'POST', cuerpo: { token, respuesta: aut1.registrar(o1.json) } }),
+          c2.pedir('/api/acceso/alta', { metodo: 'POST', cuerpo: { token, respuesta: aut2.registrar(o2.json) } }),
+        ]);
+        assert.deepEqual(altas.map((r) => r.status).sort(), [201, 410]);
+        assert.equal(altas.find((r) => r.status === 410).json.codigo, 'INVITACION_USADA');
+        assert.equal((await q('SELECT COUNT(*) AS n FROM passkeys WHERE usuario_id = ?', [a.usuario.id]))[0].n, 1, 'una sola passkey');
+        // La misma respuesta de entrar, mandada dos veces a la vez: una sesión.
+        const aut = altas[0].status === 201 ? aut1 : aut2;
+        const op = await cliente(base).pedir('/api/acceso/entrar/opciones', { metodo: 'POST', cuerpo: {} });
+        const respuesta = aut.firmar(op.json);
+        const dos = await Promise.all([1, 2].map(() => cliente(base).pedir('/api/acceso/entrar', { metodo: 'POST', cuerpo: { respuesta } })));
+        assert.deepEqual(dos.map((r) => r.status).sort(), [200, 400]);
+      });
+
+      await t.test('el primer enlace, desde la terminal del servidor (scripts/invitar.js)', async () => {
+        reloj.ahora = new Date(); // el script trabaja con la hora de verdad
+        const script = path.join(__dirname, '..', 'scripts', 'invitar.js');
+        const correr = (...args) => execFileSync(process.execPath, [script, ...args], { env: { ...process.env, DB_NAME: BD_PRUEBAS.database }, encoding: 'utf8' });
+        const salida = correr('--email', 'Primera@Ejemplo.com', '--nombre', 'Primera Directora', '--rol', 'direccion');
+        assert.match(salida, /✓ Alta de Primera Directora \(direccion\)/);
+        const enlace = /(http:\/\/\S+)/.exec(salida)[1];
+        assert.match(salida, /caduca el \d{4}-\d{2}-\d{2} a las \d{2}:\d{2} \(hora de Madrid\)/);
+        assert.equal((await cliente(base).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: tokenDe(enlace) } })).json.nombre, 'Primera Directora');
+        // Otra vez con el mismo correo: enlace nuevo, y el anterior deja de valer.
+        const otra = correr('--email', 'primera@ejemplo.com');
+        assert.match(otra, /✓ Enlace nuevo de Primera Directora/);
+        assert.equal((await cliente(base).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: tokenDe(enlace) } })).json.codigo, 'INVITACION_NO_VALE');
+        const [ev] = await q("SELECT actor FROM eventos WHERE tipo = 'usuario_creado' AND entidad_id = (SELECT id FROM usuarios WHERE email = 'primera@ejemplo.com')");
+        assert.match(ev.actor, /^consola:/);
+        assert.throws(() => correr(), /Uso: node scripts\/invitar\.js/);
       });
     });
   } finally {

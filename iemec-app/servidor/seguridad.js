@@ -67,9 +67,10 @@ function igualesSeguro(a, b) {
 // ── Límite de intentos ────────────────────────────────────────────────────────────────────────
 // Por IP y ventana de 15 minutos: retos pedidos (entrar, alta, passkey nueva), fallos (una passkey o
 // un enlace que no cuadran, la clave de emergencia equivocada) e intentos con la clave de emergencia.
+// Todo el equipo puede salir a internet con la misma IP de la clínica: los fallos no se quedan cortos.
 const LIMITES = {
   retos: { max: 60, ventanaMs: 15 * 60000 },
-  fallos: { max: 10, ventanaMs: 15 * 60000 },
+  fallos: { max: 20, ventanaMs: 15 * 60000 },
   emergencia: { max: 5, ventanaMs: 15 * 60000 },
 };
 

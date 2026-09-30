@@ -194,9 +194,9 @@ test('seguridad del acceso', async (t) => {
         } finally { fs.rmSync(carpeta, { recursive: true, force: true }); }
       });
 
-      await t.test('límite de intentos: diez fallos por IP y cuarto de hora; luego ni la passkey buena', async () => {
+      await t.test('límite de intentos: veinte fallos por IP y cuarto de hora; luego ni la passkey buena', async () => {
         const ip = '203.0.113.50';
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 20; i++) {
           const r = await cliente(base, { ip }).pedir('/api/acceso/invitacion', { metodo: 'POST', cuerpo: { token: `falso-${i}` } });
           assert.equal(r.status, 410);
         }
