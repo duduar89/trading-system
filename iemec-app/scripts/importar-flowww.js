@@ -5,9 +5,10 @@
 //
 //   node scripts/importar-flowww.js --pacientes <csv> --citas <csv> [--mapa <json>] [--aplicar] [--sin-recordatorios]
 //   node scripts/importar-flowww.js --deshacer [lote] [--aplicar]
-//   node scripts/importar-flowww.js --recordatorios si|no [--aplicar]
+//   node scripts/importar-flowww.js --recordatorios si|no [--cita <número>] [--aplicar]
 //
-// Sin --aplicar es un ensayo: no cambia nada y saca el informe. Trabaja con la base del .env.
+// Sin --aplicar es un ensayo: no cambia nada y saca el informe (confidencial: trátalo como los CSV).
+// Trabaja con la base del .env; para aplicar, con su CLAVE_CIFRADO.
 const fs = require('fs');
 const path = require('path');
 const db = require('../servidor/db');
@@ -20,13 +21,14 @@ const USO = `Uso:
       --sin-recordatorios  las citas que se traen no reciben la víspera ni las 2 horas (Flowww aún los manda)
   node scripts/importar-flowww.js --deshacer [lote] [--aplicar]
       Quita lo que metió la última importación (o la de ese lote) y nadie ha tocado.
-  node scripts/importar-flowww.js --recordatorios si|no [--aplicar]
-      Pone o quita los recordatorios a todas las citas futuras que se trajeron de Flowww.
+  node scripts/importar-flowww.js --recordatorios si|no [--cita <número>] [--aplicar]
+      Pone o quita los recordatorios a las citas futuras que se trajeron de Flowww (las que están a revisar
+      porque en Flowww ya no son así, no: esas, una a una con --cita, cuando se vea que siguen en pie).
 Sin --aplicar, nada cambia. Guía: docs/MIGRAR-FLOWWW.md`;
 
 // Opción → si lleva valor.
 const OPCIONES = {
-  '--pacientes': 'valor', '--citas': 'valor', '--mapa': 'valor', '--recordatorios': 'valor', '--deshacer': 'opcional',
+  '--pacientes': 'valor', '--citas': 'valor', '--mapa': 'valor', '--recordatorios': 'valor', '--cita': 'valor', '--deshacer': 'opcional',
   '--aplicar': 'no', '--sin-recordatorios': 'no', '--ayuda': 'no', '-h': 'no',
 };
 
@@ -48,6 +50,8 @@ function leerArgumentos(argv) {
   if (!o.ayuda && !o.h && modos !== 1) throw new ErrorUso('Di qué hacer: importar (--pacientes y/o --citas), --deshacer o --recordatorios');
   if ((o.mapa || o['sin-recordatorios']) && !(o.pacientes || o.citas)) throw new ErrorUso('--mapa y --sin-recordatorios van con --pacientes o --citas');
   if (o.recordatorios && !['si', 'sí', 'no'].includes(String(o.recordatorios).toLowerCase())) throw new ErrorUso('--recordatorios va con «si» o «no»');
+  if (o.cita && !o.recordatorios) throw new ErrorUso('--cita va con --recordatorios');
+  if (o.cita && !/^\d{1,10}$/.test(String(o.cita))) throw new ErrorUso('--cita va con el número de la cita en la app');
   return o;
 }
 
@@ -86,7 +90,7 @@ async function main(argv, { pool = null, escribir = console.log, avisar = consol
       return 0;
     }
     if (o.recordatorios) {
-      escribir((await I.cambiarRecordatorios(p, { activar: String(o.recordatorios).toLowerCase() !== 'no', aplicar })).informe);
+      escribir((await I.cambiarRecordatorios(p, { activar: String(o.recordatorios).toLowerCase() !== 'no', cita: o.cita ? Number(o.cita) : null, aplicar })).informe);
       return 0;
     }
     const r = await I.importar(p, {

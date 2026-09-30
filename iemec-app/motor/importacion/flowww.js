@@ -36,11 +36,13 @@ const CAMPOS = {
     email: EMAIL,
     fecha_nacimiento: ['Fecha nacimiento', 'Fecha de nacimiento', 'F. nacimiento', 'F. nac.', 'Nacimiento'],
     observaciones: OBSERVACIONES,
-    // Consentimiento de marketing: por los dos canales, solo WhatsApp o solo email.
+    // Consentimiento de marketing: por los dos canales, solo WhatsApp o solo email. Y desde cuándo, si
+    // Flowww lo guarda (va en la prueba del consentimiento).
     marketing: ['Consentimiento marketing', 'Acepta publicidad', 'Publicidad', 'Acepta comunicaciones comerciales', 'Comunicaciones comerciales',
       'Marketing', 'LOPD publicidad', 'Consentimiento publicidad', 'Consentimiento comercial'],
     marketing_whatsapp: ['Publicidad WhatsApp', 'WhatsApp publicidad', 'Marketing WhatsApp'],
     marketing_email: ['Publicidad email', 'Email publicidad', 'Marketing email', 'Newsletter'],
+    fecha_consentimiento: ['Fecha consentimiento', 'Fecha de consentimiento', 'F. consentimiento', 'Fecha LOPD', 'Fecha firma LOPD', 'Fecha RGPD'],
   },
   citas: {
     id: ['Id cita', 'Nº cita', 'Número de cita', 'Código cita', 'Localizador', 'Id', 'Código', 'Referencia'],
@@ -66,11 +68,16 @@ const PUEDE_REPETIR = new Set(['hora']);
 // Sin estas columnas no se puede importar el fichero.
 const OBLIGATORIAS = { pacientes: [['nombre']], citas: [['fecha'], ['servicio'], ['paciente_id', 'paciente', 'telefono', 'email']] };
 const CONSENTIMIENTOS = { marketing: ['whatsapp_marketing', 'email_marketing'], marketing_whatsapp: ['whatsapp_marketing'], marketing_email: ['email_marketing'] };
+// Un código de cita con nombre genérico puede ser el del cliente (y entonces una segunda cita suya se
+// tomaría por la misma movida): si el fichero no trae otra columna para el cliente, no se usa hasta que
+// el mapa diga qué es.
+const GENERICOS = new Set(['id', 'codigo', 'referencia']);
 
 /**
  * Qué columnas del fichero van a cada campo: las que diga el mapa o, si no dice nada de ese campo,
  * las de nombre típico. Un campo puesto a null en el mapa no se trae (p. ej. las observaciones).
- * @returns {{ campos: { campo: string[] }, sinUsar: string[], errores: string[] }}
+ * @returns {{ campos: { campo: string[] }, sinUsar: string[], errores: string[], dudosas: [{ campo, columna }] }}
+ *   dudosas: columnas que podrían ser ese campo y no se usan hasta que lo diga el mapa
  */
 function resolverColumnas(cabeceras, tipo, mapa = {}) {
   const porClave = new Map(cabeceras.map((c) => [clave(c), c]));
@@ -90,12 +97,18 @@ function resolverColumnas(cabeceras, tipo, mapa = {}) {
     campos[campo] = VARIAS.has(campo) ? halladas : halladas.slice(0, 1);
     for (const c of campos[campo]) usadas.add(c);
   }
+  const dudosas = [];
+  if (tipo === 'citas' && !Object.hasOwn(mapa, 'id') && campos.id.length && GENERICOS.has(clave(campos.id[0])) && !campos.paciente_id.length) {
+    dudosas.push({ campo: 'id', columna: campos.id[0] });
+    usadas.delete(campos.id[0]);
+    campos.id = [];
+  }
   for (const grupo of OBLIGATORIAS[tipo]) {
     if (!grupo.some((campo) => campos[campo].length)) {
       errores.push(`Falta la columna de ${grupo.map((g) => `«${g}»`).join(' o ')}: dila en el mapa («${tipo}»: { "${grupo[0]}": "nombre de la columna" })`);
     }
   }
-  return { campos, sinUsar: cabeceras.filter((c) => !usadas.has(c)), errores };
+  return { campos, sinUsar: cabeceras.filter((c) => !usadas.has(c)), errores, dudosas };
 }
 
 // Los valores con algo de un campo, en el orden de sus columnas.
@@ -237,7 +250,8 @@ const huella = (prefijo, partes) => `${prefijo}:${crypto.createHash('sha256').up
 /**
  * Una fila del fichero de pacientes, en limpio.
  * @returns { flowwwId, nombre, apellidos, telefono, email, fechaNacimiento, notas, consentimientos:
- *   [{ tipo, otorgado, columna, valor }], avisos: [], errores: [] }
+ *   [{ tipo, otorgado, columna, valor, desde }], avisos: [], errores: [] } (desde: 'AAAA-MM-DD', si
+ *   Flowww dice desde cuándo)
  */
 function leerPaciente(valores, campos, { hoy = new Date() } = {}) {
   const v = (campo) => valoresDe(valores, campos, campo);
@@ -256,13 +270,20 @@ function leerPaciente(valores, campos, { hoy = new Date() } = {}) {
     if (f && f.fecha >= '1900-01-01' && f.fecha <= hoy.toISOString().slice(0, 10)) fechaNacimiento = f.fecha;
     else avisos.push('la fecha de nacimiento no se entiende: se importa sin ella');
   }
+  let desde = null;
+  const textoDesde = v('fecha_consentimiento')[0];
+  if (textoDesde) {
+    const f = leerFecha(textoDesde, { hoy });
+    if (f && f.fecha <= hoy.toISOString().slice(0, 10)) desde = f.fecha;
+    else avisos.push('la fecha del consentimiento no se entiende: no va en su prueba');
+  }
   const consentimientos = [];
   for (const [campo, tipos] of Object.entries(CONSENTIMIENTOS)) {
     for (const columna of campos[campo] || []) {
       const valor = String(valores[columna] ?? '').trim();
       const otorgado = leerSiNo(valor);
       if (otorgado == null) continue;
-      for (const tipo of tipos) if (!consentimientos.some((c) => c.tipo === tipo)) consentimientos.push({ tipo, otorgado, columna, valor });
+      for (const tipo of tipos) if (!consentimientos.some((c) => c.tipo === tipo)) consentimientos.push({ tipo, otorgado, columna, valor, desde });
       break;
     }
   }
@@ -271,6 +292,13 @@ function leerPaciente(valores, campos, { hoy = new Date() } = {}) {
     flowwwId: v('id')[0]?.slice(0, 60) || null, ...persona, telefono: tel.telefono, email: correo.email, fechaNacimiento, notas,
     consentimientos, avisos, errores,
   };
+}
+
+// El texto de una casilla que no se entiende, para el informe: solo si parece una fecha o una hora mal
+// escrita («31/02/2026», «25:00»). Si trae letras puede ser un nombre (una columna mal elegida) y no se
+// repite.
+function noValida(que, texto, largo) {
+  return /^[\d\s/.:,hH-]*$/.test(texto) ? `${que} «${texto.slice(0, largo)}» no válida` : `${que} no válida (no parece una ${que}: ¿es la columna buena?)`;
 }
 
 /**
@@ -285,13 +313,13 @@ function leerCita(valores, campos) {
   const textoFecha = v('fecha')[0];
   const f = textoFecha ? leerFecha(textoFecha) : null;
   if (!textoFecha) errores.push('sin fecha');
-  else if (!f) errores.push(`fecha «${textoFecha.slice(0, 30)}» no válida`);
+  else if (!f) errores.push(noValida('fecha', textoFecha, 30));
   // La hora: su columna («11:00», «11:00 - 12:00» o «15/10/2026 11:00») o, si no tiene, la que venga
   // con la fecha.
   const textoHora = campos.hora.filter((c) => !campos.fecha.includes(c)).map((c) => String(valores[c] ?? '').trim()).find(Boolean) || null;
   const horas = textoHora ? horasDe(textoHora) : [];
   const hora = horas[0] || f?.hora || null;
-  if (f && !hora) errores.push(textoHora ? `hora «${textoHora.slice(0, 20)}» no válida` : 'sin hora');
+  if (f && !hora) errores.push(textoHora ? noValida('hora', textoHora, 20) : 'sin hora');
   const fin = horas[1] || leerHora(v('hora_fin')[0]);
   let duracion = leerDuracion(v('duracion')[0]);
   if (!duracion && hora && fin) {

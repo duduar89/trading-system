@@ -81,6 +81,17 @@ test('columnas: los nombres típicos en español, sin tildes ni mayúsculas, y l
   assert.deepEqual(F.resolverColumnas(['Cliente', 'Fecha'], 'citas').errores, ['Falta la columna de «servicio»: dila en el mapa («citas»: { "servicio": "nombre de la columna" })']);
 });
 
+test('un «Código», «Id» o «Referencia» a secas en las citas puede ser el del cliente: sin su columna, lo decide el mapa', () => {
+  const sinCliente = F.resolverColumnas(['Código', 'Cliente', 'Fecha', 'Hora', 'Servicio'], 'citas');
+  assert.deepEqual([sinCliente.campos.id, sinCliente.dudosas], [[], [{ campo: 'id', columna: 'Código' }]]);
+  assert.ok(sinCliente.sinUsar.includes('Código'), 'se ve en «No se traen»');
+  assert.deepEqual(F.resolverColumnas(['Id', 'Cód. cliente', 'Cliente', 'Fecha', 'Servicio'], 'citas').campos.id, ['Id'], 'con la del cliente, es el de la cita');
+  assert.deepEqual(F.resolverColumnas(['Nº cita', 'Cliente', 'Fecha', 'Servicio'], 'citas').dudosas, [], 'un nombre concreto no tiene duda');
+  const mapa = F.resolverColumnas(['Referencia', 'Cliente', 'Fecha', 'Servicio'], 'citas', { id: 'Referencia' });
+  assert.deepEqual([mapa.campos.id, mapa.dudosas], [['Referencia'], []], 'si el mapa lo dice, vale');
+  assert.deepEqual(F.resolverColumnas(['Código', 'Nombre'], 'pacientes').campos.id, ['Código'], 'en el fichero de pacientes, «Código» es el del cliente');
+});
+
 test('una fila de pacientes y otra de citas, en limpio', () => {
   const cab = ['Código', 'Nombre y apellidos', 'Móvil', 'Email', 'Observaciones', 'Publicidad WhatsApp', 'Newsletter'];
   const { campos } = F.resolverColumnas(cab, 'pacientes');
@@ -99,6 +110,21 @@ test('una fila de pacientes y otra de citas, en limpio', () => {
   assert.deepEqual([junta.fecha, junta.hora, junta.errores], ['2026-10-15', '12:45', []]);
   const mala = F.leerCita({ Cliente: 'Eva', Fecha: '31/02/2026', Hora: '10:00', Servicio: '', Profesional: '', Cabina: '', Estado: '' }, cc);
   assert.deepEqual(mala.errores, ['fecha «31/02/2026» no válida', 'sin servicio']);
+  // Lo que no parece una fecha o una hora no se repite: con la columna equivocada, puede ser un nombre.
+  const nombre = F.leerCita({ Cliente: 'Eva', Fecha: 'Ruiz Soler, Carmen', Hora: '10:00', Servicio: 'Presoterapia', Profesional: '', Cabina: '', Estado: '' }, cc);
+  assert.deepEqual(nombre.errores, ['fecha no válida (no parece una fecha: ¿es la columna buena?)']);
+  const hora = F.leerCita({ Cliente: 'Eva', Fecha: '15/10/2026', Hora: 'Carmen', Servicio: 'Presoterapia', Profesional: '', Cabina: '', Estado: '' }, cc);
+  assert.deepEqual(hora.errores, ['hora no válida (no parece una hora: ¿es la columna buena?)']);
+  assert.deepEqual(F.leerCita({ Cliente: 'Eva', Fecha: '15/10/2026', Hora: '25:00', Servicio: 'Presoterapia', Profesional: '', Cabina: '', Estado: '' }, cc).errores, ['hora «25:00» no válida']);
+});
+
+test('la fecha del consentimiento, si Flowww la trae, va con cada «sí» o «no» (para su prueba)', () => {
+  const { campos } = F.resolverColumnas(['Código', 'Nombre', 'Acepta publicidad', 'Fecha LOPD'], 'pacientes');
+  const hoy = new Date('2026-10-13T08:00:00Z');
+  const p = F.leerPaciente({ Código: '1', Nombre: 'Ana', 'Acepta publicidad': 'Sí', 'Fecha LOPD': '03/04/2024' }, campos, { hoy });
+  assert.deepEqual(p.consentimientos.map((c) => [c.tipo, c.otorgado, c.desde]), [['whatsapp_marketing', true, '2024-04-03'], ['email_marketing', true, '2024-04-03']]);
+  const futura = F.leerPaciente({ Código: '2', Nombre: 'Eva', 'Acepta publicidad': 'No', 'Fecha LOPD': '03/04/2031' }, campos, { hoy });
+  assert.deepEqual([futura.consentimientos[0].desde, futura.avisos], [null, ['la fecha del consentimiento no se entiende: no va en su prueba']]);
 });
 
 test('¿la misma persona? Mismo teléfono no basta: la madre y la hija comparten móvil', () => {
