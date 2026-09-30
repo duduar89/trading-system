@@ -23,3 +23,5 @@ web/dist-borradores/
 web/capturas/
 web/fotos/*
 !web/fotos/fotos.json
+# El zip para public_html (node web/construir.js --publicar --zip …) se construye, no se versiona.
+*.zip

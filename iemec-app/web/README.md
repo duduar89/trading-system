@@ -17,22 +17,37 @@ npm run web:fotos -- --origen <carpeta con las fotos originales>   # solo si cam
 npm run web                  # construye web/dist (y dice si algo incumple las normas)
 npm run web:ver              # la sirve en http://127.0.0.1:4321
 npm run web:revisar          # la revisa en Chromium y hace capturas en web/capturas/
-node web/construir.js --publicar     # la comprobación antes de subirla: sin ningún [PENDIENTE] a la vista
+npm run web:publicar         # la versión para subir (node web/construir.js --publicar)
+npm run web:publicar -- --zip iemec-web-publicable.zip   # …y el zip para public_html
 node web/construir.js --borradores   # vista previa con los borradores → web/dist-borradores
 ```
 
-- `npm run web` termina con código 1 si hay errores (una frase prohibida por las normas, una
-  página que pasa del tamaño máximo…). El detalle queda en `web/dist/informe.json`.
-- `--publicar` es más estricto: además da error por cada `[PENDIENTE…]` que se vea, por cada frase
-  obligatoria que falte (hoy, el correo del aviso legal) y si hay borradores. **Hoy falla a
-  propósito**: la web tiene huecos que solo puede llenar la clínica (más abajo).
+**Para lanzarla: [`docs/LANZAR-WEB.md`](../docs/LANZAR-WEB.md)** (qué falta, quién lo da, los accesos
+y los pasos, del hosting al DNS).
+
+- `npm run web` es la **vista previa** para la clínica: los datos que faltan salen en amarillo
+  (`[PENDIENTE: …]`). Termina con código 1 si hay errores (una frase prohibida por las normas, una
+  página que pasa del tamaño máximo…). El detalle queda en `web/dist/informe.json`, que también dice
+  qué falta para publicar (`lanzamiento`).
+- `--publicar` hace la **versión para subir**: cada `[PENDIENTE]` está clasificado en
+  [`web/datos/lanzamiento.json`](datos/lanzamiento.json): lo que puede esperar (clase «b») sale con
+  una redacción neutra y cierta, lo completado con fuentes oficiales (clase «c») ya está puesto y lo
+  imprescindible (clase «a») lo para. Sin marcas amarillas, notas para la revisión, borradores ni
+  enlaces a ellos. Si falta algo imprescindible, falla con la lista (qué, quién y dónde se pone) y
+  deja la carpeta vacía salvo `informe.json`, para que no se suba nada a medias. **Hoy falla a
+  propósito**: faltan cinco cosas de la clínica (el correo propio, el delegado de protección de
+  datos, quién opera y dónde, y los vistos buenos médico y legal).
+- `--zip <archivo>` (con `--publicar`) deja además el zip para «Cargar» y «Extraer» en el cPanel:
+  el contenido de `web/dist` con el `.htaccess` y sin `informe.json`.
 - `npm run web:ver -- 4322 web/dist-borradores` sirve otra carpeta en otro puerto. El servidor de
   pruebas imita a Apache: URL limpias, las 301 del `.htaccess`, la 404 y las cabeceras de
   seguridad.
 - `npm run web:revisar` carga todas las páginas en ocho anchos, de 320 a 1440 px, y mira que ninguna
   caja se salga por los lados (midiendo el rectángulo de cada elemento: con `overflow-x: clip` la
   página nunca tiene barra horizontal que avise), que no haya errores de consola ni imágenes rotas,
-  que las zonas de toque midan 44 px y que el menú del móvil funcione con el teclado;
+  que las zonas de toque midan 44 px y que el menú del móvil funcione con el teclado; también que
+  no se guarde ninguna cookie ni nada en el almacenamiento local, y en el de sesión solo
+  `iemec-campana` al llegar con un código de campaña (lo que dice la política de cookies);
   `-- --rapido` lo hace solo en 320, 390 y 1440 px, `-- --puerto 4341` usa otro puerto y
   `-- --capturas <carpeta>` guarda las capturas en otro sitio. Si el puerto está libre, arranca el
   servidor y lo para al acabar.
@@ -62,14 +77,16 @@ menús, portada, filtros ni formularios, y sus URL antiguas van a `/tratamientos
 | Textos de los tratamientos | `web/contenido/*.json` (un archivo por grupo: facial médica, facial con aparatos, corporal y peso, capilar, íntima y cirugía) |
 | Borradores que esperan autorización | `web/contenido/pendientes/*.json` (solo salen con `--borradores`) |
 | Especialidades, su foto y las preocupaciones | `web/datos/especialidades.json` |
-| Equipo | `web/datos/equipo.json` |
-| Datos de la clínica (dirección, horario, teléfono, WhatsApp, redes, ficha de Google, registro sanitario, FSE+, dirección del formulario) | `web/datos/sitio.json` |
+| Equipo (y la titulación, la colegiación y qué cirugías opera cada persona) | `web/datos/equipo.json` |
+| Datos de la clínica (dirección, horario, teléfono, WhatsApp, redes, ficha de Google, registro sanitario, Registro Mercantil, correo, delegado de protección de datos, FSE+, dirección del formulario) | `web/datos/sitio.json` |
+| Qué falta para publicar y cómo sale mientras tanto (cada `[PENDIENTE]` con su clase a, b o c) y los vistos buenos médico y legal | `web/datos/lanzamiento.json` (lo aplica `web/lib/lanzamiento.js`) |
+| Emblema oficial «Cofinanciado por la Unión Europea» del aviso del FSE+ (en git, de la Comisión Europea) | `web/emblemas/` |
 | Tarjetas regalo | `web/datos/tarjetas.json` |
 | Tecnología (sin marcas) | `web/datos/tecnologia.json` (solo sale la que usa algún tratamiento publicado) |
 | Páginas provisionales | `web/datos/provisionales.json` |
 | Redirecciones y anclas de la web anterior | `web/datos/redirecciones.json` (del inventario de SITE123) |
 | Normas de publicidad sanitaria | `web/datos/normas.json` (normas de la vuelta 9, ampliadas en la revisión final) |
-| Textos legales | `web/contenido/legal/*.md` |
+| Textos legales (con `{{correo}}`, `{{dpd}}`, `{{profesionales}}`… que rellena `web/lib/legal.js`) | `web/contenido/legal/*.md` |
 | Catálogo de tratamientos (ids, activos, familias, régimen legal, quién lo hace) | `semillas/iemec/tratamientos.json`, el de la app |
 | Fotos | `web/fotos/fotos.json` (en git: origen, derechos, `alt`, recorte) y las WebP de `web/fotos/` (fuera de git) |
 | Tipografías (Montserrat y Playfair Display, licencia OFL) | `app/public/fuentes/`, las mismas del panel |
@@ -99,9 +116,12 @@ página provisional (más abajo).
 se decide por el régimen legal y el profesional del catálogo, nunca por las palabras del texto:
 
 - **Cirugía** (`tipo: "cirugia"` o régimen `cirugia`): consulta previa con el cirujano, el
-  consentimiento informado por escrito, quién opera, dónde y «solo para mayores de edad». Mientras
-  la clínica no dé nombre, especialidad oficial y número de colegiado, se ve
-  `[PENDIENTE: nombre, especialidad oficial y n.º de colegiado]` (también en la ficha).
+  consentimiento informado por escrito, quién opera, dónde y la política con menores. Quién opera
+  sale de `web/datos/equipo.json` (la persona con `colegiado` que tiene esa especialidad o página en
+  `opera`); mientras no esté, se ve `[PENDIENTE: nombre, especialidad oficial y n.º de colegiado]`
+  (también en la ficha), que es imprescindible para publicar. Dónde: `sesion.donde` de la página o
+  `donde_cirugia` de su especialidad (en las preguntas, `{donde_cirugia}`). La edad solo se dice con
+  `sitio.json` → `politica_menores`.
 - **Médico** (lo hace un médico, o es un medicamento o un producto sanitario): valoración médica
   previa, riesgos y contraindicaciones.
 - **Valoración previa** (publicidad restringida, pero en el catálogo lo hace estética): valoración
@@ -121,7 +141,9 @@ error y no hay web. Los avisos (palabras que conviene mirar, como «EvoSculpt» 
 validador, cambia también su lista en `web/lib/normas.js`.
 
 **Lo que falta por confirmar** se escribe `[PENDIENTE: lo que falta]`, **corto** («horario del
-sábado», «correo»): en la web sale resaltado en amarillo para que nadie lo pase por alto. El
+sábado», «correo»): en la vista previa sale resaltado en amarillo para que nadie lo pase por alto.
+**Cada marca nueva se clasifica** en `web/datos/lanzamiento.json` (en `marcas` de su dato, con su
+clase y, si puede esperar, cómo se publica): si no, `--publicar` no pasa. El
 detalle (de dónde sale la duda, qué dice cada fuente) va en el campo `pendiente` del JSON o en un
 `_detalle`, que solo llegan a `informe.json`. El informe cuenta las marcas de cada página
 (`pendientes_visibles`) y agrupa sus textos (`pendientes_textos`, con cuántas páginas y un
@@ -233,33 +255,38 @@ Respuesta de la app:
 
 ## Publicar
 
+Todo, con los accesos y quién hace cada cosa, en [`docs/LANZAR-WEB.md`](../docs/LANZAR-WEB.md). En
+corto:
+
 0. **Primero la app** con la migración `015-formulario-web.sql` y, si la web va en otro dominio,
    `WEB_DOMINIO` (y `WEB_ORIGENES` para un dominio de prueba): sin ella, el formulario no tiene a
    dónde enviar (ver `docs/DESPLIEGUE.md`).
 1. `npm run web:fotos -- --origen <carpeta>` si hay fotos nuevas (las WebP no están en git).
-2. `npm run web` sin errores y `node web/construir.js --publicar` sin errores: ningún
-   `[PENDIENTE]` a la vista, el correo del aviso legal puesto y ningún borrador.
-3. `npm run web:revisar` sin problemas.
-4. Sube **el contenido** de `web/dist/` a `public_html` del alojamiento (cPanel o FTP), con el
-   `.htaccess` (es un archivo oculto: activa «mostrar archivos ocultos»). `informe.json` no hace
-   falta subirlo, y si se sube, el `.htaccess` lo bloquea. No subas nunca `web/dist-borradores/`.
-5. Pruébala antes de cambiar el dominio: con el archivo `hosts` del ordenador apuntando
+2. `node web/construir.js --publicar --zip iemec-web-publicable.zip` sin errores y
+   `npm run web:revisar` sin problemas.
+3. El zip a `public_html` del alojamiento («Cargar» y «Extraer» en el cPanel) o el contenido de
+   `web/dist/` por FTP, con el `.htaccess` (es un archivo oculto: activa «mostrar archivos
+   ocultos»). `informe.json` no se sube, y si se sube, el `.htaccess` lo bloquea. No subas nunca
+   `web/dist-borradores/`.
+4. Pruébala antes de cambiar el dominio: con el archivo `hosts` del ordenador apuntando
    `iemec-clinic.com` a la IP del alojamiento, o en un subdominio de prueba con `https` (por
    `http` o `www`, el `.htaccess` manda a https://iemec-clinic.com, que aún es SITE123).
-6. **Cambio de SITE123 a la web nueva:** hoy `iemec-clinic.com` apunta a SITE123 (lo gestiona
-   Uebea). Hay que cambiar sus DNS (registros `A` de `iemec-clinic.com` y `www`, o los servidores
-   de nombres) para que apunten al alojamiento. Antes, apunta los registros `MX` y `TXT` que haya
-   para no romper el correo ni verificaciones. Con el dominio ya apuntando, AutoSSL (o Let's
-   Encrypt) del cPanel emite el certificado; hasta entonces puede haber un rato sin `https`. No des
-   de baja SITE123 hasta comprobar la web nueva, y recuerda que su tienda (las tarjetas regalo) se
-   va con ella.
-7. Después: en Search Console (dominio verificado por DNS), envía `https://iemec-clinic.com/sitemap.xml`
-   y vigila los 404 las primeras semanas. Las 176 URL de SITE123 tienen su 301 en el `.htaccess`
-   (sin distinguir mayúsculas y con o sin barra final; cuando el tratamiento principal de un
-   artículo no tiene página, van al destino del inventario y no a otro tratamiento que solo se
-   mencionaba) y las 101 anclas antiguas (`/facial#relleno-de-labios`, `/corporal#sudor`…) las
-   resuelve `web/js/web.js` en la página de destino, con huellas y sin dejar los textos viejos en
-   el HTML. La ficha de Google Business Profile sigue con la misma URL.
+5. **Cambio de SITE123 a la web nueva:** los DNS de `iemec-clinic.com` están en Namecheap (los
+   lleva Uebea): se cambia el registro `A` de `iemec-clinic.com` (y `www`, que hoy es un `CNAME`)
+   al alojamiento, sin tocar los `MX` ni los `TXT` que haya. AutoSSL del cPanel emite el certificado
+   con el dominio ya apuntando. No des de baja SITE123 hasta comprobar la web nueva: su tienda (las
+   tarjetas regalo) se va con ella.
+6. Después: en Search Console, envía `https://iemec-clinic.com/sitemap.xml` y vigila los 404 las
+   primeras semanas. Las 176 URL de SITE123 tienen su 301 en el `.htaccess` (sin distinguir
+   mayúsculas y con o sin barra final; cuando el tratamiento principal de un artículo no tiene
+   página, van al destino del inventario y no a otro tratamiento que solo se mencionaba) y las 101
+   anclas antiguas (`/facial#relleno-de-labios`, `/corporal#sudor`…) las resuelve `web/js/web.js` en
+   la página de destino, con huellas y sin dejar los textos viejos en el HTML. La ficha de Google
+   Business Profile sigue con la misma URL.
+
+Cuando la clínica mande un dato que podía esperar, se pone donde dice su `como_completar` en
+`lanzamiento.json`, se construye con `--publicar` y se vuelve a subir la carpeta: nada se toca a mano
+en el servidor.
 
 ## Privacidad, rendimiento y accesibilidad
 
@@ -300,49 +327,26 @@ hay logotipo, la web usa uno tipográfico (IEMEC en Playfair con el nombre compl
 
 ## Pendiente de la clínica
 
-Todo esto sale en la web como `[PENDIENTE: …]` o está en `informe.json` (`pendientes_textos`,
-`contenido_pendiente`, `revision_medica` y `sin_pagina`):
+Cada `[PENDIENTE]` de la vista previa está en [`web/datos/lanzamiento.json`](datos/lanzamiento.json)
+con qué falta, por qué, dónde sale, quién lo da y su clase; el estado de hoy, en `informe.json` →
+`lanzamiento` (y `pendientes_textos`, cada texto con su dato y su clase). Qué pedir y a quién, en
+[`docs/LANZAR-WEB.md`](../docs/LANZAR-WEB.md). En resumen:
 
-- **Datos de la clínica:** horario del sábado (Google dice de 11:00 a 20:00 y Treatwell, de 10:00
-  a 20:00); correo propio del dominio (hoy solo hay un Gmail; el aviso legal y la privacidad lo
-  necesitan); «local 35» o «locales 35-36»; domicilio social y datos del Registro Mercantil (tomo,
-  folio, hoja); aparcamiento y transporte público más cercanos.
-- **Autorización sanitaria CS17886:** qué cubre la unidad U.900 (en medicina capilar); qué
-  servicios de la zona íntima cubre (la ginecología, U.26, no figura); si cubre el área de peso
-  (Endocrinología U.10 y Nutrición U.11), la sudoración excesiva y las varices; y los 41
-  tratamientos del catálogo que no tienen página (`informe.json` → `sin_pagina`, cada uno con su
-  motivo).
-- **Cirugías:** nombre, especialidad oficial y número de colegiado del cirujano de cada cirugía (y
-  el reconocimiento en España del título de especialista de Marco Vricella, que hasta entonces se
-  presenta como médico con formación en cirugía plástica); dónde se opera cada una (el hospital de
-  la cirugía estética; si el injerto capilar se hace en la sala de IEMEC) y con qué anestesia; y la
-  política con menores de 18 años.
-- **Equipo y quién hace cada cosa:** responsable asistencial (dirección médica); titulación,
-  especialidad y número de colegiado de cada profesional; si Paola Ranilla es «Dra.»; profesión de
-  Paula Vicent; quién hace el diagnóstico capilar, el microneedling capilar, la luz pulsada y la
-  valoración de los tratamientos de estética con producto; retrato de Marcela Pedraza; nombres y
-  titulación del equipo de estética y de enfermería; retratos nuevos en alta resolución, coherentes
-  entre sí.
-- **Marca y fotos:** logotipo vectorial; emblema oficial «Cofinanciado por la Unión Europea» del
-  FSE+ (el de la web actual está dañado), con la convocatoria, el organismo y la fecha hasta la
-  que hay que mantener el aviso; fotos de las instalaciones actuales, de la entrada y del head spa;
-  los originales de los 4 vídeos de ginecología que hoy están en Vimeo.
-- **Tarjetas regalo:** pago online (hoy lo cobra la tienda de SITE123, que desaparece), condiciones
-  de compra (forma de pago, desistimiento de 14 días, confirmación del pedido), cómo se comprueban
-  las tarjetas ya vendidas (no llevan código único) y qué hacer con los vales de 20 € de la
-  encuesta.
-- **Legal:** revisión del abogado sanitario y del delegado de protección de datos de todos los
-  textos legales y de las cláusulas del formulario (y la versión de la cláusula); nombre y correo
-  del DPD; proveedores (alojamiento, correo, WhatsApp Business, app de gestión) y sus regiones;
-  que el código de campaña está exento de consentimiento y la base de su medición; plazos de
-  conservación; arbitraje de consumo y códigos de conducta; fecha de publicación de los textos; y,
-  si contesta el asistente virtual de la app, decir que es una IA que se presenta como tal.
-- **Contenido:** la revisión médica de las 63 páginas marcadas (`informe.json` →
-  `revision_medica`) y las 301 notas de contenido (`contenido_pendiente`); los borradores de
-  `web/contenido/pendientes/` cuando haya autorización.
-- **Campañas y dominios:** las páginas de campaña de SITE123 (`/aprende`,
-  `/lipolaser-agenda-tu-cita`) redirigen al lipoláser: si hay anuncios activos, cambiar antes su
-  destino (y el diagnóstico de lipoláser, que solo se reserva los martes, lo lleva la agenda de la
-  app); la landing en francés (`/recuperez-vos-cheveux-a-madrid`) va a `/cirugia-capilar/`, o a
-  `cliniquecapillaire-iemec.es` si la clínica lo prefiere; Search Console y cualquier analítica
-  que hoy lleve Uebea.
+- **Imprescindible (a):** el correo propio del dominio; el delegado de protección de datos; quién
+  opera cada cirugía (nombre, número de colegiado y especialidad oficial) y dónde se operan el injerto
+  capilar y la labioplastia; el visto bueno del médico responsable a las 63 páginas médicas
+  (`revision_medica`) y el del abogado sanitario y el DPD a los textos legales y al formulario.
+- **Se publica con una redacción neutra hasta tenerlo (b):** el horario del sábado; la titulación y
+  la colegiación de cada profesional, el responsable asistencial y el equipo de estética; quién hace
+  el diagnóstico y los tratamientos capilares, la luz pulsada y la valoración de la estética con
+  producto; el hospital de las cirugías mayores; la política con menores; qué cubren la U.900 y la
+  autorización en lo íntimo; estatutos del colegio, códigos de conducta y arbitraje; la convocatoria
+  del FSE+; el pago y las condiciones de las tarjetas regalo; plazos, proveedores y bases de la
+  privacidad; el asistente virtual.
+- **Completado con fuentes oficiales (c):** los datos del Registro Mercantil y el domicilio social
+  (BORME), la dirección del Registro de centros sanitarios («puerta 35-36») y el emblema oficial
+  «Cofinanciado por la Unión Europea» (Comisión Europea; UAFSE).
+- **Sin marca en la web:** el logotipo vectorial; fotos nuevas de la entrada y del head spa y
+  retratos coherentes; los originales de los vídeos de Vimeo; los borradores de
+  `web/contenido/pendientes/` cuando haya autorización; los anuncios que apunten a páginas de
+  campaña de SITE123 y la página en francés; Search Console y la analítica que hoy lleve Uebea.

@@ -19,7 +19,8 @@
     "web": "node web/construir.js",
     "web:ver": "node web/servir.js",
     "web:fotos": "node web/fotos.js",
-    "web:revisar": "node web/revisar.mjs"
+    "web:revisar": "node web/revisar.mjs",
+    "web:publicar": "node web/construir.js --publicar"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",
