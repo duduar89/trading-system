@@ -3,6 +3,7 @@
 // limpio: teléfono en formato internacional (E.164, España por defecto), nombre, email, respuestas
 // del formulario y el tratamiento que le interesa. Sin base de datos ni red.
 const { normalizar } = require('../repesca/interpretar');
+const { esSensible } = require('../repesca/filtro-legal');
 
 const ORIGENES = ['meta_formulario', 'meta_ctwa', 'web_whatsapp', 'ghl', 'treatwell', 'telefono', 'recepcion', 'google', 'referido', 'otro', 'web'];
 const texto = (v, max = 160) => (v == null || typeof v === 'object' ? null : String(v).trim().slice(0, max) || null);
@@ -158,6 +159,10 @@ const limpio = (t) => normalizar(t).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 // anuncios y lo que pregunta la gente. El importador del catálogo lo deja inactivo con esta nota
 // (scripts/importar-catalogo.js); lo retirado del catálogo también queda inactivo, pero sin ella.
 const NOTA_AGRUPADOR = 'No se reserva: agrupa varias técnicas';
+// Un botón de WhatsApp de la web que mandan varias páginas: el importador guarda su texto en una sola
+// y a las demás les pone esta nota, con el nombre de esa: «… manda el mismo texto que «Head Spa Detox
+// Purificante».»
+const NOTA_BOTON_COMPARTIDO = 'El botón de WhatsApp de la web manda el mismo texto que «';
 
 function esAgrupador(t) {
   if (!t) return false;
@@ -165,6 +170,17 @@ function esAgrupador(t) {
   const activo = t.activo == null || Boolean(Number(t.activo));
   return !activo && String(t.notas || '').startsWith(NOTA_AGRUPADOR);
 }
+
+// ¿Es o uno de los niveles o técnicas que agrupa a? Los de su misma familia y subfamilia (los del Head
+// Spa japonés: Express, Detox, Synergie y Zen Premium).
+function esOpcion(o, a) {
+  return Boolean(o && a && o.id !== a.id && a.subfamilia && o.familia === a.familia && o.subfamilia === a.subfamilia);
+}
+
+// Lo que no se nombra si el paciente no lo ha nombrado: lo íntimo y lo de publicidad restringida
+// (medicamentos con receta, productos sanitarios).
+const restringido = (t) => Boolean(Number(t.publicidad_restringida)) || t.regimen_legal === 'medicamento_receta';
+const discreto = (t) => esSensible(t) || restringido(t);
 
 // Formas de nombrar un tratamiento: su nombre, el nombre sin lo que va entre paréntesis, cada
 // alternativa separada por «/» y sus alias.
@@ -184,35 +200,43 @@ const contiene = (texto_, frase) => ` ${texto_} `.includes(` ${frase} `);
 
 // El tratamiento del catálogo que nombra un texto. Gana el nombre exacto; si no, la forma más
 // larga que aparece entera en el texto; si el texto es corto («HIFU»), el único tratamiento que lo
-// contiene. Si hay empate entre dos tratamientos, ninguno: mejor sin tratamiento que con otro. Solo
-// si entre los empatados hay un agrupador (y uno solo), ese: «Head Spa» es el Head Spa japonés, que
-// agrupa los niveles, y la conversación le preguntará cuál.
+// contiene. Si hay empate entre dos tratamientos, ninguno: mejor sin tratamiento que con otro (ver
+// elegirMejor: el agrupador con sus técnicas).
 function buscarEnCatalogo(valor, tratamientos) {
   return completos(limpio(valor || ''), tratamientos).id;
 }
 
+// parcial: el texto es solo un trozo de su nombre («láser», «fotona»), no lo nombra entero.
 function completos(t, tratamientos) {
   if (t.length < 3) return { hay: false, id: null };
   return elegirMejor(tratamientos.map((tr) => {
     let puntos = 0;
+    let parcial = false;
+    const sube = (p, esParcial) => { if (p > puntos) { puntos = p; parcial = esParcial; } };
     for (const f of formas(tr)) {
-      if (f === t) puntos = Math.max(puntos, 1000 + f.length);
-      else if (contiene(t, f)) puntos = Math.max(puntos, f.length);
-      else if (t.length >= 4 && contiene(f, t)) puntos = Math.max(puntos, t.length - 0.5);
+      if (f === t) sube(1000 + f.length, false);
+      else if (contiene(t, f)) sube(f.length, false);
+      else if (t.length >= 4 && contiene(f, t)) sube(t.length - 0.5, true);
     }
-    return { tr, puntos };
+    return { tr, puntos, parcial };
   }));
 }
 
-// El que más puntos tiene; si empatan, el agrupador (si es uno solo); si no, ninguno. hay: si alguno
-// tenía puntos (aunque empataran).
+// El que más puntos tiene. hay: si alguno tenía puntos (aunque empataran). Si empatan varios, ninguno…
+// salvo que uno sea un agrupador y los demás, sus niveles o técnicas (esOpcion): «Head Spa» es el Head
+// Spa japonés, y la conversación le preguntará cuál. Un agrupador de lo íntimo o de publicidad
+// restringida no gana así, ni con un trozo de su nombre («láser», «radiofrecuencia», «fotona» no son
+// el rejuvenecimiento vaginal): solo si lo nombra entero.
 function elegirMejor(puntuados) {
   const max = Math.max(0, ...puntuados.map((x) => x.puntos));
   if (!max) return { hay: false, id: null };
-  const mejores = [...new Map(puntuados.filter((x) => x.puntos === max).map((x) => [x.tr.id, x.tr])).values()];
-  if (mejores.length === 1) return { hay: true, id: mejores[0].id };
-  const agrupadores = mejores.filter(esAgrupador);
-  return { hay: true, id: agrupadores.length === 1 ? agrupadores[0].id : null };
+  const mejores = [...new Map(puntuados.filter((x) => x.puntos === max).map((x) => [x.tr.id, x])).values()];
+  const reservado = (x) => esAgrupador(x.tr) && discreto(x.tr);
+  if (mejores.length === 1) return { hay: true, id: mejores[0].parcial && reservado(mejores[0]) ? null : mejores[0].tr.id };
+  const agrupadores = mejores.filter((x) => esAgrupador(x.tr));
+  const a = agrupadores.length === 1 ? agrupadores[0] : null;
+  const gana = a && !reservado(a) && mejores.every((x) => x === a || esOpcion(x.tr, a.tr));
+  return { hay: true, id: gana ? a.tr.id : null };
 }
 
 const VACIAS = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'con', 'para', 'por', 'en', 'y', 'o', 'a', 'al', 'sin', 'un', 'una']);
@@ -237,7 +261,7 @@ function buscarEnMensaje(valor, tratamientos) {
         if (texto.includes(` ${trozo.join(' ')} `)) { puntos = Math.max(puntos, trozo.join(' ').length); break; }
       }
     }
-    return { tr, puntos };
+    return { tr, puntos, parcial: true };
   })).id;
 }
 
@@ -247,7 +271,8 @@ function buscarEnMensaje(valor, tratamientos) {
  * formulario o código de la web (claves, en orden de prioridad); y el catálogo en los nombres del
  * anuncio o la campaña (textos). Valen los que se reservan y los agrupadores (esAgrupador): de esos,
  * la conversación le pregunta el nivel o la técnica, o lo pasa a recepción. Lo retirado, no.
- * @param {object} p { tratamientos: [{ id, nombre, alias, activo, notas }], mapeo: [{ clave, tratamiento_id }],
+ * @param {object} p { tratamientos: [{ id, nombre, alias, activo, notas, familia, subfamilia, sensible,
+ *                     publicidad_restringida, regimen_legal }], mapeo: [{ clave, tratamiento_id }],
  *                     id, respuesta, claves: [], textos: [] }
  * @returns {{ id: string, via: 'id'|'formulario'|'mapeo'|'catalogo', agrupador?: true } | null}
  */
@@ -276,5 +301,6 @@ function resolverTratamiento({ tratamientos = [], mapeo = [], id = null, respues
 
 module.exports = {
   ORIGENES, normalizarTelefono, telefonoLegible, esFijoEspanol, normalizarEmail, limpiarNombre, nombrePila, datosFormulario,
-  leerLeadApi, leerWebhookLeads, buscarEnCatalogo, buscarEnMensaje, resolverTratamiento, esAgrupador, NOTA_AGRUPADOR,
+  leerLeadApi, leerWebhookLeads, buscarEnCatalogo, buscarEnMensaje, resolverTratamiento, esAgrupador, esOpcion, restringido,
+  NOTA_AGRUPADOR, NOTA_BOTON_COMPARTIDO,
 };

@@ -7,6 +7,11 @@
 //   · cancelar por WhatsApp entra en la secuencia «cancelación», sin duplicarla;
 //   · los textos sin nombre o sin tratamiento se leen bien;
 //   · «por la tarde» es por la tarde (y si no hay, se dice y se ofrece la mañana).
+// Y lo que encontró la revisión: «me interesa…» también elige hueco; «no quiero info, quiero cita» no
+// cierra; las dudas médicas llegan al equipo médico; el plazo manda en el seguimiento; si pregunta por
+// otro tratamiento, ese; «más información» nunca del de su última cita (lo íntimo, ni nombrarlo); si
+// ya tiene cita de eso, no se le da otra; el botón compartido de un agrupador pregunta el nivel; la
+// plantilla de la cancelación no nombra el tratamiento; la baja de la lista cuenta.
 // Todo inventado: teléfonos 611 000 7xx, 8xx y 9xx.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -26,6 +31,7 @@ const { crearIa } = require('../servidor/integraciones/ia');
 const { crearWhatsApp } = require('../servidor/integraciones/whatsapp');
 const { BIBLIOTECA } = require('../motor/repesca/plantillas');
 const { esAgrupador, NOTA_AGRUPADOR } = require('../motor/entrada/leads');
+const { semillar } = require('../servidor/semillas');
 const T = require('../motor/tiempo');
 
 const en = (fecha, hora) => T.desdeMadrid(fecha, hora);
@@ -278,10 +284,17 @@ test('lista de espera: el aviso que no llega pasa al siguiente; lo íntimo no se
       assert.equal((await ofertaDe(enNora)).estado, 'anulada');
       assert.equal((await uno(pool, 'SELECT estado FROM citas WHERE id = ?', [o.cita_id])).estado, 'cancelada', 'el hueco que se le guardaba, libre');
       assert.equal((await uno(pool, 'SELECT estado FROM lista_espera WHERE id = ?', [enNora])).estado, 'esperando', 'sigue en la lista');
-      const tareas = await todos(pool, "SELECT tipo, titulo FROM tareas WHERE paciente_id = ? AND estado = 'abierta'", [nora]);
+      const tareas = await todos(pool, "SELECT id, tipo, titulo, conversacion_id FROM tareas WHERE paciente_id = ? AND estado = 'abierta'", [nora]);
       assert.equal(tareas.length, 1, 'una sola tarea: la de llamarle');
       assert.equal(tareas[0].tipo, 'llamar');
       assert.match(tareas[0].titulo, /no le ha llegado por WhatsApp el aviso del hueco del miércoles 21 de octubre a las 12:00/);
+      // La conversación del aviso ya no espera nada: cerrada (la tarea sigue enlazada a ella). Cuando
+      // recepción cierra la tarea, no sale «Conversación sin próximo paso».
+      const conv = await uno(pool, 'SELECT estado, motivo_cierre FROM conversaciones WHERE id = ?', [o.conversacion_id]);
+      assert.deepEqual([conv.estado, conv.motivo_cierre], ['cerrada', 'lista_espera']);
+      assert.equal(tareas[0].conversacion_id, o.conversacion_id);
+      await pool.query("UPDATE tareas SET estado = 'hecha', hecha_en = ? WHERE id = ?", [mas(lunes, 5), tareas[0].id]);
+      assert.ok(!(await R.sinProximoPaso(pool, mas(lunes, 6))).some((c) => c.id === o.conversacion_id));
       assert.equal((await espera.vuelta(deps, { ahora: mas(lunes, 6) })).ofrecidas, 1);
       assert.equal(alTelefono(whatsapp, '+34611000802').length, 1, 'se le ofrece a Olga');
       assert.equal((await ofertaDe(enOlga)).estado, 'ofrecida');
@@ -297,7 +310,7 @@ test('lista de espera: el aviso que no llega pasa al siguiente; lo íntimo no se
       await entrada.aplicarEstado(deps, { waId: aviso.waId, estado: 'fallido', error: { codigo: '131026', texto: 'No se puede entregar el mensaje' } }, { ahora: mas(lunes, 12) });
       assert.equal((await ofertaDe(enPia)).estado, 'anulada');
       const o = await ofertaDe(enPia);
-      assert.notEqual((await uno(pool, 'SELECT estado FROM conversaciones WHERE id = ?', [o.conversacion_id])).estado, 'espera_persona');
+      assert.equal((await uno(pool, 'SELECT estado FROM conversaciones WHERE id = ?', [o.conversacion_id])).estado, 'cerrada', 'ni a una persona ni esperando nada');
       assert.equal((await todos(pool, "SELECT id FROM tareas WHERE paciente_id = ? AND estado = 'abierta'", [pia])).length, 1);
     });
 
@@ -397,7 +410,7 @@ test('cancelar por WhatsApp: si no reserva otra, entra en la secuencia «cancela
   try {
     await sembrar(pool);
 
-    await t.test('cancela → secuencia «cancelación» con su cita; a las 48 h, la plantilla con el tratamiento', async () => {
+    await t.test('cancela → secuencia «cancelación» con su cita; a las 48 h, la plantilla, sin nombrar el tratamiento', async () => {
       const elena = await paciente(pool, { nombre: 'Elena', telefono: '+34611000901', consentimiento: true });
       const c = await cita(pool, elena, 'limpieza-facial', '2026-10-20', '12:00');
       const r = await cancelar('+34611000901');
@@ -410,8 +423,8 @@ test('cancelar por WhatsApp: si no reserva otra, entra en la secuencia «cancela
       assert.equal(madrid(ins.siguiente_en), '2026-10-08 11:02');
       await R.avanzarSecuencias(deps, { ahora: en('2026-10-08', '11:05') });
       const m = alTelefono(whatsapp, '+34611000901').at(-1);
-      assert.deepEqual([m.nombre, m.variables], ['iemec_cancelacion_nuevo_hueco', ['Elena', 'limpieza facial profunda']]);
-      assert.match((await textos(pool, '+34611000901')).at(-1), /^Hola Elena, vimos que tuviste que cancelar tu cita de limpieza facial profunda\./);
+      assert.deepEqual([m.nombre, m.variables], ['iemec_cancelacion_nuevo_hueco', ['Elena']]);
+      assert.match((await textos(pool, '+34611000901')).at(-1), /^Hola Elena, vimos que tuviste que cancelar tu cita en IEMEC\. ¿Te buscamos otro momento/);
     });
 
     await t.test('«No» a «¿Te busco otro momento?»: no se le persigue', async () => {
@@ -470,14 +483,47 @@ test('cancelar por WhatsApp: si no reserva otra, entra en la secuencia «cancela
       assert.equal((await uno(pool, 'SELECT estado FROM tareas WHERE id = ?', [r.recuperar.tarea])).estado, 'hecha');
     });
 
-    await t.test('lo íntimo no se nombra en la plantilla: «tu cita de hace unos días»', async () => {
+    await t.test('ni lo íntimo ni nada: la plantilla no nombra el tratamiento, ni dice cuándo era la cita', async () => {
       const julia = await paciente(pool, { nombre: 'Julia', telefono: '+34611000907', consentimiento: true });
       await cita(pool, julia, 'laser-intimo', '2026-10-20', '12:00');
       await cancelar('+34611000907');
       await R.avanzarSecuencias(deps, { ahora: en('2026-10-08', '11:30') });
       const m = alTelefono(whatsapp, '+34611000907').at(-1);
-      assert.deepEqual([m.nombre, m.variables], ['iemec_cancelacion_nuevo_hueco', ['Julia', 'hace unos días']]);
-      assert.doesNotMatch((await textos(pool, '+34611000907')).at(-1), /l[aá]ser|vaginal|atrofia/i);
+      assert.deepEqual([m.nombre, m.variables], ['iemec_cancelacion_nuevo_hueco', ['Julia']]);
+      assert.doesNotMatch((await textos(pool, '+34611000907')).at(-1), /l[aá]ser|vaginal|atrofia|hace unos días/i);
+    });
+
+    await t.test('a quien solo es cliente (sin consentimiento expreso) tampoco se le nombra; con la plantilla antigua aprobada ({{2}}), «tu cita de IEMEC»', async () => {
+      const olga = await paciente(pool, { nombre: 'Olga', telefono: '+34611000908', cliente: true });
+      await cita(pool, olga, 'hidratacion-facial', '2026-10-21', '17:00');
+      const r = await cancelar('+34611000908');
+      assert.ok(r.recuperar.inscripcion, 'cliente: entra en la secuencia (LSSI 21.2)');
+      // La plantilla que Meta aprobó antes, con el tratamiento en {{2}}.
+      await pool.query("UPDATE plantillas SET cuerpo = ? WHERE uso = 'cancelacion_recuperar'",
+        ['Hola {{1}}, vimos que tuviste que cancelar tu cita de {{2}}. ¿Te buscamos otro momento que te venga mejor? Si no quieres recibir más mensajes como este, responde BAJA.']);
+      await R.avanzarSecuencias(deps, { ahora: en('2026-10-08', '11:40') });
+      const m = alTelefono(whatsapp, '+34611000908').at(-1);
+      assert.deepEqual([m.nombre, m.variables], ['iemec_cancelacion_nuevo_hueco', ['Olga', 'IEMEC']]);
+      const texto = (await textos(pool, '+34611000908')).at(-1);
+      assert.match(texto, /^Hola Olga, vimos que tuviste que cancelar tu cita de IEMEC\./);
+      assert.doesNotMatch(texto, /hidrataci[oó]n|facial/i);
+    });
+
+    await t.test('con la baja en la lista (la pidió cuando era un lead), no entra en la secuencia: la recupera una persona llamando', async () => {
+      const pili = await paciente(pool, { nombre: 'Pili', telefono: '+34611000909', cliente: true });
+      await pool.query("INSERT INTO bajas_comerciales (telefono, fuente, creado_en) VALUES ('+34611000909', 'whatsapp', ?)", [en('2026-09-01', '10:00')]);
+      await cita(pool, pili, 'limpieza-facial', '2026-10-22', '17:00');
+      const r = await cancelar('+34611000909');
+      assert.equal(r.recuperar.omitido, 'se dio de baja de los mensajes comerciales');
+      assert.equal((await inscripciones(pili)).length, 0);
+      assert.match((await uno(pool, 'SELECT titulo FROM tareas WHERE id = ?', [r.recuperar.tarea])).titulo, /llamarle para buscarle otro hueco \(se dio de baja/);
+      // Y las secuencias que ya tenía (un «toca repetir» de antes de la baja) no le escriben.
+      const [ins] = await pool.query("INSERT INTO inscripciones (secuencia, paciente_id, inicio, paso_actual, siguiente_en) VALUES ('toca_repetir', ?, ?, 0, ?)",
+        [pili, en('2026-10-06', '10:00'), en('2026-10-06', '12:00')]);
+      const hechos = await R.avanzarSecuencias(deps, { ahora: en('2026-10-06', '12:30') });
+      assert.match(hechos.find((h) => h.inscripcion === ins.insertId)?.bloqueado || '', /baja/);
+      assert.deepEqual(alTelefono(whatsapp, '+34611000909').filter((x) => x.tipo === 'plantilla'), []);
+      assert.equal((await uno(pool, 'SELECT estado FROM inscripciones WHERE id = ?', [ins.insertId])).estado, 'cancelada');
     });
   } finally {
     await pool.end();
@@ -573,5 +619,314 @@ test('«por la tarde» es por la tarde; si no hay, se dice y se ofrece la mañan
     });
   } finally {
     await pool2.end();
+  }
+});
+
+// ── Lo que encontró la revisión ─────────────────────────────────────────────────────────────
+
+// «martes», «miércoles»… del día de un hueco.
+const diaDe = (fecha) => R.textoDia(fecha).split(' ')[1];
+const lead = (pool, telefono, nombre, tratamiento) =>
+  pool.query("INSERT INTO leads (telefono, nombre, origen, tratamiento_interes_id) VALUES (?, ?, 'meta_ctwa', ?)", [telefono, nombre, tratamiento]);
+
+test('«me interesa…» elige el hueco; «no quiero info, quiero cita» no cierra; las dudas médicas llegan al equipo médico', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const deps = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
+  const martes = en('2026-10-06', '11:00');
+  const estadoDe = async (telefono) => ({
+    lead: await uno(pool, 'SELECT etapa, motivo_perdida FROM leads WHERE telefono = ?', [telefono]),
+    conv: await uno(pool, 'SELECT * FROM conversaciones WHERE telefono = ? ORDER BY id DESC LIMIT 1', [telefono]),
+  });
+  try {
+    await sembrar(pool);
+
+    await t.test('«Me interesa el del martes a las 15:00», «me interesa la primera», «me interesa el segundo hueco»: se reserva ese', async () => {
+      const casos = [
+        ['+34611000951', 'Eva', (h) => {
+          // Uno que no sea el primero y cuyo día y hora no se repitan entre los propuestos.
+          const unico = h.find((x) => x !== h[0] && h.filter((y) => diaDe(y.fecha) === diaDe(x.fecha) && y.hora === x.hora).length === 1) || h[0];
+          return [`Me interesa el del ${diaDe(unico.fecha)} a las ${unico.hora}`, unico];
+        }],
+        ['+34611000952', 'Fe', (h) => ['Me interesa la primera', h[0]]],
+        ['+34611000953', 'Gema', (h) => ['Me interesa el segundo hueco', h[1]]],
+      ];
+      // La víspera por la tarde: el primer hueco que se le propone aún se puede reservar un rato después.
+      const lunes = en('2026-10-05', '19:00');
+      for (const [telefono, nombre, eleccion] of casos) {
+        await lead(pool, telefono, nombre, 'limpieza-facial');
+        const p = await R.procesarEntrante(deps, { telefono, texto: 'Quiero pedir cita', ahora: lunes });
+        assert.equal(p.huecos.length, 3);
+        const [texto, hueco] = eleccion(p.huecos);
+        const r = await R.procesarEntrante(deps, { telefono, texto, ahora: mas(lunes, 2) });
+        assert.equal(r.eleccion, 'reservada', `${texto}: ${r.respuesta}`);
+        assert.equal(madrid(r.cita.inicio), `${hueco.fecha} ${hueco.hora}`, texto);
+      }
+    });
+
+    await t.test('«no quiero info, quiero cita» y parecidos no le dan por perdido; «no quiero más información» a secas, sí', async () => {
+      const casos = [
+        ['+34611000954', 'No necesito más información, quiero cita', 'reservar'],
+        ['+34611000955', 'Hola, no quiero info, quiero reservar', 'reservar'],
+        ['+34611000956', 'No quiero cita para mí sino para mi hija', 'otro'],
+        ['+34611000957', 'No quiero info por aquí, llamadme', 'otro'],
+        ['+34611000958', 'Aún no quiero cita', 'otro'],
+      ];
+      for (const [telefono, texto, intencion] of casos) {
+        await lead(pool, telefono, 'Bea', 'limpieza-facial');
+        const r = await R.procesarEntrante(deps, { telefono, texto, ahora: martes });
+        assert.equal(r.decision.intencion, intencion, texto);
+        const { lead: l, conv } = await estadoDe(telefono);
+        assert.notEqual(l.etapa, 'perdido', texto);
+        assert.notEqual(conv.estado, 'cerrada', texto);
+        if (intencion === 'reservar') assert.equal(r.huecos.length, 3, texto);
+        assert.doesNotMatch(r.respuesta, /Gracias por decírnoslo/, texto);
+      }
+      await lead(pool, '+34611000959', 'Bea', 'limpieza-facial');
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000959', texto: 'No quiero más información', ahora: martes });
+      assert.equal(r.decision.intencion, 'no_interesa');
+      const { lead: l, conv } = await estadoDe('+34611000959');
+      assert.deepEqual([l.etapa, l.motivo_perdida, conv.estado], ['perdido', 'no_interesa', 'cerrada']);
+    });
+
+    await t.test('una duda médica pedida como información (sin respuesta aprobada) la contesta el equipo médico: persona y tarea', async () => {
+      const casos = ['Me interesa, ¿duele?', '¿En qué consiste la recuperación?', 'Me interesa saber si es seguro', 'Quiero info pero me da miedo el dolor',
+        '¿Me das info sobre los efectos secundarios? Tengo la piel muy sensible', 'Quiero más información sobre la anestesia'];
+      let n = 60;
+      for (const texto of casos) {
+        const telefono = `+346110009${n++}`;
+        await lead(pool, telefono, 'Cris', 'hidratacion-facial');
+        const r = await R.procesarEntrante(deps, { telefono, texto, ahora: martes });
+        assert.equal(r.decision.intencion, 'duda_medica', texto);
+        assert.deepEqual(r.huecos, [], texto);
+        const { conv } = await estadoDe(telefono);
+        assert.equal(conv.estado, 'espera_persona', texto);
+        assert.equal((await uno(pool, "SELECT titulo FROM tareas WHERE conversacion_id = ? AND estado = 'abierta'", [conv.id]))?.titulo, 'duda médica sin respuesta aprobada', texto);
+      }
+      await lead(pool, '+34611000970', 'Cris', 'hidratacion-facial');
+      const p = await R.procesarEntrante(deps, { telefono: '+34611000970', texto: 'Me interesa pero lo tengo que pensar', ahora: martes });
+      assert.equal(p.decision.intencion, 'pensar');
+    });
+
+    await t.test('el plazo manda: «me interesa, pero para el mes que viene» es aplazar; «quiero información, pero para el mes que viene», el seguimiento entonces', async () => {
+      await lead(pool, '+34611000971', 'Dani', 'limpieza-facial');
+      const a = await R.procesarEntrante(deps, { telefono: '+34611000971', texto: 'Me interesa, pero para el mes que viene', ahora: martes });
+      assert.equal(a.decision.intencion, 'aplazar');
+      const sa = await uno(pool, "SELECT motivo, programado_para FROM seguimientos WHERE conversacion_id = ? AND estado = 'pendiente'", [a.conversacionId]);
+      assert.deepEqual([sa.motivo, madrid(sa.programado_para).slice(0, 10)], ['aplazamiento', '2026-11-02']);
+      await lead(pool, '+34611000972', 'Dani', 'limpieza-facial');
+      const i = await R.procesarEntrante(deps, { telefono: '+34611000972', texto: 'Quiero información, pero para el mes que viene', ahora: martes });
+      assert.equal(i.decision.intencion, 'informacion');
+      const si = await uno(pool, "SELECT motivo, programado_para FROM seguimientos WHERE conversacion_id = ? AND estado = 'pendiente'", [i.conversacionId]);
+      assert.deepEqual([si.motivo, madrid(si.programado_para).slice(0, 10)], ['informacion', '2026-11-02'], 'no a los 2 días');
+      assert.ok(i.huecos.length && i.huecos.every((h) => h.fecha >= '2026-11-02'), JSON.stringify(i.huecos));
+      // Para dentro de más de dos meses, solo el seguimiento.
+      await lead(pool, '+34611000973', 'Dani', 'limpieza-facial');
+      const v = await R.procesarEntrante(deps, { telefono: '+34611000973', texto: 'Quiero información, pero después del verano', ahora: martes });
+      assert.deepEqual(v.huecos, []);
+      const sv = await uno(pool, "SELECT programado_para FROM seguimientos WHERE conversacion_id = ? AND estado = 'pendiente'", [v.conversacionId]);
+      assert.ok(madrid(sv.programado_para) > '2027-08-31', madrid(sv.programado_para));
+    });
+  } finally {
+    await pool.end();
+  }
+});
+
+test('«más información»: de lo que pregunta, nunca de su última cita; si ya tiene cita de eso, no se le da otra', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const deps = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
+  const martes = en('2026-10-06', '11:00');
+  const horas = ['12:00', '13:30', '15:00', '16:30', '18:00'];
+  const pasada = async (pacienteId, tratamiento) => {
+    const c = await agenda.reservar(pool, { pacienteId, tratamientoId: tratamiento, fecha: '2026-10-02', hora: horas.shift(), origen: 'recepcion', ahora: en('2026-09-25', '10:00') });
+    await pool.query("UPDATE citas SET estado = 'completada' WHERE id = ?", [c.id]);
+    return c;
+  };
+  const confirmadas = async (pacienteId) => Number((await uno(pool, "SELECT COUNT(*) AS n FROM citas WHERE paciente_id = ? AND estado = 'confirmada'", [pacienteId])).n);
+  try {
+    await sembrar(pool);
+    await pool.query(`INSERT INTO respuestas_aprobadas (tratamiento_id, pregunta, respuesta, aprobada) VALUES
+      ('head-spa-express', '¿Cuánto cuesta el Head Spa Express?', 'El Head Spa Express cuesta 60 euros.', TRUE),
+      ('laser-intimo', '¿En qué consiste el láser para la atrofia vaginal?', 'Es un láser que trata la sequedad y la atrofia vaginal en 3 sesiones.', TRUE),
+      ('toxina', '¿Cuánto cuesta la toxina botulínica?', 'La toxina botulínica para las arrugas de expresión cuesta 300 euros por zona.', TRUE)`);
+
+    await t.test('pregunta por otro tratamiento: lo aprobado y los huecos de ese (y queda en su lead)', async () => {
+      const sara = await paciente(pool, { nombre: 'Sara', telefono: '+34611000711' });
+      await pasada(sara, 'limpieza-facial');
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000711', texto: 'Hola, ¿qué precio tiene el Head Spa Express?', ahora: martes });
+      assert.match(r.respuesta, /Gracias, Sara\. El Head Spa Express cuesta 60 euros\. Si quieres, te busco hueco/);
+      assert.doesNotMatch(r.respuesta, /54 euros/);
+      assert.equal((await uno(pool, 'SELECT huecos_tratamiento_id AS t FROM conversaciones WHERE id = ?', [r.conversacionId])).t, 'head-spa-express');
+      // Lo siguiente que pregunta sigue siendo de eso, no de su última cita.
+      const r2 = await R.procesarEntrante(deps, { telefono: '+34611000711', texto: '¿Qué precio tiene?', ahora: mas(martes, 2) });
+      assert.match(r2.respuesta, /cuesta 60 euros/);
+
+      await lead(pool, '+34611000712', 'Ruth', 'limpieza-facial');
+      const l = await R.procesarEntrante(deps, { telefono: '+34611000712', texto: 'Hola, ¿qué precio tiene el Head Spa Express?', ahora: martes });
+      assert.match(l.respuesta, /El Head Spa Express cuesta 60 euros/);
+      assert.equal((await uno(pool, "SELECT tratamiento_interes_id AS t FROM leads WHERE telefono = '+34611000712'")).t, 'head-spa-express');
+    });
+
+    await t.test('«quiero más información» sin decir de qué: nada de lo íntimo ni del medicamento de su última cita; se le pregunta', async () => {
+      const nuria = await paciente(pool, { nombre: 'Nuria', telefono: '+34611000713' });
+      await pasada(nuria, 'laser-intimo');
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000713', texto: 'Hola, quiero más información', ahora: martes });
+      assert.equal(r.respuesta, 'Soy el asistente virtual de IEMEC. Gracias, Nuria. ¿Qué tratamiento te interesa? Te cuento lo que necesites y, si quieres, te busco hueco para una primera valoración con nuestro equipo, sin compromiso.');
+      assert.deepEqual(r.huecos, []);
+      const tona = await paciente(pool, { nombre: 'Toña', telefono: '+34611000714', cliente: true });
+      await pasada(tona, 'toxina');
+      const t2 = await R.procesarEntrante(deps, { telefono: '+34611000714', texto: 'Hola, quiero más información', ahora: martes });
+      assert.doesNotMatch(t2.respuesta, /toxina|300 euros|arrugas|primera valoración/i);
+      assert.match(t2.respuesta, /¿Qué tratamiento te interesa\?/);
+    });
+
+    await t.test('lo íntimo de su lead que no nombra: ni lo aprobado ni huecos, la valoración; si lo nombra, sí', async () => {
+      await lead(pool, '+34611000715', 'Luz', 'laser-intimo');
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000715', texto: 'Hola, quiero más información', ahora: martes });
+      assert.equal(r.respuesta, 'Soy el asistente virtual de IEMEC. Gracias, Luz. Lo mejor es verlo en una valoración con nuestro equipo, sin compromiso. ¿Quieres que te busquemos hueco?');
+      assert.deepEqual(r.huecos, []);
+      const r2 = await R.procesarEntrante(deps, { telefono: '+34611000715', texto: 'Quiero información del láser para la atrofia vaginal', ahora: mas(martes, 2) });
+      assert.match(r2.respuesta, /^Gracias, Luz\. Es un láser que trata la sequedad y la atrofia vaginal en 3 sesiones\. Si quieres, te busco hueco/);
+      assert.equal(r2.huecos.length, 3);
+    });
+
+    await t.test('ya tiene cita de eso: lo aprobado y su cita, sin huecos ni otra cita', async () => {
+      await lead(pool, '+34611000716', 'Mar', 'limpieza-facial');
+      const lunes = en('2026-10-05', '19:00');
+      const p = await R.procesarEntrante(deps, { telefono: '+34611000716', texto: 'Quiero pedir cita', ahora: lunes });
+      const c = await R.procesarEntrante(deps, { telefono: '+34611000716', texto: 'La primera', ahora: mas(lunes, 2) });
+      assert.equal(c.eleccion, 'reservada');
+      const mar = (await uno(pool, "SELECT id FROM pacientes WHERE telefono = '+34611000716'")).id;
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000716', texto: 'Hola, ¿qué precio tiene?', ahora: mas(lunes, 10) });
+      assert.equal(r.respuesta, `Gracias, Mar. La sesión cuesta 54 euros. Te esperamos ${R.textoDia(p.huecos[0].fecha)} a las ${p.huecos[0].hora}.`);
+      assert.deepEqual(r.huecos, []);
+      const conv = await uno(pool, 'SELECT estado, motivo_cierre FROM conversaciones WHERE id = ?', [r.conversacionId]);
+      assert.deepEqual([conv.estado, conv.motivo_cierre], ['cerrada', 'cita']);
+      await R.procesarEntrante(deps, { telefono: '+34611000716', texto: 'Vale, el miércoles', ahora: mas(lunes, 12) });
+      assert.equal(await confirmadas(mar), 1, 'ni una segunda cita');
+
+      // Clienta con su limpieza el 14 (se la dio recepción) que pregunta sin decir de qué: de su cita.
+      const ines = await paciente(pool, { nombre: 'Inés', telefono: '+34611000717', cliente: true });
+      await cita(pool, ines, 'limpieza-facial', '2026-10-14', '12:00');
+      const i = await R.procesarEntrante(deps, { telefono: '+34611000717', texto: 'Hola, ¿qué precio tiene?', ahora: martes });
+      assert.equal(i.respuesta, 'Soy el asistente virtual de IEMEC. Gracias, Inés. La sesión cuesta 54 euros. Te esperamos el miércoles 14 de octubre a las 12:00.');
+      assert.deepEqual(i.huecos, []);
+      await R.procesarEntrante(deps, { telefono: '+34611000717', texto: 'Vale, el miércoles', ahora: mas(martes, 2) });
+      assert.equal(await confirmadas(ines), 1);
+      // Si su cita es de lo íntimo, ni lo aprobado: una persona.
+      const olvido = await paciente(pool, { nombre: 'Olvido', telefono: '+34611000719' });
+      await cita(pool, olvido, 'laser-intimo', '2026-10-15', '12:00');
+      const o = await R.procesarEntrante(deps, { telefono: '+34611000719', texto: 'Hola, quiero más información', ahora: martes });
+      assert.equal(o.respuesta, 'Soy el asistente virtual de IEMEC. Gracias, Olvido. Lo revisa una persona del equipo y te contesta por aquí hoy mismo.');
+      assert.equal((await uno(pool, "SELECT titulo FROM tareas WHERE conversacion_id = ? AND estado = 'abierta'", [o.conversacionId])).titulo, 'pregunta sin respuesta aprobada (ya tiene cita)');
+    });
+
+    await t.test('a quien ya es cliente no se le habla de «primera visita»', async () => {
+      const vega = await paciente(pool, { nombre: 'Vega', telefono: '+34611000718', cliente: true });
+      await pasada(vega, 'hidratacion-facial');
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000718', texto: '¿Qué precio tiene la limpieza facial profunda?', ahora: martes });
+      assert.match(r.respuesta, /Gracias, Vega\. La sesión cuesta 54 euros\. Si quieres, te busco hueco: el .+\. ¿Te reservo alguno\?$/);
+      assert.doesNotMatch(r.respuesta, /primera/);
+    });
+  } finally {
+    await pool.end();
+  }
+});
+
+test('un tratamiento que agrupa varios: una pregunta concreta no es «¿cuál te interesa?»', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const deps = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
+  const martes = en('2026-10-06', '11:00');
+  try {
+    await sembrar(pool);
+    let n = 21;
+    for (const texto of ['¿Hacéis financiación?', '¿Dónde estáis?', '¿Qué horario tenéis?']) {
+      const telefono = `+346110007${n++}`;
+      await lead(pool, telefono, 'Lola', 'head-spa-japones');
+      const r = await R.procesarEntrante(deps, { telefono, texto, ahora: martes });
+      assert.doesNotMatch(r.respuesta, /¿Cuál te interesa\?/, texto);
+      assert.equal((await uno(pool, "SELECT titulo FROM tareas WHERE conversacion_id = ? AND estado = 'abierta'", [r.conversacionId]))?.titulo, 'pregunta sin respuesta aprobada', texto);
+    }
+    // El precio sí depende del nivel: se le pregunta cuál.
+    await lead(pool, '+34611000731', 'Lola', 'head-spa-japones');
+    const p = await R.procesarEntrante(deps, { telefono: '+34611000731', texto: '¿Qué precio tiene?', ahora: martes });
+    assert.match(p.respuesta, /¿Cuál te interesa\?/);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('con el catálogo real: el botón compartido de un agrupador le pregunta el nivel (o va a recepción); «Láser» no es lo íntimo', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const deps = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
+  const martes = en('2026-10-06', '11:00');
+  try {
+    await semillar(pool);
+    // Las semillas no traen horarios: todo el equipo, de lunes a sábado de 11 a 20.
+    for (const { id } of await todos(pool, 'SELECT id FROM profesionales')) {
+      for (const d of [1, 2, 3, 4, 5, 6]) await pool.query("INSERT INTO profesional_horarios (profesional_id, dia_semana, inicio, fin) VALUES (?, ?, '11:00', '20:00')", [id, d]);
+    }
+
+    await t.test('«…para Head Spa Japonés» (el mismo texto que el Detox): ¿cuál de los cuatro?, sin huecos del Detox', async () => {
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000741', texto: 'Hola vengo de la web quisiera reservar una cita para Head Spa Japonés', ahora: martes });
+      const conv = await uno(pool, 'SELECT * FROM conversaciones WHERE id = ?', [r.conversacionId]);
+      const pregunta = json(conv.pregunta_pendiente);
+      assert.equal(pregunta?.tipo, 'elegir_opcion', r.respuesta);
+      assert.equal(pregunta.agrupadorId, 'head-spa-japones');
+      assert.deepEqual([...pregunta.opciones].sort(), ['head-spa-detox', 'head-spa-express', 'head-spa-synergie', 'head-spa-zen-premium']);
+      assert.equal(conv.huecos_tratamiento_id, null);
+      assert.match(r.respuesta, /¿Cuál te interesa\?/);
+    });
+
+    await t.test('«…para tratamiento acne» (el mismo texto que Perfect Skin): el programa de acné, que lleva recepción', async () => {
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000742', texto: 'Hola vengo de la web quisiera reservar una cita para tratamiento acne', ahora: martes });
+      const conv = await uno(pool, 'SELECT estado, huecos_tratamiento_id FROM conversaciones WHERE id = ?', [r.conversacionId]);
+      assert.deepEqual([conv.estado, conv.huecos_tratamiento_id], ['espera_persona', null]);
+      assert.match((await uno(pool, "SELECT titulo FROM tareas WHERE conversacion_id = ? AND estado = 'abierta'", [r.conversacionId])).titulo, /«Programa de tratamiento del acné», que agrupa varias técnicas/);
+    });
+
+    await t.test('un botón que no comparte nadie sigue siendo de su tratamiento', async () => {
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000743', texto: 'Hola vengo de la web quisiera reservar una cita para diagnostico facial', ahora: martes });
+      assert.equal(r.decision.intencion, 'reservar');
+      assert.equal(r.huecos.length, 3);
+      assert.equal((await uno(pool, 'SELECT huecos_tratamiento_id AS t FROM conversaciones WHERE id = ?', [r.conversacionId])).t, 'diagnostico-facial');
+    });
+
+    await t.test('«Láser», «Radiofrecuencia» o «Fotona» no le atribuyen el rejuvenecimiento vaginal (formulario, campaña ni WhatsApp)', async () => {
+      const a = await altaLead(pool, { origen: 'meta_formulario', telefono: '611000744', nombre: 'Alba', tratamiento: { respuesta: 'Láser' } }, { inscribir: false, ahora: martes });
+      assert.equal(a.tratamientoId, null);
+      const b = await altaLead(pool, { origen: 'web', telefono: '611000745', nombre: 'Berta', campana: 'Radiofrecuencia', tratamiento: { textos: ['Radiofrecuencia'] } }, { inscribir: false, ahora: martes });
+      assert.equal(b.tratamientoId, null);
+      await altaLead(pool, { origen: 'meta_ctwa', telefono: '611000746', nombre: 'Carla' }, { inscribir: false, ahora: martes });
+      await R.procesarEntrante(deps, { telefono: '+34611000746', texto: 'Fotona', ahora: martes });
+      assert.equal((await uno(pool, "SELECT tratamiento_interes_id AS t FROM leads WHERE telefono = '+34611000746'")).t, null);
+      const r = await R.procesarEntrante(deps, { telefono: '+34611000746', texto: 'Hola, quiero más información', ahora: mas(martes, 2) });
+      assert.doesNotMatch(r.respuesta, /vaginal|íntim/i);
+      assert.deepEqual(await todos(pool, "SELECT titulo FROM tareas WHERE titulo LIKE '%vaginal%'"), []);
+      const altas = await todos(pool, "SELECT datos FROM eventos WHERE tipo = 'lead_alta'");
+      assert.ok(altas.length >= 3 && altas.every((e) => json(e.datos).tratamiento !== 'rejuvenecimiento-vaginal'));
+    });
+  } finally {
+    await pool.end();
+  }
+});
+
+test('en mitad de una frase, minúscula; las siglas y las marcas, como son', () => {
+  const casos = {
+    'Láser Fotona para flacidez de cuello y escote': 'láser Fotona para flacidez de cuello y escote',
+    'Fototerapia LED facial (terapia de luz LED)': 'fototerapia LED facial (terapia de luz LED)',
+    'Protocolo Glass Skin': 'protocolo Glass Skin',
+    'Peeling BBC': 'peeling BBC',
+    'Pack VIP «All inclusive» de injerto capilar (pacientes de Francia)': 'pack VIP «All inclusive» de injerto capilar (pacientes de Francia)',
+    'Valoración HIFU': 'valoración HIFU',
+    'Limpieza facial profunda': 'limpieza facial profunda',
+  };
+  for (const [nombre, esperado] of Object.entries(casos)) assert.equal(R.enMinuscula(nombre), esperado);
+  for (const tal of ['HIFU facial (HIFU V10 Ultralift)', 'BB Glow', 'Head Spa Detox Purificante', 'Head Spa Express', 'Perfect Skin (microneedling para acné)', 'Gua Sha Lift',
+    'Hair Filler contra la alopecia', 'Easy Diet (plan médico-nutricional)', 'Neuroline T6 (neuroestimulación para el apetito)', 'TrichoTest (test genético capilar)']) {
+    assert.equal(R.enMinuscula(tal), tal);
   }
 });

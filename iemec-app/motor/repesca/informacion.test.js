@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const { interpretar } = require('./interpretar');
 const { decidir } = require('./decidir');
 const { crearCalendario } = require('./calendario-clinica');
-const { textoSimulado } = require('../../servidor/integraciones/ia');
+const { textoSimulado, combinar } = require('../../servidor/integraciones/ia');
 
 const calendario = crearCalendario({
   horario: [1, 2, 3, 4, 5].map((d) => ({ dia_semana: d, abre: '11:00', cierra: '20:00' })).concat([{ dia_semana: 6, abre: '10:00', cierra: '20:00' }]),
@@ -46,6 +46,31 @@ test('con una franja, los huecos que pide son de esa franja; con un día, desde 
   assert.equal(j.acciones.find((a) => a.tipo === 'proponer_huecos').desdeFecha, '2026-10-01');
 });
 
+test('con un plazo, el seguimiento es entonces (no a los 2 días); para más de dos meses o «mañana te digo», sin huecos', () => {
+  const m = decidir(interpretar('Quiero información para el mes que viene'), ctx());
+  const s = m.acciones.find((a) => a.tipo === 'programar_seguimiento');
+  assert.deepEqual([s.fecha, s.motivo, s.plazo], ['2026-10-06', 'informacion', 'mes_siguiente']);
+  assert.equal(m.acciones.find((a) => a.tipo === 'proponer_huecos').desdeFecha, '2026-10-06');
+  const v = decidir(interpretar('Quiero información, pero después del verano'), ctx());
+  assert.equal(v.acciones.find((a) => a.tipo === 'programar_seguimiento').fecha, '2027-09-06');
+  assert.ok(!v.acciones.some((a) => a.tipo === 'proponer_huecos'));
+  const d = decidir(interpretar('Mándame info, mañana te digo'), ctx());
+  assert.equal(d.acciones.find((a) => a.tipo === 'programar_seguimiento').fecha, '2026-09-30');
+  assert.ok(!d.acciones.some((a) => a.tipo === 'proponer_huecos'));
+});
+
+test('si ya tiene cita de eso: lo aprobado y su cita, sin huecos ni otra cita; sin nada aprobado, una persona', () => {
+  const d = decidir(interpretar('Hola, ¿qué precio tiene?'), ctx({ citaPendiente: { id: 7 } }));
+  assert.deepEqual(tipos(d), ['responder', 'recordar_cita']);
+  assert.equal(d.acciones[1].citaId, 7);
+  assert.equal(d.proximoPaso, 'cita');
+  assert.match(d.guia, /recuérdale su cita/);
+  const p = decidir(interpretar('Hola, ¿qué precio tiene?'), ctx({ citaPendiente: { id: 7 }, tieneRespuestaAprobada: false }));
+  assert.deepEqual(tipos(p), ['pasar_a_persona']);
+  // A quien ya es cliente no se le habla de primera visita.
+  assert.match(decidir(interpretar('¿Qué precio tiene?'), ctx({ esCliente: true })).guia, /no le hables de primera visita/);
+});
+
 test('«me gustaría reservar una valoración», «quisiera pedir cita», «¿podría agendar…?»: se le proponen huecos', () => {
   for (const f of ['Me gustaría reservar una valoración', 'Quisiera pedir cita', '¿Podría agendar una cita para el jueves?']) {
     const d = decidir(interpretar(f), ctx({ frase: f }));
@@ -69,6 +94,11 @@ test('lo que agrupa varias técnicas: se le pregunta cuál; si no se puede pregu
   // «El mes que viene» o una baja no necesitan saber cuál.
   assert.equal(decidir(interpretar('El mes que viene'), ctx({ agrupador })).intencion, 'aplazar');
   assert.deepEqual(tipos(decidir(interpretar('BAJA'), ctx({ agrupador }))), ['baja']);
+  // Una pregunta concreta tampoco: lo aprobado o una persona.
+  for (const f of ['¿Hacéis financiación?', '¿Dónde estáis?', '¿Qué horario tenéis?']) {
+    assert.deepEqual(tipos(decidir(interpretar(f), ctx({ agrupador, tieneRespuestaAprobada: false }))), ['pasar_a_persona'], f);
+    assert.deepEqual(tipos(decidir(interpretar(f), ctx({ agrupador }))), ['responder', 'programar_seguimiento'], f);
+  }
 });
 
 test('lo que dice el modo simulado', () => {
@@ -87,4 +117,18 @@ test('lo que dice el modo simulado', () => {
   const opciones = textoSimulado(decidir(interpretar('Quiero más información'), ctx({ agrupador: { nombre: 'x', opciones: [{ id: 'a', nombre: 'A' }, { id: 'b', nombre: 'B' }] } })),
     { nombre: 'Ana', opcionesTexto: 'Head Spa Express o Head Spa Detox Purificante' });
   assert.equal(opciones, 'Tenemos varias opciones, Ana: Head Spa Express o Head Spa Detox Purificante. ¿Cuál te interesa? Así te busco hueco.');
+  // A quien ya es cliente, sin «primera»; si ya tiene cita de eso, lo aprobado y su cita.
+  assert.equal(info('¿Qué precio tiene?', { conTratamiento: true, esCliente: true, nombre: 'Marta', respuestaAprobada: 'Cuesta 54 euros.', huecosTexto: 'el jueves 1 de octubre a las 11:00' }),
+    'Gracias, Marta. Cuesta 54 euros. Si quieres, te busco hueco: el jueves 1 de octubre a las 11:00. ¿Te reservo alguno?');
+  assert.equal(info('Info', { conTratamiento: false, esCliente: true, nombre: 'Marta' }, { tratamiento: { id: null } }),
+    'Gracias, Marta. ¿Qué tratamiento te interesa? Te cuento lo que necesites y, si quieres, te busco hueco.');
+  assert.equal(info('¿Qué precio tiene?', { conTratamiento: true, nombre: 'Mar', respuestaAprobada: 'Cuesta 54 euros.', citaPendiente: 'el miércoles 14 de octubre a las 12:00' }, { citaPendiente: { id: 7 } }),
+    'Gracias, Mar. Cuesta 54 euros. Te esperamos el miércoles 14 de octubre a las 12:00.');
+});
+
+test('con la IA real, una duda médica que la IA toma por información sigue siendo duda médica', () => {
+  const reglas = interpretar('¿Me das info sobre los efectos secundarios?');
+  assert.equal(reglas.intencion, 'duda_medica');
+  assert.equal(combinar(reglas, { intencion: 'informacion', plazo: null, franja: null, urgente: false }).intencion, 'duda_medica');
+  assert.equal(combinar(interpretar('Hola, quiero más información'), { intencion: 'informacion', plazo: null }).intencion, 'informacion');
 });

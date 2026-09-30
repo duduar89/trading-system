@@ -29,7 +29,9 @@ const { elegirOpcion, textoOpciones } = require('../../motor/repesca/opciones');
 const { combinar, textoSimulado } = require('../integraciones/ia');
 const { cifrar, descifrar } = require('../cripto');
 const { apuntarBaja, tieneBaja } = require('../bajas');
-const { limpiarNombre, nombrePila, telefonoLegible, esAgrupador, buscarEnMensaje, NOTA_AGRUPADOR } = require('../../motor/entrada/leads');
+const {
+  limpiarNombre, nombrePila, telefonoLegible, esAgrupador, esOpcion, restringido, buscarEnCatalogo, buscarEnMensaje, NOTA_AGRUPADOR, NOTA_BOTON_COMPARTIDO,
+} = require('../../motor/entrada/leads');
 const { registrar } = require('../eventos');
 const agenda = require('../agenda');
 const LE = require('../lista-espera');
@@ -95,40 +97,52 @@ async function historial(q, conversacionId, n = 10) {
 }
 
 // Todo lo que la política necesita saber de este paciente y esta conversación. tratamientoId: el que
-// acaba de nombrar (manda sobre lo demás).
-async function cargarContexto(q, conv, ahora, { tratamientoId = null } = {}) {
+// acaba de nombrar (manda sobre lo demás). El tratamiento del que se habla, por orden: el que nombra,
+// el de su presupuesto, el de la cita de esta conversación, el que le interesa (su lead), el de los
+// huecos que se le ofrecieron y, si no hay otro, el de su última cita: la que tiene pendiente
+// («su_cita») o una que ya pasó («ultima_cita»; sinUltimaCita: esa no). origen dice de cuál ha salido.
+// citaPendiente: su próxima cita de ese tratamiento, si la tiene.
+async function cargarContexto(q, conv, ahora, { tratamientoId = null, sinUltimaCita = false } = {}) {
   const p = T.partesMadrid(ahora);
   const calendario = await calendarioDesdeBd(q);
   const [[paciente]] = conv.paciente_id ? await q.query('SELECT * FROM pacientes WHERE id = ?', [conv.paciente_id]) : [[null]];
   let tratamiento = null;
+  let origen = null;
   let importe = null;
-  if (tratamientoId) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [tratamientoId]);
+  const usar = async (id, de) => {
+    if (tratamiento || !id) return;
+    [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [id]);
+    if (tratamiento) origen = de;
+  };
+  await usar(tratamientoId, 'nombrado');
   if (conv.contexto === 'presupuesto' && conv.contexto_id) {
     const [[pres]] = await q.query('SELECT * FROM presupuestos WHERE id = ?', [conv.contexto_id]);
     importe = pres ? Number(pres.importe_eur) : null;
     const [[linea]] = await q.query('SELECT tratamiento_id FROM presupuesto_lineas WHERE presupuesto_id = ? AND tratamiento_id IS NOT NULL ORDER BY importe_eur DESC LIMIT 1', [conv.contexto_id]);
-    if (linea && !tratamiento) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [linea.tratamiento_id]);
+    await usar(linea?.tratamiento_id, 'presupuesto');
   }
   // Si la conversación va de una cita suya (recuperar un «no vino», repetir un tratamiento), manda esa.
   if (!tratamiento && ['cancelacion', 'toca_repetir', 'cita'].includes(conv.contexto) && conv.contexto_id && conv.paciente_id) {
     const [[c]] = await q.query('SELECT tratamiento_id FROM citas WHERE id = ? AND paciente_id = ?', [conv.contexto_id, conv.paciente_id]);
-    if (c) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [c.tratamiento_id]);
+    await usar(c?.tratamiento_id, 'cita');
   }
   if (!tratamiento && conv.lead_id) {
     const [[lead]] = await q.query('SELECT tratamiento_interes_id FROM leads WHERE id = ?', [conv.lead_id]);
-    if (lead?.tratamiento_interes_id) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [lead.tratamiento_interes_id]);
+    await usar(lead?.tratamiento_interes_id, 'lead');
   }
+  // Lo que nombró y se le ofreció en esta conversación (sea o no lead o paciente).
+  await usar(conv.huecos_tratamiento_id, 'huecos');
   if (!tratamiento && conv.paciente_id) {
-    const [[c]] = await q.query('SELECT tratamiento_id FROM citas WHERE paciente_id = ? ORDER BY inicio DESC LIMIT 1', [conv.paciente_id]);
-    if (c) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [c.tratamiento_id]);
+    const [[c]] = await q.query('SELECT id, tratamiento_id, inicio, estado, retenida_hasta FROM citas WHERE paciente_id = ? ORDER BY inicio DESC LIMIT 1', [conv.paciente_id]);
+    const pendiente = agenda.sigueEnPie(c, ahora);
+    if (pendiente || !sinUltimaCita) await usar(c?.tratamiento_id, pendiente ? 'su_cita' : 'ultima_cita');
   }
-  // Quien escribe sin ser lead ni paciente y nombró un tratamiento: el de los huecos que se le ofrecieron.
-  if (!tratamiento && conv.huecos_tratamiento_id) [[tratamiento]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [conv.huecos_tratamiento_id]);
   tratamiento = tratamiento || null;
   // Si agrupa varias técnicas o niveles, cuáles se le pueden preguntar.
   const agrupador = esAgrupador(tratamiento)
     ? { id: tratamiento.id, nombre: tratamiento.nombre, opciones: (await opcionesDeAgrupador(q, tratamiento)).map((o) => ({ id: o.id, nombre: o.nombre })) }
     : null;
+  const citaPendiente = tratamiento && conv.paciente_id ? await proximaCitaDe(q, conv.paciente_id, tratamiento.id, ahora) : null;
   if (tratamiento && importe == null && tratamiento.precio_eur != null) importe = Number(tratamiento.precio_eur);
   const [ofertasFilas] = await q.query('SELECT * FROM ofertas WHERE activa = TRUE');
   const ofertas = ofertasFilas.map((o) => ({
@@ -146,7 +160,7 @@ async function cargarContexto(q, conv, ahora, { tratamientoId = null } = {}) {
   let respuestas = [];
   if (tratamiento) [respuestas] = await q.query('SELECT * FROM respuestas_aprobadas WHERE aprobada = TRUE AND tratamiento_id = ?', [tratamiento.id]);
   return {
-    calendario, paciente, tratamiento, importe, ofertas, hechas, respuestas, agrupador,
+    calendario, paciente, tratamiento, origen, importe, ofertas, hechas, respuestas, agrupador, citaPendiente,
     ctx: {
       hoy: p.fecha, ahoraMin: p.minutos, calendario,
       tratamiento: tratamiento
@@ -159,14 +173,28 @@ async function cargarContexto(q, conv, ahora, { tratamientoId = null } = {}) {
       reservable: tratamiento ? Boolean(tratamiento.reservable_ia) : false,
       horaHabitual: paciente?.hora_habitual_respuesta ? String(paciente.hora_habitual_respuesta).slice(0, 5) : null,
       agrupador,
+      citaPendiente: citaPendiente ? { id: citaPendiente.id } : null,
+      esCliente: Boolean(paciente?.es_cliente),
     },
   };
+}
+
+// Su próxima cita de ese tratamiento (confirmada, o retenida a tiempo). El hueco que se le está
+// guardando de la lista de espera no cuenta: eso lo contesta la oferta.
+async function proximaCitaDe(q, pacienteId, tratamientoId, ahora) {
+  const [[c]] = await q.query(
+    `SELECT id, inicio FROM citas c WHERE paciente_id = ? AND tratamiento_id = ? AND inicio > ?
+        AND (estado = 'confirmada' OR (estado = 'retenida' AND retenida_hasta > ?))
+        AND NOT EXISTS (SELECT 1 FROM lista_espera_ofertas o WHERE o.cita_id = c.id AND o.estado = 'ofrecida')
+      ORDER BY inicio LIMIT 1`, [pacienteId, tratamientoId, ahora, ahora]);
+  if (!c) return null;
+  const inicio = new Date(c.inicio);
+  return { id: c.id, inicio, fecha: T.fechaMadrid(inicio), hora: T.hhmm(T.minutosMadrid(inicio)) };
 }
 
 // ── Lo que le interesa: tratamientos que agrupan varios y el que nombra ────────────────────────
 
 const MAX_OPCIONES = 5;
-const restringido = (t) => Boolean(t.publicidad_restringida) || t.regimen_legal === 'medicamento_receta';
 
 // Las opciones de un agrupador que se le pueden preguntar: los niveles o técnicas que se reservan, de
 // su misma familia y subfamilia (las del Head Spa japonés: Express, Detox, Synergie y Zen Premium).
@@ -184,13 +212,14 @@ async function opcionesDeAgrupador(q, t) {
 // ¿Es este tratamiento uno de los niveles o técnicas que agrupa aquel? (servidor/leads.js: quien ya
 // eligió «el Detox» no vuelve al Head Spa japonés por otro anuncio.)
 async function esOpcionDe(q, opcionId, agrupadorId) {
-  const [[a]] = await q.query('SELECT * FROM tratamientos WHERE id = ?', [agrupadorId]);
-  if (!esAgrupador(a) || !a.subfamilia) return false;
-  const [[o]] = await q.query('SELECT id FROM tratamientos WHERE id = ? AND activo = TRUE AND familia = ? AND subfamilia = ? AND id <> ?', [opcionId, a.familia, a.subfamilia, a.id]);
-  return Boolean(o);
+  const [filas] = await q.query('SELECT id, activo, notas, familia, subfamilia FROM tratamientos WHERE id IN (?)', [[opcionId, agrupadorId]]);
+  const o = filas.find((f) => f.id === opcionId);
+  const a = filas.find((f) => f.id === agrupadorId);
+  return esAgrupador(a) && Boolean(o?.activo) && esOpcion(o, a);
 }
 
-// Lo que le interesa queda en su lead: si no lo sabíamos, o era un agrupador y ya ha dicho cuál.
+// Lo que le interesa queda en su lead: si no lo sabíamos, si era un agrupador y ya ha dicho cuál, o si
+// ahora pregunta por otro.
 async function fijarInteres(q, conv, tratamientoId, anterior = null) {
   if (!conv.lead_id || !tratamientoId || tratamientoId === anterior) return;
   await q.query('UPDATE leads SET tratamiento_interes_id = ? WHERE id = ? AND (tratamiento_interes_id IS NULL OR tratamiento_interes_id = ?)',
@@ -199,23 +228,45 @@ async function fijarInteres(q, conv, tratamientoId, anterior = null) {
 
 const clave = (t) => normalizar(t).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
-// ¿Nombra lo que le interesa? Solo si no lo sabemos, o si es un agrupador y dice el nivel o la
-// técnica. Sin saberlo: el texto del botón de WhatsApp de la web («Hola vengo de la web quisiera
-// reservar una cita para…», que el catálogo reparte uno por tratamiento) o su nombre o un alias
-// (motor/entrada/leads.js → buscarEnMensaje). Lo que no está claro (dos a la vez) no se adivina.
+// ¿Nombra lo que le interesa? Si el suyo agrupa varios (el Head Spa japonés), el nivel o la técnica
+// que dice. Si no, el botón de WhatsApp de la web (delBoton) o el nombre o un alias: si aún no sabemos
+// qué le interesa, también el principio del nombre («la limpieza facial»: buscarEnMensaje); si ya lo
+// sabemos, solo otro tratamiento nombrado entero («¿qué precio tiene el Head Spa Express?»:
+// buscarEnCatalogo), que manda en esta vuelta. Lo que no está claro (dos a la vez) no se adivina, y
+// quien ya eligió el nivel no vuelve al agrupador por nombrarlo. Puede ser el mismo del que ya se
+// hablaba: entonces lo ha nombrado él.
 async function tratamientoNombrado(q, texto, datos) {
-  if (datos.agrupador) {
-    const [opciones] = datos.agrupador.opciones.length
-      ? await q.query('SELECT id, nombre, alias FROM tratamientos WHERE id IN (?)', [datos.agrupador.opciones.map((o) => o.id)])
-      : [[]];
-    return elegirOpcion(texto, opciones, { porOrden: false })?.id || null;
+  if (datos.agrupador?.opciones.length) {
+    const [opciones] = await q.query('SELECT id, nombre, alias FROM tratamientos WHERE id IN (?)', [datos.agrupador.opciones.map((o) => o.id)]);
+    const elegida = elegirOpcion(texto, opciones, { porOrden: false });
+    if (elegida) return elegida.id;
   }
-  if (datos.tratamiento) return null;
-  const [filas] = await q.query('SELECT id, nombre, alias, activo, notas, texto_whatsapp FROM tratamientos WHERE activo = TRUE OR notas LIKE ?', [`${NOTA_AGRUPADOR}%`]);
-  const validos = filas.filter((t) => t.activo || esAgrupador(t));
-  const boton = validos.filter((t) => t.texto_whatsapp && clave(t.texto_whatsapp) === clave(texto));
-  if (boton.length === 1) return boton[0].id;
-  return buscarEnMensaje(texto, validos);
+  const [filas] = await q.query(
+    `SELECT id, nombre, alias, activo, notas, texto_whatsapp, familia, subfamilia, sensible, publicidad_restringida, regimen_legal
+       FROM tratamientos WHERE activo = TRUE OR notas LIKE ?`, [`${NOTA_AGRUPADOR}%`]);
+  const catalogo = filas.filter((t) => t.activo || esAgrupador(t));
+  const actual = datos.tratamiento;
+  const id = delBoton(texto, catalogo) || (actual ? buscarEnCatalogo(texto, catalogo) : buscarEnMensaje(texto, catalogo));
+  if (!id) return null;
+  const nombrado = catalogo.find((t) => t.id === id);
+  if (actual && esAgrupador(nombrado) && esOpcion(actual, nombrado)) return null;
+  return id;
+}
+
+// El texto del botón de WhatsApp de la web («Hola vengo de la web quisiera reservar una cita para…»).
+// El catálogo lo guarda en un solo tratamiento aunque lo manden varias páginas (a las demás les pone
+// la nota NOTA_BOTON_COMPARTIDO). Si una de esas páginas es la de un agrupador (el Head Spa japonés, el
+// programa de acné), o el texto nombra un agrupador del que ese tratamiento es un nivel, el botón no
+// dice cuál: el agrupador, y la conversación le pregunta el nivel o la técnica (o recepción).
+function delBoton(texto, catalogo) {
+  const k = clave(texto);
+  const [dueno, ...otros] = catalogo.filter((t) => t.texto_whatsapp && clave(t.texto_whatsapp) === k);
+  if (!dueno || otros.length) return null;
+  const nota = `${NOTA_BOTON_COMPARTIDO}${dueno.nombre}»`;
+  const agrupadores = catalogo.filter((t) => esAgrupador(t) && (t.id === dueno.id || String(t.notas || '').includes(nota)));
+  if (agrupadores.length === 1) return agrupadores[0].id;
+  const nombrado = catalogo.find((t) => t.id === buscarEnMensaje(texto, catalogo));
+  return esAgrupador(nombrado) && esOpcion(dueno, nombrado) ? nombrado.id : dueno.id;
 }
 
 // Lo que no dice qué le interesa, aunque nombre un tratamiento («ya me hice la limpieza en otro sitio»).
@@ -316,6 +367,13 @@ async function aplicarDecision(con, conv, decision, { ahora, texto, datos }) {
       case 'proponer_huecos':
         salida.huecosPedidos = a;
         break;
+      case 'recordar_cita': {
+        // Ya tiene cita de eso: lo que queda de la conversación es su cita (si vuelve a escribir, se
+        // reabre: ver conversacionPara).
+        const [[c]] = await con.query('SELECT inicio FROM citas WHERE id = ?', [a.citaId]);
+        Object.assign(cambios, { estado: 'cerrada', motivo_cierre: 'cita', proximo_paso_en: c?.inicio || null });
+        break;
+      }
       case 'cita_reservada': {
         // a.motivo: 'cambio' (ha cambiado de día una cita que ya tenía) o 'lista_espera' (acepta un
         // hueco que se le guardaba). Eso puede caer en la conversación de otra cosa (el presupuesto de
@@ -480,7 +538,8 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
   let datos = await cargarContexto(pool, conv, ahora);
   const hist = await historial(pool, conv.id);
   const reglas = interpretar(texto);
-  // Si no sabíamos qué le interesa (o era un agrupador) y lo nombra, manda eso.
+  // Si nombra lo que le interesa (no lo sabíamos, dice el nivel de un agrupador o pregunta por otro
+  // tratamiento), en esta vuelta se habla de eso, y queda en su lead.
   if (!NO_ES_INTERES.has(reglas.intencion)) {
     const nombrado = await tratamientoNombrado(pool, texto, datos);
     if (nombrado) {
@@ -509,7 +568,14 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
     desdeIa = ia.modo === 'real' ? await ia.interpretar({ texto, historial: hist, contexto: { tipo: conv.contexto, tratamiento: datos.tratamiento?.nombre } }) : null;
   } catch { desdeIa = null; }
   const interp = ia.modo === 'real' ? combinar(reglas, desdeIa) : reglas;
-  const decision = decidir(interp, { ...datos.ctx, frase: texto });
+  // «Quiero más información» sin decir de qué: del tratamiento del que se está hablando, nunca del de
+  // su última cita, que no ha nombrado (puede ser íntimo o un medicamento con receta): se le pregunta
+  // cuál. Y de lo íntimo o de publicidad restringida que no nombra él, ni lo aprobado ni huecos: se le
+  // ofrece la valoración.
+  if (interp.intencion === 'informacion' && datos.origen === 'ultima_cita') datos = await cargarContexto(pool, conv, ahora, { sinUltimaCita: true });
+  const discreto = interp.intencion === 'informacion' && datos.origen !== 'nombrado' && Boolean(datos.tratamiento)
+    && (esSensible(datos.tratamiento) || restringido(datos.tratamiento));
+  const decision = decidir(interp, { ...datos.ctx, ...(discreto ? { tieneRespuestaAprobada: false, reservable: false } : {}), frase: texto });
 
   const con2 = await pool.getConnection();
   let aplicado;
@@ -537,12 +603,14 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
     decision.guia += ` En la franja que pidió (${FRANJA_TEXTO[propuesta.franjaSinHuecos]}) no queda nada estos días: díselo y ofrécele los de la otra (${FRANJA_TEXTO[propuesta.franjaOfrecida]}).`;
   }
   const opcion = decision.acciones.find((x) => x.tipo === 'preguntar_opcion');
+  const suCita = decision.acciones.some((x) => x.tipo === 'recordar_cita') ? datos.citaPendiente : null;
   const datosRedaccion = {
     nombre: nombrePila, huecos, huecosTexto: textoHuecos(huecos), primerMensajeIa,
     ofertaTexto: aplicado.oferta?.textoPaciente || null,
-    respuestaAprobada: (decision.intencion === 'informacion' ? respuestaParaInformacion(datos.respuestas, texto) : datos.respuestas[0])?.respuesta || null,
+    respuestaAprobada: discreto ? null : (decision.intencion === 'informacion' ? respuestaParaInformacion(datos.respuestas, texto) : datos.respuestas[0])?.respuesta || null,
     fecha: decision.acciones.find((x) => x.tipo === 'programar_seguimiento')?.texto || null,
-    conTratamiento: Boolean(datos.tratamiento),
+    conTratamiento: Boolean(datos.tratamiento), esCliente: datos.ctx.esCliente,
+    citaPendiente: suCita ? `${textoDia(suCita.fecha)} a las ${suCita.hora}` : null,
     franjaSinHuecos: propuesta.franjaSinHuecos, franjaOfrecida: propuesta.franjaOfrecida,
     opcionesTexto: opcion ? textoOpciones(datos.agrupador.opciones.map((o) => o.nombre)) : null,
   };
@@ -629,8 +697,9 @@ async function sinRepesca(deps, conv, { texto, ahora, datos, hist, reglas, nombr
 // ── El paciente elige hueco: se reserva y le llega su cita ──────────────────────────────────
 
 // Intenciones con las que puede estar eligiendo. Con las demás (precio, «me lo pienso», salud…)
-// sigue la repesca normal aunque nombre un día.
-const PUEDE_ELEGIR = new Set(['reservar', 'acepta', 'aplazar', 'preferencia_horario', 'pregunta', 'otro']);
+// sigue la repesca normal aunque nombre un día. «Me interesa…» también: si nombra uno de los huecos
+// propuestos («me interesa el del martes»), lo elige; si no nombra ninguno, sigue la repesca.
+const PUEDE_ELEGIR = new Set(['reservar', 'acepta', 'aplazar', 'preferencia_horario', 'pregunta', 'informacion', 'otro']);
 
 async function nombreDelLead(q, conv) {
   if (!conv.lead_id) return null;
@@ -1415,11 +1484,15 @@ function enlaceDelBoton(plantilla, valor) {
   return boton?.url ? boton.url.replace('{{1}}', valor) : `${config.urlPublica}/c/${valor}`;
 }
 
-// «Valoración HIFU» → «valoración HIFU» (para ponerlo en mitad de una frase sin romper las siglas). Un
-// nombre propio escrito como tal («Head Spa Detox Purificante») se queda como está.
+// «Valoración HIFU» → «valoración HIFU», «Láser Fotona para…» → «láser Fotona para…» (para ponerlo en
+// mitad de una frase sin romper las siglas ni las marcas). Lo que empieza por siglas («HIFU facial»,
+// «BB Glow»), por una marca («Head Spa Detox Purificante», «Perfect Skin», «Easy Diet») o por una
+// palabra con mayúsculas dentro («TrichoTest») se queda como está.
+const EMPIEZA_POR_MARCA = /^(Head Spa|Perfect Skin|Gua Sha|Hair Filler|Easy Diet|Neuroline)\b/;
 function enMinuscula(nombre) {
   const t = String(nombre || '');
-  return /^[A-ZÁÉÍÓÚÑ]{2,}\b/.test(t) || /^\S+\s+[A-ZÁÉÍÓÚÑ]/.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1);
+  const tal = /^[A-ZÁÉÍÓÚÑ]{2,}\b/.test(t) || EMPIEZA_POR_MARCA.test(t) || /^\p{Lu}\p{Ll}+\p{Lu}/u.test(t);
+  return tal ? t : t.charAt(0).toLowerCase() + t.slice(1);
 }
 
 async function plantillasBd(q) {
@@ -1524,13 +1597,14 @@ async function nombreTratamiento(q, conv) {
 
 // Cómo va su tratamiento en cada plantilla que lo lleva en {{2}}, para que se lea bien con lo que
 // sepamos: [con su nombre, con su familia, sin nombrarlo (íntimo), sin saber cuál es]. Nada de «tu
-// interés en tu tratamiento».
+// interés en tu tratamiento». La de recuperar una cita cancelada ya no lo lleva (le llega también a
+// quien solo es cliente, como la de «no vino»): si la aprobada en Meta aún tiene {{2}}, «IEMEC».
 const tal = (x) => x;
 const FRASE_TRATAMIENTO = {
   lead_primer_contacto: [tal, tal, 'IEMEC', 'IEMEC'], //                         «Gracias por tu interés en {{2}}.»
   lead_sin_cita: [tal, tal, 'nuestros tratamientos', 'nuestros tratamientos'], // «por tu consulta sobre {{2}}»
   lead_ultimo_intento: [tal, tal, 'tu consulta', 'tu consulta'], //              «si quieres retomar lo de {{2}}»
-  cancelacion_recuperar: [tal, tal, 'hace unos días', 'hace unos días'], //      «tuviste que cancelar tu cita de {{2}}»
+  cancelacion_recuperar: ['IEMEC', 'IEMEC', 'IEMEC', 'IEMEC'], //                «tuviste que cancelar tu cita de {{2}}» (la antigua)
   presupuesto_2d: [tal, tal, 'tu valoración', 'tu valoración'], //               «el plan de tratamiento de {{2}} que te preparamos»
   presupuesto_7d: [tal, tal, 'tratamiento', 'tratamiento'], //                   «sobre tu plan de {{2}}»
   presupuesto_21d: [tal, tal, 'tratamiento', 'tratamiento'], //                  «guardamos tu plan de {{2}}»
@@ -1541,8 +1615,9 @@ const FRASE_TRATAMIENTO = {
 function fraseTratamiento(uso, ref) {
   const f = FRASE_TRATAMIENTO[uso];
   if (!f) return null;
-  if (ref?.nombre) return f[0](ref.nombre);
-  if (ref?.familia) return f[1](ref.familia);
+  const con = (forma, x) => (typeof forma === 'function' ? forma(x) : forma);
+  if (ref?.nombre) return con(f[0], ref.nombre);
+  if (ref?.familia) return con(f[1], ref.familia);
   return ref ? f[2] : f[3];
 }
 
@@ -1770,8 +1845,10 @@ async function permisoComercial(q, ins, ahora) {
   let seguimientoHasta = null;
   let enviados = [];
   if (pid) {
-    const [[p]] = await q.query('SELECT baja_comercial_en, es_cliente FROM pacientes WHERE id = ?', [pid]);
-    baja = Boolean(p?.baja_comercial_en);
+    // La baja, de su ficha o de la lista de bajas por su teléfono (la que pidió cuando aún era un lead,
+    // o la que avisó Meta, no siempre está en su ficha).
+    const [[p]] = await q.query('SELECT baja_comercial_en, es_cliente, telefono FROM pacientes WHERE id = ?', [pid]);
+    baja = Boolean(p?.baja_comercial_en) || await tieneBaja(q, p?.telefono);
     cliente = Boolean(p?.es_cliente);
     const [[c]] = await q.query("SELECT estado FROM consentimientos WHERE paciente_id = ? AND tipo = 'whatsapp_marketing' ORDER BY registrado_en DESC, id DESC LIMIT 1", [pid]);
     consentimiento = c?.estado === 'otorgado';

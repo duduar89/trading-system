@@ -187,10 +187,40 @@ module.exports = [
   { frase: 'Quería consultar el precio', intencion: 'informacion' },
   { frase: 'Me lo pienso, mándame info', intencion: 'informacion' },
   { frase: 'Quiero información, mejor por las tardes', intencion: 'informacion' },
+  { frase: 'Hola, me interesa', intencion: 'informacion' },
+  { frase: 'Me interesa la limpieza facial', intencion: 'informacion' },
+  { frase: 'Hola buenas, estoy interesada en la mesoterapia', intencion: 'informacion' },
+  // Con un plazo: el seguimiento (y los huecos) desde entonces.
+  { frase: 'Quiero información para el mes que viene', intencion: 'informacion', plazo: 'mes_siguiente', fecha: '2026-10-06' },
+  { frase: 'Quiero información, pero después del verano', intencion: 'informacion', plazo: 'tras_hito', fecha: '2027-09-06' },
+  // «Me interesa…» con algo más: manda eso (elige un hueco, da un plazo, se lo piensa).
+  { frase: 'Me interesa el del martes a las 15:00', intencion: 'reservar', plazo: 'dia_semana' },
+  { frase: 'Me interesa la primera', intencion: 'reservar' },
+  { frase: 'Me interesa el segundo hueco', intencion: 'reservar' },
+  { frase: 'Me interesa, pero para el mes que viene', intencion: 'aplazar', plazo: 'mes_siguiente', fecha: '2026-10-06' },
+  { frase: 'Me interesa pero lo tengo que pensar', intencion: 'pensar' },
+  // Una duda médica, aunque la pida como información: la contesta el equipo médico.
+  { frase: 'Me interesa, ¿duele?', intencion: 'duda_medica' },
+  { frase: '¿En qué consiste la recuperación?', intencion: 'duda_medica' },
+  { frase: 'Me interesa saber si es seguro', intencion: 'duda_medica' },
+  { frase: 'Quiero info pero me da miedo el dolor', intencion: 'duda_medica' },
+  { frase: '¿Me das info sobre los efectos secundarios? Tengo la piel muy sensible', intencion: 'duda_medica' },
+  { frase: 'Quiero información sobre los riesgos', intencion: 'duda_medica' },
+  { frase: 'Necesito información sobre la recuperación', intencion: 'duda_medica' },
+  { frase: 'Quiero más información sobre la anestesia', intencion: 'duda_medica' },
+  { frase: 'Quiero saber más de los efectos secundarios del bótox', intencion: 'duda_medica' },
   // Lo que no es pedir información, aunque lo parezca.
   { frase: 'No quiero más información', intencion: 'no_interesa' },
   { frase: 'No quiero cita, gracias', intencion: 'no_interesa' },
+  { frase: 'No, no quiero cita', intencion: 'no_interesa' },
+  { frase: 'No quiero más info, gracias', intencion: 'no_interesa' },
   { frase: 'El precio me parece alto', intencion: 'precio' },
+  // …ni que no le interese: si sigue, manda lo que pide.
+  { frase: 'No necesito más información, quiero cita', intencion: 'reservar' },
+  { frase: 'Hola, no quiero info, quiero reservar', intencion: 'reservar' },
+  { frase: 'No quiero cita para mí sino para mi hija', intencion: 'otro' },
+  { frase: 'No quiero info por aquí, llamadme', intencion: 'otro' },
+  { frase: 'Aún no quiero cita', intencion: 'otro' },
 
   // ── Quiere cita (o una valoración), dicho de muchas formas ───────────────────────────────
   { frase: 'Me gustaría reservar una valoración', intencion: 'reservar' },
@@ -209,4 +239,9 @@ module.exports = [
   { frase: '¿Tenéis disponibilidad el martes por la tarde?', intencion: 'reservar', plazo: 'dia_semana' },
   // El botón de WhatsApp de la web.
   { frase: 'Hola vengo de la web quisiera reservar una cita para diagnóstico facial', intencion: 'reservar' },
+  { frase: 'Quiero reservar cita con la doctora', intencion: 'reservar' },
+  // Pedir cita en otro sitio no es pedirnos cita.
+  { frase: 'Voy a reservar en otra clínica', intencion: 'otro' },
+  { frase: 'Voy a reservar cita en otra clínica', intencion: 'otro' },
+  { frase: 'Tengo que pedir cita con mi dermatólogo primero', intencion: 'otro' },
 ];

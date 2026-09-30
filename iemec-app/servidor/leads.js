@@ -30,9 +30,13 @@ const EN_CURSO = "('nuevo','contactado','conversando','cita')";
 const DOS_HORAS = 2 * 3600000;
 const cortar = (v, max = 160) => (v == null || v === '' ? null : String(v).slice(0, max));
 
-// Lo que se reserva y los agrupadores; lo retirado del catálogo, no.
+// Lo que se reserva y los agrupadores; lo retirado del catálogo, no. Con su familia y subfamilia (un
+// agrupador solo gana el empate con sus técnicas) y lo que dice si es íntimo o de publicidad
+// restringida (eso no se le atribuye por una palabra suelta, como «láser»).
 async function catalogo(q) {
-  const [tratamientos] = await q.query('SELECT id, nombre, alias, activo, notas FROM tratamientos WHERE activo = TRUE OR notas LIKE ?', [`${E.NOTA_AGRUPADOR}%`]);
+  const [tratamientos] = await q.query(
+    `SELECT id, nombre, alias, activo, notas, familia, subfamilia, sensible, publicidad_restringida, regimen_legal
+       FROM tratamientos WHERE activo = TRUE OR notas LIKE ?`, [`${E.NOTA_AGRUPADOR}%`]);
   const [mapeo] = await q.query('SELECT clave, tratamiento_id FROM mapeo_tratamientos');
   return { tratamientos: tratamientos.filter((t) => t.activo || E.esAgrupador(t)), mapeo };
 }

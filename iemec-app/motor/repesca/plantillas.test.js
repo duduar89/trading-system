@@ -20,8 +20,8 @@ test('la biblioteca cubre todos los usos de la repesca y de la agenda', () => {
 
 test('lo que sale solo tras una cita no nombra el tratamiento ni dice lo que no ha pasado', () => {
   const de = (uso) => P.BIBLIOTECA.find((p) => p.uso === uso);
-  // «No vino» y «toca repetir» llegan también a quien solo es cliente: sin {{2}} (el tratamiento).
-  for (const uso of ['no_vino_recuperar', 'toca_repetir']) assert.deepEqual(P.variablesDe(de(uso).cuerpo), [1], uso);
+  // La cancelada, «No vino» y «toca repetir» llegan también a quien solo es cliente: sin {{2}} (el tratamiento).
+  for (const uso of ['cancelacion_recuperar', 'no_vino_recuperar', 'toca_repetir']) assert.deepEqual(P.variablesDe(de(uso).cuerpo), [1], uso);
   assert.doesNotMatch(de('no_vino_recuperar').cuerpo, /cancel/i, 'a quien no vino no se le dice que canceló');
   assert.doesNotMatch(de('toca_repetir').cuerpo, /meses|semanas|años/i, 'los hay que se repiten cada mes');
   assert.doesNotMatch(de('resena').cuerpo, /\bhoy\b/i, 'la de una cita de tarde sale al día siguiente');

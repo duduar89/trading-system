@@ -41,12 +41,12 @@ const BIBLIOTECA = [
   { uso: 'lead_ultimo_intento', categoria: 'marketing', nombre: 'iemec_lead_ultimo',
     cuerpo: `Hola {{1}}, no queremos insistir. Si más adelante quieres retomar lo de {{2}}, escríbenos por aquí y te atendemos encantados. ${BAJA}`,
     ejemplos: ['Laura', 'tu valoración'], botones: [{ tipo: 'respuesta_rapida', texto: 'Quiero retomarlo' }] },
+  // Los que salen solos tras una cita (la cancelada, «No vino» y «toca repetir») le llegan también a
+  // quien solo es cliente, sin consentimiento expreso: no nombran el tratamiento (es un dato de salud y
+  // se lee en la pantalla bloqueada). La conversación ya sabe de qué cita va si contesta.
   { uso: 'cancelacion_recuperar', categoria: 'marketing', nombre: 'iemec_cancelacion_nuevo_hueco',
-    cuerpo: `Hola {{1}}, vimos que tuviste que cancelar tu cita de {{2}}. ¿Te buscamos otro momento que te venga mejor? ${BAJA}`,
-    ejemplos: ['Laura', 'limpieza facial'], botones: BOTONES_REPESCA },
-  // Los dos que salen solos tras una cita («No vino» y «toca repetir») le llegan también a quien solo
-  // es cliente, sin consentimiento expreso: no nombran el tratamiento (es un dato de salud y se lee en
-  // la pantalla bloqueada). La conversación ya sabe de qué cita va si contesta.
+    cuerpo: `Hola {{1}}, vimos que tuviste que cancelar tu cita en IEMEC. ¿Te buscamos otro momento que te venga mejor? ${BAJA}`,
+    ejemplos: ['Laura'], botones: BOTONES_REPESCA },
   { uso: 'no_vino_recuperar', categoria: 'marketing', nombre: 'iemec_no_vino_nuevo_hueco',
     cuerpo: `Hola {{1}}, te echamos de menos en tu última cita en IEMEC. ¿Te buscamos otro momento que te venga mejor? ${BAJA}`,
     ejemplos: ['Laura'], botones: BOTONES_REPESCA },
