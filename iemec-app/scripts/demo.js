@@ -4,6 +4,8 @@
 // presupuestos y reseñas INVENTADOS para enseñar la app. Todo pasa por los motores de verdad
 // (agenda, repesca con la IA simulada, reseñas). Nunca en producción.
 //   node scripts/demo.js            → base iemec_dev (o la del .env)
+// Las pruebas del panel (test/panel-e2e.test.js) la cargan con cargarDemo en su propia base y a una
+// hora fija.
 const db = require('../servidor/db');
 const { migrar } = require('../servidor/migraciones');
 const { semillar } = require('../servidor/semillas');
@@ -17,18 +19,17 @@ const { crearWhatsApp } = require('../servidor/integraciones/whatsapp');
 const { crearGoogle } = require('../servidor/integraciones/google');
 const T = require('../motor/tiempo');
 
-if (process.env.NODE_ENV === 'production') { console.error('✗ La demo no se carga en producción'); process.exit(1); }
-
 const NOMBRES = [['Lucía', 'Martín'], ['Carmen', 'Ruiz'], ['Elena', 'Soto'], ['Marta', 'Vidal'], ['Sara', 'Nieto'], ['Paula', 'Gil'], ['Irene', 'Mora'],
   ['Laura', 'Pardo'], ['Nuria', 'Cano'], ['Julia', 'Ramos'], ['Andrea', 'Lozano'], ['Beatriz', 'Pastor'], ['Clara', 'Serrano'], ['Rocío', 'Molina'],
   ['Javier', 'Ortega'], ['Pablo', 'Castro'], ['Diego', 'Rubio'], ['Sergio', 'Marín'], ['Alba', 'Iglesias'], ['Noelia', 'Garrido']];
 
-async function main() {
-  const pool = db.pool();
-  const log = (m) => console.log(`▸ ${m}`);
-  await migrar({ log });
+// Migra la base del pool (bd: sus datos de conexión; por defecto, la del .env), siembra la clínica y
+// añade lo inventado alrededor de `ahora`: citas de ese día y los tres siguientes, conversaciones de
+// las horas de antes, presupuestos, lista de espera y reseñas.
+async function cargarDemo({ pool = db.pool(), bd, ahora = new Date(), log = (m) => console.log(`▸ ${m}`) } = {}) {
+  if (process.env.NODE_ENV === 'production') throw new Error('La demo no se carga en producción');
+  await migrar({ bd, log });
   await semillar(pool, { demo: true, log });
-  const ahora = new Date();
   const hoy = T.fechaMadrid(ahora);
 
   // Horarios de ejemplo: todos de lunes a sábado, comida flotante de 45 min entre 14:00 y 16:00.
@@ -134,8 +135,17 @@ async function main() {
   ] });
   await resenas.importarResenas(pool, google);
   log('reseñas de ejemplo');
+}
+
+async function main() {
+  if (process.env.NODE_ENV === 'production') { console.error('✗ La demo no se carga en producción'); process.exitCode = 1; return; }
+  await cargarDemo();
   await db.cerrar();
   console.log('✓ Demo lista. Arranca con: MODO_DEMO=1 npm start');
 }
 
-main().catch(async (err) => { console.error(`✗ ${err.stack || err.message}`); await db.cerrar(); process.exitCode = 1; });
+module.exports = { cargarDemo };
+
+if (require.main === module) {
+  main().catch(async (err) => { console.error(`✗ ${err.stack || err.message}`); await db.cerrar(); process.exitCode = 1; });
+}

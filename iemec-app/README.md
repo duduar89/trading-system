@@ -11,7 +11,10 @@ App para IEMEC (Instituto Europeo de Medicina Estética y Capilar, Boadilla del 
   código y ninguna conversación se queda sin próximo paso.
 - **Plantillas de WhatsApp** con filtro de publicidad sanitaria.
 - **Reseñas de Google** pedidas a todos tras la cita, con respuestas que aprueba una persona.
-- **Panel** con la estética de la clínica (terciopelo), PWA para tablet y móvil.
+- **Panel** con la estética de la clínica (terciopelo), PWA para tablet y móvil. El personal entra con
+  passkeys, cada persona con su rol (`npm run invitar` da el primer enlace de alta).
+- **Importador de Flowww** (`scripts/importar-flowww.js`): pacientes y citas futuras, con ensayo y
+  deshacer, para apagarlo sin perder nada. Guía en [`docs/MIGRAR-FLOWWW.md`](docs/MIGRAR-FLOWWW.md).
 
 Stack: Node 22 + Express 5 + MariaDB, React + Vite + Tailwind. Integraciones (WhatsApp, Claude,
 Google) detrás de adaptadores con modo simulado.

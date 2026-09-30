@@ -398,6 +398,8 @@ test('lista de espera en el panel: apuntar, ver y quitar', async (t) => {
   const deps = { ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
   try {
     await sembrar(pool);
+    // Con las passkeys la sesión se comprueba en la base: la persona de la cookie tiene que existir.
+    await pool.query("INSERT INTO usuarios (id, email, nombre, rol) VALUES (1, 'recepcion@prueba', 'Recepción', 'recepcion')");
     const cookie = `iemec_sesion=${encodeURIComponent(firmar({ id: 1, email: 'recepcion@prueba', nombre: 'Recepción', rol: 'recepcion', hasta: Date.now() + 3600000 }))}`;
     const s = crearApp({ pool, deps }).listen(0);
     await new Promise((r) => s.once('listening', r));
@@ -765,6 +767,7 @@ test('lista de espera: si la conversación pasa a una persona, recepción acepta
   try {
     await sembrar(pool);
     const lunes = new Date('2026-10-19T08:00:00Z');
+    await pool.query("INSERT INTO usuarios (id, email, nombre, rol) VALUES (1, 'recepcion@prueba', 'Recepción', 'recepcion')");
     const cookie = `iemec_sesion=${encodeURIComponent(firmar({ id: 1, email: 'recepcion@prueba', nombre: 'Recepción', rol: 'recepcion', hasta: Date.now() + 3600000 }))}`;
     const s = crearApp({ pool, deps }).listen(0);
     await new Promise((r) => s.once('listening', r));

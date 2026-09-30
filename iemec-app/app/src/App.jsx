@@ -86,7 +86,7 @@ export default function App() {
         <div className="relative z-10 flex items-center justify-between px-6 pt-7 pb-6">
           <a href="#hoy" className="block">
             <div className="marca text-2xl text-turquesa">IEMEC</div>
-            <div className="mt-1 text-[10px] tracking-[.2em] uppercase text-white/60">Panel de la clínica</div>
+            <div className="mt-1 text-[10px] tracking-[.2em] uppercase text-white/75">Panel de la clínica</div>
           </a>
           <button type="button" className="md:hidden rounded-full border border-white/30 px-3 py-1 text-xs" onClick={() => setMenu(!menu)} aria-expanded={menu}>Menú</button>
         </div>

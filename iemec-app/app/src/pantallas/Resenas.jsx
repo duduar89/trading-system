@@ -3,7 +3,7 @@ import { api, fechaHora } from '../api.js';
 import { useDatos, Cabecera, Cifra, Boton, Error } from '../componentes/comunes.jsx';
 import { usePuede } from '../sesion.js';
 
-const Estrellas = ({ n }) => <span aria-label={`${n} de 5`} className="text-oro tracking-wider">{'★'.repeat(n)}<span className="opacity-25">{'★'.repeat(5 - n)}</span></span>;
+const Estrellas = ({ n }) => <span role="img" aria-label={`${n} de 5`} className="text-oro tracking-wider">{'★'.repeat(n)}<span className="opacity-25">{'★'.repeat(5 - n)}</span></span>;
 
 export default function Resenas() {
   const { datos: d, error, recargar } = useDatos('/panel/resenas');

@@ -299,7 +299,7 @@ function DetalleCita({ id, alCerrar, alCambiar }) {
       className="m-auto w-[min(32rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border filete bg-[var(--superficie)] p-0 text-[var(--texto)] shadow-2xl backdrop:bg-terciopelo-950/60">
       <header className="terciopelo overflow-hidden px-6 pt-5 pb-5 text-white">
         <div className="relative z-10">
-          <p className="text-[10px] uppercase tracking-[.2em] text-white/60">
+          <p className="text-[10px] uppercase tracking-[.2em] text-white/75">
             {d ? `${d.fecha === hoy ? 'Hoy' : diaLargo(d.fecha)} · ${d.inicio}–${d.fin}` : 'Cita'}
           </p>
           {/* El foco entra por el título (así se lee a quién es la cita); no es un control: sin anillo. */}
