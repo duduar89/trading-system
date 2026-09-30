@@ -8,7 +8,7 @@ const express = require('express');
 const ICAL = require('ical.js');
 const { prepararBdDePrueba } = require('./ayuda-bd');
 const { crearApp } = require('../servidor/index');
-const { paginaCita, vistaDe } = require('../servidor/rutas/publicas');
+const { paginaCita, vistaDe, CSP_CITA } = require('../servidor/rutas/publicas');
 const agenda = require('../servidor/agenda');
 const config = require('../servidor/config');
 const T = require('../motor/tiempo');
@@ -113,10 +113,14 @@ test('«Tu cita»: la página según el estado, el .ics y «Añadir al calendari
         const r = await pedir(`/c/${cita.token}`, { ua: UA.iphone });
         assert.equal(r.status, 200);
         cabecerasPrivadas(r);
-        assert.match(r.headers.get('content-security-policy'), /default-src 'none'.*form-action 'self'.*frame-ancestors 'none'/);
+        assert.equal(r.headers.get('content-security-policy'), CSP_CITA);
+        assert.match(CSP_CITA, /default-src 'none'.*form-action 'self'.*frame-ancestors 'none'/);
         assert.match(r.headers.get('vary'), /User-Agent/i);
         const html = await r.text();
         sinTerceros(html);
+        // Quién presta el servicio y cómo trata sus datos (LSSI art. 10, RGPD art. 13), sin llevarse el enlace.
+        assert.match(html, /<a href="https:\/\/iemec-clinic\.com\/aviso-legal" rel="noopener noreferrer">Aviso legal<\/a>/);
+        assert.match(html, /<a href="https:\/\/iemec-clinic\.com\/politicas-de-privacidad" rel="noopener noreferrer">Política de privacidad<\/a>/);
         assert.match(html, /<title>Tu cita · IEMEC<\/title>/, 'título genérico');
         assert.match(html, /name="robots" content="noindex, nofollow"/);
         assert.match(html, /martes 6 de octubre, a las 17:00/);
@@ -191,6 +195,22 @@ test('«Tu cita»: la página según el estado, el .ics y «Añadir al calendari
           assert.equal(r.status, 404, ruta);
           cabecerasPrivadas(r);
         }
+        assert.match(await pagina('/c/noexiste'), /Aviso legal[\s\S]*Política de privacidad/);
+      });
+
+      await t.test('lo que no tiene forma de enlace no llega a la base: ni una consulta', async () => {
+        let consultas = 0;
+        const contado = { query: (...a) => { consultas++; return pool.query(...a); }, getConnection: () => pool.getConnection() };
+        const otraApp = express();
+        otraApp.use((req, _res, next) => { req.ahora = reloj.ahora; next(); });
+        otraApp.use(crearApp({ pool: contado }));
+        await conServidor(otraApp, async (otra) => {
+          const rutas = [['/c/basura', 'GET'], ['/c/basura.ics', 'GET'], ['/cal/basura', 'GET'], ['/c/basura/cancelar', 'POST'], ['/c/basura/confirmar', 'POST'], [`/c/${'x'.repeat(42)}`, 'GET']];
+          for (const [ruta, method] of rutas) assert.equal((await fetch(`${otra}${ruta}`, { method, redirect: 'manual' })).status, 404, ruta);
+          assert.equal(consultas, 0);
+          assert.equal((await fetch(`${otra}/c/${'x'.repeat(43)}`)).status, 404);
+          assert.ok(consultas > 0, 'uno bien formado sí se busca');
+        });
       });
 
       await t.test('en otra sede (el quirófano externo): su dirección, su mapa y sus indicaciones', async () => {
@@ -399,14 +419,19 @@ test('«Tu cita»: la página según el estado, el .ics y «Añadir al calendari
           const html = await r.text();
           assert.doesNotMatch(html, /octubre|Valoración|Dra\.|Siglo XXI/, 'un enlace viejo no enseña nada de la cita');
         }
-        assert.match(await pagina(`/c/${cita.token}`), /<h1>Enlace caducado<\/h1>[\s\S]*Escribir por WhatsApp/);
+        assert.match(await pagina(`/c/${cita.token}`), /<h1>Enlace caducado<\/h1>[\s\S]*Escribir por WhatsApp[\s\S]*Aviso legal/);
       });
 
-      await t.test('robots.txt: ni /c/ ni /cal/ se indexan; la reseña sigue yendo a Google', async () => {
+      await t.test('robots.txt no bloquea /c/ ni /cal/, para que el buscador lea que no se indexan; la reseña sigue yendo a Google', async () => {
         const robots = await pagina('/robots.txt');
         assert.match(robots, /^User-agent: \*$/m);
-        assert.match(robots, /^Disallow: \/c\/$/m);
-        assert.match(robots, /^Disallow: \/cal\/$/m);
+        // Bloqueadas, un buscador podría listar la URL (que es el secreto) si alguien la enlaza, sin leer su noindex.
+        assert.doesNotMatch(robots, /Disallow: \/c/);
+        assert.match(robots, /^Disallow: \/r\/$/m);
+        assert.match(robots, /^Disallow: \/api\/$/m);
+        for (const ruta of [`/c/${cita.token}`, `/cal/${cita.token}`, `/c/${cita.token}.ics`, '/c/noexiste']) {
+          assert.equal((await pedir(ruta)).headers.get('x-robots-tag'), 'noindex, nofollow', ruta);
+        }
         const r = await pedir('/r/abcdefghijklmnopqrstuv');
         assert.equal(r.status, 302);
         assert.equal(r.headers.get('location'), 'https://search.google.com/local/writereview?placeid=ChIJiemec');

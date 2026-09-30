@@ -25,7 +25,14 @@ const config = require('../config');
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-const CSP = "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+// La política de contenido de estas páginas: nada de fuera (ni fuentes, ni scripts, ni imágenes) y los
+// formularios, solo a sí mismas. Los enlaces a otros sitios (el aviso legal, Google Calendar) sí valen.
+const CSP_CITA = "default-src 'none'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+// Quién presta el servicio y cómo trata sus datos (LSSI art. 10; RGPD art. 13): en la web de la clínica.
+const AVISO_LEGAL = 'https://iemec-clinic.com/aviso-legal';
+const PRIVACIDAD = 'https://iemec-clinic.com/politicas-de-privacidad';
+// El WhatsApp de la clínica (el de su web) si la ficha no lo tiene.
+const WHATSAPP_CLINICA = '34722833285';
 
 // Lo que va en todas las respuestas con el token en la URL.
 function privado(res) {
@@ -41,7 +48,7 @@ function privado(res) {
 
 async function datosClinica(q) {
   const [[cl]] = await q.query('SELECT nombre_corto, whatsapp FROM clinica WHERE id = 1');
-  return { marca: cl?.nombre_corto || 'IEMEC', whatsapp: String(cl?.whatsapp || '34722833285').replace(/\D/g, '') };
+  return { marca: cl?.nombre_corto || 'IEMEC', whatsapp: String(cl?.whatsapp || WHATSAPP_CLINICA).replace(/\D/g, '') };
 }
 
 // La cita del enlace (sin datos del paciente: la página no los necesita), con su sede.
@@ -168,11 +175,14 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--suav
 .enlace{color:var(--terciopelo);font-size:14px}
 form{margin:0}button.btn{width:100%;cursor:pointer;font-family:inherit}.aviso{background:#f3ead8;border:1px solid var(--oro);border-radius:12px;padding:12px;font-size:14px}
 .pie{font-size:12px;color:var(--suave);text-align:center}
+.legal{max-width:440px;margin:0 auto 24px;text-align:center;font-size:12px;color:var(--suave)}.legal a{color:var(--suave)}
 </style></head><body><main class="tarjeta">
 <header class="cab"><div class="marca">IEMEC</div><h1>${esc(titulo)}</h1>${cuando ? `<div class="cuando">${esc(cuando)}</div>` : ''}</header>
 <section class="cuerpo">
 ${cuerpo}
-</section></main></body></html>`;
+</section></main>
+<footer class="legal"><a href="${AVISO_LEGAL}" rel="noopener noreferrer">Aviso legal</a> · <a href="${PRIVACIDAD}" rel="noopener noreferrer">Política de privacidad</a></footer>
+</body></html>`;
 }
 
 // Dónde: la sede de la sala (nombre, dirección, indicaciones) y «Cómo llegar».
@@ -296,7 +306,7 @@ ${boton(escribir(whatsapp, 'Hola, os escribo por una cita'), 'Escribir por Whats
 
 function enviarPagina(res, status, html) {
   privado(res);
-  res.set({ 'Content-Security-Policy': CSP, 'X-Frame-Options': 'DENY', Vary: 'User-Agent' });
+  res.set({ 'Content-Security-Policy': CSP_CITA, 'X-Frame-Options': 'DENY', Vary: 'User-Agent' });
   res.status(status).type('html').send(html);
 }
 
@@ -339,13 +349,18 @@ function rutasPublicas({ pool }) {
   const p = () => (typeof pool === 'function' ? pool() : pool);
   const reloj = (req) => req.ahora || new Date();
 
-  // Nada de esto se indexa (y lo que lleva token, tampoco se sigue).
+  // Lo que lleva el token de «Tu cita» (/c/, /cal/) no se bloquea aquí: para que un buscador lea su
+  // «noindex» (la cabecera X-Robots-Tag y la meta) tiene que poder pedirlo. Bloqueado, podría listar la
+  // URL sola si alguien la enlaza (así lo documenta Google), y la URL es el secreto. Sus GET no cambian
+  // nada. El enlace corto de la reseña y la API, fuera.
   r.get('/robots.txt', (_req, res) => {
-    res.type('text/plain').send('User-agent: *\nDisallow: /c/\nDisallow: /cal/\nDisallow: /r/\nDisallow: /api/\n');
+    res.type('text/plain').send('User-agent: *\nDisallow: /r/\nDisallow: /api/\n');
   });
 
-  // La cita del enlace, o la página que toca si no la hay o ha caducado (entonces devuelve null).
+  // La cita del enlace, o la página que toca si no la hay o ha caducado (entonces devuelve null). Lo
+  // que ni siquiera tiene forma de enlace no le cuesta a la base ni una consulta.
   async function laCita(req, res) {
+    if (!agenda.tokenValido(req.params.token)) { enviarPagina(res, 404, paginaNoEncontrada(WHATSAPP_CLINICA)); return null; }
     const q = p();
     const cl = await datosClinica(q);
     const cita = await citaPorToken(q, req.params.token);
@@ -471,4 +486,4 @@ async function datosClinicaResena(q) {
   return cl || {};
 }
 
-module.exports = { rutasPublicas, paginaCita, eventoDe, vistaDe, citaPorToken };
+module.exports = { rutasPublicas, paginaCita, eventoDe, vistaDe, citaPorToken, CSP_CITA };
