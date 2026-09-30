@@ -47,6 +47,7 @@ const { valorEn, RETRASO_FG } = require('../../mercado/sentimiento');
 const calendario = require('../../mercado/calendario');
 const { inicioVela, MIN } = require('../../util/reloj');
 const { EPS, etiqueta, puestoId, puestoSombraId, agenteDePuesto, precioDe, isoCompacto, llenarSombra, posicionDe } = require('./comun');
+const f = require('../../util/formato');
 
 const MARCOS = universo.MARCOS;
 const COMPROBAR_ACCIONES = 15 * MIN;
@@ -213,10 +214,13 @@ function refrescarTextos(ctx) {
 
 // Marca las velas que faltan desde la última decidida (desde…i), sube el
 // trailing en cada una y decide el puesto (real o sombra) en la vela i.
-function decidirPuesto(ctx, { mesa, est, prep, simbolo, i, desde = i, tDecision, pid }) {
+function decidirPuesto(ctx, { mesa, est, prep, simbolo, i, desde = i, tDecision, pid, rebalanceoYa = false, precioAhora = null }) {
   const serie = prep.velas[simbolo];
   const d0 = Number.isInteger(desde) && desde >= 1 && desde <= i ? desde : i;
-  for (let j = d0; j <= i; j++) {
+  // Rebalanceo pedido sobre una vela ya decidida: no se vuelve a marcar (las
+  // velas abiertas y el trailing de esa vela ya se contaron).
+  const marcarDesde = rebalanceoYa && desde > i ? i + 1 : d0;
+  for (let j = marcarDesde; j <= i; j++) {
     ctx.libros.marcarVela(pid, serie[j].c);
     const p = ctx.libros.puesto(pid);
     if (!(p.cantidad > EPS)) continue;
@@ -224,13 +228,15 @@ function decidirPuesto(ctx, { mesa, est, prep, simbolo, i, desde = i, tDecision,
     if (nuevo !== null && nuevo !== undefined && Number.isFinite(nuevo)) ctx.libros.fijarStop(pid, nuevo);
   }
   const p = ctx.libros.puesto(pid);
-  const senal = est.decidir(prep, { simbolo, i, iAnterior: d0 - 1, posicion: posicionDe(p), t: tDecision, contexto: contextoEstrategia(ctx, mesa, tDecision) });
+  const contexto = contextoEstrategia(ctx, mesa, tDecision);
+  if (rebalanceoYa) { contexto.rebalanceoYa = true; contexto.precioAhora = precioAhora; }
+  const senal = est.decidir(prep, { simbolo, i, iAnterior: d0 - 1, posicion: posicionDe(p), t: tDecision, contexto });
   return { senal, p };
 }
 
 // ---------- Real ----------
 
-async function proponerApertura(ctx, { mesa, simbolo, senal, cierre, tVela, vol }) {
+async function proponerApertura(ctx, { mesa, simbolo, senal, cierre, tVela, vol, rebalanceoPedido = false }) {
   const pid = puestoId(mesa.id, simbolo);
   const agente = agenteDePuesto(mesa.id, simbolo);
   const q = ctx.vivo.precios[simbolo];
@@ -247,7 +253,7 @@ async function proponerApertura(ctx, { mesa, simbolo, senal, cierre, tVela, vol 
   ctx.bus.publicar({
     de: agente, canal: 'parque', tipo: 'propuesta',
     texto: plantillas.propuesta({ etiqueta: etiqueta(simbolo), lado: 'compra', nocional: dim.nocional, cantidad: dim.cantidad, precio, stop: senal.stop, factor: dim.factor }),
-    datos: { ...propuesta, limitadoPor: dim.limitadoPor, nocionalBase: dim.nocionalBase, capitalMesa: capitalMesa(ctx, mesa) }, importancia: 2,
+    datos: { ...propuesta, limitadoPor: dim.limitadoPor, nocionalBase: dim.nocionalBase, capitalMesa: capitalMesa(ctx, mesa), ...(rebalanceoPedido ? { rebalanceoPedido: true } : {}) }, importancia: 2,
   });
   // Acciones con la bolsa cerrada (§6.7): la decisión queda pendiente y Riesgos
   // la mira a la apertura + 5 min, con el precio de entonces (si se ha movido
@@ -347,11 +353,13 @@ function llenarAperturaSombra(ctx, o) {
   if (r.decision === 'vetar') return null;
   const fill = llenarSombra({ lado: 'compra', simbolo: o.simbolo, precio: o.precio, nocional: r.nocional });
   if (ctx.estado.sombra.efectivo + fill.efectivoDelta < -1e-9) return null;   // sin margen, como el bróker
-  ctx.libros.aplicarEjecucion({
+  const ap = ctx.libros.aplicarEjecucion({
     puestoId: sid, lado: 'compra', cantidad: fill.cantidad, precio: fill.precio, comision: fill.comision, t: ctx.reloj.ahora(), motivo: 'señal',
     idCliente: `sombra-${sid}-${isoCompacto(o.tVela)}-abrir`, stop: o.stop, objetivoPrecio: o.objetivoPrecio,
     regimen: o.regimen ?? null, precioReferencia: o.precio,
   });
+  // Ya aplicada (la misma vela dos veces): ni posición ni dinero.
+  if (ap && ap.duplicada) return null;
   ctx.estado.sombra.efectivo += fill.efectivoDelta;
   ctx.revalorarSombra();
   return fill;
@@ -461,23 +469,57 @@ async function procesarMesa(ctx, mesa, ahora) {
   const marcoMs = MARCOS[mesa.marco];
   const ultima = e.ultimaVela[mesa.id];
   const cripto = mesa.universo.every(s => universo.esCripto(s));
+  // Rebalanceo pedido desde el panel (comando 'rebalancear'): se decide ya con
+  // la última vela cerrada aunque ya estuviera decidida, y con el precio de
+  // ahora (ver más abajo). Una sola vez: la marca se quita al acabar.
+  let rebalanceoYa = Boolean(mesa.rebalanceoYa) && est.familia === 'momentum-rotacion';
+  // Con el fondo parado o la mesa en el banquillo no se hace: se quita la
+  // marca y se dice, para no gastarla en silencio con todo vetado.
+  if (rebalanceoYa && (e.fondo.nivel !== 'normal' || mesa.estado === 'banquillo')) {
+    delete mesa.rebalanceoYa;
+    rebalanceoYa = false;
+    ctx.bus.publicar({ de: 'cio', canal: 'parque', tipo: 'nota', importancia: 2, datos: { mesaId: mesa.id, nivel: e.fondo.nivel },
+      texto: plantillas.frase(`${mesa.nombre}: el rebalanceo pedido no se hace, ${mesa.estado === 'banquillo' ? 'la mesa está en el banquillo' : 'el fondo no está en marcha normal'}. Vuelve a pedirlo tras Reabrir.`, 280) });
+  }
   if (cripto) {
     // La vela que acaba de cerrar empieza un marco antes del inicio de la actual.
-    if (ultima !== undefined && inicioVela(ahora, marcoMs) - marcoMs <= ultima) return false;
+    if (!rebalanceoYa && ultima !== undefined && inicioVela(ahora, marcoMs) - marcoMs <= ultima) return false;
   } else {
-    if (ahora - (e.comprobadoMesa[mesa.id] || 0) < COMPROBAR_ACCIONES) return false;
+    if (!rebalanceoYa && ahora - (e.comprobadoMesa[mesa.id] || 0) < COMPROBAR_ACCIONES) return false;
     e.comprobadoMesa[mesa.id] = ahora;
   }
   const velas = await cargarVelas(ctx, mesa, ahora);
   const simbolos = Object.keys(velas);
   if (!simbolos.length) return false;
   const tVela = Math.max(...simbolos.map(s => velas[s][velas[s].length - 1].t));
-  if (ultima !== undefined && tVela <= ultima) return false;
+  if (!rebalanceoYa && ultima !== undefined && tVela <= ultima) return false;
+  if (rebalanceoYa) {
+    // Una sola vez por vela: si ya se rebalanceó con esta, no se repite (tras
+    // un stop, volver a abrir sobre la misma vela duplicaría la sombra).
+    if (mesa.rebalanceoVela !== undefined && tVela <= mesa.rebalanceoVela) {
+      delete mesa.rebalanceoYa;
+      ctx.bus.publicar({ de: 'cio', canal: 'parque', tipo: 'nota', importancia: 2, datos: { mesaId: mesa.id, tVela },
+        texto: plantillas.frase(`${mesa.nombre}: ya se rebalanceó con la vela del ${f.fechaCorta(tVela)}; no se repite. El próximo, en su día.`, 280) });
+      return false;
+    }
+    // Todas las de la mesa con la última vela y con precio de ahora: si falta
+    // alguna, se espera (la marca sigue) en vez de decidir sin ella.
+    const faltan = mesa.universo.filter(s => !velas[s] || velas[s][velas[s].length - 1].t !== tVela || (ultima !== undefined && tVela < ultima)
+      || !(ctx.vivo.precios[s] && ctx.vivo.precios[s].precio > 0));
+    if (faltan.length) {
+      if (!mesa.rebalanceoYa.avisado) {
+        mesa.rebalanceoYa.avisado = true;
+        ctx.bus.publicar({ de: 'cio', canal: 'parque', tipo: 'nota', importancia: 1, datos: { mesaId: mesa.id, faltan },
+          texto: plantillas.frase(`${mesa.nombre}: el rebalanceo pedido espera a tener la última vela y el precio de ${faltan.map(etiqueta).join(', ')}.`, 280) });
+      }
+      return false;
+    }
+  }
   // Alpaca publica cada vela con algo de retraso y no todas a la vez: si falta
   // la de algún símbolo, se espera un poco (una decisión por puesto y vela, y
   // marcar la vela como vista dejaría sin decidir al que llegó tarde).
   if (cripto && simbolos.some(s => velas[s][velas[s].length - 1].t < tVela) && ahora - (tVela + marcoMs) < ESPERA_VELA) return false;
-  e.ultimaVela[mesa.id] = tVela;
+  e.ultimaVela[mesa.id] = ultima !== undefined ? Math.max(ultima, tVela) : tVela;
 
   const prep = est.preparar(velas, paramsDe(mesa));
   const tDecision = tVela + marcoMs;
@@ -495,8 +537,15 @@ async function procesarMesa(ctx, mesa, ahora) {
     // Primera vela aún sin decidir (ordenador apagado o dormido: puede haber varias).
     let desde = i;
     if (ultima !== undefined) while (desde > 1 && serie[desde - 1].t > ultima) desde--;
-    sinDecidir = Math.max(sinDecidir, i - desde);
-    const cierre = serie[i].c;
+    // Rebalanceo pedido sobre una vela ya decidida: nada que marcar.
+    if (rebalanceoYa && ultima !== undefined && serie[i].t <= ultima) desde = i + 1;
+    sinDecidir = Math.max(sinDecidir, Math.max(0, i - desde));
+    // Con el rebalanceo pedido se decide AHORA: el precio de la decisión es el
+    // de ahora (si no, el control de desvío lo vetaría al llevar horas desde el
+    // cierre) y el stop se traslada para mantener su distancia (3×ATR).
+    const qAhora = rebalanceoYa ? ctx.vivo.precios[simbolo] : null;
+    const precioAhora = qAhora && qAhora.precio > 0 ? qAhora.precio : null;
+    const cierre = precioAhora || serie[i].c;
     const vol = volatilidad(serie.map(v => v.c), n30, comunEst.periodosAnio([simbolo], mesa.marco))[i];
     const pid = puestoId(mesa.id, simbolo);
     const sid = puestoSombraId(mesa.id, simbolo);
@@ -504,7 +553,7 @@ async function procesarMesa(ctx, mesa, ahora) {
     aux.chispa = serie.slice(-16).map(v => v.c);
 
     // Real
-    const real = decidirPuesto(ctx, { mesa, est, prep, simbolo, i, desde, tDecision, pid });
+    const real = decidirPuesto(ctx, { mesa, est, prep, simbolo, i, desde, tDecision, pid, rebalanceoYa, precioAhora });
     aux.ultimaSenal = { accion: real.senal.accion, t: ahora };
     // La espera de la estrategia se guarda para rehacer la tarjeta si cambia el
     // nivel del fondo antes de la vela siguiente (refrescarTextos). Solo vale
@@ -535,7 +584,7 @@ async function procesarMesa(ctx, mesa, ahora) {
 
     // Sombra: misma regla, su propia posición. Con el fondo parado no decide
     // aperturas (abrirSombra), como el fondo.
-    const sombra = decidirPuesto(ctx, { mesa, est, prep, simbolo, i, desde, tDecision, pid: sid });
+    const sombra = decidirPuesto(ctx, { mesa, est, prep, simbolo, i, desde, tDecision, pid: sid, rebalanceoYa, precioAhora });
     if (sombra.senal.accion === 'abrir' && !(sombra.p.cantidad > EPS) && e.fondo.nivel === 'normal') aperturasSombra.push({ mesa, simbolo, senal: sombra.senal, cierre, tVela, vol });
     else if (sombra.senal.accion === 'cerrar' && sombra.p.cantidad > EPS) cierresSombra.push({ puestoId: sid, clave: isoCompacto(tVela) });
   }
@@ -548,11 +597,38 @@ async function procesarMesa(ctx, mesa, ahora) {
     });
   }
 
+  // Rebalanceo pedido: la marca se quita ANTES de mandar órdenes (si el
+  // latido muere después, el siguiente no lo repite: resuelve lo pendiente por
+  // ordenes.jsonl como cualquier orden) y se apunta la vela usada.
+  const antesRebalanceo = rebalanceoYa ? new Set(mesa.universo.filter(s => { const p = ctx.libros.puesto(puestoId(mesa.id, s)); return p && p.cantidad > EPS; })) : null;
+  const pedido = rebalanceoYa ? mesa.rebalanceoYa : null;
+  if (rebalanceoYa) { delete mesa.rebalanceoYa; mesa.rebalanceoVela = tVela; }
+
   // Como el motor: primero se vende (libera efectivo y exposición) y luego se compra.
   for (const c of cierres) await proponerCierre(ctx, c);
-  for (const a of aperturas) await proponerApertura(ctx, a);
+  for (const a of aperturas) await proponerApertura(ctx, { ...a, rebalanceoPedido: rebalanceoYa });
   for (const c of cierresSombra) cerrarSombra(ctx, c);
   for (const a of aperturasSombra) abrirSombra(ctx, a);
+
+  if (rebalanceoYa) {
+    // Lo que de verdad quedó en los libros, no lo decidido (Riesgos puede vetar).
+    const ahoraDentro = new Set(mesa.universo.filter(s => { const p = ctx.libros.puesto(puestoId(mesa.id, s)); return p && p.cantidad > EPS; }));
+    const entran = [...ahoraDentro].filter(s => !antesRebalanceo.has(s));
+    const salen = [...antesRebalanceo].filter(s => !ahoraDentro.has(s));
+    const mov = s => {
+      const serie = velas[s]; const q = ctx.vivo.precios[s];
+      return serie && q && q.precio > 0 ? q.precio / serie[serie.length - 1].c - 1 : null;
+    };
+    const conMov = s => { const m = mov(s); return m === null ? etiqueta(s) : `${etiqueta(s)} (${f.pct(m, { signo: true, decimales: 1 })} desde el cierre)`; };
+    const texto = `${mesa.nombre}: rebalanceo pedido hecho ya, al precio de ahora. `
+      + (entran.length ? `Entran ${entran.map(conMov).join(' y ')}.` : 'No entra ninguna.')
+      + (salen.length ? ` Salen ${salen.map(etiqueta).join(' y ')}.` : '');
+    ctx.bus.publicar({
+      de: 'cio', canal: 'parque', tipo: 'nota', importancia: 2,
+      texto: plantillas.frase(texto, 280),
+      datos: { mesaId: mesa.id, tVela, entran, salen, decididas: aperturas.map(a => a.simbolo), movimientos: Object.fromEntries(mesa.universo.map(s => [s, mov(s)])), pedido },
+    });
+  }
   return true;
 }
 

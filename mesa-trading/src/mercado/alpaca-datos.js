@@ -145,6 +145,27 @@ class AlpacaDatos {
     return true;
   }
 
+  // Hasta dónde se da por cubierta la cola tras pedirla. Cripto: nunca más
+  // allá de una vela reciente que falte. Alpaca publica a veces una diaria
+  // minutos tarde (29-sep-2026: la revisión vio que una diaria publicada más
+  // de 5 min tras las 00:00 UTC no se volvía a pedir nunca, porque `hasta`
+  // saltaba por encima de ella). Una vela que falta y tiene menos de
+  // GRACIA_COLA de antigüedad frena `hasta` justo antes de ella, así que se
+  // vuelve a pedir (como mucho cada 30 s). Un hueco más viejo es un hueco de
+  // verdad (SOL estuvo 13 meses sin datos) y no frena nada: si no, cada
+  // lectura volvería a pedir todo desde el hueco.
+  _hastaFirme(entrada, simbolo, marco, desde, firme) {
+    if (!universo.esCripto(simbolo)) return Math.max(desde, firme);
+    const m = MARCOS[marco];
+    const presentes = new Set();
+    for (let i = entrada.velas.length - 1; i >= 0 && entrada.velas[i].t > desde; i--) presentes.add(entrada.velas[i].t);
+    const gracia = Math.max(3 * m, DIA);
+    for (let t = Math.floor(desde / m) * m + m; t <= firme; t += m) {
+      if (!presentes.has(t) && firme - t <= gracia) return Math.max(desde, t - 1);
+    }
+    return Math.max(desde, firme);
+  }
+
   _rutaCache(simbolo, marco) {
     if (!this.carpetaCache) return null;
     return path.join(this.carpetaCache, 'velas', `${universo.clave(simbolo)}_${marco}.json`);
@@ -218,7 +239,8 @@ class AlpacaDatos {
     if (!entrada) {
       if (ini <= tope) {
         // ultimaCola: la cola se acaba de pedir; no se repite antes de 30 s.
-        entrada = { desde: ini, hasta: Math.max(ini - 1, firme), velas: await this._pedirVelas(simbolo, marco, ini, tope), ultimaCola: ahora };
+        entrada = { desde: ini, hasta: ini - 1, velas: await this._pedirVelas(simbolo, marco, ini, tope), ultimaCola: ahora };
+        entrada.hasta = this._hastaFirme(entrada, simbolo, marco, ini - 1, firme);
         cambiada = true;
       }
     } else {
@@ -243,7 +265,9 @@ class AlpacaDatos {
         const reciente = entrada.ultimaCola !== undefined && ahora - entrada.ultimaCola < 30_000 && ahora >= entrada.ultimaCola;
         if (!reciente) {
           const nuevas = await this._pedirVelas(simbolo, marco, entrada.hasta + 1, tope);
-          entrada = { ...entrada, hasta: Math.max(entrada.hasta, firme), velas: unir(entrada.velas, nuevas), ultimaCola: ahora };
+          const velasUnidas = unir(entrada.velas, nuevas);
+          entrada = { ...entrada, velas: velasUnidas, ultimaCola: ahora };
+          entrada.hasta = this._hastaFirme(entrada, simbolo, marco, entrada.hasta, firme);
           cambiada = true;
         }
       }

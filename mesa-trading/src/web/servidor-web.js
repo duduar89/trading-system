@@ -45,7 +45,7 @@ const REVISAR_SESION_SSE_MS = 60_000;
 const MAX_MENSAJES_DISCO = 5000;
 // Los mismos que ofrece Ajustes en el modo local (orquestador.MODELOS_DISPONIBLES).
 const MODELOS_DISPONIBLES = Object.keys(TARIFAS).filter(m => m !== 'claude-opus-4-8');
-const COMANDOS = new Set(['comite', 'megafono', 'megafono-aplicar', 'prueba', 'pausar', 'reabrir', 'kill', 'ajustes']);
+const COMANDOS = new Set(['comite', 'megafono', 'megafono-aplicar', 'prueba', 'pausar', 'reabrir', 'kill', 'ajustes', 'rebalancear']);
 
 // Lo que se ve sin sesión (rutas ya sin el prefijo /web).
 const PUBLICOS = new Set([
