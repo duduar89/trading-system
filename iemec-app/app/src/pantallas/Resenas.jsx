@@ -19,7 +19,7 @@ export default function Resenas() {
     <>
       <Cabecera antetitulo="Google Business Profile" titulo="Reseñas y ficha de Google" />
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Cifra etiqueta="Nota media" valor={m.notaMediaTotal ?? '—'} detalle={`${d.resenas.length} reseñas en la app`} tono="oro" />
+        <Cifra etiqueta="Nota media" valor={m.notaMediaTotal == null ? '—' : Number(m.notaMediaTotal).toLocaleString('es-ES', { maximumFractionDigits: 2 })} detalle={`${d.resenas.length} reseñas en la app`} tono="oro" />
         <Cifra etiqueta="Sin responder" valor={m.sinResponder} detalle="con borrador listo para aprobar" tono={m.sinResponder ? 'alerta' : 'normal'} />
         <Cifra etiqueta="Peticiones enviadas" valor={m.peticiones} detalle={`${m.pulsadas} abrieron el enlace`} />
         <Cifra etiqueta="Conversión" valor={m.conversion == null ? '—' : `${m.conversion} %`} detalle="peticiones que acaban en reseña" />

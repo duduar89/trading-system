@@ -21,7 +21,7 @@ export default defineConfig({
         theme_color: '#123f3e',
         icons: [{ src: '/icono.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }],
       },
-      workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/c\//, /^\/r\//, /^\/webhooks\//] },
+      workbox: { globPatterns: ['**/*.{js,css,html,svg,woff2}'], navigateFallbackDenylist: [/^\/api\//, /^\/c\//, /^\/r\//, /^\/webhooks\//] },
     }),
   ],
   build: { outDir: '../servidor/public', emptyOutDir: true },

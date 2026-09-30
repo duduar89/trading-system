@@ -53,7 +53,7 @@ function paginaCita(cita, clinica, mensaje = '') {
   const cambiar = `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hola, quiero cambiar mi cita del ${textoFechaHora(cita.inicio)}`)}`;
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex"><title>Tu cita · IEMEC</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500&family=Playfair+Display:ital,wght@1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/fuentes/fuentes.css">
 <style>
 :root{--terciopelo:#123f3e;--terciopelo-2:#0b2b2a;--turquesa:#76c3c7;--oro:#c9a45c;--marfil:#f5f7f6;--tinta:#1f232b;--suave:#5c6b6a}
 *{box-sizing:border-box}body{margin:0;font-family:Montserrat,system-ui,sans-serif;background:var(--marfil);color:var(--tinta);padding:16px}

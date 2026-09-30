@@ -1,6 +1,14 @@
 import { useDatos, Cabecera, Cifra, Error } from '../componentes/comunes.jsx';
 import { diaLargo, euros } from '../api.js';
 
+// Según la hora de Madrid: el panel se abre a primera hora y también a última.
+function saludo(ahora = new Date()) {
+  const h = Number(new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: 'numeric', hourCycle: 'h23' }).format(ahora));
+  if (h >= 6 && h < 14) return 'Buenos días';
+  if (h >= 14 && h < 21) return 'Buenas tardes';
+  return 'Buenas noches';
+}
+
 export default function Hoy() {
   const { datos: d, error } = useDatos('/panel/hoy', { cadaMs: 30000 });
   if (error) return <Error texto={error} />;
@@ -14,7 +22,7 @@ export default function Hoy() {
   ].filter(Boolean);
   return (
     <>
-      <Cabecera antetitulo={diaLargo(d.fecha)} titulo="Buenos días, IEMEC" />
+      <Cabecera antetitulo={diaLargo(d.fecha)} titulo={`${saludo()}, IEMEC`} />
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Cifra etiqueta="Citas hoy" valor={d.citas.total} detalle={`${d.citas.confirmadas} confirmadas`} />
         <Cifra etiqueta="La IA atiende" valor={d.conversaciones.conIa} detalle="conversaciones abiertas" />

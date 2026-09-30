@@ -111,9 +111,9 @@ async function main() {
 
   // Reseñas de ejemplo.
   const google = crearGoogle('simulado', { resenas: [
-    { googleId: 'demo-1', autor: 'Ejemplo · Marta', nota: 5, texto: 'Trato exquisito, muy profesionales y la clínica preciosa.', publicadaEn: new Date(ahora.getTime() - 2 * 86400000).toISOString() },
-    { googleId: 'demo-2', autor: 'Ejemplo · Carlos', nota: 4, texto: 'Muy contento con el resultado, aunque esperé un rato.', publicadaEn: new Date(ahora.getTime() - 4 * 86400000).toISOString() },
-    { googleId: 'demo-3', autor: 'Ejemplo · Ana', nota: 2, texto: 'Me costó mucho que me contestaran por teléfono.', publicadaEn: new Date(ahora.getTime() - 6 * 86400000).toISOString() },
+    { googleId: 'demo-1', autor: 'Marta G.', nota: 5, texto: 'Trato exquisito, muy profesionales y la clínica preciosa.', publicadaEn: new Date(ahora.getTime() - 2 * 86400000).toISOString() },
+    { googleId: 'demo-2', autor: 'Carlos R.', nota: 4, texto: 'Muy contento con el resultado, aunque esperé un rato.', publicadaEn: new Date(ahora.getTime() - 4 * 86400000).toISOString() },
+    { googleId: 'demo-3', autor: 'Ana P.', nota: 2, texto: 'Me costó mucho que me contestaran por teléfono.', publicadaEn: new Date(ahora.getTime() - 6 * 86400000).toISOString() },
   ] });
   await resenas.importarResenas(pool, google);
   log('reseñas de ejemplo');
