@@ -2,15 +2,18 @@
 // Lo que llega por el webhook de WhatsApp (formato de la Cloud API de Meta, el mismo que usa
 // 360dialog), puesto en limpio para el servidor. Sin base de datos ni red: solo lee el cuerpo.
 //
-//   mensajes  { waId, telefono, perfil, tipo, texto, aIa, leyenda, referral, reaccion, tarea, marca }
+//   mensajes  { waId, telefono, perfil, tipo, texto, aIa, leyenda, referral, reaccion, tarea, marca, numeroId }
 //             · texto, botón de plantilla e interactivo (botón o lista) → su texto va a la repesca
 //               (aIa = true)
 //             · audio, imagen, vídeo, documento, ubicación, sticker, contacto… → se registran como
 //               «[audio]», «[imagen] leyenda»… y los atiende una persona (tarea = su título)
 //             · reacción → se registra, sin más
-//   estados   { waId, estado, telefono, marca, error: { codigo, texto } | null }
+//   estados   { waId, estado, telefono, marca, numeroId, error: { codigo, texto } | null }
 //             sent → enviado, delivered → entregado, read → leido, failed → fallido
+// numeroId es el número de WhatsApp de la empresa al que va el aviso (metadata.phone_number_id): con
+// él se descarta lo que llega de otros números de la misma app.
 const crypto = require('crypto');
+const { telefonoLegible } = require('./leads');
 
 const ESTADOS = { sent: 'enviado', delivered: 'entregado', read: 'leido', failed: 'fallido' };
 
@@ -129,6 +132,7 @@ function leerWebhook(cuerpo) {
       if (cambio?.field) campos.add(String(cambio.field));
       if (cambio?.field !== 'messages') continue;
       const v = cambio.value || {};
+      const numeroId = texto(v.metadata?.phone_number_id);
       const perfiles = new Map((Array.isArray(v.contacts) ? v.contacts : []).map((c) => [String(c?.wa_id), texto(c?.profile?.name)]));
       for (const m of Array.isArray(v.messages) ? v.messages : []) {
         const c = contenido(m || {});
@@ -136,14 +140,14 @@ function leerWebhook(cuerpo) {
         mensajes.push({
           waId: texto(m.id), telefono: telefonoDe(m.from), perfil: perfiles.get(String(m.from)) || null,
           tipo: c.tipo, texto: c.texto, aIa: Boolean(c.aIa), leyenda: c.leyenda || null, tarea: c.tarea || null,
-          reaccion: c.reaccion || null, referral: leerReferral(m.referral), marca: m.timestamp ? new Date(Number(m.timestamp) * 1000) : null,
+          reaccion: c.reaccion || null, referral: leerReferral(m.referral), marca: m.timestamp ? new Date(Number(m.timestamp) * 1000) : null, numeroId,
         });
       }
       for (const s of Array.isArray(v.statuses) ? v.statuses : []) {
         const estado = ESTADOS[s?.status];
         if (!estado || !texto(s.id)) continue;
         estados.push({
-          waId: texto(s.id), estado, telefono: telefonoDe(s.recipient_id), marca: s.timestamp ? new Date(Number(s.timestamp) * 1000) : null,
+          waId: texto(s.id), estado, telefono: telefonoDe(s.recipient_id), marca: s.timestamp ? new Date(Number(s.timestamp) * 1000) : null, numeroId,
           error: estado === 'fallido' ? describirError((s.errors || [])[0] || {}) : null,
         });
       }
@@ -163,13 +167,18 @@ function idExterno(datos, crudo) {
 }
 
 // Lo que se le contesta al momento cuando manda algo que la IA no puede ver ni escuchar. Si ya lo
-// lleva una persona, o es un sticker, una ubicación…, no se le dice nada: lo ve el equipo.
-function respuestaAutomatica(tipo, { nombre = null, primerMensajeIa = false } = {}) {
+// lleva una persona, o es un sticker, una ubicación…, no se le dice nada: lo ve el equipo. Un audio,
+// una foto o un vídeo pueden ser una complicación tras un tratamiento: se le dice qué hacer si es
+// urgente, que de noche nadie lo ve hasta el día siguiente.
+function respuestaAutomatica(tipo, { nombre = null, primerMensajeIa = false, telefonoClinica = null } = {}) {
   const hola = primerMensajeIa ? 'Soy el asistente virtual de IEMEC. ' : '';
   const n = nombre ? `, ${nombre}` : '';
-  if (tipo === 'audio') return `${hola}Gracias${n}. Ahora mismo no puedo escuchar audios, así que se lo paso a una persona del equipo, que te contesta por aquí lo antes posible.`;
-  if (['imagen', 'video', 'documento'].includes(tipo)) return `${hola}Gracias${n}. Se lo paso a una persona del equipo, que lo revisa y te contesta por aquí lo antes posible.`;
+  const tel = telefonoLegible(telefonoClinica);
+  const urgente = ` Si es algo urgente de salud, llámanos${tel ? ` al ${tel}` : ''} o, si te encuentras mal, llama al 112.`;
+  if (tipo === 'audio') return `${hola}Gracias${n}. Ahora mismo no puedo escuchar audios, así que se lo paso a una persona del equipo, que te contesta por aquí lo antes posible.${urgente}`;
+  if (['imagen', 'video'].includes(tipo)) return `${hola}Gracias${n}. Se lo paso a una persona del equipo, que lo revisa y te contesta por aquí lo antes posible.${urgente}`;
+  if (tipo === 'documento') return `${hola}Gracias${n}. Se lo paso a una persona del equipo, que lo revisa y te contesta por aquí lo antes posible.`;
   return null;
 }
 
-module.exports = { leerWebhook, idExterno, describirError, telefonoDe, respuestaAutomatica, ERRORES };
+module.exports = { leerWebhook, idExterno, describirError, telefonoDe, telefonoLegible, respuestaAutomatica, ERRORES };

@@ -23,6 +23,8 @@ const { elegirPlantilla, rellenar } = require('../../motor/repesca/plantillas');
 const S = require('../../motor/repesca/secuencias');
 const { combinar, textoSimulado } = require('../integraciones/ia');
 const { cifrar, descifrar } = require('../cripto');
+const { apuntarBaja, tieneBaja } = require('../bajas');
+const { limpiarNombre, nombrePila, telefonoLegible } = require('../../motor/entrada/leads');
 const { registrar } = require('../eventos');
 const agenda = require('../agenda');
 const config = require('../config');
@@ -157,13 +159,17 @@ async function aplicarDecision(con, conv, decision, { ahora, texto, datos }) {
   for (const a of decision.acciones) {
     switch (a.tipo) {
       case 'baja':
-        if (conv.lead_id) await con.query("UPDATE leads SET etapa = 'perdido', motivo_perdida = 'baja' WHERE id = ? AND etapa NOT IN ('cita','asistio','vendido')", [conv.lead_id]);
+        // A la lista de bajas (sea o no paciente), y fuera cualquier lead con su teléfono.
+        await apuntarBaja(con, { telefono: conv.telefono, fuente: 'whatsapp', conversacionId: conv.id, leadId: conv.lead_id, pacienteId, ahora });
+        await con.query("UPDATE leads SET etapa = 'perdido', motivo_perdida = 'baja' WHERE (id = ? OR telefono = ?) AND etapa NOT IN ('cita','asistio','vendido')", [conv.lead_id, conv.telefono]);
         if (pacienteId) {
           await con.query("INSERT INTO consentimientos (paciente_id, tipo, estado, fuente, prueba) VALUES (?, 'whatsapp_marketing', 'revocado', 'whatsapp', ?)", [pacienteId, texto.slice(0, 500)]);
           await con.query('UPDATE pacientes SET baja_comercial_en = ? WHERE id = ?', [ahora, pacienteId]);
         }
         // Ojo con los nulos: «paciente_id <=> NULL» casaría con todos los contactos sin ficha.
-        await con.query("UPDATE inscripciones SET estado = 'cancelada', motivo_fin = 'baja' WHERE estado IN ('activa','pausada') AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?))", [pacienteId, conv.lead_id]);
+        await con.query(`UPDATE inscripciones SET estado = 'cancelada', motivo_fin = 'baja' WHERE estado IN ('activa','pausada')
+            AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?) OR lead_id IN (SELECT id FROM leads WHERE telefono = ?))`,
+        [pacienteId, conv.lead_id, conv.telefono]);
         await con.query("UPDATE seguimientos SET estado = 'cancelado', resultado = 'baja' WHERE estado = 'pendiente' AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR conversacion_id = ?)", [pacienteId, conv.id]);
         Object.assign(cambios, { estado: 'cerrada', motivo_cierre: 'baja' });
         break;
@@ -272,8 +278,10 @@ function textoDia(fecha) {
 /**
  * Llega un mensaje del paciente por WhatsApp.
  * deps: { pool, ia, whatsapp }
+ * recibidoEn: cuándo lo escribió (la marca de WhatsApp); si se procesa tarde, su hora y la ventana de
+ * 24 h cuentan desde entonces, no desde que lo coge el cron.
  */
-async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = new Date(), nombre = null }) {
+async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = new Date(), nombre = null, recibidoEn = null }) {
   const { pool, ia } = deps;
   const con = await pool.getConnection();
   let conv;
@@ -286,12 +294,16 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
       if (ya) { await con.commit(); return { duplicado: true }; }
     }
     const reglasPrevias = interpretar(texto);
-    mensajeId = await guardarMensaje(con, { conversacionId: conv.id, direccion: 'entrante', autor: 'paciente', texto, waId, intencion: reglasPrevias.intencion, creadoEn: ahora });
-    await con.query('UPDATE conversaciones SET ultimo_entrante_en = ?, ventana_hasta = ? WHERE id = ?', [ahora, new Date(ahora.getTime() + VENTANA_MS), conv.id]);
-    if (conv.lead_id) await con.query("UPDATE leads SET etapa = 'conversando' WHERE id = ? AND etapa IN ('nuevo','contactado')", [conv.lead_id]);
-    // Lo que dice el paciente manda: se pausan sus secuencias.
-    await con.query("UPDATE inscripciones SET estado = 'pausada', motivo_fin = 'el paciente contestó' WHERE estado = 'activa' AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?))",
-      [conv.paciente_id, conv.lead_id]);
+    const recibido = recibidoEn && recibidoEn < ahora ? recibidoEn : ahora;
+    mensajeId = await guardarMensaje(con, { conversacionId: conv.id, direccion: 'entrante', autor: 'paciente', texto, waId, intencion: reglasPrevias.intencion, creadoEn: recibido });
+    await con.query('UPDATE conversaciones SET ultimo_entrante_en = ?, ventana_hasta = ? WHERE id = ?', [recibido, new Date(recibido.getTime() + VENTANA_MS), conv.id]);
+    // Lo que dice el paciente manda: se pausan sus secuencias, las de su ficha y las de cualquier lead
+    // con su teléfono (aunque aún no sea el de esta conversación).
+    await con.query("UPDATE leads SET etapa = 'conversando' WHERE (id = ? OR telefono = ?) AND etapa IN ('nuevo','contactado')", [conv.lead_id, telefono]);
+    await con.query(
+      `UPDATE inscripciones SET estado = 'pausada', motivo_fin = 'el paciente contestó' WHERE estado = 'activa'
+          AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?) OR lead_id IN (SELECT id FROM leads WHERE telefono = ?))`,
+      [conv.paciente_id, conv.lead_id, telefono]);
     await con.commit();
   } catch (err) {
     await con.rollback().catch(() => {});
@@ -669,17 +681,19 @@ async function procesarSeguimientos(deps, { ahora = new Date(), limite = 20 } = 
       if (sinRespuesta) {
         await pool.query("UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'sin_respuesta', proximo_paso = 'cerrada' WHERE id = ?", [conv.id]);
         await pool.query("UPDATE seguimientos SET estado = 'cumplido', resultado = 'cerrada sin respuesta' WHERE id = ?", [s.id]);
+        // Su lead, perdido: si vuelve a pedir información, entra como lead nuevo con su secuencia.
+        if (conv.lead_id) await pool.query("UPDATE leads SET etapa = 'perdido', motivo_perdida = 'sin_respuesta' WHERE id = ? AND etapa IN ('nuevo','contactado','conversando')", [conv.lead_id]);
       }
       resultados.push({ id: s.id, cierre: sinRespuesta });
       continue;
     }
 
     const tratamiento = await nombreTratamiento(pool, conv);
-    const nombre = paciente?.nombre || 'hola';
+    const nombre = await nombreParaSaludar(pool, { pacienteId: conv.paciente_id, leadId: s.lead_id || conv.lead_id, conv });
     const ventanaAbierta = conv.ventana_hasta && new Date(conv.ventana_hasta) > ahora;
     let envio;
     if (ventanaAbierta) {
-      envio = await enviar(deps, conv, { texto: `Hola ${nombre}, como quedamos, te escribo para buscarte hueco para ${tratamiento}. ¿Te viene bien esta semana o la que viene?`, autor: 'ia', ahora });
+      envio = await enviar(deps, conv, { texto: `Hola${nombre ? ` ${nombre}` : ''}, como quedamos, te escribo para buscarte hueco para ${tratamiento}. ¿Te viene bien esta semana o la que viene?`, autor: 'ia', ahora });
     } else {
       const p = elegirPlantilla(s.motivo === 'recordatorio' ? 'como_quedamos' : 'como_quedamos', plantillas);
       if (!p) {
@@ -689,15 +703,15 @@ async function procesarSeguimientos(deps, { ahora = new Date(), limite = 20 } = 
         resultados.push({ id: s.id, fallido: 'sin plantilla' });
         continue;
       }
-      envio = await enviar(deps, conv, { plantilla: p, variables: [nombre, tratamiento], autor: 'sistema', ahora });
+      envio = await enviar(deps, conv, { plantilla: p, variables: [nombre || saludoSinNombre(ahora), tratamiento], autor: 'sistema', ahora });
     }
     // Siguiente: un recordatorio a los 4 días; si ya lo era, cierre a los 4 días si no contesta.
     const hoy = T.fechaMadrid(ahora);
     const siguiente = calcularSeguimiento({ tipo: 'dias', n: 4 }, { hoy, ahoraMin: T.minutosMadrid(ahora), calendario });
     const motivo = s.motivo === 'recordatorio' ? 'cierre_sin_respuesta' : 'recordatorio';
     await pool.query(
-      'INSERT INTO seguimientos (paciente_id, lead_id, conversacion_id, contexto, contexto_id, motivo, plazo_tipo, programado_para, creado_por) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [s.paciente_id, s.lead_id, s.conversacion_id, s.contexto, s.contexto_id, motivo, 'dias', T.desdeMadrid(siguiente.fecha, siguiente.hora), 'sistema']);
+      'INSERT INTO seguimientos (paciente_id, lead_id, conversacion_id, contexto, contexto_id, motivo, plazo_tipo, programado_para, creado_por, creado_en) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [s.paciente_id, s.lead_id, s.conversacion_id, s.contexto, s.contexto_id, motivo, 'dias', T.desdeMadrid(siguiente.fecha, siguiente.hora), 'sistema', ahora]);
     await pool.query("UPDATE conversaciones SET proximo_paso = 'espera_respuesta', proximo_paso_en = ? WHERE id = ?", [T.desdeMadrid(siguiente.fecha, siguiente.hora), conv.id]);
     await registrar(pool, { tipo: 'seguimiento_enviado', entidad: 'seguimiento', entidadId: s.id, datos: { ventanaAbierta: Boolean(ventanaAbierta), siguiente: motivo } });
     resultados.push({ id: s.id, envio, siguiente: { motivo, fecha: siguiente.fecha } });
@@ -705,27 +719,28 @@ async function procesarSeguimientos(deps, { ahora = new Date(), limite = 20 } = 
   return resultados;
 }
 
+// Cómo se nombra su tratamiento en los mensajes que salen sin que el paciente pregunte. Los de
+// publicidad restringida (medicamentos con receta, productos sanitarios) no se nombran: se habla de
+// su familia («medicina estética facial»).
 async function nombreTratamiento(q, conv) {
-  const datos = await cargarContexto(q, conv, new Date());
-  const t = datos.tratamiento;
+  const t = (await cargarContexto(q, conv, new Date())).tratamiento;
   if (!t) return 'tu tratamiento';
-  // Un medicamento con receta o un producto sanitario no se nombra en un mensaje que puede ser
-  // comercial (las plantillas de las secuencias, «como quedamos»): se dice su familia.
-  if (t.publicidad_restringida) {
+  if (t.publicidad_restringida || t.regimen_legal === 'medicamento_receta') {
     const [[f]] = await q.query('SELECT nombre FROM familias WHERE codigo = ?', [t.familia]);
-    return f ? enMinuscula(f.nombre) : 'tu consulta';
+    return f ? enMinuscula(f.nombre) : 'tu tratamiento';
   }
   return enMinuscula(t.nombre);
 }
 
 // Mete a alguien en una secuencia (lead nuevo, cancelación, presupuesto, toca repetir…).
-async function inscribir(q, { secuencia, pacienteId = null, leadId = null, citaId = null, presupuestoId = null, inicio = new Date(), grupoControl = false }) {
+// desdePaso: para saltarse los primeros (p. ej., la bienvenida a quien ya está hablando con la IA).
+async function inscribir(q, { secuencia, pacienteId = null, leadId = null, citaId = null, presupuestoId = null, inicio = new Date(), grupoControl = false, desdePaso = 0 }) {
   if (!S.SECUENCIAS[secuencia]) throw new Error(`Secuencia desconocida: ${secuencia}`);
   const calendario = await calendarioDesdeBd(q);
-  const primero = S.momentoDelPaso({ secuencia, inicio }, 0, calendario);
+  const primero = S.momentoDelPaso({ secuencia, inicio }, desdePaso, calendario);
   const [r] = await q.query(
-    'INSERT INTO inscripciones (secuencia, paciente_id, lead_id, cita_id, presupuesto_id, inicio, siguiente_en, grupo_control) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [secuencia, pacienteId, leadId, citaId, presupuestoId, inicio, primero?.cuando || null, grupoControl]);
+    'INSERT INTO inscripciones (secuencia, paciente_id, lead_id, cita_id, presupuesto_id, inicio, paso_actual, siguiente_en, grupo_control) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [secuencia, pacienteId, leadId, citaId, presupuestoId, inicio, desdePaso, primero?.cuando || null, grupoControl]);
   return r.insertId;
 }
 
@@ -750,10 +765,15 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
   const resultados = [];
   for (const ins of filas) {
     const { paso } = S.momentoDelPaso(ins, ins.paso_actual, calendario) || {};
-    const siguiente = S.momentoDelPaso(ins, ins.paso_actual + 1, calendario);
+    // El siguiente, con la espera que marca la secuencia desde este (aunque este salga tarde).
+    const siguiente = S.momentoDelSiguiente(ins, ins.paso_actual, calendario, ahora);
     const avanzar = async (extra = {}) => {
-      await pool.query('UPDATE inscripciones SET paso_actual = paso_actual + 1, siguiente_en = ?, estado = ?, motivo_fin = ? WHERE id = ?',
-        [siguiente?.cuando || null, siguiente ? 'activa' : 'terminada', siguiente ? null : 'secuencia completa', ins.id]);
+      // Si mientras tanto ha contestado o se ha dado de baja, ya no está «activa»: eso se respeta.
+      await pool.query(
+        `UPDATE inscripciones SET paso_actual = paso_actual + 1, siguiente_en = ?, motivo_fin = IF(estado = 'activa', ?, motivo_fin),
+                                  estado = IF(estado = 'activa', ?, estado) WHERE id = ?`,
+        [siguiente?.cuando || null, siguiente ? null : 'secuencia completa', siguiente ? 'activa' : 'terminada', ins.id]);
+      if (!siguiente && ins.secuencia === 'lead' && ins.lead_id) await leadSinRespuesta(pool, ins, { ahora, calendario });
       resultados.push({ inscripcion: ins.id, paso: ins.paso_actual, ...extra });
     };
     if (!paso) { await avanzar({ omitido: 'sin paso' }); continue; }
@@ -766,7 +786,11 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
         const [[pr]] = await pool.query('SELECT importe_eur FROM presupuestos WHERE id = ?', [ins.presupuesto_id]);
         if (!pr || Number(pr.importe_eur) < paso.soloSiImporteDesde) { await avanzar({ omitido: 'importe bajo' }); continue; }
       }
-      await pool.query('INSERT INTO tareas (tipo, titulo, paciente_id, vence_en) VALUES (?, ?, ?, ?)', [paso.tarea, paso.motivo, ins.paciente_id, new Date(ahora.getTime() + 2 * 3600000)]);
+      // Con quién es y su teléfono: un lead sin conversación solo se ve en la lista de tareas.
+      const [[abierta]] = await pool.query("SELECT id FROM conversaciones WHERE telefono = ? AND estado <> 'cerrada' ORDER BY id DESC LIMIT 1", [telefono]);
+      await pool.query('INSERT INTO tareas (tipo, titulo, paciente_id, lead_id, conversacion_id, vence_en) VALUES (?, ?, ?, ?, ?, ?)',
+        [paso.tarea, `${paso.tarea === 'llamar' ? 'Llamar a ' : ''}${await quienEs(pool, ins, telefono)}: ${paso.motivo}`.slice(0, 200), ins.paciente_id, ins.lead_id,
+          abierta?.id || null, new Date(ahora.getTime() + 2 * 3600000)]);
       await avanzar({ tarea: paso.tarea });
       continue;
     }
@@ -786,8 +810,16 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
       }
     }
     if (!p) {
-      await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, vence_en) VALUES ('otro', ?, ?, ?)", [`Falta plantilla aprobada para «${paso.uso}»`, ins.paciente_id, new Date(ahora.getTime() + 3600000)]);
+      await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, lead_id, vence_en) VALUES ('otro', ?, ?, ?, ?)",
+        [`Falta plantilla aprobada para «${paso.uso}»: escribir a mano a ${await quienEs(pool, ins, telefono)}`.slice(0, 200), ins.paciente_id, ins.lead_id, new Date(ahora.getTime() + 3600000)]);
       await avanzar({ fallido: 'sin plantilla' });
+      continue;
+    }
+    // Si una persona lleva ya su conversación, la secuencia no se mete en medio: se para.
+    const [[conPersona]] = await pool.query("SELECT id FROM conversaciones WHERE telefono = ? AND estado IN ('persona','espera_persona') LIMIT 1", [telefono]);
+    if (conPersona) {
+      await pool.query("UPDATE inscripciones SET estado = 'pausada', motivo_fin = 'su conversación la lleva una persona' WHERE id = ? AND estado = 'activa'", [ins.id]);
+      resultados.push({ inscripcion: ins.id, paso: ins.paso_actual, omitido: 'la lleva una persona' });
       continue;
     }
     const con3 = await pool.getConnection();
@@ -799,7 +831,7 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
     } finally {
       con3.release();
     }
-    const nombre = await nombreDe(pool, ins);
+    const nombre = await nombreDe(pool, ins, { conv, ahora });
     const variables = [nombre, await nombreTratamiento(pool, conv)].slice(0, (p.cuerpo.match(/\{\{\d+\}\}/g) || []).length);
     const envio = await enviar(deps, conv, { plantilla: p, variables, ahora });
     await avanzar({ envio: envio.estado, plantilla: p.nombre });
@@ -817,10 +849,61 @@ async function telefonoDe(q, ins) {
   return null;
 }
 
-async function nombreDe(q, ins) {
-  if (ins.paciente_id) { const [[p]] = await q.query('SELECT nombre FROM pacientes WHERE id = ?', [ins.paciente_id]); if (p) return p.nombre; }
-  if (ins.lead_id) { const [[l]] = await q.query('SELECT nombre FROM leads WHERE id = ?', [ins.lead_id]); if (l?.nombre) return l.nombre.split(' ')[0]; }
-  return 'hola';
+// El nombre con el que se le saluda: el de su ficha, el del lead o el de su perfil de WhatsApp (el
+// de pila). null si no hay ninguno que valga («Paciente» es el que se pone a quien reserva sin nombre).
+async function nombreParaSaludar(q, { pacienteId = null, leadId = null, conv = null }) {
+  if (pacienteId) {
+    const [[p]] = await q.query('SELECT nombre FROM pacientes WHERE id = ?', [pacienteId]);
+    if (p?.nombre && p.nombre !== 'Paciente' && limpiarNombre(p.nombre)) return p.nombre;
+  }
+  if (leadId) {
+    const [[l]] = await q.query('SELECT nombre FROM leads WHERE id = ?', [leadId]);
+    if (nombrePila(l?.nombre)) return nombrePila(l.nombre);
+  }
+  return nombrePila(conv?.nombre_whatsapp);
+}
+
+// Las plantillas dicen «Hola {{1}}, …». Sin nombre, «Hola buenos días, …» (o «buenas tardes»), nunca
+// «Hola hola».
+function saludoSinNombre(ahora) {
+  return T.minutosMadrid(ahora) < 14 * 60 ? 'buenos días' : 'buenas tardes';
+}
+
+async function nombreDe(q, ins, { conv = null, ahora = new Date() } = {}) {
+  return (await nombreParaSaludar(q, { pacienteId: ins.paciente_id, leadId: ins.lead_id, conv })) || saludoSinNombre(ahora);
+}
+
+// «Carla Llamar (611 00 06 07)»: para el título de una tarea (quien la lee tiene que poder llamar).
+async function quienEs(q, ins, telefono) {
+  let nombre = null;
+  if (ins.paciente_id) {
+    const [[p]] = await q.query('SELECT nombre, apellidos FROM pacientes WHERE id = ?', [ins.paciente_id]);
+    nombre = p ? [p.nombre, p.apellidos].filter(Boolean).join(' ') : null;
+  }
+  if (!nombre && ins.lead_id) {
+    const [[l]] = await q.query('SELECT nombre FROM leads WHERE id = ?', [ins.lead_id]);
+    nombre = l?.nombre || null;
+  }
+  return `${nombre || 'Sin nombre'} (${telefonoLegible(telefono)})`;
+}
+
+// La secuencia del lead ha terminado sin que conteste: si en 4 días sigue sin contestar, se cierra su
+// conversación y el lead queda perdido (si vuelve a pedir información, entra como nuevo). Sin
+// conversación abierta, perdido ya.
+async function leadSinRespuesta(q, ins, { ahora, calendario }) {
+  const [[i]] = await q.query('SELECT estado FROM inscripciones WHERE id = ?', [ins.id]);
+  if (i?.estado !== 'terminada') return;
+  const [[conv]] = await q.query("SELECT * FROM conversaciones WHERE lead_id = ? AND estado <> 'cerrada' ORDER BY id DESC LIMIT 1", [ins.lead_id]);
+  if (!conv) {
+    await q.query("UPDATE leads SET etapa = 'perdido', motivo_perdida = 'sin_respuesta' WHERE id = ? AND etapa IN ('nuevo','contactado')", [ins.lead_id]);
+    return;
+  }
+  const s = calcularSeguimiento({ tipo: 'dias', n: 4 }, { hoy: T.fechaMadrid(ahora), ahoraMin: T.minutosMadrid(ahora), calendario });
+  const cuando = T.desdeMadrid(s.fecha, s.hora);
+  await q.query(
+    `INSERT INTO seguimientos (lead_id, conversacion_id, contexto, contexto_id, motivo, plazo_tipo, programado_para, creado_por, creado_en)
+     VALUES (?, ?, ?, ?, 'cierre_sin_respuesta', 'dias', ?, 'sistema', ?)`, [ins.lead_id, conv.id, conv.contexto, conv.contexto_id, cuando, ahora]);
+  await q.query("UPDATE conversaciones SET proximo_paso = 'espera_respuesta', proximo_paso_en = ? WHERE id = ?", [cuando, conv.id]);
 }
 
 async function permisoComercial(q, ins, ahora) {
@@ -843,13 +926,26 @@ async function permisoComercial(q, ins, ahora) {
        WHERE c.paciente_id = ? AND m.direccion = 'saliente' AND p.categoria = 'marketing' AND m.creado_en > ?`, [pid, new Date(ahora.getTime() - 30 * 86400000)]);
     enviados = m.map((x) => x.creado_en);
   } else if (ins.lead_id) {
-    // Un lead que deja sus datos pidiendo información da su consentimiento para que le contestemos.
+    // Un lead que deja sus datos pidiendo información da su consentimiento para que le contestemos,
+    // con los mismos límites que un paciente: la baja (de su ficha o de la lista de bajas), el silencio
+    // pactado y los mensajes comerciales de la semana y del mes, contados por su teléfono.
     consentimiento = true;
+    const [[l]] = await q.query('SELECT telefono FROM leads WHERE id = ?', [ins.lead_id]);
+    baja = await tieneBaja(q, l?.telefono);
+    const [[s]] = await q.query("SELECT MAX(programado_para) AS hasta FROM seguimientos WHERE lead_id = ? AND estado = 'pendiente' AND creado_por IN ('ia','persona')", [ins.lead_id]);
+    seguimientoHasta = s?.hasta || null;
+    if (l?.telefono) {
+      const [m] = await q.query(
+        `SELECT m.creado_en FROM mensajes m JOIN conversaciones c ON c.id = m.conversacion_id JOIN plantillas p ON p.id = m.plantilla_id
+         WHERE c.telefono = ? AND m.direccion = 'saliente' AND p.categoria = 'marketing' AND m.creado_en > ?`, [l.telefono, new Date(ahora.getTime() - 30 * 86400000)]);
+      enviados = m.map((x) => x.creado_en);
+    }
   }
   return S.puedeEnviarComercial({ ahora, enviados, seguimientoPendienteHasta: seguimientoHasta, baja, consentimientoMarketing: consentimiento, esClienteConServicioSimilar: cliente });
 }
 
 // Conversaciones abiertas sin próximo paso (la lista de cada mañana: el objetivo es que esté vacía).
+// Una con su secuencia en marcha sí lo tiene: su siguiente mensaje.
 async function sinProximoPaso(q, ahora = new Date()) {
   const [filas] = await q.query(
     `SELECT c.id, c.telefono, c.estado, c.proximo_paso, c.ultimo_saliente_en, c.ultimo_entrante_en
@@ -857,7 +953,9 @@ async function sinProximoPaso(q, ahora = new Date()) {
       WHERE c.estado <> 'cerrada'
         AND NOT EXISTS (SELECT 1 FROM seguimientos s WHERE s.conversacion_id = c.id AND s.estado = 'pendiente')
         AND NOT EXISTS (SELECT 1 FROM tareas t WHERE t.conversacion_id = c.id AND t.estado = 'abierta')
-        AND NOT EXISTS (SELECT 1 FROM citas ci WHERE ci.paciente_id = c.paciente_id AND ci.inicio > ? AND ci.estado IN ('confirmada','retenida'))`, [ahora]);
+        AND NOT EXISTS (SELECT 1 FROM citas ci WHERE ci.paciente_id = c.paciente_id AND ci.inicio > ? AND ci.estado IN ('confirmada','retenida'))
+        AND NOT EXISTS (SELECT 1 FROM inscripciones i WHERE i.estado = 'activa'
+                         AND ((i.lead_id IS NOT NULL AND i.lead_id = c.lead_id) OR (i.paciente_id IS NOT NULL AND i.paciente_id = c.paciente_id)))`, [ahora]);
   return filas;
 }
 

@@ -88,6 +88,9 @@ test('POST /api/leads: lo que se acepta', () => {
   assert.equal(datos.tratamiento.respuesta, 'Mesoterapia capilar');
   assert.deepEqual(datos.tratamiento.claves.slice(0, 2), ['OTO26-CAP', 'otono-capilar']);
   assert.equal(L.leerLeadApi({ email: 'x@ejemplo.com', origen: 'ghl' }).datos.origen, 'ghl');
+  // De GHL: el envío (para no duplicar si reintenta) va aparte de la persona (que puede volver).
+  const ghl = L.leerLeadApi({ telefono: '611000404', origen: 'ghl', id_externo: 'op-404-1', id_contacto: 'contacto-404', id_oportunidad: 'op-404-1' }).datos;
+  assert.deepEqual([ghl.idExterno, ghl.idContacto, ghl.idOportunidad], ['op-404-1', 'contacto-404', 'op-404-1']);
 });
 
 test('webhook de leads de Meta: solo los avisos «leadgen» de una página', () => {

@@ -31,6 +31,19 @@ test('el paso de las 4 h que cae en domingo pasa al siguiente día que abre (y s
   assert.equal(madrid(S.momentoDelPaso(ins, 1, calendario).cuando), '2026-10-06 11:00');
 });
 
+test('lead que entra el martes a las 23:30: la bienvenida sale el miércoles al abrir y el paso de las 4 h, 4 h después (no un minuto más tarde)', () => {
+  const ins = { secuencia: 'lead', inicio: T.desdeMadrid('2026-10-06', '23:30') };
+  const primero = S.momentoDelPaso(ins, 0, calendario).cuando;
+  assert.equal(madrid(primero), '2026-10-07 11:00');
+  assert.equal(madrid(S.momentoDelPaso(ins, 1, calendario).cuando), '2026-10-07 11:00', 'contado desde la entrada, los dos caerían juntos');
+  assert.equal(madrid(S.momentoDelSiguiente(ins, 0, calendario, primero).cuando), '2026-10-07 15:00');
+  // Si sale a su hora, el siguiente va a la suya; la tarea de las 24 h, a las 24 h de la inscripción.
+  const deDia = { secuencia: 'lead', inicio: T.desdeMadrid('2026-10-06', '12:00') };
+  assert.equal(madrid(S.momentoDelSiguiente(deDia, 0, calendario, T.desdeMadrid('2026-10-06', '12:00')).cuando), '2026-10-06 16:00');
+  assert.equal(madrid(S.momentoDelSiguiente(deDia, 1, calendario, T.desdeMadrid('2026-10-06', '16:00')).cuando), '2026-10-07 12:00');
+  assert.equal(S.momentoDelSiguiente(deDia, 4, calendario, T.desdeMadrid('2026-10-13', '12:00')), null);
+});
+
 test('presupuesto: 2, 7 y 21 días, con llamada a los 8 si el importe es alto', () => {
   const ins = { secuencia: 'presupuesto', inicio: T.desdeMadrid('2026-09-29', '12:00') };
   assert.equal(madrid(S.momentoDelPaso(ins, 0, calendario).cuando), '2026-10-01 12:00');

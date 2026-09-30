@@ -20,7 +20,7 @@ const COMMIT = (() => {
   try { return fs.readFileSync(path.join(__dirname, 'commit.txt'), 'utf8').trim(); } catch { return null; }
 })();
 
-function crearApp({ pool = db.pool, deps = null } = {}) {
+function crearApp({ pool = db.pool, deps = null, reloj } = {}) {
   const dependencias = deps || {
     ia: crearIa(config.modos.ia),
     whatsapp: crearWhatsApp(config.modos.whatsapp),
@@ -31,7 +31,7 @@ function crearApp({ pool = db.pool, deps = null } = {}) {
   app.set('trust proxy', 1);
   // Webhooks de WhatsApp y Meta y alta de leads: antes del lector de JSON, porque la firma se
   // comprueba sobre el cuerpo tal cual llega.
-  app.use(rutasWebhooks({ pool }));
+  app.use(rutasWebhooks({ pool, reloj }));
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/api/version', (_req, res) => {

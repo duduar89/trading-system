@@ -100,6 +100,19 @@ function momentoDelPaso(inscripcion, n, calendario, limites = LIMITES) {
   return { paso, cuando: paso.accion === 'tarea' ? base : ajustarAHorario(base, calendario, limites) };
 }
 
+// Cuándo toca el paso n+1 si el paso n se ha hecho en «hecho». Nunca antes de su hora, y nunca más
+// pegado al anterior de lo que dice la secuencia: si el paso n salió tarde (entró de noche, en
+// festivo o esperó al límite semanal), el siguiente se retrasa lo mismo. Así dos plantillas no salen
+// una detrás de otra al abrir.
+function momentoDelSiguiente(inscripcion, n, calendario, hecho, limites = LIMITES) {
+  const sig = momentoDelPaso(inscripcion, n + 1, calendario, limites);
+  if (!sig) return null;
+  const actual = SECUENCIAS[inscripcion.secuencia].pasos[n];
+  const minimo = new Date(new Date(hecho).getTime() + (sig.paso.esperaMin - (actual?.esperaMin || 0)) * 60000);
+  if (minimo <= sig.cuando) return sig;
+  return { paso: sig.paso, cuando: sig.paso.accion === 'tarea' ? minimo : ajustarAHorario(minimo, calendario, limites) };
+}
+
 /**
  * ¿Se puede mandar ahora este mensaje comercial a este paciente?
  * @param {object} p { ahora, enviados: [Date] comerciales enviados, seguimientoPendienteHasta: Date|null,
@@ -138,4 +151,4 @@ function alOcurrir(evento, inscripciones) {
   });
 }
 
-module.exports = { SECUENCIAS, LIMITES, ajustarAHorario, momentoDelPaso, puedeEnviarComercial, laQueManda, alOcurrir };
+module.exports = { SECUENCIAS, LIMITES, ajustarAHorario, momentoDelPaso, momentoDelSiguiente, puedeEnviarComercial, laQueManda, alOcurrir };

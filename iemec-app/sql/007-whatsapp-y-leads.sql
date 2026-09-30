@@ -1,7 +1,7 @@
 -- 007 · Entrada de WhatsApp y de leads: los tipos de mensaje que llegan (vídeo, sticker, ubicación,
 -- reacción…), el lead que llega de la web, las respuestas del formulario (cifradas, como los
--- mensajes), las tareas de un lead que aún no tiene conversación y el mapeo de campañas, anuncios,
--- respuestas y códigos de la web a tratamientos.
+-- mensajes), las tareas de un lead que aún no tiene conversación, el mapeo de campañas, anuncios,
+-- respuestas y códigos de la web a tratamientos y la lista de bajas comerciales por teléfono.
 -- Los valores nuevos de los ENUM van al final: así el cambio no reescribe los que ya hay.
 
 ALTER TABLE mensajes
@@ -39,4 +39,17 @@ CREATE TABLE IF NOT EXISTS mapeo_tratamientos (
   notas VARCHAR(255) NULL,
   creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT mapeo_trat_fk FOREIGN KEY (tratamiento_id) REFERENCES tratamientos (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- La lista de bajas comerciales: quien ha pedido no recibir mensajes comerciales, sea o no paciente
+-- (lo escribió por WhatsApp o Meta avisa con el 131050 de que ha bloqueado el marketing de la
+-- clínica). Por teléfono: si vuelve a entrar como lead, no se le inscribe en ninguna secuencia (tarea
+-- para recepción). Sin claves ajenas: la baja se respeta aunque se borre el lead o la conversación.
+CREATE TABLE IF NOT EXISTS bajas_comerciales (
+  telefono VARCHAR(20) NOT NULL PRIMARY KEY,
+  fuente VARCHAR(40) NOT NULL,
+  conversacion_id INT UNSIGNED NULL,
+  lead_id INT UNSIGNED NULL,
+  paciente_id INT UNSIGNED NULL,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

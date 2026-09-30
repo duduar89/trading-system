@@ -23,6 +23,13 @@ function normalizarTelefono(valor) {
   return espanol(t);
 }
 
+// «+34916320000» → «916 32 00 00», para decirlo en un mensaje o en una tarea; los de fuera, tal cual.
+function telefonoLegible(e164) {
+  const t = String(e164 || '').replace(/[^\d+]/g, '');
+  const m = /^(?:\+34)?([6789]\d{2})(\d{2})(\d{2})(\d{2})$/.exec(t);
+  return m ? m.slice(1).join(' ') : t || null;
+}
+
 // Un fijo español no tiene WhatsApp: a ese lead se le llama.
 const esFijoEspanol = (e164) => /^\+34[89]\d{8}$/.test(e164 || '');
 
@@ -87,7 +94,11 @@ function datosFormulario(campos = []) {
 /**
  * El cuerpo de POST /api/leads (la web, GHL…) → { ok, datos } o { ok: false, error }.
  * Campos: telefono, nombre, email, tratamiento (id o nombre), origen, codigo_web, utm (objeto) o
- * utm_source…utm_term, campana, conjunto, anuncio, id_externo, mensaje.
+ * utm_source…utm_term, campana, conjunto, anuncio, mensaje y, de la otra herramienta:
+ *   id_externo      ESTE envío (el formulario enviado, la oportunidad de GHL): si lo reintenta, no se
+ *                   duplica. No es la persona: la misma persona puede volver a pedir información.
+ *   id_contacto     la persona en la otra herramienta (el contacto de GHL); se guarda, puede repetirse
+ *   id_oportunidad  la oportunidad de GHL
  */
 function leerLeadApi(cuerpo) {
   if (!cuerpo || typeof cuerpo !== 'object' || Array.isArray(cuerpo)) return { ok: false, error: 'El cuerpo tiene que ser un objeto JSON' };
@@ -110,7 +121,8 @@ function leerLeadApi(cuerpo) {
     ok: true,
     datos: {
       origen, telefono, nombre, email, codigoWeb, campana, conjunto: texto(cuerpo.conjunto), anuncio: texto(cuerpo.anuncio),
-      idExterno: texto(cuerpo.id_externo, 120), utm: Object.keys(utm).length ? utm : null,
+      idExterno: texto(cuerpo.id_externo, 120), idContacto: texto(cuerpo.id_contacto, 60), idOportunidad: texto(cuerpo.id_oportunidad, 60),
+      utm: Object.keys(utm).length ? utm : null,
       respuestas: mensaje ? [{ pregunta: 'Mensaje', valor: mensaje }] : [],
       tratamiento: {
         id: tratamiento, respuesta: tratamiento,
@@ -209,6 +221,6 @@ function resolverTratamiento({ tratamientos = [], mapeo = [], id = null, respues
 }
 
 module.exports = {
-  ORIGENES, normalizarTelefono, esFijoEspanol, normalizarEmail, limpiarNombre, nombrePila, datosFormulario,
+  ORIGENES, normalizarTelefono, telefonoLegible, esFijoEspanol, normalizarEmail, limpiarNombre, nombrePila, datosFormulario,
   leerLeadApi, leerWebhookLeads, buscarEnCatalogo, resolverTratamiento,
 };

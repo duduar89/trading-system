@@ -26,6 +26,8 @@ test('cron de cada minuto', async (t) => {
       const i = await vuelta({ pool, deps, ahora: new Date('2026-10-06T09:00:00Z') });
       assert.equal(i.retencionesCaducadas, 0);
       assert.equal(i.sinProximoPaso, 0, 'a las 11:00 de Madrid se hace la revisión diaria');
+      assert.equal(i.webhooksVaciados, 0, 'y se vacían los cuerpos de los webhooks de hace más de 30 días');
+      assert.deepEqual(i.entrada, { hechos: 0, reintentos: 0, fallidos: 0, aplazados: 0 }, 'lo que ha llegado va lo primero');
     });
     await t.test('dos cron a la vez: uno trabaja y el otro se aparta', async () => {
       const ahora = new Date('2026-10-06T09:01:00Z');

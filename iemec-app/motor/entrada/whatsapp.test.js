@@ -129,11 +129,22 @@ test('identificador del aviso: el wamid, «wamid:estado» o la huella del cuerpo
 });
 
 test('respuesta al momento: al audio y a la foto sí (presentándose la primera vez); al sticker no', () => {
-  assert.equal(W.respuestaAutomatica('audio', { nombre: 'Laura', primerMensajeIa: true }),
-    'Soy el asistente virtual de IEMEC. Gracias, Laura. Ahora mismo no puedo escuchar audios, así que se lo paso a una persona del equipo, que te contesta por aquí lo antes posible.');
-  assert.match(W.respuestaAutomatica('imagen', {}), /^Gracias\. Se lo paso a una persona del equipo/);
+  assert.equal(W.respuestaAutomatica('audio', { nombre: 'Laura', primerMensajeIa: true, telefonoClinica: '+34916000000' }),
+    'Soy el asistente virtual de IEMEC. Gracias, Laura. Ahora mismo no puedo escuchar audios, así que se lo paso a una persona del equipo, que te contesta por aquí lo antes posible.'
+    + ' Si es algo urgente de salud, llámanos al 916 00 00 00 o, si te encuentras mal, llama al 112.');
+  assert.match(W.respuestaAutomatica('imagen', {}), /^Gracias\. Se lo paso a una persona del equipo.* Si es algo urgente de salud, llámanos o, si te encuentras mal, llama al 112\.$/);
+  assert.match(W.respuestaAutomatica('video', {}), /112/, 'una foto o un vídeo pueden ser una complicación: se le dice qué hacer');
+  assert.doesNotMatch(W.respuestaAutomatica('documento', {}), /112/);
   assert.equal(W.respuestaAutomatica('sticker', {}), null);
   assert.equal(W.respuestaAutomatica('ubicacion', {}), null);
+  assert.equal(W.telefonoLegible('+34722000000'), '722 00 00 00');
+  assert.equal(W.telefonoLegible('+447700900123'), '+447700900123');
+});
+
+test('cada mensaje y cada estado dicen a qué número de la empresa iban', () => {
+  const r = W.leerWebhook(cuerpo({ mensajes: [msg({ type: 'text', text: { body: 'hola' } })], estados: [{ id: 'wamid.N1', status: 'read', recipient_id: de }] }));
+  assert.equal(r.mensajes[0].numeroId, 'NUM-PRUEBA');
+  assert.equal(r.estados[0].numeroId, 'NUM-PRUEBA');
 });
 
 test('teléfono de WhatsApp: el número internacional con «+»', () => {

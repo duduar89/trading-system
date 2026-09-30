@@ -16,6 +16,8 @@ const { leerLeadApi, leerWebhookLeads } = require('../../motor/entrada/leads');
 
 const envolver = (fn) => (req, res, next) => fn(req, res).catch(next);
 const crudo = express.raw({ type: () => true, limit: '1mb' });
+// Una clave compartida más corta se puede adivinar: se trata como si no estuviera.
+const LARGO_MINIMO_CLAVE = 16;
 
 // Compara dos secretos en tiempo constante, también si miden distinto (se comparan sus huellas).
 function igualesSeguro(a, b) {
@@ -26,10 +28,11 @@ function igualesSeguro(a, b) {
 /**
  * ¿Viene de verdad de Meta (o del proveedor)? Con secreto de la app, la firma tiene que cuadrar; sin
  * él, vale una clave compartida en la cabecera X-Clave (360dialog no firma con el secreto de nuestra
- * app, pero deja añadir cabeceras). Sin ninguno de los dos: en producción se rechaza; fuera, se
- * admite y queda firma_ok = NULL.
+ * app, pero deja añadir cabeceras), de 16 caracteres o más. Sin ninguno de los dos: en producción se
+ * rechaza; fuera, se admite y queda firma_ok = NULL.
  */
-function autenticar(req, cuerpo, { secreto, clave }) {
+function autenticar(req, cuerpo, { secreto, clave: dada = null }) {
+  const clave = dada && dada.length >= LARGO_MINIMO_CLAVE ? dada : null;
   if (secreto) {
     const esperada = `sha256=${crypto.createHmac('sha256', secreto).update(cuerpo).digest('hex')}`;
     const firma = req.get('x-hub-signature-256');
@@ -64,7 +67,8 @@ function leerJson(cuerpo) {
   }
 }
 
-function rutasWebhooks({ pool }) {
+// reloj: la hora con la que se encola y se da de alta (las pruebas la fijan).
+function rutasWebhooks({ pool, reloj = () => new Date() }) {
   const r = express.Router();
   const p = () => (typeof pool === 'function' ? pool() : pool);
 
@@ -80,6 +84,7 @@ function rutasWebhooks({ pool }) {
     await guardarWebhook(p(), {
       proveedor: 'whatsapp', trabajo: datos.mensajes.length ? TRABAJOS.whatsapp : TRABAJOS.estados,
       evento, idExterno: W.idExterno(datos, cuerpo), cuerpo: cuerpo.toString('utf8'), firmaOk: a.firmaOk,
+      telefonos: [...new Set(datos.mensajes.map((m) => m.telefono).filter(Boolean))], ahora: reloj(),
     });
     res.sendStatus(200);
   }));
@@ -93,7 +98,7 @@ function rutasWebhooks({ pool }) {
     if (!json) return res.status(400).json({ error: 'El cuerpo no es JSON' });
     const leads = leerWebhookLeads(json);
     const idExterno = leads.length === 1 ? `leadgen:${leads[0].leadgenId}` : `sha256:${crypto.createHash('sha256').update(cuerpo).digest('hex')}`;
-    await guardarWebhook(p(), { proveedor: 'meta', evento: leads.length ? 'leadgen' : 'otro', idExterno, cuerpo: cuerpo.toString('utf8'), firmaOk: a.firmaOk });
+    await guardarWebhook(p(), { proveedor: 'meta', evento: leads.length ? 'leadgen' : 'otro', idExterno, cuerpo: cuerpo.toString('utf8'), firmaOk: a.firmaOk, ahora: reloj() });
     res.sendStatus(200);
   }));
 
@@ -101,7 +106,7 @@ function rutasWebhooks({ pool }) {
   // La clave se mira antes de leer el cuerpo.
   const conClave = (req, res, next) => {
     const clave = process.env.LEADS_CLAVE || '';
-    if (clave.length < 16) return res.status(503).json({ error: 'La entrada de leads no está configurada (LEADS_CLAVE)' });
+    if (clave.length < LARGO_MINIMO_CLAVE) return res.status(503).json({ error: 'La entrada de leads no está configurada (LEADS_CLAVE)' });
     const dada = req.get('x-clave');
     if (!dada || !igualesSeguro(dada, clave)) return res.status(401).json({ error: 'Clave no válida' });
     next();
@@ -109,7 +114,7 @@ function rutasWebhooks({ pool }) {
   r.post('/api/leads', conClave, express.json({ limit: '100kb' }), express.urlencoded({ extended: false, limit: '100kb' }), envolver(async (req, res) => {
     const l = leerLeadApi(req.body);
     if (!l.ok) return res.status(400).json({ error: l.error });
-    const a = await altaLead(p(), l.datos, { ahora: new Date() });
+    const a = await altaLead(p(), l.datos, { ahora: reloj() });
     res.status(a.nuevo ? 201 : 200).json({
       ok: true, leadId: a.leadId, nuevo: a.nuevo, inscrito: a.inscrito, motivo: a.motivo || null, tratamiento: a.tratamientoId || null,
     });
