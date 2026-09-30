@@ -64,7 +64,7 @@ Devuelve solo el texto del mensaje.`;
 function textoSimulado(decision, d = {}) {
   const nombre = d.nombre ? `, ${d.nombre}` : '';
   const presentacion = d.primerMensajeIa ? 'Soy el asistente virtual de IEMEC. ' : '';
-  const huecos = (d.huecos || []).map((h) => h.texto).join(', ');
+  const huecos = d.huecosTexto || (d.huecos || []).map((h) => h.texto).join(', ');
   const tipos = new Set(decision.acciones.map((a) => a.tipo));
   const seg = decision.acciones.find((a) => a.tipo === 'programar_seguimiento');
   const oferta = decision.acciones.find((a) => a.tipo === 'ofrecer');

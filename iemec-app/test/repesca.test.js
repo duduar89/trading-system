@@ -186,3 +186,9 @@ test('repesca de punta a punta', async (t) => {
     await pool.end();
   }
 });
+
+test('los huecos se proponen agrupados por día', () => {
+  assert.equal(R.textoHuecos([{ fecha: '2026-10-06', hora: '11:00' }, { fecha: '2026-10-06', hora: '17:30' }, { fecha: '2026-10-07', hora: '12:00' }]),
+    'el martes 6 de octubre a las 11:00 o a las 17:30, o el miércoles 7 de octubre a las 12:00');
+  assert.equal(R.textoHuecos([{ fecha: '2026-10-06', hora: '11:00' }]), 'el martes 6 de octubre a las 11:00');
+});

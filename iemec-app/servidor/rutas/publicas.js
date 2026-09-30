@@ -63,7 +63,7 @@ function paginaCita(cita, clinica, mensaje = '') {
 h1{font-family:"Playfair Display",Georgia,serif;font-style:italic;font-weight:500;font-size:28px;margin:14px 0 4px}
 .cuando{font-size:15px;opacity:.92}.cuerpo{padding:22px 24px 26px;display:grid;gap:14px}
 .dato{display:flex;justify-content:space-between;gap:12px;font-size:14px;border-bottom:1px solid #e7ecea;padding-bottom:10px}.dato span:first-child{color:var(--suave)}
-.btn{display:block;text-align:center;text-decoration:none;border-radius:999px;padding:13px 16px;font-weight:500;font-size:15px;border:1px solid var(--terciopelo);color:var(--terciopelo);background:#fff}
+.btn{display:flex;align-items:center;justify-content:center;min-height:48px;text-align:center;text-decoration:none;border-radius:999px;padding:12px 16px;font-weight:500;font-size:15px;line-height:1.25;border:1px solid var(--terciopelo);color:var(--terciopelo);background:#fff}
 .btn.lleno{background:var(--terciopelo);color:#fff;border-color:var(--terciopelo)}.fila{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 form{margin:0}button.btn{width:100%;cursor:pointer;font-family:inherit}.aviso{background:#f3ead8;border:1px solid var(--oro);border-radius:12px;padding:12px;font-size:14px}
 .pie{font-size:12px;color:var(--suave);text-align:center}
@@ -77,7 +77,7 @@ ${cita.profesional ? `<div class="dato"><span>Con</span><span>${esc(cita.profesi
 ${cancelada ? '' : `
 ${cita.estado === 'retenida' ? `<form method="post" action="/c/${esc(cita.token)}/confirmar"><button class="btn lleno" type="submit">Confirmar mi cita</button></form>` : ''}
 <a class="btn lleno" href="/c/${esc(cita.token)}.ics">Añadir a mi calendario</a>
-<div class="fila"><a class="btn" href="${esc(enlaceGoogle(ev))}" rel="noopener">Google Calendar</a><a class="btn" href="${esc(enlaceOutlook(ev))}" rel="noopener">Outlook</a></div>
+<div class="fila"><a class="btn" href="${esc(enlaceGoogle(ev))}" rel="noopener">Google</a><a class="btn" href="${esc(enlaceOutlook(ev))}" rel="noopener">Outlook</a></div>
 <a class="btn" href="${esc(cambiar)}">Cambiarla por WhatsApp</a>
 <form method="post" action="/c/${esc(cita.token)}/cancelar"><button class="btn" type="submit">Cancelar la cita</button></form>`}
 <p class="pie">En iPhone, «Añadir a mi calendario» abre el calendario del teléfono. Si algo cambia, te avisamos por WhatsApp.</p>

@@ -211,6 +211,14 @@ async function huecosParaProponer(pool, pedido, tratamientoId, ahora) {
   return lista.map((h) => ({ fecha: h.fecha, hora: h.hora, texto: `${textoDia(h.fecha)} a las ${h.hora}` }));
 }
 
+// «el martes 6 de octubre a las 11:00 o a las 17:30, o el miércoles 7 de octubre a las 12:00»
+function textoHuecos(huecos) {
+  const porDia = new Map();
+  for (const h of huecos) (porDia.get(h.fecha) || porDia.set(h.fecha, []).get(h.fecha)).push(h.hora);
+  const partes = [...porDia.entries()].map(([f, horas]) => `${textoDia(f)} a las ${horas.join(' o a las ')}`);
+  return partes.length <= 1 ? partes.join('') : `${partes.slice(0, -1).join(', ')}, o ${partes.at(-1)}`;
+}
+
 function textoDia(fecha) {
   const { DIAS, MESES } = require('../../motor/repesca/plazos');
   return `el ${DIAS[T.diaSemana(fecha)]} ${Number(fecha.slice(8, 10))} de ${MESES[Number(fecha.slice(5, 7))]}`;
@@ -283,7 +291,7 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
   const huecos = await huecosParaProponer(pool, aplicado.huecosPedidos, datos.tratamiento?.id, ahora);
   const primerMensajeIa = !hist.some((m) => m.autor === 'ia');
   const datosRedaccion = {
-    nombre: nombre || datos.paciente?.nombre || null, huecos, primerMensajeIa,
+    nombre: nombre || datos.paciente?.nombre || null, huecos, huecosTexto: textoHuecos(huecos), primerMensajeIa,
     ofertaTexto: aplicado.oferta?.textoPaciente || null,
     respuestaAprobada: datos.respuestas[0]?.respuesta || null,
     fecha: decision.acciones.find((x) => x.tipo === 'programar_seguimiento')?.texto || null,
@@ -541,4 +549,4 @@ async function sinProximoPaso(q, ahora = new Date()) {
   return filas;
 }
 
-module.exports = { procesarEntrante, procesarSeguimientos, avanzarSecuencias, inscribir, sinProximoPaso, enviar, historial, calendarioDesdeBd, cargarContexto };
+module.exports = { textoHuecos, procesarEntrante, procesarSeguimientos, avanzarSecuencias, inscribir, sinProximoPaso, enviar, historial, calendarioDesdeBd, cargarContexto };

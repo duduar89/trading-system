@@ -69,12 +69,15 @@ async function huecos(pool, { fecha, tratamientoId, ahora = new Date(), antelaci
 }
 
 // Huecos de los próximos días (para proponer al paciente).
-async function proximosHuecos(pool, { tratamientoId, desdeFecha, dias = 14, n = 3, preferencia = null, ahora = new Date() }) {
+// Huecos para proponer al paciente: repartidos en varios días (como mucho `porDia` en cada uno,
+// uno de mañana y otro de tarde si se puede), para que tenga dónde elegir.
+async function proximosHuecos(pool, { tratamientoId, desdeFecha, dias = 14, n = 3, porDia = 2, preferencia = null, ahora = new Date() }) {
   const salida = [];
   for (let i = 0; i < dias && salida.length < n; i++) {
     const fecha = T.sumarDias(desdeFecha, i);
     const lista = await huecos(pool, { fecha, tratamientoId, ahora });
-    for (const h of proponer(lista, { n: n - salida.length, preferencia })) salida.push(h);
+    const cuantos = Math.min(porDia, n - salida.length);
+    for (const h of proponer(lista, { n: cuantos, preferencia, separacionMin: 180 })) salida.push(h);
   }
   return salida;
 }

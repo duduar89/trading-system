@@ -33,6 +33,7 @@ test('la cita del paciente, de WhatsApp a su calendario', async (t) => {
       assert.match(html, /martes 6 de octubre, a las 17:00/);
       assert.match(html, /Añadir a mi calendario/);
       assert.match(html, /calendar\.google\.com/);
+      assert.match(html, />Google<\/a>/);
       assert.match(html, /noindex/);
 
       const ics = await fetch(`${base}/c/${cita.token}.ics`);
