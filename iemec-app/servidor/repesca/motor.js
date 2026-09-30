@@ -3,24 +3,29 @@
 // plazos, ofertas, plantillas, secuencias) con MariaDB, WhatsApp y la IA.
 //
 //   procesarEntrante     llega un mensaje del paciente → se para la secuencia → se entiende → se
-//                        decide → se aplica (seguimiento, oferta, persona, baja…) → se contesta
+//                        decide → se aplica (seguimiento, oferta, persona, baja…) → se contesta.
+//                        Si elige uno de los huecos propuestos, se reserva y le llega su cita con el
+//                        enlace para añadirla al calendario.
 //   procesarSeguimientos (cron) seguimientos vencidos → «como quedamos» → un recordatorio → cierre
 //   avanzarSecuencias    (cron) pasos de las secuencias de quien no ha contestado
 //   inscribir            mete a un lead, cancelación o presupuesto en su secuencia
 //   sinProximoPaso       (cada mañana) conversaciones abiertas sin próximo paso
 const T = require('../../motor/tiempo');
 const { crearCalendario } = require('../../motor/repesca/calendario-clinica');
-const { interpretar } = require('../../motor/repesca/interpretar');
+const { interpretar, normalizar } = require('../../motor/repesca/interpretar');
+const { elegirHueco } = require('../../motor/repesca/eleccion');
+const { proponer } = require('../../motor/agenda/huecos');
 const { decidir } = require('../../motor/repesca/decidir');
 const { calcularSeguimiento } = require('../../motor/repesca/plazos');
 const { comprobarOfertaPropuesta } = require('../../motor/repesca/ofertas');
 const { revisar } = require('../../motor/repesca/filtro-legal');
-const { elegirPlantilla } = require('../../motor/repesca/plantillas');
+const { elegirPlantilla, rellenar } = require('../../motor/repesca/plantillas');
 const S = require('../../motor/repesca/secuencias');
 const { combinar, textoSimulado } = require('../integraciones/ia');
 const { cifrar, descifrar } = require('../cripto');
 const { registrar } = require('../eventos');
 const agenda = require('../agenda');
+const config = require('../config');
 
 const VENTANA_MS = 24 * 3600 * 1000;
 
@@ -30,10 +35,21 @@ async function calendarioDesdeBd(q) {
   return crearCalendario({ horario, festivos: festivos.map((f) => (f.fecha instanceof Date ? f.fecha.toISOString().slice(0, 10) : String(f.fecha).slice(0, 10))) });
 }
 
-async function conversacionPara(con, { telefono, pacienteId = null, leadId = null, contexto = 'general', contextoId = null }) {
+async function conversacionPara(con, { telefono, pacienteId = null, leadId = null, contexto = 'general', contextoId = null, ahora = new Date() }) {
   const [[abierta]] = await con.query(
     "SELECT * FROM conversaciones WHERE telefono = ? AND estado <> 'cerrada' ORDER BY id DESC LIMIT 1 FOR UPDATE", [telefono]);
   if (abierta) return abierta;
+  // Si su última conversación acabó en una cita que aún no ha llegado, se sigue en esa: así el
+  // «gracias», el «confirmo» o el «necesito cambiarla» quedan junto a la reserva.
+  const [[conCita]] = await con.query(
+    `SELECT c.* FROM conversaciones c
+      WHERE c.telefono = ? AND c.estado = 'cerrada' AND c.motivo_cierre = 'cita' AND c.paciente_id IS NOT NULL
+        AND EXISTS (SELECT 1 FROM citas ci WHERE ci.paciente_id = c.paciente_id AND ci.inicio > ? AND ci.estado IN ('confirmada','retenida'))
+      ORDER BY c.id DESC LIMIT 1 FOR UPDATE`, [telefono, ahora]);
+  if (conCita) {
+    await con.query("UPDATE conversaciones SET estado = 'esperando_paciente' WHERE id = ?", [conCita.id]);
+    return { ...conCita, estado: 'esperando_paciente' };
+  }
   if (!pacienteId) {
     const [[p]] = await con.query('SELECT id FROM pacientes WHERE telefono = ?', [telefono]);
     pacienteId = p?.id || null;
@@ -195,6 +211,16 @@ async function aplicarDecision(con, conv, decision, { ahora, texto, datos }) {
       case 'proponer_huecos':
         salida.huecosPedidos = a;
         break;
+      case 'cita_reservada': {
+        // Lo que se le ofreció en esta conversación queda aceptado; si venía de un presupuesto, también.
+        await con.query("UPDATE ofertas_hechas SET estado = 'aceptada' WHERE conversacion_id = ? AND estado = 'propuesta'", [conv.id]);
+        if (conv.contexto === 'presupuesto' && conv.contexto_id) {
+          await con.query("UPDATE presupuestos SET estado = 'aceptado', aceptado_en = ? WHERE id = ? AND estado = 'entregado'", [ahora, conv.contexto_id]);
+        }
+        const [[ci]] = await con.query('SELECT inicio FROM citas WHERE id = ?', [a.citaId]);
+        Object.assign(cambios, { estado: 'cerrada', motivo_cierre: 'cita', proximo_paso_en: ci?.inicio || null, huecos_ofrecidos: null, huecos_ofrecidos_en: null });
+        break;
+      }
       default:
         break;
     }
@@ -205,17 +231,36 @@ async function aplicarDecision(con, conv, decision, { ahora, texto, datos }) {
   return salida;
 }
 
-async function huecosParaProponer(pool, pedido, tratamientoId, ahora) {
-  if (!pedido || !tratamientoId) return [];
-  const lista = await agenda.proximosHuecos(pool, { tratamientoId, desdeFecha: pedido.desdeFecha, dias: 10, n: 3, preferencia: pedido.franja, ahora });
+async function huecosParaProponer(pool, pedido, tratamiento, ahora) {
+  // Los tratamientos que necesitan valoración previa (reservable_ia = 0) los agenda una persona.
+  if (!pedido || !tratamiento || !tratamiento.reservable_ia) return [];
+  const lista = await agenda.proximosHuecos(pool, { tratamientoId: tratamiento.id, desdeFecha: pedido.desdeFecha, dias: 10, n: 3, preferencia: pedido.franja, ahora });
   return lista.map((h) => ({ fecha: h.fecha, hora: h.hora, texto: `${textoDia(h.fecha)} a las ${h.hora}` }));
+}
+
+// Lo que se le ofrece queda guardado en la conversación: si contesta «el martes a las 11», se sabe
+// de qué huecos hablaba.
+async function guardarHuecos(q, conversacionId, huecos, tratamientoId, ahora) {
+  await q.query('UPDATE conversaciones SET huecos_ofrecidos = ?, huecos_tratamiento_id = ?, huecos_ofrecidos_en = ? WHERE id = ?',
+    [JSON.stringify(huecos.map((h) => ({ fecha: h.fecha, hora: h.hora }))), tratamientoId, ahora, conversacionId]);
+}
+
+// Los huecos que se le ofrecieron, en el mismo orden (para que «la primera» sea la primera que
+// leyó). Si ya han pasado todos, no hay propuesta en marcha.
+function huecosOfrecidos(conv, ahora) {
+  const lista = parseJson(conv.huecos_ofrecidos);
+  if (!Array.isArray(lista) || !lista.some((h) => T.desdeMadrid(h.fecha, h.hora) > ahora)) return [];
+  return lista;
 }
 
 // «el martes 6 de octubre a las 11:00 o a las 17:30, o el miércoles 7 de octubre a las 12:00»
 function textoHuecos(huecos) {
   const porDia = new Map();
   for (const h of huecos) (porDia.get(h.fecha) || porDia.set(h.fecha, []).get(h.fecha)).push(h.hora);
-  const partes = [...porDia.entries()].map(([f, horas]) => `${textoDia(f)} a las ${horas.join(' o a las ')}`);
+  const alas = (horas) => (horas.length > 2
+    ? `a las ${horas.slice(0, -1).join(', a las ')} o a las ${horas.at(-1)}`
+    : `a las ${horas.join(' o a las ')}`);
+  const partes = [...porDia.entries()].map(([f, horas]) => `${textoDia(f)} ${alas(horas)}`);
   return partes.length <= 1 ? partes.join('') : `${partes.slice(0, -1).join(', ')}, o ${partes.at(-1)}`;
 }
 
@@ -232,15 +277,16 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
   const { pool, ia } = deps;
   const con = await pool.getConnection();
   let conv;
+  let mensajeId;
   try {
     await con.beginTransaction();
-    conv = await conversacionPara(con, { telefono });
+    conv = await conversacionPara(con, { telefono, ahora });
     if (waId) {
       const [[ya]] = await con.query('SELECT id FROM mensajes WHERE wa_id = ?', [waId]);
       if (ya) { await con.commit(); return { duplicado: true }; }
     }
     const reglasPrevias = interpretar(texto);
-    await guardarMensaje(con, { conversacionId: conv.id, direccion: 'entrante', autor: 'paciente', texto, waId, intencion: reglasPrevias.intencion, creadoEn: ahora });
+    mensajeId = await guardarMensaje(con, { conversacionId: conv.id, direccion: 'entrante', autor: 'paciente', texto, waId, intencion: reglasPrevias.intencion, creadoEn: ahora });
     await con.query('UPDATE conversaciones SET ultimo_entrante_en = ?, ventana_hasta = ? WHERE id = ?', [ahora, new Date(ahora.getTime() + VENTANA_MS), conv.id]);
     if (conv.lead_id) await con.query("UPDATE leads SET etapa = 'conversando' WHERE id = ? AND etapa IN ('nuevo','contactado')", [conv.lead_id]);
     // Lo que dice el paciente manda: se pausan sus secuencias.
@@ -267,6 +313,32 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
   const datos = await cargarContexto(pool, conv, ahora);
   const hist = await historial(pool, conv.id);
   const reglas = interpretar(texto);
+  const primerMensajeIa = !hist.some((m) => m.autor === 'ia');
+  const hola = primerMensajeIa ? 'Soy el asistente virtual de IEMEC. ' : '';
+  const nombrePila = nombre || datos.paciente?.nombre || (await nombreDelLead(pool, conv)) || null;
+
+  if (!['baja', 'salud_personal', 'queja'].includes(reglas.intencion)) {
+    const ofrecidos = huecosOfrecidos(conv, ahora);
+    // Tiene una cita pendiente y contesta sobre ella («gracias», «confirmo», «necesito cambiarla»).
+    if (!ofrecidos.length && conv.paciente_id) {
+      const sobreCita = await atenderSobreCita(deps, conv, { texto, ahora, nombre: nombrePila, hist });
+      if (sobreCita) {
+        await pool.query("UPDATE mensajes SET intencion = 'cita' WHERE id = ?", [mensajeId]);
+        return sobreCita;
+      }
+    }
+    // ¿Está eligiendo uno de los huecos propuestos (o pidiendo un día y una hora concretos)?
+    const tratamiento = conv.huecos_tratamiento_id ? { id: conv.huecos_tratamiento_id, reservable_ia: 1 } : datos.tratamiento;
+    if (tratamiento?.reservable_ia && PUEDE_ELEGIR.has(reglas.intencion) && (ofrecidos.length || ['reservar', 'preferencia_horario'].includes(reglas.intencion))) {
+      const e = elegirHueco(texto, ofrecidos, { hoy: T.fechaMadrid(ahora) });
+      // «el 15 de noviembre» sin hora puede ser «escríbeme entonces»: eso lo lleva la repesca normal.
+      if (e && !(reglas.intencion === 'aplazar' && e.tipo === 'pide' && !e.hora)) {
+        await pool.query("UPDATE mensajes SET intencion = 'eleccion_hueco' WHERE id = ?", [mensajeId]);
+        return atenderEleccion(deps, conv, e, { ahora, texto, datos, nombre: nombrePila, hola, tratamientoId: tratamiento.id, ofrecidos });
+      }
+    }
+  }
+
   let desdeIa;
   try {
     desdeIa = ia.modo === 'real' ? await ia.interpretar({ texto, historial: hist, contexto: { tipo: conv.contexto, tratamiento: datos.tratamiento?.nombre } }) : null;
@@ -288,10 +360,15 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
     con2.release();
   }
 
-  const huecos = await huecosParaProponer(pool, aplicado.huecosPedidos, datos.tratamiento?.id, ahora);
-  const primerMensajeIa = !hist.some((m) => m.autor === 'ia');
+  const huecos = await huecosParaProponer(pool, aplicado.huecosPedidos, datos.tratamiento, ahora);
+  if (huecos.length) await guardarHuecos(pool, conv.id, huecos, datos.tratamiento.id, ahora);
+  else if (aplicado.huecosPedidos && !aplicado.huecosPedidos.opcional) {
+    // Quería cita y la IA no puede ofrecer huecos: que no se quede esperando a nadie.
+    await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, conversacion_id, vence_en) VALUES ('atender_conversacion', ?, ?, ?, ?)",
+      ['Quiere cita: proponerle huecos a mano', conv.paciente_id, conv.id, new Date(ahora.getTime() + 2 * 3600000)]);
+  }
   const datosRedaccion = {
-    nombre: nombre || datos.paciente?.nombre || null, huecos, huecosTexto: textoHuecos(huecos), primerMensajeIa,
+    nombre: nombrePila, huecos, huecosTexto: textoHuecos(huecos), primerMensajeIa,
     ofertaTexto: aplicado.oferta?.textoPaciente || null,
     respuestaAprobada: datos.respuestas[0]?.respuesta || null,
     fecha: decision.acciones.find((x) => x.tipo === 'programar_seguimiento')?.texto || null,
@@ -304,21 +381,237 @@ async function procesarEntrante(deps, { telefono, texto, waId = null, ahora = ne
   return { conversacionId: conv.id, interpretacion: interp, decision, respuesta, huecos, envio, seguimientoId: aplicado.seguimientoId };
 }
 
+// ── El paciente elige hueco: se reserva y le llega su cita ──────────────────────────────────
+
+// Intenciones con las que puede estar eligiendo. Con las demás (precio, «me lo pienso», salud…)
+// sigue la repesca normal aunque nombre un día.
+const PUEDE_ELEGIR = new Set(['reservar', 'acepta', 'aplazar', 'preferencia_horario', 'pregunta', 'otro']);
+
+async function nombreDelLead(q, conv) {
+  if (!conv.lead_id) return null;
+  const [[l]] = await q.query('SELECT nombre FROM leads WHERE id = ?', [conv.lead_id]);
+  return l?.nombre ? l.nombre.trim().split(/\s+/)[0] : null;
+}
+
+// Un lead que reserva pasa a tener ficha de paciente (la cita la necesita).
+async function asegurarPaciente(q, conv, { nombre }) {
+  if (conv.paciente_id) return conv.paciente_id;
+  const [[lead]] = conv.lead_id ? await q.query('SELECT nombre, email, origen FROM leads WHERE id = ?', [conv.lead_id]) : [[null]];
+  const [pila, ...resto] = String(lead?.nombre || nombre || 'Paciente').trim().split(/\s+/);
+  const [r] = await q.query(
+    'INSERT INTO pacientes (nombre, apellidos, telefono, email, origen) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)',
+    [pila.slice(0, 80), resto.join(' ').slice(0, 120) || null, conv.telefono, lead?.email || null, lead?.origen || 'whatsapp']);
+  await q.query('UPDATE conversaciones SET paciente_id = ? WHERE id = ?', [r.insertId, conv.id]);
+  if (conv.lead_id) await q.query('UPDATE leads SET paciente_id = ? WHERE id = ? AND paciente_id IS NULL', [r.insertId, conv.lead_id]);
+  conv.paciente_id = r.insertId;
+  return r.insertId;
+}
+
+const mayuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const ventanaDe = (hora) => ({ desde: T.minutosDe(hora) - 60, hasta: T.minutosDe(hora) + 61 });
+
+async function datosCita(q, citaId) {
+  const [[c]] = await q.query(
+    `SELECT c.id, c.inicio, c.token, c.estado, t.nombre AS tratamiento, cl.direccion, cl.municipio, cl.nombre_corto
+       FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id LEFT JOIN clinica cl ON cl.id = 1 WHERE c.id = ?`, [citaId]);
+  if (!c) return null;
+  const inicio = new Date(c.inicio);
+  return { ...c, fecha: T.fechaMadrid(inicio), hora: T.hhmm(T.minutosMadrid(inicio)), url: `${config.urlPublica}/c/${c.token}`,
+    donde: [c.direccion, c.municipio].filter(Boolean).join(', '), marca: c.nombre_corto || 'IEMEC' };
+}
+
+function textoCitaReservada(c, { nombre, hola = '' }) {
+  return `${hola}¡Hecho${nombre ? `, ${nombre}` : ''}! Te esperamos ${textoDia(c.fecha)} a las ${c.hora} en ${c.marca}`
+    + `${c.donde ? ` (${c.donde})` : ''} para: ${c.tratamiento}.\n\n`
+    + `Aquí tienes tu cita para añadirla a tu calendario, y cambiarla o cancelarla si lo necesitas: ${c.url}`;
+}
+
+async function enTransaccion(pool, fn) {
+  const con = await pool.getConnection();
+  try {
+    await con.beginTransaction();
+    const r = await fn(con);
+    await con.commit();
+    return r;
+  } catch (err) {
+    await con.rollback().catch(() => {});
+    throw err;
+  } finally {
+    con.release();
+  }
+}
+
+async function reservarElegido(deps, conv, { fecha, hora, tratamientoId }, { ahora, nombre, datos, frase, hola }) {
+  const { pool } = deps;
+  const pacienteId = await asegurarPaciente(pool, conv, { nombre });
+  const [[pac]] = await pool.query('SELECT nombre, es_cliente FROM pacientes WHERE id = ?', [pacienteId]);
+  let cita;
+  try {
+    cita = await agenda.reservar(pool, {
+      pacienteId, tratamientoId, fecha, hora, origen: 'ia_whatsapp', actor: 'ia', leadId: conv.lead_id,
+      conversacionId: conv.id, primeraVisita: !pac?.es_cliente, antelacionMin: 60, ahora,
+    });
+  } catch (err) {
+    if (err.codigo === 'HUECO_OCUPADO') return { ocupado: true };
+    throw err;
+  }
+  const decision = { intencion: 'eleccion_hueco', acciones: [{ tipo: 'cita_reservada', citaId: cita.id }], proximoPaso: 'cita' };
+  await enTransaccion(pool, async (con) => {
+    const [[fresca]] = await con.query('SELECT * FROM conversaciones WHERE id = ? FOR UPDATE', [conv.id]);
+    await aplicarDecision(con, fresca, decision, { ahora, texto: frase, datos });
+  });
+  const respuesta = textoCitaReservada(await datosCita(pool, cita.id), { nombre: nombre || pac?.nombre, hola });
+  const envio = await enviar(deps, conv, { texto: respuesta, autor: 'ia', ahora });
+  if (envio.estado === 'enviado') await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [ahora, cita.id]);
+  return { conversacionId: conv.id, eleccion: 'reservada', cita, decision, respuesta, envio };
+}
+
+// Le ofrece unos huecos y queda esperando su respuesta (con un seguimiento por si no contesta).
+// Sin huecos, se lo pasa a una persona.
+async function ofrecerYEsperar(deps, conv, { huecos, texto, ahora, datos, frase, tratamientoId, nombre, hola }) {
+  const { pool } = deps;
+  let decision;
+  let respuesta = texto;
+  if (huecos.length) {
+    decision = decidir({ intencion: 'preferencia_horario' }, { ...datos.ctx, frase });
+    decision.intencion = 'eleccion_hueco';
+  } else {
+    decision = { intencion: 'eleccion_hueco', acciones: [{ tipo: 'pasar_a_persona', motivo: 'Quiere cita y no hay huecos para lo que pide: proponerle alternativas' }], proximoPaso: 'persona' };
+    respuesta = `${hola}Ahora mismo no veo huecos para eso${nombre ? `, ${nombre}` : ''}. Una persona del equipo te propone alternativas por aquí enseguida.`;
+  }
+  await enTransaccion(pool, async (con) => {
+    const [[fresca]] = await con.query('SELECT * FROM conversaciones WHERE id = ? FOR UPDATE', [conv.id]);
+    await aplicarDecision(con, fresca, decision, { ahora, texto: frase, datos });
+    if (huecos.length) await guardarHuecos(con, conv.id, huecos, tratamientoId, ahora);
+  });
+  const envio = await enviar(deps, conv, { texto: respuesta, autor: 'ia', ahora });
+  return { conversacionId: conv.id, eleccion: huecos.length ? 'propuesta' : 'persona', decision, respuesta, huecos, envio };
+}
+
+function evitando(lista, evitar) {
+  if (!evitar) return lista;
+  return lista.filter((h) => !((evitar.fecha && h.fecha === evitar.fecha)
+    || (evitar.diaSemana && T.diaSemana(h.fecha) === evitar.diaSemana)
+    || (evitar.diaMes && Number(h.fecha.slice(8, 10)) === evitar.diaMes)));
+}
+
+async function atenderEleccion(deps, conv, e, { ahora, texto, datos, nombre, hola, tratamientoId, ofrecidos }) {
+  const { pool } = deps;
+  const hoy = T.fechaMadrid(ahora);
+  const n = nombre ? `, ${nombre}` : '';
+  const comun = { ahora, datos, frase: texto, tratamientoId, nombre, hola };
+  const siguientes = async (desdeFecha, preferencia, cuantos = 3) => (await agenda.proximosHuecos(pool, { tratamientoId, desdeFecha, dias: 21, n: cuantos, preferencia, ahora }))
+    .map((h) => ({ fecha: h.fecha, hora: h.hora }));
+
+  if (e.tipo === 'elegido') {
+    const r = await reservarElegido(deps, conv, { ...e.hueco, tratamientoId }, comun);
+    if (!r.ocupado) return r;
+    const otros = (await siguientes(e.hueco.fecha, null, 6)).filter((h) => !(h.fecha === e.hueco.fecha && h.hora === e.hueco.hora)).slice(0, 3);
+    return ofrecerYEsperar(deps, conv, { ...comun, huecos: otros, texto: `${hola}Vaya${n}, ese hueco ya no está libre. Te puedo ofrecer ${textoHuecos(otros)}. ¿Cuál te viene mejor?` });
+  }
+
+  if (e.tipo === 'dudoso') {
+    const t = e.candidatos.length === 1
+      ? `${hola}Perfecto${n}. ¿Te reservo ${textoHuecos(e.candidatos)}?`
+      : `${hola}¡Genial${n}! ¿Cuál prefieres: ${textoHuecos(e.candidatos)}?`;
+    return ofrecerYEsperar(deps, conv, { ...comun, huecos: e.candidatos, texto: t });
+  }
+
+  if (e.tipo === 'pide') {
+    const preferencia = e.hora ? ventanaDe(e.hora) : e.franja;
+    if (e.fecha) {
+      const delDia = await agenda.huecos(pool, { fecha: e.fecha, tratamientoId, ahora });
+      const exacto = e.hora && delDia.find((h) => h.hora === e.hora);
+      if (exacto) {
+        return ofrecerYEsperar(deps, conv, { ...comun, huecos: [{ fecha: e.fecha, hora: e.hora }],
+          texto: `${hola}${mayuscula(textoDia(e.fecha))} a las ${e.hora} lo tengo libre${n}. ¿Te lo reservo?` });
+      }
+      const esteDia = proponer(delDia, { n: 3, preferencia, separacionMin: 60 }).map((h) => ({ fecha: e.fecha, hora: h.hora }));
+      if (esteDia.length) {
+        const t = e.hora
+          ? `${hola}A las ${e.hora} ya no me queda hueco${n}, pero ${textoHuecos(esteDia)} sí. ¿Te viene bien?`
+          : `${hola}${mayuscula(textoHuecos(esteDia))} tengo hueco${n}. ¿Cuál te viene mejor?`;
+        return ofrecerYEsperar(deps, conv, { ...comun, huecos: esteDia, texto: t });
+      }
+      const despues = await siguientes(T.sumarDias(e.fecha, 1), preferencia);
+      return ofrecerYEsperar(deps, conv, { ...comun, huecos: despues,
+        texto: `${hola}Ese día lo tengo completo${n}. Te puedo ofrecer ${textoHuecos(despues)}. ¿Cuál te viene mejor?` });
+    }
+    const lista = await siguientes(hoy, preferencia);
+    return ofrecerYEsperar(deps, conv, { ...comun, huecos: lista, texto: `${hola}Te puedo ofrecer ${textoHuecos(lista)}. ¿Cuál te viene mejor?` });
+  }
+
+  // «Ninguno me viene bien»: otros, a partir del último día ofrecido.
+  const ultimo = ofrecidos.length ? ofrecidos.map((h) => h.fecha).sort().at(-1) : hoy;
+  const otros = evitando(await siguientes(T.sumarDias(ultimo, 1), e.franja, 8), e.evitar).slice(0, 3);
+  return ofrecerYEsperar(deps, conv, { ...comun, huecos: otros,
+    texto: `${hola}Sin problema${n}. Te propongo otros: ${textoHuecos(otros)}. Si tampoco te encajan, dime qué día u horario te viene mejor.` });
+}
+
+// ── Tiene una cita pendiente y escribe sobre ella ───────────────────────────────────────────
+const AGRADECE = /^((muchas|mil) )?gracias\b|^(genial|perfecto|estupendo|fenomenal|vale|ok|okey|de acuerdo|nos vemos|hasta (el|luego|pronto|entonces|manana)|un saludo|besos?)\b/;
+const CONFIRMA = /^(si,? )?(confirmo|confirmado|confirmada|(alli|ahi) estare|(alli|ahi) estaremos|cuenta conmigo|si,? (alli|ahi) estare)\b/;
+const CAMBIAR = /\b(cambiar(la)?|mover(la)?|aplazar(la)?|retrasar(la)?|adelantar(la)?|cancelar(la)?|anular(la)?|reprogramar(la)?)\b|no (voy a poder|podre|puedo) (ir|venir|acudir)|me ha surgido/;
+
+async function citaProxima(q, pacienteId, ahora) {
+  const [[c]] = await q.query(
+    "SELECT id FROM citas WHERE paciente_id = ? AND inicio > ? AND inicio < ? AND estado IN ('confirmada','retenida') ORDER BY inicio LIMIT 1",
+    [pacienteId, ahora, new Date(ahora.getTime() + 60 * 86400000)]);
+  return c ? c.id : null;
+}
+
+async function atenderSobreCita(deps, conv, { texto, ahora, nombre, hist }) {
+  const { pool } = deps;
+  const t = normalizar(texto);
+  const cambiar = CAMBIAR.test(t);
+  const confirma = !cambiar && CONFIRMA.test(t);
+  const agradece = !cambiar && !confirma && t.length <= 60 && !t.includes('?') && AGRADECE.test(t);
+  if (!cambiar && !confirma && !agradece) return null;
+  const citaId = await citaProxima(pool, conv.paciente_id, ahora);
+  if (!citaId) return null;
+  const c = await datosCita(pool, citaId);
+  const n = nombre ? `, ${nombre}` : '';
+
+  if (cambiar) {
+    const decision = { intencion: 'cita', acciones: [{ tipo: 'pasar_a_persona', motivo: `Quiere cambiar o cancelar su cita del ${textoDia(c.fecha).slice(3)} a las ${c.hora}` }], proximoPaso: 'persona' };
+    await enTransaccion(pool, async (con) => {
+      const [[fresca]] = await con.query('SELECT * FROM conversaciones WHERE id = ? FOR UPDATE', [conv.id]);
+      await aplicarDecision(con, fresca, decision, { ahora, texto, datos: null });
+    });
+    const respuesta = `Sin problema${n}. Una persona del equipo te ayuda ahora mismo a buscar otro momento. Si prefieres cancelarla, puedes hacerlo desde aquí: ${c.url}`;
+    const envio = await enviar(deps, conv, { texto: respuesta, autor: 'ia', ahora });
+    return { conversacionId: conv.id, sobreCita: 'cambiar', decision, respuesta, envio };
+  }
+
+  if (confirma) await registrar(pool, { tipo: 'cita_confirmada_paciente', entidad: 'cita', entidadId: citaId, actor: 'paciente', datos: { por: 'whatsapp' } });
+  // Un «gracias» al «gracias» no hace falta: si ya le contestamos hace poco, no se repite.
+  const ultimo = [...hist].reverse().find((m) => m.autor !== 'paciente');
+  const reciente = ultimo && /^(¡A ti|¡Perfecto)/.test(ultimo.texto) && ahora - new Date(ultimo.en) < 30 * 60000;
+  await pool.query("UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cita', proximo_paso = 'cita', proximo_paso_en = ? WHERE id = ?", [c.inicio, conv.id]);
+  if (reciente) return { conversacionId: conv.id, sobreCita: confirma ? 'confirma' : 'agradece', respuesta: null };
+  const respuesta = confirma
+    ? `¡Perfecto${n}! Queda confirmada: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`
+    : `¡A ti${n}! Nos vemos ${textoDia(c.fecha)} a las ${c.hora}.`;
+  const envio = await enviar(deps, conv, { texto: respuesta, autor: 'ia', ahora });
+  return { conversacionId: conv.id, sobreCita: confirma ? 'confirma' : 'agradece', respuesta, envio };
+}
+
 // Envía un texto libre (solo con la ventana de 24 h abierta) o una plantilla.
-async function enviar(deps, conv, { texto = null, plantilla = null, variables = [], autor = 'sistema', ahora = new Date() }) {
+async function enviar(deps, conv, { texto = null, plantilla = null, variables = [], botonUrl = null, autor = 'sistema', ahora = new Date() }) {
   const { pool, whatsapp } = deps;
   let r;
   let estado = 'enviado';
   let error = null;
   try {
     r = plantilla
-      ? await whatsapp.enviarPlantilla({ telefono: conv.telefono, nombre: plantilla.nombre, idioma: plantilla.idioma || 'es', variables })
+      ? await whatsapp.enviarPlantilla({ telefono: conv.telefono, nombre: plantilla.nombre, idioma: plantilla.idioma || 'es', variables, botonUrl })
       : await whatsapp.enviarTexto({ telefono: conv.telefono, texto });
   } catch (err) {
     estado = 'fallido';
     error = err.message;
   }
-  const cuerpo = plantilla ? `[plantilla ${plantilla.nombre}] ${variables.join(' · ')}` : texto;
+  // En la conversación queda el texto tal y como lo lee el paciente (con el enlace del botón).
+  const cuerpo = plantilla ? `${rellenar(plantilla, variables)}${botonUrl ? `\n\n${enlaceDelBoton(plantilla, botonUrl)}` : ''}` : texto;
   const id = await guardarMensaje(pool, { conversacionId: conv.id, direccion: 'saliente', autor, tipo: plantilla ? 'plantilla' : 'texto', texto: cuerpo, waId: r?.waId, estado, plantillaId: plantilla?.id, creadoEn: ahora });
   await pool.query('UPDATE conversaciones SET ultimo_saliente_en = ? WHERE id = ?', [ahora, conv.id]);
   if (conv.lead_id && estado === 'enviado') {
@@ -326,6 +619,17 @@ async function enviar(deps, conv, { texto = null, plantilla = null, variables = 
   }
   if (error) await pool.query('UPDATE mensajes SET error_texto = ? WHERE id = ?', [error.slice(0, 255), id]);
   return { mensajeId: id, estado, waId: r?.waId || null };
+}
+
+function enlaceDelBoton(plantilla, valor) {
+  const boton = (parseJson(plantilla.botones) || []).find((b) => b.tipo === 'url');
+  return boton?.url ? boton.url.replace('{{1}}', valor) : `${config.urlPublica}/c/${valor}`;
+}
+
+// «Valoración HIFU» → «valoración HIFU» (para ponerlo en mitad de una frase sin romper las siglas).
+function enMinuscula(nombre) {
+  const t = String(nombre || '');
+  return /^[A-ZÁÉÍÓÚÑ]{2,}\b/.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1);
 }
 
 async function plantillasBd(q) {
@@ -403,7 +707,7 @@ async function procesarSeguimientos(deps, { ahora = new Date(), limite = 20 } = 
 
 async function nombreTratamiento(q, conv) {
   const datos = await cargarContexto(q, conv, new Date());
-  return datos.tratamiento ? datos.tratamiento.nombre.toLowerCase() : 'tu tratamiento';
+  return datos.tratamiento ? enMinuscula(datos.tratamiento.nombre) : 'tu tratamiento';
 }
 
 // Mete a alguien en una secuencia (lead nuevo, cancelación, presupuesto, toca repetir…).
@@ -549,4 +853,7 @@ async function sinProximoPaso(q, ahora = new Date()) {
   return filas;
 }
 
-module.exports = { textoHuecos, procesarEntrante, procesarSeguimientos, avanzarSecuencias, inscribir, sinProximoPaso, enviar, historial, calendarioDesdeBd, cargarContexto };
+module.exports = {
+  textoHuecos, textoDia, procesarEntrante, procesarSeguimientos, avanzarSecuencias, inscribir, sinProximoPaso, enviar, historial,
+  calendarioDesdeBd, cargarContexto, conversacionPara, datosCita, plantillasBd, enMinuscula,
+};

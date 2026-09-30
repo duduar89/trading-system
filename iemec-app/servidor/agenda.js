@@ -100,7 +100,8 @@ async function bloquearRecursos(con, t) {
 /**
  * Reserva (o retiene) una cita.
  * @param {object} p pacienteId, tratamientoId, fecha 'AAAA-MM-DD', hora 'HH:MM', profesionalId?, salaId?,
- *   origen, retener (deja la cita «retenida» unos minutos hasta que el paciente confirme), actor
+ *   origen, retener (deja la cita «retenida» unos minutos hasta que el paciente confirme), actor,
+ *   leadId?, conversacionId? (la conversación de WhatsApp de la que sale)
  */
 async function reservar(pool, p) {
   const ahora = p.ahora || new Date();
@@ -132,13 +133,13 @@ async function reservar(pool, p) {
     const token = crypto.randomBytes(32).toString('base64url');
     const [r] = await con.query(
       `INSERT INTO citas (paciente_id, tratamiento_id, profesional_id, sala_id, equipo_id, inicio, fin,
-         sala_desde, sala_hasta, prof_desde, prof_hasta, estado, retenida_hasta, origen, primera_visita,
-         token, creada_por, confirmada_en)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         sala_desde, sala_hasta, prof_desde, prof_hasta, estado, retenida_hasta, origen, conversacion_id, primera_visita,
+         token, creada_por, confirmada_en, creado_en)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [p.pacienteId, t.fila.id, hueco.profesionalId, hueco.salaId, hueco.equipoId, inst.inicio, inst.fin,
         inst.sala_desde, inst.sala_hasta, inst.prof_desde, inst.prof_hasta,
-        p.retener ? 'retenida' : 'confirmada', retenidaHasta, p.origen || 'recepcion', Boolean(p.primeraVisita),
-        token, p.actor || 'sistema', p.retener ? null : ahora]);
+        p.retener ? 'retenida' : 'confirmada', retenidaHasta, p.origen || 'recepcion', p.conversacionId || null, Boolean(p.primeraVisita),
+        token, p.actor || 'sistema', p.retener ? null : ahora, ahora]);
     if (p.leadId) await con.query("UPDATE leads SET etapa = 'cita', cita_id = ? WHERE id = ?", [r.insertId, p.leadId]);
     // Con cita, se acaban sus secuencias de captación y los seguimientos de repesca.
     await con.query("UPDATE inscripciones SET estado = 'terminada', motivo_fin = 'cita' WHERE estado IN ('activa','pausada') AND secuencia IN ('lead','cancelacion','toca_repetir','dormido','vale_regalo') AND ((paciente_id IS NOT NULL AND paciente_id = ?) OR (lead_id IS NOT NULL AND lead_id = ?))", [p.pacienteId, p.leadId || null]);

@@ -1,10 +1,9 @@
-import { useDatos, Cabecera, Cifra, Error } from '../componentes/comunes.jsx';
+import { useDatos, Cabecera, Cifra, Error, INTENCION } from '../componentes/comunes.jsx';
 import Barras from '../componentes/Barras.jsx';
 import { euros } from '../api.js';
 
 const ETAPAS = ['nuevo', 'contactado', 'conversando', 'cita', 'asistio', 'vendido', 'perdido'];
 const ETAPA = { nuevo: 'Nuevos', contactado: 'Contactados', conversando: 'Conversando', cita: 'Con cita', asistio: 'Vinieron', vendido: 'Compraron', perdido: 'Perdidos' };
-const INTENCION = { aplazar: 'Aplaza («el mes que viene»…)', precio: 'Le parece caro', competencia_precio: 'Lo ha visto más barato', pensar: 'Lo tiene que pensar', duda_medica: 'Duda (dolor, riesgos…)', salud_personal: 'Cuenta algo de su salud', ocupado_ahora: 'Ahora no puede', reservar: 'Quiere cita', no_interesa: 'No le interesa', ya_hecho: 'Ya se lo hizo', baja: 'Pide la baja', queja: 'Queja', pregunta: 'Pregunta', evento: 'Tiene un evento', preferencia_horario: 'Prefiere un horario', acepta: 'Dice que sí', otro: 'Otras' };
 const ORIGEN = { meta_formulario: 'Meta · formulario', meta_ctwa: 'Meta · clic a WhatsApp', web_whatsapp: 'Web (botón WhatsApp)', ghl: 'GHL', treatwell: 'Treatwell', telefono: 'Teléfono', recepcion: 'Recepción', google: 'Google', referido: 'Recomendación', otro: 'Otros' };
 const CIERRE = { precio: 'Precio', no_interesa: 'No le interesa', competencia: 'Se lo hizo en otro sitio', sin_respuesta: 'No contestó', baja: 'Pidió la baja' };
 

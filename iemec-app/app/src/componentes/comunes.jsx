@@ -46,8 +46,13 @@ const ESTADOS = {
   pausada: ['Pausada', 'bg-[var(--superficie-2)] text-[var(--texto-suave)]'],
   cerrada: ['Cerrada', 'bg-[var(--superficie-2)] text-[var(--texto-suave)]'],
 };
-export function EstadoConversacion({ estado, urgente }) {
-  const [texto, clase] = ESTADOS[estado] || [estado, ''];
+// Lo que la repesca entiende de cada respuesta, en palabras de recepción.
+export const INTENCION = { aplazar: 'Aplaza («el mes que viene»…)', precio: 'Le parece caro', competencia_precio: 'Lo ha visto más barato', pensar: 'Lo tiene que pensar', duda_medica: 'Duda (dolor, riesgos…)', salud_personal: 'Cuenta algo de su salud', ocupado_ahora: 'Ahora no puede', reservar: 'Quiere cita', no_interesa: 'No le interesa', ya_hecho: 'Ya se lo hizo', baja: 'Pide la baja', queja: 'Queja', pregunta: 'Pregunta', evento: 'Tiene un evento', preferencia_horario: 'Prefiere un horario', acepta: 'Dice que sí', otro: 'Otras', eleccion_hueco: 'Elige hueco', cita: 'Sobre su cita' };
+
+export function EstadoConversacion({ estado, urgente, motivoCierre }) {
+  const [texto, clase] = estado === 'cerrada' && motivoCierre === 'cita'
+    ? ['Cita reservada', 'bg-oro/20 text-[#7a5a1f] dark:text-champan']
+    : ESTADOS[estado] || [estado, ''];
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${clase}`}>
       {urgente && <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-rosa" />}

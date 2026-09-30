@@ -32,7 +32,7 @@ const INTENCIONES = [
   ['baja', /\b(baja|stop|no me (escribas|escribais|escriban|mandes|mandeis|envieis|envies|molestes|molesteis)|dej(a|ad|en|ar) de (escribir|mandar|enviar)(me)?|no quiero (recibir|mas mensajes|que me escrib)|borr(a|ad|ar|en) mis datos|elimin(a|ad|ar) mi (numero|telefono|contacto)|quita(me|dme) de (la lista|vuestra lista)|no vuelvas a escribir)/],
   ['salud_urgente', /(me ha salido (un|una)|bulto|muy hinchad|sigue hinchad|inflamad|se me ha puesto (morad|roj|blanc)|me duele (mucho|muchisimo|desde)|infeccion|fiebre|pus\b|no puedo (abrir|mover)|necrosis|reaccion alergica)/],
   ['salud_personal', /(embarazad|lactancia|dando el pecho|dando pecho|anticoagul|sintrom|alergic|alergia|medicacion|me estoy medicando|tomo (pastillas|medicacion|antibiotico)|antibiotico|enfermedad|autoinmune|diabet|herpes|cancer|quimio|marcapasos|epilep|tiroides|operad[ao] hace|operacion|me operan|me opero|mi medic[oa] (me )?(ha dicho|dice)|estoy de baja medica)/],
-  ['queja', /(queja|reclamacion|fatal|pesimo|muy mal servicio|mal atendid|indignad|estafa|vergüenza|verguenza|nadie me (contesta|coge)|no me cogeis|timo|enfadad)/],
+  ['queja', /(queja|reclamacion|fatal|pesimo|muy mal servicio|mal atendid|indignad|estafa|vergüenza|verguenza|nadie me (contesta|coge)|no me cogeis|\btimo\b|enfadad)/],
   ['ya_hecho', /(ya me lo (he )?hecho|ya me lo hice|me lo hice en|ya me lo hicieron|ya lo tengo hecho|ya me (he )?(puesto|operado|tratado) en)/],
   ['competencia_precio', /(mas barato|mas economico|por menos (dinero)?|me lo dejan (en|por)|en otr[oa] (sitio|clinica|centro) (me lo )?(cuesta|vale|cobran|hacen por|lo tienen)|he visto (precios|ofertas|promociones) (mas|mejores)|a mejor precio|mejor precio en)/],
   ['evento', /(tengo|es) (una |la |mi )?(boda|comunion|bautizo|evento|graduacion|fiesta|cena de empresa|sesion de fotos)|quiero estar (bien|guapa|guapo|perfecta|perfecto) para/],
@@ -62,6 +62,11 @@ function detectarPlazo(t) {
   if (trasMejor && /^(lunes|martes|miercoles|jueves|viernes|sabado|\d{1,2}\b)/.test(trasMejor[1])) {
     const sub = detectarPlazo(trasMejor[1].startsWith('dia') ? trasMejor[1] : `el ${trasMejor[1]}`);
     if (sub) return sub;
+  }
+  // «el último día de octubre».
+  if ((m = new RegExp(`\\bultimo dia de (${RX_MES})\\b`).exec(t))) {
+    const mes = MESES[m[1]];
+    return { tipo: /hasta/.test(t) ? 'tras_fecha' : 'fecha', dia: [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mes - 1], mes };
   }
   // «finales de octubre», «principios de noviembre», «mediados de diciembre».
   if ((m = new RegExp(`\\b(principios|primeros|mediados|finales|final) de (${RX_MES})\\b`).exec(t))) {

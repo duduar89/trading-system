@@ -79,9 +79,9 @@ function textoSimulado(decision, d = {}) {
   else if (oferta) t = `Te entiendo${nombre}. ${d.ofertaTexto || 'Tenemos una opción que puede encajarte.'} ¿Te encaja así?`;
   else if (tipos.has('preguntar_cuando')) t = `Sin problema${nombre}. ¿Cuándo te vendría mejor que te escribamos?`;
   else if (decision.intencion === 'ocupado_ahora' && seg) t = `Sin problema${nombre}, te escribo ${seg.texto}.`;
-  else if (tipos.has('proponer_huecos') && seg && huecos) t = `¡Claro${nombre}! Si quieres, te dejo ya guardado un hueco: ${huecos}. Si prefieres esperar, te escribo ${seg.texto}.`;
+  else if (decision.intencion === 'aplazar' && tipos.has('proponer_huecos') && seg && huecos) t = `¡Claro${nombre}! Si quieres, te dejo ya guardado un hueco: ${huecos}. Si prefieres esperar, te escribo ${seg.texto}.`;
   else if (seg && decision.intencion === 'aplazar') t = `Perfecto${nombre}. Te escribo ${seg.texto} y lo vemos con calma.`;
-  else if (tipos.has('proponer_huecos') && huecos) t = `Tengo estos huecos para ti: ${huecos}. ¿Cuál te viene mejor?`;
+  else if (tipos.has('proponer_huecos') && huecos) t = `¡Genial${nombre}! Tengo estos huecos para ti: ${huecos}. ¿Cuál te viene mejor?`;
   else if (tipos.has('proponer_huecos')) t = `Ahora mismo no veo huecos en esas fechas${nombre}; una persona del equipo te propone alternativas.`;
   else if (decision.intencion === 'pensar') t = `Claro${nombre}, tómate tu tiempo. ¿Hay algo que te frene o que quieras que te aclare?${seg ? ` Si te parece, te escribo ${seg.texto}.` : ''}`;
   else if (d.respuestaAprobada) t = `${d.respuestaAprobada} Si quieres, lo vemos en una valoración con el equipo médico.`;

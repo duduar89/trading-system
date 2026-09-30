@@ -74,25 +74,30 @@ async function main() {
   const deps = { pool, ia: crearIa('simulado'), whatsapp: crearWhatsApp('simulado') };
   const [[facial]] = await pool.query("SELECT id FROM tratamientos WHERE familia = 'facial' AND regimen_legal IN ('cosmetico','aparatologia','servicio') ORDER BY precio_eur IS NULL, precio_eur LIMIT 1");
   const [[capilar]] = await pool.query("SELECT id FROM tratamientos WHERE familia IN ('medicina_capilar','cirugia_capilar') ORDER BY id LIMIT 1");
+  // Cada guion: lo que va contestando el paciente (la IA contesta entre medias).
   const guiones = [
-    ['Rocío', 'Bueno, pero el mes que viene me viene mejor', facial?.id],
-    ['Andrea', 'Me parece muy caro', facial?.id],
-    ['Beatriz', '¿Duele?', facial?.id],
-    ['Clara', 'Estoy embarazada, ¿puedo hacérmelo igual?', facial?.id],
-    ['Alba', 'Vale, dame cita', facial?.id],
-    ['Noelia', 'Ahora no puedo, estoy trabajando', capilar?.id],
-    ['Sergio', 'Cuando cobre, que cobro el 5', capilar?.id],
-    ['Diego', 'Ya me lo hice en otra clínica', capilar?.id],
-    ['Pablo', 'No me escribáis más', capilar?.id],
+    ['Rocío', ['Bueno, pero el mes que viene me viene mejor'], facial?.id],
+    ['Andrea', ['Me parece muy caro'], facial?.id],
+    ['Beatriz', ['¿Duele?'], facial?.id],
+    ['Clara', ['Estoy embarazada, ¿puedo hacérmelo igual?'], facial?.id],
+    ['Alba', ['Vale, dame cita', 'La primera me va genial', '¡Muchas gracias!'], facial?.id],
+    ['Irene', ['Hola, ¿tenéis hueco el jueves por la tarde?', 'Sí, la primera'], facial?.id],
+    ['Julia', ['Vale', 'Ninguno me viene bien, mejor por la tarde'], facial?.id],
+    ['Noelia', ['Ahora no puedo, estoy trabajando'], capilar?.id],
+    ['Sergio', ['Cuando cobre, que cobro el 5'], capilar?.id],
+    ['Diego', ['Ya me lo hice en otra clínica'], capilar?.id],
+    ['Pablo', ['No me escribáis más'], capilar?.id],
   ];
-  for (const [i, [nombre, frase, trat]] of guiones.entries()) {
+  for (const [i, [nombre, frases, trat]] of guiones.entries()) {
     const tel = `+3461100${String(2000 + i)}`;
     const [l] = await pool.query("INSERT INTO leads (telefono, nombre, origen, campana, tratamiento_interes_id, etapa) VALUES (?, ?, ?, 'Otoño facial (ejemplo)', ?, 'contactado')",
       [tel, `${nombre} (ejemplo)`, i % 2 ? 'meta_formulario' : 'web_whatsapp', trat || null]);
     const inicio = new Date(ahora.getTime() - (3 + i) * 3600000);
     await repesca.inscribir(pool, { secuencia: 'lead', leadId: l.insertId, inicio });
     await repesca.avanzarSecuencias(deps, { ahora: inicio });
-    await repesca.procesarEntrante(deps, { telefono: tel, texto: frase, nombre, ahora: new Date(inicio.getTime() + 25 * 60000) });
+    for (const [k, frase] of frases.entries()) {
+      await repesca.procesarEntrante(deps, { telefono: tel, texto: frase, nombre, ahora: new Date(inicio.getTime() + (25 + k * 12) * 60000) });
+    }
   }
   log(`${guiones.length} conversaciones de repesca`);
 

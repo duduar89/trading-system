@@ -175,3 +175,10 @@ test('proponer: tres huecos repartidos y, si prefiere tardes, por la tarde', () 
   const tardes = proponer(huecos, { preferencia: 'tarde' });
   assert.ok(tardes.every((x) => x.inicio >= h('15:00')));
 });
+
+test('proponer: a igualdad, horas redondas (13:00 antes que 12:50)', () => {
+  const lista = [h('12:50'), h('12:55'), h('13:00'), h('13:05'), h('16:10'), h('16:15'), h('16:30'), h('17:45')].map((inicio) => ({ inicio }));
+  assert.deepEqual(proponer(lista, { n: 2, separacionMin: 180 }).map((x) => x.inicio), [h('13:00'), h('16:30')]);
+  // Si no hay horas redondas, se proponen las que hay.
+  assert.deepEqual(proponer([{ inicio: h('12:50') }, { inicio: h('16:10') }], { n: 2 }).map((x) => x.inicio), [h('12:50'), h('16:10')]);
+});

@@ -106,7 +106,7 @@ function rutasPanel({ pool, deps = null }) {
       nombre: c.nombre ? `${c.nombre}${c.apellidos ? ` ${c.apellidos}` : ''}` : c.lead_nombre || c.telefono,
       origen: c.lead_origen, campana: c.campana, telefonoFinal: String(c.telefono).slice(-3),
       ventanaAbierta: Boolean(c.ventana_hasta && new Date(c.ventana_hasta) > (req.ahora || new Date())),
-      ventanaHasta: c.ventana_hasta, proximoPaso: c.proximo_paso, proximoSeguimiento: c.proximo_seguimiento,
+      ventanaHasta: c.ventana_hasta, proximoPaso: c.proximo_paso, proximoPasoEn: c.proximo_paso_en, proximoSeguimiento: c.proximo_seguimiento,
       motivoCierre: c.motivo_cierre, actualizado: c.actualizado_en,
     })));
   }));
@@ -122,7 +122,7 @@ function rutasPanel({ pool, deps = null }) {
     const [[lead]] = c.lead_id ? await p().query('SELECT l.nombre, l.origen, l.campana, l.etapa, t.nombre AS tratamiento FROM leads l LEFT JOIN tratamientos t ON t.id = l.tratamiento_interes_id WHERE l.id = ?', [c.lead_id]) : [[null]];
     const [citas] = c.paciente_id ? await p().query('SELECT c.inicio, c.estado, t.nombre AS tratamiento FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id WHERE c.paciente_id = ? ORDER BY c.inicio DESC LIMIT 5', [c.paciente_id]) : [[]];
     res.json({
-      conversacion: { id: c.id, estado: c.estado, urgente: Boolean(c.urgente), contexto: c.contexto, proximoPaso: c.proximo_paso, ventanaHasta: c.ventana_hasta },
+      conversacion: { id: c.id, estado: c.estado, urgente: Boolean(c.urgente), contexto: c.contexto, proximoPaso: c.proximo_paso, proximoPasoEn: c.proximo_paso_en, ventanaHasta: c.ventana_hasta, motivoCierre: c.motivo_cierre },
       paciente, lead, citas,
       mensajes: msgs.map((m) => ({ id: m.id, direccion: m.direccion, autor: m.autor, tipo: m.tipo, texto: descifrar(m.cuerpo_cifrado, m.iv, m.tag), estado: m.estado, intencion: m.intencion, en: m.creado_en })),
       seguimientos: segs.map((s) => ({ id: s.id, motivo: s.motivo, plazo: s.plazo_tipo, frase: descifrar(s.frase_cifrada, s.frase_iv, s.frase_tag), programado: s.programado_para, estado: s.estado, creadoPor: s.creado_por })),

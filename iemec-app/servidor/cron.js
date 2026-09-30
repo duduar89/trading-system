@@ -10,6 +10,7 @@ const cola = require('./cola');
 const agenda = require('./agenda');
 const repesca = require('./repesca/motor');
 const resenas = require('./resenas');
+const avisos = require('./avisos-cita');
 const { crearIa } = require('./integraciones/ia');
 const { crearWhatsApp } = require('./integraciones/whatsapp');
 const T = require('../motor/tiempo');
@@ -21,6 +22,7 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
     retencionesCaducadas: await agenda.caducarRetenciones(pool, ahora),
     seguimientos: (await repesca.procesarSeguimientos(d, { ahora })).length,
     secuencias: (await repesca.avanzarSecuencias(d, { ahora })).length,
+    avisosCita: (await avisos.enviarPendientes(d, { ahora })).length,
     peticionesResena: (await resenas.enviarPeticionesPendientes(d, { ahora })).length,
     cola: await cola.procesar(pool, {}, { ahora }),
   }), { ahora });
@@ -30,6 +32,9 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
   const p = T.partesMadrid(ahora);
   if (p.minutos >= 8 * 60) {
     await cola.unaVez(pool, `diario-${p.fecha}`, new Date(ahora.getTime() + 2 * 86400000), async () => {
+      // Primero se cierran las que solo esperaban a una cita que ya pasó; lo que quede sin próximo
+      // paso es trabajo de verdad.
+      informe.conversacionesDeCitasPasadas = await avisos.cerrarConversacionesDeCitasPasadas(pool, ahora);
       const huerfanas = await repesca.sinProximoPaso(pool, ahora);
       for (const c of huerfanas) {
         await pool.query("INSERT INTO tareas (tipo, titulo, conversacion_id, vence_en) VALUES ('atender_conversacion', 'Conversación sin próximo paso', ?, ?)", [c.id, new Date(ahora.getTime() + 2 * 3600000)]);

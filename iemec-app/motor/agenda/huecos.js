@@ -120,6 +120,8 @@ function buscarHuecos(dia, t, { desde = 0, hasta = 1440 } = {}) {
 
 // Elige n huecos para proponer al paciente: repartidos en el día (no tres seguidos de 5 en 5) y,
 // si tiene preferencia (mañana / tarde / hora concreta), primero los que encajan.
+// Los que se proponen al paciente: repartidos, en su franja si la dice y, a igualdad, a horas
+// redondas (las 12:00 o las 15:30 antes que las 12:50): se leen mejor y dejan la agenda más limpia.
 function proponer(huecos, { n = 3, preferencia = null, separacionMin = 60 } = {}) {
   const encaja = (h) => {
     if (!preferencia) return true;
@@ -128,11 +130,16 @@ function proponer(huecos, { n = 3, preferencia = null, separacionMin = 60 } = {}
     if (typeof preferencia === 'object' && preferencia.desde != null) return h.inicio >= preferencia.desde && h.inicio < preferencia.hasta;
     return true;
   };
-  const ordenados = [...huecos].sort((a, b) => Number(encaja(b)) - Number(encaja(a)) || a.inicio - b.inicio);
+  const redondez = (h) => (h.inicio % 30 === 0 ? 2 : h.inicio % 15 === 0 ? 1 : 0);
   const elegidos = [];
-  for (const h of ordenados) {
-    if (elegidos.length >= n) break;
-    if (elegidos.every((e) => Math.abs(e.inicio - h.inicio) >= separacionMin)) elegidos.push(h);
+  const separado = (h) => elegidos.every((e) => Math.abs(e.inicio - h.inicio) >= separacionMin && e.inicio !== h.inicio);
+  // Por pasadas: primero lo que encaja y es redondo; después lo que encaja; después el resto.
+  const pasadas = [(h) => encaja(h) && redondez(h) === 2, (h) => encaja(h) && redondez(h) >= 1, encaja, () => true];
+  for (const vale of pasadas) {
+    for (const h of [...huecos].sort((a, b) => a.inicio - b.inicio)) {
+      if (elegidos.length >= n) break;
+      if (vale(h) && separado(h)) elegidos.push(h);
+    }
   }
   return elegidos.sort((a, b) => a.inicio - b.inicio);
 }

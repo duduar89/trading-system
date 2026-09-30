@@ -2,7 +2,12 @@ import { useState } from 'react';
 import { api, fechaHora } from '../api.js';
 import { useDatos, Cabecera, Boton, Error, Vacio } from '../componentes/comunes.jsx';
 
-const MOTIVO = { aplazamiento: 'Aplazó', ocupado: 'Estaba ocupado', recordatorio_oferta: 'Recordar oferta', pensar: 'Lo estaba pensando', duda: 'Tenía una duda', recordatorio: 'Recordatorio', cierre_sin_respuesta: 'Cierre si no contesta', sin_respuesta_a_cuando: 'No dijo cuándo', precio_sin_oferta: 'Precio', precio_importe_alto: 'Precio (importe alto)', pregunta: 'Pregunta' };
+const MOTIVO = {
+  aplazamiento: 'Aplazó', ocupado: 'Estaba ocupado', recordatorio_oferta: 'Recordar oferta', pensar: 'Lo estaba pensando',
+  duda: 'Tenía una duda', recordatorio: 'Recordatorio', cierre_sin_respuesta: 'Cierre si no contesta',
+  sin_respuesta_a_cuando: 'No dijo cuándo', sin_respuesta_a_propuesta: 'No eligió hueco', precio_sin_oferta: 'Precio',
+  precio_importe_alto: 'Precio (importe alto)', pregunta: 'Pregunta', evento: 'Tiene un evento', reserva: 'Quiere cita',
+};
 
 export default function Seguimientos() {
   const { datos, error, recargar } = useDatos('/panel/seguimientos', { cadaMs: 30000 });

@@ -130,6 +130,9 @@ module.exports = [
   { frase: 'Quitadme de vuestra lista', intencion: 'baja' },
   { frase: 'Fatal, nadie me contesta nunca', intencion: 'queja' },
   { frase: 'Quiero poner una reclamación', intencion: 'queja' },
+  { frase: 'Esto es un timo', intencion: 'queja' },
+  // «último» contiene «timo»: no es una queja.
+  { frase: 'El último día de octubre me viene bien', intencion: 'aplazar', plazo: 'fecha', fecha: '2026-10-31' },
 
   // ── Quiere cita o pregunta ───────────────────────────────────────────────────────────────
   { frase: 'Vale, dame cita', intencion: 'reservar' },
