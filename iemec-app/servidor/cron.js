@@ -11,6 +11,7 @@ const agenda = require('./agenda');
 const repesca = require('./repesca/motor');
 const resenas = require('./resenas');
 const avisos = require('./avisos-cita');
+const entrada = require('./entrada');
 const { crearIa } = require('./integraciones/ia');
 const { crearWhatsApp } = require('./integraciones/whatsapp');
 const T = require('../motor/tiempo');
@@ -20,6 +21,9 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
   const informe = { rescatados: await cola.rescatarAtascados(pool, ahora) };
   const r = await cola.conCandado(pool, 'cron-minuto', 55000, async () => ({
     retencionesCaducadas: await agenda.caducarRetenciones(pool, ahora),
+    // Lo que ha llegado (WhatsApp, leads de Meta) va antes que las secuencias: si el paciente ha
+    // contestado, su secuencia ya no le escribe.
+    entrada: await entrada.procesarPendientes(d, { ahora }),
     seguimientos: (await repesca.procesarSeguimientos(d, { ahora })).length,
     secuencias: (await repesca.avanzarSecuencias(d, { ahora })).length,
     avisosCita: (await avisos.enviarPendientes(d, { ahora })).length,

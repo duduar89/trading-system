@@ -30,6 +30,7 @@ const config = {
     ia: leer('MODO_IA', 'simulado'),
     google: leer('MODO_GOOGLE', 'simulado'),
     correo: leer('MODO_CORREO', 'simulado'),
+    meta: leer('MODO_META', 'simulado'),
   },
 };
 

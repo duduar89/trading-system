@@ -9,6 +9,7 @@ const config = require('./config');
 const db = require('./db');
 const { rutasPublicas } = require('./rutas/publicas');
 const { rutasPanel } = require('./rutas/panel');
+const { rutasWebhooks } = require('./rutas/webhooks');
 const { rutasSesion, requiereSesion } = require('./sesion');
 const { crearIa } = require('./integraciones/ia');
 const { crearWhatsApp } = require('./integraciones/whatsapp');
@@ -28,6 +29,9 @@ function crearApp({ pool = db.pool, deps = null } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
+  // Webhooks de WhatsApp y Meta y alta de leads: antes del lector de JSON, porque la firma se
+  // comprueba sobre el cuerpo tal cual llega.
+  app.use(rutasWebhooks({ pool }));
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/api/version', (_req, res) => {
