@@ -457,8 +457,38 @@ async function interpretar(texto, { llm, universo = [], mesas = [], directivas: 
   return { directivas, explicacion: validas.length ? explicar(validas, notas, mesas) : explicar([], notas.length ? notas : ['prueba con «pausa SOL 24 h» o «reduce el riesgo a la mitad»']), fuente: 'palabras_clave' };
 }
 
+// Una interpretación hecha FUERA (la web interpreta sin el cerrojo de la
+// mesa, ARQUITECTURA-WEB W3) se vuelve a pasar por validarDirectiva contra el
+// estado de AHORA: entre interpretar y guardar pudo pasar un latido. La
+// explicación solo se conserva si ninguna directiva cambió; si no, la redacta
+// el código. Devuelve lo mismo que interpretar().
+function revalidar(interpretacion, { universo = [], mesas = [], directivas: estado, ahora, texto = '' } = {}) {
+  const ctx = { universo, mesas, directivas: estado, ahora };
+  const brutas = interpretacion && Array.isArray(interpretacion.directivas) ? interpretacion.directivas.slice(0, 20) : [];
+  const validas = []; const notas = [];
+  let cambiada = false;
+  for (const d of brutas) {
+    const v = validarDirectiva(d, ctx);
+    if (!v.ok) { notas.push(v.error.replace(/\.$/, '')); cambiada = true; continue; }
+    if (v.directiva.tipo === 'sin_efecto') v.directiva.motivo = motivoComprobado(v.directiva.motivo, texto, [...LIMITES, HORAS_POR_DEFECTO]);
+    if (JSON.stringify(v.directiva) !== JSON.stringify(d)) cambiada = true;
+    validas.push(v.directiva);
+  }
+  const utiles = validas.filter(d => d.tipo !== 'sin_efecto');
+  const directivas = utiles.length ? utiles : validas.length ? validas
+    : [{ tipo: 'sin_efecto', motivo: 'No he entendido ninguna orden de la lista cerrada (pausa, para, reduce, baja, solo cerrar, no abras, reanuda).' }];
+  if (utiles.length !== validas.length && utiles.length) cambiada = true;
+  const fuente = interpretacion && interpretacion.fuente === 'llm' ? 'llm' : 'palabras_clave';
+  const suya = typeof (interpretacion && interpretacion.explicacion) === 'string' ? interpretacion.explicacion.trim() : '';
+  const explicacion = !cambiada && suya ? plantillas.frase(suya, 280) : explicar(utiles.length ? utiles : validas, notas, mesas);
+  const coste = Number(interpretacion && interpretacion.costeUsd);
+  return { directivas, explicacion, fuente, ...(Number.isFinite(coste) && coste > 0 ? { costeUsd: coste } : {}) };
+}
+
 module.exports = {
   interpretar,
+  revalidar,
+  explicar,
   validarDirectiva,
   aplicarDirectiva,
   directivasVigentes,

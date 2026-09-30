@@ -148,3 +148,32 @@ test('un solo proceso por carpeta: otro pid vivo → error claro; un pid muerto 
   fs.writeFileSync(ruta, JSON.stringify({ pid: process.pid, host: 'otro-portatil' }));
   assert.throws(() => tomarBloqueo(c), /otro-portatil/);
 });
+
+// La web matada a mitad de un botón deja un cerrojo de un pid muerto, y el
+// latido del minuto y otro botón lo ven a la vez: antes, el segundo borraba el
+// cerrojo que el primero acababa de tomar y acababan los dos dueños.
+test('cerrojo de un pid muerto visto por muchos procesos a la vez: UN solo dueño', async () => {
+  const { fork } = require('child_process');
+  const os = require('os');
+  const hijo = `
+    const { tomarBloqueo } = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'util', 'proceso.js'))});
+    process.on('message', carpeta => {
+      let ok = false;
+      try { tomarBloqueo(carpeta); ok = true; } catch (e) { if (e.code !== 'EBLOQUEO') throw e; }
+      setTimeout(() => { process.send(ok); process.exit(0); }, 200);
+    });
+    process.send('listo');`;
+  const fichero = path.join(carpetaTemporal(), 'hijo-cerrojo.js');
+  fs.writeFileSync(fichero, hijo);
+  for (let ronda = 0; ronda < 8; ronda++) {
+    const c = carpetaTemporal();
+    fs.writeFileSync(rutaBloqueo(c), JSON.stringify({ pid: 2 ** 22 + 54321, host: os.hostname() }));
+    const hijos = Array.from({ length: 6 }, () => fork(fichero));
+    await Promise.all(hijos.map(h => new Promise(r => h.once('message', r))));
+    const respuestas = Promise.all(hijos.map(h => new Promise(r => h.once('message', r))));
+    for (const h of hijos) h.send(c);
+    const dueños = (await respuestas).filter(Boolean).length;
+    assert.equal(dueños, 1, `ronda ${ronda}: ${dueños} dueños a la vez`);
+    assert.equal(fs.existsSync(`${rutaBloqueo(c)}.romper`), false, 'no queda el .romper');
+  }
+});

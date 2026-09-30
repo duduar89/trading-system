@@ -156,7 +156,11 @@
     if (!inst || typeof inst !== 'object') return;
     const anterior = est.inst;
     est.inst = inst;
-    est.recibido = Date.now();
+    // Modo web: la instantánea la publicó el último latido hace `edadSeg`; el
+    // dato es de entonces, no de cuando llega al panel.
+    const edadMs = inst.web && Number.isFinite(inst.edadSeg) ? Math.max(0, inst.edadSeg * 1000) : 0;
+    est.recibido = Date.now() - edadMs;
+    if (inst.web && !est.pwa && raiz.MesaPWA) { est.pwa = true; raiz.MesaPWA.activar(); }
     est.llegadas.push(est.recibido);
     if (est.llegadas.length > 8) est.llegadas.shift();
     paneles.datosViejos(null);
@@ -262,7 +266,10 @@
   // llegan (mediana de los últimos intervalos): 2,5 latidos, nunca menos de 20 s.
   function comprobarDatosParados() {
     if (ES_MAQUETA || !est.inst) return;
-    const r = cifras.datosParados(est.llegadas, Date.now());
+    // En modo web la instantánea llega una vez por latido (del cron): el
+    // límite es 2,5 × latidoMs, el ritmo que declara la propia instantánea.
+    const latidoMs = est.inst.web && Number.isFinite(est.inst.latidoMs) ? est.inst.latidoMs : null;
+    const r = cifras.datosParados(est.llegadas, Date.now(), latidoMs);
     // Texto que cambia como mucho una vez por minuto: la franja es role=status
     // y un lector de pantalla la leería cada segundo.
     const min = Math.floor((r.pasadoMs || 0) / 60000);
@@ -310,9 +317,20 @@
         .finally(() => { if (reloj) clearTimeout(reloj); });
     }
 
+    // Modo web: sin sesión (caducada o cerrada en otro sitio) la API responde
+    // 401 con { login } y el panel se va al login.
+    function aLogin(j) {
+      if (TOKEN || !j || typeof j.login !== 'string' || !j.login.startsWith('/')) return false;
+      location.replace(j.login);
+      return true;
+    }
+
     function traerEstado() {
       return conTope('/api/estado', { headers: cabeceras(), cache: 'no-store' }, TOPE_ESTADO_MS, r => {
-        if (r.status === 401 || r.status === 403) { const e = new Error(`HTTP ${r.status}`); e.codigo = r.status; throw e; }
+        if (r.status === 401) {
+          return r.json().catch(() => null).then(j => { aLogin(j); const e = new Error('HTTP 401'); e.codigo = 401; throw e; });
+        }
+        if (r.status === 403) { const e = new Error(`HTTP ${r.status}`); e.codigo = r.status; throw e; }
         if (r.status === 503) {
           return r.json().catch(() => null).then(j => {
             const e = new Error('HTTP 503'); e.codigo = 503; e.motivo = cifras.motivo503(j); throw e;
@@ -385,6 +403,8 @@
         if (!abierto) { sseFallo = true; if (apiBien) sondearEventos(); }
         reintentar();
       };
+      // Modo web: el servidor avisa si la sesión caduca con el panel abierto.
+      es.addEventListener('sesion', () => { location.replace('/login'); });
       for (const tipo of ['estado', 'mensaje', 'agente', 'ejecucion', 'ping']) {
         es.addEventListener(tipo, (ev) => {
           ultimoLatido = Date.now();
@@ -427,6 +447,7 @@
         });
         let datos = null;
         try { datos = await r.json(); } catch (_) { datos = null; }
+        if (r.status === 401 && aLogin(datos)) return { ok: false, mensaje: 'La sesión ha caducado: vuelve a entrar.' };
         if (datos && typeof datos === 'object' && 'ok' in datos) return datos;
         return { ok: r.ok, mensaje: r.ok ? 'Hecho.' : `El servidor respondió ${r.status}.`, datos };
       } catch (_) {
@@ -438,6 +459,12 @@
       nombre: 'servidor',
       comando: (nombre, cuerpo) => pedir('POST', `/api/comando/${nombre}`, cuerpo),
       ajustes: () => pedir('GET', '/api/comando/ajustes'),
+      // Modo web: cierra la sesión en el servidor (borra la cookie) y al login.
+      cerrarSesion: async () => {
+        const r = await pedir('POST', '/api/logout', {});
+        if (r && r.ok) location.replace('/login');
+        return r;
+      },
     };
   }
 
@@ -958,6 +985,7 @@
     departamentos: mapaMod.DEPARTAMENTOS_POR_DEFECTO,
     comando: (nombre, cuerpo) => (fuente ? fuente.comando(nombre, cuerpo) : Promise.resolve({ ok: false, mensaje: 'Sin conexión con la mesa.' })),
     ajustes: () => (fuente ? fuente.ajustes() : Promise.resolve(null)),
+    cerrarSesion: () => (fuente && fuente.cerrarSesion ? fuente.cerrarSesion() : Promise.resolve({ ok: false, mensaje: 'Sin sesión que cerrar.' })),
     instantanea: () => est.inst,
     alCamara: mandoCamara,
     alCerrarTarjeta: () => { est.seleccion = null; },

@@ -258,3 +258,28 @@ test('las mesas se nombran por su nombre en la explicación y en los avisos', as
   const r2 = await pc('reanuda la mesa momentum etf', { directivas: m.directivasVacias(), ahora: T0 });
   assert.match(r2.explicacion, /sobre la mesa Momentum ETF que deshacer/);
 });
+
+// ---------- interpretación hecha fuera (web, ARQUITECTURA-WEB W3) ----------
+
+test('revalidar: una interpretación de fuera vuelve a pasar por las reglas contra el estado de ahora', () => {
+  const buena = { directivas: [{ tipo: 'pausar_activo', simbolo: 'SOL/USD', horas: 24 }], explicacion: 'Pausa SOL 24 h.', fuente: 'llm', costeUsd: 0.001 };
+  const r = m.revalidar(buena, { ...CTX, ahora: T0, texto: 'pausa SOL 24 h' });
+  assert.deepEqual(r.directivas, buena.directivas);
+  assert.equal(r.explicacion, 'Pausa SOL 24 h.');
+  assert.equal(r.fuente, 'llm');
+  assert.equal(r.costeUsd, 0.001);
+  // Un factor fuera de la lista cerrada y un activo que no existe se caen, y la
+  // explicación ya no es la de fuera: la redacta el código.
+  const mala = { directivas: [{ tipo: 'reducir_riesgo', factor: 0, horas: 4 }, { tipo: 'pausar_activo', simbolo: 'XRP/USD', horas: 2 }, { tipo: 'solo_cerrar', horas: 6 }], explicacion: 'Todo a cero.', fuente: 'llm' };
+  const r2 = m.revalidar(mala, { ...CTX, ahora: T0, texto: 'x' });
+  assert.deepEqual(r2.directivas, [{ tipo: 'solo_cerrar', horas: 6 }]);
+  assert.notEqual(r2.explicacion, 'Todo a cero.');
+  assert.match(r2.explicacion, /Nota/);
+  // Un «reanudar» que ya no deshace nada (la pausa caducó entre interpretar y guardar) se cae.
+  const reanudar = { directivas: [{ tipo: 'reanudar_activo', simbolo: 'SOL/USD' }], explicacion: 'Reanudo SOL.', fuente: 'palabras_clave' };
+  const r3 = m.revalidar(reanudar, { ...CTX, directivas: m.directivasVacias(), ahora: T0 });
+  assert.equal(r3.directivas.length, 1);
+  assert.equal(r3.directivas[0].tipo, 'sin_efecto');
+  // Nada útil: sin_efecto con su motivo fijo.
+  assert.equal(m.revalidar({ directivas: 'no' }, CTX).directivas[0].tipo, 'sin_efecto');
+});

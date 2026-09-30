@@ -86,13 +86,30 @@ function publicarInstantanea(config, orquestador) → void
   si hay configuración de base) y sale con 0 aunque la base falle (se apunta).
   **Vigía**: si el proceso pasa de 4 minutos, se sale solo con código 1 (lo
   guardado en el último paso manda; la recuperación tras un corte ya está
-  probada).
+  probada). Si sale «omitido» porque el cerrojo lleva cogido más que el vigía
+  y 1 min, sale con **código 2** (cerrojo viejo: el cron avisa).
 - **Un latido no tarda.** En marcha normal, menos de 20 s. Lo largo va fuera:
   el laboratorio semanal corre en `scripts/laboratorio.js` (su propio cron de
   los lunes y su propio cerrojo `.laboratorio`), lee lo que necesita del estado
   sin tocarlo y deja el resultado en `data/laboratorio-resultado.json`; el
   latido siguiente lo incorpora al estado bajo el cerrojo principal. El comité
-  con LLM cabe en un latido (tope de 45 s para la llamada).
+  con LLM cabe en un latido: en el modo latido cada llamada al LLM tiene un
+  **tope de 45 s y 0 reintentos**, y todo el LLM del proceso un **plazo** que
+  acaba 1 min antes del vigía (`scripts/latido.js` se lo pasa a
+  `latido(config, { plazoLLM })`; por defecto, 150 s desde que se toma el
+  cerrojo). Una llamada a la que no le quedan 15 s no se hace (plantillas).
+- **Un corte a mitad del comité no se repite.** Antes de llamar al LLM el
+  latido guarda el estado con `comite.pedido = null`, la próxima cita ya
+  movida y `comite.enCurso = { desde, motivo }`. Si el latido siguiente
+  encuentra un `enCurso`, lo quita y lo dice en el canal del comité; no lo
+  reconvoca.
+- **El gasto del LLM se reserva en disco** (`src/agentes/reservas-llm.js`):
+  mirar el tope y reservar se hace bajo un cerrojo corto (`data/.llm-reservas`)
+  y la reserva queda en `data/llm-reservas.jsonl` hasta que la llamada apunta
+  su coste. Todas las instancias (latido, cada petición del Megáfono, cada
+  proceso web) ven lo que las demás tienen en vuelo. Una reserva que vence sin
+  cerrarse (el proceso murió a mitad) se apunta en `llm-costes.jsonl` con su
+  estimado (`estimado: true, huerfana: true`) una sola vez.
 - **Un paso por proceso tiene que ser exacto.** Todo lo que hoy viva solo en
   memoria entre pasos y cambie decisiones (contadores de órdenes por minuto y por
   mesa/hora, órdenes en vuelo, reservas de gasto del LLM, pendientes de la bolsa,
@@ -134,8 +151,31 @@ web**:
 - **Ritmo:** la instantánea trae `latidoMs` (60 000 en tiempo real). La franja de
   «Cifras sin actualizar» salta a los `2,5 × latidoMs`, no a los 30 s.
 - **Salud:** `GET /api/salud` (sin sesión, sin datos del fondo): `{ ok, version,
-  ultimoLatidoHaceSeg, modo }`; 503 si el último latido tiene más de 3 min. Sirve
-  para el cron de vigilancia y para comprobar un despliegue.
+  ultimoLatidoHaceSeg, modo, latidosMalosSeguidos }`; 503 si el último latido
+  **bueno** (`ok: true` en `latidos.jsonl`) tiene más de 3 min. Los omitidos por
+  el cerrojo y los fallidos no cuentan como latido; `latidosMalosSeguidos` dice
+  cuántos lleva al final. Sirve para el cron de vigilancia y para comprobar un
+  despliegue.
+
+**Lo que la web añade a la instantánea y a la API** (integrado el 30-sep-2026):
+
+- `/api/estado` y el evento `estado` llevan, además de la instantánea publicada,
+  `edadSeg` (segundos desde que se escribió `instantanea.json`), `web: true`,
+  `sesion: { usuario }` y `latidoMs` solo si el motor no lo trae. El motor, en
+  modo latido, añade `latidoMs` y `cabecera.comitePedido` (ARQUITECTURA.md §7).
+- `GET /api/sesion` → `{ ok, usuario }` (con sesión).
+- Evento SSE `sesion` `{ ok: false, mensaje }`: la sesión caducó o se cerró con
+  el panel abierto (se revisa cada minuto); después se corta el flujo y el panel
+  va a `/login`.
+- `MESA_URL` (o `URL_PUBLICA`), separadas por comas: orígenes admitidos además
+  del propio `Host`/`X-Forwarded-Host` en la defensa CSRF por `Origin`.
+- El Megáfono: `src/web/megafono.js` interpreta con lo que hay en disco
+  (estado, universo, Ajustes guardados) y el orquestador recibe la
+  interpretación por el canal interno `comando('megafono', { texto },
+  { interpretacion })`, la **revalida** (`megafono.revalidar`) contra el estado
+  de ese momento y no vuelve a llamar al LLM. Una `interpretacion` que venga en
+  el cuerpo de una petición se borra.
+- `GET /sw.js` se sirve con la versión dentro (`VERSION` + huella de la carcasa).
 
 **Login** (solo en modo web; el modo local sigue como está):
 
@@ -148,8 +188,15 @@ web**:
   guarda solo su SHA-256. Se renueva el uso (`ultima`) como mucho una vez por
   minuto.
 - Freno: 5 fallos por IP en 15 min o 20 por usuario en 1 h → 429 con el tiempo de
-  espera. La IP sale de `X-Forwarded-For` (primer valor) porque LiteSpeed hace de
-  proxy.
+  espera. La IP sale de `X-Forwarded-For`, **último valor** (el que añade
+  LiteSpeed, único proxy de confianza; los de delante los escribe el cliente).
+  El freno por usuario no se aplica a una IP desde la que ese usuario entró bien
+  en los últimos 7 días (si no, cualquiera que sepa el nombre deja a Eduardo
+  fuera); a esa IP le sigue valiendo el de 5 por IP. El intento se apunta como
+  fallo **antes** de comprobar la clave (`reservarIntento`) y se corrige a bueno
+  si entra (`resolverIntento`), así una ráfaga a la vez no pasa entera; además,
+  una sola comprobación de clave a la vez por IP en cada proceso (la siguiente,
+  429).
 - Sin sesión: `/`, `/api/*` (salvo `login`, `salud`) y el SSE → a `/login` (HTML)
   o 401 (API). Los estáticos del login, el manifest y los iconos son públicos.
 - Cabeceras de seguridad en modo web: `Strict-Transport-Security`,
@@ -186,9 +233,22 @@ async function crearUsuario(pool, { usuario, clave }) ; async function comprobar
 async function crearSesion(pool, { usuarioId, ip, agente }) → { token, expira }
 async function leerSesion(pool, token) → { usuarioId, usuario, expira } | null
 async function cerrarSesion(pool, token) ; async function anotarIntento(pool, { ip, usuario, ok }) ; async function frenado(pool, { ip, usuario }) → { frenado, esperaSeg }
+async function reservarIntento(pool, { ip, usuario }) → { frenado, esperaSeg, id }   // INSERT como fallo y luego cuenta sin el suyo; frenado → borra su fila
+async function resolverIntento(pool, { id, ok })                                     // el login bueno lo marca ok = 1
 // src/bd/espejo.js
 async function sincronizar(config) → { copiados, fuentes }   // registros JSONL → mesa_registros, idempotente
 ```
+
+Añadido por D al construirlo (30-sep-2026), compatible con las firmas de arriba:
+`src/bd/tablas.js` (`sqlTablas()`, `crearTablas(pool) → { existian, creadas }`,
+el SQL que comparten el script y las pruebas); `cambiarClave` (cierra las
+sesiones del usuario) y `existeUsuario` en `usuarios.js`, con contraseña mínima
+de 12 caracteres y hash autodescrito `scrypt$ln=15,r=8,p=1$sal$clave`; un
+`ahora` opcional (reloj de infraestructura) en sesiones y usuarios;
+`sincronizar(config, { pool, entorno, tablas, maxBytes })` con su propio
+cerrojo `data/.espejo` (sale con `{ ocupado: true }` si otro copia) y un tope de
+4 MB por fuente y llamada; `frenado` usa `evaluarFreno` de `src/web/freno.js`
+(una sola regla para la base y la memoria). Caso conocido: `scripts/probar-bd.js`.
 
 Tablas (prefijo `mesa_`, InnoDB, utf8mb4), creadas por `scripts/crear-tablas.js`
 (idempotente, `CREATE TABLE IF NOT EXISTS`; imprime el SQL antes y pide
@@ -246,7 +306,8 @@ instalarla en el móvil; y cómo parar todo.
   `TEST_DB_*`): tablas idempotentes, usuario y contraseña, sesiones y caducidad,
   freno, espejo idempotente (dos veces → mismas filas). Sin `TEST_DB_*`, las
   pruebas de base de datos se saltan diciendo por qué (no fallan en el portátil).
-- **De extremo a extremo** (tras integrar): 3 procesos web en 3 puertos sobre la
+- **De extremo a extremo** (tras integrar; `scripts/probar-web.js`, que sin
+  `TEST_DB_*` hace solo la parte sin base y lo dice): 3 procesos web en 3 puertos sobre la
   misma carpeta y la misma base, más un bucle que lanza `scripts/latido.js`
   (sintético, 5 min por latido) cada pocos segundos; dos órdenes a la vez desde dos
   procesos se ejecutan en serie y una sola vez; el kill cierra todo y el latido

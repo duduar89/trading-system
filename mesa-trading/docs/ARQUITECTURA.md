@@ -677,6 +677,12 @@ y no tiene salvavidas del servidor):
   llamada cortada por timeout llegó al servidor y puede estar cobrada: se
   apunta como gastado lo reservado × (1 + reintentos), con `estimado: true` en
   `llm-costes.jsonl`. El resto de errores (401, 429, 5xx, sin conexión) cuentan 0.
+  Con `rutaCostes`, mirar el tope y reservar se hace en disco y bajo un cerrojo
+  corto, compartido por todas las instancias y procesos (`src/agentes/reservas-llm.js`,
+  `data/llm-reservas.jsonl`); una reserva vencida sin cerrar (proceso muerto a
+  mitad) se apunta con `estimado: true, huerfana: true`. En el modo latido,
+  `crearLLM` recibe además `limiteLlamadaMs` (45 s), `reintentos` (0) y
+  `plazo()` (ARQUITECTURA-WEB W2).
 
 `src/agentes/cifras.js` (D): `verificarCifras(texto, entrada) → { ok, noEncontradas: [] }`. Extrae
 números del texto (formatos 1.234,56 · 1,234.56 · 12 % · 3,5 $) y los busca
@@ -722,6 +728,13 @@ Lista CERRADA de directivas (solo aprietan; caducan):
 (`horasPorDefecto`: la duración si la orden no dice cuánto; el orquestador pasa
 `COMITE_HORAS`, hasta el comité siguiente. `directivas` y `ahora`: para que un
 «reanuda» solo deshaga una pausa del Megáfono vigente),
+`revalidar(interpretacion, { universo, mesas, directivas?, ahora?, texto? })` → lo mismo que
+`interpretar`, para una interpretación hecha FUERA del cerrojo (modo web): cada
+directiva pasa otra vez por `validarDirectiva` contra el estado de ahora, sin
+llamar al LLM; la explicación de fuera solo se conserva si ninguna directiva
+cambió. El orquestador la recibe por un canal interno,
+`comando('megafono', { texto }, { interpretacion })`, que el cuerpo de una
+petición HTTP nunca alcanza (el modo local pasa solo `datos`).
 `validarDirectiva(d, ctx)`, `aplicarDirectiva(directivas, d, ahora) → directivas`,
 `directivasVigentes(directivas, ahora)`. Sin LLM: palabras clave («pausa»,
 «para», «reduce», «baja», «solo cerrar», «no abras», «reanuda» + etiqueta o
@@ -1002,6 +1015,9 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
 ```js
 {
   version: 1, ahora, modo: 'alpaca'|'simulado'|'sintetico', broker: 'alpaca-paper'|'simulado', velocidad,
+  latidoMs,          // SOLO en modo latido (web, ARQUITECTURA-WEB W2-W3): el ritmo del cron (60 000 en tiempo
+                     //   real); la franja «Cifras sin actualizar» salta a 2,5 × latidoMs. En modo local no aparece.
+  publicada,         // SOLO en data/instantanea.json del modo latido: Date.now() al publicarla (infraestructura).
   fondo: { nivel: 'normal'|'solo_cerrar'|'pausado'|'bloqueado', motivo, multiplicadorCaida,
            factorTamano: { total, comite, megafono, caida } },
   // factorTamano: el recorte que se aplica DE VERDAD al tamaño de cada apertura nueva, para que la
@@ -1017,6 +1033,8 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
   cabecera: { patrimonio, pnlDia, pnlDiaPct, caida, exposicionBrutaPct, exposicionCriptoPct, posiciones,
               regimen: { valor, detalle }, miedoCodicia: { valor, etiqueta, sintetico } | null,
               proximoComite, modoComite: 'NORMAL'|'DEFENSIVO'|'SOLO_CERRAR',
+              comitePedido,                            // SOLO en modo latido: true si está convocado desde el panel
+                                                       //   y se celebra en el latido siguiente («Comité convocado»)
               sinAsignar: { fraccion, usd },           // capital que ninguna mesa tiene (queda en efectivo)
               vigilancia: { perdidaDiaPct | null, caidaPct, desdeReapertura } },
   // pnlDia/pnlDiaPct: desde el inicio REAL del día (también tras reabrir); caida: desde el máximo HISTÓRICO.

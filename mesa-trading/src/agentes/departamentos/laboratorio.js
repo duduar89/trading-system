@@ -157,7 +157,8 @@ function revisionSemanal(ctx) {
   if (!nuevas.length) {
     ctx.bus.publicar({ de: 'laboratorio', canal: 'laboratorio', tipo: 'nota', texto: `Semana ${semana}: sin hipótesis nuevas (${pistas.length} pistas del Auditor).` });
   }
-  ctx.lanzar('laboratorio', () => evaluarPendientes(ctx));
+  // Modo latido: la evaluación (larga) la hace scripts/laboratorio.js fuera del latido.
+  if (!(ctx.opciones && ctx.opciones.laboratorioFuera)) ctx.lanzar('laboratorio', () => evaluarPendientes(ctx));
   return nuevas;
 }
 
@@ -171,51 +172,121 @@ async function evaluarPendientes(ctx) {
       const entrada = lab.hipotesis.find(x => x.estado === 'pendiente');
       if (!entrada) break;
       entrada.estado = 'evaluando';
-      const h = entrada.h;
-      const firma = entrada.firma || firmaHipotesis(h);
-      const ahora = ctx.reloj.ahora();
-      const cargar = crearCargador(ctx, ahora);
-      const contexto = await crearContextoHistorico(ctx, cargar);
-      await ceder();
-      const ensayosPrevios = lab.ensayosTotales;
-      let ref = { valor: undefined, mesaId: null };
-      const res = await evaluarHipotesis(h, {
-        cargarVelas: cargar, contextoHistorico: contexto, ensayosPrevios, sharpesPrevios: [...lab.sharpesEnsayos],
-        retornosMesasActivas: retornosMesasActivas(ctx),
-        maxDDReferencia: async tramo => { ref = await maxDDReferencia(ctx, h, tramo, { cargar, contexto }); return ref; },
-        costes: costesPorDefecto(), limites: ctx.limites, universo: ctx.universo, pesoMesa: PESO_HIPOTESIS,
-      });
-      const wf = res.walkforward;
-      if (wf) {
-        lab.ensayosTotales = ensayosPrevios + (wf.combinaciones || 0);
-        lab.sharpesEnsayos.push(...(wf.sharpesEnsayos || []));
-        if (lab.sharpesEnsayos.length > MAX_SHARPES_GUARDADOS) lab.sharpesEnsayos.splice(0, lab.sharpesEnsayos.length - MAX_SHARPES_GUARDADOS);
-        lab.ensayos.push({ hipotesisId: h.id, t: ctx.reloj.ahora(), combinaciones: wf.combinaciones || 0, sharpesEnsayos: wf.sharpesEnsayos || [] });
-        if (lab.ensayos.length > 200) lab.ensayos.splice(0, lab.ensayos.length - 200);
-      }
-      entrada.estado = res.aprobada ? 'aprobada' : 'rechazada';
-      entrada.firma = firma;
-      entrada.criterios = (res.criterios || []).map(c => ({ nombre: c.nombre, valor: c.valor, umbral: c.umbral, ok: c.ok }));
-      entrada.informe = res.informe;
-      entrada.referenciaDD = { valor: ref.valor ?? null, mesaId: ref.mesaId ?? null };
-      entrada.tFin = ctx.reloj.ahora();
-      // La firma es la del contenido que fijó la hipótesis (antes de los
-      // parámetros finales del walk-forward): una aprobada no entra dos veces.
-      if (res.aprobada && !lab.aprobadas.some(a => a.firma === firma)) {
-        lab.aprobadas.push({ ...h, params: { ...(h.params || {}), ...(res.paramsFinales || {}) }, firma, informe: res.informe, t: ctx.reloj.ahora() });
-      }
-      ctx.bus.publicar({
-        de: 'laboratorio', canal: 'laboratorio', tipo: 'hipotesis',
-        texto: plantillas.resultadoHipotesis({ id: h.id, aprobada: res.aprobada, criterios: res.criterios }),
-        datos: { id: h.id, aprobada: res.aprobada, criterios: entrada.criterios, informe: res.informe, ensayos: lab.ensayosTotales, dsr: res.dsr ?? null },
-        importancia: res.aprobada ? 3 : 2,
-      });
+      const ev = await evaluarUna(ctx, entrada, { ensayosPrevios: lab.ensayosTotales, sharpesPrevios: [...lab.sharpesEnsayos] });
+      aplicarEvaluacion(ctx, entrada, ev);
       n++;
       await ceder();
     }
   } finally {
     ctx._labEnCurso = false;
   }
+  return n;
+}
+
+// Evalúa una hipótesis sin tocar el estado. Devuelve lo que hace falta para
+// apuntarla (aplicarEvaluacion), en JSON: así el laboratorio fuera de banda
+// (scripts/laboratorio.js) lo deja en un fichero y el latido lo incorpora.
+async function evaluarUna(ctx, entrada, { ensayosPrevios, sharpesPrevios }) {
+  const h = entrada.h;
+  const firma = entrada.firma || firmaHipotesis(h);
+  const ahora = ctx.reloj.ahora();
+  const cargar = crearCargador(ctx, ahora);
+  const contexto = await crearContextoHistorico(ctx, cargar);
+  await ceder();
+  let ref = { valor: undefined, mesaId: null };
+  const res = await evaluarHipotesis(h, {
+    cargarVelas: cargar, contextoHistorico: contexto, ensayosPrevios, sharpesPrevios,
+    retornosMesasActivas: retornosMesasActivas(ctx),
+    maxDDReferencia: async tramo => { ref = await maxDDReferencia(ctx, h, tramo, { cargar, contexto }); return ref; },
+    costes: costesPorDefecto(), limites: ctx.limites, universo: ctx.universo, pesoMesa: PESO_HIPOTESIS,
+  });
+  const wf = res.walkforward;
+  return {
+    id: h.id,
+    firma,
+    aprobada: Boolean(res.aprobada),
+    criterios: res.criterios || [],
+    informe: res.informe,
+    paramsFinales: res.paramsFinales || null,
+    dsr: res.dsr ?? null,
+    walkforward: wf ? { combinaciones: wf.combinaciones || 0, sharpesEnsayos: wf.sharpesEnsayos || [] } : null,
+    referenciaDD: { valor: ref.valor ?? null, mesaId: ref.mesaId ?? null },
+    tFin: ctx.reloj.ahora(),
+  };
+}
+
+// Apunta en el estado lo que devolvió evaluarUna y lo cuenta en el chat.
+function aplicarEvaluacion(ctx, entrada, ev) {
+  const lab = ctx.estado.laboratorio;
+  const h = entrada.h;
+  const wf = ev.walkforward;
+  if (wf) {
+    lab.ensayosTotales = (lab.ensayosTotales || 0) + (wf.combinaciones || 0);
+    lab.sharpesEnsayos.push(...(wf.sharpesEnsayos || []));
+    if (lab.sharpesEnsayos.length > MAX_SHARPES_GUARDADOS) lab.sharpesEnsayos.splice(0, lab.sharpesEnsayos.length - MAX_SHARPES_GUARDADOS);
+    lab.ensayos.push({ hipotesisId: h.id, t: ctx.reloj.ahora(), combinaciones: wf.combinaciones || 0, sharpesEnsayos: wf.sharpesEnsayos || [] });
+    if (lab.ensayos.length > 200) lab.ensayos.splice(0, lab.ensayos.length - 200);
+  }
+  entrada.estado = ev.aprobada ? 'aprobada' : 'rechazada';
+  entrada.firma = ev.firma;
+  entrada.criterios = (ev.criterios || []).map(c => ({ nombre: c.nombre, valor: c.valor, umbral: c.umbral, ok: c.ok }));
+  entrada.informe = ev.informe;
+  entrada.referenciaDD = { valor: ev.referenciaDD ? ev.referenciaDD.valor ?? null : null, mesaId: ev.referenciaDD ? ev.referenciaDD.mesaId ?? null : null };
+  entrada.tFin = ev.tFin ?? ctx.reloj.ahora();
+  // La firma es la del contenido que fijó la hipótesis (antes de los
+  // parámetros finales del walk-forward): una aprobada no entra dos veces.
+  if (ev.aprobada && !lab.aprobadas.some(a => a.firma === ev.firma)) {
+    lab.aprobadas.push({ ...h, params: { ...(h.params || {}), ...(ev.paramsFinales || {}) }, firma: ev.firma, informe: ev.informe, t: ctx.reloj.ahora() });
+  }
+  ctx.bus.publicar({
+    de: 'laboratorio', canal: 'laboratorio', tipo: 'hipotesis',
+    texto: plantillas.resultadoHipotesis({ id: h.id, aprobada: ev.aprobada, criterios: ev.criterios }),
+    datos: { id: h.id, aprobada: ev.aprobada, criterios: entrada.criterios, informe: ev.informe, ensayos: lab.ensayosTotales, dsr: ev.dsr ?? null },
+    importancia: ev.aprobada ? 3 : 2,
+  });
+}
+
+// ---------- Fuera de banda (modo latido, docs/ARQUITECTURA-WEB.md W2) ----------
+// scripts/laboratorio.js evalúa, con su propio cerrojo y sobre una COPIA del
+// estado, las hipótesis pendientes; deja el resultado en un fichero y el
+// latido siguiente lo incorpora bajo el cerrojo principal (una sola vez: el
+// id del resultado queda en estado.laboratorio.incorporados).
+
+// ctx: { estado (copia), reloj, datos, fg, universo, limites, modo }. No publica nada.
+async function evaluarFueraDeBanda(ctx) {
+  const lab = ctx.estado.laboratorio;
+  const evaluaciones = [];
+  let ensayos = lab.ensayosTotales || 0;
+  const sharpes = [...(lab.sharpesEnsayos || [])];
+  for (const entrada of lab.hipotesis.filter(x => x.estado === 'pendiente' || x.estado === 'evaluando')) {
+    const ev = await evaluarUna(ctx, entrada, { ensayosPrevios: ensayos, sharpesPrevios: [...sharpes] });
+    if (ev.walkforward) {
+      ensayos += ev.walkforward.combinaciones || 0;
+      sharpes.push(...(ev.walkforward.sharpesEnsayos || []));
+    }
+    evaluaciones.push(ev);
+    await ceder();
+  }
+  return evaluaciones;
+}
+
+// Incorpora un resultado de evaluarFueraDeBanda ({ id, evaluaciones }).
+// Devuelve cuántas hipótesis apuntó; 0 si ya estaba incorporado o si sus
+// hipótesis ya no esperan (se apuntaron por otro camino).
+function incorporarResultado(ctx, resultado) {
+  if (!resultado || !resultado.id || !Array.isArray(resultado.evaluaciones)) return 0;
+  const lab = ctx.estado.laboratorio;
+  if (!Array.isArray(lab.incorporados)) lab.incorporados = [];
+  if (lab.incorporados.includes(resultado.id)) return 0;
+  let n = 0;
+  for (const ev of resultado.evaluaciones) {
+    const entrada = lab.hipotesis.find(x => x.id === ev.id && (x.estado === 'pendiente' || x.estado === 'evaluando'));
+    if (!entrada) continue;
+    aplicarEvaluacion(ctx, entrada, ev);
+    n++;
+  }
+  lab.incorporados.push(resultado.id);
+  if (lab.incorporados.length > 20) lab.incorporados.splice(0, lab.incorporados.length - 20);
   return n;
 }
 
@@ -301,6 +372,6 @@ async function auditoria(ctx, operaciones) {
 }
 
 module.exports = {
-  revisionSemanal, evaluarPendientes, backtestsPendientes, backtestMesa, auditoria, maxDDReferencia, siguienteLunes, crearContextoHistorico,
+  revisionSemanal, evaluarPendientes, evaluarUna, aplicarEvaluacion, evaluarFueraDeBanda, incorporarResultado, backtestsPendientes, backtestMesa, auditoria, maxDDReferencia, siguienteLunes, crearContextoHistorico,
   PESO_HIPOTESIS,
 };

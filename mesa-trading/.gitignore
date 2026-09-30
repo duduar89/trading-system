@@ -3,3 +3,7 @@ node_modules/
 data/
 *.log
 data-demo/
+# Lo escribe el despliegue (commit publicado) y lo lee /api/salud.
+VERSION
+# tmp/restart.txt de Passenger en el servidor.
+tmp/

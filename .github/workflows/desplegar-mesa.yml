@@ -1,0 +1,154 @@
+name: Mesa de trading · desplegar
+
+# QUÉ ES ESTO
+#
+# El camino de la mesa de trading (carpeta mesa-trading/) a su app de Node en el cPanel
+# (mesa.brainstormersagency.es). Calcado del «Desplegar a producción» del portal: parte de una
+# copia LIMPIA del repositorio, así que se publica exactamente lo commiteado y nada más.
+# Contrato: mesa-trading/docs/ARQUITECTURA-WEB.md (W4). Paso a paso: mesa-trading/docs/06-app-web.md.
+#
+# QUÉ HACE, en este orden, y se para en el primero que falla:
+#   1. instala las dependencias (npm ci, con el package-lock.json de la mesa);
+#   2. crea las tablas en un MariaDB 11.4 de prueba (un servicio que solo vive en esta
+#      ejecución) y pasa `npm test` contra él: las pruebas de base de datos NO se saltan aquí;
+#   3. los casos conocidos (`npm run probar`: scripts/probar-*.js y la demo de 20 días);
+#   4. .github/scripts/desplegar-mesa.sh: rsync por SSH, npm install en el servidor,
+#      reinicio y comprobación de /api/salud desde dentro del servidor.
+#
+# MODOS. Se elige al pulsar «Run workflow»:
+#   · probar (el de por defecto): todo lo anterior y ENSEÑA qué cambiaría con
+#     `rsync --dry-run`. No toca nada del servidor. Es como se empieza siempre.
+#   · subir: publica de verdad. Lo sustituido queda en ~/respaldo-mesa/<fecha>-<commit>.
+#
+# NUNCA sube ni borra data/ (la memoria del fondo), .env (las claves), node_modules/ ni
+# data-demo/. No toca la base de datos de producción, ni el .env del servidor, ni el crontab.
+#
+# SECRETOS (una vez, con `bash .github/scripts/secretos-mesa.sh` desde tu terminal):
+#   MESA_SSH_KEY, MESA_SSH_HOST, MESA_SSH_USER, MESA_KNOWN_HOSTS, MESA_RUTA, MESA_URL.
+
+on:
+  # A mano y solo a mano: un push no publica nada.
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'probar = pruebas + enseñar qué cambiaría, sin tocar el servidor · subir = publicar'
+        type: choice
+        options:
+          - probar
+          - subir
+        default: probar
+      motivo:
+        description: 'Qué se está subiendo (queda en el registro de la ejecución)'
+        required: false
+        default: ''
+
+# Dos despliegues a la vez dejarían la app a medio camino. Se hace cola; el que está en marcha
+# no se cancela.
+concurrency:
+  group: mesa-produccion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  desplegar:
+    name: Probar y publicar la mesa
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mesa-trading
+
+    # MariaDB de usar y tirar para las pruebas de base de datos (test/bd-*.test.js y
+    # test/web-bd.test.js). Su clave no es un secreto: la base muere con la ejecución.
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_DATABASE: mesa_prueba
+          MARIADB_USER: mesa
+          MARIADB_PASSWORD: mesa-ci
+          MARIADB_RANDOM_ROOT_PASSWORD: '1'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    env:
+      TEST_DB_HOST: 127.0.0.1
+      TEST_DB_PUERTO: '3306'
+      TEST_DB_USUARIO: mesa
+      TEST_DB_CLAVE: mesa-ci
+      TEST_DB_NOMBRE: mesa_prueba
+
+    steps:
+      - name: Traer el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node 22 (el mismo que la app del cPanel)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      - name: Crear las tablas en el MariaDB de prueba
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PUERTO: '3306'
+          DB_USUARIO: mesa
+          DB_CLAVE: mesa-ci
+          DB_NOMBRE: mesa_prueba
+        run: node scripts/crear-tablas.js --si
+
+      - name: Pruebas (si algo cae, no se sube nada)
+        run: npm test
+
+      - name: Casos conocidos y demo acelerada
+        run: npm run probar
+
+      - name: Preparar la conexión SSH
+        id: ssh
+        env:
+          MESA_SSH_KEY: ${{ secrets.MESA_SSH_KEY }}
+          MESA_KNOWN_HOSTS: ${{ secrets.MESA_KNOWN_HOSTS }}
+          MESA_SSH_HOST: ${{ secrets.MESA_SSH_HOST }}
+          MESA_SSH_USER: ${{ secrets.MESA_SSH_USER }}
+          MESA_RUTA: ${{ secrets.MESA_RUTA }}
+          MESA_URL: ${{ secrets.MESA_URL }}
+          MODO: ${{ inputs.modo }}
+        run: |
+          faltan=""
+          for s in MESA_SSH_KEY MESA_KNOWN_HOSTS MESA_SSH_HOST MESA_SSH_USER MESA_RUTA MESA_URL; do
+            [ -n "${!s}" ] || faltan="$faltan $s"
+          done
+          if [ -n "$faltan" ]; then
+            if [ "$MODO" = probar ]; then
+              echo "::warning::Faltan los secretos:$faltan. Las pruebas han pasado, pero sin ellos no se puede enseñar qué cambiaría en el servidor. Ejecuta 'bash .github/scripts/secretos-mesa.sh'."
+              echo "listo=no" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::Faltan los secretos:$faltan. Ejecuta 'bash .github/scripts/secretos-mesa.sh' desde tu terminal."
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$MESA_SSH_KEY" > ~/.ssh/mesa_deploy_key
+          chmod 600 ~/.ssh/mesa_deploy_key
+          printf '%s\n' "$MESA_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          echo "listo=si" >> "$GITHUB_OUTPUT"
+
+      - name: Desplegar (modo ${{ inputs.modo }})
+        if: steps.ssh.outputs.listo == 'si'
+        env:
+          MODO: ${{ inputs.modo }}
+          MOTIVO: ${{ inputs.motivo }}
+          SSH_HOST: ${{ secrets.MESA_SSH_HOST }}
+          SSH_USER: ${{ secrets.MESA_SSH_USER }}
+          RUTA: ${{ secrets.MESA_RUTA }}
+          URL: ${{ secrets.MESA_URL }}
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/desplegar-mesa.sh"

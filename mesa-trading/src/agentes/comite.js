@@ -404,6 +404,10 @@ async function celebrar(ctx, { motivo = 'programado' } = {}) {
   } finally {
     const bloqueado = e.fondo.nivel === 'bloqueado';
     for (const id of JEFES) ctx.moverAgente(id, null, bloqueado ? 'de_pie' : 'trabajando');
+    // Modo latido: la reunión cabe en un paso y no hay pausas de pantalla; los
+    // jefes se ven en la sala hasta este instante (solo visual: la instantánea).
+    const sala = ctx.opciones && ctx.opciones.salaTrasComiteMs;
+    if (sala > 0) e.comite.salaHasta = ctx.reloj.ahora() + sala;
     ctx.comiteEnCurso = false;
   }
 }

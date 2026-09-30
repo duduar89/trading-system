@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0f1424">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Entrar · Mesa de trading</title>
+  <meta name="description" content="Acceso a la mesa de trading de agentes (solo papel).">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/iconos/icono-32.png" type="image/png">
+  <link rel="apple-touch-icon" href="/iconos/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mesa">
+  <link rel="stylesheet" href="/css/login.css">
+</head>
+<body class="acceso">
+  <main class="tarjeta-acceso" aria-labelledby="titulo">
+    <div class="marca-acceso" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7z" fill="#1d4ed8"/><path d="M12 2l9 5-9 5-9-5z" fill="#60a5fa"/><path d="M12 12v10l9-5V7z" fill="#1e3a8a"/></svg>
+    </div>
+    <h1 id="titulo">Mesa de trading</h1>
+    <p class="texto-acceso">Fondo de agentes que opera solo en papel. Entra con tu usuario.</p>
+    <form id="formulario" class="formulario-acceso" novalidate>
+      <label class="campo-acceso">
+        <span>Usuario</span>
+        <input id="usuario" name="usuario" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="64" required>
+      </label>
+      <label class="campo-acceso">
+        <span>Contraseña</span>
+        <input id="clave" name="clave" type="password" autocomplete="current-password" maxlength="1024" required>
+      </label>
+      <p id="error" class="error-acceso" role="alert" hidden></p>
+      <button id="entrar" class="boton-acceso" type="submit">Entrar</button>
+    </form>
+    <p class="pie-acceso">Solo papel: aquí no se mueve dinero real.</p>
+  </main>
+  <aside id="pista-ios" class="pista-ios" hidden aria-label="Instalar en el iPhone">
+    <p>Para tenerla como app: pulsa <b>Compartir</b> <svg class="icono-compartir" viewBox="0 0 24 24" aria-label="(el cuadrado con la flecha hacia arriba)"><path d="M12 3v12M8 7l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg> y luego <b>Añadir a pantalla de inicio</b>.</p>
+    <button id="cerrar-pista" class="cerrar-pista" type="button" aria-label="Cerrar el aviso">×</button>
+  </aside>
+  <script src="/js/pwa.js"></script>
+  <script src="/js/login.js"></script>
+</body>
+</html>

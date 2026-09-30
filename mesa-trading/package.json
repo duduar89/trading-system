@@ -13,7 +13,14 @@
     "demo": "node src/index.js --modo=sintetico --velocidad=600",
     "demo-rapida": "node scripts/demo-acelerada.js",
     "test": "node --test \"test/*.test.js\"",
-    "probar": "node scripts/probar-todo.js"
+    "probar": "node scripts/probar-todo.js",
+    "crear-tablas": "node scripts/crear-tablas.js",
+    "crear-usuario": "node scripts/crear-usuario.js",
+    "latido": "node scripts/latido.js",
+    "laboratorio": "node scripts/laboratorio.js",
+    "web": "node src/web.js",
+    "iconos": "node scripts/generar-iconos.js",
+    "probar-web": "node scripts/probar-web.js --navegador"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.129.0",

@@ -47,7 +47,9 @@ const CONSEJO_PROXY = 'arranca con npm run start-proxy (Node 22.21 o posterior)'
 
 // Construye todas las piezas según el modo. Lo usan este arranque, la demo
 // acelerada y las pruebas de integración.
-function construir(config, { opciones = {}, llm: llmInyectado, reloj: relojInyectado } = {}) {
+// `llmOpciones` va tal cual a crearLLM (el modo latido pone ahí los topes de
+// tiempo: limiteLlamadaMs, reintentos, plazo).
+function construir(config, { opciones = {}, llm: llmInyectado, reloj: relojInyectado, llmOpciones = {} } = {}) {
   const carpeta = config.carpetaDatos;
   const cache = path.join(carpeta, 'cache');
   let reloj;
@@ -78,6 +80,7 @@ function construir(config, { opciones = {}, llm: llmInyectado, reloj: relojInyec
   const llm = llmInyectado || crearLLM({
     apiKey: config.llm.apiKey, modeloComite: config.llm.modeloComite, modeloAgentes: config.llm.modeloAgentes,
     presupuestoDiaUsd: config.llm.presupuestoDiaUsd, reloj, rutaCostes: path.join(carpeta, 'llm-costes.jsonl'),
+    ...llmOpciones,
   });
   const bus = new Bus({ reloj, ruta: path.join(carpeta, 'mensajes.jsonl') });
   const orquestador = new Orquestador({ config, reloj, datos, broker, llm, fg, bus, modo: config.modo, velocidad: config.velocidad, opciones });

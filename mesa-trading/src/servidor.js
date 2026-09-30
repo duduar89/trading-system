@@ -180,9 +180,19 @@ function esComodin(host) {
   return h === '0.0.0.0' || h === '::' || h === '';
 }
 
+// Dos modos:
+// - local (por defecto): el de siempre, con el orquestador en este proceso.
+// - web ({ modo: 'web', config, almacen, conLaMesa? }): la app del cPanel, sin
+//   orquestador, con login y leyendo lo que publica el latido
+//   (src/web/servidor-web.js, ARQUITECTURA-WEB W3).
+function crearServidor(opciones = {}) {
+  if (opciones && opciones.modo === 'web') return require('./web/servidor-web').crearServidorWeb(opciones);
+  return crearServidorLocal(opciones);
+}
+
 // Opciones: `host` es el HOST configurado (se admite también como nombre del
 // panel); el puerto es el real en que escucha (vale con listen(0)).
-function crearServidor({
+function crearServidorLocal({
   orquestador, raizWeb, carpetaDatos, token = '', host = '', pingMs = PING_MS,
   maxClientesSSE = MAX_CLIENTES_SSE, maxPendienteSSE = MAX_PENDIENTE_SSE, maxAtascoSSEMs = MAX_ATASCO_SSE_MS,
 } = {}) {

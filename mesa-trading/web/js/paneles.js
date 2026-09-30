@@ -338,9 +338,11 @@
     if (!Number.isFinite(cab.proximoComite) || !Number.isFinite(ahoraServidor)) { pc.textContent = 'Comité —'; return; }
     const resta = cab.proximoComite - ahoraServidor;
     const reunido = (inst.agentes || []).some(a => a.sala === 'comite');
-    pc.textContent = reunido ? 'Comité reunido' : resta > 0 ? `Comité en ${cifras.cuentaAtras(resta)}` : 'Comité pendiente';
-    pc.className = 'pildora ' + (reunido ? 'ambar' : 'gris');
-    pc.title = `Modo del comité: ${cifras.modoComite(cab.modoComite)}`;
+    // Modo web: convocado desde el panel, se celebra en el latido siguiente.
+    const pedido = !reunido && cab.comitePedido === true;
+    pc.textContent = reunido ? 'Comité reunido' : pedido ? 'Comité convocado' : resta > 0 ? `Comité en ${cifras.cuentaAtras(resta)}` : 'Comité pendiente';
+    pc.className = 'pildora ' + (reunido || pedido ? 'ambar' : 'gris');
+    pc.title = pedido ? 'Convocado: empieza en el próximo latido.' : `Modo del comité: ${cifras.modoComite(cab.modoComite)}`;
   }
 
   // ---------- feed ----------
@@ -1127,9 +1129,29 @@
           if (rr && rr.ok) Object.assign(a, cambios, (rr.datos && typeof rr.datos === 'object') ? rr.datos : {});
         });
       });
-      poner(c, form, tabla, res, pieModal(guardar));
+      // Modo web: quién ha entrado y «Cerrar sesión» (en el modo local no hay login).
+      let sesion = null;
+      if (inst && inst.web && inst.sesion && est.manejadores.cerrarSesion) {
+        const resSesion = zonaResultado();
+        const salir = el('button', { class: 'boton', type: 'button', text: 'Cerrar sesión' });
+        salir.addEventListener('click', () => { ejecutarSesion(salir, resSesion); });
+        sesion = el('section', { class: 'sesion-ajustes', 'aria-label': 'Sesión' },
+          el('p', { class: 'modal-texto' }, 'Has entrado como ', el('b', { text: inst.sesion.usuario || 'usuario' }), '. En este dispositivo la sesión dura 30 días.'),
+          salir, resSesion);
+      }
+      poner(c, form, sesion, tabla, res, pieModal(guardar));
     },
   };
+
+  async function ejecutarSesion(boton, zona) {
+    boton.disabled = true;
+    zona.className = 'resultado';
+    zona.textContent = 'Cerrando sesión…';
+    let r;
+    try { r = await est.manejadores.cerrarSesion(); } catch (_) { r = { ok: false, mensaje: 'Sin conexión con la mesa.' }; }
+    boton.disabled = false;
+    pintarResultado(zona, r);
+  }
 
   return {
     iniciar, fijarDepartamentos, actualizarBarra, actualizarComite, marcarDesborde, anadirMensajes, repintarFeed, ultimoMensajeDe,

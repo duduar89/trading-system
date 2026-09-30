@@ -146,8 +146,20 @@ class Orquestador extends EventEmitter {
       guardarCadaPasos: 1,              // estado.json en cada latido (§6.10)
       comiteEnSegundoPlano: true,       // el comité (con LLM tarda) no retiene el latido
       ahoraPantalla: () => Date.now(),  // SOLO para lo visual: bocadillos y descansos en pantalla
+      // Modo latido (web en cPanel, docs/ARQUITECTURA-WEB.md W2): cada paso es
+      // un proceso nuevo que reconstruye el orquestador desde disco. Todo lo
+      // que vive en memoria entre pasos y cambia decisiones se guarda en el
+      // estado o se reconstruye de los registros; el laboratorio corre fuera
+      // (scripts/laboratorio.js) y el comité no hace pausas de pantalla. Sin
+      // esta opción (modo local continuo) nada de eso cambia.
+      latido: false,
+      laboratorioFuera: false,          // la evaluación de hipótesis la hace scripts/laboratorio.js
+      salaTrasComiteMs: 0,              // los jefes se ven en la sala de comité este rato tras la reunión
+      latidoMs: null,                   // ritmo que dice la instantánea del modo latido; null = LATIDO_SEG
       ...opciones,
     };
+    // En un latido no hay pantalla continua: lo visual va con el reloj de la mesa.
+    if (this.opciones.latido && !opciones.ahoraPantalla) this.opciones.ahoraPantalla = () => this.reloj.ahora();
     this.setMaxListeners(100);
     this.hayAlpaca = Boolean(config.alpaca && config.alpaca.hay) && this.modo !== 'sintetico';
     this.universo = universoMod.disponibles({ hayAlpaca: this.hayAlpaca }).filter(a => datos.disponible(a.simbolo));
@@ -189,15 +201,19 @@ class Orquestador extends EventEmitter {
     this._pausas = new Set();
     // Lo que un humano pulsa en el panel y cambia el fondo (Reabrir, Pausar,
     // kill, Megáfono aplicado), numerado: el comité lo mira para decir en su
-    // punto lo que cambió mientras estaba reunido. Solo en memoria.
-    this.accionesHumanas = [];
-    this.seqHumana = 0;
+    // punto lo que cambió mientras estaba reunido. En el modo local, solo en
+    // memoria; en el modo latido, en el estado (estado.humanas).
+    this._humanas = { seq: 0, lista: [] };
   }
 
+  get accionesHumanas() { return this._humanas.lista; }
+  get seqHumana() { return this._humanas.seq; }
+
   _anotarHumana(tipo) {
-    this.seqHumana++;
-    this.accionesHumanas.push({ seq: this.seqHumana, t: this.reloj.ahora(), tipo });
-    if (this.accionesHumanas.length > 50) this.accionesHumanas.shift();
+    const h = this._humanas;
+    h.seq++;
+    h.lista.push({ seq: h.seq, t: this.reloj.ahora(), tipo });
+    if (h.lista.length > 50) h.lista.shift();
   }
 
   // ---------- Arranque ----------
@@ -230,8 +246,16 @@ class Orquestador extends EventEmitter {
     if (guardado && guardado.modo && guardado.modo !== this.modo) {
       throw new Error(`${this.rutas.estado} es de modo ${guardado.modo} y se arranca en modo ${this.modo}: usa otra carpeta con --datos= o apártalo.`);
     }
+    const latido = Boolean(this.opciones.latido);
+    // Modo latido: lo que vivía en memoria entre pasos, desde el estado. Antes
+    // de pedir precios: el historial de var24h se completa con ellos.
+    if (latido && guardado && guardado.version === VERSION_ESTADO && guardado.historialPrecios) {
+      this.historialPrecios = guardado.historialPrecios;
+      this._historialDeEstado = true;
+    }
     await this._actualizarPrecios(this.reloj.ahora());
-    if (guardado && guardado.version === VERSION_ESTADO) {
+    const nuevo = !(guardado && guardado.version === VERSION_ESTADO);
+    if (!nuevo) {
       this.libros = new Libros(guardado.libros);
       delete guardado.libros;
       this.estado = this._completar(guardado);
@@ -240,6 +264,7 @@ class Orquestador extends EventEmitter {
       this.estado = await this._estadoInicial();
     }
     this._aplicarAjustes();
+    if (latido) this._restaurarMemoria();
     // Las tarjetas guardadas están escritas con el nivel guardado.
     this._nivelTextos = this.estado.fondo.nivel;
     this.plantilla = crearPlantilla({ universo: this.universo, mesas: this.estado.mesas });
@@ -261,12 +286,21 @@ class Orquestador extends EventEmitter {
     this._oyente = m => this._alMensaje(m);
     this.bus.on('mensaje', this._oyente);
     this.ejecutor = new operaciones.Ejecutor(this);
+    // Ritmo de órdenes (por minuto y por mesa y hora): en el modo latido, desde ordenes.jsonl.
+    if (latido) this.registroOrdenes = this.ejecutor.ordenesRecientes(ahora - HORA);
 
     // Arranque seguro: bloqueado sigue bloqueado; órdenes a medias; conciliar; operar.
     const bloqueado = this.estado.fondo.nivel === 'bloqueado';
     await this.refrescarCartera();
     await this._seguro('órdenes a medias', 'ejecutor', () => this.ejecutor.resolverAlArrancar());
     await this.refrescarCartera();
+    // Modo latido: cada paso es un arranque. La conciliación y los avisos del
+    // arranque van solo la primera vez; luego los hace paso(), como en el
+    // proceso continuo (si no, un descuadre grave contaría dos veces por paso).
+    if (latido && !nuevo) {
+      this.iniciado = true;
+      return this;
+    }
     await this._seguro('conciliación', 'controller', () => operaciones.conciliarCadaLatido(this));
     for (const h of this.estado.laboratorio.hipotesis) if (h.estado === 'evaluando') h.estado = 'pendiente';
     this.bus.publicar({
@@ -278,11 +312,28 @@ class Orquestador extends EventEmitter {
       this.bus.publicar({ de: 'riesgos', canal: 'riesgo', tipo: 'alerta', texto: 'Arranco con el fondo BLOQUEADO: sigue bloqueado hasta que un humano pulse Reabrir.', importancia: 3 });
       for (const a of this.plantilla) this.moverAgente(a.id, null, 'de_pie');
     }
-    this.lanzar('backtests de referencia', () => laboratorio.backtestsPendientes(this));
-    if (this.estado.laboratorio.hipotesis.some(h => h.estado === 'pendiente')) this.lanzar('laboratorio', () => laboratorio.evaluarPendientes(this));
+    // En el modo latido los backtests de referencia van dentro de paso().
+    if (!latido) this.lanzar('backtests de referencia', () => laboratorio.backtestsPendientes(this));
+    if (!this.opciones.laboratorioFuera && this.estado.laboratorio.hipotesis.some(h => h.estado === 'pendiente')) this.lanzar('laboratorio', () => laboratorio.evaluarPendientes(this));
     this.iniciado = true;
     this.guardar();
     return this;
+  }
+
+  // Modo latido: lo que en el proceso continuo vive en memoria entre pasos
+  // pasa a vivir en el estado (mismo objeto: se guarda con él).
+  //   humanas        acciones del panel que el comité cita (seq y lista)
+  //   erroresVistos  el mismo error se avisa una vez por hora
+  //   historialPrecios  muestras horarias de var24h (sin volver a pedir velas)
+  // Los bocadillos salen de los últimos mensajes del bus.
+  _restaurarMemoria() {
+    const e = this.estado;
+    if (!e.humanas || !Array.isArray(e.humanas.lista)) e.humanas = { seq: 0, lista: [] };
+    this._humanas = e.humanas;
+    if (!e.erroresVistos || typeof e.erroresVistos !== 'object') e.erroresVistos = {};
+    this._erroresVistos = e.erroresVistos;
+    e.historialPrecios = this.historialPrecios;
+    for (const m of this.bus.ultimos(Infinity)) if (m && m.de && m.texto !== undefined) this.ultimoMensaje[m.de] = { texto: m.texto, t: m.t };
   }
 
   _completar(e) {
@@ -403,6 +454,9 @@ class Orquestador extends EventEmitter {
   _semillarHistorial(ahora) {
     // var24h de las cotizaciones: muestras horarias; al arrancar se siembran
     // con las velas de 1H de las últimas 26 h (en segundo plano, no bloquea).
+    // En el modo latido el historial viene guardado: solo se siembra la primera
+    // vez (si no, cada latido volvería a pedir velas).
+    if (this.opciones.latido && this._historialDeEstado) return;
     this.lanzar('historial de precios', async () => {
       for (const a of this.universo) {
         const v = await this.datos.velas(a.simbolo, '1Hour', { desde: ahora - 26 * HORA, hasta: ahora });
@@ -480,6 +534,8 @@ class Orquestador extends EventEmitter {
     log.error(texto, e && e.stack ? `\n${e.stack.split('\n').slice(1, 4).join('\n')}` : '');
     const ahora = this.reloj.ahora();
     if (this._erroresVistos[texto] !== undefined && ahora - this._erroresVistos[texto] < HORA) return;
+    // Los de hace más de una hora ya no silencian nada (en el modo latido van al estado).
+    for (const [k, t] of Object.entries(this._erroresVistos)) if (!(ahora - t < HORA)) delete this._erroresVistos[k];
     this._erroresVistos[texto] = ahora;
     // Como la alerta: el mismo error, una vez por hora.
     this.registrarIncidente('error_departamento', texto, { departamento: nombre });
@@ -658,6 +714,11 @@ class Orquestador extends EventEmitter {
     this.pasos++;
     await this._seguro('precios', 'controller', () => this._actualizarPrecios(ahora));
     await this._seguro('valoración', 'controller', () => this.refrescarCartera());
+    // Modo latido: el backtest de referencia de una mesa sin él (la primera
+    // vez y tras una contratación), dentro del paso: no hay fondo que lo espere.
+    if (this.opciones.latido && this.estado.mesas.some(m => !m.backtest)) {
+      await this._seguro('backtests de referencia', 'laboratorio', () => laboratorio.backtestsPendientes(this));
+    }
     await this._cadenciaDiaria(ahora);
     await this._seguro('vigilante', 'riesgos', () => this._vigilar(ahora));
     if (Object.keys(this.estado.ordenesEnVuelo).length) await this._seguro('órdenes en vuelo', 'ejecutor', () => this.ejecutor.resolverEnVuelo());
@@ -781,12 +842,44 @@ class Orquestador extends EventEmitter {
 
   async _cadenciaComite(ahora) {
     const c = this.estado.cadencias;
-    if (ahora < c.proximoComite) return;
-    const ms = this.config.cadencias.comiteHoras * HORA;
-    c.proximoComite = inicioVela(ahora, ms) + ms;
-    const celebrar = () => comite.celebrar(this, { motivo: 'programado' });
-    if (this.opciones.comiteEnSegundoPlano) this.lanzar('comité', celebrar);
-    else await this._seguro('comité', 'cio', celebrar);
+    // Modo latido: el convocado desde el panel se celebra en este paso. Si
+    // además tocaba el programado, es una sola reunión (la programada).
+    // Un comité «en curso» que viene del disco es de un latido que murió a
+    // mitad de la reunión (el vigía, un kill): no se repite (ya se pagó la
+    // llamada y se habría convocado en bucle); se dice y toca en su cadencia.
+    const cortado = this.estado.comite.enCurso;
+    if (cortado) {
+      delete this.estado.comite.enCurso;
+      this.bus.publicar({
+        de: 'cio', canal: 'comite', tipo: 'alerta', importancia: 2,
+        texto: plantillas.frase(`El comité ${cortado.motivo === 'demanda' ? 'convocado' : 'programado'} se cortó a mitad (el proceso se paró). No se repite: el próximo, en su hora o si se vuelve a convocar.`),
+        datos: { comiteCortado: cortado },
+      });
+    }
+    const pedido = this.estado.comite.pedido || null;
+    const toca = ahora >= c.proximoComite;
+    if (!toca && !pedido) return;
+    if (pedido) this.estado.comite.pedido = null;
+    if (toca) {
+      const ms = this.config.cadencias.comiteHoras * HORA;
+      c.proximoComite = inicioVela(ahora, ms) + ms;
+    }
+    const motivo = toca ? 'programado' : 'demanda';
+    const celebrar = () => comite.celebrar(this, { motivo });
+    if (this.opciones.comiteEnSegundoPlano) { this.lanzar('comité', celebrar); return; }
+    // Modo latido con LLM: antes de la llamada se guarda que el comité ya no
+    // está pendiente (pedido y próxima cita) y que está en curso. Si el
+    // proceso muere a mitad, el latido siguiente no lo vuelve a convocar.
+    const guardarAntes = this.opciones.latido && this.llm.activo;
+    if (guardarAntes) {
+      this.estado.comite.enCurso = { desde: ahora, motivo };
+      this._seguroSinc('guardar', () => this.guardar());
+    }
+    try {
+      await this._seguro('comité', 'cio', celebrar);
+    } finally {
+      if (guardarAntes) delete this.estado.comite.enCurso;
+    }
   }
 
   async _cadenciaDiaria(ahora) {
@@ -882,12 +975,20 @@ class Orquestador extends EventEmitter {
   }
 
   async detener() {
+    return this.cerrar({ guardar: true });
+  }
+
+  // Como detener(), pero sin guardar si guardar es false: tras un fallo a
+  // mitad de un latido vale el estado.json del último paso completo (en el
+  // modo latido lo usa src/latido.js). Espera igual a las tareas de fondo:
+  // ninguna puede seguir escribiendo con el cerrojo ya suelto.
+  async cerrar({ guardar = true } = {}) {
     this._deteniendo = true;
     for (const fin of [...this._pausas]) fin();
     try {
       await this._cadena;
       await this.esperarTareas();
-      this.guardar();
+      if (guardar) this.guardar();
     } finally {
       if (this._oyente) this.bus.off('mensaje', this._oyente);
       if (this._estadoProgramado) clearTimeout(this._estadoProgramado);
@@ -1008,14 +1109,19 @@ class Orquestador extends EventEmitter {
       };
     });
 
+    // Modo latido: el comité se celebra entero dentro de un paso; para que se
+    // vea en el panel, los jefes siguen en la sala hasta estado.comite.salaHasta.
+    const enSala = !bloqueado && Number.isFinite(e.comite.salaHasta) && ahora < e.comite.salaHasta;
     const agentes = this.plantilla.map(a => {
       const vis = e.agentes[a.id] || {};
       let estado = vis.estado || 'trabajando';
+      let sala = vis.sala || this._casa(a);
       if (a.mesaId) { const m = this.mesaPorId(a.mesaId); if (m && m.estado === 'banquillo') estado = 'banquillo'; }
       if (bloqueado && estado !== 'banquillo' && estado !== 'reunion') estado = 'de_pie';
+      if (enSala && JEFES.includes(a.id) && estado !== 'descanso') { sala = 'comite'; estado = 'reunion'; }
       return {
         id: a.id, nombre: a.nombre, departamento: a.departamento, rol: a.rol, queDecide: a.queDecide, usaLLM: a.usaLLM,
-        sala: vis.sala || this._casa(a), estado, bocadillo: this._bocadillo(a.id, ahora),
+        sala, estado, bocadillo: this._bocadillo(a.id, ahora),
         mesaId: a.mesaId || null, simbolo: a.simbolo || null, etiqueta: a.etiqueta || null, puestoId: a.puestoId || null,
       };
     });
@@ -1046,6 +1152,8 @@ class Orquestador extends EventEmitter {
       modo: this.modo,
       broker: this.broker.nombre,
       velocidad: this.velocidad,
+      // Modo latido (W3): el ritmo del cron, para la franja «Cifras sin actualizar».
+      ...(this.opciones.latido ? { latidoMs: this._latidoMs() } : {}),
       fondo: { nivel: e.fondo.nivel, motivo: e.fondo.motivo || null, multiplicadorCaida: e.fondo.multiplicadorCaida, factorTamano: tamano },
       cabecera: {
         patrimonio,
@@ -1058,6 +1166,7 @@ class Orquestador extends EventEmitter {
         regimen: reg ? { valor: reg.valor, detalle: reg.detalle } : { valor: 'NEUTRAL', detalle: 'Sin datos todavía' },
         miedoCodicia: e.macro.fg ? { valor: e.macro.fg.valor, etiqueta: e.macro.fg.etiqueta, sintetico: Boolean(e.macro.fg.sintetico) } : null,
         proximoComite: e.cadencias.proximoComite,
+        ...(this.opciones.latido ? { comitePedido: Boolean(e.comite.pedido) } : {}),
         modoComite: e.directivas.modo || 'NORMAL',
         sinAsignar,
         vigilancia: vig,
@@ -1098,6 +1207,13 @@ class Orquestador extends EventEmitter {
       listoParaReal: this._listoParaReal(patrimonio, ahora),
       avisos,
     };
+  }
+
+  // Cada cuánto llega una instantánea nueva en el modo latido, en ms reales:
+  // el panel avisa de «Cifras sin actualizar» a los 2,5 × latidoMs.
+  _latidoMs() {
+    if (Number.isFinite(this.opciones.latidoMs) && this.opciones.latidoMs > 0) return this.opciones.latidoMs;
+    return (this.config.cadencias && this.config.cadencias.latidoMs) || 60_000;
   }
 
   // Semáforo «¿Listo para dinero real?» (§5.8, §7). Solo informa: no activa nada.
@@ -1225,12 +1341,15 @@ class Orquestador extends EventEmitter {
   // ---------- Comandos (§7) ----------
   // Devuelven { ok, mensaje, datos? } y, si hace falta otro código HTTP, `codigo`.
 
-  async comando(nombre, datos) {
+  // `interno` NO sale nunca del cuerpo de una petición: lo pone quien llama
+  // desde el propio servidor. Hoy solo { interpretacion } del Megáfono
+  // interpretado fuera del cerrojo (modo web, ARQUITECTURA-WEB W3).
+  async comando(nombre, datos, interno = {}) {
     const d = datos && typeof datos === 'object' ? datos : {};
     let r;
     switch (nombre) {
       case 'comite': r = this._cmdComite(); break;
-      case 'megafono': r = await this._cmdMegafono(d); break;
+      case 'megafono': r = await this._cmdMegafono(d, interno && interno.interpretacion); break;
       case 'megafono-aplicar': r = this._cmdMegafonoAplicar(d); break;
       case 'prueba': r = await this._cmdPrueba(d); break;
       case 'pausar': r = this._cmdPausar(); break;
@@ -1247,20 +1366,28 @@ class Orquestador extends EventEmitter {
 
   _cmdComite() {
     if (this.comiteEnCurso) return { ok: false, mensaje: 'Ya hay un comité reunido.' };
+    // Modo latido: queda pedido en el estado y se celebra en el paso siguiente.
+    if (this.opciones.latido) {
+      if (this.estado.comite.pedido) return { ok: true, mensaje: 'Ya estaba convocado: empieza en el próximo latido.' };
+      this.estado.comite.pedido = { t: this.reloj.ahora(), motivo: 'demanda' };
+      return { ok: true, mensaje: 'Convocado: empieza en el próximo latido.' };
+    }
     this.lanzar('comité', () => comite.celebrar(this, { motivo: 'demanda' }));
     return { ok: true, mensaje: 'Comité convocado: los jefes van a la sala.' };
   }
 
-  async _cmdMegafono(d) {
+  async _cmdMegafono(d, interpretacion = null) {
     const texto = typeof d.texto === 'string' ? d.texto.trim().slice(0, 500) : '';
     if (!texto) return { ok: false, mensaje: 'Escribe qué quieres que haga la mesa.' };
     const ahora = this.reloj.ahora();
     this.bus.publicar({ de: 'humano', canal: 'megafono', tipo: 'megafono', texto: `«${texto}»`, datos: { texto }, importancia: 3 });
     // Sin duración escrita, la orden dura hasta el comité siguiente (COMITE_HORAS).
-    const r = await megafono.interpretar(texto, {
-      llm: this.llm, universo: this.universo, mesas: this.estado.mesas, directivas: this.estado.directivas, ahora,
-      horasPorDefecto: this.config.cadencias.comiteHoras,
-    });
+    // Interpretada fuera (web): no se vuelve a llamar al LLM, pero cada
+    // directiva pasa otra vez por las reglas contra el estado de ahora.
+    const ctx = { universo: this.universo, mesas: this.estado.mesas, directivas: this.estado.directivas, ahora };
+    const r = interpretacion && typeof interpretacion === 'object'
+      ? megafono.revalidar(interpretacion, { ...ctx, texto })
+      : await megafono.interpretar(texto, { llm: this.llm, ...ctx, horasPorDefecto: this.config.cadencias.comiteHoras });
     this.estado.contadores.megafono = (this.estado.contadores.megafono || 0) + 1;
     const propuesta = { id: `mf-${ahora.toString(36)}-${this.estado.contadores.megafono}`, texto, directivas: r.directivas, explicacion: r.explicacion, fuente: r.fuente };
     this.estado.megafonoPendiente = propuesta;

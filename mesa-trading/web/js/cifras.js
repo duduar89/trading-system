@@ -415,14 +415,20 @@
   // llegaron las últimas instantáneas. Límite: 2,5 veces el intervalo típico
   // (mediana; los de menos de 1 s son la instantánea doble de conectar), nunca
   // menos de 20 s; sin historia suficiente se supone un latido de 60 s.
-  function datosParados(llegadas, ahoraMs) {
+  // Con `latidoMs` (modo web: la instantánea declara su ritmo, un latido del
+  // cron por minuto) el límite es 2,5 × latidoMs, sin adivinar por las llegadas.
+  function datosParados(llegadas, ahoraMs, latidoMs) {
     const l = Array.isArray(llegadas) ? llegadas : [];
     if (!l.length || !valido(ahoraMs)) return { parado: false, pasadoMs: null, limiteMs: null };
-    const intervalos = [];
-    for (let k = 1; k < l.length; k++) { const d = l[k] - l[k - 1]; if (d >= 1000) intervalos.push(d); }
-    intervalos.sort((a, b) => a - b);
-    const tipico = intervalos.length >= 2 ? intervalos[Math.floor(intervalos.length / 2)] : 60000;
-    const limiteMs = Math.max(20000, 2.5 * tipico);
+    let limiteMs;
+    if (valido(latidoMs) && latidoMs > 0) limiteMs = Math.max(20000, 2.5 * latidoMs);
+    else {
+      const intervalos = [];
+      for (let k = 1; k < l.length; k++) { const d = l[k] - l[k - 1]; if (d >= 1000) intervalos.push(d); }
+      intervalos.sort((a, b) => a - b);
+      const tipico = intervalos.length >= 2 ? intervalos[Math.floor(intervalos.length / 2)] : 60000;
+      limiteMs = Math.max(20000, 2.5 * tipico);
+    }
     const pasadoMs = ahoraMs - l[l.length - 1];
     return { parado: pasadoMs > limiteMs, pasadoMs, limiteMs };
   }

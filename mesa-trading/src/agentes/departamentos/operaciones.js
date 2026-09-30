@@ -63,7 +63,19 @@ class Ejecutor {
     this.activos = new Map();       // simbolo → activo() del bróker (incrementos)
     this.usados = new Set();        // idCliente ya usados (no se repiten nunca)
     this.ruta = path.join(ctx.carpeta, 'ordenes.jsonl');
-    for (const r of leerJSONL(this.ruta)) if (r && r.idCliente) this.usados.add(r.idCliente);
+    this._intenciones = [];         // { t, mesaId } de cada orden propia enviada (ritmo de órdenes)
+    for (const r of leerJSONL(this.ruta)) {
+      if (!r || !r.idCliente) continue;
+      this.usados.add(r.idCliente);
+      if (r.estado === 'INTENCION' && !r.ajena && r.mesaId !== 'sombra' && Number.isFinite(r.t)) this._intenciones.push({ t: r.t, mesaId: r.mesaId });
+    }
+  }
+
+  // Las órdenes enviadas desde `desde` (exclusive), como las apunta _ejecutar
+  // en ctx.registroOrdenes: el modo latido reconstruye así el ritmo de
+  // órdenes por minuto y por mesa y hora en cada proceso.
+  ordenesRecientes(desde) {
+    return this._intenciones.filter(o => o.t > desde).map(o => ({ ...o }));
   }
 
   _registrar(reg) {
@@ -359,7 +371,8 @@ class Ejecutor {
       cantidad: orden.cantidad ?? null, nocional: orden.nocional ?? null, reparto, cierraTodo: true, idCliente, ...extra,
     };
     this.usados.add(idCliente);
-    this._registrar({ estado: 'INTENCION', ...registro });
+    // ajena: no la mandó el fondo, no cuenta para el ritmo de órdenes (ordenesRecientes).
+    this._registrar({ estado: 'INTENCION', ajena: true, ...registro });
     this._registrar({ estado: 'ENVIADA', idCliente, id: orden.id });
     ctx.estado.ordenesEnVuelo[idCliente] = { ...registro, enviadaT: ctx.reloj.ahora() };
     return this._resolver(idCliente, orden);

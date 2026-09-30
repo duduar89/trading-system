@@ -299,3 +299,25 @@ test('comité con LLM: si los votos cambian durante la reunión, su decisión (t
   assert.equal(o.estado.directivas.activosVetados.filter(v => v.origen === 'comite' && v.simbolo === 'SOL/USD').length, 0);
   await o.detener();
 });
+
+test('Megáfono con la interpretación hecha fuera (web): no vuelve a llamar al LLM y revalida contra el estado', async () => {
+  const { orquestador: o } = await crearOrquestador();
+  let llamadas = 0;
+  const original = megafono.interpretar;
+  megafono.interpretar = async (...a) => { llamadas++; return original(...a); };
+  try {
+    const fuera = { directivas: [{ tipo: 'pausar_activo', simbolo: 'SOL/USD', horas: 24 }, { tipo: 'reducir_riesgo', factor: 0, horas: 4 }], explicacion: 'Pauso SOL y bajo todo a cero.', fuente: 'llm' };
+    const r = await o.comando('megafono', { texto: 'pausa SOL 24 h' }, { interpretacion: fuera });
+    assert.equal(r.ok, true);
+    assert.equal(llamadas, 0, 'con la interpretación de fuera no se interpreta otra vez');
+    assert.deepEqual(o.estado.megafonoPendiente.directivas, [{ tipo: 'pausar_activo', simbolo: 'SOL/USD', horas: 24 }]);
+    assert.notEqual(o.estado.megafonoPendiente.explicacion, fuera.explicacion);
+    // Sin canal interno, una «interpretacion» entre los datos (lo que manda un navegador) no cuenta.
+    const r2 = await o.comando('megafono', { texto: 'pausa DOGE 2 h', interpretacion: { directivas: [{ tipo: 'solo_cerrar', horas: 72 }] } });
+    assert.equal(r2.ok, true);
+    assert.equal(llamadas, 1);
+    assert.deepEqual(o.estado.megafonoPendiente.directivas.map(d => d.tipo), ['pausar_activo']);
+  } finally {
+    megafono.interpretar = original;
+  }
+});

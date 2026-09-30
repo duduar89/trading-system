@@ -7,6 +7,7 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 const { anadirJSONL, leerJSONL } = require('../util/almacen');
+const { crearReservas } = require('./reservas-llm');
 const { RelojReal, diaUTC, DIA } = require('../util/reloj');
 const log = require('../util/log').crear('llm');
 
@@ -42,6 +43,12 @@ const DESTINOS_SALVAVIDAS = Object.freeze(['claude-opus-5', 'claude-opus-4-8']);
 // intento cortado puede haberse cobrado igual.
 const REINTENTOS = 1;
 const timeoutPara = maxTokens => Math.min(600_000, Math.max(60_000, maxTokens * 40));
+// Con un plazo (el modo latido: el proceso tiene un vigía que lo mata), una
+// llamada que no tendría al menos esto para responder no se hace.
+const MIN_LLAMADA_MS = 15_000;
+// Margen tras el timeout total de una llamada para dar su reserva por
+// huérfana (los reintentos del SDK esperan unos segundos entre intento e intento).
+const MARGEN_VENCE_MS = 60_000;
 // Días de gasto que se guardan en memoria para gastoDelDia/gastoEntre.
 const DIAS_HISTORIAL = 8;
 
@@ -242,10 +249,22 @@ function reservaMaxima(p) {
 
 const SISTEMA_POR_DEFECTO = 'Eres un agente de una mesa de trading en papel. Respondes solo con el JSON pedido, en español.';
 
+// Opciones de tiempo (el modo latido, ARQUITECTURA-WEB W2):
+// - limiteLlamadaMs: tope del timeout de cada intento (el del comité es 45 s).
+// - reintentos: reintentos del SDK (0 en el latido: cada intento cortado se
+//   cobra y el tiempo no da para dos).
+// - plazo(): instante (ms, Date.now()) en que todo el LLM de este proceso
+//   tiene que haber acabado; el timeout de cada llamada se recorta para caber
+//   y, si no queda MIN_LLAMADA_MS, la llamada no se hace.
+// Con rutaCostes, las reservas contra el tope diario se comparten entre
+// procesos por disco (src/agentes/reservas-llm.js).
 function crearLLM({
   apiKey = '', modeloComite = 'claude-opus-5-5', modeloAgentes = 'claude-opus-5-5', presupuestoDiaUsd = 2,
   reloj = new RelojReal(), rutaCostes = null, cliente = null, fetch = undefined,
+  limiteLlamadaMs = null, reintentos = REINTENTOS, plazo = null,
 } = {}) {
+  const numReintentos = Number.isInteger(reintentos) && reintentos >= 0 ? reintentos : REINTENTOS;
+  const reservas = rutaCostes ? crearReservas({ rutaCostes }) : null;
   const hayClave = Boolean(apiKey) || Boolean(cliente);
   let desactivadoPor401 = false;
   let api = cliente;
@@ -273,6 +292,10 @@ function crearLLM({
   // Todo lo gastado desde que existe la carpeta de datos (el criterio g del
   // semáforo «¿Listo para dinero real?» lo compara con el beneficio del fondo).
   let gastoTotalUsd = 0;
+  // Llamadas de un proceso que murió a mitad: al registro antes de leerlo.
+  if (reservas) {
+    for (const x of reservas.saldarSiSePuede()) log.aviso(`llamada huérfana (${x.proposito}) apuntada como gastada: ${x.costeUsd.toFixed(4)} $ estimados`);
+  }
   // Tras un reinicio, el gasto del día sale del registro: si no, cada arranque
   // regalaría otro presupuesto entero. Se lee entero por el acumulado.
   if (rutaCostes) {
@@ -337,22 +360,61 @@ function crearLLM({
     const esq = esquema || { type: 'object' };
 
     alDia();
+    // Tiempo: el timeout por intento, recortado al tope y al plazo del proceso.
+    let timeout = timeoutPara(tope);
+    if (Number.isFinite(limiteLlamadaMs) && limiteLlamadaMs > 0) timeout = Math.min(timeout, limiteLlamadaMs);
+    const hasta = typeof plazo === 'function' ? plazo() : null;
+    if (Number.isFinite(hasta)) {
+      const queda = hasta - Date.now();
+      if (queda < MIN_LLAMADA_MS) {
+        return { ok: false, motivo: 'error', detalle: `Sin tiempo para llamar al LLM en este latido (quedan ${Math.max(0, Math.round(queda / 1000))} s): se usa la plantilla.` };
+      }
+      timeout = Math.min(timeout, Math.floor(queda / (1 + numReintentos)));
+    }
     // Con salvavidas se reserva también el intento del modelo de reserva: si
     // no, una llamada que cabe podría acabar costando más que el tope.
     const estimado = reservaMaxima({ modelo, sistema: textoSistema, contenido, esquema: esq, maxTokens: tope });
-    if (cuenta.gastoUsd + reservado + estimado > presupuesto) {
-      return {
-        ok: false,
-        motivo: 'presupuesto',
-        detalle: `Tope diario: gastado ${cuenta.gastoUsd.toFixed(4)} $ + esta llamada hasta ${estimado.toFixed(4)} $ > ${presupuesto} $.`,
-      };
+    const t = ahoraGasto();
+    const textoTope = (gastado, enVuelo) => `Tope diario: gastado ${gastado.toFixed(4)} $${enVuelo > 0 ? ` + en vuelo ${enVuelo.toFixed(4)} $` : ''} + esta llamada hasta ${estimado.toFixed(4)} $ > ${presupuesto} $.`;
+    let idReserva = null;
+    if (reservas) {
+      // Mirar el tope y reservar, a la vez para todos los procesos.
+      let r;
+      try {
+        r = await reservas.reservar({
+          t, costeUsd: estimado, intentos: 1 + numReintentos, vence: Date.now() + timeout * (1 + numReintentos) + MARGEN_VENCE_MS,
+          proposito, modelo, presupuesto, gastoMemoria: cuenta.gastoUsd,
+        });
+      } catch (e) {
+        return { ok: false, motivo: 'error', detalle: `No se pudo reservar el gasto del LLM: ${e.message}` };
+      }
+      for (const x of r.saldados) {
+        log.aviso(`llamada huérfana (${x.proposito}) apuntada como gastada: ${x.costeUsd.toFixed(4)} $ estimados`);
+        if (diaUTC(x.t) === cuenta.dia) { cuenta.gastoUsd += x.costeUsd; cuenta.llamadas += 1; }
+        anotarGasto(x.t, x.costeUsd);
+      }
+      if (!r.ok) return { ok: false, motivo: 'presupuesto', detalle: textoTope(r.gastado, r.reservado) };
+      idReserva = r.id;
+    } else if (cuenta.gastoUsd + reservado + estimado > presupuesto) {
+      return { ok: false, motivo: 'presupuesto', detalle: textoTope(cuenta.gastoUsd, reservado) };
     }
 
     const { via, cuerpo } = construirPeticion({ modelo, maxTokens: tope, esfuerzo: nivel, sistema: textoSistema, contenido, esquema: esq });
-    const opcionesPeticion = { timeout: timeoutPara(tope), maxRetries: REINTENTOS };
+    const opcionesPeticion = { timeout, maxRetries: numReintentos };
     reservado += estimado;
-    const t = ahoraGasto();
     const inicio = Date.now();
+    // Apunta el coste (y, con reservas en disco, cierra la reserva a la vez).
+    const apuntarYCerrar = async (registro) => {
+      if (!idReserva) { apuntar(registro); return; }
+      try {
+        await reservas.cerrar(idReserva, registro);
+      } catch (e) {
+        // Sin el cerrojo: se apunta igual; la reserva la saldará otro como
+        // huérfana (cuenta de más, nunca de menos).
+        log.aviso(`reserva del LLM sin cerrar: ${e.message}`);
+        apuntar(registro);
+      }
+    };
     let respuesta;
     try {
       respuesta = via === 'beta' ? await api.beta.messages.create(cuerpo, opcionesPeticion) : await api.messages.create(cuerpo, opcionesPeticion);
@@ -371,12 +433,12 @@ function crearLLM({
       // como estimado. El resto de errores (401, 429, 5xx, sin conexión) no
       // llegan a generar y cuentan 0.
       const cortada = e instanceof Anthropic.APIConnectionTimeoutError;
-      const coste = cortada ? estimado * (1 + REINTENTOS) : 0;
+      const coste = cortada ? estimado * (1 + numReintentos) : 0;
       alDia();
       cuenta.gastoUsd += coste;
       cuenta.llamadas += 1;
       anotarGasto(t, coste);
-      apuntar({
+      await apuntarYCerrar({
         t, proposito, modelo, entrada: 0, salida: 0, cacheLectura: 0, cacheEscritura: 0, costeUsd: coste, ok: false, motivo: 'error', ms: Date.now() - inicio,
         ...(cortada ? { estimado: true } : {}),
       });
@@ -392,7 +454,7 @@ function crearLLM({
     anotarGasto(t, costeUsd);
 
     const resultado = interpretarRespuesta(respuesta, esq);
-    apuntar({
+    await apuntarYCerrar({
       t, proposito, modelo: modeloServido, entrada: tokens.entrada, salida: tokens.salida,
       cacheLectura: tokens.cacheLectura, cacheEscritura: tokens.cacheEscritura, costeUsd,
       ok: resultado.ok, motivo: resultado.ok ? null : resultado.motivo, ms,
@@ -492,6 +554,7 @@ module.exports = {
   reservaSalvavidas,
   reservaMaxima,
   timeoutPara,
+  MIN_LLAMADA_MS,
   validarEsquema,
   esquemaParaApi,
   interpretarRespuesta,

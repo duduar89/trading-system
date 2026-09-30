@@ -1,0 +1,81 @@
+/* Login y página sin conexión de la mesa: los mismos colores y la misma letra
+   que el panel (css/estilo.css), en una tarjeta centrada. */
+:root {
+  --fondo: #0f1424;
+  --panel: #151b2e;
+  --panel-2: #1a2138;
+  --borde: #232b45;
+  --borde-2: #2e3858;
+  --texto: #e6e9f2;
+  --secundario: #8a93b0;
+  --negativo: #ef4444;
+  --azul: #3b82f6;
+  --fuente: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; margin: 0; }
+body.acceso {
+  min-height: 100dvh;
+  display: grid; place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(59, 130, 246, .16), transparent 60%),
+    var(--fondo);
+  color: var(--texto);
+  font: 15px/1.45 var(--fuente);
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+.tarjeta-acceso {
+  width: min(380px, 100%);
+  padding: 28px 24px 22px;
+  border: 1px solid var(--borde-2);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .45);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.marca-acceso svg { width: 44px; height: 44px; display: block; }
+.tarjeta-acceso h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+.texto-acceso { margin: 0; color: #c1c8dc; font-size: 14px; }
+.formulario-acceso { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.campo-acceso { display: flex; flex-direction: column; gap: 6px; }
+.campo-acceso span { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--secundario); }
+.campo-acceso input {
+  width: 100%;
+  height: 44px; padding: 0 12px;
+  border-radius: 10px; border: 1px solid var(--borde-2);
+  background: var(--panel-2); color: var(--texto);
+  font: inherit; font-size: 16px;   /* 16 px: iOS no hace zoom al enfocar */
+}
+.campo-acceso input:focus { border-color: #60a5fa; outline: none; box-shadow: 0 0 0 3px rgba(96, 165, 250, .25); }
+.error-acceso {
+  margin: 0; padding: 9px 11px;
+  border-radius: 10px; border: 1px solid rgba(239, 68, 68, .6);
+  background: rgba(185, 28, 28, .18); color: #fecaca; font-size: 14px;
+}
+.boton-acceso {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 44px; padding: 0 16px; margin-top: 4px;
+  border-radius: 10px; border: 1px solid var(--azul);
+  background: var(--azul); color: #fff;
+  font: inherit; font-weight: 650; text-decoration: none; cursor: pointer;
+  transition: background .12s, transform .06s;
+}
+.boton-acceso:hover { background: #2563eb; }
+.boton-acceso:active { transform: translateY(1px); }
+.boton-acceso:disabled { opacity: .6; cursor: progress; transform: none; }
+.pie-acceso { margin: 4px 0 0; color: var(--secundario); font-size: 12.5px; text-align: center; }
+.pista-ios {
+  position: fixed; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom));
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; border-radius: 14px;
+  border: 1px solid var(--borde-2); background: #1a2138f2; color: var(--texto);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .5); font-size: 14px;
+}
+.pista-ios[hidden] { display: none; }
+.pista-ios p { margin: 0; flex: 1; }
+.icono-compartir { width: 18px; height: 18px; vertical-align: -3px; fill: none; stroke: #60a5fa; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cerrar-pista { flex: none; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--borde-2); background: var(--panel-2); color: #c7cde0; font-size: 18px; line-height: 1; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
