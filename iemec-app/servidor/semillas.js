@@ -25,6 +25,18 @@ const OFERTAS = [
   { codigo: 'por-fases', nombre: 'Plan por fases', tipo: 'alternativa', texto_paciente: 'Podemos plantearlo por fases, empezando por lo que más te preocupa, y seguir a tu ritmo.', requiere_aprobacion: true },
 ];
 
+// Dónde se hace cada cosa mientras la clínica no diga otra cosa (lo cambia en el panel).
+const APARATO_EN_SALA = { 'laser-fotona': 'cabina-laser', ipl: 'cabina-laser', hifu: 'cabina-laser', plexr: 'cabina-laser', lipolaser: 'cabina-laser', evo: 'cabina-corporal', oxigenoterapia: 'cabina-facial', 'neuroline-t6': 'consulta-2' };
+const SALA_POR_TIPO = { head_spa: ['head-spa'], sala_capilar: ['sala-capilar'], cabina_aparatologia: ['cabina-laser'], consulta_medica: ['consulta-1', 'consulta-2'] };
+
+function salasPorDefecto(x, equipoSala = {}) {
+  if (x.salas?.length) return x.salas;
+  // Si necesita un aparato fijo, va donde está el aparato.
+  if (x.equipo_codigo && equipoSala[x.equipo_codigo]) return [equipoSala[x.equipo_codigo]];
+  if (x.sala_tipo === 'cabina_estetica') return [x.familia === 'corporal' ? 'cabina-corporal' : 'cabina-facial'];
+  return SALA_POR_TIPO[x.sala_tipo] || [];
+}
+
 async function semillar(pool, { demo = false, log = () => {} } = {}) {
   const c = leer('clinica.json');
   const e = leer('equipo.json');
@@ -80,6 +92,25 @@ async function semillar(pool, { demo = false, log = () => {} } = {}) {
                ON DUPLICATE KEY UPDATE ${cols.filter((k) => k !== 'id').map((k) => `${k} = IF(validado_clinica, ${k}, VALUES(${k}))`).join(', ')}`,
       cols.map((k) => fila[k]));
     }
+    // Aparatos fijos: viven en su cabina (el motor solo ofrece esa cabina para lo que los usa).
+    for (const eq of t.aparatos || []) {
+      const sala = eq.sala || (!eq.movil && APARATO_EN_SALA[eq.codigo]);
+      if (sala) await q('UPDATE equipos SET sala_id = (SELECT id FROM salas WHERE codigo = ?) WHERE codigo = ? AND sala_id IS NULL', [sala, eq.codigo]);
+    }
+    // Sala concreta por tratamiento. Solo si todavía no tiene: lo que marque la clínica en el panel manda.
+    const [salasBd] = await q('SELECT id, codigo FROM salas');
+    const idSala = Object.fromEntries(salasBd.map((s) => [s.codigo, s.id]));
+    const [yaAsignados] = await q('SELECT DISTINCT tratamiento_id FROM tratamiento_salas');
+    const conSalas = new Set(yaAsignados.map((r) => r.tratamiento_id));
+    const equipoSala = Object.fromEntries((t.aparatos || []).map((eq) => [eq.codigo, eq.sala || (!eq.movil && APARATO_EN_SALA[eq.codigo]) || null]));
+    let asignados = 0;
+    for (const x of t.tratamientos) {
+      if (conSalas.has(x.id)) continue;
+      const salas = salasPorDefecto(x, equipoSala).map((c) => idSala[c]).filter(Boolean);
+      for (const s of salas) await q('INSERT IGNORE INTO tratamiento_salas (tratamiento_id, sala_id) VALUES (?, ?)', [x.id, s]);
+      if (salas.length) asignados++;
+    }
+    log(`${asignados} tratamientos con su sala asignada (editable en «Cabinas y tratamientos»)`);
     for (const f of t.faqs || []) {
       await q('INSERT INTO respuestas_aprobadas (tratamiento_id, pregunta, respuesta, fuente_url) SELECT ?, ?, ?, ? FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM respuestas_aprobadas WHERE pregunta = ? AND tratamiento_id <=> ?)',
         [f.tratamiento_id || null, f.pregunta.slice(0, 255), f.respuesta.slice(0, 800), f.url || null, f.pregunta.slice(0, 255), f.tratamiento_id || null]);
@@ -99,4 +130,4 @@ async function semillar(pool, { demo = false, log = () => {} } = {}) {
   log(`${BIBLIOTECA.length} plantillas${demo ? ' (aprobadas, demo)' : ' (borrador)'} y ${OFERTAS.length} ofertas propuestas`);
 }
 
-module.exports = { semillar, FAMILIAS };
+module.exports = { semillar, FAMILIAS, salasPorDefecto };

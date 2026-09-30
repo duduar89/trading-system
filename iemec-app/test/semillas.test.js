@@ -39,3 +39,46 @@ test('las semillas de la clínica cargan y se pueden repetir sin duplicar', asyn
     await pool.end();
   }
 });
+
+test('cada tratamiento tiene su sala concreta y el motor solo ofrece esa', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  try {
+    await semillar(pool);
+    const [trats] = await pool.query('SELECT t.id, t.nombre, t.familia, t.equipo_codigo, t.rol_profesional FROM tratamientos t WHERE t.activo AND t.reservable_ia AND t.sala_tipo IS NOT NULL');
+    const [pares] = await pool.query('SELECT ts.tratamiento_id, s.codigo FROM tratamiento_salas ts JOIN salas s ON s.id = ts.sala_id');
+    const salasDe = new Map();
+    for (const p of pares) (salasDe.get(p.tratamiento_id) || salasDe.set(p.tratamiento_id, []).get(p.tratamiento_id)).push(p.codigo);
+    const sinSala = trats.filter((x) => !salasDe.has(x.id));
+    assert.deepEqual(sinSala.map((x) => x.nombre), [], 'todos los tratamientos reservables tienen sala asignada');
+
+    // Con todos los profesionales trabajando un martes normal, cada tratamiento tiene huecos… y solo en su sala.
+    for (const d of [1, 2, 3, 4, 5]) await pool.query("INSERT INTO profesional_horarios (profesional_id, dia_semana, inicio, fin) SELECT id, ?, '11:00', '20:00' FROM profesionales", [d]);
+    const [salas] = await pool.query('SELECT id, codigo FROM salas');
+    const codigo = Object.fromEntries(salas.map((s) => [s.id, s.codigo]));
+    const sinHueco = [];
+    for (const x of trats) {
+      const h = await agenda.huecos(pool, { fecha: '2026-10-06', tratamientoId: x.id, ahora: new Date('2026-09-29T08:00:00Z') });
+      if (!h.length) { sinHueco.push(x.nombre); continue; }
+      for (const hu of h) assert.ok(salasDe.get(x.id).includes(codigo[hu.salaId]), `${x.nombre} se ha ofrecido en ${codigo[hu.salaId]}`);
+    }
+    assert.deepEqual(sinHueco, [], 'ningún tratamiento reservable se queda sin huecos por falta de sala, aparato o profesional');
+
+    // Fijar un tratamiento a UNA sala concreta: aunque la otra consulta esté libre, solo se ofrece esa.
+    const medico = trats.find((x) => salasDe.get(x.id).length === 2);
+    if (medico) {
+      const c2 = salas.find((s) => s.codigo === 'consulta-2').id;
+      await pool.query('DELETE FROM tratamiento_salas WHERE tratamiento_id = ?', [medico.id]);
+      await pool.query('INSERT INTO tratamiento_salas (tratamiento_id, sala_id) VALUES (?, ?)', [medico.id, c2]);
+      const h = await agenda.huecos(pool, { fecha: '2026-10-06', tratamientoId: medico.id, ahora: new Date('2026-09-29T08:00:00Z') });
+      assert.ok(h.length > 0);
+      assert.ok(h.every((x) => x.salaId === c2), 'solo en la consulta 2');
+      // Y volver a sembrar no pisa lo que la clínica cambió.
+      await semillar(pool);
+      const [[n]] = await pool.query('SELECT COUNT(*) AS n FROM tratamiento_salas WHERE tratamiento_id = ?', [medico.id]);
+      assert.equal(Number(n.n), 1);
+    }
+  } finally {
+    await pool.end();
+  }
+});
