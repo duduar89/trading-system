@@ -14,9 +14,40 @@ const repesca = require('./repesca/motor');
 const resenas = require('./resenas');
 const avisos = require('./avisos-cita');
 const espera = require('./avisos-espera');
+const fichaGoogle = require('./ficha-google');
+const posiciones = require('./posiciones');
 const { crearIa } = require('./integraciones/ia');
 const { crearWhatsApp } = require('./integraciones/whatsapp');
 const T = require('../motor/tiempo');
+
+// Google (avisos, reseñas, ficha y métricas) y DataForSEO (posiciones en Maps): llamadas lentas a
+// fuera, con su propio candado para no hacer esperar a lo de cada minuto. Solo en modo real y con
+// credenciales (servidor/ficha-google.js y servidor/posiciones.js): si falta algo, lo dice el informe
+// y lo demás sigue. Lo guardado de la API de Google que pasa de plazo se borra en cualquier modo.
+// El candado dura 5 minutos (una vuelta lenta, con reintentos, no se pisa con la del minuto
+// siguiente) y se suelta al terminar.
+const CANDADO_EXTERNOS_MS = 5 * 60000;
+
+async function externos(d, ahora) {
+  const informe = {};
+  const purgadas = await fichaGoogle.purgarCadaDia(d.pool, ahora);
+  if (purgadas) informe.googlePurgadas = purgadas;
+  const activos = [['google', fichaGoogle], ['posiciones', posiciones]].filter(([, m]) => m.activo(d));
+  if (!activos.length) return informe;
+  const r = await cola.conCandado(d.pool, 'cron-google', CANDADO_EXTERNOS_MS, async () => {
+    const hecho = {};
+    for (const [nombre, m] of activos) {
+      try {
+        const x = await m.vuelta(d, { ahora });
+        if (x) hecho[nombre] = x;
+      } catch (err) {
+        hecho[nombre] = { error: String(err.message).slice(0, 300) };
+      }
+    }
+    return hecho;
+  }, { ahora });
+  return r.ejecutado ? Object.assign(informe, r.resultado) : informe;
+}
 
 async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}) {
   const d = deps || { pool, ia: crearIa(config.modos.ia), whatsapp: crearWhatsApp(config.modos.whatsapp) };
@@ -63,10 +94,11 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
       await pool.query("DELETE FROM candados WHERE nombre LIKE 'diario-%' AND hasta < ?", [ahora]);
     });
   }
+  Object.assign(informe, await externos(d, ahora));
   return informe;
 }
 
-module.exports = { vuelta };
+module.exports = { vuelta, externos };
 
 if (require.main === module) {
   vuelta()
