@@ -288,6 +288,13 @@ test('«Tu cita»: la página según el estado, el .ics y «Añadir al calendari
         assert.doesNotMatch(otraVez.html, /No se ha podido/);
         const [[una]] = await pool.query("SELECT COUNT(*) AS n FROM eventos WHERE tipo = 'cita_cancelada' AND entidad_id = ?", [String(c.id)]);
         assert.equal(una.n, 1, 'se cancela una vez');
+        // Dos toques a la vez: uno la cancela y el otro se encuentra que ya lo está; los dos, sin error.
+        const d = await reservar('2026-10-13', '12:00');
+        for (const x of await Promise.all([1, 2].map(() => tocar(`/c/${d.token}/cancelar`)))) {
+          assert.equal(x.destino, `/c/${d.token}?hecho=cancelada`);
+          assert.match(x.html, /Cita cancelada\. Cuando quieras, te buscamos otro hueco por WhatsApp\./);
+          assert.doesNotMatch(x.html, /No se ha podido/);
+        }
         // «hecho» solo cuenta lo que de verdad ha pasado: en una cita que sigue en pie, nada.
         assert.doesNotMatch(await pagina(`/c/${cita.token}?hecho=cancelada`), /Cita cancelada/);
         assert.doesNotMatch(await pagina(`/c/${c.token}?hecho=confirmada`), /Cita confirmada/);
