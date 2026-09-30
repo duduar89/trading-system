@@ -112,7 +112,7 @@ test('lista de espera: el hueco que se libera, al primero que encaja', async (t)
       assert.equal(c.estado, 'confirmada');
       assert.ok(c.aviso_confirmacion_en, 'no se le repite la confirmación por plantilla');
       assert.match(r.respuesta, /^Soy el asistente virtual de IEMEC\. ¡Hecho, Ana! Te esperamos el miércoles 21 de octubre a las 17:00 en IEMEC/);
-      assert.ok(r.respuesta.endsWith(`/c/${c.token}`));
+      assert.ok(r.respuesta.endsWith(`/c/${agenda.tokenDe(c)}`), 'el último enlace es el de su página');
       assert.equal((await entrada(pool, ana.id)).estado, 'aceptado');
       assert.equal((await ofertasDe(pool, ana.id))[0].estado, 'aceptada');
       const [[conv]] = await pool.query('SELECT estado, motivo_cierre FROM conversaciones WHERE id = ?', [r.conversacionId]);
@@ -255,7 +255,7 @@ test('lista de espera: adelantar la cita, alta por WhatsApp y baja', async (t) =
       const r = await R.procesarEntrante(deps, { telefono: '+34611000501', texto: 'Sí, porfa', ahora: mas(lunes, 10) });
       assert.equal(r.listaEspera, 'aceptada');
       assert.equal(r.reprograma, f.cita.id);
-      assert.match(r.respuesta, /¡Hecho, Fabi! Te he cambiado la cita: te esperamos el martes 27 de octubre a las 12:00 en IEMEC .+ La del viernes 30 de octubre a las 12:00 queda anulada\./);
+      assert.match(r.respuesta, /¡Hecho, Fabi! Te he cambiado la cita: te esperamos el martes 27 de octubre a las 12:00 en IEMEC .+ La del viernes 30 de octubre a las 12:00 queda anulada: si la tenías en tu calendario, bórrala\./);
       const vieja = await cita(pool, f.cita.id);
       assert.deepEqual([vieja.estado, vieja.reprograma_a_id, vieja.secuencia_ics], ['reprogramada', r.citaId, 1]);
       assert.equal((await cita(pool, r.citaId)).estado, 'confirmada');
@@ -558,7 +558,7 @@ test('lista de espera: su cita solo se adelanta si se apuntó para eso, y dicié
       const r2 = await R.procesarEntrante(deps, { telefono: '+34611000813', texto: 'Sí', ahora: mas(lunes, 27) });
       assert.equal(r2.listaEspera, 'aceptada');
       assert.equal(r2.reprograma, fabi.cita.id);
-      assert.match(r2.respuesta, /Te he cambiado la cita: te esperamos el miércoles 28 de octubre a las 12:00 .+ La del viernes 30 de octubre a las 17:00 queda anulada\./);
+      assert.match(r2.respuesta, /Te he cambiado la cita: te esperamos el miércoles 28 de octubre a las 12:00 .+ La del viernes 30 de octubre a las 17:00 queda anulada: si la tenías en tu calendario, bórrala\./);
       assert.equal((await cita(pool, fabi.cita.id)).estado, 'reprogramada');
     });
 

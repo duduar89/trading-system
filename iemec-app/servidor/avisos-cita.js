@@ -1,16 +1,23 @@
 'use strict';
-// Avisos de cita al paciente por WhatsApp, con el enlace «Tu cita» para añadirla al calendario:
+// Avisos de cita al paciente por WhatsApp:
 //
 //   confirmación   al reservar desde recepción, teléfono o la web (la que reserva la IA ya la
-//                  confirma en la propia conversación)
-//   víspera        el día antes, desde las 10:00, con «¿Nos lo confirmas?»
-//   2 horas antes  un recordatorio corto (desde las 9:00)
+//                  confirma en la propia conversación). Con el mapa de la sede y dos botones:
+//                  «Añadir al calendario» (/cal/…, un toque) y «Ver mi cita» (/c/…). Si la cita
+//                  sustituye a otra (recepción le aceptó un hueco de la lista de espera), «tu cita
+//                  ha cambiado: borra la anterior de tu calendario» (en el calendario es otro evento)
+//   víspera        el día antes, desde las 10:00, «¿Nos confirmas que vienes?» con dos respuestas
+//                  rápidas («Sí, allí estaré» / «Necesito cambiarla»), que entiende la repesca
+//   2 horas antes  un recordatorio corto con el mapa de la sede y «Ver mi cita» (desde las 9:00)
 //
-// Con la ventana de 24 h abierta va como texto; si no, con la plantilla aprobada de su uso. Son
-// mensajes de servicio sobre su propia cita: se mandan aunque haya pedido la baja comercial. Lo
-// llama el cron cada minuto; cada aviso se marca antes de mandarlo, así nunca sale dos veces.
+// Ninguno nombra el tratamiento (sale en la pantalla bloqueada y es un dato de salud): dicen el día,
+// la hora y la sede; la página «Tu cita» enseña el resto. Con la ventana de 24 h abierta va como
+// texto (con los enlaces); si no, con la plantilla aprobada de su uso. Son mensajes de servicio sobre
+// su propia cita: se mandan aunque haya pedido la baja comercial. Lo llama el cron cada minuto; cada
+// aviso se marca antes de mandarlo, así nunca sale dos veces.
 const T = require('../motor/tiempo');
 const { elegirPlantilla } = require('../motor/repesca/plantillas');
+const { direccionPostal } = require('../motor/calendario/ics');
 const { registrar } = require('./eventos');
 const R = require('./repesca/motor');
 
@@ -24,22 +31,52 @@ const USOS = {
   vispera: { columna: 'aviso_24h_en', uso: 'cita_recordatorio_24h' },
   dos_horas: { columna: 'aviso_2h_en', uso: 'cita_recordatorio_2h' },
 };
+// La confirmación de una cita que sustituye a otra. Sin esa plantilla aprobada, sale la confirmación.
+const USO_CAMBIADA = 'cita_cambiada';
 
-function textoLibre(tipo, c, nombre) {
+function textoLibre(tipo, c, nombre, { cambiada = false } = {}) {
   const hola = `Hola${nombre ? ` ${nombre}` : ''}`;
+  const donde = c.donde ? ` en ${c.donde}` : '';
   if (tipo === 'confirmacion') {
-    return `${hola}, tu cita en ${c.marca} está confirmada: ${R.textoDia(c.fecha)} a las ${c.hora}, ${c.tratamiento}.\n\n`
-      + `Aquí la tienes para añadirla a tu calendario, y cambiarla o cancelarla si lo necesitas: ${c.url}`;
+    return cambiada
+      ? `${hola}, tu cita ha cambiado: ahora te esperamos ${R.textoDia(c.fecha)} a las ${c.hora}${donde}. Si tenías la anterior en tu calendario, bórrala y añade esta.${R.enlacesCita(c)}`
+      : `${hola}, tu cita está confirmada: te esperamos ${R.textoDia(c.fecha)} a las ${c.hora}${donde}.${R.enlacesCita(c)}`;
   }
-  if (tipo === 'vispera') {
-    return `${hola}, te esperamos mañana a las ${c.hora} en ${c.marca}${c.donde ? ` (${c.donde})` : ''}. ¿Nos lo confirmas?\n\nTu cita: ${c.url}`;
-  }
-  return `${hola}, en un par de horas, a las ${c.hora}, te vemos en ${c.marca}. Si te surge algo, avísanos por aquí.`;
+  const tuCita = c.url ? `\n\nTu cita: ${c.url}` : '';
+  if (tipo === 'vispera') return `${hola}, te esperamos mañana, ${R.textoDia(c.fecha).slice(3)}, a las ${c.hora}${donde}. ¿Nos confirmas que vienes?${tuCita}`;
+  return `${hola}, hoy a las ${c.hora} te esperamos${donde}. Si te surge algo, responde a este mensaje.${tuCita}`;
 }
 
-function variablesPlantilla(tipo, c, nombre) {
-  if (tipo === 'confirmacion') return [nombre || 'hola', R.textoDia(c.fecha).slice(3), c.hora, R.enMinuscula(c.tratamiento)];
-  return [nombre || 'hola', c.hora];
+// Las variables de cada plantilla (motor/repesca/plantillas.js): sin tratamiento. Meta no admite una
+// variable vacía: sin sede, el nombre de la clínica.
+function variablesPlantilla(tipo, c, saludo) {
+  const donde = c.donde || c.marca;
+  if (tipo === 'dos_horas') return [saludo, c.hora, donde];
+  return [saludo, R.textoDia(c.fecha).slice(3), c.hora, donde];
+}
+
+// El final de la URL de sus botones de enlace: el token de la cita («Añadir al calendario» y «Ver
+// mi cita» en la confirmación; «Ver mi cita» dos horas antes). La víspera solo lleva respuestas rápidas.
+function botonesPlantilla(tipo, c) {
+  if (!c.token) return [];
+  if (tipo === 'confirmacion') return [c.token, c.token];
+  if (tipo === 'dos_horas') return [c.token];
+  return [];
+}
+
+// El mapa de la sede (solo sale si la plantilla lo lleva).
+function mapaDe(sede) {
+  if (!sede || sede.lat == null || sede.lng == null) return null;
+  return { tipo: 'ubicacion', lat: sede.lat, lng: sede.lng, nombre: sede.nombre, direccion: direccionPostal(sede) };
+}
+
+// Las plantillas dicen «Hola {{1}}, …». Sin nombre, «Hola buenos días, …» (o «buenas tardes»).
+const saludoSinNombre = (ahora) => (T.minutosMadrid(ahora) < 14 * 60 ? 'buenos días' : 'buenas tardes');
+
+// ¿Sustituye a otra cita (que se cambió a esta)?
+async function sustituyeAOtra(q, citaId) {
+  const [[vieja]] = await q.query("SELECT id FROM citas WHERE reprograma_a_id = ? AND estado = 'reprogramada' LIMIT 1", [citaId]);
+  return Boolean(vieja);
 }
 
 async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
@@ -52,6 +89,9 @@ async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
     'SELECT c.paciente_id, p.nombre, p.telefono FROM citas c JOIN pacientes p ON p.id = c.paciente_id WHERE c.id = ?', [citaId]);
   if (!fila?.telefono) return { citaId, tipo, omitido: 'sin teléfono' };
   const c = await R.datosCita(pool, citaId);
+  // «Paciente» es el nombre que se pone a quien reserva sin decirlo: no se le saluda así.
+  const nombre = fila.nombre && fila.nombre !== 'Paciente' ? fila.nombre : null;
+  const cambiada = tipo === 'confirmacion' && await sustituyeAOtra(pool, citaId);
 
   const con = await pool.getConnection();
   let conv;
@@ -68,10 +108,12 @@ async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
 
   const ventanaAbierta = conv.ventana_hasta && new Date(conv.ventana_hasta) > ahora;
   let envio;
+  let plantilla = null;
   if (ventanaAbierta) {
-    envio = await R.enviar(deps, conv, { texto: textoLibre(tipo, c, fila.nombre), autor: 'sistema', ahora });
+    envio = await R.enviar(deps, conv, { texto: textoLibre(tipo, c, nombre, { cambiada }), autor: 'sistema', ahora });
   } else {
-    const plantilla = elegirPlantilla(uso, await R.plantillasBd(pool));
+    const plantillas = await R.plantillasBd(pool);
+    plantilla = (cambiada && elegirPlantilla(USO_CAMBIADA, plantillas)) || elegirPlantilla(uso, plantillas);
     if (!plantilla) {
       await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, conversacion_id, vence_en) VALUES ('otro', ?, ?, ?, ?)",
         [`Falta la plantilla aprobada «${uso}»: avisar a mano de la cita`, fila.paciente_id, conv.id, new Date(ahora.getTime() + HORA)]);
@@ -79,8 +121,8 @@ async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
       return { citaId, tipo, fallido: 'sin plantilla' };
     }
     envio = await R.enviar(deps, conv, {
-      plantilla, variables: variablesPlantilla(tipo, c, fila.nombre), autor: 'sistema', ahora,
-      botonUrl: tipo === 'confirmacion' ? c.token : null,
+      plantilla, variables: variablesPlantilla(tipo, c, nombre || saludoSinNombre(ahora)), autor: 'sistema', ahora,
+      botones: botonesPlantilla(tipo, c), cabecera: mapaDe(c.sede),
     });
   }
   // Un aviso no deja trabajo en la bandeja: si la conversación no tiene nada más en marcha, se
@@ -90,7 +132,14 @@ async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
       WHERE c.id = ? AND c.estado IN ('ia_activa','esperando_paciente')
         AND NOT EXISTS (SELECT 1 FROM seguimientos s WHERE s.conversacion_id = c.id AND s.estado = 'pendiente')
         AND NOT EXISTS (SELECT 1 FROM tareas t WHERE t.conversacion_id = c.id AND t.estado = 'abierta')`, [c.inicio, conv.id]);
-  await registrar(pool, { tipo: `aviso_cita_${tipo}`, entidad: 'cita', entidadId: citaId, datos: { ventanaAbierta: Boolean(ventanaAbierta), estado: envio.estado } });
+  // La víspera le pregunta si viene: su «sí» a secas (o su «no») contesta a eso.
+  if (tipo === 'vispera' && envio.estado === 'enviado') {
+    await R.ponerPregunta(pool, conv.id, { tipo: 'confirmar_cita', citaId, mensajeId: envio.mensajeId }, ahora);
+  }
+  await registrar(pool, {
+    tipo: `aviso_cita_${tipo}`, entidad: 'cita', entidadId: citaId,
+    datos: { ventanaAbierta: Boolean(ventanaAbierta), estado: envio.estado, ...(plantilla ? { plantilla: plantilla.nombre } : {}), ...(cambiada ? { cambiada } : {}) },
+  });
   return { citaId, tipo, envio };
 }
 
@@ -148,4 +197,4 @@ async function cerrarConversacionesDeCitasPasadas(pool, ahora = new Date()) {
   return r.affectedRows;
 }
 
-module.exports = { avisar, pendientes, enviarPendientes, cerrarConversacionesDeCitasPasadas, textoLibre };
+module.exports = { avisar, pendientes, enviarPendientes, cerrarConversacionesDeCitasPasadas, textoLibre, variablesPlantilla };

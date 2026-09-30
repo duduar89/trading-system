@@ -90,24 +90,29 @@ test('cambiar y cancelar la cita por WhatsApp', async (t) => {
       assert.equal(antigua.reprograma_a_id, nueva.id);
       assert.equal(antigua.secuencia_ics, 1, 'el .ics sube de versión');
       assert.ok(antigua.cancelada_en);
-      assert.match(r2.respuesta, /^¡Hecho, Alba! Te he cambiado la cita: te esperamos el \S+ \d+ de \S+ a las \d\d:\d\d en IEMEC \(Av\. Siglo XXI 13, local 35, Boadilla del Monte\) para: Limpieza facial profunda\. La del jueves 8 de octubre a las 17:00 queda anulada\.\n\n/);
-      assert.ok(r2.respuesta.endsWith(`/c/${nueva.token}`), 'le llega la nueva cita con su enlace');
+      assert.match(r2.respuesta, /^¡Hecho, Alba! Te he cambiado la cita: te esperamos el \S+ \d+ de \S+ a las \d\d:\d\d en IEMEC \(Av\. Siglo XXI, 13, local 35, Boadilla del Monte\)\. La del jueves 8 de octubre a las 17:00 queda anulada: si la tenías en tu calendario, bórrala\.\n\n/);
+      assert.doesNotMatch(r2.respuesta, /limpieza/i, 'sin el tratamiento: se lee en la pantalla bloqueada');
+      const tokenNueva = agenda.tokenDe(nueva);
+      const tokenAntigua = agenda.tokenDe(antigua);
+      assert.ok(r2.respuesta.includes(`/cal/${tokenNueva}\n`), 'y el botón de calendario de la nueva');
+      assert.ok(r2.respuesta.endsWith(`/c/${tokenNueva}`), 'le llega la nueva cita con su enlace');
       assert.equal(whatsapp.enviados.at(-1).texto, r2.respuesta);
       const [[conv2]] = await pool.query('SELECT estado, motivo_cierre, reprograma_cita_id, huecos_ofrecidos FROM conversaciones WHERE id = ?', [r.conversacionId]);
       assert.deepEqual({ ...conv2 }, { estado: 'cerrada', motivo_cierre: 'cita', reprograma_cita_id: null, huecos_ofrecidos: null });
       assert.ok(!(await avisos.pendientes(pool, mas(martes, 10))).some((a) => a.id === nueva.id));
 
       await conServidor(crearApp({ pool }), async (base) => {
-        const ics = await (await fetch(`${base}/c/${antigua.token}.ics`)).text();
+        const ics = await (await fetch(`${base}/c/${tokenAntigua}.ics`)).text();
         assert.match(ics, /STATUS:CANCELLED/);
         assert.match(ics, /SEQUENCE:1/);
         assert.doesNotMatch(ics, /BEGIN:VALARM/, 'sin recordatorios en el calendario');
-        const pag = await (await fetch(`${base}/c/${antigua.token}`)).text();
+        const pag = await (await fetch(`${base}/c/${tokenAntigua}`)).text();
         assert.match(pag, /Cita cambiada/);
-        assert.match(pag, new RegExp(`href="/c/${nueva.token}"`));
+        assert.match(pag, new RegExp(`href="/c/${tokenNueva}"`));
         assert.doesNotMatch(pag, /Cancelar la cita/);
-        const icsNueva = await (await fetch(`${base}/c/${nueva.token}.ics`)).text();
+        const icsNueva = await (await fetch(`${base}/c/${tokenNueva}.ics`)).text();
         assert.match(icsNueva, /STATUS:CONFIRMED/);
+        assert.notEqual(nueva.uid_ics, antigua.uid_ics, 'la nueva es otro evento, con otro UID');
       });
     });
 

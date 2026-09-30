@@ -21,12 +21,13 @@ export default defineConfig({
         theme_color: '#123f3e',
         icons: [{ src: '/icono.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }],
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,woff2}'], navigateFallbackDenylist: [/^\/api\//, /^\/c\//, /^\/r\//, /^\/webhooks\//] },
+      // Lo del paciente (su cita, «Añadir al calendario», la reseña) lo sirve siempre el servidor.
+      workbox: { globPatterns: ['**/*.{js,css,html,svg,woff2}'], navigateFallbackDenylist: [/^\/api\//, /^\/c\//, /^\/cal\//, /^\/r\//, /^\/webhooks\//] },
     }),
   ],
   build: { outDir: '../servidor/public', emptyOutDir: true },
   server: {
     port: 5174,
-    proxy: { '/api': 'http://localhost:3004', '/c/': 'http://localhost:3004', '/r/': 'http://localhost:3004' },
+    proxy: { '/api': 'http://localhost:3004', '/c/': 'http://localhost:3004', '/cal/': 'http://localhost:3004', '/r/': 'http://localhost:3004' },
   },
 });

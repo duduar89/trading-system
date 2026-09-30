@@ -10,6 +10,13 @@ const config = require('./config');
 
 const CARPETA = path.join(__dirname, '..', 'sql');
 
+// Lo que una migración necesita y no se puede hacer en SQL. Va después de la suya, en cada pasada:
+// cuando ya no queda nada que hacer, no hace nada.
+const PASOS = [
+  // 010: los tokens de «Tu cita» que aún estén en claro se cifran con CLAVE_CIFRADO.
+  { tras: '010-privacidad-cita.sql', hacer: (con) => require('./agenda').cifrarTokensAntiguos(con) },
+];
+
 function listar(carpeta = CARPETA) {
   return fs.readdirSync(carpeta)
     .filter((f) => /^\d{3}-[a-z0-9-]+\.sql$/.test(f))
@@ -43,6 +50,9 @@ async function migrar({ bd = config.bd, carpeta = CARPETA, log = console.log } =
       await conexion.query(m.sql);
       await conexion.query('INSERT INTO _migraciones (nombre, huella) VALUES (?, ?)', [m.nombre, m.huella]);
       aplicadas.push(m.nombre);
+    }
+    for (const paso of PASOS) {
+      if (hechas.has(paso.tras) || aplicadas.includes(paso.tras)) await paso.hacer(conexion);
     }
     return aplicadas;
   } finally {

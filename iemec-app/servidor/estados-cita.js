@@ -274,6 +274,7 @@ async function detalle(q, id, { ahora = new Date() } = {}) {
   const espera = ahora < new Date(c.inicio)
     ? E.ACCIONES.map((a) => E.comprobarCambio(c, a, ahora)).find((v) => v.codigo === 'FUERA_DE_HORA')?.mensaje || null
     : null;
+  const token = agenda.tokenDe(c);
   return {
     id: c.id, estado: c.estado, etiqueta: E.ETIQUETA[c.estado] || c.estado,
     paciente: [c.paciente_nombre, c.paciente_apellidos].filter(Boolean).join(' '), pacienteId: c.paciente_id,
@@ -281,7 +282,8 @@ async function detalle(q, id, { ahora = new Date() } = {}) {
     fecha: inicio.fecha, inicio: inicio.hora, fin: T.partesMadrid(new Date(c.fin)).hora,
     origen: c.origen, primeraVisita: Boolean(c.primera_visita),
     llegadaEn: c.llegada_en, completadaEn: c.completada_en, noPresentadaEn: c.no_presentada_en,
-    enlaceCita: `/c/${c.token}`, conversacionId: conv?.id || null,
+    // Su página «Tu cita» (el token se guarda cifrado; si no se puede descifrar, sin enlace).
+    enlaceCita: token ? `/c/${token}` : null, conversacionId: conv?.id || null,
     acciones: E.accionesPosibles(c, ahora), espera,
     deshacer: d.ok ? { de: E.ETIQUETA[c.estado], a: d.a, etiqueta: E.ETIQUETA[d.a] || d.a, hasta: d.hasta } : null,
   };

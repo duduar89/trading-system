@@ -142,7 +142,7 @@ test('repesca de punta a punta', async (t) => {
 
     await t.test('toxina: ante «caro», plazos (nunca promoción)', async () => {
       const [p] = await pool.query("INSERT INTO pacientes (nombre, telefono) VALUES ('Sara', '+34611000005')");
-      await pool.query("INSERT INTO citas (paciente_id, tratamiento_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token) VALUES (?, 'toxina-facial', '2026-03-01 10:00', '2026-03-01 10:30', '2026-03-01 10:00', '2026-03-01 10:40', '2026-03-01 10:00', '2026-03-01 10:30', 'completada', REPEAT('a', 43))", [p.insertId]);
+      await pool.query("INSERT INTO citas (paciente_id, tratamiento_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token_hash) VALUES (?, 'toxina-facial', '2026-03-01 10:00', '2026-03-01 10:30', '2026-03-01 10:00', '2026-03-01 10:40', '2026-03-01 10:00', '2026-03-01 10:30', 'completada', UNHEX(SHA2(UUID(), 256)))", [p.insertId]);
       const r = await R.procesarEntrante(deps, { telefono: '+34611000005', texto: 'Es carísimo', ahora: new Date('2026-09-29T15:00:00Z') });
       assert.equal(r.decision.acciones.find((a) => a.tipo === 'ofrecer').ofertaTipo, 'plazos');
     });

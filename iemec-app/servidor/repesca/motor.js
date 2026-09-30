@@ -23,7 +23,8 @@ const { decidir } = require('../../motor/repesca/decidir');
 const { calcularSeguimiento } = require('../../motor/repesca/plazos');
 const { comprobarOfertaPropuesta } = require('../../motor/repesca/ofertas');
 const { revisar, esSensible } = require('../../motor/repesca/filtro-legal');
-const { elegirPlantilla, rellenar, BIBLIOTECA } = require('../../motor/repesca/plantillas');
+const { elegirPlantilla, rellenar, botonesDe, cabeceraDe, BIBLIOTECA } = require('../../motor/repesca/plantillas');
+const { textoSede } = require('../../motor/calendario/ics');
 const S = require('../../motor/repesca/secuencias');
 const { combinar, textoSimulado } = require('../integraciones/ia');
 const { cifrar, descifrar } = require('../cripto');
@@ -538,15 +539,32 @@ const mayuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 const ventanaDe = (hora) => ({ desde: T.minutosDe(hora) - 60, hasta: T.minutosDe(hora) + 61 });
 const FRANJA_TEXTO = { manana: 'mañana', tarde: 'tarde' };
 
+// Lo que los mensajes dicen de una cita: día, hora, la sede de su sala (donde: «IEMEC (Av. Siglo XXI,
+// 13, local 35, Boadilla del Monte)») y sus dos enlaces, «Tu cita» (url) y «Añadir al calendario»
+// (urlCalendario). El tratamiento viene para quien lo necesite (la IA, las tareas), pero los mensajes
+// que salen solos no lo nombran.
 async function datosCita(q, citaId) {
-  const [[c]] = await q.query(
-    `SELECT c.id, c.inicio, c.token, c.estado, c.retenida_hasta, c.origen, c.tratamiento_id, t.nombre AS tratamiento, t.reservable_ia,
-            cl.direccion, cl.municipio, cl.nombre_corto
+  const [[fila]] = await q.query(
+    `SELECT c.id, c.inicio, c.estado, c.retenida_hasta, c.origen, c.tratamiento_id, c.sala_id, c.token_cifrado, c.token_iv, c.token_tag,
+            t.nombre AS tratamiento, t.reservable_ia, cl.nombre_corto
        FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id LEFT JOIN clinica cl ON cl.id = 1 WHERE c.id = ?`, [citaId]);
-  if (!c) return null;
+  if (!fila) return null;
+  const token = await agenda.tokenParaEnviar(q, fila);
+  const c = { ...fila };
+  for (const k of ['token_cifrado', 'token_iv', 'token_tag']) delete c[k];
   const inicio = new Date(c.inicio);
-  return { ...c, fecha: T.fechaMadrid(inicio), hora: T.hhmm(T.minutosMadrid(inicio)), url: `${config.urlPublica}/c/${c.token}`,
-    donde: [c.direccion, c.municipio].filter(Boolean).join(', '), marca: c.nombre_corto || 'IEMEC' };
+  const sede = await agenda.sedeDe(q, c.sala_id);
+  return {
+    ...c, token, fecha: T.fechaMadrid(inicio), hora: T.hhmm(T.minutosMadrid(inicio)),
+    url: token ? `${config.urlPublica}/c/${token}` : null, urlCalendario: token ? `${config.urlPublica}/cal/${token}` : null,
+    sede, donde: textoSede(sede), marca: c.nombre_corto || 'IEMEC',
+  };
+}
+
+// Los dos enlaces de la cita, al final del mensaje: añadirla al calendario con un toque y su página.
+function enlacesCita(c) {
+  if (!c.url) return '';
+  return `\n\nAñádela a tu calendario con un toque: ${c.urlCalendario}\nPara verla, cambiarla o cancelarla: ${c.url}`;
 }
 
 // La cita, si todavía vale (confirmada o retenida a tiempo, y sin empezar).
@@ -555,12 +573,14 @@ async function citaEnPie(q, citaId, ahora) {
   return agenda.sigueEnPie(c, ahora) ? c : null;
 }
 
-// antes: la cita que esta sustituye (se le dice que queda anulada).
+// La cita que le acaba de quedar, con sus dos enlaces. No nombra el tratamiento: el mensaje se lee
+// en la pantalla bloqueada (su página sí lo dice). antes: la cita que esta sustituye (queda anulada;
+// en su calendario es otro evento, así que se le pide borrarla).
 function textoCitaReservada(c, { nombre, hola = '', antes = null }) {
-  return `${hola}¡Hecho${nombre ? `, ${nombre}` : ''}! ${antes ? 'Te he cambiado la cita: te' : 'Te'} esperamos ${textoDia(c.fecha)} a las ${c.hora} en ${c.marca}`
-    + `${c.donde ? ` (${c.donde})` : ''} para: ${c.tratamiento}.`
-    + `${antes ? ` La del ${textoDia(antes.fecha).slice(3)} a las ${antes.hora} queda anulada.` : ''}\n\n`
-    + `Aquí tienes tu cita para añadirla a tu calendario, y cambiarla o cancelarla si lo necesitas: ${c.url}`;
+  return `${hola}¡Hecho${nombre ? `, ${nombre}` : ''}! ${antes ? 'Te he cambiado la cita: te' : 'Te'} esperamos ${textoDia(c.fecha)} a las ${c.hora}`
+    + `${c.donde ? ` en ${c.donde}` : ''}.`
+    + `${antes ? ` La del ${textoDia(antes.fecha).slice(3)} a las ${antes.hora} queda anulada: si la tenías en tu calendario, bórrala.` : ''}`
+    + enlacesCita(c);
 }
 
 async function enTransaccion(pool, fn) {
@@ -850,7 +870,7 @@ async function cambioAPersona(deps, conv, c, { ahora, nombre, hola = '', texto =
   });
   const sigue = `mientras, tu cita ${textoDia(c.fecha)} a las ${c.hora} sigue en pie`;
   const respuesta = {
-    no_reservable: `${hola}Sin problema${n}. Una persona del equipo te ayuda ahora mismo a buscar otro momento. Si prefieres cancelarla, puedes hacerlo desde aquí: ${c.url}`,
+    no_reservable: `${hola}Sin problema${n}. Una persona del equipo te ayuda ahora mismo a buscar otro momento.${c.url ? ` Si prefieres cancelarla, puedes hacerlo desde aquí: ${c.url}` : ''}`,
     treatwell: `${hola}Sin problema${n}. Esa cita se reservó en Treatwell: una persona del equipo te ayuda ahora mismo a cambiarla o cancelarla y te lo confirma por aquí.`,
     sin_huecos: `${hola}Ahora mismo no veo huecos para eso${n}. Una persona del equipo te ayuda por aquí a buscar otro momento; ${sigue}.`,
     no_entendido: `${hola}Perdona${n}, no te he entendido bien. Una persona del equipo te ayuda ahora mismo a buscar otro momento; ${sigue}.`,
@@ -911,6 +931,20 @@ async function atenderPregunta(deps, conv, pregunta, { texto, ahora, datos, regl
   const n = nombre ? `, ${nombre}` : '';
   const si = SI.test(t);
   const no = NO.test(t);
+
+  if (pregunta.tipo === 'confirmar_cita') {
+    // «¿Nos confirmas que vienes?» (la víspera). Lo que dice de su cita («Sí, allí estaré»,
+    // «necesito cambiarla», «cancélala») lo entiende atenderSobreCita; aquí, el «sí» y el «no» a secas.
+    const c = await citaEnPie(pool, pregunta.citaId, ahora);
+    if (!c || CAMBIO.test(t) || CANCELAR.test(t) || CONFIRMA.test(t)) return null;
+    if (si) {
+      await registrar(pool, { tipo: 'cita_confirmada_paciente', entidad: 'cita', entidadId: c.id, actor: 'paciente', datos: { por: 'whatsapp' } });
+      await pool.query("UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cita', proximo_paso = 'cita', proximo_paso_en = ? WHERE id = ?", [c.inicio, conv.id]);
+      return contestar(deps, conv, `¡Perfecto${n}! Queda confirmada: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`, ahora, { sobreCita: 'confirma' });
+    }
+    if (no) return preguntarCancelar(deps, conv, c, { ahora, nombre, hola });
+    return null;
+  }
 
   if (pregunta.tipo === 'cancelar_cita') {
     const c = await citaEnPie(pool, pregunta.citaId, ahora);
@@ -1161,22 +1195,35 @@ async function aceptarOferta(deps, conv, oferta, { texto, ahora, datos, nombre, 
   return { conversacionId: conv.id, listaEspera: 'aceptada', citaId: r.citaId, reprograma: r.reprograma, decision, respuesta, envio };
 }
 
-// Envía un texto libre (solo con la ventana de 24 h abierta) o una plantilla.
-async function enviar(deps, conv, { texto = null, plantilla = null, variables = [], botonUrl = null, autor = 'sistema', ahora = new Date() }) {
+/**
+ * Envía un texto libre (solo con la ventana de 24 h abierta) o una plantilla.
+ * Con plantilla: variables (del cuerpo), botones (el final de la URL de cada botón de enlace de la
+ * plantilla, por orden: el token de la cita en /cal/{{1}} y /c/{{1}}; botonUrl, el del primero) y
+ * cabecera ({ tipo: 'ubicacion', lat, lng, nombre, direccion }: solo sale si la plantilla la tiene).
+ */
+async function enviar(deps, conv, { texto = null, plantilla = null, variables = [], botones = null, botonUrl = null, cabecera = null, autor = 'sistema', ahora = new Date() }) {
   const { pool, whatsapp } = deps;
+  const conBotones = plantilla ? botonesDelEnvio(plantilla, botones ?? (botonUrl == null ? [] : [botonUrl])) : [];
+  const conCabecera = plantilla && cabecera && cabeceraDe(plantilla)?.tipo === cabecera.tipo ? cabecera : null;
   let r;
   let estado = 'enviado';
   let error = null;
   try {
     r = plantilla
-      ? await whatsapp.enviarPlantilla({ telefono: conv.telefono, nombre: plantilla.nombre, idioma: plantilla.idioma || 'es', variables, botonUrl })
+      ? await whatsapp.enviarPlantilla({
+        telefono: conv.telefono, nombre: plantilla.nombre, idioma: plantilla.idioma || 'es', variables,
+        botones: conBotones.map(({ indice, valor }) => ({ tipo: 'url', indice, valor })), cabecera: conCabecera,
+      })
       : await whatsapp.enviarTexto({ telefono: conv.telefono, texto });
   } catch (err) {
     estado = 'fallido';
     error = err.message;
   }
-  // En la conversación queda el texto tal y como lo lee el paciente (con el enlace del botón).
-  const cuerpo = plantilla ? `${rellenar(plantilla, variables)}${botonUrl ? `\n\n${enlaceDelBoton(plantilla, botonUrl)}` : ''}` : texto;
+  // En la conversación queda el texto tal y como lo lee el paciente (con el mapa y los enlaces de los botones).
+  const cuerpo = plantilla
+    ? `${conCabecera ? `[Mapa: ${conCabecera.nombre} · ${conCabecera.direccion}]\n` : ''}${rellenar(plantilla, variables)}`
+      + `${conBotones.length ? `\n\n${conBotones.map((b) => `${b.texto}: ${b.enlace}`).join('\n')}` : ''}`
+    : texto;
   const id = await guardarMensaje(pool, { conversacionId: conv.id, direccion: 'saliente', autor, tipo: plantilla ? 'plantilla' : 'texto', texto: cuerpo, waId: r?.waId, estado, plantillaId: plantilla?.id, creadoEn: ahora });
   // Lo que le preguntamos antes ya no es lo último que ha leído (un recordatorio, lo que escribe
   // recepción…): su próximo «sí» no puede contestar a aquello.
@@ -1188,9 +1235,18 @@ async function enviar(deps, conv, { texto = null, plantilla = null, variables = 
   return { mensajeId: id, estado, waId: r?.waId || null };
 }
 
-function enlaceDelBoton(plantilla, valor) {
-  const boton = (parseJson(plantilla.botones) || []).find((b) => b.tipo === 'url');
-  return boton?.url ? boton.url.replace('{{1}}', valor) : `${config.urlPublica}/c/${valor}`;
+// Los botones de enlace de la plantilla que llevan variable, cada uno con su valor (por orden) y su
+// índice entre todos los botones (el que pide Meta): [{ indice, valor, texto, enlace }].
+function botonesDelEnvio(plantilla, valores) {
+  const salida = [];
+  let i = 0;
+  botonesDe(plantilla).forEach((b, indice) => {
+    if (b.tipo !== 'url' || !/\{\{1\}\}/.test(b.url || '')) return;
+    const valor = valores[i++];
+    if (valor == null) return;
+    salida.push({ indice, valor: String(valor), texto: b.texto, enlace: b.url.replace('{{1}}', valor) });
+  });
+  return salida;
 }
 
 // «Valoración HIFU» → «valoración HIFU» (para ponerlo en mitad de una frase sin romper las siglas).
@@ -1541,4 +1597,5 @@ async function sinProximoPaso(q, ahora = new Date()) {
 module.exports = {
   textoHuecos, textoDia, procesarEntrante, procesarSeguimientos, avanzarSecuencias, inscribir, sinProximoPaso, enviar, historial,
   calendarioDesdeBd, cargarContexto, conversacionPara, datosCita, plantillasBd, enMinuscula, nombreTratamiento, permisoComercial,
+  ponerPregunta, textoCitaReservada, enlacesCita,
 };

@@ -808,9 +808,9 @@ test('entrada de leads y WhatsApp: lo que encontró la revisión', async (t) => 
         const cita = async (pacienteId, dias) => {
           const inicio = mas(martes, -dias * 1440);
           await pool.query(
-            `INSERT INTO citas (paciente_id, tratamiento_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token)
+            `INSERT INTO citas (paciente_id, tratamiento_id, inicio, fin, sala_desde, sala_hasta, prof_desde, prof_hasta, estado, token_hash)
              VALUES (?, 'toxina-botulinica', ?, ?, ?, ?, ?, ?, 'completada', ?)`,
-            [pacienteId, inicio, mas(inicio, 30), inicio, mas(inicio, 40), inicio, mas(inicio, 30), crypto.randomBytes(32).toString('base64url')]);
+            [pacienteId, inicio, mas(inicio, 30), inicio, mas(inicio, 40), inicio, mas(inicio, 30), crypto.randomBytes(32)]);
         };
         const [p10] = await pool.query("INSERT INTO pacientes (nombre, telefono) VALUES ('Marina', '+34611000610')");
         await cita(p10.insertId, 1);

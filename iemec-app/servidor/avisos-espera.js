@@ -14,6 +14,7 @@
 // partir de las 9:00 (si aún da tiempo). Las reglas y la base están en servidor/lista-espera.js.
 const T = require('../motor/tiempo');
 const { elegirPlantilla } = require('../motor/repesca/plantillas');
+const { esSensible } = require('../motor/repesca/filtro-legal');
 const { registrar } = require('./eventos');
 const cola = require('./cola');
 const LE = require('./lista-espera');
@@ -33,13 +34,16 @@ function textoOferta(c, { nombre, actual, tratamiento }) {
     + `Te lo guardo ${LE.RETENCION_MIN} minutos: ¿te lo reservo?`;
 }
 
-// Cómo se nombra su tratamiento en un aviso que le llega sin haber preguntado: los de publicidad
-// restringida (medicamentos con receta, productos sanitarios) no se nombran, se habla de su familia.
+// Cómo se nombra su tratamiento en un aviso que le llega sin haber preguntado: lo íntimo
+// (ginecoestética, sexualidad masculina, pérdida de peso o lo que marque la clínica) no se nombra, ni
+// por su familia (se lee en la pantalla bloqueada); los de publicidad restringida (medicamentos con
+// receta, productos sanitarios), tampoco: se habla de su familia.
 async function nombreEnAviso(q, tratamientoId) {
   const [[t]] = await q.query(
-    'SELECT t.nombre, t.regimen_legal, t.publicidad_restringida, f.nombre AS familia FROM tratamientos t LEFT JOIN familias f ON f.codigo = t.familia WHERE t.id = ?',
+    `SELECT t.nombre, t.familia AS familia_codigo, t.sensible, t.regimen_legal, t.publicidad_restringida, f.nombre AS familia
+       FROM tratamientos t LEFT JOIN familias f ON f.codigo = t.familia WHERE t.id = ?`,
     [tratamientoId]);
-  if (!t) return 'tratamiento';
+  if (!t || esSensible({ sensible: t.sensible, familia: t.familia_codigo })) return 'tratamiento';
   if (t.publicidad_restringida || t.regimen_legal === 'medicamento_receta') return t.familia ? R.enMinuscula(t.familia) : 'tratamiento';
   return R.enMinuscula(t.nombre);
 }

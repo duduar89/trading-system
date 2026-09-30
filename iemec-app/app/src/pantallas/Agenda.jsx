@@ -332,9 +332,11 @@ function DetalleCita({ id, alCerrar, alCambiar }) {
             )}
           </dl>
           <p className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-            <a href={d.enlaceCita} target="_blank" rel="noreferrer" className="underline decoration-oro/60 underline-offset-4 hover:decoration-oro">
-              Su página «Tu cita»<span className="sr-only"> (se abre en otra pestaña)</span><span aria-hidden="true"> ↗</span>
-            </a>
+            {d.enlaceCita && (
+              <a href={d.enlaceCita} target="_blank" rel="noreferrer" className="underline decoration-oro/60 underline-offset-4 hover:decoration-oro">
+                Su página «Tu cita»<span className="sr-only"> (se abre en otra pestaña)</span><span aria-hidden="true"> ↗</span>
+              </a>
+            )}
             {d.conversacionId
               ? <a href={`#conversaciones/${d.conversacionId}`} className="underline decoration-oro/60 underline-offset-4 hover:decoration-oro">Su conversación</a>
               : <span style={suave}>Aún no tiene conversación de WhatsApp</span>}
