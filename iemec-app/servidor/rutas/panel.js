@@ -5,7 +5,8 @@
 const express = require('express');
 const T = require('../../motor/tiempo');
 const { descifrar } = require('../cripto');
-const { comprobarPlantilla } = require('../../motor/repesca/plantillas');
+const { comprobarPlantilla, variablesDe } = require('../../motor/repesca/plantillas');
+const { limpiarNombre, nombrePila } = require('../../motor/entrada/leads');
 const R = require('../../motor/resenas/resenas');
 const { ideasDelMes } = require('../../motor/resenas/publicaciones');
 const agenda = require('../agenda');
@@ -17,6 +18,10 @@ const estados = require('../estados-cita');
 
 const madrid = (d) => (d ? T.partesMadrid(new Date(d)) : null);
 const envolver = (fn) => (req, res, next) => fn(req, res).catch(next);
+const json = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
+// Una plantilla con un botón de enlace que lleva variable (el de «Tu cita» o el de la reseña): ese valor
+// lo pone la app cuando la manda sola. Desde la bandeja no se puede mandar.
+const conEnlaceDeLaApp = (pl) => (json(pl.botones) || []).some((b) => b.tipo === 'url' && /\{\{\d+\}\}/.test(b.url || ''));
 
 function rutasPanel({ pool, deps = null }) {
   const r = express.Router();
@@ -160,7 +165,7 @@ function rutasPanel({ pool, deps = null }) {
   r.post('/citas', envolver(async (req, res) => {
     const b = req.body || {};
     try {
-      const c = await agenda.reservar(p(), { pacienteId: b.pacienteId, tratamientoId: b.tratamientoId, fecha: b.fecha, hora: b.hora, profesionalId: b.profesionalId, salaId: b.salaId, origen: 'recepcion', actor: req.usuario?.email || 'panel' });
+      const c = await agenda.reservar(p(), { pacienteId: b.pacienteId, tratamientoId: b.tratamientoId, fecha: b.fecha, hora: b.hora, profesionalId: b.profesionalId, salaId: b.salaId, origen: 'recepcion', actor: req.usuario?.email || 'panel', ahora: req.ahora || new Date() });
       res.status(201).json(c);
     } catch (err) {
       if (err.codigo) return res.status(409).json({ error: err.message, codigo: err.codigo });
@@ -265,9 +270,13 @@ function rutasPanel({ pool, deps = null }) {
       respuestas: fila.respuestas_cifradas ? JSON.parse(descifrar(fila.respuestas_cifradas, fila.respuestas_iv, fila.respuestas_tag)) : [],
     };
     const [citas] = c.paciente_id ? await p().query('SELECT c.inicio, c.estado, t.nombre AS tratamiento FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id WHERE c.paciente_id = ? ORDER BY c.inicio DESC LIMIT 5', [c.paciente_id]) : [[]];
+    // Con qué nombre se le saluda en una plantilla («Hola {{1}}»), como en los mensajes automáticos:
+    // el de su ficha, el de pila del lead o el de su perfil de WhatsApp.
+    const saludo = (paciente?.nombre && paciente.nombre !== 'Paciente' && limpiarNombre(paciente.nombre) ? paciente.nombre : null)
+      || nombrePila(fila?.nombre) || nombrePila(c.nombre_whatsapp) || null;
     res.json({
       conversacion: { id: c.id, estado: c.estado, urgente: Boolean(c.urgente), contexto: c.contexto, proximoPaso: c.proximo_paso, proximoPasoEn: c.proximo_paso_en, ventanaHasta: c.ventana_hasta, motivoCierre: c.motivo_cierre, nombreWhatsapp: c.nombre_whatsapp },
-      paciente, lead, citas,
+      paciente, lead, citas, saludo,
       mensajes: msgs.map((m) => ({
         id: m.id, direccion: m.direccion, autor: m.autor, tipo: m.tipo, texto: descifrar(m.cuerpo_cifrado, m.iv, m.tag), estado: m.estado,
         error: m.estado === 'fallido' && (m.error_codigo || m.error_texto) ? { codigo: m.error_codigo, texto: m.error_texto } : null, intencion: m.intencion, en: m.creado_en,
@@ -277,20 +286,9 @@ function rutasPanel({ pool, deps = null }) {
     });
   }));
 
-  // Tomar la conversación (la IA calla) o devolverla a la IA.
-  r.post('/conversaciones/:id/:accion', envolver(async (req, res) => {
-    const id = Number(req.params.id);
-    const accion = req.params.accion;
-    if (!['tomar', 'devolver', 'cerrar'].includes(accion)) return res.status(404).json({ error: 'Acción desconocida' });
-    const estado = { tomar: 'persona', devolver: 'ia_activa', cerrar: 'cerrada' }[accion];
-    await p().query('UPDATE conversaciones SET estado = ?, urgente = IF(? = \'persona\', urgente, FALSE), motivo_cierre = IF(? = \'cerrada\', ?, motivo_cierre) WHERE id = ?',
-      [estado, estado, estado, req.body?.motivo || 'cerrada a mano', id]);
-    if (accion !== 'tomar') await p().query("UPDATE tareas SET estado = 'hecha', hecha_en = ? WHERE conversacion_id = ? AND estado = 'abierta'", [new Date(), id]);
-    await registrar(p(), { tipo: `conversacion_${accion}`, entidad: 'conversacion', entidadId: id, actor: req.usuario?.email || 'panel' });
-    res.json({ ok: true, estado });
-  }));
-
-  // Escribir desde el panel: texto si la ventana está abierta; si no, hay que elegir plantilla.
+  // Escribir desde el panel: texto si la ventana está abierta; si no, hay que elegir plantilla y darle
+  // un valor a cada variable (Meta rechaza la plantilla con una vacía o que falte, y al paciente le
+  // llegaría «{{2}}»). Las que llevan un enlace de la app (su cita, su reseña) solo salen solas.
   r.post('/conversaciones/:id/enviar', envolver(async (req, res) => {
     const id = Number(req.params.id);
     const [[c]] = await p().query('SELECT * FROM conversaciones WHERE id = ?', [id]);
@@ -301,13 +299,32 @@ function rutasPanel({ pool, deps = null }) {
     if (req.body?.plantillaId) {
       const [[pl]] = await p().query("SELECT * FROM plantillas WHERE id = ? AND estado = 'aprobada'", [req.body.plantillaId]);
       if (!pl) return res.status(400).json({ error: 'Esa plantilla no está aprobada' });
-      return res.json(await repesca.enviar({ ...deps, pool: p() }, c, { plantilla: pl, variables: req.body.variables || [], autor: 'persona', ahora }));
+      if (conEnlaceDeLaApp(pl)) return res.status(400).json({ error: 'Esa plantilla lleva el enlace de una cita o de una reseña: la manda la app sola', codigo: 'PLANTILLA_AUTOMATICA' });
+      // Sin saltos de línea ni espacios de más: Meta no los admite en una variable.
+      const variables = (Array.isArray(req.body.variables) ? req.body.variables : []).map((v) => String(v ?? '').replace(/\s+/g, ' ').trim());
+      const faltan = [...new Set(variablesDe(pl.cuerpo))].filter((n) => !variables[n - 1]);
+      if (faltan.length) return res.status(400).json({ error: `Falta rellenar ${faltan.map((n) => `{{${n}}}`).join(', ')} de la plantilla`, codigo: 'FALTAN_VARIABLES' });
+      return res.json(await repesca.enviar({ ...deps, pool: p() }, c, { plantilla: pl, variables, autor: 'persona', ahora }));
     }
     if (!abierta) return res.status(409).json({ error: 'Han pasado 24 horas desde el último mensaje del paciente: solo se puede escribir con una plantilla aprobada', codigo: 'VENTANA_CERRADA' });
     const texto = String(req.body?.texto || '').trim();
     if (!texto) return res.status(400).json({ error: 'El mensaje está vacío' });
     await p().query("UPDATE conversaciones SET estado = 'persona' WHERE id = ?", [id]);
     res.json(await repesca.enviar({ ...deps, pool: p() }, c, { texto, autor: 'persona', ahora }));
+  }));
+
+  // Tomar la conversación (la IA calla) o devolverla a la IA. Va detrás de «enviar»: si no, esta se
+  // quedaba con /enviar como una acción desconocida (404) y desde el panel no se podía escribir.
+  r.post('/conversaciones/:id/:accion', envolver(async (req, res) => {
+    const id = Number(req.params.id);
+    const accion = req.params.accion;
+    if (!['tomar', 'devolver', 'cerrar'].includes(accion)) return res.status(404).json({ error: 'Acción desconocida' });
+    const estado = { tomar: 'persona', devolver: 'ia_activa', cerrar: 'cerrada' }[accion];
+    await p().query('UPDATE conversaciones SET estado = ?, urgente = IF(? = \'persona\', urgente, FALSE), motivo_cierre = IF(? = \'cerrada\', ?, motivo_cierre) WHERE id = ?',
+      [estado, estado, estado, req.body?.motivo || 'cerrada a mano', id]);
+    if (accion !== 'tomar') await p().query("UPDATE tareas SET estado = 'hecha', hecha_en = ? WHERE conversacion_id = ? AND estado = 'abierta'", [req.ahora || new Date(), id]);
+    await registrar(p(), { tipo: `conversacion_${accion}`, entidad: 'conversacion', entidadId: id, actor: req.usuario?.email || 'panel' });
+    res.json({ ok: true, estado });
   }));
 
   // ── Seguimientos ──────────────────────────────────────────────────────────────────────────
@@ -356,7 +373,7 @@ function rutasPanel({ pool, deps = null }) {
          FROM plantillas pl LEFT JOIN mensajes m ON m.plantilla_id = pl.id GROUP BY pl.id ORDER BY pl.uso, pl.id`);
     res.json(filas.map((x) => ({
       id: x.id, nombre: x.nombre, uso: x.uso, categoria: x.categoria, estado: x.estado, calidad: x.calidad, cuerpo: x.cuerpo,
-      botones: typeof x.botones === 'string' ? JSON.parse(x.botones) : x.botones, motivoRechazo: x.motivo_rechazo, reservaDeId: x.reserva_de_id,
+      botones: json(x.botones), ejemplos: json(x.ejemplos) || [], aMano: !conEnlaceDeLaApp(x), motivoRechazo: x.motivo_rechazo, reservaDeId: x.reserva_de_id,
       enviadas: Number(x.enviadas), leidas: Number(x.leidas || 0), fallidas: Number(x.fallidas || 0),
     })));
   }));
