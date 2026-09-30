@@ -61,6 +61,9 @@ test('la bandeja escribe: texto con la ventana abierta y plantilla completa con 
       [leadBaja.insertId, hace(1)]);
     const [plantillas] = await pool.query('SELECT id, uso FROM plantillas');
     const plantilla = Object.fromEntries(plantillas.map((p) => [p.uso, p.id]));
+    // Las variables de una plantilla con el nombre que se quiera y los ejemplos de la biblioteca en el
+    // resto (el recordatorio de la víspera lleva el día, la hora…: las que tenga).
+    const conEjemplos = (uso, nombre) => [nombre, ...BIBLIOTECA.find((p) => p.uso === uso).ejemplos.slice(1)];
 
     const app = express();
     app.use(express.json());
@@ -144,7 +147,7 @@ test('la bandeja escribe: texto con la ventana abierta y plantilla completa con 
         assert.deepEqual([quedamos.status, quedamos.cuerpo.codigo], [409, 'SIN_PERMISO_COMERCIAL']);
         assert.equal(whatsapp.enviados.length, antes, 'no ha salido nada comercial');
         // Un recordatorio de su cita no es comercial: ese sí sale.
-        const recordatorio = await post(`/conversaciones/${conBaja}/enviar`, { plantillaId: plantilla.cita_recordatorio_24h, variables: ['Pablo', '17:00'] });
+        const recordatorio = await post(`/conversaciones/${conBaja}/enviar`, { plantillaId: plantilla.cita_recordatorio_24h, variables: conEjemplos('cita_recordatorio_24h', 'Pablo') });
         assert.equal(recordatorio.status, 200, JSON.stringify(recordatorio.cuerpo));
         assert.equal(whatsapp.enviados.at(-1).nombre, 'iemec_recordatorio_24h');
       });
@@ -169,7 +172,9 @@ test('la bandeja escribe: texto con la ventana abierta y plantilla completa con 
         const enElNombre = await post(`/conversaciones/${cerrada}/enviar`, { plantillaId: plantilla.como_quedamos, variables: ['Sara, tu botox al 20 %', 'tu limpieza facial'] });
         assert.deepEqual([enElNombre.status, enElNombre.cuerpo.codigo], [400, 'FILTRO_LEGAL']);
         // Una de servicio tampoco lleva una promoción de un medicamento.
-        const servicio = await post(`/conversaciones/${cerrada}/enviar`, { plantillaId: plantilla.cita_recordatorio_24h, variables: ['Sara', '17:00, y tu botox con un 20 % de descuento'] });
+        const conPromocion = conEjemplos('cita_recordatorio_24h', 'Sara');
+        conPromocion[conPromocion.length - 1] += ', y tu botox con un 20 % de descuento';
+        const servicio = await post(`/conversaciones/${cerrada}/enviar`, { plantillaId: plantilla.cita_recordatorio_24h, variables: conPromocion });
         assert.deepEqual([servicio.status, servicio.cuerpo.codigo], [400, 'FILTRO_LEGAL']);
         assert.equal(whatsapp.enviados.length, antes, 'no ha salido nada');
         // El nombre de su ficha no se mira: a una Milagros no se le bloquea nada.

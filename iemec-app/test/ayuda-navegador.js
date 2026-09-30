@@ -8,7 +8,7 @@
 // degradado con grano, y lo que importa es lo que se ve. Para el texto se capturan los fondos con los
 // textos ocultos y se compara el color de cada texto con lo que tiene detrás; para el foco, la zona de
 // cada control con foco y sin él.
-/* global window, document, getComputedStyle, Image -- lo de «Dentro de la página» corre en el navegador */
+/* global window, document, getComputedStyle, createImageBitmap -- lo de «Dentro de la página» corre en el navegador */
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -73,13 +73,13 @@ function instalarWcag() {
     const texto = (el.getAttribute('aria-label') || el.innerText || el.value || '').trim().replace(/\s+/g, ' ').slice(0, 50);
     return `<${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}> «${texto}»`;
   };
-  // Los píxeles de una captura PNG (en base64), con el tamaño en píxeles CSS.
+  // Los píxeles de una captura PNG (en base64), con el tamaño en píxeles CSS. Se decodifica desde los
+  // bytes, sin cargar una imagen: una página con Content-Security-Policy estricta (img-src 'self', como
+  // «Tu cita») no deja cargar una data: URL.
   const pixeles = async (b64) => {
-    const img = new Image();
-    img.src = `data:image/png;base64,${b64}`;
-    await img.decode();
+    const img = await createImageBitmap(new Blob([Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0))], { type: 'image/png' }));
     const c = document.createElement('canvas');
-    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.width = img.width; c.height = img.height;
     const x = c.getContext('2d', { willReadFrequently: true });
     x.drawImage(img, 0, 0);
     return { ancho: c.width, alto: c.height, datos: x.getImageData(0, 0, c.width, c.height).data };

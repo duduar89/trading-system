@@ -1,12 +1,15 @@
 'use strict';
 // Las comprobaciones de las pruebas del panel pillan lo que tienen que pillar (y no lo que no): texto
 // gris claro sobre blanco, un botón sin contorno de foco, uno sin nombre y algo que se sale a lo ancho;
-// lo decorativo, lo que se lee bien y el foco de serie del navegador, no. Sin navegador, se salta.
+// lo decorativo, lo que se lee bien y el foco de serie del navegador, no. También en una página con
+// Content-Security-Policy estricta, como «Tu cita» (sin imágenes que no sean suyas). Sin navegador, se
+// salta.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { lanzarNavegador, revisarPantalla } = require('./ayuda-navegador');
 
-const PAGINA = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Prueba</title></head>
+const PAGINA = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Prueba</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self'"></head>
 <body style="margin:0;padding:8px;background:#fff;color:#1f232b;font:16px/1.4 sans-serif">
   <p style="color:#9a9a9a">Gris claro que no se lee</p>
   <p style="color:#595959">Gris que sí se lee</p>
@@ -22,8 +25,11 @@ test('las comprobaciones de las pruebas del panel pillan lo que tienen que pilla
   if (!navegador) { t.skip('sin Chromium para Playwright'); return; }
   try {
     const pagina = await navegador.newPage({ viewport: { width: 390, height: 600 }, reducedMotion: 'reduce' });
+    const errores = [];
+    pagina.on('console', (m) => { if (m.type() === 'error') errores.push(m.text()); });
     await pagina.setContent(PAGINA);
     const r = await revisarPantalla(pagina);
+    assert.deepEqual(errores, [], 'mirar la página no choca con su Content-Security-Policy');
     assert.equal(r.contraste.length, 1, r.contraste.join('\n'));
     assert.match(r.contraste[0], /«Gris claro que no se lee»: 2\.\d\d:1 \(#9a9a9a sobre #ffffff; hace falta 4\.5:1\)$/);
     assert.equal(r.foco.length, 1, r.foco.join('\n'));
