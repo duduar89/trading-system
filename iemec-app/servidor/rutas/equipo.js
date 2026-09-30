@@ -6,7 +6,7 @@
 //   /api/panel/sesiones/cerrar-otras   cierra las sesiones de los demás aparatos (esta sigue).
 const express = require('express');
 const acceso = require('../acceso');
-const { exige } = require('../permisos');
+const { exige, PERMISOS } = require('../permisos');
 const { emitir, cerrarCookie } = require('../sesion');
 const { contar } = require('../seguridad');
 const { errores } = require('./acceso');
@@ -27,8 +27,12 @@ function rutasEquipo({ pool }) {
   const seguirDentro = (req, res, u) => emitir(res, u, { inicio: req.usuario.inicio ?? ahoraDe(req).getTime(), passkeyId: req.usuario.passkeyId, emergencia: req.usuario.emergencia, ahora: ahoraDe(req) });
 
   // ── El equipo ─────────────────────────────────────────────────────────────────────────────
+  // Con la tabla de permisos, para que se vea qué puede hacer cada rol.
   r.get('/equipo', gestionar, envolver(async (req, res) => {
-    res.json({ usuarios: await acceso.equipo(p(), { ahora: ahoraDe(req) }), yo: req.usuario.id ?? null });
+    res.json({
+      usuarios: await acceso.equipo(p(), { ahora: ahoraDe(req) }), yo: req.usuario.id ?? null,
+      permisos: Object.entries(PERMISOS).map(([id, { roles, que }]) => ({ id, roles, que })),
+    });
   }));
 
   // Cuerpo: { email, nombre, rol }. Devuelve el enlace de alta: solo se ve esta vez.

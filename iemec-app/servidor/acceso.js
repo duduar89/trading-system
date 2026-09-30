@@ -307,6 +307,8 @@ async function completarAlta(pool, { token, respuesta, dispositivo, ahora = new 
     const i = await leerInvitacion(con, token, ahora, { bloquear: true });
     await con.query('UPDATE invitaciones SET usada_en = ? WHERE id = ?', [ahora, i.id]);
     const passkeyId = await guardarPasskey(con, { usuarioId: i.usuario_id, info, dispositivo, actor: i.email, ahora });
+    // Con ella entra ya: cuenta como su primer uso.
+    await con.query('UPDATE passkeys SET ultimo_uso_en = ? WHERE id = ?', [ahora, passkeyId]);
     await con.query('UPDATE usuarios SET ultimo_acceso_en = ? WHERE id = ?', [ahora, i.usuario_id]);
     await registrar(con, { tipo: 'sesion_iniciada', entidad: 'usuario', entidadId: i.usuario_id, actor: i.email, datos: { passkey: passkeyId, alta: true } });
     return { usuario: { id: i.usuario_id, email: i.email, nombre: i.nombre, rol: i.rol, sesion_version: i.sesion_version }, passkeyId };

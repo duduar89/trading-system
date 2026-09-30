@@ -1,4 +1,5 @@
-// Llamadas a la API del panel. Si la sesión caduca, la app vuelve a la pantalla de entrada.
+// Llamadas a la API del panel. Si la sesión caduca, la app vuelve a la pantalla de entrada (en las de
+// entrar, un 401 es que la passkey no vale, no que la sesión haya caducado).
 export async function api(ruta, { metodo = 'GET', cuerpo } = {}) {
   const r = await fetch(`/api${ruta}`, {
     method: metodo,
@@ -6,9 +7,9 @@ export async function api(ruta, { metodo = 'GET', cuerpo } = {}) {
     body: cuerpo ? JSON.stringify(cuerpo) : undefined,
     credentials: 'same-origin',
   });
-  if (r.status === 401) { window.dispatchEvent(new Event('iemec:sin-sesion')); throw new Error('Hay que entrar al panel'); }
+  if (r.status === 401 && !ruta.startsWith('/acceso')) { window.dispatchEvent(new Event('iemec:sin-sesion')); throw new Error('Hay que entrar al panel'); }
   const datos = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(datos.error || 'Algo ha fallado'); e.codigo = datos.codigo; throw e; }
+  if (!r.ok) { const e = new Error(datos.error || 'Algo ha fallado'); e.codigo = datos.codigo; e.datos = datos; throw e; }
   return datos;
 }
 

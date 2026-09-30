@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api, fechaHora } from '../api.js';
 import { useDatos, Cabecera, Cifra, Boton, Error } from '../componentes/comunes.jsx';
+import { usePuede } from '../sesion.js';
 
 const Estrellas = ({ n }) => <span aria-label={`${n} de 5`} className="text-oro tracking-wider">{'★'.repeat(n)}<span className="opacity-25">{'★'.repeat(5 - n)}</span></span>;
 
@@ -8,6 +9,7 @@ export default function Resenas() {
   const { datos: d, error, recargar } = useDatos('/panel/resenas');
   const [textos, setTextos] = useState({});
   const [aviso, setAviso] = useState('');
+  const puedeAprobar = usePuede('resenas.aprobar');
   if (error) return <Error texto={error} />;
   if (!d) return null;
   const m = d.metricas;
@@ -37,6 +39,10 @@ export default function Resenas() {
               {r.temas?.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{r.temas.map((t) => <span key={t} className="rounded-full bg-[var(--superficie-2)] px-2.5 py-0.5 text-xs">{t.replaceAll('_', ' ')}</span>)}</div>}
               {r.estado === 'publicada' ? (
                 <div className="mt-3 rounded-xl border filete p-3 text-sm"><div className="etiqueta mb-1">Respuesta publicada</div>{r.respuesta}</div>
+              ) : r.borrador && !puedeAprobar ? (
+                <div className="mt-3 rounded-xl border border-[var(--borde)] p-3 text-sm">
+                  <div className="etiqueta mb-1">Respuesta propuesta · la aprueba dirección o marketing</div>{r.borrador}
+                </div>
               ) : r.borrador ? (
                 <div className="mt-3">
                   <label className="etiqueta" htmlFor={`r-${r.id}`}>Respuesta propuesta (sin datos de salud)</label>
