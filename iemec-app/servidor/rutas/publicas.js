@@ -175,13 +175,14 @@ h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--suav
 .enlace{color:var(--terciopelo);font-size:14px}
 form{margin:0}button.btn{width:100%;cursor:pointer;font-family:inherit}.aviso{background:#f3ead8;border:1px solid var(--oro);border-radius:12px;padding:12px;font-size:14px}
 .pie{font-size:12px;color:var(--suave);text-align:center}
-.legal{max-width:440px;margin:0 auto 24px;text-align:center;font-size:12px;color:var(--suave)}.legal a{color:var(--suave)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--terciopelo);outline-offset:2px}
+.legal{max-width:440px;margin:0 auto 24px;display:flex;flex-wrap:wrap;justify-content:center;gap:6px 20px;font-size:12px}.legal a{color:var(--suave)}
 </style></head><body><main class="tarjeta">
 <header class="cab"><div class="marca">IEMEC</div><h1>${esc(titulo)}</h1>${cuando ? `<div class="cuando">${esc(cuando)}</div>` : ''}</header>
 <section class="cuerpo">
 ${cuerpo}
 </section></main>
-<footer class="legal"><a href="${AVISO_LEGAL}" rel="noopener noreferrer">Aviso legal</a> · <a href="${PRIVACIDAD}" rel="noopener noreferrer">Política de privacidad</a></footer>
+<footer class="legal"><a href="${AVISO_LEGAL}" rel="noopener noreferrer">Aviso legal</a><a href="${PRIVACIDAD}" rel="noopener noreferrer">Política de privacidad</a></footer>
 </body></html>`;
 }
 
