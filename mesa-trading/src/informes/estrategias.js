@@ -8,8 +8,10 @@
 // Las dos frases que se añaden aquí las escribe el código con esas cifras:
 //
 // - `lectura`: papel frente al histórico, con el Sharpe (la misma medida que
-//   usa el asignador). Con menos operaciones de las que pide el asignador
-//   para juzgar una mesa en prueba, lo dice en vez de sacar conclusiones.
+//   usa el asignador). Con menos operaciones O MENOS DÍAS de los que pide el
+//   asignador para juzgarla (en prueba: 10 y 60; titular: 20 y 60), lo dice
+//   en tono neutro y «de momento» en vez de sacar conclusiones: el Sharpe de
+//   papel se anualiza desde retornos diarios y con 4 días es ruido.
 // - `regla`: dónde está la mesa frente a la regla del asignador (§5.7, sus
 //   REGLAS, no copias): cuánto le falta para ascender o qué la mandaría al
 //   banquillo. Es una lectura de hoy; decide la revisión mensual.
@@ -18,6 +20,8 @@ const f = require('../util/formato');
 const { REGLAS } = require('../aprendizaje/asignador');
 const lectores = require('./lectores');
 const registros = require('../registros');
+const { plazoMesa, tiposMesa, PLAZOS } = require('../estrategias');
+const universo = require('../mercado/universo');
 
 const PUNTOS_EVOLUCION = 120;
 const RANGO_ESTADO = { titular: 0, incubacion: 1, banquillo: 2 };
@@ -26,6 +30,15 @@ const es = x => typeof x === 'number' && Number.isFinite(x);
 const n2 = x => (es(x) ? f.numero(x, 2) : 'sin dato');
 const p1 = x => (es(x) ? f.pct(x, { decimales: 1 }) : 'sin dato');
 
+// Lo mínimo para juzgar una mesa, el mismo que usa el asignador (§5.7): una en
+// prueba se juzga desde incubacionDias con ascensoMinOperaciones; una titular
+// no mueve capital con menos de minOperaciones o minDias.
+function minimosJuicio(m) {
+  return m.estado === 'titular'
+    ? { operaciones: REGLAS.minOperaciones, dias: REGLAS.minDias }
+    : { operaciones: REGLAS.ascensoMinOperaciones, dias: REGLAS.incubacionDias };
+}
+
 // Papel frente al histórico (backtest de referencia).
 function lectura(m) {
   const papel = m.metricas || {};
@@ -33,19 +46,22 @@ function lectura(m) {
   const sP = es(papel.sharpe) ? papel.sharpe : null;
   const sB = bt && es(bt.sharpe) ? bt.sharpe : (es(m.sharpeBacktest) ? m.sharpeBacktest : null);
   const ops = es(papel.operaciones) ? papel.operaciones : 0;
-  const min = REGLAS.ascensoMinOperaciones;
-  const base = { sharpePapel: sP, sharpeBacktest: sB, operaciones: ops, minimo: min };
+  const dias = es(m.diasActiva) ? m.diasActiva : 0;
+  const min = minimosJuicio(m);
+  const base = { sharpePapel: sP, sharpeBacktest: sB, operaciones: ops, minimo: min.operaciones, dias, minimoDias: min.dias };
   if (sB === null) {
     return { ...base, tipo: 'sin_backtest', texto: 'Aún no hay backtest de referencia con el que comparar: se calcula al arrancar la mesa.' };
   }
-  if (ops < min || sP === null) {
+  if (ops < min.operaciones || dias < min.dias || sP === null) {
+    const opsTxt = `${f.numero(ops)} ${ops === 1 ? 'operación cerrada' : 'operaciones cerradas'}`;
+    const diasTxt = `${f.numero(dias)} ${dias === 1 ? 'día' : 'días'}`;
     return {
       ...base, tipo: 'pocas',
-      texto: `Con ${f.numero(ops)} ${ops === 1 ? 'operación cerrada' : 'operaciones cerradas'} en papel aún no se puede comparar con el histórico (el asignador no juzga una mesa con menos de ${min}). Sharpe del histórico: ${n2(sB)}${sP !== null ? `; en papel, de momento, ${n2(sP)}` : ''}.`,
+      texto: `Con ${opsTxt} en ${diasTxt} de papel aún no se puede comparar con el histórico (el asignador no juzga una mesa con menos de ${f.numero(min.operaciones)} operaciones y ${f.numero(min.dias)} días). Sharpe del histórico: ${n2(sB)}${sP !== null ? `; en papel, de momento, ${n2(sP)}, que con tan poco es sobre todo ruido` : ''}.`,
     };
   }
-  if (sP >= sB) return { ...base, tipo: 'mejor', texto: `En papel va mejor que en el histórico: Sharpe ${n2(sP)} frente a ${n2(sB)}, con ${f.numero(ops)} operaciones.` };
-  return { ...base, tipo: 'peor', texto: `En papel va peor que en el histórico: Sharpe ${n2(sP)} frente a ${n2(sB)}, con ${f.numero(ops)} operaciones.` };
+  if (sP >= sB) return { ...base, tipo: 'mejor', texto: `En papel va mejor que en el histórico: Sharpe ${n2(sP)} frente a ${n2(sB)}, con ${f.numero(ops)} operaciones en ${f.numero(dias)} días.` };
+  return { ...base, tipo: 'peor', texto: `En papel va peor que en el histórico: Sharpe ${n2(sP)} frente a ${n2(sB)}, con ${f.numero(ops)} operaciones en ${f.numero(dias)} días.` };
 }
 
 // Dónde está frente a la regla del asignador (§5.7).
@@ -126,6 +142,10 @@ function hitos(carpeta) {
   for (const d of lista) {
     const x = d.datos || {};
     if (d.tipo === 'asignacion') {
+      // Decisión de Eduardo sobre una mesa que suspendió el estudio (30-sep-2026): no es un alta.
+      if (x.migracion === 'notas-etf-2026-09-30' || x.migracion === 'notas-revision-2026-09-30') { poner(x.mesaId, { t: d.t, tipo: 'estudio', texto: d.resumen }); continue; }
+      // Su backtest de referencia se rehízo con el universo nuevo (30-sep-2026): tampoco es un alta.
+      if (x.migracion === 'backtest-etf-2026-09-30') { poner(x.mesaId, { t: d.t, tipo: 'backtest', texto: d.resumen }); continue; }
       if (x.migracion) { poner(x.mesaId, { t: d.t, tipo: 'alta', texto: d.resumen }); continue; }
       for (const c of x.contratadas || []) poner(c.mesaId, { t: d.t, tipo: 'alta', texto: `Contratada desde el laboratorio (hipótesis ${c.hipotesisId}) con el ${p1(c.peso)} del capital.` });
       for (const c of x.cambios || []) {
@@ -147,10 +167,18 @@ function estrategias({ instantanea, carpeta } = {}) {
   const hit = carpeta ? hitos(carpeta) : new Map();
   const cuenta = e => mesas.filter(m => m.estado === e).length;
   const sa = inst.cabecera && inst.cabecera.sinAsignar ? inst.cabecera.sinAsignar : null;
+  // Para agrupar la vista (plazo y tipo de activo): solo los que tiene alguna mesa, en su orden.
+  const plazos = mesas.map(m => plazoMesa(m).id);
+  const tipos = new Set(mesas.flatMap(m => tiposMesa(m).map(t => t.id)));
   return {
     t: es(inst.ahora) ? inst.ahora : null,
     modo: inst.modo || null,
     resumen: { total: mesas.length, titulares: cuenta('titular'), incubacion: cuenta('incubacion'), banquillo: cuenta('banquillo'), sinAsignar: sa },
+    grupos: {
+      plazos: PLAZOS.filter(p => plazos.includes(p.id)).map(p => ({ id: p.id, nombre: p.nombre, mesas: plazos.filter(x => x === p.id).length })),
+      tipos: [...universo.TIPOS.map(t => t.id), universo.TIPO_OTROS.id].filter(id => tipos.has(id))
+        .map(id => ({ id, nombre: universo.nombreTipo(id), mesas: mesas.filter(m => tiposMesa(m).some(t => t.id === id)).length })),
+    },
     // Primero las titulares, luego las que están en prueba y al final el
     // banquillo; dentro de cada grupo, la de más peso delante.
     mesas: mesas.slice().sort((a, b) => (RANGO_ESTADO[a.estado] ?? 9) - (RANGO_ESTADO[b.estado] ?? 9) || (b.peso || 0) - (a.peso || 0)).map(m => ({
@@ -158,6 +186,7 @@ function estrategias({ instantanea, carpeta } = {}) {
       peso: es(m.peso) ? m.peso : null, capital: es(m.capital) ? m.capital : null, multiplicador: es(m.multiplicador) ? m.multiplicador : null,
       universo: Array.isArray(m.universo) ? m.universo : [], params: m.params || null, filtros: Array.isArray(m.filtros) ? m.filtros : [],
       diasActiva: es(m.diasActiva) ? m.diasActiva : null, nota: m.nota || null, explicacion: m.explicacion || null,
+      plazo: plazoMesa(m), tipos: tiposMesa(m), estudio: m.estudio || null,
       papel: m.metricas ? { ...m.metricas, pnlDia: es(m.pnlDia) ? m.pnlDia : null } : null,
       backtest: m.backtest || null,
       sharpeBacktest: es(m.sharpeBacktest) ? m.sharpeBacktest : null,

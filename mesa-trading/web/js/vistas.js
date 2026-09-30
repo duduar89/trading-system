@@ -112,6 +112,115 @@
   // Nombre de pila («Marta Solís» → «Marta»); el humano del panel, «tú».
   const pila = n => String(n || '').trim().split(/\s+/)[0].replace(/,$/, '') || '';
 
+  // ---- Estrategias: agrupar por plazo o por tipo de activo (30-sep-2026) ----
+  // Cómo se agrupan las mesas. Por estado es el orden de siempre (titulares,
+  // en prueba, banquillo) sin rótulos; por plazo y por tipo, en el orden que
+  // da el servidor (datos.grupos). Una mesa con varios tipos (Momentum ETF:
+  // índices, bonos y materias primas) va en su propio grupo de mezcla, nunca
+  // repetida; al filtrar por un tipo sale en todos los que opera.
+  const AGRUPAR = Object.freeze([
+    { id: 'estado', nombre: 'Por estado' },
+    { id: 'plazo', nombre: 'Por plazo' },
+    { id: 'tipo', nombre: 'Por tipo de activo' },
+  ]);
+  // Qué quiere decir cada plazo (fijo, sin cifras de negocio).
+  const AYUDA_PLAZO = {
+    horas: 'Deciden al cierre de cada vela de 4 horas: son las que más operan.',
+    dia: 'Deciden una vez al día (la rotación de cripto cambia de manos los lunes).',
+    mes: 'Rotan una vez al mes: las que menos operan.',
+  };
+  const listaY = xs => cifras.yLista(xs);
+  const minus = (t, k) => (k === 0 ? t : t.charAt(0).toLowerCase() + t.slice(1));
+  function claveTipos(m) { return (Array.isArray(m.tipos) ? m.tipos : []).map(t => t.id).join('+') || 'otros'; }
+  function nombreTipos(m) {
+    const ts = Array.isArray(m.tipos) ? m.tipos : [];
+    return ts.length ? listaY(ts.map((t, k) => minus(t.nombre, k))) : 'Otros';
+  }
+  // → [{ id, nombre, ayuda, tipos: [id] | null, mesas }] (un solo grupo sin nombre por estado).
+  function agruparMesas(mesas, grupos, por, filtro) {
+    const lista = (mesas || []).filter(m => {
+      if (!filtro) return true;
+      if (por === 'plazo') return m.plazo && m.plazo.id === filtro;
+      if (por === 'tipo') return (m.tipos || []).some(t => t.id === filtro);
+      return true;
+    });
+    if (por === 'plazo') {
+      const orden = ((grupos && grupos.plazos) || []).map(p => p.id);
+      const ids = [...new Set(lista.map(m => (m.plazo && m.plazo.id) || 'dia'))].sort((a, b) => orden.indexOf(a) - orden.indexOf(b));
+      return ids.map(id => {
+        const ms = lista.filter(m => ((m.plazo && m.plazo.id) || 'dia') === id);
+        return { id, nombre: (ms[0].plazo && ms[0].plazo.nombre) || id, ayuda: AYUDA_PLAZO[id] || null, tipos: null, mesas: ms };
+      });
+    }
+    if (por === 'tipo') {
+      const orden = ((grupos && grupos.tipos) || []).map(t => t.id);
+      const rango = k => { const ids = k.split('+'); return [orden.indexOf(ids[0]), ids.length]; };
+      const claves = [...new Set(lista.map(claveTipos))].sort((a, b) => { const [ra, na] = rango(a); const [rb, nb] = rango(b); return ra - rb || na - nb || a.localeCompare(b); });
+      return claves.map(k => {
+        const ms = lista.filter(m => claveTipos(m) === k);
+        const mezcla = k.includes('+');
+        return { id: k, nombre: nombreTipos(ms[0]), ayuda: mezcla ? 'Mesas que mezclan varios tipos de activo.' : null, tipos: k.split('+'), mesas: ms };
+      });
+    }
+    return [{ id: 'todas', nombre: null, ayuda: null, tipos: null, mesas: lista }];
+  }
+
+  // El estudio que respalda a una mesa (las de ETF, 30-sep-2026): el titular
+  // («Suspendió el filtro; sigue en prueba por decisión de Eduardo.») y cada
+  // cifra con su umbral. Todo del campo `estudio` de la mesa. → null si no hay.
+  // `universoMesa` (opcional, símbolos o etiquetas): el de la mesa. Si el
+  // estudio es de otro universo, lo dice en el titular: sus cifras son de otra
+  // cartera, no el respaldo de esta (revisión del 30-sep-2026: Reversión ETF
+  // opera SPY y QQQ y enseñaba el estudio de SPY, QQQ, IWM y DIA).
+  // La rentabilidad va con el dinero que tenía invertido, como mucho
+  // (`exposicionMaxima`), frente a comprar y mantener, que lo tiene todo; con
+  // los Sharpe de las dos en el estudio, la comparación es la de los Sharpe.
+  function textoEstudio(e, universoMesa) {
+    if (!e || typeof e !== 'object') return null;
+    const d = e.decision || {};
+    const veredicto = e.aprobada === false ? 'Suspendió el filtro' : e.aprobada === true ? 'Aprobó el filtro' : 'Estudiada';
+    const decision = d.que && d.quien ? `; ${d.que} por decisión de ${d.quien}` : '';
+    const c = e.cifras || {};
+    const u = e.umbrales || {};
+    const av = e.avisos || {};
+    const n = (x, dec) => (valido(x) ? cifras.numero(x, dec) : '—');
+    const p = x => (valido(x) ? cifras.pct(x, { decimales: 0 }) : '—');
+    const filas = [
+      { nombre: 'Sharpe fuera de muestra', ayuda: 'rentabilidad por unidad de riesgo en datos que no vio', valor: n(c.sharpeFueraDeMuestra, 2), umbral: `mín. ${n(u.sharpeFueraDeMuestra, 1)}`, ok: valido(c.sharpeFueraDeMuestra) && valido(u.sharpeFueraDeMuestra) ? c.sharpeFueraDeMuestra >= u.sharpeFueraDeMuestra : null, nota: av.sharpeFueraDeMuestra || null },
+      { nombre: 'Ventanas en positivo', ayuda: 'tramos de prueba en los que ganó', valor: p(c.ventanasPositivas), umbral: `mín. ${p(u.ventanasPositivas)}`, ok: valido(c.ventanasPositivas) && valido(u.ventanasPositivas) ? c.ventanasPositivas >= u.ventanasPositivas : null, nota: av.ventanasPositivas || null },
+      { nombre: 'Sharpe deflactado', ayuda: 'probabilidad de que no sea suerte', valor: n(c.sharpeDeflactado, 2), umbral: `mín. ${n(u.sharpeDeflactado, 2)}`, ok: valido(c.sharpeDeflactado) && valido(u.sharpeDeflactado) ? c.sharpeDeflactado >= u.sharpeDeflactado : null, nota: av.sharpeDeflactado || null },
+    ];
+    const anos = valido(e.anos) ? `${cifras.numero(e.anos)} años` : null;
+    const tf = typeof e.fecha === 'string' ? Date.parse(`${e.fecha}T12:00:00Z`) : NaN;
+    const fecha = valido(tf) ? cifras.fechaCorta(tf) : null;
+    const etq = x => String(x).split('/')[0];
+    const estudiado = Array.isArray(e.universo) ? e.universo.map(etq) : [];
+    const deMesa = Array.isArray(universoMesa) ? universoMesa.map(etq) : null;
+    const otraCartera = Boolean(deMesa && deMesa.length && estudiado.length
+      && (new Set(estudiado).size !== new Set(deMesa).size || !deMesa.every(x => estudiado.includes(x))));
+    const universo = estudiado.length ? ` de ${listaY(estudiado)}` : '';
+    const mantiene = d.quien && d.porque ? ` ${d.quien} la mantiene ${d.porque}.` : '';
+    const invertido = valido(e.exposicionMaxima) && e.exposicionMaxima < 1 ? ` con como mucho el ${cifras.pct(e.exposicionMaxima, { decimales: 0 })} invertido` : '';
+    const todo = invertido ? ', con todo invertido,' : '';
+    let comparacion = null;
+    if (valido(c.sharpeCompleto) && valido(c.comprarYMantenerSharpe)) {
+      comparacion = `En ${anos || 'el estudio'}, rentabilidad por unidad de riesgo (Sharpe): ${n(c.sharpeCompleto, 2)}; comprar y mantener, ${n(c.comprarYMantenerSharpe, 2)}.`
+        + (valido(c.rentabilidadAnual) && valido(c.comprarYMantenerAnual) ? ` Al año: ${cifras.pct(c.rentabilidadAnual, { decimales: 1 })}${invertido}, frente a ${cifras.pct(c.comprarYMantenerAnual, { decimales: 1 })}${invertido ? ' con todo invertido' : ''}.` : '');
+    } else if (valido(c.rentabilidadAnual) && valido(c.comprarYMantenerAnual)) {
+      comparacion = `En ${anos || 'el estudio'}: ${cifras.pct(c.rentabilidadAnual, { decimales: 1 })} al año${invertido}; comprar y mantener${todo} ${cifras.pct(c.comprarYMantenerAnual, { decimales: 1 })}.${invertido ? ' No se comparan tal cual.' : ''}`;
+    }
+    return {
+      titular: otraCartera ? `Su cartera (${listaY(deMesa)}) aún no se ha estudiado${decision}.` : `${veredicto}${decision}.`,
+      suspendida: e.aprobada === false || otraCartera,
+      otraCartera,
+      contexto: otraCartera
+        ? `El estudio${fecha ? ` del ${fecha}` : ''}${anos ? ` con ${anos} de datos reales` : ''} fue de otra cartera${e.nombre ? `, ${e.nombre},` : ''}${universo}, y ${veredicto.charAt(0).toLowerCase()}${veredicto.slice(1)}. Estas son sus cifras, no las de esta mesa.${mantiene}`
+        : `Estudio${fecha ? ` del ${fecha}` : ''}${anos ? ` con ${anos} de datos reales` : ''}${universo}.${mantiene}`,
+      filas,
+      comparacion,
+    };
+  }
+
   // Filas de historial.jsonl → series alineadas por instante.
   function seriesEvolucion(filas) {
     const ordenadas = (filas || []).filter(l => l && valido(l.t)).slice().sort((a, b) => a.t - b.t);
@@ -322,6 +431,7 @@
     limiteDecisiones: 300,
     sinFoco: false,         // al cerrar para abrir la ficha de un agente, el foco no vuelve a «Informes»
     noticias: { simbolo: '', graves: false },
+    estrategias: { por: 'estado', grupo: null },   // agrupar por 'estado' | 'plazo' | 'tipo' y, si se filtra, qué grupo
     cache: new Map(),       // ruta → { t, datos }
     animado: new Set(),     // vistas que ya han entrado con animación
     refresco: null,
@@ -390,6 +500,8 @@
     est.opciones = opciones || {};
     const guardado = recuperar('rango');
     if (RANGOS.some(r => r.id === guardado)) est.rango = guardado;
+    const por = recuperar('estrategias-por');
+    if (AGRUPAR.some(a => a.id === por)) est.estrategias.por = por;
     const app = $('app') || document.body;
     const seccion = el('section', { class: 'vistas', id: 'vistas', 'aria-label': 'Informes', hidden: true },
       el('header', { class: 'vistas-cab' },
@@ -520,6 +632,9 @@
 
   function ocultar() {
     est.abierta = false;
+    // Las decisiones de un agente (desde su ficha) son de esa visita: quien
+    // vuelve a abrir Informes ve las de todos.
+    est.quienDecision = null;
     $('vistas').hidden = true;
     const app = $('app');
     if (app) app.classList.remove('vistas-abiertas');
@@ -809,13 +924,60 @@
       el('p', { class: 'v-lectura', text: `${cifras.numero(r.total || 0)} ${r.total === 1 ? 'mesa' : 'mesas'}: ${cifras.numero(r.titulares || 0)} titular${r.titulares === 1 ? '' : 'es'}, ${cifras.numero(r.incubacion || 0)} en prueba y ${cifras.numero(r.banquillo || 0)} en el banquillo.${sa && valido(sa.fraccion) && sa.fraccion > 0.0005 ? ` Sin asignar: ${cifras.pct(sa.fraccion, { decimales: 0 })} del patrimonio${valido(sa.usd) ? ` (${cifras.usd(sa.usd)})` : ''}, en efectivo.` : ''}` }),
       el('p', { class: 'v-sub', text: 'Cada mesa es una estrategia con reglas fijas. Se compara lo que hace en papel con lo que hizo en su histórico (backtest), las dos con costes y el resultado de papel con su penalización: si en papel se porta mucho peor, la ventaja del histórico era suerte o ya no existe.' })));
     if (!datos.mesas.length) { cont.appendChild(vacio('Todavía no hay mesas.')); return cont; }
-    const rejilla = el('div', { class: 'v-rejilla' });
+    // Agrupar por estado (lo de siempre), por plazo o por tipo de activo; y,
+    // agrupando, quedarse con un solo grupo.
+    const f = est.estrategias;
+    const g = datos.grupos || {};
+    const dimension = f.por === 'plazo' ? (g.plazos || []) : f.por === 'tipo' ? (g.tipos || []) : [];
+    if (f.grupo && !dimension.some(x => x.id === f.grupo)) f.grupo = null;
+    const repintar = () => pintarVista({ fresco: false });
+    cont.appendChild(el('div', { class: 'v-filtros v-agrupar' },
+      el('div', { class: 'v-segmentos', role: 'radiogroup', 'aria-label': 'Agrupar las mesas' }, AGRUPAR.map(a => el('button', {
+        type: 'button', role: 'radio', class: `v-segmento${a.id === f.por ? ' activo' : ''}`, 'aria-checked': String(a.id === f.por), text: a.nombre,
+        onclick: () => { if (f.por === a.id) return; f.por = a.id; f.grupo = null; recordar('estrategias-por', a.id); repintar(); },
+      })))));
+    if (dimension.length > 1) {
+      const chip = (id, texto, n, color) => {
+        const b = el('button', { type: 'button', class: `v-chip-filtro${f.grupo === id ? ' activo' : ''}`, 'aria-pressed': String(f.grupo === id),
+          onclick: () => { f.grupo = id; repintar(); } },
+        color ? el('span', { class: 'v-punto', 'aria-hidden': 'true' }) : null, el('span', { text: texto }), el('span', { class: 'v-chip-n', text: cifras.numero(n) }));
+        if (color) b.querySelector('.v-punto').style.setProperty('--c', color);
+        return b;
+      };
+      cont.appendChild(el('div', { class: 'v-filtros v-chips-filtro', role: 'group', 'aria-label': f.por === 'plazo' ? 'Ver un solo plazo' : 'Ver un solo tipo de activo' },
+        chip(null, f.por === 'plazo' ? 'Todos los plazos' : 'Todos los tipos', datos.mesas.length),
+        dimension.map(x => chip(x.id, x.nombre, x.mesas, f.por === 'tipo' ? cifras.colorTipo(x.id) : null))));
+    }
     const i = inst();
-    for (const m of datos.mesas) rejilla.appendChild(fichaMesa(m, cont, animar, datos.t, i));
-    cont.appendChild(rejilla);
+    const grupos = agruparMesas(datos.mesas, g, f.por, f.grupo);
+    for (const gr of grupos) {
+      const rejilla = el('div', { class: 'v-rejilla' });
+      for (const m of gr.mesas) rejilla.appendChild(fichaMesa(m, cont, animar, datos.t, i));
+      if (!gr.nombre) { cont.appendChild(rejilla); continue; }
+      const cab = el('header', { class: 'v-grupo-cab' },
+        gr.tipos ? el('span', { class: 'v-puntos', 'aria-hidden': 'true' }, gr.tipos.map(t => { const d = el('span', { class: 'v-punto' }); d.style.setProperty('--c', cifras.colorTipo(t)); return d; })) : null,
+        el('h3', { text: gr.nombre }), el('span', { class: 'v-tenue', text: `${cifras.numero(gr.mesas.length)} ${gr.mesas.length === 1 ? 'mesa' : 'mesas'}` }));
+      cont.appendChild(el('section', { class: 'v-grupo', 'aria-label': gr.nombre }, cab, gr.ayuda ? el('p', { class: 'v-sub', text: gr.ayuda }) : null, rejilla));
+    }
     alMontar(cont, (primera) => { if (primera) animarCifras(cont); });
     return cont;
   };
+
+  // Aviso del estudio de una mesa (las de ETF): titular, cifras con su umbral y la comparación.
+  function avisoEstudio(e, universoMesa) {
+    const x = textoEstudio(e, universoMesa);
+    if (!x) return null;
+    return el('div', { class: `v-estudio${x.suspendida ? ' suspendida' : ''}${x.otraCartera ? ' otra-cartera' : ''}`, role: 'note' },
+      el('p', { class: 'v-estudio-titular' }, el('span', { class: 'v-estudio-icono', 'aria-hidden': 'true', text: x.suspendida ? '!' : '✓' }), el('span', { text: x.titular })),
+      el('p', { class: 'v-estudio-contexto', text: x.contexto }),
+      el('ul', { class: 'v-estudio-cifras' }, x.filas.map(r => el('li', {},
+        el('span', { class: 'v-estudio-nombre', text: r.nombre, title: r.ayuda }),
+        el('b', { text: r.valor }),
+        el('span', { class: 'v-tenue', text: r.umbral }),
+        r.ok === null ? null : el('span', { class: `v-estudio-ok ${r.ok ? 'bien' : 'mal'}`, text: r.ok ? '✓ pasa' : '✗ no pasa' }),
+        r.nota ? el('span', { class: 'v-tenue v-estudio-aviso', text: r.nota }) : null))),
+      x.comparacion ? el('p', { class: 'v-estudio-contexto', text: x.comparacion }) : null);
+  }
 
   // Quién opera la mesa: la cara de cada operador (botón a su ficha) y su activo.
   function operadores(m, i) {
@@ -841,14 +1003,17 @@
     const tono = m.lectura ? ({ mejor: 'bien', peor: 'mal' }[m.lectura.tipo] || 'neutro') : 'neutro';
     const ficha = el('article', { class: 'v-mesa', 'aria-labelledby': `mesa-${m.id}` },
       el('header', { class: 'v-mesa-cab' }, llave, el('h3', { id: `mesa-${m.id}`, text: m.nombre }), pildora(e.texto, e.clase, e.ayuda)),
-      el('p', { class: 'v-mesa-sub', text: [FAMILIA[m.familia] || m.familia, MARCO[m.marco] || m.marco, valido(m.diasActiva) ? `${cifras.numero(m.diasActiva)} ${m.diasActiva === 1 ? 'día' : 'días'} en marcha` : null].filter(Boolean).join(' · ') }),
+      el('p', { class: 'v-mesa-sub', text: [FAMILIA[m.familia] || m.familia, MARCO[m.marco] || m.marco, m.plazo && m.plazo.nombre ? minus(m.plazo.nombre, 1) : null, valido(m.diasActiva) ? `${cifras.numero(m.diasActiva)} ${m.diasActiva === 1 ? 'día' : 'días'} en marcha` : null].filter(Boolean).join(' · ') }),
+      avisoEstudio(m.estudio, m.universo),
       el('div', { class: 'v-mesa-cifras' },
         el('div', {}, el('span', { class: 'v-rotulo', text: 'Peso' }), cifra(m.peso, y => cifras.pct(y, { decimales: 0 }), null, animar),
           valido(m.capital) ? el('span', { class: 'v-mini-sub', text: cifras.usd(m.capital) }) : null),
         el('div', {}, el('span', { class: 'v-rotulo', text: 'Resultado en papel' }), cifra(papel.pnlTotal, y => cifras.usd(y, { signo: true }), cifras.claseSigno(papel.pnlTotal, 0.005), animar),
           el('span', { class: 'v-mini-sub', text: `${cifras.numero(papel.operaciones || 0)} operaciones` }))),
       evol.length > 1 ? caja : null,
-      el('div', { class: 'v-activos', 'aria-label': 'Activos que opera' }, (m.universo || []).map(a => el('span', { class: 'v-chip', text: a }))),
+      el('div', { class: 'v-activos', 'aria-label': 'Activos que opera' },
+        (m.tipos || []).map(t => { const c = el('span', { class: 'v-tipo', title: 'Tipo de activo' }, el('span', { class: 'v-punto', 'aria-hidden': 'true' }), t.nombre); c.querySelector('.v-punto').style.setProperty('--c', cifras.colorTipo(t.id)); return c; }),
+        (m.universo || []).map(a => el('span', { class: 'v-chip', text: a }))),
       operadores(m, i),
       x.queMira ? el('p', { class: 'v-explica', text: x.queMira }) : null,
       (x.cuandoCompra || x.cuandoVende || x.cuandoNada || x.riesgo || x.filtros) ? el('details', { class: 'v-datos' }, el('summary', { text: 'Cuándo compra, cuándo vende y cuánto arriesga' }),
@@ -1080,7 +1245,7 @@
     const director = quienEs('laboratorio', i);
     const auditor = quienEs('auditor', i);
     cont.appendChild(el('div', { class: 'v-intro' },
-      el('h2', { class: 'v-pregunta', text: '¿Quien crea las estrategias lo hace bien?' }),
+      el('h2', { class: 'v-pregunta', text: '¿Quién crea las estrategias lo hace bien?' }),
       director.agente ? el('div', { class: 'v-quien' }, caraDe(director, i, 40),
         el('div', { class: 'v-quien-t' }, el('b', { text: director.nombre }), el('span', { class: 'v-tenue', text: `${director.rol}: propone las ideas y las examina.${auditor.agente ? ` ${pila(auditor.nombre)}, el auditor, le pasa pistas de las operaciones cerradas.` : ''}` })),
         el('button', { class: 'boton enlace', type: 'button', text: 'Sus decisiones', onclick: () => abrir('decisiones', { quien: 'laboratorio' }) })) : null,
@@ -1160,7 +1325,7 @@
   return {
     VISTAS, RANGOS, GRUPOS_DECISION, PUERTAS, NOMBRE_PUERTA, ORDEN_MESAS, COLOR_FONDO, COLOR_SOMBRA,
     colorMesa, seriesEvolucion, reparto, variacion, lecturaPeriodo, marcasDe, bandasDe, porDia, agruparRutina,
-    valorCriterio, detalleCriterio, textoValor, quienEs, textoSinNoticias,
+    valorCriterio, detalleCriterio, textoValor, quienEs, textoSinNoticias, AGRUPAR, agruparMesas, textoEstudio,
     iniciar, abrir, cerrar, abierta: () => est.abierta, vista: () => est.vista,
   };
 });

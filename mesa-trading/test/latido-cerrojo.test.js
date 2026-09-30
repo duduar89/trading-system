@@ -138,7 +138,7 @@ test('latido: avanza 5 min en sintético, publica la instantánea con latidoMs y
   fs.unlinkSync(path.join(config.carpetaDatos, '.proceso'));
 });
 
-test('comité convocado desde fuera: queda pedido y se celebra en el latido siguiente; los jefes se ven en la sala 5 min', async () => {
+test('comité convocado desde fuera: queda pedido y se celebra en el latido siguiente; los jefes se ven en la sala 15 min', async () => {
   const config = configEn(carpetaTemporal());
   await latido(config, { llm: llmApagado() });
   const c = await conLaMesa(config, orq => orq.comando('comite', {}), { espera: 1000, llm: llmApagado() });
@@ -168,7 +168,14 @@ test('comité convocado desde fuera: queda pedido y se celebra en el latido sigu
   }
   // En el estado (lo que decide) ya han vuelto a su sitio.
   for (const id of JEFES) assert.equal(estado.agentes[id].estado, 'trabajando');
-  // 5 min después (un latido sintético) ya no están.
+  // 15 min (30-sep-2026; antes 5, y no daba tiempo a verlo): dos latidos
+  // sintéticos después (10 min) siguen allí; al tercero (15 min) ya no están.
+  assert.equal(SALA_TRAS_COMITE_MS, 15 * 60_000);
+  for (let k = 0; k < 2; k++) {
+    await latido(config, { llm: llmApagado() });
+    inst = leerJSON(path.join(config.carpetaDatos, FICHEROS.instantanea));
+    for (const id of JEFES) assert.equal(inst.agentes.find(x => x.id === id).sala, 'comite', `${id} sigue en la sala a los ${(k + 1) * 5} min`);
+  }
   await latido(config, { llm: llmApagado() });
   inst = leerJSON(path.join(config.carpetaDatos, FICHEROS.instantanea));
   for (const id of JEFES) assert.notEqual(inst.agentes.find(x => x.id === id).sala, 'comite');

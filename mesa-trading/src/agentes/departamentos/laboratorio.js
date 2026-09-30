@@ -375,13 +375,27 @@ async function backtestMesa(ctx, mesa) {
   return {
     sharpe: r.metricas.sharpe, mu: m.media, sigma: m.desviacion, vol: m.desviacion > 0 ? m.desviacion * Math.sqrt(pa) : null,
     maxDD: r.metricas.maxDD, operaciones: r.metricas.operaciones, rentabilidad: r.metricas.rentabilidad, dias, t: ahora,
+    // El universo de la mesa con el que se hizo: si la mesa cambia de
+    // universo, este backtest ya no es su referencia (backtestVigente).
+    universo: [...mesa.universo],
   };
+}
+
+// ¿El backtest de referencia de la mesa es de su universo de ahora? Uno de
+// antes de guardar su universo vale hasta que una migración diga lo contrario
+// (orquestador._migrarUniverso).
+function backtestVigente(mesa) {
+  const bt = mesa && mesa.backtest;
+  if (!bt) return false;
+  if (!Array.isArray(bt.universo)) return true;
+  const a = new Set(bt.universo);
+  return a.size === new Set(mesa.universo).size && mesa.universo.every(s => a.has(s));
 }
 
 async function backtestsPendientes(ctx) {
   let n = 0;
   for (const mesa of ctx.estado.mesas) {
-    if (mesa.backtest) continue;
+    if (backtestVigente(mesa)) continue;
     try {
       mesa.backtest = await backtestMesa(ctx, mesa);
       if (mesa.backtest) {
@@ -428,6 +442,6 @@ async function auditoria(ctx, operaciones) {
 }
 
 module.exports = {
-  revisionSemanal, evaluarPendientes, evaluarUna, aplicarEvaluacion, evaluarFueraDeBanda, incorporarResultado, backtestsPendientes, backtestMesa, auditoria, maxDDReferencia, siguienteLunes, crearContextoHistorico,
+  revisionSemanal, evaluarPendientes, evaluarUna, aplicarEvaluacion, evaluarFueraDeBanda, incorporarResultado, backtestsPendientes, backtestMesa, backtestVigente, auditoria, maxDDReferencia, siguienteLunes, crearContextoHistorico,
   PESO_HIPOTESIS,
 };

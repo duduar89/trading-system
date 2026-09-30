@@ -125,6 +125,56 @@ test('conversación: una respuesta a un mensaje de más arriba sube la conversac
   assert.equal(new Set(ids).size, ids.length);
 });
 
+test('feed sin repintar (revisión del 30-sep-2026): un mensaje «fuera de orden» o la respuesta a una conversación de arriba no rehacen el feed', () => {
+  // Lo que suelta el reproductor llega con su hora original, anterior a la del
+  // último mensaje del feed: antes se rehacía el feed entero (hasta 300 bloques
+  // con sus caras) por cada uno. Ahora los nodos que ya estaban siguen siendo
+  // los mismos: solo entra el nuevo y, si es una respuesta, su conversación baja.
+  const raiz = msg('cio', { canal: 'comite', tipo: 'comite', texto: 'Abro el comité.' });
+  raiz.hilo = raiz.id;
+  paneles.anadirMensajes([raiz]);
+  for (let k = 0; k < 12; k++) paneles.anadirMensajes([msg('macro', { texto: `Nota ${k}.` })]);
+  const antes = $('feed').children.slice();
+  const bloqueRaiz = antes.find(x => x.getAttribute('data-id') === raiz.id);
+  // Una respuesta con una hora ANTERIOR a la del último mensaje (la suelta el reproductor tarde).
+  const r1 = msg('controller', { respondeA: raiz.id, hilo: raiz.id, texto: 'El fondo vale 100.000 $.', t: raiz.t + 1 });
+  paneles.anadirMensajes([r1]);
+  const despues = $('feed').children;
+  assert.equal(despues[despues.length - 1], bloqueRaiz, 'la conversación, el mismo nodo, baja al final (orden de llegada)');
+  assert.deepEqual(bloqueRaiz.querySelector('.respuestas').children.map(c => c.querySelector('p').textContent), ['El fondo vale 100.000 $.']);
+  for (const n of antes) if (n !== bloqueRaiz) assert.ok(despues.includes(n), 'ningún otro nodo se ha rehecho');
+  // Un mensaje suelto con una hora anterior a la del último: al final, sin rehacer nada.
+  const tarde = msg('macro', { texto: 'Llego tarde.', t: raiz.t + 2 });
+  paneles.anadirMensajes([tarde]);
+  const fin = $('feed').children;
+  assert.equal(fin[fin.length - 1].getAttribute('data-id'), tarde.id);
+  for (const n of antes) assert.ok(fin.includes(n), 'sigue sin rehacerse');
+  const ids = $('feed').querySelectorAll('.msg').map(x => x.getAttribute('data-id'));
+  assert.equal(new Set(ids).size, ids.length, 'nada repetido');
+});
+
+test('feed sin repintar: al bajar una conversación de otro día no queda un separador de día vacío, y cada día sigue diciendo el suyo', () => {
+  // Día 1: una conversación; día 2: un mensaje. La respuesta del día 1 llega tarde.
+  const D1 = Date.UTC(2026, 8, 29, 12, 0);   // 29-sep en Madrid (el día del feed va con la hora de Madrid)
+  const D2 = Date.UTC(2026, 8, 30, 1, 0);    // 30-sep en Madrid
+  const a = msg('cio', { canal: 'comite', tipo: 'comite', texto: 'Comité de anoche.', t: D1 });
+  a.hilo = a.id;
+  paneles.anadirMensajes(Array.from({ length: 61 }, (_, k) => msg('macro', { texto: `relleno ${k}`, t: D1 - 3600000 + k })));   // de golpe: se rehace entero
+  paneles.anadirMensajes([a]);
+  paneles.anadirMensajes([msg('macro', { texto: 'Buenos días.', t: D2 })]);
+  const seps = () => $('feed').children.filter(c => c.classList.contains('separador-dia'));
+  const antesSeps = seps().length;
+  paneles.anadirMensajes([msg('riesgos', { respondeA: a.id, hilo: a.id, texto: 'Anoche, nada.', t: D1 + 60000 })]);
+  const hijos = $('feed').children;
+  for (let k = 1; k < hijos.length; k++) {
+    const vacio = hijos[k - 1].classList.contains('separador-dia') && hijos[k].classList.contains('separador-dia');
+    assert.ok(!vacio, 'dos separadores seguidos: uno se quedó sin mensajes');
+  }
+  assert.ok(hijos[hijos.length - 1].getAttribute('data-id') === a.id, 'la conversación de anoche, abajo');
+  assert.ok(hijos[hijos.length - 2].classList.contains('separador-dia'), 'con su día encima: el del mensaje anterior es otro');
+  assert.ok(seps().length <= antesSeps + 1);
+});
+
 test('ficha del agente: cara grande, nombre, departamento, rol, qué hace en llano y el detalle técnico desplegable que sobrevive al refresco', () => {
   paneles.mostrarTarjeta({ tipo: 'agente', id: 'riesgos' }, INST);
   const t = $('tarjeta');
@@ -256,4 +306,21 @@ test('al cerrar la ficha, el foco vuelve a la fila del equipo aunque el equipo s
   paneles.ocultarTarjeta();
   assert.equal(DOC.activeElement, nueva);
   AGENTES.find(a => a.id === 'macro').estado = 'trabajando';
+});
+
+test('píldora del comité: con los jefes en la sala dice qué reunión es (el nombre de su cita) o «Comité reunido»', () => {
+  const cab = { proximoComite: T0 + 3600e3, modoComite: 'NORMAL' };
+  const enSala = { ...INST, cabecera: cab, agentes: AGENTES.map(a => (['cio', 'controller'].includes(a.id) ? { ...a, sala: 'comite', estado: 'reunion' } : a)) };
+  // Lo último que se abrió en la sala: la reunión informativa de las 22:15.
+  paneles.anadirMensajes([msg('cio', { canal: 'direccion', tipo: 'reunion', t: T0 + 500000, datos: { reunion: 'cierre', fase: 'apertura', nombre: 'Cierre del día' } })]);
+  paneles.actualizarComite(enSala, T0 + 500000);
+  assert.equal($('p-comite').textContent, 'Cierre del día');
+  assert.match($('p-comite').title, /no cambia nada/);
+  // Después, un comité: ya no es la reunión.
+  paneles.anadirMensajes([msg('cio', { canal: 'comite', tipo: 'comite', t: T0 + 600000 })]);
+  paneles.actualizarComite(enSala, T0 + 600000);
+  assert.equal($('p-comite').textContent, 'Comité reunido');
+  // Con los jefes fuera de la sala, la cuenta atrás.
+  paneles.actualizarComite({ ...enSala, agentes: AGENTES }, T0 + 600000);
+  assert.match($('p-comite').textContent, /^Comité en /);
 });

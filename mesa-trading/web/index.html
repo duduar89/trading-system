@@ -30,7 +30,7 @@
         <span class="pildora maqueta" id="p-maqueta" hidden title="Datos inventados para trabajar la interfaz">MAQUETA</span>
       </div>
       <div class="cifras">
-        <div class="cifra"><span class="rotulo">Patrimonio</span><span class="valor" id="v-patrimonio">—</span></div>
+        <button class="cifra cifra-boton" type="button" id="c-patrimonio" data-explica="patrimonio" aria-controls="capital-explica" aria-expanded="false"><span class="rotulo">Patrimonio</span><span class="valor" id="v-patrimonio">—</span></button>
         <div class="cifra"><span class="rotulo">Resultado hoy</span><span class="valor-linea"><span class="valor" id="v-resultado">—</span> <span class="sub" id="v-resultado-pct"></span></span></div>
         <div class="cifra"><span class="rotulo">Caída</span><span class="valor" id="v-caida">—</span></div>
         <div class="cifra secundaria"><span class="rotulo">Exposición</span><span class="valor" id="v-exposicion">—</span></div>
@@ -46,6 +46,19 @@
       </div>
     </header>
 
+    <section class="capital" id="capital" aria-label="Capital: dónde está el dinero">
+      <div class="capital-cifras">
+        <button class="cifra cifra-boton" type="button" id="c-invertido" data-explica="invertido" aria-controls="capital-explica" aria-expanded="false"><span class="rotulo">Invertido</span><span class="valor-linea"><span class="valor" id="v-invertido">—</span> <span class="sub" id="v-invertido-pct"></span></span></button>
+        <button class="cifra cifra-boton" type="button" id="c-efectivo" data-explica="efectivo" aria-controls="capital-explica" aria-expanded="false"><span class="rotulo">Efectivo</span><span class="valor" id="v-efectivo">—</span></button>
+        <button class="cifra cifra-boton" type="button" id="c-disponible" data-explica="disponible" aria-controls="capital-explica" aria-expanded="false"><span class="rotulo">Margen de los límites</span><span class="valor-linea"><span class="valor" id="v-disponible">—</span> <span class="sub" id="v-disponible-nota"></span></span></button>
+      </div>
+      <div class="reparto">
+        <div class="reparto-barra" id="reparto-barra" aria-hidden="true"></div>
+        <div class="reparto-tipos" id="reparto-tipos" aria-label="Invertido por tipo de activo"></div>
+      </div>
+      <p class="capital-explica" id="capital-explica" role="status" aria-live="polite" hidden></p>
+    </section>
+
     <aside class="lateral" id="lateral" aria-label="Mensajes y equipo">
       <div class="lateral-cab">
         <button class="asa" id="asa" type="button" aria-expanded="false" aria-controls="lateral" aria-label="Abrir o cerrar el panel de mensajes y equipo"><span></span></button>
@@ -56,6 +69,7 @@
       </div>
       <div class="vista" id="vista-mensajes" role="tabpanel" aria-labelledby="pestana-mensajes">
         <div class="chips" id="chips" role="toolbar" aria-label="Filtrar mensajes por departamento"></div>
+        <div class="en-curso" id="en-curso" role="status" aria-live="polite" hidden></div>
         <div class="feed" id="feed" role="log" aria-live="polite" aria-relevant="additions" tabindex="0"></div>
         <button class="nuevos" id="nuevos" type="button" hidden>Nuevos ↓</button>
       </div>
@@ -94,6 +108,7 @@
   <script src="js/personajes.js"></script>
   <script src="js/caras.js"></script>
   <script src="js/paneles.js"></script>
+  <script src="js/reproductor.js"></script>
   <script src="js/maqueta.js"></script>
   <script src="js/pwa.js"></script>
   <script src="js/graficas.js"></script>

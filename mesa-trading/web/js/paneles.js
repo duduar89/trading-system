@@ -142,6 +142,10 @@
     feedAbajo: true,             // ¿estaba el feed abajo del todo al cambiar de pestaña?
     detalleAbierto: new Set(),   // fichas de agente con «Detalle técnico» desplegado (sobrevive al refresco)
     cacheAgentes: { lista: null, mapa: new Map() },
+    explica: null,               // la cifra del capital cuya explicación se ve ('invertido', 'tipo:cripto'…)
+    explicaT: 0,                 // cuándo se escribió (se refresca como mucho cada 30 s: es role=status)
+    repartoClave: '',            // tipos de la barra del reparto (se rehace si cambian)
+    reproduciendo: null,         // la reunión que el reproductor está soltando: { nombre, vistos, total } o null
   };
 
   function colorDep(id) {
@@ -190,6 +194,14 @@
     construirPestanas();
     construirBuscadorEquipo();
     for (const id of ['pildoras', 'acciones']) { const n = $(id); if (n) n.addEventListener('scroll', marcarDesborde, { passive: true }); }
+    // Cifras del capital: al tocarlas, una línea dice de dónde salen.
+    for (const id of ['barra', 'capital']) {
+      const n = $(id);
+      if (n) n.addEventListener('click', (e) => {
+        const b = e.target && e.target.closest ? e.target.closest('[data-explica]') : null;
+        if (b) alternarExplicacion(b.getAttribute('data-explica'));
+      });
+    }
     const feed = $('feed');
     feed.addEventListener('scroll', () => {
       if (pegadoAbajo()) { est.nuevosSinVer = 0; $('nuevos').hidden = true; }
@@ -204,6 +216,7 @@
     });
     window.addEventListener('resize', () => { marcarDesborde(); ajustarModoTarjeta(); });
     document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && est.explica && !$('modal').open && !est.tarjeta) { alternarExplicacion(null); return; }
       if (e.key === 'Escape' && !$('modal').open && est.tarjeta) {
         ocultarTarjeta();
         if (est.manejadores.alCerrarTarjeta) est.manejadores.alCerrarTarjeta();
@@ -427,6 +440,7 @@
       pl.title = 'Sin clave o desactivado: los agentes hablan con plantillas.';
     }
     $('p-maqueta').hidden = !(o && o.maqueta);
+    actualizarCapital(inst);
     actualizarComite(inst, o && o.ahoraServidor);
     actualizarEquipo(inst);          // la pestaña Equipo, si se ve y ha cambiado alguien
     marcarDesborde();
@@ -443,6 +457,106 @@
     }
   }
 
+  // ---------- capital (§7, cabecera.capital) ----------
+  // Debajo de la barra: invertido (importe y %), efectivo, el margen que dejan
+  // los límites (no lo que el fondo va a comprar: las mesas solo invierten su
+  // parte; revisión del 30-sep-2026) y el reparto por tipo de activo (barra apilada que crece desde
+  // la izquierda y, debajo, cada tipo con su nombre, importe y %). Todo sale de
+  // la instantánea; un servidor sin el campo no pinta la franja.
+  let instCapital = null;
+  function actualizarCapital(inst) {
+    const sec = $('capital');
+    if (!sec) return;
+    const cap = inst && inst.cabecera && inst.cabecera.capital;
+    sec.hidden = !cap;
+    instCapital = cap ? inst : null;
+    if (!cap) return;
+    cifras.animar($('v-invertido'), cap.invertido, x => cifras.usd(x));
+    $('v-invertido-pct').textContent = `(${cifras.pct(cap.invertidoPct, { decimales: 0 })})`;
+    cifras.animar($('v-efectivo'), cap.efectivo, x => cifras.usd(x));
+    cifras.animar($('v-disponible'), cap.disponible, x => cifras.usd(x));
+    // El margen de los límites no es lo que el fondo va a comprar: con el
+    // fondo parado (kill, pausa, solo cerrar) no compra nada, y se marca.
+    const parado = cifras.nivelEfectivo(inst, inst.ahora).nivel !== 'normal';
+    const nota = $('v-disponible-nota');
+    if (nota) nota.textContent = parado ? '(no compra)' : '';
+    const boton = $('c-disponible');
+    if (boton) boton.classList.toggle('no-compra', parado);
+    pintarReparto(cap);
+    if (est.explica && Date.now() - est.explicaT > 30000) escribirExplicacion();
+  }
+
+  function pintarReparto(cap) {
+    const barra = $('reparto-barra');
+    const tipos = $('reparto-tipos');
+    if (!barra || !tipos) return;
+    const P = cap.patrimonio > 0 ? cap.patrimonio : 0;
+    const lista = (cap.porTipo || []);
+    const clave = lista.map(t => t.tipo).join('|');
+    const ancho = x => `${P > 0 ? Math.max(0, Math.min(100, (x / P) * 100)).toFixed(3) : 0}%`;
+    if (clave !== est.repartoClave) {
+      est.repartoClave = clave;
+      barra.textContent = '';
+      tipos.textContent = '';
+      lista.forEach((t, k) => {
+        const seg = el('span', { class: 'reparto-seg', 'data-tipo': t.tipo });
+        seg.style.setProperty('--c', cifras.colorTipo(t.tipo));
+        seg.style.setProperty('--retraso', `${k * 35}ms`);
+        barra.appendChild(seg);
+        const punto = el('span', { class: 'punto', 'aria-hidden': 'true' });
+        punto.style.setProperty('--c', cifras.colorTipo(t.tipo));
+        tipos.appendChild(el('button', { class: 'reparto-tipo', type: 'button', 'data-explica': `tipo:${t.tipo}`, 'data-tipo': t.tipo,
+          'aria-controls': 'capital-explica', 'aria-expanded': 'false' },
+        punto, el('span', { class: 'reparto-nombre', text: t.nombre }), el('span', { class: 'reparto-importe' }), el('span', { class: 'reparto-pct' })));
+      });
+      const ef = el('span', { class: 'reparto-seg efectivo', 'data-tipo': 'efectivo' });
+      ef.style.setProperty('--retraso', `${lista.length * 35}ms`);
+      barra.appendChild(ef);
+      tipos.appendChild(el('span', { class: 'reparto-tipo leyenda-efectivo', 'aria-hidden': 'true' }, el('span', { class: 'punto efectivo' }), el('span', { class: 'reparto-nombre', text: 'Efectivo' })));
+      barra.classList.remove('entra');
+      void barra.offsetWidth;   // reinicia la animación de entrada
+      barra.classList.add('entra');
+      marcarExplicando();
+    }
+    for (const t of lista) {
+      const seg = barra.querySelector(`.reparto-seg[data-tipo="${t.tipo}"]`);
+      if (seg) { seg.style.setProperty('--w', ancho(t.importe)); seg.title = `${t.nombre}: ${cifras.usd(t.importe)} (${cifras.pct(t.pct, { decimales: 1 })})`; }
+      const b = tipos.querySelector(`.reparto-tipo[data-tipo="${t.tipo}"]`);
+      if (b) {
+        const cero = !(t.importe > 0);
+        b.classList.toggle('cero', cero);
+        // Sin nada invertido: «0 $», sin céntimos ni «0 %» (el tipo sale porque lo opera una mesa).
+        b.querySelector('.reparto-importe').textContent = cero ? '0 $' : cifras.usd(t.importe);
+        b.querySelector('.reparto-pct').textContent = cero ? '' : cifras.pct(t.pct, { decimales: 0 });
+        b.setAttribute('aria-label', `${t.nombre}: ${cifras.usd(t.importe)}, ${cifras.pct(t.pct, { decimales: 1 })} del patrimonio. Toca para ver de dónde sale.`);
+      }
+    }
+    const ef = barra.querySelector('.reparto-seg.efectivo');
+    if (ef) { ef.style.setProperty('--w', ancho(cap.efectivo)); ef.title = `Efectivo: ${cifras.usd(cap.efectivo)}`; }
+  }
+
+  // Toca una cifra: su línea; la misma otra vez (o Escape), se quita.
+  function alternarExplicacion(clave) {
+    est.explica = clave && clave !== est.explica ? clave : null;
+    escribirExplicacion();
+  }
+
+  function escribirExplicacion() {
+    const p = $('capital-explica');
+    if (!p) return;
+    // «50.255 $» no se parte entre dos líneas.
+    const texto = est.explica ? (cifras.explicarCapital(est.explica, instCapital) || '').replace(/ ([$%])/g, '\u00a0$1') || null : null;
+    if (!texto) est.explica = null;
+    p.hidden = !texto;
+    if (p.textContent !== (texto || '')) p.textContent = texto || '';
+    est.explicaT = Date.now();
+    marcarExplicando();
+  }
+
+  function marcarExplicando() {
+    document.querySelectorAll('[data-explica]').forEach(b => b.setAttribute('aria-expanded', String(b.getAttribute('data-explica') === est.explica)));
+  }
+
   function actualizarComite(inst, ahoraServidor) {
     const pc = $('p-comite');
     const cab = (inst && inst.cabecera) || {};
@@ -454,10 +568,35 @@
     const reunion = reunido ? reunionEnCurso(est.mensajes.length ? est.mensajes : (inst.mensajes || [])) : null;
     // Modo web: convocado desde el panel, se celebra en el latido siguiente.
     const pedido = !reunido && cab.comitePedido === true;
-    pc.textContent = reunion ? reunion.nombre : reunido ? 'Comité reunido' : pedido ? 'Comité convocado' : resta > 0 ? `Comité en ${cifras.cuentaAtras(resta)}` : 'Comité pendiente';
-    pc.className = 'pildora ' + (reunido || pedido ? 'ambar' : 'gris');
-    pc.title = reunion ? `Reunión informativa: cuenta cómo va el fondo y no cambia nada. Modo del comité: ${cifras.modoComite(cab.modoComite)}`
-      : pedido ? 'Convocado: empieza en el próximo latido.' : `Modo del comité: ${cifras.modoComite(cab.modoComite)}`;
+    // Mientras el feed la reproduce, la píldora lo dice (con los jefes en la sala o no).
+    const rep = est.reproduciendo;
+    pc.textContent = rep ? `${rep.nombre} en curso` : reunion ? reunion.nombre : reunido ? 'Comité reunido' : pedido ? 'Comité convocado' : resta > 0 ? `Comité en ${cifras.cuentaAtras(resta)}` : 'Comité pendiente';
+    pc.className = 'pildora ' + (rep || reunido || pedido ? 'ambar' : 'gris');
+    pc.title = rep ? `El feed la cuenta punto por punto: ${cifras.numero(Math.min(rep.vistos, rep.total))} de ${cifras.numero(rep.total)}.`
+      : reunion ? `Reunión informativa: cuenta cómo va el fondo y no cambia nada. Modo del comité: ${cifras.modoComite(cab.modoComite)}`
+        : pedido ? 'Convocado: empieza en el próximo latido.' : `Modo del comité: ${cifras.modoComite(cab.modoComite)}`;
+  }
+
+  // «Reunión en curso» encima del feed mientras el reproductor (app.js) suelta
+  // una reunión que llegó de golpe; r = { nombre, vistos, total } o null.
+  function reunionEnCursoFeed(r) {
+    const antes = est.reproduciendo;
+    est.reproduciendo = r || null;
+    const n = $('en-curso');
+    const clave = r ? `${r.nombre}|${r.vistos}|${r.total}` : '';
+    if (n && n.getAttribute('data-clave') !== clave) {
+      n.setAttribute('data-clave', clave);
+      n.hidden = !r;
+      n.textContent = '';
+      if (r) {
+        poner(n, el('span', { class: 'punto-vivo', 'aria-hidden': 'true' }), el('b', { text: `${r.nombre} en curso` }),
+          el('span', { class: 'en-curso-n', text: `${cifras.numero(Math.min(r.vistos, r.total))} de ${cifras.numero(r.total)}` }));
+      }
+    }
+    if ((antes ? antes.nombre + antes.vistos : '') !== (r ? r.nombre + r.vistos : '') && est.manejadores.instantanea) {
+      const inst = est.manejadores.instantanea();
+      if (inst) actualizarComite(inst, typeof est.manejadores.ahoraServidor === 'function' ? est.manejadores.ahoraServidor() : null);
+    }
   }
 
   // ¿Los jefes están en la sala por una reunión informativa y no por un
@@ -466,7 +605,7 @@
   // comité (canal 'comite', tipo 'comite'). En el modo latido los jefes se
   // quedan unos minutos en la sala tras acabar: sigue siendo esa reunión.
   // Devuelve { reunion: 'manana'|'cierre', nombre } o null.
-  const NOMBRE_REUNION = { manana: 'Reunión de la mañana', cierre: 'Reunión de cierre' };
+  const NOMBRE_REUNION = { manana: 'Reunión de la mañana', cierre: 'Cierre del día' };   // los de src/agentes/reuniones.js (CITAS)
   function reunionEnCurso(mensajes) {
     for (let k = (mensajes || []).length - 1; k >= 0; k--) {
       const m = mensajes[k];
@@ -474,7 +613,8 @@
       if (m.canal === 'comite' && m.tipo === 'comite') return null;
       if (m.canal === 'direccion' && m.tipo === 'reunion' && m.datos && m.datos.fase === 'apertura') {
         const tipo = m.datos.reunion === 'cierre' ? 'cierre' : 'manana';
-        return { reunion: tipo, nombre: NOMBRE_REUNION[tipo] };
+        const nombre = typeof m.datos.nombre === 'string' && m.datos.nombre.trim() ? m.datos.nombre.trim().slice(0, 40) : NOMBRE_REUNION[tipo];
+        return { reunion: tipo, nombre };
       }
     }
     return null;
@@ -589,24 +729,85 @@
     if (primero && primero.classList.contains('msg')) feed.insertBefore(separadorDia(Number(primero.dataset.t)), primero);
   }
 
-  // ¿Dónde va un mensaje nuevo? 'suelto': al final del feed, como siempre;
-  // un nodo: es una respuesta a la conversación que ya está abajo del todo y
-  // va dentro de ella; 'repintar': su conversación está más arriba (o llegó
-  // una respuesta antes que su mensaje), y se rehace el feed para subirla.
-  function destinoDe(m, feed) {
-    const clave = caras.claveHilo(m, est.porId);
-    if (clave === String(m.id)) {
-      const tieneRespuestas = est.mensajes.some(x => x !== m && (x.respondeA === m.id || String(x.hilo) === String(m.id)));
-      return tieneRespuestas ? 'repintar' : 'suelto';
+  // El bloque de una conversación en el feed (buscando desde abajo: casi
+  // siempre es de las últimas), o null.
+  function bloqueEnFeed(feed, clave) {
+    for (let n = feed.lastElementChild; n; n = n.previousElementSibling) if (n.dataset && n.dataset.clave === clave) return n;
+    return null;
+  }
+
+  // Una conversación entera desde la memoria del feed (est.mensajes), o null.
+  function bloqueDe(clave) {
+    const ms = est.mensajes.filter(x => caras.claveHilo(x, est.porId) === clave);
+    return ms.length ? caras.organizarHilos(ms, est.porId)[0] : null;
+  }
+
+  // Saca un nodo del feed sin dejar arriba un separador de día que ya no
+  // separa nada (sin mensajes debajo hasta el siguiente separador).
+  function sacarDelFeed(feed, n) {
+    const antes = n.previousElementSibling;
+    feed.removeChild(n);
+    if (antes && antes.classList.contains('separador-dia')) {
+      const despues = antes.nextElementSibling;
+      if (!despues || despues.classList.contains('separador-dia')) feed.removeChild(antes);
     }
-    const ultimo = feed.lastElementChild;
-    if (ultimo && ultimo.classList.contains('msg') && ultimo.dataset.clave === clave && ultimo.dataset.dia === (cifras.dia(m.t) || '')) return ultimo;
-    return 'repintar';
+  }
+
+  // Al final del feed, con su separador si cambia el día.
+  function alFinalDelFeed(feed, n) {
+    if (n.dataset.dia !== ultimoDiaDelFeed(feed)) feed.appendChild(separadorDia(Number(n.dataset.t)));
+    feed.appendChild(n);
+  }
+
+  // Un mensaje nuevo en su sitio, por orden de LLEGADA (revisión del
+  // 30-sep-2026). Una respuesta a una conversación que está en el feed entra
+  // dentro de ella (por su hora) y la conversación baja al final: es lo último
+  // que ha pasado. Una raíz nueva, o una respuesta cuya conversación no está
+  // (podada, filtrada, o su raíz llegó después), entra con su conversación
+  // entera al final. → true si entra algo que se ve.
+  function colocarMensaje(feed, m) {
+    const clave = caras.claveHilo(m, est.porId);
+    const actual = bloqueEnFeed(feed, clave);
+    if (actual && clave !== String(m.id)) {
+      const raiz = est.porId.get(actual.getAttribute('data-id')) || null;
+      let resp = actual.querySelector('.respuestas');
+      if (!resp) {
+        const cuerpo = actual.querySelector('.cuerpo');
+        if (!cuerpo) return false;
+        resp = el('div', { class: 'respuestas', role: 'group', 'aria-label': `Respuestas a ${(raiz && raiz.deNombre) || 'este mensaje'}` });
+        cuerpo.appendChild(resp);
+        actual.classList.add('conversacion');
+      }
+      const nodo = nodoMensaje(m, { raiz: raiz || m });
+      let antesDe = null;
+      for (const r of resp.children) if (Number(r.dataset.t) > m.t) { antesDe = r; break; }
+      resp.insertBefore(nodo, antesDe);
+      const t = Math.max(Number(actual.dataset.t) || -Infinity, m.t);
+      actual.dataset.t = t;
+      actual.dataset.dia = cifras.dia(t) || '';
+      if (actual !== feed.lastElementChild) { sacarDelFeed(feed, actual); alFinalDelFeed(feed, actual); }
+      return true;
+    }
+    const bloque = bloqueDe(clave);
+    if (!bloque || !(pasaFiltro(bloque.raiz) || bloque.respuestas.some(pasaFiltro))) return false;
+    if (actual) sacarDelFeed(feed, actual);
+    alFinalDelFeed(feed, nodoBloque(bloque));
+    return true;
   }
 
   // Añade mensajes nuevos (sin repetir: se quitan los duplicados por id, también
   // los que vuelven a llegar con la instantánea o al reconectar). Devuelve los nuevos.
-  function anadirMensajes(lista) {
+  //
+  // Sin rehacer el feed (revisión del 30-sep-2026): con el reproductor, cada
+  // mensaje soltado llegaba «fuera de orden» (su hora es anterior a la del
+  // último) o era la respuesta a una conversación de más arriba, y se rehacía
+  // el feed entero, hasta 300 bloques con sus caras: en el móvil, cientos de ms
+  // de hilo principal por mensaje. Ahora cada uno va a su sitio
+  // (colocarMensaje). Solo se rehace entero con muchos de golpe (más de 60: la
+  // primera instantánea), con `historia` (mensajes viejos que llegan tras una
+  // reconexión y van en su sitio por hora) y al cambiar de filtro.
+  function anadirMensajes(lista, opciones) {
+    const o = opciones || {};
     const nuevos = [];
     for (const m of lista || []) {
       if (!m || !m.id || est.vistos.has(m.id)) continue;
@@ -623,38 +824,11 @@
     const feed = $('feed');
     const abajo = pegadoAbajo();
     const ultimo = feed.lastElementChild;
-    const ultimoT = ultimo && ultimo.classList.contains('msg') ? Number(ultimo.dataset.t) : -Infinity;
-    const enOrden = nuevos.every(m => m.t >= ultimoT);
-    const destinos = enOrden && nuevos.length <= 60 ? nuevos.map(m => destinoDe(m, feed)) : [];
-    if (!enOrden || nuevos.length > 60 || destinos.includes('repintar')
+    if (o.historia || nuevos.length > 60
       || (ultimo && !ultimo.classList.contains('msg') && !ultimo.classList.contains('separador-dia'))) {
       repintarFeed(abajo);
     } else {
-      let dia = ultimoDiaDelFeed(feed);
-      nuevos.forEach((m, k) => {
-        const destino = destinos[k];
-        if (destino !== 'suelto') {
-          // Respuesta a la conversación de abajo del todo: dentro de ella, sangrada.
-          const raiz = est.porId.get(destino.dataset.id) || null;
-          let resp = destino.querySelector('.respuestas');
-          if (!resp) {
-            const cuerpo = destino.querySelector('.cuerpo');
-            if (!cuerpo) return;
-            resp = el('div', { class: 'respuestas', role: 'group', 'aria-label': `Respuestas a ${(raiz && raiz.deNombre) || 'este mensaje'}` });
-            cuerpo.appendChild(resp);
-            destino.classList.add('conversacion');
-          }
-          resp.appendChild(nodoMensaje(m, { raiz: raiz || m }));
-          destino.dataset.t = m.t;
-          if (!abajo) est.nuevosSinVer++;
-          return;
-        }
-        if (!pasaFiltro(m)) return;
-        const n = nodoBloque({ clave: String(m.id), raiz: m, respuestas: [], ultimoT: m.t });
-        if (n.dataset.dia !== dia) { feed.appendChild(separadorDia(m.t)); dia = n.dataset.dia; }
-        feed.appendChild(n);
-        if (!abajo) est.nuevosSinVer++;
-      });
+      for (const m of nuevos) if (colocarMensaje(feed, m) && !abajo) est.nuevosSinVer++;
       while (feed.childElementCount > MAX_DOM) feed.removeChild(feed.firstElementChild);
       asegurarSeparadorArriba(feed);
       if (abajo) feed.scrollTop = feed.scrollHeight;
@@ -1526,5 +1700,6 @@
     mostrarTarjeta, ocultarTarjeta, refrescarTarjeta, conexion, refrescarFranja, datosViejos, textoConexion, tostada, abrirModal, cerrarModal,
     textoDirectiva, nombreMesa, frase, valorCriterio, capitalDe, iniciales, get tarjeta() { return est.tarjeta; }, _est: est,
     elegirPestana, actualizarEquipo, ultimosMensajesDe, reunionEnCurso, get pestana() { return est.pestana; },
+    actualizarCapital, alternarExplicacion, reunionEnCursoFeed, yaVisto: id => est.vistos.has(id),
   };
 });

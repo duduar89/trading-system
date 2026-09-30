@@ -188,3 +188,46 @@ test('vistas: quién decidió, colores fijos por mesa y textos sin noticias', ()
   assert.match(V.textoSinNoticias({ modo: 'alpaca' }, { simbolo: 'BTC' }), /filtro/);
   assert.equal(typeof cifras.modoComite, 'function');
 });
+
+test('estrategias (30-sep-2026): agrupar por plazo o por tipo de activo, filtrar un grupo, y la mezcla de tipos sin repetir mesa', () => {
+  const m = (id, plazo, tipos) => ({ id, plazo: { id: plazo, nombre: { horas: 'Cada 4 horas', dia: 'Cada día o semana', mes: 'Cada mes' }[plazo] },
+    tipos: tipos.map(t => ({ id: t, nombre: { cripto: 'Cripto', indices: 'Índices', bonos: 'Bonos', materias: 'Materias primas' }[t] })) });
+  const mesas = [m('momentum', 'dia', ['cripto']), m('momentum-etf', 'mes', ['indices', 'bonos', 'materias']), m('reversion-etf', 'dia', ['indices']), m('tendencia', 'horas', ['cripto'])];
+  const grupos = { plazos: [{ id: 'horas' }, { id: 'dia' }, { id: 'mes' }], tipos: [{ id: 'cripto' }, { id: 'indices' }, { id: 'bonos' }, { id: 'materias' }] };
+  const ver = (por, f) => V.agruparMesas(mesas, grupos, por, f).map(g => [g.nombre, g.mesas.map(x => x.id)]);
+  assert.deepEqual(ver('estado'), [[null, ['momentum', 'momentum-etf', 'reversion-etf', 'tendencia']]], 'por estado: el orden del servidor, sin rótulos');
+  assert.deepEqual(ver('plazo'), [['Cada 4 horas', ['tendencia']], ['Cada día o semana', ['momentum', 'reversion-etf']], ['Cada mes', ['momentum-etf']]]);
+  assert.deepEqual(ver('tipo'), [['Cripto', ['momentum', 'tendencia']], ['Índices', ['reversion-etf']], ['Índices, bonos y materias primas', ['momentum-etf']]]);
+  assert.deepEqual(ver('tipo', 'bonos'), [['Índices, bonos y materias primas', ['momentum-etf']]], 'filtrar por un tipo trae las que lo operan');
+  assert.deepEqual(ver('tipo', 'indices'), [['Índices', ['reversion-etf']], ['Índices, bonos y materias primas', ['momentum-etf']]]);
+  assert.deepEqual(ver('plazo', 'dia'), [['Cada día o semana', ['momentum', 'reversion-etf']]]);
+  const todas = V.agruparMesas(mesas, grupos, 'tipo', null).flatMap(g => g.mesas.map(x => x.id));
+  assert.equal(new Set(todas).size, todas.length, 'ninguna mesa sale dos veces');
+});
+
+test('estrategias: el aviso del estudio dice «Suspendió el filtro; sigue en prueba por decisión de Eduardo» con sus cifras y umbrales', () => {
+  const e = JSON.parse(JSON.stringify(require('../src/estrategias').ESTUDIOS_ETF['momentum-etf']));
+  const x = V.textoEstudio(e);
+  assert.equal(x.titular, 'Suspendió el filtro; sigue en prueba por decisión de Eduardo.');
+  assert.equal(x.suspendida, true);
+  assert.deepEqual(x.filas.map(f => [f.valor, f.umbral, f.ok]), [['0,19', 'mín. 0,6', false], ['69 %', 'mín. 75 %', false], ['0,48', 'mín. 0,90', false]]);
+  assert.equal(x.comparacion, 'En 10 años: 2,1 % al año con como mucho el 20 % invertido; comprar y mantener, con todo invertido, 13,3 %. No se comparan tal cual.');
+  assert.match(x.contexto, /con 10 años de datos reales de SPY, QQQ, IWM, TLT, GLD y DIA\. Eduardo la mantiene para verla en vivo\.$/);
+  assert.equal(x.otraCartera, false);
+  assert.equal(V.textoEstudio(e, ['SPY', 'QQQ', 'IWM', 'TLT', 'GLD', 'DIA']).otraCartera, false, 'con el mismo universo, su estudio');
+  assert.equal(V.textoEstudio(null), null, 'sin estudio, sin aviso');
+  // Con los Sharpe de las dos (la salida siguiente del estudio), se comparan los Sharpe.
+  const conSharpe = V.textoEstudio({ ...e, cifras: { ...e.cifras, sharpeCompleto: 0.21, comprarYMantenerSharpe: 0.84 } });
+  assert.equal(conSharpe.comparacion, 'En 10 años, rentabilidad por unidad de riesgo (Sharpe): 0,21; comprar y mantener, 0,84. Al año: 2,1 % con como mucho el 20 % invertido, frente a 13,3 % con todo invertido.');
+});
+
+test('estrategias: un estudio de otra cartera no se enseña como el de la mesa (Reversión ETF: SPY y QQQ; estudio de SPY, QQQ, IWM y DIA)', () => {
+  const e = JSON.parse(JSON.stringify(require('../src/estrategias').ESTUDIOS_ETF['reversion-etf']));
+  const x = V.textoEstudio(e, ['SPY', 'QQQ']);
+  assert.equal(x.otraCartera, true);
+  assert.equal(x.suspendida, true);
+  assert.equal(x.titular, 'Su cartera (SPY y QQQ) aún no se ha estudiado; sigue en prueba por decisión de Eduardo.');
+  assert.match(x.contexto, /fue de otra cartera, Reversión en índices, de SPY, QQQ, IWM y DIA, y suspendió el filtro\. Estas son sus cifras, no las de esta mesa\./);
+  assert.equal(x.filas[2].nota, 'sin contar las pruebas del estudio anterior: puede ser más bajo', 'el deflactado lleva su aviso');
+  assert.match(x.comparacion, /0,3 % al año con como mucho el 40 % invertido; comprar y mantener, con todo invertido, 15,3 %/);
+});

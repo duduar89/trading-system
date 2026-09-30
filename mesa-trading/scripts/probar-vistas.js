@@ -102,6 +102,16 @@ async function main() {
       if (!ev || !h || ev.pnl !== h.pnlAcumulado) bien = false;
     }
     caso(bien, `estrategias: ${est.mesas.length} mesas con peso, métricas y backtest de la instantánea y su último P&L del historial`);
+    // Grupos (30-sep-2026): cada mesa en su plazo y sus tipos, y los grupos cuentan lo mismo.
+    const { plazoMesa, tiposMesa } = require('../src/estrategias');
+    let grupos = true;
+    for (const m of est.mesas) {
+      const im = inst.mesas.find(y => y.id === m.id);
+      if (JSON.stringify(m.plazo) !== JSON.stringify(plazoMesa(im)) || JSON.stringify(m.tipos) !== JSON.stringify(tiposMesa(im))) grupos = false;
+    }
+    const cuentaPlazos = est.grupos.plazos.reduce((x, g) => x + g.mesas, 0);
+    caso(grupos && cuentaPlazos === est.mesas.length && est.grupos.tipos.every(t => t.mesas === est.mesas.filter(m => m.tipos.some(x => x.id === t.id)).length),
+      `estrategias: plazo y tipo de cada mesa; grupos ${est.grupos.plazos.map(g => `${g.nombre} ${g.mesas}`).join(', ')} · ${est.grupos.tipos.map(g => `${g.nombre} ${g.mesas}`).join(', ')}`);
 
     // Laboratorio frente a las decisiones y el estado.
     const lab = informes.consultar('laboratorio', { carpeta, instantanea: () => inst });
@@ -169,6 +179,7 @@ async function navegador({ carpeta, config, caso, capturas, orquestador }) {
       // Evolución: tocar la gráfica abre la ficha con las cifras.
       await p.click('#vt-evolucion');
       await p.waitForSelector('.v-grafica .g-capa');
+      await p.locator('.v-grafica .g-capa').first().scrollIntoViewIfNeeded();
       const caja = await p.locator('.v-grafica .g-capa').first().boundingBox();
       await p.mouse.click(caja.x + caja.width * 0.6, caja.y + caja.height / 2);
       const ficha = await p.locator('.v-grafica .g-ficha').first().textContent();

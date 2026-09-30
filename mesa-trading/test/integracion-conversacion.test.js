@@ -310,3 +310,120 @@ test('conversacion: el hilo de un cierre se guarda para el Auditor, se usa una v
   assert.equal(conversacion.cierreDe(ctx, 'op2').id, 'm9');
   assert.equal(conversacion.cierreDe(ctx, 'op2'), null, 'se usa una sola vez');
 });
+
+// ---------- Modo, voto, régimen y conteos del LLM, también en llano (revisión H) ----------
+
+// LLM falso para reuniones y comité: `reunion(entrada)` y `comite(args)` devuelven lo que diría.
+function llmFalsoTono({ reunion = () => [], comite = null } = {}) {
+  const llamadas = [];
+  return {
+    llamadas,
+    activo: true,
+    async pedirJSON(args) {
+      llamadas.push(args);
+      if (args.proposito === 'reunion') return { ok: true, costeUsd: 0.001, modelo: 'x', tokens: {}, datos: { intervenciones: reunion(args.entrada) } };
+      if (args.proposito === 'comite' && comite) {
+        const mult = Object.fromEntries(Object.keys(args.esquema.properties.multiplicadores.properties).map(k => [k, 1]));
+        return { ok: true, costeUsd: 0.01, modelo: 'x', tokens: {}, datos: { modo: 'NORMAL', multiplicadores: mult, vetos: [], razon: '', intervenciones: [], ...comite(args) } };
+      }
+      return { ok: false, motivo: 'sin respuesta' };
+    },
+    estado: () => ({ activo: true, modeloComite: 'x', modeloAgentes: 'y', gastoHoyUsd: 0, presupuestoDiaUsd: 1 }),
+    gastoHoy: () => 0, gastoDelDia: () => 0, gastoEntre: () => 0, gastoTotal: () => 0, fijarModelos() {}, fijarPresupuesto() {},
+  };
+}
+
+// Un entero de 2 a 30 que no está (ni redondeado) en los datos: un conteo inventado.
+function conteoInventado(datos) {
+  const { numerosDeEntrada } = require('../src/agentes/cifras');
+  const valores = numerosDeEntrada(datos).valores.map(Math.abs);
+  for (let n = 30; n >= 2; n--) if (!valores.some(v => Math.abs(v - n) <= 0.5)) return n;
+  throw new Error('sin conteo libre');
+}
+
+test('reunión con LLM: un modo o un régimen dicho en llano al revés que los datos, o un conteo inventado, sale con plantilla', async () => {
+  let entradaNoche = null;
+  const llm = llmFalsoTono({
+    reunion: e => {
+      entradaNoche = e.turnos.find(t => t.turno === 'noche').datos;
+      return [
+        { turno: 'noche', texto: `Gracias, Carmen. Esta noche hemos cerrado ${conteoInventado(entradaNoche)} operaciones, todas ganadoras.` },
+        { turno: 'macro', texto: 'Gracias, Inés. El mercado tiene miedo esta mañana.' },
+        { turno: 'riesgos', texto: 'Gracias. Todo tranquilo por mi lado.' },
+        { turno: 'resumen', texto: 'Seguimos con las compras nuevas a la mitad hasta el próximo comité. Buen día.' },
+      ];
+    },
+  });
+  const { orquestador: o } = await crearOrquestador({ pasos: 2, llm });
+  o.estado.directivas.modo = 'NORMAL';
+  o.estado.macro.regimen = { valor: 'RISK-ON', puntos: 2, detalle: 'prueba' };
+  const mensajes = oir(o);
+  await reuniones.celebrar(o, 'manana');
+  const turno = id => mensajes.find(m => m.datos && m.datos.reunion === 'manana' && m.datos.turno === id);
+  assert.equal(turno('noche').datos.fuente, 'plantilla', `operaciones reales: ${entradaNoche.operaciones}`);
+  assert.doesNotMatch(turno('noche').texto, /todas ganadoras/);
+  assert.equal(turno('macro').datos.fuente, 'plantilla', '«tiene miedo» es RISK-OFF y el régimen es RISK-ON');
+  assert.match(turno('macro').texto, /RISK-ON/);
+  assert.equal(turno('resumen').datos.fuente, 'plantilla', '«a la mitad» es DEFENSIVO y el modo es NORMAL');
+  assert.match(turno('resumen').texto, /en modo NORMAL \(compras a tamaño normal\)/);
+  // Lo que no dice nada de modo, régimen ni cifras sí sale del LLM: el control no lo tapa todo.
+  assert.equal(turno('riesgos').datos.fuente, 'llm');
+  // Y el prompt ya no empuja al llano sin control: dice qué se comprueba.
+  const instr = llm.llamadas.find(x => x.proposito === 'reunion').instrucciones;
+  assert.match(instr, /aunque sea en llano/);
+  await o.detener();
+});
+
+test('comité con LLM: Macro no puede decir en llano otro régimen ni otro voto, ni el Controller inventar un conteo', async () => {
+  const llm = llmFalsoTono({
+    comite: args => ({
+      modo: 'NORMAL',
+      intervenciones: [
+        { agente: 'controller', texto: `Gracias. Esta semana hemos cerrado ${conteoInventado(args.entrada.controller)} operaciones.` },
+        { agente: 'macro', texto: 'Gracias. El mercado tiene miedo: yo pondría las compras nuevas a la mitad. Mi voto: NORMAL.' },
+        { agente: 'laboratorio', texto: 'Sin novedades en el laboratorio.' },
+      ],
+    }),
+  });
+  const { orquestador: o } = await crearOrquestador({ pasos: 2, llm });
+  o.estado.macro.regimen = { valor: 'RISK-ON', puntos: 2, detalle: 'prueba' };
+  o.estado.fondo.nivel = 'normal';
+  const mensajes = oir(o);
+  await comite.celebrar(o, { motivo: 'demanda' });
+  const punto = p => mensajes.find(m => m.canal === 'comite' && m.datos && m.datos.punto === p);
+  assert.equal(punto('macro').datos.voto, 'NORMAL');
+  assert.equal(punto('macro').datos.fuente, 'plantilla');
+  assert.doesNotMatch(punto('macro').texto, /miedo|a la mitad/);
+  assert.equal(punto('controller').datos.fuente, 'plantilla', 'el conteo no está en sus datos');
+  assert.equal(punto('laboratorio').datos.fuente, 'llm');
+  const instr = llm.llamadas.find(x => x.proposito === 'comite').instrucciones;
+  assert.doesNotMatch(instr, /mejor que «DEFENSIVO»/, 'ya no pide el llano sin control');
+  await o.detener();
+});
+
+test('tras un kill, la reunión, el cierre y el comité dicen que el fondo no compra nada (ni la razón del LLM puede decir que sí)', async () => {
+  const llm = llmFalsoTono({
+    reunion: () => [{ turno: 'resumen', texto: 'Seguimos en modo NORMAL, con las compras a tamaño normal.' }],
+    comite: () => ({ modo: 'DEFENSIVO', razon: 'Pasamos a DEFENSIVO: las compras nuevas, a la mitad.' }),
+  });
+  const { orquestador: o, reloj } = await crearOrquestador({ pasos: 1, llm });
+  const mensajes = oir(o);
+  await hasta(o, reloj, Date.UTC(2026, 5, 1, 6, 30));
+  const k = await o.comando('kill', { confirmacion: 'KILL' });
+  assert.equal(k.ok, true);
+  assert.equal(o.estado.fondo.nivel, 'bloqueado');
+  await hasta(o, reloj, Date.UTC(2026, 5, 1, 8, 0));     // reunión de las 9:00 de Madrid y comité de las 08:00 UTC
+  const resumen = mensajes.find(m => m.datos && m.datos.reunion === 'manana' && m.datos.turno === 'resumen');
+  assert.equal(resumen.datos.fuente, 'plantilla', 'con el fondo bloqueado no se compra a tamaño normal');
+  assert.doesNotMatch(resumen.texto, /compras/);
+  assert.match(resumen.texto, /no compra nada: está bloqueado por el kill switch hasta Reabrir/);
+  const decision = mensajes.filter(m => m.canal === 'comite' && m.tipo === 'decision').pop();
+  assert.ok(decision && decision.t >= Date.UTC(2026, 5, 1, 8, 0), 'comité de las 08:00 UTC');
+  assert.doesNotMatch(decision.texto, /compras|a la mitad/);
+  assert.match(decision.texto, /^Decido: modo DEFENSIVO.*\. Ahora el fondo no compra nada/);
+  await reuniones.celebrar(o, 'cierre');
+  const cierre = mensajes.filter(m => m.datos && m.datos.reunion === 'cierre' && m.datos.turno === 'resumen').pop();
+  assert.doesNotMatch(cierre.texto, /compras/);
+  assert.match(cierre.texto, /no compra nada/);
+  await o.detener();
+});

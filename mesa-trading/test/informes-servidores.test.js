@@ -112,3 +112,46 @@ test('local: estrategias, laboratorio, historial reducido y noticias filtradas; 
     await ctx.orquestador.detener();
   }
 });
+
+// Paridad (ARQUITECTURA-WEB W3): la web lee lo que publicó el último latido y el
+// local lo tiene en memoria, pero sobre la misma carpeta sirven lo mismo.
+test('local y web sirven lo mismo sobre la misma carpeta: informes, mensajes, operaciones e instantánea', async (t) => {
+  const { crearOrquestador, arrancarServidor, pedir: pedirLocal } = require('./integracion-ayuda');
+  const ctx = await crearOrquestador({ pasos: 2 * 288 });
+  // Lo que corre en segundo plano (backtests de referencia) ha acabado: la
+  // instantánea publicada es la de ahora, como la que publica un latido al salir.
+  await ctx.orquestador.esperarTareas();
+  linea(ctx.carpeta, 'noticias.jsonl', { t: 1, id: 'n1', titular: 'uno', simbolos: ['BTC/USD'], clasificacion: [{ simbolo: 'BTC/USD', categoria: 'hackeo', grave: true }], veto: null });
+  linea(ctx.carpeta, 'noticias.jsonl', { t: 2, id: 'n2', titular: 'dos', simbolos: ['ETH/USD'], clasificacion: null, veto: null });
+  const inst = ctx.orquestador.instantanea();
+  const w = await arrancarWeb({ carpeta: ctx.carpeta, instantanea: inst });
+  const l = await arrancarServidor(ctx.orquestador);
+  t.after(async () => { await w.cerrar(); await new Promise(r => l.servidor.close(r)); await ctx.orquestador.detener(); });
+  const cookie = await entrar(w.base);
+  const desde = inst.mensajes[Math.max(0, inst.mensajes.length - 40)].t;
+  const rutas = [
+    '/api/estrategias', '/api/laboratorio',
+    '/api/historial', '/api/historial?puntos=40', `/api/historial?desde=${inst.ahora - 6 * HORA}`,
+    '/api/decisiones', '/api/decisiones?tipo=comite,reunion', '/api/decisiones?quien=cio', '/api/decisiones?tipo=orden&limite=5',
+    '/api/noticias', '/api/noticias?simbolo=BTC&graves=1',
+    `/api/mensajes?desde=${desde}`, '/api/operaciones', '/api/costes-llm',
+  ];
+  for (const r of rutas) {
+    const a = await pedirLocal(l.base, r);
+    const b = await pedir(w.base, r, { cookie });
+    assert.equal(a.status, 200, `local ${r}`);
+    assert.equal(b.status, 200, `web ${r}`);
+    assert.deepEqual(b.json, a.json, r);
+  }
+  // Hay de todo: si alguna lista saliera vacía en los dos, «iguales» no probaría nada.
+  const dec = (await pedirLocal(l.base, '/api/decisiones?tipo=comite,reunion')).json;
+  assert.ok(dec.some(d => d.tipo === 'comite') && dec.some(d => d.tipo === 'reunion'), 'comités y reuniones en decisiones');
+  assert.ok((await pedirLocal(l.base, '/api/historial')).json.length >= 24);
+  assert.ok((await pedirLocal(l.base, `/api/mensajes?desde=${desde}`)).json.some(m => m.hilo), 'mensajes con su conversación');
+  // La instantánea: la web añade solo lo suyo (edadSeg, web, sesion y latidoMs).
+  const el = (await pedirLocal(l.base, '/api/estado')).json;
+  const ew = (await pedir(w.base, '/api/estado', { cookie })).json;
+  assert.equal(ew.web, true);
+  for (const k of ['edadSeg', 'web', 'sesion', 'latidoMs']) delete ew[k];
+  assert.deepEqual(ew, el);
+});

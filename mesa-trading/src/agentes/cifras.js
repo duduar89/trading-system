@@ -155,16 +155,127 @@ function numeroEncontrado(n, valores) {
   return false;
 }
 
-function verificarCifras(texto, entrada) {
+// Conteos escritos con letra («cuatro operaciones», «ninguna posición»): con
+// { conteos: true } son cifras como las otras. «Un», «uno» y «una» no entran:
+// casi siempre son artículos («una buena racha»).
+const NUMEROS_LETRA = Object.freeze({
+  cero: 0, ningun: 0, ninguna: 0, ninguno: 0, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8,
+  nueve: 9, diez: 10, once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17,
+  dieciocho: 18, diecinueve: 19, veinte: 20, veintiuno: 21, veintidos: 22, veintitres: 23, veinticuatro: 24,
+  veinticinco: 25, veintiseis: 26, veintisiete: 27, veintiocho: 28, veintinueve: 29, treinta: 30,
+});
+const sinTildes = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const RE_PALABRA = /\p{L}+/gu;
+
+function numerosConLetra(texto) {
+  const out = [];
+  for (const m of String(texto ?? '').matchAll(RE_PALABRA)) {
+    const clave = sinTildes(m[0].toLowerCase());
+    if (Object.prototype.hasOwnProperty.call(NUMEROS_LETRA, clave)) out.push({ texto: m[0], valor: NUMEROS_LETRA[clave] });
+  }
+  return out;
+}
+
+// `conteos: true` (reuniones y comité, donde lo que se cuenta son operaciones,
+// posiciones y órdenes): los enteros pequeños sin unidad y los escritos con
+// letra también tienen que estar en los datos. Sin la opción pasan libres,
+// como siempre (días y conteos que el texto no puede inventar con daño).
+function verificarCifras(texto, entrada, { conteos = false } = {}) {
   const { numeros, horas } = extraerNumeros(texto);
   const datos = numerosDeEntrada(entrada);
   const noEncontradas = [];
   for (const h of horas) if (!datos.horas.has(h)) noEncontradas.push(h);
   for (const n of numeros) {
-    if (n.libre) continue;
+    if (n.libre && !conteos) continue;
     if (!numeroEncontrado(n, datos.valores)) noEncontradas.push(n.texto);
+  }
+  if (conteos) {
+    for (const p of numerosConLetra(texto)) {
+      if (!datos.valores.some(d => Math.abs(d) === p.valor)) noEncontradas.push(p.texto);
+    }
   }
   return { ok: noEncontradas.length === 0, noEncontradas };
 }
 
-module.exports = { verificarCifras, extraerNumeros, numerosDeEntrada, lecturas };
+// ---------- Modo, voto y régimen, también en llano ----------
+//
+// Un texto del LLM no puede decir un modo, un voto o un régimen distinto del
+// que calculó el código, ni con su nombre (DEFENSIVO, «modo defensivo») ni en
+// llano («las compras nuevas a la mitad», «el mercado tiene miedo»): ahí no hay
+// cifras y verificarCifras no lo ve. Se buscan sin distinguir mayúsculas. Las
+// frases de plantillas.MODO_TEXTO y REGIMEN_TEXTO se reconocen como su valor
+// (test/agentes-cifras.test.js lo comprueba). Un falso positivo solo cuesta
+// que salga la plantilla; un falso negativo enseña algo falso.
+
+// Lo que no es un modo ni un régimen aunque use sus palabras.
+const QUITAR = [
+  /\b(el\s+)?(nivel|estado)\s+(del\s+fondo\s+)?(es\s+|de\s+)?[«"]?(normal|solo[\s_-]+cerrar|en\s+pausa|pausado|bloqueado)\b[»"]?/giu,  // el nivel de riesgo del fondo
+  /\b([ií]ndice|indicador|term[oó]metro)\s+(de(l)?\s+)?miedo\s+y\s+(la\s+)?codicia\b/giu,
+  /\bmiedo\s+y\s+(la\s+)?codicia\b/giu,
+  /\bfear\s*(and|&)\s*greed\b/giu,
+];
+
+// Por su nombre (en cualquier forma).
+const NOMBRES_MODO = [
+  ['NORMAL', /\bNORMAL\b/u],                                  // en mayúsculas: el nombre del modo
+  ['NORMAL', /\bmodo\s+normal\b/iu],
+  ['NORMAL', /\bvot\p{L}*\s*:?\s*(por\s+)?(el\s+)?(modo\s+)?normal\b/iu],
+  ['DEFENSIVO', /\bdefensiv[oa]s?\b/iu],
+  ['SOLO_CERRAR', /\bs[oó]lo[\s_-]+cerrar\b/iu],
+];
+// Lo que dice que se hace con las compras, como el modo que lo produce.
+const COMPRAS = [
+  ['NORMAL', /\b(a|de|con)\s+tama[ñn]o\s+(normal|completo|entero|habitual)\b/iu],   // «a ×0,5 del tamaño normal» no
+  ['NORMAL', /\bcompras?\s+normales?\b/iu],
+  ['DEFENSIVO', /\ba\s+la\s+mitad\b/iu],
+  ['DEFENSIVO', /\b(la\s+)?mitad\s+del?\s+(tama[ñn]o|capital|dinero|riesgo)\b/iu],
+  ['DEFENSIVO', /\bmedio\s+tama[ñn]o\b/iu],
+  ['SOLO_CERRAR', /\bs[oó]lo\s+(se\s+)?(cierra|cierran|cerramos|cierro)\b/iu],
+  ['SOLO_CERRAR', /\bno\s+se\s+(abre|compra)\s+nada\b/iu],
+  ['SOLO_CERRAR', /\bno\s+(abrimos|compramos|abro|compro|abre|compra)\s+nada\b/iu],
+  ['SOLO_CERRAR', /\bsin\s+(abrir|comprar)\s+nada\b/iu],
+];
+const NEUTRAL_LLANO = /\bni\s+a\s+favor\s+ni\s+en\s+contra\b/giu;
+const REGIMENES = [
+  ['RISK-ON', /\brisk[\s-]?on\b/iu],
+  ['RISK-ON', /\bacompa[ñn]a\b/iu],
+  ['RISK-ON', /\bapetito\b/iu],
+  ['RISK-ON', /\ba\s+favor\b(?!\s+de)/iu],
+  ['NEUTRAL', /\bneutral\b/iu],
+  ['NEUTRAL', NEUTRAL_LLANO],
+  ['RISK-OFF', /\brisk[\s-]?off\b/iu],
+  ['RISK-OFF', /\bmiedo\b/iu],
+  ['RISK-OFF', /\baversi[oó]n\b/iu],
+  ['RISK-OFF', /\ben\s+contra\b/iu],
+];
+
+function buscar(lista, texto) {
+  const out = new Set();
+  for (const [valor, re] of lista) { re.lastIndex = 0; if (re.test(texto)) out.add(valor); }
+  return [...out];
+}
+
+// { modos, compras, regimenes } que dice un texto.
+function vocabulario(texto) {
+  let s = String(texto ?? '');
+  for (const re of QUITAR) s = s.replace(re, ' ');
+  const modos = buscar(NOMBRES_MODO, s);
+  const compras = buscar(COMPRAS, s);
+  const regimenes = buscar(REGIMENES, s);
+  // «ni a favor ni en contra» es NEUTRAL, no «a favor» ni «en contra».
+  const sinNeutral = s.replace(NEUTRAL_LLANO, ' ');
+  return { modos, compras, regimenes: [...new Set([...buscar(REGIMENES.filter(([v]) => v !== 'NEUTRAL'), sinNeutral), ...regimenes.filter(v => v === 'NEUTRAL')])] };
+}
+
+// ¿Dice el texto algo distinto de lo permitido? `modos`: los modos que puede
+// nombrar ([] = ninguno); `compras`: lo que puede decir que se hace con las
+// compras (por defecto, lo mismo que `modos`); `regimen`: el único régimen que
+// puede decir (null = ninguno).
+function contradiceVocabulario(texto, { modos = [], compras = modos, regimen = null } = {}) {
+  const v = vocabulario(texto);
+  if (v.modos.some(m => !modos.includes(m))) return true;
+  if (v.compras.some(m => !compras.includes(m))) return true;
+  return v.regimenes.some(r => r !== regimen);
+}
+
+module.exports = { verificarCifras, extraerNumeros, numerosDeEntrada, lecturas, vocabulario, contradiceVocabulario };

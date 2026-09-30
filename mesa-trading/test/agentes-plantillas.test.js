@@ -70,6 +70,7 @@ const CASOS = {
   informeDiario: [{ dia: '2026-09-29', patrimonio: 100234.5, pnlDia: 234.5, pnlDiaPct: 0.00234, operaciones: 4, acierto: 0.5, gastoLLMUsd: 0.84 }],
   informeSemanal: [{ rentabilidad: 0.012, sharpe90Fondo: 0.85, sharpe90SinComite: 0.8, sharpe90Btc: 0.6 }],
   descanso: [{ minutos: 15 }],
+  esperaOrden: [{ etiqueta: 'SPY', lado: 'compra', hasta: T }, { etiqueta: 'BTC', lado: 'venta' }],
   killSwitch: [{ motivo: 'caída del 25,2 % desde el máximo (límite 25 %)' }],
   soloCerrar: [{ motivo: 'pérdida del día −2,10 % (límite −2 %)', hasta: T }],
   reabrir: [{ quien: 'Eduardo' }],
@@ -184,7 +185,7 @@ test('las plantillas no inventan cifras: todo número está en sus datos (más l
     assert.ok(r.ok, `${donde}: ${texto} → ${r.noEncontradas.join(', ')}`);
   };
   for (const [nombre, casos] of Object.entries(CASOS)) {
-    if (nombre === 'informeDiario' || nombre === 'soloCerrar') continue;   // la hora/fecha de un instante, aparte
+    if (nombre === 'informeDiario' || nombre === 'soloCerrar' || nombre === 'esperaOrden') continue;   // la hora/fecha de un instante, aparte
     casos.forEach((c, i) => {
       const datos = nombre === 'ejecucion' && !Number.isFinite(c.nocional) ? { ...c, importe: c.cantidad * c.precio } : c;
       mirar(p[nombre](c), datos, `${nombre}[${i}]`);
@@ -192,6 +193,12 @@ test('las plantillas no inventan cifras: todo número está en sus datos (más l
   }
   for (const [jefe, datos] of Object.entries(INFORMES)) mirar(p.informeComite(jefe, { ...datos, anterior: 'Inés' }), datos, `informeComite(${jefe})`);
   mirar(p.notaAnalista({ etiqueta: 'ETH', nombre: 'Ethereum', precio: 2560, sesgo: 'alcista', sma50: 2480, rsi: 71.2, volAnual: 0.62 }), { precio: 2560, sma50: 2480, rsi: 71.2, volAnual: 0.62 }, 'nota');
+});
+
+test('esperaOrden: el operador de pie junto al Ejecutor dice qué espera y, con la bolsa cerrada, a qué hora sale', () => {
+  const f = require('../src/util/formato');
+  assert.equal(p.esperaOrden({ etiqueta: 'SPY', lado: 'compra', hasta: T }), `Espero junto al Ejecutor: la compra de SPY sale cuando abra la bolsa, a las ${f.hora(T)}.`);
+  assert.equal(p.esperaOrden({ etiqueta: 'BTC', lado: 'venta' }), 'Espero junto al Ejecutor a que el bróker confirme la venta de BTC.');
 });
 
 test('frase(): recorta a MAX con puntos suspensivos y sin partir números', () => {
@@ -232,6 +239,14 @@ test('directiva y decisión del comité: con la lista de mesas, el nombre y no e
   assert.equal(p.decisionComite({ modo: 'NORMAL', multiplicadores: { reversion: 0, lab3: 0.5 }, vetos: [] }, MESAS),
     'Decido: modo NORMAL (compras a tamaño normal). Paro la mesa Reversión RSI. A la mitad: Tendencia SMA lenta.');
   comprobar(p.decisionComite(CASOS.decisionComite[0], MESAS), 'decisionComite(con nombres)');
+});
+
+test('decisión del comité con el fondo sin comprar: las citas (veto, votos recontados) van detrás del modo y nunca se recortan', () => {
+  const cita = 'Marta ha votado DEFENSIVO y su voto es veto: no puede salir NORMAL.';
+  const d = p.decisionComite({ modo: 'DEFENSIVO', multiplicadores: { tendencia: 0, reversion: 0.5, ruptura: 0.5, lab3: 0.5 }, vetos: ['DOGE/USD', 'SOL/USD'], fuente: 'llm', nivel: 'solo_cerrar' }, MESAS, { citas: [cita], max: 300 });
+  assert.ok(d.length <= 300);
+  assert.match(d, /^Decido: modo DEFENSIVO\. Ahora el fondo no compra nada: solo cierra hasta las 00:00 UTC por la pérdida del día\. Marta ha votado DEFENSIVO y su voto es veto: no puede salir NORMAL\. /);
+  assert.doesNotMatch(d, /compras/);
 });
 
 test('despido: dice lo que pasa de verdad (sin «sigue en sombra») y lo dice antes que el motivo', () => {

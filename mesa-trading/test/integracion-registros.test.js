@@ -17,6 +17,7 @@ const { crearPlantilla } = require('../src/agentes/registro');
 const analisis = require('../src/agentes/departamentos/analisis');
 const laboratorio = require('../src/agentes/departamentos/laboratorio');
 const registros = require('../src/registros');
+const informes = require('../src/informes');
 const { leerJSONL, leerJSON, escribirJSON } = require('../src/util/almacen');
 
 const MIN = 60_000;
@@ -143,7 +144,7 @@ test('migración del universo en un fondo existente: mesa ampliada en incubació
   assert.equal(amp.estado, 'incubacion');
   assert.equal(amp.peso, 0.02);
   assert.equal(amp.universo.length, 10);
-  assert.match(amp.nota, /0,82 a 0,58/);
+  assert.equal(amp.nota, require('../src/estrategias').NOTAS_INICIALES.ampliada);
   assert.deepEqual(o.mesaPorId('momentum').universo, mom.universo, 'la titular no cambia');
   assert.deepEqual(o.mesaPorId('momentum-etf').universo, ['SPY', 'QQQ', 'DIA']);
   assert.ok(Math.abs(o.estado.mesas.reduce((s, m) => s + m.peso, 0) - (pesosAntes + 0.02)) < 1e-12);
@@ -163,6 +164,13 @@ test('migración del universo en un fondo existente: mesa ampliada en incubació
   const dec = () => leerJSONL(path.join(carpeta, 'decisiones.jsonl')).filter(d => d.datos && d.datos.migracion);
   assert.equal(dec().length, 2);
   assert.ok(dec().every(d => d.tipo === 'asignacion' && d.quien === 'humano'));
+  // Con DIA cambia la referencia: el backtest de antes (de otro universo) no se
+  // queda; se rehace con el universo nuevo y la decisión lo dice.
+  const altaDia = dec().find(d => d.datos.mesaId === 'momentum-etf');
+  assert.match(altaDia.resumen, /Su backtest de referencia se rehace con los 3 ETF\./);
+  assert.equal(altaDia.datos.backtestAnterior.sharpe, mom.backtest.sharpe);
+  await o.esperarTareas();
+  assert.deepEqual(o.mesaPorId('momentum-etf').backtest.universo, ['SPY', 'QQQ', 'DIA'], 'el backtest se rehace con los de ahora');
   // Un paso con la mesa nueva no rompe nada.
   c1.reloj.avanzar(PASO);
   assert.equal(await o.paso(), true);
@@ -176,6 +184,50 @@ test('migración del universo en un fondo existente: mesa ampliada en incubació
   assert.equal(dec().length, 2);
   for (const [id, nombre] of Object.entries(nombresAntes)) assert.equal(c2.orquestador.agentePorId(id).nombre, nombre);
   await c2.orquestador.detener();
+});
+
+test('migración: un fondo que ya había metido DIA con el backtest de antes lo rehace una vez, con hito en la mesa', async () => {
+  const carpeta = carpetaTemporal();
+  const c0 = await arrancarAmpliado(carpeta);
+  await c0.orquestador.esperarTareas();
+  await c0.orquestador.detener();
+  // Como en producción: DIA ya migrado (30-sep) y el backtest de los ETF de antes, sin universo guardado.
+  const ruta = path.join(carpeta, 'estado.json');
+  const e = leerJSON(ruta);
+  const etf = e.mesas.find(m => m.id === 'momentum-etf');
+  assert.ok(etf && etf.universo.includes('DIA'));
+  etf.backtest = { sharpe: 0.45, mu: 0.0002, sigma: 0.01, vol: 0.16, maxDD: 0.12, operaciones: 30, rentabilidad: 0.08, dias: 365, t: 1 };
+  delete e.migraciones.backtestEtf;
+  escribirJSON(ruta, e);
+
+  const c1 = await arrancarAmpliado(carpeta);
+  const o = c1.orquestador;
+  const d = leerJSONL(path.join(carpeta, 'decisiones.jsonl')).filter(x => x.datos && x.datos.migracion === 'backtest-etf-2026-09-30');
+  assert.equal(d.length, 1);
+  assert.equal(d[0].datos.mesaId, 'momentum-etf');
+  assert.match(d[0].resumen, new RegExp(`era de sus ${etf.universo.length - 1} ETF de antes de DIA \\(Sharpe 0,45\\): lo rehago con los ${etf.universo.length}`));
+  await o.esperarTareas();
+  const bt = o.mesaPorId('momentum-etf').backtest;
+  assert.notEqual(bt.sharpe, 0.45, 'el de la otra cartera ya no se enseña ni lo usa el asignador');
+  assert.deepEqual(bt.universo, etf.universo);
+  // La ficha de la vista Estrategias lo cuenta como hito de la mesa (no como alta).
+  const { hitos } = require('../src/informes/estrategias');
+  assert.ok(hitos(carpeta).get('momentum-etf').some(h => h.tipo === 'backtest'));
+  await o.detener();
+  // Una sola vez.
+  const c2 = await arrancarAmpliado(carpeta);
+  await c2.orquestador.esperarTareas();
+  assert.equal(leerJSONL(path.join(carpeta, 'decisiones.jsonl')).filter(x => x.datos && x.datos.migracion === 'backtest-etf-2026-09-30').length, 1);
+  assert.equal(c2.orquestador.mesaPorId('momentum-etf').backtest.t, bt.t, 'no se vuelve a rehacer');
+  await c2.orquestador.detener();
+});
+
+test('backtestVigente: un backtest es de un universo; si la mesa cambia de universo, se rehace', () => {
+  const m = { universo: ['SPY', 'QQQ', 'DIA'], backtest: { sharpe: 1, universo: ['QQQ', 'SPY', 'DIA'] } };
+  assert.equal(laboratorio.backtestVigente(m), true, 'el orden no importa');
+  assert.equal(laboratorio.backtestVigente({ ...m, universo: ['SPY', 'QQQ'] }), false);
+  assert.equal(laboratorio.backtestVigente({ ...m, backtest: null }), false);
+  assert.equal(laboratorio.backtestVigente({ ...m, backtest: { sharpe: 1 } }), true, 'uno de antes vale hasta que una migración diga otra cosa');
 });
 
 test('migración: en sintético (sin las criptos nuevas) no hace nada', async () => {
@@ -285,6 +337,69 @@ test('noticias con LLM falso: se clasifican, vetan y la clasificación tardía l
   assert.deepEqual(n3.clasificacion, [{ simbolo: 'ETH/USD', categoria: 'mercado', grave: false }]);
   assert.equal(n3.titular, 'Titular 3');
   assert.equal(n3.clasificadaT, ctx.reloj.ahora());
+});
+
+// Un latido que escribe en noticias.jsonl y muere antes de guardar estado.json:
+// el siguiente parte del estado de antes (revisión del 30-sep-2026).
+function morirSinGuardar(ctx, antes) { ctx.estado = JSON.parse(JSON.stringify(antes)); }
+
+test('noticias: un latido cortado antes de guardar el estado no duplica la noticia y la pantalla enseña su clasificación', async () => {
+  let ok = false;
+  const llamadas = [];
+  const llm = { activo: true, async pedirJSON(args) {
+    llamadas.push(args.entrada.noticias.map(x => x.id));
+    if (!ok) return { ok: false, motivo: 'error', detalle: 'timeout', costeUsd: 0 };
+    return { ok: true, costeUsd: 0.001, datos: { noticias: args.entrada.noticias.map(x => ({ id: x.id, simbolo: 'SOL/USD', categoria: 'hackeo', impacto: 'negativo', eventoGrave: true })) } };
+  } };
+  const { ctx, avanzar, ruta, carpeta, decisiones } = ctxNoticias({ llm, lista: [N(77, ['SOL/USD'], 'Exchange X hackeado: roban 400 M en SOL')] });
+  // Latido 1: se escribe sin clasificar (el LLM falla) y muere antes de guardar.
+  const antes = JSON.parse(JSON.stringify(ctx.estado));
+  await analisis.noticias(ctx);
+  morirSinGuardar(ctx, antes);
+  // Latido 2: el LLM ya contesta.
+  ok = true;
+  avanzar(MIN);
+  const r = await analisis.noticias(ctx);
+  assert.equal(r.nuevas, 0, 'ya estaba en noticias.jsonl: no se vuelve a escribir como nueva');
+  assert.equal(r.graves, 1, 'y sí se clasifica: un evento grave no se escapa');
+  const lineas = leerJSONL(ruta);
+  assert.equal(lineas.filter(l => l.id === '77' && !l.actualiza).length, 1, 'una sola línea base');
+  assert.deepEqual(ctx.estado.directivas.activosVetados.map(v => v.simbolo), ['SOL/USD']);
+  // Lo que ve la pantalla de Noticias (todos los filtros): la clasificación y el veto.
+  const vista = informes.consultar('noticias', { carpeta, params: new URLSearchParams('') });
+  assert.equal(vista.length, 1);
+  assert.equal(vista[0].clasificacion[0].grave, true);
+  assert.equal(vista[0].veto.simbolo, 'SOL/USD');
+  assert.equal(informes.consultar('noticias', { carpeta, params: new URLSearchParams('graves=1') }).length, 1);
+  assert.equal(informes.consultar('noticias', { carpeta, params: new URLSearchParams('simbolo=SOL') })[0].clasificacion[0].categoria, 'hackeo');
+  assert.equal(decisiones.filter(d => d.tipo === 'noticia').length, 1);
+});
+
+test('noticias: un latido que clasificó, vetó y apuntó la decisión y murió antes de guardar no vuelve a clasificar (ni a pagar) y el veto sigue', async () => {
+  let llamadas = 0;
+  const llm = { activo: true, async pedirJSON(args) {
+    llamadas++;
+    return { ok: true, costeUsd: 0.001, datos: { noticias: args.entrada.noticias.map(x => ({ id: x.id, simbolo: 'SOL/USD', categoria: 'hackeo', impacto: 'negativo', eventoGrave: true })) } };
+  } };
+  const { ctx, avanzar, ruta, decisiones } = ctxNoticias({ llm, lista: [N(78, ['SOL/USD'])] });
+  const antes = JSON.parse(JSON.stringify(ctx.estado));
+  const r1 = await analisis.noticias(ctx);
+  assert.equal(r1.graves, 1);
+  const hasta = ctx.estado.directivas.activosVetados[0].hasta;
+  morirSinGuardar(ctx, antes);
+  assert.equal(ctx.estado.directivas.activosVetados.length, 0, 'el estado de antes no tenía el veto');
+  avanzar(MIN);
+  const r2 = await analisis.noticias(ctx);
+  assert.equal(r2.nuevas, 0);
+  assert.equal(llamadas, 1, 'no se vuelve a clasificar ni a pagar');
+  assert.deepEqual(ctx.estado.directivas.activosVetados.map(v => [v.simbolo, v.hasta, v.origen]), [['SOL/USD', hasta, 'noticias']], 'el veto que se decidió sigue');
+  assert.ok(ctx.estado.noticias.eventosGraves.some(e => e.simbolo === 'SOL/USD'));
+  assert.equal(decisiones.filter(d => d.tipo === 'noticia').length, 1, 'la decisión no se apunta dos veces');
+  assert.equal(leerJSONL(ruta).filter(l => l.id === '78').length, 1);
+  // Y un fichero con la noticia ya repetida (de antes de este arreglo) se lee bien.
+  registros.anadir(ruta, { ...leerJSONL(ruta)[0], t: ctx.reloj.ahora() + 1, clasificacion: null, veto: null });
+  const [x] = registros.leerNoticias(ruta);
+  assert.equal(x.clasificacion[0].categoria, 'hackeo', 'un null posterior no borra la clasificación');
 });
 
 test('noticias: sin claves de Alpaca, o en sintético, no hay nada (ni fichero)', async () => {

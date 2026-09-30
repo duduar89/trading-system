@@ -30,7 +30,8 @@
 //   informeComite(jefe, datos) o informeComite.<jefe>(datos), jefe ∈ controller|macro|riesgos|mesas|laboratorio|megafono
 //     datos.anterior (opcional): nombre de quien habló antes; el turno empieza dándole las gracias.
 //   aperturaComite({ hora, motivo, primero? })
-//   decisionComite({ modo, multiplicadores: {mesaId: m}, vetos: [simbolo], fuente: 'llm'|'defecto' }, mesas?)
+//   decisionComite({ modo, multiplicadores: {mesaId: m}, vetos: [simbolo], fuente: 'llm'|'defecto', nivel?, factor?, soloCerrarHasta? }, mesas?, { citas?, max? })
+//   comoCompra({ modo, nivel?, factor?, soloCerrarHasta? })  (lo que el fondo hace de verdad con las compras)
 //   directiva(d, mesas?)  (una directiva del Megáfono, §6.5)
 //     mesas: [{ id, nombre }] opcional; con ella se escribe el nombre de la mesa
 //     («Reversión RSI») en vez de su id («reversion», «lab3»).
@@ -129,6 +130,53 @@ const REGIMEN_TEXTO = Object.freeze({
   'RISK-OFF': 'el mercado tiene miedo',
 });
 const NIVEL_TEXTO = Object.freeze({ normal: 'normal', solo_cerrar: 'solo cerrar', pausado: 'en pausa', bloqueado: 'bloqueado' });
+
+// Con el fondo fuera del nivel normal no se compra nada, diga lo que diga el
+// modo: el kill y la pausa, hasta Reabrir; la pérdida del día, hasta las
+// 00:00 UTC (src/riesgo/vigilante.js).
+const NO_COMPRA = Object.freeze({
+  bloqueado: 'el fondo no compra nada: está bloqueado por el kill switch hasta Reabrir',
+  pausado: 'el fondo no compra nada: está en pausa hasta Reabrir',
+  solo_cerrar: 'el fondo no compra nada: solo cierra hasta las 00:00 UTC por la pérdida del día',
+});
+
+// Lo que hace el fondo de verdad con las compras nuevas, para la Presidenta.
+// Sin `nivel` ni `factor` (el de mesas.factorTamano: { total, comite,
+// megafono, caida }), lo que significa el modo, como siempre. Con ellos, lo que
+// se aplica: nada si el fondo no compra, y el factor real si recorta por más
+// que el modo (la caída del fondo, el Megáfono). `soloCerrarHasta`: la hora
+// del «solo cerrar» del Megáfono, si está vigente.
+function comoCompra({ modo, nivel, factor, soloCerrarHasta } = {}) {
+  const md = t(modo, 'NORMAL');
+  if (nivel && nivel !== 'normal') return NO_COMPRA[nivel] || 'el fondo no compra nada';
+  if (md === 'SOLO_CERRAR') return MODO_TEXTO.SOLO_CERRAR;
+  if (soloCerrarHasta) return `el fondo no compra nada: el Megáfono pide solo cerrar hasta las ${t(soloCerrarHasta)}`;
+  if (factor && fin(factor.total)) {
+    const causas = [
+      factor.comite < 1 && 'el modo DEFENSIVO',
+      factor.megafono < 1 && 'el Megáfono',
+      factor.caida < 1 && 'la caída del fondo',
+    ].filter(Boolean);
+    if (factor.total >= 1) return MODO_TEXTO.NORMAL;
+    // Solo el modo DEFENSIVO: su frase de siempre.
+    if (causas.length === 1 && factor.comite < 1 && factor.total === factor.comite && factor.total === 0.5) return MODO_TEXTO.DEFENSIVO;
+    return `compras nuevas a ${f.factor(factor.total)} del tamaño normal${causas.length ? ` por ${lista(causas)}` : ''}`;
+  }
+  return MODO_TEXTO[md] || 'sin cambios';
+}
+const noCompra = nivel => Boolean(nivel && nivel !== 'normal');
+
+// El modo al que equivale lo que el fondo hace de verdad con las compras
+// (mismos datos que comoCompra): 'NORMAL' (tamaño normal), 'DEFENSIVO' (a la
+// mitad), 'SOLO_CERRAR' (nada) o null (otro factor, como ×0,25: ninguna de las
+// frases llanas es verdad). Lo usa el control de los textos del LLM.
+function comprasEfectivas({ modo, nivel, factor, soloCerrarHasta } = {}) {
+  const md = t(modo, 'NORMAL');
+  if (noCompra(nivel) || md === 'SOLO_CERRAR' || soloCerrarHasta) return 'SOLO_CERRAR';
+  if (!factor || !fin(factor.total)) return md;
+  if (factor.total >= 1) return 'NORMAL';
+  return factor.total === 0.5 ? 'DEFENSIVO' : null;
+}
 
 // Por qué salió mal (o bien) una operación, en llano (post-mortem, §6.6).
 const CATEGORIA_TEXTO = Object.freeze({
@@ -422,17 +470,27 @@ function aperturaComite({ hora, motivo, primero } = {}) {
   return frase(`Abro el comité de las ${t(hora)}${motivo === 'demanda' ? ' (convocado a demanda)' : ''}. Orden del día: siete puntos.${p ? ` ${p}, empiezas tú.` : ''}`);
 }
 
-function decisionComite({ modo, multiplicadores, vetos, fuente } = {}, mesas = null) {
+// `nivel`, `factor` y `soloCerrarHasta` (opcionales, ver comoCompra): con el
+// fondo sin comprar, el modo vale para cuando vuelva a comprar y la frase dice
+// que ahora no compra nada («Ahora …») en vez de explicar el modo.
+// `citas` (opcional): frases que van justo detrás del modo, antes que las
+// mesas y los vetos (quién vetó o votó distinto, votos recontados): si no cabe
+// todo en `max`, se recorta lo último, nunca ellas.
+function decisionComite({ modo, multiplicadores, vetos, fuente, nivel, factor, soloCerrarHasta } = {}, mesas = null, { citas = [], max = MAX } = {}) {
   const porValor = { 0: [], 0.5: [] };
   for (const [id, m] of Object.entries(multiplicadores || {})) if (m === 0 || m === 0.5) porValor[m].push(nombreMesa(id, mesas));
   const md = t(modo, 'NORMAL');
+  const defecto = fuente === 'defecto' ? ', el plan por defecto' : '';
+  const como = comoCompra({ modo: md, nivel, factor, soloCerrarHasta });
   // De más a menos grave, con el modo en la cabeza: con nombres de mesa
   // largos, lo que se recorta es lo último, las mesas a la mitad.
-  const partes = [`Decido: modo ${md} (${MODO_TEXTO[md] || 'sin cambios'})${fuente === 'defecto' ? ', el plan por defecto' : ''}.`];
+  const partes = [noCompra(nivel)
+    ? `Decido: modo ${md}${defecto}. Ahora ${como}.`
+    : `Decido: modo ${md} (${como})${defecto}.`, ...(citas || []).filter(Boolean)];
   if (porValor[0].length) partes.push(`Paro ${plural(porValor[0].length, 'la mesa', 'las mesas')} ${lista(porValor[0], 3)}.`);
   if (vetos && vetos.length) partes.push(`No se abre en ${lista(vetos.map(etq), 3)} durante 24 h.`);
   if (porValor[0.5].length) partes.push(`A la mitad: ${lista(porValor[0.5], 3)}.`);
-  return frase(partes.join(' '));
+  return frase(partes.join(' '), max);
 }
 
 function directiva(d = {}, mesas = null) {
@@ -541,6 +599,14 @@ function descanso({ minutos = 15 } = {}) {
   return frase(`No tengo nada pendiente: me tomo ${f.numero(fin(minutos) ? minutos : 15)} min en la sala de descanso.`);
 }
 
+// Lo que dice el operador mientras espera de pie junto al Ejecutor a que su
+// orden salga (§7, estado 'ejecucion'): con la bolsa cerrada, hasta cuándo.
+function esperaOrden({ etiqueta, lado = 'compra', hasta } = {}) {
+  const que = `${lado === 'venta' ? 'la venta' : 'la compra'} de ${etq(etiqueta)}`;
+  if (fin(hasta)) return frase(`Espero junto al Ejecutor: ${que} sale cuando abra la bolsa, a las ${f.hora(hasta)}.`);
+  return frase(`Espero junto al Ejecutor a que el bróker confirme ${que}.`);
+}
+
 function killSwitch({ motivo } = {}) {
   return frase(`Freno de emergencia (kill switch): ${t(motivo, 'límite duro')}. Vendo todo y bloqueo el fondo hasta que alguien pulse Reabrir.`);
 }
@@ -620,11 +686,17 @@ const reunion = {
     const s = fin(stop) ? ` Mi stop está en ${px(stop)}.` : ' No tengo stop puesto.';
     return frase(`Tengo ${f.cantidad(cantidad)} ${etq(etiqueta)} comprados a ${px(entrada)}.${ahora}${s}`);
   },
-  resumenManana({ patrimonio, posiciones, modo, proximoComite, anterior } = {}) {
+  // `nivel`, `factor` y `soloCerrarHasta` (opcionales, ver comoCompra): lo que
+  // se dice del modo es lo que el fondo hace de verdad con las compras.
+  resumenManana({ patrimonio, posiciones, modo, nivel, factor, soloCerrarHasta, proximoComite, anterior } = {}) {
     const n = fin(posiciones) ? posiciones : 0;
     const md = t(modo, 'NORMAL');
     const prox = proximoComite ? ` El próximo comité, a las ${proximoComite}.` : '';
-    return saludar(anterior, `Resumen: el fondo vale ${f.usd(patrimonio)}, con ${f.numero(n)} ${plural(n, 'posición abierta', 'posiciones abiertas')} y en modo ${md} (${MODO_TEXTO[md] || 'sin cambios'}).${prox} Buen día a todos.`);
+    const como = comoCompra({ modo: md, nivel, factor, soloCerrarHasta });
+    const pos = `${f.numero(n)} ${plural(n, 'posición abierta', 'posiciones abiertas')}`;
+    return saludar(anterior, noCompra(nivel)
+      ? `Resumen: el fondo vale ${f.usd(patrimonio)}, con ${pos}. Ahora ${como}.${prox} Buen día a todos.`
+      : `Resumen: el fondo vale ${f.usd(patrimonio)}, con ${pos} y en modo ${md} (${como}).${prox} Buen día a todos.`);
   },
   // Controller por la noche: el día del fondo (desde las 00:00 UTC).
   resultadoDia({ patrimonio, pnlDia, pnlDiaPct, desdeHora, anterior } = {}) {
@@ -649,10 +721,13 @@ const reunion = {
     return saludar(anterior, `Queda${n === 1 ? '' : 'n'} ${f.numero(n)} ${plural(n, 'posición abierta', 'posiciones abiertas')} (${lista((etiquetas || []).map(etq), 4)}), `
       + `con ${f.usd(pnlAbierto, { signo: true })} sin realizar. Cada una sigue con su stop.`);
   },
-  resumenCierre({ patrimonio, pnlDia, modo, anterior } = {}) {
+  resumenCierre({ patrimonio, pnlDia, modo, nivel, factor, soloCerrarHasta, anterior } = {}) {
     const md = t(modo, 'NORMAL');
     const dia = fin(pnlDia) ? ` (${f.usd(pnlDia, { signo: true })} hoy)` : '';
-    return saludar(anterior, `Cerramos el día con ${f.usd(patrimonio)}${dia}, en modo ${md} (${MODO_TEXTO[md] || 'sin cambios'}). Buenas noches.`);
+    const como = comoCompra({ modo: md, nivel, factor, soloCerrarHasta });
+    return saludar(anterior, noCompra(nivel)
+      ? `Cerramos el día con ${f.usd(patrimonio)}${dia}. Ahora ${como}. Buenas noches.`
+      : `Cerramos el día con ${f.usd(patrimonio)}${dia}, en modo ${md} (${como}). Buenas noches.`);
   },
 };
 
@@ -665,6 +740,6 @@ function saludar(anterior, texto) { return frase(saludarTexto(anterior, texto));
 module.exports = {
   estadoPuesto, notaAnalista, regimen, propuesta, aprobacion, veto, orden, ejecucion, cierre, stopSaltado,
   informeComite, aperturaComite, decisionComite, directiva, respuestaMegafono, leccion, hipotesis, resultadoHipotesis, contratacion, despido,
-  informeDiario, informeSemanal, descanso, killSwitch, soloCerrar, reabrir, conciliacion, reunion,
-  frase, juntar, pila, CATEGORIA_TEXTO, MODO_TEXTO, REGIMEN_TEXTO, NIVEL_TEXTO, MAX,
+  informeDiario, informeSemanal, descanso, esperaOrden, killSwitch, soloCerrar, reabrir, conciliacion, reunion,
+  comoCompra, comprasEfectivas, frase, juntar, pila, CATEGORIA_TEXTO, MODO_TEXTO, REGIMEN_TEXTO, NIVEL_TEXTO, NO_COMPRA, MAX,
 };

@@ -23,14 +23,18 @@
 //
 // Conversación (§6.2): la apertura de la Presidenta abre el hilo y cada turno
 // contesta al anterior. Con LLM, UNA llamada redacta los turnos; cada texto
-// pasa por verificarCifras contra los datos de SU turno y no puede nombrar un
-// modo o un régimen distinto del de ahora; si no, plantilla.
+// pasa por verificarCifras contra los datos de SU turno, también los conteos
+// («4 operaciones», «cuatro»), y no puede decir un modo o un régimen distinto
+// del de ahora, ni por su nombre ni en llano («a la mitad», «tiene miedo»);
+// del modo y de las compras solo habla el resumen, con lo que el fondo hace
+// de verdad (nada, si no está en nivel normal); si no, plantilla.
 
 const plantillas = require('./plantillas');
 const comite = require('./comite');
-const { verificarCifras } = require('./cifras');
+const { verificarCifras, contradiceVocabulario } = require('./cifras');
 const conversacion = require('./conversacion');
 const { directivasVigentes } = require('./megafono');
+const mesasDep = require('./departamentos/mesas');
 const f = require('../util/formato');
 const { inicioVela, MIN, HORA, DIA } = require('../util/reloj');
 const { EPS, etiqueta, agenteDePuesto } = require('./departamentos/comun');
@@ -171,10 +175,21 @@ function turnosManana(ctx, ahora) {
   }
   turnos.push({
     id: 'resumen', de: 'cio', tipo: 'reunion',
-    datos: { patrimonio: ctx.vivo.patrimonio, posiciones: pos.length, modo: e.directivas.modo || 'NORMAL', proximoComite: Number.isFinite(e.cadencias.proximoComite) ? f.hora(e.cadencias.proximoComite) : null },
+    datos: { patrimonio: ctx.vivo.patrimonio, posiciones: pos.length, ...comoCompra(ctx, ahora), proximoComite: Number.isFinite(e.cadencias.proximoComite) ? f.hora(e.cadencias.proximoComite) : null },
     plantilla: plantillas.reunion.resumenManana,
   });
   return turnos;
+}
+
+// Lo que el fondo hace de verdad con las compras (plantillas.comoCompra): el
+// modo, el nivel, el factor que se aplica y el «solo cerrar» del Megáfono.
+function comoCompra(ctx, ahora) {
+  const e = ctx.estado;
+  const vig = directivasVigentes(e.directivas, ahora);
+  return {
+    modo: e.directivas.modo || 'NORMAL', nivel: e.fondo.nivel, factor: mesasDep.factorTamano(ctx, ahora),
+    soloCerrarHasta: Number.isFinite(vig.soloCerrarHasta) ? f.hora(vig.soloCerrarHasta) : null,
+  };
 }
 
 function turnosCierre(ctx, ahora) {
@@ -207,7 +222,7 @@ function turnosCierre(ctx, ahora) {
     },
     {
       id: 'resumen', de: 'cio', tipo: 'reunion',
-      datos: { patrimonio, pnlDia, modo: e.directivas.modo || 'NORMAL' },
+      datos: { patrimonio, pnlDia, ...comoCompra(ctx, ahora) },
       plantilla: plantillas.reunion.resumenCierre,
     },
   ];
@@ -222,7 +237,9 @@ const SISTEMA = 'Redactas lo que dice cada participante en una reunión informat
 const INSTRUCCIONES = [
   'Para cada turno de «turnos», escribe lo que dice «quien» con los «datos» de SU turno: una o dos frases, 200 caracteres como mucho.',
   'Es una conversación: cuando venga a cuento, dirígete a quien habló antes por su nombre de pila («Gracias, Inés.»). El primero contesta a la Presidenta, que abrió la reunión.',
-  'No nombres un modo (NORMAL, DEFENSIVO, SOLO_CERRAR) ni un régimen (RISK-ON, NEUTRAL, RISK-OFF) distinto del de los datos, y no propongas cambios: la reunión solo cuenta.',
+  'Del modo del fondo y de cómo se compra («a la mitad», «tamaño normal», «no se abre nada») solo habla la Presidenta en el resumen, y solo con lo de sus datos: si «nivel» no es «normal», el fondo no compra nada.',
+  'Del mercado, solo el régimen de los datos, también en llano («acompaña» es RISK-ON; «ni a favor ni en contra», NEUTRAL; «tiene miedo», RISK-OFF). No propongas cambios: la reunión solo cuenta.',
+  'Un turno que diga otro modo u otro régimen, aunque sea en llano, o una cifra que no esté en sus datos (también «cuatro operaciones»), se descarta y sale la plantilla.',
 ].join('\n');
 
 function esquema(ids) {
@@ -244,17 +261,20 @@ function esquema(ids) {
   };
 }
 
-const RE_MODO = /\b(NORMAL|DEFENSIVO|SOLO_CERRAR)\b/g;
-const RE_REGIMEN = /\b(RISK-ON|RISK-OFF|NEUTRAL)\b/g;
-const nombra = (re, texto) => [...String(texto || '').matchAll(re)].map(m => m[1]);
-
-// Un texto del LLM vale si sus cifras están en los datos de su turno y no
-// nombra un modo o un régimen que no es el de ahora.
-function textoValido(texto, turno, { hora, modo, regimen }) {
+// Un texto del LLM vale si sus cifras (también los conteos) están en los datos
+// de su turno y no dice un modo ni un régimen que no son los de ahora, ni por
+// su nombre ni en llano. El modo solo lo puede decir el turno que lo lleva en
+// sus datos (el resumen), y lo que diga de las compras tiene que ser lo que
+// pasa (plantillas.comprasEfectivas): nada si el fondo no está en nivel
+// normal, y el factor real (con la caída del fondo, «tamaño normal» no vale).
+function textoValido(texto, turno, { hora, regimen }) {
   if (!texto) return false;
-  if (nombra(RE_MODO, texto).some(m => m !== modo)) return false;
-  if (nombra(RE_REGIMEN, texto).some(r => r !== regimen)) return false;
-  return verificarCifras(texto, { hora, datos: turno.datos }).ok;
+  const d = turno.datos || {};
+  const modos = d.modo ? [d.modo] : [];
+  const efectivas = d.modo ? plantillas.comprasEfectivas(d) : null;
+  const compras = efectivas ? [efectivas] : [];
+  if (contradiceVocabulario(texto, { modos, compras, regimen })) return false;
+  return verificarCifras(texto, { hora, datos: d }, { conteos: true }).ok;
 }
 
 async function redactarConLLM(ctx, tipo, turnos, hora) {
@@ -285,7 +305,7 @@ async function celebrar(ctx, tipo) {
     for (const id of JEFES) ctx.moverAgente(id, 'comite', 'reunion');
     const turnos = tipo === 'manana' ? turnosManana(ctx, ahora) : turnosCierre(ctx, ahora);
     const { textos, costeUsd } = await redactarConLLM(ctx, tipo, turnos, hora);
-    const comprobar = { hora, modo: e.directivas.modo || 'NORMAL', regimen: e.macro.regimen ? e.macro.regimen.valor : 'NEUTRAL' };
+    const comprobar = { hora, regimen: e.macro.regimen ? e.macro.regimen.valor : 'NEUTRAL' };
     const apertura = ctx.bus.publicar({
       de: 'cio', para: turnos[0].de, canal: 'direccion', tipo: 'reunion',
       texto: plantillas.reunion.apertura({ tipo, hora, primero: nombre(ctx, turnos[0].de) }),
@@ -324,9 +344,11 @@ async function celebrar(ctx, tipo) {
 function anotar(ctx, tipo, turnos, { hora, fuente, costeUsd }) {
   if (typeof ctx.anotarDecision !== 'function') return false;
   const d = Object.fromEntries(turnos.map(t => [t.id, t.datos]));
+  const nivel = d.resumen.nivel;
+  const modo = nivel && nivel !== 'normal' ? `modo ${d.resumen.modo} pero sin comprar (fondo ${plantillas.NIVEL_TEXTO[nivel] || nivel})` : `modo ${d.resumen.modo}`;
   const resumen = tipo === 'manana'
-    ? `${CITAS.manana.nombre} (${hora}): el fondo vale ${f.usd(d.resumen.patrimonio)}, ${d.resumen.posiciones} ${d.resumen.posiciones === 1 ? 'posición abierta' : 'posiciones abiertas'}, modo ${d.resumen.modo}. Informativa: no cambia nada.`
-    : `${CITAS.cierre.nombre} (${hora}): el fondo vale ${f.usd(d.resumen.patrimonio)}${Number.isFinite(d.resumen.pnlDia) ? ` (${f.usd(d.resumen.pnlDia, { signo: true })} hoy)` : ''}, ${d.cerradas.operaciones} ${d.cerradas.operaciones === 1 ? 'operación cerrada' : 'operaciones cerradas'}. Informativa: no cambia nada.`;
+    ? `${CITAS.manana.nombre} (${hora}): el fondo vale ${f.usd(d.resumen.patrimonio)}, ${d.resumen.posiciones} ${d.resumen.posiciones === 1 ? 'posición abierta' : 'posiciones abiertas'}, ${modo}. Informativa: no cambia nada.`
+    : `${CITAS.cierre.nombre} (${hora}): el fondo vale ${f.usd(d.resumen.patrimonio)}${Number.isFinite(d.resumen.pnlDia) ? ` (${f.usd(d.resumen.pnlDia, { signo: true })} hoy)` : ''}, ${d.cerradas.operaciones} ${d.cerradas.operaciones === 1 ? 'operación cerrada' : 'operaciones cerradas'}, ${modo}. Informativa: no cambia nada.`;
   return ctx.anotarDecision({ tipo: 'reunion', quien: 'cio', resumen, datos: { reunion: tipo, hora, fuente, costeUsd, turnos: d } });
 }
 

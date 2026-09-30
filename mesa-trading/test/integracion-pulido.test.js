@@ -76,7 +76,8 @@ const EN_PAUSA = 'Fondo en pausa: no se abre nada hasta Reabrir.';
 test('tarjeta de los puestos: tras el kill, Reabrir y Pausar se rehace en el acto con el nivel nuevo, no en la vela siguiente', async () => {
   const { orquestador: o, reloj } = await crearOrquestador({ pasos: 2 * 288 });
   const puestos = () => o.instantanea().puestos;
-  assert.ok(puestos().some(p => !p.posicion && /Sin posición|Esperando|Rebalanceo/.test(p.estadoTexto)), 'antes del kill hablan de su estrategia');
+  // La espera de su estrategia, en llano (§6.4): «No tengo BTC. Compro si…», «Aún no decido…», «Reparto de nuevo…».
+  assert.ok(puestos().some(p => !p.posicion && /No tengo|Aún no|Reparto|Esperando/.test(p.estadoTexto)), 'antes del kill hablan de su estrategia');
 
   // Kill: todos (los que tenían posición, ya cerrada, y los que no) dicen el bloqueo al momento.
   const k = await o.comando('kill', { confirmacion: 'KILL' });

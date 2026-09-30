@@ -132,6 +132,11 @@
     get clave() { return this.col + this.fila; }
 
     puntoObjetivo(sitio, estado, mapa) {
+      // Operador que espera a que el Ejecutor mande su orden: de pie a su lado.
+      if (estado === 'ejecucion' && mapa) {
+        const p = puntoEjecucion(mapa, this.id);
+        if (p) return { col: p.col, fila: p.fila, postura: 'de_pie', mira: p.mira };
+      }
       if (!sitio) return { col: this.col || 10, fila: this.fila || 10, postura: 'de_pie' };
       if (estado === 'de_pie') {
         const p = mapaMod.posicionDePie(mapa, sitio);
@@ -155,14 +160,14 @@
       const cortado = Boolean(this.paseo);
       if (cortado) { this.paseo = null; this.ruta = []; }
       if (mismo && !cortado) {
-        if (!this.andando) { this.postura = p.postura; this.mira = sitio ? sitio.mira : this.mira; }
+        if (!this.andando) { this.postura = p.postura; this.mira = p.mira || (sitio ? sitio.mira : this.mira); }
         return false;
       }
       if (o.instantaneo) {
         this.col = p.col; this.fila = p.fila; this.ruta = [];
         this.z = mapaMod.elevacionEn(p.col, p.fila);
         this.postura = p.postura;
-        this.mira = sitio ? sitio.mira : this.mira;
+        this.mira = p.mira || (sitio ? sitio.mira : this.mira);
         return true;
       }
       const r = mapaMod.ruta(mapa, { col: this.col, fila: this.fila }, p);
@@ -200,7 +205,8 @@
       if (pa && pa.fase === 'vuelta') this.paseo = null;
       if (this.destino) {
         this.postura = this.destino.postura;
-        if (this.sitio) this.mira = this.sitio.mira;
+        if (this.destino.mira) this.mira = this.destino.mira;
+        else if (this.sitio) this.mira = this.sitio.mira;
       }
     }
 
@@ -369,6 +375,18 @@
       }
     }
     return null;
+  }
+
+  // Junto al puesto del Ejecutor, de pie y mirándolo: donde espera el operador
+  // cuya orden aún no ha salido. Hasta cuatro a la vez sin pisarse (el sitio
+  // sale de un hash del id: siempre el mismo para el mismo operador).
+  function puntoEjecucion(mapa, id) {
+    const s = (mapa.sitios && mapa.sitios.riesgos || []).find(x => x.preferente === 'ejecutor');
+    if (!s) return null;
+    const k = hash(String(id || '')) % 4;
+    const d = [[-1.2, 0.1], [-1.2, 0.95], [-2.0, 0.5], [-2.0, -0.4]][k];
+    const p = puntoLibre(mapa, s.col + d[0], s.fila + d[1], 'riesgos');
+    return p ? { col: p.col, fila: p.fila, mira: 'E' } : null;
   }
 
   // Punto al que va cada objetivo (y hacia dónde mira allí). null = no se mueve.
@@ -730,7 +748,7 @@
 
   return {
     VELOCIDAD, MAX_BOCADILLOS, MAX_CARACTERES_LINEA, MAX_LINEAS, ESCALA,
-    Personaje, crearElenco, planificarActividad, intervaloPasoMs, ventanaActividad, textoActividad, elegible, puntoDeObjetivo,
+    Personaje, crearElenco, planificarActividad, intervaloPasoMs, ventanaActividad, textoActividad, elegible, puntoDeObjetivo, puntoEjecucion,
     duracionBocadillo, partirTexto, elegirBocadillos, direccion,
     pintarPersonaje, pintarBocadillos, cajaPersonaje, cabeza, hash, giroCabeza, rafaga,
     PIELES, PELOS, aspectoDe,

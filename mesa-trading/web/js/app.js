@@ -40,7 +40,18 @@
     texturasSucias: true, animPatr: null, patrMostrado: null, ultimoPintado: 0, parado: false,
     rotulosPintados: [], cursor: -1, activoHasta: 0, llegadas: [], relojesClave: '', ventanasClave: '',
     stats: { frames: 0, msPintar: 0, maxMs: 0 },
+    // Operadores de pie junto al Ejecutor mientras se reproduce su operación
+    // (la propuesta ya salió y la ejecución aún no): agenteId → { texto, hilo, desde }.
+    enEjecucion: new Map(),
   };
+
+  // Reproductor (reproductor.js): lo que llega de golpe (un comité, una
+  // operación entera dentro de un latido) entra en el feed uno a uno.
+  const repro = PQ.reproductor ? PQ.reproductor.crearReproductor({
+    ahora: () => performance.now(),
+    ventana: () => PQ.reproductor.ventanaReunionMs(est.inst),
+  }) : null;
+  const ESPERA_MAX_MS = 120000;   // la espera de pie de una operación reproducida nunca dura más
 
   function lienzoTex(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
   const texturas = {
@@ -184,16 +195,19 @@
     }
     sincronizarPersonas(!anterior);
     programarActividad(inst);
-    // Bocadillos que trae la instantánea (p. ej. al conectar a mitad de una frase).
+    // Bocadillos que trae la instantánea (p. ej. al conectar a mitad de una
+    // frase), salvo los de quien tiene un mensaje esperando en el reproductor:
+    // su bocadillo sale cuando sale su mensaje.
     const tServ = inst.ahora;
     for (const a of inst.agentes || []) {
       const p = est.elenco.personajes.get(a.id);
+      if (repro && repro.esperaDe(a.id)) continue;
       if (p && a.bocadillo && a.bocadillo.texto && a.bocadillo.hasta > tServ && a.bocadillo.texto !== p.textoVisto) {
         p.textoVisto = a.bocadillo.texto;
         p.decir(a.bocadillo.texto, 2, performance.now());
       }
     }
-    paneles.anadirMensajes(inst.mensajes || []);
+    entrarMensajes(inst.mensajes || [], { primera: !anterior, desdeInstantanea: true });
     // El patrimonio de la pantalla gigante cuenta hacia arriba, como la barra.
     const patr = inst.cabecera && inst.cabecera.patrimonio;
     if (Number.isFinite(patr)) {
@@ -214,7 +228,10 @@
     const inst = est.inst;
     if (!inst || !est.mapa) return;
     est.asignacion = mapaMod.asignarSitios(est.mapa, inst.agentes || [], inst.departamentos);
-    est.elenco.sincronizar(inst.agentes || [], est.mapa, est.asignacion, {
+    // Mientras se reproduce su operación, el operador que propuso espera de pie
+    // junto al Ejecutor (como dice el servidor cuando la orden espera de verdad).
+    const agentes = (inst.agentes || []).map(a => (est.enEjecucion.has(a.id) && a.estado === 'trabajando' ? Object.assign({}, a, { estado: 'ejecucion' }) : a));
+    est.elenco.sincronizar(agentes, est.mapa, est.asignacion, {
       instantaneo: primera || reducir,
       forzarDePie: inst.fondo && inst.fondo.nivel === 'bloqueado',
     });
@@ -238,19 +255,108 @@
 
   function alMensaje(m) {
     if (!m || !m.id) return;
-    const nuevos = paneles.anadirMensajes([m]);
+    entrarMensajes([m]);
+  }
+
+  // Todo mensaje nuevo pasa por aquí (el SSE y la instantánea). El reproductor
+  // decide cuáles entran ya y cuáles esperan su turno (una reunión o una
+  // operación que llegó de golpe). En la primera instantánea el feed es
+  // historia y entra entero, salvo una reunión que acaba de celebrarse: esa se
+  // reproduce desde su apertura.
+  //
+  // Después, lo que llega y es más viejo que lo que dura una reproducción (en
+  // tiempo de la mesa) también es historia: entra ya, en su sitio por hora y
+  // sin bocadillos ni operadores de pie. Pasa al volver la red o al despertar
+  // el móvil: la instantánea trae lo que no se vio, y un comité de hace 3 h
+  // se reproducía como si fuera en directo («Reunión de la mañana en curso,
+  // 2 de 7»; revisión del 30-sep-2026). Mismo criterio que reunionReciente.
+  function entrarMensajes(lista, opciones) {
+    const o = opciones || {};
+    const nuevos = (lista || []).filter(m => m && m.id && !paneles.yaVisto(m.id) && !(repro && repro.retenido(m.id)));
+    if (!nuevos.length) return;
+    if (!repro) { mostrarMensajes(nuevos, { silencio: o.desdeInstantanea }); return; }
+    if (o.primera) {
+      const reciente = reunionReciente(nuevos);
+      const resto = reciente ? nuevos.filter(m => String(m.hilo || m.id) !== reciente) : nuevos;
+      mostrarMensajes(resto, { silencio: true });
+      if (reciente) repro.recibir(nuevos.filter(m => String(m.hilo || m.id) === reciente), { retener: true });
+      return;
+    }
+    const { viejos, recientes } = PQ.reproductor.separarViejos(nuevos, limiteReproduccion());
+    if (viejos.length) mostrarMensajes(viejos, { silencio: true, historia: true });
+    if (recientes.length) mostrarMensajes(repro.recibir(recientes), {});
+  }
+
+  // Lo más viejo que aún se reproduce (reloj de la mesa), o null sin instantánea.
+  function limiteReproduccion() {
+    const inst = est.inst;
+    if (!inst || !Number.isFinite(inst.ahora)) return null;
+    return PQ.reproductor.limiteHistoria(inst, ahoraServidor());
+  }
+
+  // Hilo de la reunión (comité o informativa) cuya apertura es de hace menos
+  // de lo que dura su reproducción (en tiempo de la mesa), o null.
+  function reunionReciente(lista) {
+    const limite = limiteReproduccion();
+    if (!Number.isFinite(limite)) return null;
+    let hilo = null;
+    for (const m of lista) {
+      const apertura = (m.canal === 'comite' && m.tipo === 'comite') || (m.canal === 'direccion' && m.tipo === 'reunion' && m.datos && m.datos.fase === 'apertura');
+      if (apertura && m.t >= limite) hilo = String(m.hilo || m.id);
+    }
+    return hilo;
+  }
+
+  // Al feed, con sus efectos: bocadillo de quien habla, destello del puesto
+  // y, en una operación, el operador de pie junto al Ejecutor desde su
+  // propuesta hasta la ejecución (o el veto). `silencio`: historia, sin efectos.
+  function mostrarMensajes(lista, opciones) {
+    const o = opciones || {};
+    const nuevos = paneles.anadirMensajes(lista || [], { historia: Boolean(o.historia) });
     if (!nuevos.length) return;
     if (est.inst) {
-      est.inst.mensajes = (est.inst.mensajes || []).concat([m]).slice(-150);
+      const ids = new Set((est.inst.mensajes || []).map(m => m.id));
+      est.inst.mensajes = (est.inst.mensajes || []).concat(nuevos.filter(m => !ids.has(m.id))).slice(-150);
     }
-    const p = est.elenco.personajes.get(m.de);
-    if (p) { p.textoVisto = m.texto; p.decir(m.texto, m.importancia, performance.now()); }
-    const puestoId = m.datos && m.datos.puestoId;
-    if (puestoId && (m.tipo === 'orden' || m.tipo === 'veto')) {
-      est.destellos.set(puestoId, { tipo: m.tipo === 'veto' ? 'veto' : 'orden', hasta: performance.now() + DESTELLO_MS });
+    if (o.silencio) return;
+    const ahora = performance.now();
+    let mover = false;
+    for (const m of nuevos) {
+      const p = est.elenco.personajes.get(m.de);
+      if (p) { p.textoVisto = m.texto; p.decir(m.texto, m.importancia, ahora); }
+      const puestoId = m.datos && m.datos.puestoId;
+      if (puestoId && (m.tipo === 'orden' || m.tipo === 'veto')) {
+        est.destellos.set(puestoId, { tipo: m.tipo === 'veto' ? 'veto' : 'orden', hasta: ahora + DESTELLO_MS });
+      }
+      if (PQ.reproductor && PQ.reproductor.abreEspera(m)) {
+        est.enEjecucion.set(m.de, { texto: m.texto, hilo: String(m.hilo || m.id), desde: ahora });
+        mover = true;
+      } else if (PQ.reproductor && PQ.reproductor.cierraEspera(m)) {
+        for (const [id, x] of est.enEjecucion) if (x.hilo === String(m.hilo || m.id)) { est.enEjecucion.delete(id); mover = true; }
+      }
     }
+    if (mover) sincronizarPersonas(false);
     if (est.seleccion) paneles.refrescarTarjeta(est.inst);
   }
+
+  // Cada 250 ms: lo que el reproductor suelta, la píldora de «en curso» y las
+  // esperas que ya no tienen quien las cierre.
+  function ticReproductor() {
+    if (!repro) return;
+    const sale = repro.tic();
+    if (sale.length) mostrarMensajes(sale, {});
+    const ahora = performance.now();
+    let mover = false;
+    for (const [id, x] of est.enEjecucion) if (ahora - x.desde > ESPERA_MAX_MS) { est.enEjecucion.delete(id); mover = true; }
+    if (mover) sincronizarPersonas(false);
+    paneles.reunionEnCursoFeed(repro.reunionEnCurso());
+  }
+  setInterval(ticReproductor, 250);
+  document.addEventListener('visibilitychange', () => {
+    // Tras mucho rato con la pestaña oculta no se reproduce lo viejo: entra de golpe.
+    if (!document.hidden && repro && repro.pendientes > 0 && est.ocultaDesde && performance.now() - est.ocultaDesde > 5 * 60000) mostrarMensajes(repro.vaciar(), {});
+    est.ocultaDesde = document.hidden ? performance.now() : null;
+  });
 
   function alAgente(ev) {
     if (!ev || !ev.id || !est.inst) return;
@@ -804,8 +910,14 @@
   function pintarBocadillos(t, pjs) {
     const candidatos = [];
     for (const p of pjs) {
-      const b = p.bocadillo;
-      if (!b || b.hasta <= t) continue;
+      let b = p.bocadillo && p.bocadillo.hasta > t ? p.bocadillo : null;
+      // Quien espera de pie junto al Ejecutor sigue diciendo qué espera.
+      if (!b && p.agente && p.agente.estado === 'ejecucion') {
+        const e = est.enEjecucion.get(p.id);
+        const texto = e ? e.texto : (p.agente.bocadillo && p.agente.bocadillo.texto);
+        if (texto) b = { texto, importancia: 2, desde: e ? e.desde : t - 1000, hasta: t + 1000 };
+      }
+      if (!b) continue;
       const cab = pers.cabeza(p);
       const s = camara.mundoAPantalla(cab.x, cab.y);
       if (s.x < -20 || s.x > est.ancho + 20 || s.y < -20 || s.y > est.alto + 40) continue;

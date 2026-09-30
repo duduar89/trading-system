@@ -57,6 +57,8 @@ necesita algo de él, lo pide ajustando este documento.
 | `src/agentes/departamentos/*.js`, `src/agentes/comite.js`, `src/orquestador.js`, `src/servidor.js`, `src/index.js`, `scripts/demo-acelerada.js`, `scripts/probar-todo.js`, `test/integracion-*.test.js` | **F · Integración** (después de A–D) |
 | `src/registros.js`, `test/integracion-registros.test.js` (noticias, historial y decisiones en disco, 30-sep-2026) | **F · Integración** (agente de datos) |
 | `src/agentes/{conversacion,reuniones}.js`, `test/integracion-conversacion.test.js` (quién contesta a quién y reuniones de las 9:00 y las 22:15, 30-sep-2026) | **F · Integración** (agente de tono) |
+| `src/informes/{index,lectores,estrategias,laboratorio}.js`, `test/informes-*.test.js`, `scripts/probar-vistas.js` (lo que leen las vistas de Informes, los dos servidores, 30-sep-2026) | **F · Integración** (agente de vistas) |
+| `scripts/estudiar-candidatas.js`, `scripts/estudiar-ampliada.js`, `docs/estudios/*.json` (la salida versionada de la que salen las notas de las mesas), `test/cuant-candidatas.test.js` (revisión del 30-sep-2026) | **A · Cuant** |
 
 ---
 
@@ -73,7 +75,8 @@ MARCOS = { '1Hour': 3_600_000, '4Hour': 14_400_000, '1Day': 86_400_000 }
 // clave(s) = s.replace('/', '')  → 'BTCUSD' (así vienen las posiciones cripto de Alpaca)
 
 // Activo del universo
-{ simbolo: 'BTC/USD', etiqueta: 'BTC', clase: 'cripto'|'accion', nombre: 'Bitcoin' }
+{ simbolo: 'BTC/USD', etiqueta: 'BTC', clase: 'cripto'|'accion', tipo, nombre: 'Bitcoin' }
+// tipo (30-sep-2026): 'cripto' | 'indices' | 'bonos' | 'materias' | 'acciones' | 'volatilidad'
 ```
 
 **Universo** (`src/mercado/universo.js`, dueño B):
@@ -86,6 +89,13 @@ MARCOS = { '1Hour': 3_600_000, '4Hour': 14_400_000, '1Day': 86_400_000 }
   tiene analista, ni puesto, ni orden (la plantilla lo salta, `_completar` lo
   quita de cualquier mesa guardada y el Ejecutor rechaza su orden con
   `motivo: 'solo_dato'`).
+- **Tipo de activo** (`tipo`, 30-sep-2026; lo usan el capital de la cabecera y
+  la vista Estrategias, §7 y §8): Cripto (las 10), Índices (SPY, QQQ, IWM, DIA),
+  Bonos (TLT), Materias primas (GLD), Acciones (XLE, XLK, XLF: cestas de
+  acciones de un sector) y Volatilidad (VIXY, que nadie opera y nunca sale en un
+  desglose). `TIPOS` (`[{ id, nombre }]`, en ese orden), `tipoDe(simbolo)` (acepta
+  también la clave `BTCUSD`; fuera del universo, `'otros'`, sin adivinar) y
+  `nombreTipo(id)`.
 - Exporta `UNIVERSO`, `CRIPTO` (las 10), `CESTA_CRIPTO` (las 6 originales: la
   cartera sombra `cesta-cripto` no cambia), `ETF` (los 9 operables),
   `SOLO_DATO` (`['VIXY']`), `porSimbolo(s)`, `porEtiqueta(e)`, `clave(s)`,
@@ -93,11 +103,15 @@ MARCOS = { '1Hour': 3_600_000, '4Hour': 14_400_000, '1Day': 86_400_000 }
   (sin los de solo dato), `esCripto(s)`, `esSoloDato(s)` y `generacion(s)`
   (1 el universo original, 2 la ampliación: la usa la plantilla para no
   cambiar la cara de nadie, §6.1).
-- Decisión de Eduardo (30-sep-2026) con el histórico real mar-2022 → sep-2026:
-  Momentum cripto titular sigue con sus 6 (con LTC y BCH su Sharpe bajaba de
-  0,82 a 0,58; con XRP, de 0,74 a 0,56; ADA solo tiene 7 meses de datos). Las
-  4 nuevas las opera solo «Momentum cripto ampliada» (§4.3), en incubación; DIA
-  entra en Momentum ETF.
+- Decisión de Eduardo (30-sep-2026) con el histórico real: Momentum cripto
+  titular sigue con sus 6. Las 4 nuevas las opera solo «Momentum cripto
+  ampliada» (§4.3), en incubación; DIA entra en Momentum ETF. Las cifras, del
+  estudio guardado `docs/estudios/ampliada-2026-09-30.json`
+  (`scripts/estudiar-ampliada.js`), cada par en el tramo en que cotizan todas:
+  con LTC y BCH el Sharpe de la titular baja de 0,63 a 0,40 (dic-2021 →
+  sep-2026); con XRP, de 0,81 a 0,65 (ene-2024 → sep-2026); ADA cotiza desde
+  feb-2026 (7 meses). Las que enseñaba antes (0,82 → 0,58 y 0,74 → 0,56) no
+  salían de ningún estudio guardado (revisión del 30-sep-2026).
 
 ---
 
@@ -342,7 +356,15 @@ volatilidad 30 d en su propia historia). Cada filtro: `{ id, parametros, permite
 `mesasIniciales({ hayAlpaca }) → Mesa[]`:
 
 ```js
-Mesa = { id, nombre, familia, marco, universo: [simbolo], params, filtros: [{id, parametro}], estado: 'titular'|'incubacion'|'banquillo', origen: 'inicial'|'laboratorio', nota }
+Mesa = { id, nombre, familia, marco, universo: [simbolo], params, filtros: [{id, parametro}], estado: 'titular'|'incubacion'|'banquillo', origen: 'inicial'|'laboratorio', nota,
+         estudio? /* solo las de ETF, abajo */ }
+Estudio = { fecha: 'AAAA-MM-DD', fuente /* el script */, anos, nombre? /* la candidata */, universo: [simbolo] /* el estudiado */, aprobada: boolean,
+            cifras: { sharpeFueraDeMuestra, ventanasPositivas, sharpeDeflactado, rentabilidadAnual, comprarYMantenerAnual,
+                      sharpeCompleto?, comprarYMantenerSharpe? /* desde la salida siguiente del estudio */ },
+            exposicionMaxima /* con cuánto dinero invertido, como mucho, se hizo rentabilidadAnual (exposicionMaximaEstudio) */,
+            avisos?: { <cifra>: texto } /* lo que hay que saber de una cifra, p. ej. un deflactado sin todos los ensayos */,
+            umbrales: { sharpeFueraDeMuestra: 0.6, ventanasPositivas: 0.75, sharpeDeflactado: 0.9 } /* los CRITERIOS del laboratorio */,
+            decision: { quien: 'Eduardo', que: 'sigue en prueba', peso: 0.02, porque: 'para verla en vivo' } }
 ```
 Iniciales: `tendencia` (BTC, ETH, SOL · 4Hour), `momentum` (6 cripto), `reversion` (BTC, ETH),
 `ruptura` (BTC, ETH, SOL), `momentum-ampliada` («Momentum cripto ampliada», las 6 +
@@ -354,12 +376,91 @@ Un fondo que ya existía recibe la ampliada y DIA con una migración idempotente
 arrancar (`orquestador._migrarUniverso`, §6.10 `migraciones`): mensaje en el feed
 (canal direccion, tipo `contratacion`, `datos.migracion = 'universo-2026-09-30'`),
 dos decisiones `asignacion` de `quien: 'humano'`, sin tocar ninguna posición; la
-ampliada entra con el 2 % del efectivo sin asignar. Estado de arranque (decisión del 30-sep-2026):
+ampliada entra con el 2 % del efectivo sin asignar. Con DIA cambia la
+referencia de Momentum ETF: su backtest (el de los 5 ETF de antes) se pone a
+`null` y `backtestsPendientes` lo rehace con los 6 (la decisión lo dice y
+guarda `backtestAnterior`). Un fondo que ya había migrado DIA con el backtest
+viejo lo rehace una vez (`migraciones.backtestEtf`, decisión `asignacion` de
+`quien: 'laboratorio'` con `datos.migracion = 'backtest-etf-2026-09-30'`, hito
+`backtest` de la mesa en /api/estrategias, y nota del laboratorio en el feed).
+Todo backtest de referencia guarda desde el 30-sep-2026 el `universo` de la
+mesa con que se hizo; `laboratorio.backtestVigente(mesa)` es falso si la mesa
+ya tiene otro, y entonces se rehace (revisión del 30-sep-2026: la columna
+«Histórico», la lectura y el umbral de ascenso comparaban el papel con 6 ETF
+contra el histórico de 5). Estado de arranque (decisión del 30-sep-2026):
 `momentum` es la única **titular**; todas las demás arrancan en **incubación**
 (2 %) y su `nota` dice por qué con la cifra: tendencia y reversión pierden con
 costes, ruptura no diversifica frente a momentum (correlación diaria 0,80,
-`scripts/estudiar-limites.js`) y las de ETF no se pueden validar sin claves.
+`scripts/estudiar-limites.js`) y las de ETF suspendieron el filtro del
+laboratorio con 10 años de velas reales (`scripts/estudiar-candidatas.js`,
+30-sep-2026): Momentum ETF, Sharpe fuera de muestra 0,19 (mín. 0,6), 69 % de
+ventanas en positivo (mín. 75 %), Sharpe deflactado 0,48 (mín. 0,90), 2,1 %/año
+con como mucho el 20 % invertido frente a 13,3 % de comprar y mantener, con
+todo invertido; Reversión en índices (SPY, QQQ, IWM, DIA), 0,33, 56 %, 0,59 y
+0,3 %/año (como mucho el 40 % invertido) frente a 15,3 %. Eduardo decidió que
+sigan en prueba al 2 % para verlas en vivo: su `nota` lo dice en llano y la
+mesa lleva su `estudio` (`ESTUDIOS_ETF`, `UMBRALES_FILTRO`; la prueba comprueba
+que los umbrales son los `CRITERIOS` del laboratorio y que la nota lleva sus
+cifras).
+
+Revisión del 30-sep-2026 (la salida de aquel estudio no se guardó en git; el
+script la deja ahora también en `docs/estudios/candidatas-AAAA-MM-DD.json`,
+versionada):
+- **Estudio y mesa son lo mismo.** Reversión ETF opera SPY y QQQ; el estudio
+  fue de otra cartera, «Reversión en índices» (SPY, QQQ, IWM y DIA). Su nota y
+  la vista lo dicen («Su cartera (SPY y QQQ) aún no se ha estudiado… Estas son
+  sus cifras, no las de esta mesa»: `estudioDeOtraCartera(mesa)` y
+  `textoEstudio(estudio, universoMesa)` de la vista), y
+  `scripts/estudiar-candidatas.js` estudia ya cada mesa de ETF con SU universo
+  (candidatas con `mesaId`, sacadas de `mesasIniciales`). Con las claves de
+  Alpaca, la salida siguiente sustituye esas cifras, o Eduardo decide pasar la
+  mesa a los 4 ETF (con migración). La prueba: toda mesa con estudio, también
+  tras la migración, o tiene el mismo universo o lo dice.
+- **Ensayos previos.** `ensayosPrevios` y `sharpesPrevios` iban dentro de un
+  comentario del script: cada candidata se deflactaba como si fuera la
+  primera. Arreglado (`test/cuant-candidatas.test.js`); el 0,59 de Reversión en
+  índices (2.ª candidata) lleva el aviso `avisos.sharpeDeflactado` («sin
+  contar las pruebas del estudio anterior: puede ser más bajo»). No cambia el
+  veredicto: suspende también por las otras dos cifras.
+- **Comparar lo comparable.** La rentabilidad del estudio se hizo con los
+  límites duros (10 % por activo): como mucho el 20 % invertido con top 2, el
+  40 % con cuatro activos (`exposicionMaximaEstudio(familia, universo,
+  limites)`), y comprar y mantener lo tiene todo. La nota y la vista lo dicen al
+  lado; con `cifras.sharpeCompleto` y `comprarYMantenerSharpe` (la salida del
+  script ya los trae) la vista compara los Sharpe.
+- **La nota de la ampliada sale de un estudio guardado.** Sus cifras (0,82 →
+  0,58 con LTC y BCH; 0,74 → 0,56 con XRP) no tenían script ni salida, y no
+  cuadraban entre sí: cada cripto nueva cotiza en Alpaca desde un día distinto
+  (XRP desde ene-2024, ADA desde feb-2026) y cada par tiene su tramo.
+  `scripts/estudiar-ampliada.js` (velas reales de cripto, sin claves; la
+  configuración de la titular en `probar-backtest --real`: parámetros por
+  defecto, costes, límites duros, mesa del 25 %) compara la titular con y sin
+  las nuevas en el tramo en que cotizan todas, y deja
+  `docs/estudios/ampliada-AAAA-MM-DD.json`; la nota dice cada par con su tramo
+  y la prueba la compara con ese fichero.
+- Un fondo que ya tenía las notas del 30-sep las cambia al arrancar
+  (`NOTAS_ETF_SUPERADAS` con `notaEtfNueva → { nota, estudio, revision }`, y
+  `NOTAS_SUPERADAS` con `notaRevisada → { nota, revision }` para la ampliada;
+  `migraciones.notasRevision`): decisión `asignacion` de `quien:
+  'laboratorio'` por mesa (`datos.migracion = 'notas-revision-2026-09-30'`,
+  hito `estudio`) y una nota del laboratorio en el feed. Sin tocar peso ni
+  estado.
+Un fondo que ya existía cambia la nota de antes del estudio (`NOTA_ETF_ANTERIOR`,
+«Sin validar con datos reales…») por la nueva al arrancar
+(`orquestador._migrarNotasEtf`, con `notaEtfNueva(mesa)`): idempotente porque
+solo toca una mesa con la nota vieja (una nota ya cambiada, o puesta a mano, no
+se pisa), no cambia peso ni estado, deja una decisión `asignacion` de `quien:
+'humano'` por mesa (`datos.migracion = 'notas-etf-2026-09-30'`, con la nota y el
+estudio) y un mensaje del CIO en el canal direccion.
 Pueden ascender por la regla del asignador (§5.7).
+
+`plazoMesa(mesa) → { id: 'horas'|'dia'|'mes', nombre }` y `tiposMesa(mesa) →
+[{ id, nombre }]` (30-sep-2026, para agrupar la vista Estrategias; el universo
+puede venir por símbolo o por etiqueta): «Cada 4 horas» (marco 4Hour o 1Hour),
+«Cada mes» (rotación con rebalanceo mensual: el de la mesa o, sin él, el del
+perfil por su universo) y «Cada día o semana» (el resto: diarias y rotación
+semanal); los tipos de su universo (§2) en el orden de `TIPOS`. `PLAZOS`, en
+ese orden.
 
 ### 4.4 Dimensionado (`src/cuant/dimensionado.js`) — lo usan backtest y vivo
 
@@ -644,19 +745,22 @@ siempre que el semáforo no activa nada: el código sigue siendo solo papel.
 ### 6.1 Departamentos, salas y plantilla (`src/agentes/registro.js`, D)
 
 ```js
-DEPARTAMENTOS = [
-  { id: 'direccion',   nombre: 'Dirección',   color: '#f5b942', sala: 'direccion' },
-  { id: 'macro',       nombre: 'Macro',       color: '#8b5cf6', sala: 'macro' },
-  { id: 'analisis',    nombre: 'Análisis',    color: '#22c55e', sala: 'analisis' },
-  { id: 'mesas',       nombre: 'Mesas',       color: '#3b82f6', sala: 'parque' },
-  { id: 'riesgos',     nombre: 'Riesgos',     color: '#ef4444', sala: 'riesgos' },
-  { id: 'operaciones', nombre: 'Operaciones', color: '#f97316', sala: 'riesgos' },
-  { id: 'laboratorio', nombre: 'Laboratorio', color: '#06b6d4', sala: 'laboratorio' },
+DEPARTAMENTOS = [   // cada uno con `queHace`: una frase llana y sin cifras (pestaña Equipo, §8)
+  { id: 'direccion',   nombre: 'Dirección',   color: '#f5b942', sala: 'direccion',   queHace },
+  { id: 'macro',       nombre: 'Macro',       color: '#8b5cf6', sala: 'macro',       queHace },
+  { id: 'analisis',    nombre: 'Análisis',    color: '#22c55e', sala: 'analisis',    queHace },
+  { id: 'mesas',       nombre: 'Mesas',       color: '#3b82f6', sala: 'parque',      queHace },
+  { id: 'riesgos',     nombre: 'Riesgos',     color: '#ef4444', sala: 'riesgos',     queHace },
+  { id: 'operaciones', nombre: 'Operaciones', color: '#f97316', sala: 'riesgos',     queHace },
+  { id: 'laboratorio', nombre: 'Laboratorio', color: '#06b6d4', sala: 'laboratorio', queHace },
 ]
 SALAS = ['parque', 'direccion', 'macro', 'analisis', 'laboratorio', 'riesgos', 'comite', 'descanso']
 crearPlantilla({ universo, mesas }) → Agente[]
-Agente = { id, nombre, departamento, rol, queDecide, queHace, usaLLM: boolean, sala, mesaId?, simbolo?, etiqueta?, puestoId? }
+Agente = { id, nombre, genero: 'f'|'m', departamento, rol, queDecide, queHace, usaLLM: boolean, sala, mesaId?, simbolo?, etiqueta?, puestoId? }
 ```
+`genero` sale del nombre de pila (`NOMBRES`, y fijo en los puestos fijos) y es
+el mismo que decide «Operador»/«Operadora» en el rol; la cara del panel lo usa
+(barba solo en hombres, §8).
 `queHace` (30-sep-2026): una o dos frases en lenguaje llano para alguien que no
 sabe de bolsa; `queDecide` sigue siendo el técnico. Los activos de la
 ampliación (`universo.generacion` 2) se nombran en una segunda vuelta, después
@@ -771,7 +875,7 @@ y no tiene salvavidas del servidor):
   `crearLLM` recibe además `limiteLlamadaMs` (45 s), `reintentos` (0) y
   `plazo()` (ARQUITECTURA-WEB W2).
 
-`src/agentes/cifras.js` (D): `verificarCifras(texto, entrada) → { ok, noEncontradas: [] }`. Extrae
+`src/agentes/cifras.js` (D): `verificarCifras(texto, entrada, { conteos = false } = {}) → { ok, noEncontradas: [] }`. Extrae
 números del texto (formatos 1.234,56 · 1,234.56 · 12 % · 3,5 $) y los busca
 entre todos los números de `entrada` (aplanada; se aceptan redondeos a 0-2
 decimales y porcentajes ×100). Signo: un «+» o «−» escrito pegado al número
@@ -779,7 +883,23 @@ tiene que coincidir con el del dato («+523,40 $» no pasa si el dato es
 −523,40); sin signo escrito se compara el valor absoluto. Enteros 0-31 sin
 unidad ni signo se aceptan siempre (conteos, días, horas); con unidad
 («12 %», «5 $») o con signo («+3»), no: son cifras que hay que encontrar.
-Una hora de reloj (16:00) solo pasa si esa hora está en los datos.
+Una hora de reloj (16:00) solo pasa si esa hora está en los datos. Con
+`{ conteos: true }` (reuniones y comité, donde lo que se cuenta son
+operaciones, posiciones y órdenes; revisión del 30-sep-2026) esos enteros
+pequeños también tienen que estar en los datos, y también los escritos con
+letra («cuatro», «ninguna»; no «un/una», que son artículos).
+
+`vocabulario(texto) → { modos, compras, regimenes }` y
+`contradiceVocabulario(texto, { modos: [], compras = modos, regimen = null }) → boolean`
+(mismo fichero, 30-sep-2026): el modo, el voto y el régimen que dice un texto,
+por su nombre en cualquier forma («DEFENSIVO», «modo defensivo», «solo
+cerrar») o en llano («a la mitad», «tamaño normal», «no se abre nada»; «el
+mercado acompaña», «ni a favor ni en contra», «tiene miedo»), sin distinguir
+mayúsculas. «nivel normal/solo cerrar» (el del fondo) y «el índice de miedo y
+codicia» no cuentan. Un texto del LLM que diga algo fuera de lo permitido se
+descarta: ahí no hay cifras y `verificarCifras` no lo ve. Las frases de
+`plantillas.MODO_TEXTO`, `REGIMEN_TEXTO` y `NO_COMPRA` se reconocen como su
+valor (`test/agentes-cifras.test.js`).
 
 ### 6.4 Plantillas (`src/agentes/plantillas.js`, D)
 
@@ -796,6 +916,18 @@ nombre («Ruptura Donchian», no «ruptura») si reciben la lista de mesas;
 dice el tramo real si el cierre no cubre 24 h (portátil apagado a las 00:05);
 `reabrir({ quien, patrimonio, pico })` dice con cifras cuánto está el fondo por
 debajo de su máximo histórico.
+`comoCompra({ modo, nivel?, factor?, soloCerrarHasta? })` (30-sep-2026) es lo
+que el fondo hace de verdad con las compras nuevas, y lo usan
+`decisionComite`, `reunion.resumenManana` y `reunion.resumenCierre` (que
+reciben esos mismos campos): con el fondo fuera del nivel normal, «el fondo no
+compra nada: …» con su motivo y hasta cuándo (`NO_COMPRA`: el kill y la pausa,
+hasta Reabrir; la pérdida del día, hasta las 00:00 UTC) en vez de explicar el
+modo; con el «solo cerrar» del Megáfono, hasta su hora; con un factor
+(`mesas.factorTamano`: `{ total, comite, megafono, caida }`) que recorta más
+que el modo, el factor real y por qué («compras nuevas a ×0,25 del tamaño
+normal por el modo DEFENSIVO y la caída del fondo»). `comprasEfectivas(mismos
+datos) → 'NORMAL'|'DEFENSIVO'|'SOLO_CERRAR'|null` dice a qué modo equivale eso
+(null: otro factor) para el control de los textos del LLM.
 
 Frases cortas (≤ 220 caracteres, `plantillas.MAX`), con cifras, sin adjetivos
 vacíos. **Tono llano (30-sep-2026)**: para alguien que no sabe de bolsa, en
@@ -954,10 +1086,18 @@ plan por defecto = modo por mayoría de votos (en empate, el más prudente),
 multiplicadores 1, vetos los activos con evento grave de noticias. Las
 `intervenciones` sustituyen a las plantillas de los puntos 1-6 solo si pasan
 `verificarCifras` contra los datos de SU punto (`{ hora, [punto]: … }`, más
-los límites en el de Riesgos) y no nombran un voto o un régimen distinto del
-calculado. El voto publicado de Macro y Riesgos es siempre el del código. La
-`razon` del LLM solo sale si no hubo veto de Riesgos (con veto, el modo
-aplicado no es el que razonó) y no nombra otro modo. Durante el comité, los
+los límites en el de Riesgos), con `{ conteos: true }`, y no dicen un voto, un
+modo o un régimen distinto del calculado, ni por su nombre ni en llano
+(`contradiceVocabulario`, §6.3): Macro y Riesgos solo pueden decir su voto; los
+demás puntos no hablan de modo; el régimen, solo el de Macro. El voto publicado
+de Macro y Riesgos es siempre el del código. La `razon` del LLM solo sale si no
+hubo veto de Riesgos (con veto, el modo aplicado no es el que razonó), no
+nombra otro modo y lo que dice de las compras es lo que pasa con la decisión
+ya aplicada (`plantillas.comprasEfectivas`: nada con el fondo fuera del nivel
+normal). La decisión dice lo que el fondo hace de verdad con las compras
+(`plantillas.comoCompra`): con el fondo bloqueado, en pausa o en solo cerrar,
+«Decido: modo DEFENSIVO, el plan por defecto. Ahora el fondo no compra nada:
+…». Durante el comité, los
 jefes van a la sala de comité (evento `agente`); las pausas entre puntos son
 solo de pantalla y `detener()` las corta.
 
@@ -1026,16 +1166,25 @@ la referencia del día nuevo.
   multiplicadores ni vetos. Canal `direccion`: apertura y resumen con tipo
   `reunion`, turnos con `informe`; `datos: { reunion: 'manana'|'cierre',
   turno?, fase?, fuente }`. Los jefes van a la sala de comité como en el
-  comité (modo latido: hasta `estado.comite.salaHasta`). Van después del
+  comité y se quedan hasta `estado.comite.salaHasta`: `SALA_TRAS_REUNION_MS`
+  (`src/agentes/comite.js`), 15 min del reloj de la mesa tras un comité o una
+  reunión (antes 5 en el modo latido, y Eduardo no llegaba a verlo), en el
+  modo latido y en el local (opción `salaTrasComiteMs`). Solo visual. Van después del
   comité del mismo paso (en invierno las 9:00 son las 08:00 UTC, hora de
   comité) y, si hay un comité reunido en segundo plano, esperan al paso
   siguiente. Una que llega más de 1 h tarde (portátil apagado) no se celebra.
   Con LLM, una llamada (`uso: 'agentes'`, propósito `reunion`) redacta los
-  turnos; cada texto pasa por `verificarCifras` contra los datos de SU turno y
-  no puede nombrar otro modo ni otro régimen; si no, plantilla. En el modo
-  latido con LLM, la cita ya movida se guarda antes de llamar. Deja una línea
-  `reunion` en `decisiones.jsonl` solo cuando `registros.TIPOS_DECISION` la
-  admita (hoy no: pendiente del dueño de `src/registros.js`).
+  turnos; cada texto pasa por `verificarCifras` contra los datos de SU turno
+  (con `{ conteos: true }`) y no puede decir otro modo ni otro régimen, ni por
+  su nombre ni en llano (`contradiceVocabulario`, §6.3): del modo y de las
+  compras solo habla el resumen, con lo que el fondo hace de verdad
+  (`comprasEfectivas`); si no, plantilla. El resumen de la Presidenta lleva
+  `modo`, `nivel`, `factor` y `soloCerrarHasta` y lo dice con
+  `plantillas.comoCompra` (con el fondo bloqueado: «Ahora el fondo no compra
+  nada: está bloqueado por el kill switch hasta Reabrir»). En el modo
+  latido con LLM, la cita ya movida se guarda antes de llamar. Cada reunión
+  deja una línea `reunion` en `decisiones.jsonl` (§6.10): no decide nada, pero
+  la pantalla de Decisiones la cuenta con sus cifras.
 - Diario 00:05 UTC: cierre diario (patrimonio inicio de día, pico, curva diaria, sombras, métricas de mesa), post-mortem en lote, informe diario.
   Si llega tarde (más de 15 min: portátil apagado o dormido), el día que se
   cierra es el de la referencia (`diaInicio`), las operaciones van por ventana
@@ -1047,7 +1196,7 @@ la referencia del día nuevo.
   más de un 5 % o si Alpaca no apuntó nada.
 - Semanal (lunes 00:10 UTC): laboratorio (≤ 3 hipótesis, en trozos con `setImmediate` para no bloquear), informe semanal (Sharpe 90 d del fondo contra sombras), alarma de deriva.
 - Mensual (día 1, 00:15 UTC): asignador → contrataciones (incubación 2 %), ascensos, despidos.
-- Descanso: un agente sin trabajo durante 2 h (simuladas) va 15 min a la sala de descanso. Nunca durante un comité ni con el fondo en alerta.
+- Descanso: un agente sin trabajo durante 2 h (simuladas) va 15 min a la sala de descanso. Nunca durante un comité ni con el fondo en alerta, ni un operador cuya orden espera al Ejecutor (§7, estado `ejecucion`).
 
 ### 6.10 Estado persistido (`data/`)
 
@@ -1088,12 +1237,27 @@ visual), próximas cadencias. Campos añadidos después del primer contrato:
   `noticias.jsonl` (1.000 últimos); `noticias.pendientes`: las guardadas que
   esperan clasificación `[{ id, t, titular, resumen, simbolos, url }]` (24 h,
   100 como mucho). `noticias.ultima` / `ultimaOk` / `vistos` siguen siendo los
-  de la clasificación con LLM.
+  de la clasificación con LLM. Un latido puede escribir en `noticias.jsonl` y
+  morir antes de guardar el estado: antes de traer o clasificar,
+  `analisis.alinearConRegistro` lee las últimas 300 noticias del fichero y, de
+  las que tienen una línea posterior a `max(ultimaTraida, ultima)` (lo último
+  que el estado sabe haber escrito), las da por guardadas, devuelve a
+  `pendientes` las que siguen sin clasificar (24 h) y da por vistas las ya
+  clasificadas, reponiendo su veto vigente en `directivas` y `eventosGraves`
+  sin publicar ni apuntar otra decisión (revisión del 30-sep-2026: se
+  escribía dos veces y la pantalla enseñaba la primera, sin clasificar).
 - `historial.ultimaHora`: la hora (inicio, ms) de la última línea `hora` de
   `historial.jsonl`. Al arrancar se contrasta con las últimas 20 líneas del
   fichero: tras un corte entre escribir la línea y guardar el estado no se repite.
-- `migraciones`: `{ ampliada?: t, dia?: t }`, la migración del universo del
-  30-sep-2026 hecha en este fondo (no se repite).
+- `mesas[].estudio` (las de ETF, §4.3) y `migraciones.notasEtf`: cuándo se
+  cambiaron las notas de ETF en este fondo (informativo: lo que evita repetirla
+  es que la nota ya no es la vieja).
+- `migraciones`: `{ ampliada?: t, dia?: t, backtestEtf?: t }`, la migración del universo del
+  30-sep-2026 hecha en este fondo (no se repite; `backtestEtf`, el backtest de
+  Momentum ETF rehecho con DIA, §4.3). No deja línea en `historial.jsonl`: al
+  arrancar aún no hay valoración y el patrimonio saldría mal; la línea de la
+  hora siguiente ya trae la mesa nueva (la migración queda en el feed y en
+  `decisiones.jsonl`).
 - `mesas[].universo` nunca lleva un activo de solo dato (se quita al cargar).
 - `cadencias.proximaReunionManana`, `cadencias.proximaReunionCierre`: las
   próximas reuniones (§6.9); un estado sin ellas las pone en el primer paso.
@@ -1123,6 +1287,9 @@ lanza. `scripts/probar-latido.js` los compara continuo contra latido a latido.
 `clasificacion: []` = clasificada sin nada válido (su clasificación no valía o
 no nombraba un símbolo suyo). `leerNoticias(ruta, { desde, limite })` fusiona
 las actualizaciones (y pone `clasificadaT`) y devuelve de la más nueva a la más vieja.
+Una segunda línea base del mismo id (de un latido cortado, antes del arreglo
+del 30-sep-2026) se fusiona como una actualización: vale la clasificación y el
+veto no nulos más recientes; la noticia conserva su primera `t`.
 
 `historial.jsonl`, una línea por hora de reloj de la mesa (motivo `hora`) y otra
 en cada cambio de modo del comité (`comite`), revisión mensual con cambios de
@@ -1156,11 +1323,14 @@ Idempotente: una sola `hora` por hora y un solo suceso por (motivo, instante).
 | `pausa` | `humano` (Pausar, Reabrir), `controller` (conciliaciones graves), `riesgos` (solo cerrar por la pérdida del día) | _cmdPausar, _cmdReabrir, conciliarCadaLatido, vigilarFondo | `{ accion: 'pausar'|'reabrir'|'solo_cerrar', nivel, … }` |
 | `megafono` | `humano` | _cmdMegafonoAplicar | `{ id, texto, directivas, fuente }` |
 | `noticia` | `analista-…` | analisis.noticias (evento grave) | `{ noticiaId, simbolo, categoria, hasta, titular, url }` |
+| `reunion` | `cio` | reuniones.celebrar (9:00 y 22:15 de Madrid; informativa) | `{ reunion: 'manana'|'cierre', hora, fuente: 'llm'|'plantilla', costeUsd, turnos: { [turno]: datos del turno } }` |
 
 Lectores (`src/registros.js`): `leerNoticias`, `leerHistorial(ruta, { desde,
 limite })`, `leerDecisiones(ruta, { desde, tipo /* uno o varios separados por
-comas */, limite })` y `consultar(carpeta, fuente, URLSearchParams)` para los
-servidores (§7).
+comas */, quien /* id de agente o 'humano': las de la ficha de un agente */, limite })`
+y `consultar(carpeta, fuente, URLSearchParams)`. Los servidores no los llaman
+directamente: pasan por `src/informes` (§7), que añade los filtros y las
+reducciones de las vistas y responde lo mismo en local y en la web.
 Además `data/.proceso` (el bloqueo de la carpeta, con el pid), `mensajes.jsonl`,
 `ordenes.jsonl`, `operaciones.jsonl`, `operaciones-sombra.jsonl`,
 `llm-costes.jsonl`, `informes.jsonl`, `broker-simulado.json`, `cache/` e
@@ -1224,9 +1394,11 @@ REABRIR o PRUEBA no protegen: la web atacante las mete en el cuerpo):
 | `GET /api/mensajes?desde=<t>` | mensajes con `t ≥ desde` (INCLUSIVO; se deduplican por `id`). Si `desde` es anterior a lo que hay en memoria (500), se completa con las últimas 5.000 líneas de `mensajes.jsonl` |
 | `GET /api/operaciones` | últimas 200 operaciones cerradas |
 | `GET /api/costes-llm` | gasto por día y por propósito |
-| `GET /api/noticias?desde=&limite=` | noticias de `noticias.jsonl` con las actualizaciones fusionadas, de la más nueva a la más vieja (200 por defecto, máx. 1.000) |
-| `GET /api/historial?desde=&limite=` | líneas de `historial.jsonl` (las últimas 2.000 por defecto, máx. 20.000), en orden |
-| `GET /api/decisiones?desde=&tipo=&limite=` | líneas de `decisiones.jsonl` (500 por defecto, máx. 5.000), en orden; `tipo` admite varios separados por comas |
+| `GET /api/noticias?desde=&limite=&simbolo=&graves=1` | noticias de `noticias.jsonl` con las actualizaciones fusionadas, de la más nueva a la más vieja (200 por defecto, máx. 1.000). `simbolo` (BTC, btc, BTC/USD o BTCUSD) busca en `simbolos`, `clasificacion[].simbolo` y `veto.simbolos`; `graves=1`, las que tienen alguna clasificación grave |
+| `GET /api/historial?desde=&limite=&puntos=` | líneas de `historial.jsonl` (las últimas 2.000 por defecto, máx. 20.000), en orden. Con `puntos` (20 a 2.000): todo el tramo `t ≥ desde` de la cola (`limite`, 20.000 por defecto) reducido a ≤ `puntos` con LTTB; siempre entran el primero, el último, el máximo y el mínimo del patrimonio y las líneas con `motivo ≠ 'hora'` (como mucho `puntos`/4) |
+| `GET /api/decisiones?desde=&tipo=&quien=&limite=` | líneas de `decisiones.jsonl` (500 por defecto, máx. 5.000), en orden; `tipo` admite varios separados por comas; `quien`, las de un agente (o `humano`) |
+| `GET /api/estrategias` | ficha de cada mesa para la vista Estrategias (abajo) |
+| `GET /api/laboratorio` | el laboratorio para su vista (abajo) |
 | `POST /api/comando/comite` | convoca comité ya |
 | `POST /api/comando/megafono` `{texto}` | devuelve la propuesta `{ id, directivas, explicacion }` (no aplica) |
 | `POST /api/comando/megafono-aplicar` `{id}` | aplica la propuesta |
@@ -1236,6 +1408,53 @@ REABRIR o PRUEBA no protegen: la web atacante las mete en el cuerpo):
 | `POST /api/comando/kill` `{confirmacion: 'KILL'}` | bloquea al instante (y lo guarda), cancela todo y cierra todo. `ok: false` si algo queda sin vender: el fondo sigue bloqueado y se reintenta solo cada pocos minutos. Las acciones con la bolsa cerrada se venden a la apertura |
 | `GET/POST /api/comando/ajustes` | ver; cambiar `presupuestoDiaUsd`, `modeloComite`, `modeloAgentes`, `velocidad` (sintético). Los límites se ven, no se cambian. |
 | `POST /api/comando/rebalancear` `{ mesa }` | Solo mesas de rotación por momentum, fondo en marcha normal y mesa fuera del banquillo. Deja `mesas[].rebalanceoYa = { t, quien }` en el estado; el paso siguiente (procesarMesa) decide como si fuera su día con la última vela cerrada y el precio de ahora (precioDecision = precio de ahora; stop a 3×ATR de ese precio; no entra si el precio ya está bajo el stop que daría el cierre), también en la sombra. Espera, con la marca puesta, si falta la última vela o el precio de alguna de sus criptos. Quita la marca antes de mandar órdenes y apunta `mesas[].rebalanceoVela = tVela`: sobre la misma vela no se repite. Con el fondo parado cuando toca, la marca se quita con una nota. Las propuestas llevan `datos.rebalanceoPedido: true` y la nota del CIO dice qué entró de verdad y cuánto se movió cada precio desde el cierre. Lo pidió Eduardo el 30-sep-2026 (que la titular no esperara 5 días vacía). Desde la terminal: `node scripts/comando.js rebalancear '{"mesa":"momentum"}'`. |
+
+Las cinco rutas de lectura de arriba (noticias, historial, decisiones,
+estrategias y laboratorio) son de `src/informes/index.js`,
+`consultar(fuente, { carpeta, params, instantanea })`, una sola entrada para
+los dos servidores: en local con la instantánea en memoria y en la web con la
+publicada por el último latido. Sobre la misma carpeta responden lo mismo
+(`test/informes-servidores.test.js` lo compara ruta a ruta). Nunca lanzan: un
+fichero que no existe, vacío o con líneas rotas da una lista vacía, y un fallo
+en estrategias o laboratorio devuelve el objeto vacío con `error`. Sin los
+parámetros de las vistas (`simbolo`, `graves`, `puntos`) responden exactamente
+`registros.consultar`; con ellos, y en estrategias y laboratorio, leen solo la
+cola de cada JSONL (20.000 líneas, 32 MB como mucho), con caché por tamaño y fecha.
+
+```js
+// GET /api/estrategias. Orden: titulares, en prueba y banquillo; dentro, por peso.
+{ t, modo, resumen: { total, titulares, incubacion, banquillo, sinAsignar },
+  mesas: [{ id, nombre, familia, marco, estado, peso, capital, multiplicador, universo, params, filtros, diasActiva, nota,
+            explicacion, papel: { ...metricas de la instantánea, pnlDia }, backtest, sharpeBacktest,
+            lectura: { tipo: 'sin_backtest'|'pocas'|'mejor'|'peor', texto, sharpePapel, sharpeBacktest, operaciones, minimo, dias, minimoDias },
+            regla: { tipo: 'incubacion'|'titular'|'banquillo', texto, … las cifras de la regla del asignador (§5.7) },
+            evolucion: [{ t, pnl, peso, estado }] /* ~120 puntos, con extremos y cambios */,
+            hitos: [{ t, tipo: 'alta'|'peso'|'ascenso'|'despido'|'descarte'|'estudio', texto }] /* ≤ 12 */,
+            plazo: { id: 'horas'|'dia'|'mes', nombre }, tipos: [{ id, nombre }], estudio: Estudio | null }],   // 30-sep-2026
+  grupos: { plazos: [{ id, nombre, mesas /* cuántas */ }], tipos: [{ id, nombre, mesas }] },   // solo los que tiene alguna mesa, en su orden
+  error? }
+// plazo y tipos: plazoMesa y tiposMesa (§4.3); estudio: el de la mesa (§4.3). El hito 'estudio' es la
+// decisión de Eduardo de la migración de notas de ETF (no un alta).
+// GET /api/laboratorio. Las evaluadas salen de las decisiones 'laboratorio'; las
+// pendientes y en curso, de la instantánea; las contratadas, de las 'asignacion'.
+{ t, ensayosTotales, proximaRevision, resumen: { evaluadas, aprobadas, rechazadas, pendientes, contratadas, tasaAprobacion },
+  puertas: [{ nombre, comparacion, miradas, pasan, fallan }],
+  hipotesis: [{ id, t, estado: 'aprobada'|'rechazada'|'pendiente'|'evaluando', aprobada, descripcion, resumen, familia, marco, universo,
+                filtros, params, origen, motivo, mesaId, criterios /* tal cual en decisiones.jsonl */, puertasOk, puertasTotal,
+                walkforward, dsr, ensayosPrevios, ensayosTotales, paramsFinales, referenciaDD, informe,
+                contratada: { mesaId, mesa, t } | null }] /* ≤ 300, de la más nueva a la más vieja */,
+  contratadas: [{ hipotesisId, mesaId, mesa, t, estadoActual, sharpePapel, operaciones, sharpeBacktest, diasActiva }],
+  error? }
+```
+La lectura de una mesa compara papel con histórico solo cuando el asignador
+ya la juzgaría, y lo dice: en prueba, desde `REGLAS.ascensoMinOperaciones` (10)
+operaciones Y `REGLAS.incubacionDias` (60) días; titular, desde
+`REGLAS.minOperaciones` (20) Y `REGLAS.minDias` (60). Por debajo, `tipo:
+'pocas'`, tono neutro y el Sharpe de papel «de momento» (anualizado desde
+retornos diarios, con pocos días es ruido; revisión del 30-sep-2026: con 10
+operaciones en 4 días decía «va mejor» en verde mientras la regla de la misma
+ficha decía «no se juzga hasta los 60»). No hay otro umbral escrito para esa
+comparación (si Eduardo quiere otro, es regla de negocio suya).
 
 Respuesta de comando: `{ ok, mensaje, datos? }` (HTTP 200; 400 si falta la
 confirmación o el JSON no vale; 404 comando desconocido; 405 un comando por
@@ -1266,7 +1485,24 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
               comitePedido,                            // SOLO en modo latido: true si está convocado desde el panel
                                                        //   y se celebra en el latido siguiente («Comité convocado»)
               sinAsignar: { fraccion, usd },           // capital que ninguna mesa tiene (queda en efectivo)
-              vigilancia: { perdidaDiaPct | null, caidaPct, desdeReapertura } },
+              vigilancia: { perdidaDiaPct | null, caidaPct, desdeReapertura },
+              capital },                               // desde el 30-sep-2026, abajo
+  // capital = { patrimonio, invertido, invertidoPct, efectivo, disponible, disponibleCripto,
+  //             porTipo: [{ tipo, nombre, importe, pct, activos: [{ simbolo, etiqueta, importe }], mesas: [mesaId] }],
+  //             limites: { bruta: Tope, cripto: Tope } }     Tope = { maximo /* fracción de config.limites */, tope /* $ */, usado /* $ */, queda /* $ */ }
+  //   Lo que la barra de arriba enseña de dónde está el dinero (Eduardo, 30-sep-2026). patrimonio,
+  //   efectivo e invertido son del bróker (cuenta y posiciones del último refresco): invertido = Σ |valor|
+  //   de sus posiciones, invertido + efectivo = patrimonio (el de la cabecera), invertidoPct = invertido /
+  //   patrimonio. porTipo: el desglose por `tipo` del universo (§2), en el orden de TIPOS, con los tipos
+  //   que tienen algo invertido o alguna mesa fuera del banquillo que los opera (esos, aunque sea 0);
+  //   Σ importe = invertido, pct = importe / patrimonio, activos de mayor a menor. disponible, «Puedes
+  //   invertir aún», es lo que dejan los límites duros y nada más: min(efectivo, limites.bruta.queda);
+  //   disponibleCripto = min(disponible, limites.cripto.queda). En cada Tope, tope = maximo · patrimonio,
+  //   usado = la exposición que miran los topes de Riesgos (§5.3: por activo, el máximo entre libros y
+  //   bróker, a precio de la mesa; la que de verdad frena una compra, que en marcha normal coincide con lo
+  //   invertido) y queda = max(0, tope − usado): la interfaz lo cuenta sin restar. No dice si hoy se puede abrir (nivel,
+  //   solo cerrar, vetos: eso lo cuentan fondo, directivas y avisos). test/integracion-capital.test.js y la
+  //   demo acelerada lo cuadran con el bróker.
   // pnlDia/pnlDiaPct: desde el inicio REAL del día (también tras reabrir); caida: desde el máximo HISTÓRICO.
   // vigilancia: lo que mide el vigilante contra sus límites (tras un Reabrir humano después de un kill,
   //   desde la reapertura); es la cercanía a los límites, no el resultado. perdidaDiaPct null antes del cierre diario.
@@ -1276,9 +1512,16 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
   curva: [{ t, patrimonio }],                            // ≤ 500 puntos
   cotizaciones: [{ simbolo, etiqueta, precio, var24hPct, t }],   // var24hPct: frente al precio de 24 h antes del DATO (t), no
                                                                   //   del latido: con los datos parados no se mueve sola
-  departamentos: DEPARTAMENTOS,
-  agentes: [{ id, nombre, departamento, rol, queDecide, queHace /* llano, §6.1 */, usaLLM, sala, estado: 'trabajando'|'reunion'|'descanso'|'de_pie'|'banquillo',
+  departamentos: DEPARTAMENTOS,                          // con su `queHace` (§6.1)
+  agentes: [{ id, nombre, genero: 'f'|'m', departamento, rol, queDecide, queHace /* llano, §6.1 */, usaLLM, sala, estado: 'trabajando'|'reunion'|'descanso'|'de_pie'|'banquillo'|'ejecucion',
               bocadillo: { texto, hasta } | null, mesaId, simbolo, etiqueta, puestoId }],
+  // estado 'ejecucion' (30-sep-2026): el operador que propuso una apertura o un cierre por señal espera de
+  //   pie junto al Ejecutor mientras su orden no ha salido (en estado.pendientes, la bolsa cerrada) o no la
+  //   ha confirmado el bróker (ordenesEnVuelo). Sale del estado (orquestador._esperandoOrden), así que es
+  //   igual en el continuo y latido a latido; no cuenta con el fondo bloqueado (todos de_pie), ni para los
+  //   stops, el kill o el despido (no los propuso él). Su bocadillo, mientras espera, lo escribe
+  //   plantillas.esperaOrden («Espero junto al Ejecutor: la compra de SPY sale cuando abra la bolsa, a las
+  //   15:35.»), con hasta = ahora + 1 min de pantalla. `sala` sigue siendo la suya. Tampoco se va a descansar.
   // capital: patrimonio · peso · multiplicador · (0,5 con DEFENSIVO), lo que la mesa opera de verdad
   //   (el recorte va al nocional, §6.7); 0 en el banquillo.
   mesas: [{ id, nombre, familia, marco, estado, peso, capital, multiplicador, universo: [etiqueta], params,
@@ -1288,7 +1531,8 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
             diasActiva, filtros: [{ id, parametro }],
             explicacion: Explicacion | null /* §4.3, con SUS params, filtros y el riesgo por operación de los límites */,
             sharpeBacktest: number | null,
-            backtest: { sharpe, maxDD, operaciones, rentabilidad, vol, dias, t } | null /* backtest de referencia guardado */ }],
+            backtest: { sharpe, maxDD, operaciones, rentabilidad, vol, dias, t } | null /* backtest de referencia guardado (en el estado lleva además mu, sigma y el `universo` con que se hizo) */,
+            estudio: Estudio | null /* §4.3: solo las de ETF */ }],
   // metricas son las de papel (desde su alta); backtest, el de referencia (§6.9, laboratorio.backtestMesa).
   puestos: [{ id, mesaId, simbolo, etiqueta, agenteId,
               posicion: { cantidad, nocional, entrada, stop, objetivo, pnlAbierto, pnlAbiertoPct, abiertaT } | null,
@@ -1356,19 +1600,112 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
 ## 8. Interfaz (E)
 
 Una sola página, HTML + CSS + JS vanilla (sin librerías), en `web/`:
-`index.html`, `css/estilo.css`, `js/{app,iso,mapa,dibujo,personajes,paneles,cifras,maqueta}.js`
+`index.html`, `css/{estilo,vistas}.css`,
+`js/{cifras,iso,mapa,dibujo,personajes,caras,paneles,reproductor,maqueta,pwa,graficas,vistas,app}.js`
 (scripts clásicos con un namespace `window.Parque`, sin módulos ES para que
-abra también desde `file://` en modo maqueta).
+abra también desde `file://` en modo maqueta). Gráficas propias en SVG
+(`graficas.js`); la CSP de la web no admite recursos de fuera, `style=""` ni
+`innerHTML` (los colores por dato van en variables CSS puestas desde JS).
 
 - Barra superior: PATRIMONIO, RESULTADO HOY, CAÍDA, EXPOSICIÓN (bruta y
   cripto), POSICIONES, píldoras RÉGIMEN, F&G, «Comité en HH:MM», MODO (PAPEL
   ALPACA ámbar / SIMULADO azul / SINTÉTICO lila), LLM gasto/tope. Si la fila
   de píldoras no cabe, primero se compacta (F&G se queda en el número; la
   palabra, en su título) y solo después se desliza con el borde desvanecido;
-  la del estado del fondo va siempre la primera.
-- Panel lateral «Departamentos»: chips de filtro por departamento y feed de
-  mensajes (avatar del color del departamento, nombre, hora, texto; lo último
-  abajo; autoscroll salvo si el usuario ha subido; máx. 300 en el DOM).
+  la del estado del fondo va siempre la primera. La del comité dice «Reunión
+  de la mañana» o «Cierre del día» (el nombre de la cita, `datos.nombre`) cuando los jefes están en la sala por una
+  reunión informativa (§6.9: lo último que se abrió en la sala es una apertura
+  `direccion`/`reunion`), «Comité reunido» en un comité y, si no, la cuenta atrás.
+  Mientras el feed reproduce una reunión (abajo), «Comité en curso» (o «Reunión
+  de la mañana en curso»…), en ámbar. Patrimonio es un botón (abajo, capital).
+- Franja de CAPITAL (30-sep-2026, pedida por Eduardo; `cabecera.capital`, §7),
+  justo debajo de la barra y de su mismo fondo, móvil primero: INVERTIDO
+  (importe y %), EFECTIVO y MARGEN DE LOS LÍMITES (antes «Puedes invertir aún»:
+  la pantalla decía a la vez que se podían invertir 68.451 $ y que el 54 % se
+  queda en efectivo; la cifra, `capital.disponible`, es la de los límites y es
+  regla de Eduardo: no cambia sin él. Con el fondo parado, `(no compra)` al
+  lado y apagada); debajo (al lado en escritorio),
+  la barra apilada del reparto (un tramo por tipo de activo con su color y el
+  efectivo al final, separados por 2 px; crece desde la izquierda al aparecer,
+  sin rebote) y un botón por tipo con su nombre, importe y % (un tipo que opera
+  una mesa pero sin nada dentro sale apagado, «0 $»), más la leyenda del
+  efectivo: el color nunca va solo. Colores por tipo en `cifras.COLOR_TIPO`,
+  paleta categórica validada sobre el fondo de la barra. Al tocar una cifra
+  (también PATRIMONIO de la barra), una línea debajo explica de dónde sale, con
+  las cifras de la instantánea (`cifras.explicarCapital`: ninguna calculada en
+  la pantalla; en el margen, el tope, lo usado y lo que queda de
+  `capital.limites`, si manda el efectivo, que no es lo que el fondo va a
+  comprar (lo que tienen las mesas, Σ `mesas[].capital`, y lo que se queda en
+  efectivo por el reparto, `cabecera.sinAsignar`) y si el fondo hoy no compra); tocar
+  otra vez o Escape la quita (`aria-expanded`, `role=status`, se refresca como
+  mucho cada 30 s). Sin el campo (servidor anterior) la franja no se pinta. En
+  el móvil, con Informes abierto, se esconde para dejarles sitio.
+- Reproductor del feed (`reproductor.js`, 30-sep-2026): en el modo latido un
+  comité entero (8 mensajes) o una operación entera llegan en el mismo segundo.
+  El feed los suelta uno a uno sin cambiar su hora: una reunión (canal comité,
+  o `datos.reunion` de las de las 9:00 y las 22:15) repartida en
+  `ventanaReunionMs` (150 s; en el sintético acelerado, como mucho la mitad del
+  tiempo real entre comités), a razón de total − 1 huecos (8 en el comité; en
+  las reuniones, `datos.turnos` + 1), con «Comité en curso · n de 8» encima del
+  feed y en la píldora; una operación de un puesto, un mensaje cada 8 s como
+  mucho. El primero de cada conversación entra en el acto; lo que llega de
+  otra conversación no espera; lo de una conversación con cola, detrás (el
+  orden no se rompe). Al abrir el panel, una reunión que acaba de celebrarse
+  (su apertura dentro de la ventana) se reproduce desde su apertura; lo demás
+  es historia y entra entero. Con la pestaña oculta más de 5 min, lo que
+  quedaba entra de golpe. El bocadillo de quien habla sale con su mensaje (el
+  de la instantánea espera si tiene algo en cola) y los jefes siguen en la
+  sala los 15 min del backend (`SALA_TRAS_REUNION_MS`, §6.9).
+  Revisión del 30-sep-2026: tras volver la red o despertar el móvil, lo que
+  llega con `t` anterior a `reproductor.limiteHistoria(inst, ahoraMesa)` (el
+  reloj de la mesa menos lo que dura una reproducción, en tiempo de la mesa)
+  es historia (`separarViejos`): entra de golpe en su sitio por hora, sin
+  bocadillos ni operador de pie, y no sale «en curso» un comité de hace 3 h.
+  El feed ya no se rehace por cada mensaje soltado (`paneles.anadirMensajes`):
+  cada uno va a su sitio por orden de LLEGADA, no por su `t`; una respuesta
+  entra en su conversación (el mismo nodo, por hora dentro de ella) y la
+  conversación baja al final; un separador de día que se queda sin mensajes se
+  quita. Solo se rehace entero con más de 60 de golpe (la primera
+  instantánea), con `{ historia: true }` y al cambiar de filtro; se mantienen
+  los separadores de día y el tope de 300 nodos (`MAX_DOM`). Antes, en un
+  móvil con la CPU a ×4, cada mensaje del reproductor costaba 100–450 ms de
+  hilo principal.
+- Operador de pie junto al Ejecutor (estado `ejecucion`, §7): mientras su
+  orden espera a la bolsa o al bróker (servidor) y, en una operación que se
+  reproduce, desde que sale su propuesta hasta que sale la ejecución, el veto
+  o el aviso del Ejecutor (panel, `reproductor.abreEspera`/`cierraEspera`, dos
+  minutos como mucho). Anda hasta el puesto del Ejecutor (`personajes.
+  puntoEjecucion`, hasta cuatro a la vez sin pisarse), se queda de pie
+  mirándolo con su bocadillo fijo (su propuesta, o el `esperaOrden` del
+  servidor) y vuelve a su silla; no sale a pasear ni a descansar.
+- Caras (`caras.js`): cada agente tiene un retrato SVG plano, determinista por
+  su id, con la piel, el pelo y el peinado de su muñeco
+  (`personajes.aspectoDe(id)`, fuente única), la camisa del color de su
+  departamento y, por un segundo hash, corte, gafas, cejas, boca y barba (solo
+  si `genero` es 'm'; sin `genero`, lo deduce del rol o del nombre de pila).
+  Tres tamaños (24, 40 y 96 px); el humano del Megáfono lleva un megáfono
+  ámbar y el sistema un cubo gris. Sin imágenes, `style`, ids ni clipPath.
+- Panel lateral con pestañas «Mensajes (n) | Equipo (n)» (`role=tab`, flechas,
+  Inicio y Fin; en el móvil, tocar una pestaña abre la hoja inferior).
+  Mensajes: chips de filtro por departamento y feed (cara de 40 px, que abre la
+  ficha del agente; nombre, etiqueta del departamento con su color, rol, «→
+  Marta» si el mensaje va para alguien, hora y texto; lo último abajo;
+  autoscroll salvo si el usuario ha subido; máx. 300 en el DOM). Las
+  conversaciones (`hilo`/`respondeA`, §6.2) van juntas: las respuestas,
+  sangradas bajo el mensaje que abre la conversación, con cara de 24 px, y la
+  conversación entera baja al final del feed con cada respuesta nueva; con un
+  filtro, sale entera si alguno de sus mensajes es de ese departamento.
+  Equipo: los agentes por departamento (en el orden de `DEPARTAMENTOS`, con su
+  color, cuántos son y su `queHace`), las Mesas con un rótulo por mesa; cada
+  fila (cara, nombre, estado si no trabaja, rol, `queHace` en 2 líneas) abre su
+  ficha. Buscador sin tildes ni mayúsculas por nombre o rol (así «btc»
+  encuentra a sus operadores); Escape lo borra.
+- Ficha del agente (clic en su cara o en su fila de Equipo): cara de 96 px,
+  nombre, departamento, estado y rol; «Qué hace» (`queHace`), dónde está, sus
+  últimos 5 mensajes y «Ver sus decisiones» (la vista Decisiones filtrada por
+  `quien`); si es operador, su mesa (estado y peso) y su posición, con «Ver su
+  puesto» y «Ver la mesa»; «Detalle técnico» desplegable (queDecide, LLM, id),
+  que sigue abierto aunque la ficha se rehaga. En escritorio, 340 px de ancho.
 - Lienzo isométrico Canvas 2D, rejilla 2:1, tesela 64×32, plano 28×22 con
   salas: parqué (pantalla gigante al fondo con cotizaciones, patrimonio y
   curva, y «Hechos de la mesa»), dirección, macro (elevada), análisis,
@@ -1398,7 +1735,9 @@ abra también desde `file://` en modo maqueta).
   situación, nocional, cantidad, entrada, stop, objetivo, abierto, P&L del
   día, operaciones, acierto, adherencia, factor, último mensaje, y la mesa del
   puesto con su estado (con tilde: titular, incubación, banquillo), su peso y
-  su `nota`; para agentes no-puesto: rol, qué decide, si usa LLM, último mensaje.
+  su `nota`; para agentes no-puesto, su ficha (arriba). El operador sentado en
+  el parqué abre la tarjeta de su PUESTO (es la que dice cómo va su
+  operación); esa tarjeta lleva su cara como botón a su ficha.
 - Rótulos de mesa: nunca fuera del lienzo ni encima de lo pintado; con poco
   sitio van por peso (una titular del 40 % antes que una incubada del 2 %) y,
   de último recurso, con la primera palabra del nombre («RUPTURA»): así la de
@@ -1416,6 +1755,53 @@ abra también desde `file://` en modo maqueta).
   Resultados, Prueba, Pausar todo, Reabrir (escribir REABRIR), Kill switch
   (rojo, escribir KILL), Ajustes (modal). Controles de cámara y zoom; arrastrar
   para mover, rueda o pellizco para zoom.
+- Informes (botón «Informes», al principio de la botonera; `vistas.js`): una
+  capa encima del parqué con cinco pestañas y dirección propia (#evolucion,
+  #estrategias, #noticias, #decisiones, #laboratorio; «atrás» o la X vuelven al
+  parqué y cambiar de pestaña no apila historial). Con la capa abierta el
+  parqué no se pinta y la hoja del móvil se esconde; la botonera (Kill, Pausar)
+  sigue a la vista. Todas leen de las rutas de §7, nunca inventan: si no hay
+  datos, dicen por qué.
+  · Evolución: 1S/1M/3M/Todo (recordado en localStorage), patrimonio que cuenta
+    hacia arriba y variación del periodo, una frase del periodo hecha por el
+    código con las cifras del historial, el fondo frente a las tres sombras en %
+    desde el inicio del periodo, tramos del comité en DEFENSIVO o SOLO CERRAR y
+    del fondo bloqueado, marcas de kill, pausas, ascensos, despidos, descartes,
+    mesa nueva y cambio de modo, el resultado de cada mesa, el reparto del
+    capital (con «Sin asignar») y la caída con los límites del vigilante.
+  · Estrategias: arriba, «Agrupar» Por estado (el orden de siempre) | Por plazo
+    («Cada 4 horas», «Cada día o semana», «Cada mes») | Por tipo de activo
+    (recordado en localStorage) y, agrupando, fichas para quedarse con un solo
+    grupo (con cuántas mesas tiene); cada grupo con su rótulo, su número de mesas
+    y una línea de qué quiere decir. Una mesa con varios tipos (Momentum ETF:
+    índices, bonos y materias primas) va en su propio grupo de mezcla, nunca
+    repetida, y al filtrar por uno de sus tipos sale (`vistas.agruparMesas`,
+    con `plazo`, `tipos` y `grupos` de /api/estrategias). Una mesa con
+    `estudio` (las de ETF) lleva, justo bajo su nombre, el aviso en ámbar con
+    icono «Suspendió el filtro; sigue en prueba por decisión de Eduardo.», el
+    estudio (fecha, años, activos), cada cifra con su mínimo y «✗ no pasa», y
+    su rentabilidad al año frente a comprar y mantener (`vistas.textoEstudio`).
+    Después, una tarjeta por mesa con estado, familia, marco, plazo y días, peso y
+    capital, resultado en papel, su curva, activos y operadores (con su cara),
+    la explicación llana, histórico frente a papel (Sharpe, caída, operaciones;
+    el resultado va aparte: uno es % y el otro $ sobre un capital que cambia),
+    la lectura, la regla del asignador aplicada a ella, su nota y su historia.
+  · Noticias: filtro por activo y «Solo graves», fuente, activos, enlace
+    (`rel=noopener noreferrer`), clasificación y veto; sin noticias, por qué
+    (sintético, sin claves o esperando) y si el LLM está apagado.
+  · Decisiones: por grupos (comité y reuniones, órdenes, vetos y recortes,
+    cambios de estrategia, laboratorio, kill/pausas/Megáfono, noticias), cada
+    una con la cara de quien decidió, su rol, hora, resumen y «Ver los datos»;
+    separadores por día, «Ver más antiguas», comités seguidos sin cambio de
+    modo en una línea, y filtro por agente desde su ficha.
+  · Laboratorio: evaluadas, aprobadas, ensayos y contratadas; qué puertas
+    pasan (barras) y por qué protegen de la suerte; cada hipótesis con sus
+    puertas (valor, comparación, umbral y de dónde sale), walk-forward e
+    informe; y cómo van en papel las contratadas.
+  Gráficas con cruz y ficha al tocar, al pasar el ratón y con el teclado; las
+  líneas se descubren y las barras crecen desde su base, sin rebote, y nada se
+  anima con `prefers-reduced-motion`. El refresco de cada minuto no repinta si
+  los datos no han cambiado y deja abierto lo desplegado.
 - Resultados (modal ancho): arriba del todo, el semáforo «¿Listo para dinero
   real?» (`listoParaReal`): veredicto («Todavía no: n de 7» o «Sí: cumple
   todos»), cada criterio a-g con ✓/✗ (y «cumple» / «no cumple» para el lector
@@ -1441,6 +1827,12 @@ abra también desde `file://` en modo maqueta).
   en canvas fuera de pantalla; pausa con la pestaña oculta.
 - `?maqueta=1` (o abrir `index.html` como fichero): genera una instantánea y
   mensajes falsos con `maqueta.js` para poder trabajar la interfaz sin backend.
+  La maqueta trae todos los campos de §7 (sin excepciones:
+  `test/integracion-servidor.test.js` compara sus claves con las de la mesa de
+  verdad) y la misma plantilla (departamentos y fijos de `registro.js`,
+  parámetros y explicación de `src/estrategias`), con sus conversaciones:
+  operaciones enteras, comité, reuniones informativas y Megáfono. Las vistas de
+  Informes no tienen registros en la maqueta y lo dicen.
 - Franja de arriba. Roja sin conexión, con el motivo si se sabe y reconexión
   SSE con espera creciente:
   «Sin conexión con la mesa, reintentando en N s…» (red; N cuenta hacia
@@ -1503,6 +1895,40 @@ código ≠ 0 si falla. Obligatorio como mínimo:
   el Megáfono, las reuniones en verano, en invierno y la noche del cambio de
   hora, la reunión que llega tarde y la reunión con LLM). `probar-latido`
   compara también los ids, `respondeA` e `hilo` de los mensajes.
+
+- Pantallas (30-sep-2026): `scripts/probar-vistas.js` (el historial reducido
+  conserva primero, último, máximo, mínimo y el kill; la variación del periodo
+  es la calculada a mano; el reparto suma 100 %; estrategias y laboratorio
+  cuadran con la instantánea y las decisiones; con `--navegador`, las cinco
+  vistas en Chromium a 390×844 y 1440×900 sin errores ni avisos de CSP);
+  `test/informes-*.test.js` (lectores contra ficheros rotos o enormes, LTTB,
+  filtros, y los dos servidores: 401 sin sesión o token, y local = web ruta a
+  ruta sobre la misma carpeta, instantánea incluida salvo lo que añade la web);
+  `test/parque-{caras,equipo,graficas,maqueta}.test.js` (caras deterministas y
+  SVG válido sin `style`, feed con conversaciones, ficha, Equipo, gráficas, y
+  la maqueta con la forma y la plantilla de la mesa de verdad);
+  `test/web-pwa.test.js` (el service worker guarda la carcasa del panel, todo
+  lo que enlaza `index.html`, al abrir con sesión y nunca `/api/*`).
+
+- Extras del 30-sep-2026: `test/integracion-capital.test.js` (el capital cuadra
+  con el bróker: Σ porTipo = invertido = Σ posiciones, invertido + efectivo =
+  patrimonio, lo disponible con los topes de verdad, con cripto y ETF, con
+  cripto por encima del 50 % y con poco efectivo) y la demo acelerada lo
+  comprueba cada hora simulada; `test/parque-capital.test.js` (explicaciones sin
+  cifras que no estén en la instantánea, la franja con su reparto y sus
+  botones, la maqueta cuadrada); `test/mercado-universo.test.js` (tipo de cada
+  activo); `test/cuant-estrategias.test.js` (notas y estudio de las ETF con los
+  umbrales del laboratorio, plazo y tipos de cada mesa);
+  `test/integracion-notas-etf.test.js` (la migración de notas, una sola vez,
+  sin pisar una nota distinta, y /api/estrategias con estudio, plazo, tipos,
+  grupos y el hito «estudio»); `test/parque-reproductor.test.js` (un comité de
+  golpe en ~2,5 min en su orden y con su hora, las reuniones por sus turnos, el
+  sintético acelerado, una operación a 8 s y quién abre y cierra la espera, la
+  reunión recién celebrada al abrir el panel); `test/integracion-bolsa.test.js`
+  (el operador de pie junto al Ejecutor mientras su compra de ETF espera a la
+  bolsa, y de vuelta al salir); `test/latido-cerrojo.test.js` (los jefes, 15 min
+  en la sala); `test/parque-graficas.test.js` (agrupar y el aviso del estudio);
+  `scripts/probar-vistas.js` (plazo y tipos de cada mesa y los grupos).
 
 `scripts/estudiar-limites.js` no es un caso conocido (no está en
 `probar-todo`): repite con las velas de `data/cache/probar/` el estudio con el

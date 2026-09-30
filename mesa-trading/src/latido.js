@@ -43,7 +43,8 @@ const REINTENTO_MS = 250;
 // vigía, que mataría el proceso sin guardar ni apuntar lo gastado.
 const LLM_LATIDO = Object.freeze({ limiteLlamadaMs: 45_000, reintentos: 0 });
 const PLAZO_LLM_MS = 150_000;
-const SALA_TRAS_COMITE_MS = 5 * MIN;
+const { SALA_TRAS_REUNION_MS } = require('./agentes/comite');
+const SALA_TRAS_COMITE_MS = SALA_TRAS_REUNION_MS;   // 15 min (antes 5: no daba tiempo a verlo)
 const MAX_RESUMEN = 255;
 const FICHEROS = {
   instantanea: 'instantanea.json',
@@ -64,7 +65,7 @@ function opcionesLatido(config) {
     laboratorioFuera: true,
     comiteEnSegundoPlano: false,    // el comité cabe en el latido (LLM_LATIDO: tope de 45 s y plazo del proceso)
     pausaComiteMs: 0,               // sin pausas de pantalla...
-    salaTrasComiteMs: SALA_TRAS_COMITE_MS,   // ...los jefes se ven en la sala 5 min tras la reunión
+    salaTrasComiteMs: SALA_TRAS_COMITE_MS,   // ...los jefes se ven en la sala 15 min tras la reunión
     descansoMinPantallaMs: 0,
     guardarCadaPasos: 1,
     intervaloEstadoMs: 0,

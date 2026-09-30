@@ -433,7 +433,82 @@
     return { parado: pasadoMs > limiteMs, pasadoMs, limiteMs };
   }
 
+  // ---------- capital (§7, cabecera.capital) ----------
+
+  // Color de cada tipo de activo: paleta categórica validada sobre el fondo de
+  // la barra (#0c1122) en este orden (cripto, índices, bonos, materias,
+  // acciones): contraste ≥ 3:1, pares vecinos distinguibles también con
+  // daltonismo. Nunca va sola: cada color lleva su nombre al lado.
+  const COLOR_TIPO = Object.freeze({
+    cripto: '#d95926', indices: '#3987e5', bonos: '#199e70', materias: '#c98500', acciones: '#d55181',
+    volatilidad: '#8a93b0', otros: '#8a93b0',
+  });
+  const colorTipo = id => COLOR_TIPO[id] || '#8a93b0';
+
+  // Lista llana: «BTC, ETH y SOL».
+  function yLista(xs) {
+    const l = (xs || []).filter(Boolean);
+    if (l.length <= 1) return l.join('');
+    return `${l.slice(0, -1).join(', ')} y ${l[l.length - 1]}`;
+  }
+
+  // La línea que explica de dónde sale cada cifra del capital, con las cifras
+  // de la instantánea (ninguna calculada aquí: el servidor trae hechos los
+  // topes y lo que queda). clave: 'patrimonio' | 'invertido' | 'efectivo' |
+  // 'disponible' | 'tipo:<id>'. → texto | null si no hay capital.
+  function explicarCapital(clave, inst) {
+    const i = inst || {};
+    const cap = i.cabecera && i.cabecera.capital;
+    if (!cap || !clave) return null;
+    const u = x => usd(x);
+    const p0 = x => pct(x, { decimales: 0 });
+    const p1 = x => pct(x, { decimales: 1 });
+    if (clave === 'patrimonio') {
+      return `Lo que vale el fondo según el bróker: ${u(cap.efectivo)} en efectivo más ${u(cap.invertido)} invertidos, ${u(cap.patrimonio)} en total.`;
+    }
+    if (clave === 'invertido') {
+      return cap.invertido > 0
+        ? `Lo que hay en posiciones abiertas, a su precio de ahora según el bróker: ${u(cap.invertido)}, el ${p1(cap.invertidoPct)} del patrimonio (${u(cap.patrimonio)}).`
+        : `Ahora no hay nada invertido: los ${u(cap.patrimonio)} del patrimonio están en efectivo.`;
+    }
+    if (clave === 'efectivo') {
+      return `Dinero sin invertir en la cuenta del bróker: ${u(cap.efectivo)}. Con lo invertido (${u(cap.invertido)}) suma el patrimonio, ${u(cap.patrimonio)}.`;
+    }
+    if (clave === 'disponible') {
+      // Es el margen de los límites, no lo que el fondo va a invertir: cada
+      // mesa solo invierte su parte y lo que no se reparte se queda en
+      // efectivo (revisión del 30-sep-2026: la pantalla decía a la vez
+      // «Puedes invertir aún 68.451 $» y «54 % sin asignar: queda en efectivo»).
+      const b = (cap.limites && cap.limites.bruta) || {};
+      const c = (cap.limites && cap.limites.cripto) || {};
+      let t = `Margen que dejan los límites de seguridad: como mucho el ${p0(b.maximo)} del patrimonio invertido (${u(b.tope)}); ya hay ${u(b.usado)}, quedan ${u(b.queda)}`;
+      if (valido(cap.efectivo) && valido(b.queda) && cap.efectivo < b.queda) t += `, pero solo hay ${u(cap.efectivo)} en efectivo`;
+      t += `. En cripto, como mucho el ${p0(c.maximo)} (${u(c.tope)}): hay ${u(c.usado)}, así que en cripto caben ${u(cap.disponibleCripto)}.`;
+      const mesas = (i.mesas || []).filter(m => m && m.estado !== 'banquillo' && valido(m.capital));
+      const sa = sinAsignar(i);
+      if (mesas.length && sa && valido(sa.usd) && sa.fraccion > 0.0005) {
+        const asignado = mesas.reduce((x, m) => x + m.capital, 0);
+        t += ` No es lo que el fondo va a comprar: las mesas tienen ${u(asignado)} para invertir y el resto, el ${p0(sa.fraccion)} (${u(sa.usd)}), se queda en efectivo por el reparto.`;
+      }
+      const n = nivelEfectivo(i, i.ahora);
+      if (n.nivel !== 'normal') t += ` Ahora el fondo no compra nada${n.motivo ? `: ${n.motivo}` : '.'}`;
+      return t;
+    }
+    if (clave.startsWith('tipo:')) {
+      const t = (cap.porTipo || []).find(x => x.tipo === clave.slice(5));
+      if (!t) return null;
+      const nombres = (t.mesas || []).map(id => { const m = (i.mesas || []).find(x => x.id === id); return m ? m.nombre : id; });
+      const quien = nombres.length ? ` ${nombres.length === 1 ? 'Lo opera' : 'Lo operan'} ${yLista(nombres)}.` : '';
+      if (!(t.importe > 0)) return `${t.nombre}: nada invertido ahora.${quien}`;
+      const activos = (t.activos || []).slice(0, 6).map(a => `${a.etiqueta} ${u(a.importe)}`);
+      const mas = (t.activos || []).length > 6 ? ` y ${(t.activos || []).length - 6} más` : '';
+      return `${t.nombre}: ${activos.join(', ')}${mas} (posiciones del bróker a su precio de ahora), el ${p1(t.pct)} del patrimonio.${quien}`;
+    }
+    return null;
+  }
+
   return {
+    COLOR_TIPO, colorTipo, explicarCapital, yLista,
     rotuloMesa, datosParados, MARCO_CORTO,
     usd, pct, precio, cantidad, numero, hora, dia, fechaCorta, momento, hastaLas, cuando, hace, cuentaAtras, claseSigno, suavizar, reducirMovimiento, animar, agrupar,
     ZONA, ESTADO_MESA, MODO_COMITE, estadoMesa, modoComite, nivelEfectivo, bloqueosMesa, bloqueosPuesto, sinAsignar, medidaLimites, motivo503, precioViejo,

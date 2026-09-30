@@ -74,15 +74,20 @@ test('espejo: todas las fuentes, idempotente, incremental y con la última líne
   escribir(c, 'informes.jsonl', linea({ t: 5000, tipo: 'diario' }));
   escribir(c, 'mensajes.jsonl', linea({ t: 6000, texto: 'hola' }) + '\n' + 'esto no es json\n' + linea({ t: 7000, texto: 'adiós' }) + '{"t":8000,"texto":"a me');
   escribir(c, 'latidos.jsonl', linea({ t: 1_790_000_000_000, inicio: 1_790_000_000_000, ms: 1234, ok: true, resumen: 'x'.repeat(300) }) + linea({ inicio: 1_790_000_060_000, ms: 50, ok: false, resumen: 'ocupado' }));
+  // Las fuentes del panel v2 (noticias, historial, decisiones) también se copian.
+  escribir(c, 'noticias.jsonl', linea({ t: 9100, id: 'n1', titular: 'Titular' }));
+  escribir(c, 'historial.jsonl', linea({ t: 9200, motivo: 'hora', patrimonio: 100000 }));
+  escribir(c, 'decisiones.jsonl', linea({ t: 9300, tipo: 'comite', quien: 'cio', resumen: 'NORMAL' }));
 
   const r1 = await sincronizar(config, { pool, tablas });
-  assert.equal(r1.copiados, 11);
+  assert.equal(r1.copiados, 14);
+  for (const f of ['noticias', 'historial', 'decisiones']) assert.equal(r1.fuentes[f].copiados, 1, f);
   assert.equal(r1.fuentes.ordenes.noExiste, true, 'un fichero que no existe se salta');
   assert.equal(r1.fuentes.mensajes.copiados, 3, 'ni la vacía ni la de a medias');
   assert.equal(r1.fuentes.mensajes.linea, 4, 'la vacía cuenta como línea');
 
   const antes = await filas();
-  assert.equal(antes.length, 11);
+  assert.equal(antes.length, 14);
   const mensajes = antes.filter(f => f.fuente === 'mensajes');
   assert.deepEqual(mensajes.map(f => [f.linea, f.t]), [[1, 6000], [3, null], [4, 7000]]);
   assert.equal(mensajes[1].datos, 'esto no es json', 'lo que no es JSON se copia tal cual');

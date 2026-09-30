@@ -1,0 +1,171 @@
+{
+ "fecha": "2026-09-30",
+ "fuente": "scripts/estudiar-ampliada.js",
+ "datos": "Alpaca, velas diarias de cripto (v1beta3)",
+ "desdeDescarga": "2021-01-01",
+ "configuracion": {
+  "familia": "momentum-rotacion",
+  "params": {
+   "perfil": "cripto",
+   "lookbacks": [
+    28
+   ],
+   "ajustarVol": true,
+   "top": 2,
+   "rebalanceo": "semanal",
+   "soloPositivos": true,
+   "atr": 14,
+   "atrStop": 3
+  },
+  "pesoMesa": 0.25,
+  "capital": 10000,
+  "limites": "LIMITES_DUROS",
+  "costes": "costesPorDefecto"
+ },
+ "primerasVelas": {
+  "BTC/USD": "2021-01-01",
+  "ETH/USD": "2021-01-01",
+  "SOL/USD": "2021-01-01",
+  "LINK/USD": "2021-01-01",
+  "AVAX/USD": "2021-11-18",
+  "DOGE/USD": "2021-01-01",
+  "XRP/USD": "2024-01-01",
+  "LTC/USD": "2021-01-01",
+  "BCH/USD": "2021-01-01",
+  "ADA/USD": "2026-02-13"
+ },
+ "comparaciones": [
+  {
+   "id": "ltc-bch",
+   "anade": [
+    "LTC/USD",
+    "BCH/USD"
+   ],
+   "universo": [
+    "BTC/USD",
+    "ETH/USD",
+    "SOL/USD",
+    "LINK/USD",
+    "AVAX/USD",
+    "DOGE/USD",
+    "LTC/USD",
+    "BCH/USD"
+   ],
+   "suficiente": true,
+   "desde": "2021-12-17",
+   "hasta": "2026-09-29",
+   "meses": 57,
+   "titular": {
+    "sharpe": 0.6258273956481862,
+    "cagr": 0.14636919884629096,
+    "maxDD": 0.3459630335394085,
+    "operaciones": 132
+   },
+   "conNuevas": {
+    "sharpe": 0.3951718425983722,
+    "cagr": 0.0753463976134765,
+    "maxDD": 0.42962845784927206,
+    "operaciones": 161
+   }
+  },
+  {
+   "id": "xrp",
+   "anade": [
+    "XRP/USD"
+   ],
+   "universo": [
+    "BTC/USD",
+    "ETH/USD",
+    "SOL/USD",
+    "LINK/USD",
+    "AVAX/USD",
+    "DOGE/USD",
+    "XRP/USD"
+   ],
+   "suficiente": true,
+   "desde": "2024-01-30",
+   "hasta": "2026-09-29",
+   "meses": 32,
+   "titular": {
+    "sharpe": 0.8113240325707347,
+    "cagr": 0.2143934074350351,
+    "maxDD": 0.34596303353940805,
+    "operaciones": 71
+   },
+   "conNuevas": {
+    "sharpe": 0.6503782028819204,
+    "cagr": 0.16565229021264471,
+    "maxDD": 0.35942749320853307,
+    "operaciones": 80
+   }
+  },
+  {
+   "id": "ada",
+   "anade": [
+    "ADA/USD"
+   ],
+   "universo": [
+    "BTC/USD",
+    "ETH/USD",
+    "SOL/USD",
+    "LINK/USD",
+    "AVAX/USD",
+    "DOGE/USD",
+    "ADA/USD"
+   ],
+   "suficiente": true,
+   "desde": "2026-03-14",
+   "hasta": "2026-09-29",
+   "meses": 7,
+   "titular": {
+    "sharpe": 1.0011029893475165,
+    "cagr": 0.28297602766699814,
+    "maxDD": 0.13395666597196043,
+    "operaciones": 18
+   },
+   "conNuevas": {
+    "sharpe": 0.24545512485516896,
+    "cagr": 0.031151512596375275,
+    "maxDD": 0.17558562606347128,
+    "operaciones": 19
+   }
+  },
+  {
+   "id": "las-4",
+   "anade": [
+    "XRP/USD",
+    "LTC/USD",
+    "BCH/USD",
+    "ADA/USD"
+   ],
+   "universo": [
+    "BTC/USD",
+    "ETH/USD",
+    "SOL/USD",
+    "LINK/USD",
+    "AVAX/USD",
+    "DOGE/USD",
+    "XRP/USD",
+    "LTC/USD",
+    "BCH/USD",
+    "ADA/USD"
+   ],
+   "suficiente": true,
+   "desde": "2026-03-14",
+   "hasta": "2026-09-29",
+   "meses": 7,
+   "titular": {
+    "sharpe": 1.0011029893475165,
+    "cagr": 0.28297602766699814,
+    "maxDD": 0.13395666597196043,
+    "operaciones": 18
+   },
+   "conNuevas": {
+    "sharpe": -0.15574569887916298,
+    "cagr": -0.07732138799131028,
+    "maxDD": 0.21972451268054338,
+    "operaciones": 21
+   }
+  }
+ ]
+}

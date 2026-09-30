@@ -97,18 +97,31 @@ function lineaNoticia(n, { t, universo, clasificacion = null, veto = null }) {
 // Lee noticias.jsonl y fusiona las actualizaciones en su noticia. Devuelve
 // las `limite` más recientes (por t de la línea base), de la más nueva a la
 // más vieja, con `desde` (t ≥ desde) si se da.
-function leerNoticias(ruta, { desde = -Infinity, limite = 200 } = {}) {
+//
+// Una segunda línea BASE del mismo id (un latido la escribió y murió antes de
+// guardar el estado, y el siguiente la volvió a escribir ya clasificada) se
+// fusiona como una actualización: vale la clasificación o el veto no nulos más
+// recientes, nunca un null posterior. La noticia conserva su primera `t`.
+// Con `conHuerfanas` (un instante) cada noticia lleva además `ultimaLineaT`,
+// la `t` de su última línea (analisis.alinearConRegistro).
+function leerNoticias(ruta, { desde = -Infinity, limite = 200, conHuerfanas = null } = {}) {
   const lineas = leerJSONL(ruta, Math.max(limite * 3, 600));
   const porId = new Map();
   for (const l of lineas) {
     if (!l || l.id === undefined) continue;
     const id = String(l.id);
-    if (l.actualiza) {
-      const base = porId.get(id);
-      if (base) Object.assign(base, { clasificacion: l.clasificacion ?? null, veto: l.veto ?? null, clasificadaT: l.t });
+    const base = porId.get(id);
+    if (l.actualiza || base) {
+      if (!base) continue;
+      if (l.actualiza) Object.assign(base, { clasificacion: l.clasificacion ?? null, veto: l.veto ?? null, clasificadaT: l.t });
+      else {
+        if (l.clasificacion !== null && l.clasificacion !== undefined) Object.assign(base, { clasificacion: l.clasificacion, clasificadaT: l.t });
+        if (l.veto !== null && l.veto !== undefined) base.veto = l.veto;
+      }
+      if (conHuerfanas !== null) base.ultimaLineaT = Math.max(base.ultimaLineaT, l.t);
       continue;
     }
-    if (!porId.has(id)) porId.set(id, { ...l });
+    porId.set(id, conHuerfanas !== null ? { ...l, ultimaLineaT: l.t } : { ...l });
   }
   return [...porId.values()].filter(n => n.t >= desde).sort((a, b) => b.t - a.t || (a.id < b.id ? 1 : -1)).slice(0, limite);
 }

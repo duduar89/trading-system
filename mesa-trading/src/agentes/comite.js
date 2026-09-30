@@ -28,10 +28,14 @@
 // en empate el más prudente; multiplicadores 1; vetos = eventos graves de
 // noticias). Las intervenciones del LLM sustituyen a las plantillas de los
 // puntos 1-6 solo si pasan verificarCifras() contra los datos DE SU PUNTO (un
-// «80 %» que es un límite no vale como exposición del Controller) y no nombran
-// un voto, un modo o un régimen distinto del que calculó el código. La razón
-// de la Presidenta no se publica si Riesgos vetó su modo o si contradice lo
-// que se aplica.
+// «80 %» que es un límite no vale como exposición del Controller), también los
+// conteos pequeños ({ conteos: true }), y no dicen un voto, un modo o un
+// régimen distinto del que calculó el código, ni por su nombre ni en llano
+// («las compras nuevas a la mitad», «el mercado tiene miedo»:
+// cifras.contradiceVocabulario). Solo Macro y Riesgos hablan de modo, y solo
+// de su voto. La razón de la Presidenta no se publica si Riesgos vetó su modo
+// o si contradice lo que se aplica (con el fondo sin comprar, no puede decir
+// que se compra).
 //
 // Conversación (§6.2): la Presidenta abre la reunión (su mensaje abre el
 // hilo) y da la palabra al Controller; cada jefe habla en su turno
@@ -41,16 +45,22 @@
 // cifras en los dos casos.
 
 const plantillas = require('./plantillas');
-const { verificarCifras } = require('./cifras');
+const { verificarCifras, contradiceVocabulario } = require('./cifras');
 const { directivasVigentes } = require('./megafono');
 const { HORA } = require('../util/reloj');
 const f = require('../util/formato');
 const { pnlMesaTotal } = require('./departamentos/operaciones');
 const { referenciasVigilancia } = require('./departamentos/riesgos');
 const { etiqueta } = require('./departamentos/comun');
+const mesasDep = require('./departamentos/mesas');
 const { diaUTC } = require('../util/reloj');
 
 const JEFES = Object.freeze(['cio', 'controller', 'macro', 'riesgos', 'laboratorio']);
+// Cuánto se quedan los jefes en la sala de comité tras un comité o una reunión
+// informativa, con el reloj de la mesa (estado.comite.salaHasta). En el modo
+// latido la reunión cabe en un paso y el panel la reproduce en 2–3 min: con 5
+// min no se veía (Eduardo, 30-sep-2026). Solo visual: no decide nada.
+const SALA_TRAS_REUNION_MS = 15 * 60_000;
 const MODOS = Object.freeze(['NORMAL', 'DEFENSIVO', 'SOLO_CERRAR']);
 const PRUDENCIA = Object.freeze({ NORMAL: 0, DEFENSIVO: 1, SOLO_CERRAR: 2 });
 const MULTIPLICADORES = Object.freeze([0, 0.5, 1]);
@@ -63,16 +73,21 @@ const VETO_HORAS = 24;
 
 const esperarReal = ms => (ms > 0 ? new Promise(r => setTimeout(r, ms)) : Promise.resolve());
 
-// Modos y regímenes que nombra un texto. En mayúsculas a propósito: «nivel
-// normal» en minúscula es el nivel de riesgo, no un modo.
-const RE_MODO = /\b(NORMAL|DEFENSIVO|SOLO_CERRAR)\b/g;
-const RE_REGIMEN = /\b(RISK-ON|RISK-OFF|NEUTRAL)\b/g;
-const nombra = (re, texto) => [...String(texto || '').matchAll(re)].map(m => m[1]);
-
-// ¿El texto de un punto dice un voto o un régimen distinto del calculado?
+// ¿El texto de un punto dice un voto, un modo o un régimen distinto del
+// calculado? Macro y Riesgos solo pueden decir su voto (por su nombre o en
+// llano); los demás puntos no hablan de modo, que no está en sus datos. El
+// régimen, en cualquier punto, solo el de Macro.
 function contradice(punto, texto, datos) {
-  if ((punto === 'macro' || punto === 'riesgos') && nombra(RE_MODO, texto).some(m => m !== datos.votos[punto])) return true;
-  return nombra(RE_REGIMEN, texto).some(r => r !== datos.macro.regimen);
+  const voto = (punto === 'macro' || punto === 'riesgos') ? datos.votos[punto] : null;
+  return contradiceVocabulario(texto, { modos: voto ? [voto] : [], regimen: datos.macro.regimen });
+}
+
+// ¿La razón de la Presidenta dice otro modo, otro régimen, o algo de las
+// compras que no es lo que pasa? Puede nombrar el modo que se aplica; lo que
+// diga de las compras tiene que ser `efectivas` (plantillas.comprasEfectivas
+// con la decisión ya aplicada: nada si el fondo no compra, el factor real).
+function razonContradice(texto, decision, datos, efectivas = decision.modo) {
+  return contradiceVocabulario(texto, { modos: [decision.modo], compras: efectivas ? [efectivas] : [], regimen: datos.macro.regimen });
 }
 
 // Entrada con la que se comprueban las cifras de una intervención: solo los
@@ -217,7 +232,7 @@ function entradaDe(ctx, datos, plan) {
     hora: datos.hora, controller: datos.controller, macro: datos.macro, riesgos: datos.riesgos,
     mesas: { mejor: datos.mesas.mejor, peor: datos.mesas.peor, lista: datos.mesas.lista.map(m => ({ id: m.id, nombre: m.nombre, estado: m.estado, peso: m.peso, pnl: m.pnl })) },
     laboratorio: datos.laboratorio, megafono: datos.megafono, votos: datos.votos, eventosGraves: datos.eventosGraves,
-    planPorDefecto: { modo: plan.modo, multiplicadores: plan.multiplicadores, vetos: plan.vetos },
+    planPorDefecto: { modo: plan.modo, multiplicadores: plan.multiplicadores, vetos: plan.vetos }, vetoHoras: VETO_HORAS,
     limites: { maxExposicionBruta: ctx.limites.maxExposicionBruta, maxExposicionCripto: ctx.limites.maxExposicionCripto, perdidaDiariaSoloCerrar: ctx.limites.perdidaDiariaSoloCerrar, caidaKill: ctx.limites.caidaKill },
   };
 }
@@ -276,7 +291,9 @@ const INSTRUCCIONES = [
   'intervenciones: una o dos frases por punto del orden del día (controller, macro, riesgos, mesas, laboratorio, megafono), con cifras de los datos.',
   'Cada intervención la dice, en primera persona, quien presenta ese punto («participantes» da su nombre de pila; los puntos mesas y megafono los presentas tú).',
   'Es una conversación: cada uno se dirige a quien habló antes por su nombre de pila cuando venga a cuento («Gracias, Inés. Por mi parte…»). El primero contesta a la Presidenta.',
-  'Sin jerga: «las compras nuevas a la mitad» mejor que «DEFENSIVO»; si nombras un modo o un régimen, que sea el de los datos.',
+  'Del modo solo hablan Macro y Riesgos, y solo de su voto (el de «votos»; el código lo repite al final de su turno). Nadie más habla del modo ni de cómo se compra, ni por su nombre ni en llano («a la mitad», «tamaño normal», «no se abre nada»), salvo tú en la razón y solo con el modo que decides.',
+  'Del mercado, solo el régimen de los datos, también en llano («acompaña» es RISK-ON; «ni a favor ni en contra», NEUTRAL; «tiene miedo», RISK-OFF). Si riesgos.nivel no es «normal», el fondo no compra nada, decidas lo que decidas.',
+  'Un texto que diga otro modo, otro voto u otro régimen, aunque sea en llano, o una cifra que no esté en los datos de su punto (también «cuatro operaciones»), se descarta y sale la plantilla.',
 ].join('\n');
 
 function normalizarDecision(datosLLM, mesasActivas, simbolos, votos) {
@@ -367,7 +384,7 @@ async function celebrar(ctx, { motivo = 'programado' } = {}) {
       const datos = reunirDatos(ctx);
       const entradaPunto = entradaDelPunto(entradaDe(ctx, datos, planPorDefecto(datos, mesasActivas)), punto);
       const propuesta = intervenciones[punto];
-      const vale = propuesta && !contradice(punto, propuesta, datos) && verificarCifras(propuesta, entradaPunto).ok;
+      const vale = propuesta && !contradice(punto, propuesta, datos) && verificarCifras(propuesta, entradaPunto, { conteos: true }).ok;
       // Cada uno contesta a quien habló antes (salvo que hable él mismo otra vez).
       const deAntes = anterior.de !== PORTAVOZ[punto] ? anterior.de : null;
       let texto = vale ? plantillas.frase(propuesta, 200) : textoPlantilla(punto, datos, deAntes ? nombreDe(ctx, deAntes) : null);
@@ -394,37 +411,48 @@ async function celebrar(ctx, { motivo = 'programado' } = {}) {
     const plan = planPorDefecto(final, activasFinal);
     let decision = { ...plan, vetoRiesgos: false };
     let fuente = 'defecto';
-    let razon = null;
+    let razonLLM = null;              // se comprueba con la decisión ya aplicada
     const cambiados = Object.keys(final.votos).filter(k => final.votos[k] !== inicio.votos[k]);
     if (respuestaLLM && cambiados.length) {
       motivoDefecto = `los votos cambiaron durante el comité (${cambiados.map(k => `${NOMBRE_VOTO[k] || k} ${inicio.votos[k]} → ${final.votos[k]}`).join(', ')}): la decisión del LLM se tomó con los de antes`;
     } else if (respuestaLLM) {
       decision = normalizarDecision(respuestaLLM, mesasActivas, simbolos, final.votos);
       fuente = 'llm';
-      const rz = String(respuestaLLM.razon || '').trim();
-      // Con el veto de Riesgos el modo aplicado no es el que razonó el LLM.
-      const razonCuadra = rz && !decision.vetoRiesgos && !nombra(RE_MODO, rz).some(m => m !== decision.modo) && !contradice('decision', rz, final);
-      if (razonCuadra && verificarCifras(rz, entradaDe(ctx, final, plan)).ok) razon = plantillas.frase(rz, 200);
+      razonLLM = String(respuestaLLM.razon || '').trim();
     }
     const ahora = ctx.reloj.ahora();
     const modoAnterior = e.directivas.modo || 'NORMAL';
     aplicarDecision(ctx, decision, ahora);
-    let texto = plantillas.decisionComite({ ...decision, fuente }, e.mesas);
-    // La Presidenta cita a quien vetó o votó distinto, por su nombre.
+    // Lo que se dice de las compras es lo que el fondo hace de verdad ya con la
+    // decisión aplicada: nada si no está en nivel normal, y el factor real.
+    const vigentes = directivasVigentes(e.directivas, ahora);
+    const compras = {
+      modo: decision.modo, nivel: e.fondo.nivel, factor: mesasDep.factorTamano(ctx, ahora),
+      soloCerrarHasta: Number.isFinite(vigentes.soloCerrarHasta) ? f.hora(vigentes.soloCerrarHasta) : null,
+    };
+    let razon = null;
+    // Con el veto de Riesgos el modo aplicado no es el que razonó el LLM.
+    const razonCuadra = razonLLM && !decision.vetoRiesgos && !razonContradice(razonLLM, decision, final, plantillas.comprasEfectivas(compras));
+    if (razonCuadra && verificarCifras(razonLLM, entradaDe(ctx, final, plan), { conteos: true }).ok) razon = plantillas.frase(razonLLM, 200);
+    // La Presidenta cita a quien vetó o votó distinto, por su nombre, y los
+    // votos que se recontaron. Van detrás del modo y antes que las mesas: si
+    // no cabe todo, se recorta la lista de mesas, nunca una cita.
+    const citas = [];
     const quienVota = k => nombreDe(ctx, k) || NOMBRE_VOTO[k] || k;
     const vm = final.votos.macro;
     const vr = final.votos.riesgos;
     if (decision.vetoRiesgos || (vr !== 'NORMAL' && decision.modo === vr && vm !== vr)) {
-      texto = plantillas.frase(`${texto} ${quienVota('riesgos')} ha votado ${vr} y su voto es veto: no puede salir NORMAL.`, 240);
+      citas.push(`${quienVota('riesgos')} ha votado ${vr} y su voto es veto: no puede salir NORMAL.`);
     } else if (vm !== vr) {
-      texto = plantillas.frase(`${texto} ${quienVota('macro')} ha votado ${vm} y ${quienVota('riesgos')}, ${vr}.`, 240);
+      citas.push(`${quienVota('macro')} ha votado ${vm} y ${quienVota('riesgos')}, ${vr}.`);
     }
     // Un voto dicho en su punto que ya no es el del final: se recalculó.
     const recalculados = Object.keys(votosDichos).filter(k => votosDichos[k] !== final.votos[k]);
     if (recalculados.length) {
       const porque = k => (k === 'riesgos' && nivelDicho !== final.riesgos.nivel ? `; el fondo está ahora ${NIVEL_TEXTO[final.riesgos.nivel] || final.riesgos.nivel}` : '');
-      texto = plantillas.frase(`${texto} Al cerrar he vuelto a contar los votos: ${recalculados.map(k => `${quienVota(k)} vota ahora ${final.votos[k]} (antes dijo ${votosDichos[k]}${porque(k)})`).join(', ')}.`, 300);
+      citas.push(`Al cerrar he vuelto a contar los votos: ${recalculados.map(k => `${quienVota(k)} vota ahora ${final.votos[k]} (antes dijo ${votosDichos[k]}${porque(k)})`).join(', ')}.`);
     }
+    let texto = plantillas.decisionComite({ ...decision, fuente, ...compras }, e.mesas, { citas, max: 300 });
     if (razon) texto = plantillas.frase(`${texto} ${razon}`, 300);
     ctx.bus.publicar({
       de: 'cio', para: 'todos', respondeA: anterior.id, hilo: apertura.id, canal: 'comite', tipo: 'decision', texto,
@@ -464,4 +492,4 @@ async function celebrar(ctx, { motivo = 'programado' } = {}) {
   }
 }
 
-module.exports = { celebrar, reunirDatos, planPorDefecto, esquemaDecision, normalizarDecision, aplicarDecision, contradice, entradaDelPunto, entradaDe, notaCambios, JEFES, PUNTOS, MODOS };
+module.exports = { celebrar, reunirDatos, planPorDefecto, esquemaDecision, normalizarDecision, aplicarDecision, contradice, razonContradice, entradaDelPunto, entradaDe, notaCambios, JEFES, PUNTOS, MODOS, SALA_TRAS_REUNION_MS };

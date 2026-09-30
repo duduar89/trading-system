@@ -48,9 +48,12 @@ class FElemento extends FNodo {
     this.dataset = {}; this.oyentes = {}; this.scrollTop = 0; this.open = false;
   }
   get children() { return this.childNodes.filter(c => c.nodeType === 1); }
+  // Solo el propio elemento o sus padres, con los selectores simples de encaja().
+  closest(selector) { for (let n = this; n && n.nodeType === 1; n = n.parentNode) if (selector.split(',').some(s => encaja(n, s.trim()))) return n; return null; }
   get firstElementChild() { return this.children[0] || null; }
   get lastElementChild() { const h = this.children; return h[h.length - 1] || null; }
   get previousElementSibling() { const h = this.parentNode ? this.parentNode.children : []; return h[h.indexOf(this) - 1] || null; }
+  get nextElementSibling() { const h = this.parentNode ? this.parentNode.children : []; const i = h.indexOf(this); return i >= 0 ? h[i + 1] || null : null; }
   get childElementCount() { return this.children.length; }
   get className() { return this.getAttribute('class') || ''; }
   set className(v) { this.setAttribute('class', v); }
@@ -119,7 +122,7 @@ function encaja(n, sel) {
 // Documento con los ids que usa paneles.js. `conPestanas`: además, las
 // pestañas del panel lateral (Mensajes y Equipo) y el buscador del equipo,
 // como en web/index.html.
-function crearDocumento({ conPestanas = false } = {}) {
+function crearDocumento({ conPestanas = false, conCapital = false } = {}) {
   const doc = { oyentes: {}, addEventListener(tipo, fn) { (doc.oyentes[tipo] = doc.oyentes[tipo] || []).push(fn); } };
   doc.createElement = tag => new FElemento(doc, tag);
   doc.createElementNS = (_, tag) => new FElemento(doc, tag);
@@ -157,6 +160,17 @@ function crearDocumento({ conPestanas = false } = {}) {
     const input = doc.createElement('input'); input.setAttribute('id', 'buscar-equipo'); input.value = ''; vistaEquipo.appendChild(input);
     const equipo = doc.createElement('div'); equipo.setAttribute('id', 'equipo'); vistaEquipo.appendChild(equipo);
   }
+  if (conCapital) {
+    // La franja del capital (web/index.html): tres cifras, la barra del reparto y la explicación.
+    const cap = doc.createElement('section'); cap.setAttribute('id', 'capital'); doc.body.appendChild(cap);
+    for (const [id, explica] of [['c-invertido', 'invertido'], ['c-efectivo', 'efectivo'], ['c-disponible', 'disponible']]) {
+      const b = doc.createElement('button'); b.setAttribute('id', id); b.setAttribute('data-explica', explica); b.dataset.explica = explica;
+      b.setAttribute('aria-expanded', 'false'); cap.appendChild(b);
+    }
+    for (const id of ['v-invertido', 'v-invertido-pct', 'v-efectivo', 'v-disponible', 'v-disponible-nota', 'reparto-barra', 'reparto-tipos']) { const e = doc.createElement('span'); e.setAttribute('id', id); cap.appendChild(e); }
+    const p = doc.createElement('p'); p.setAttribute('id', 'capital-explica'); p.hidden = true; cap.appendChild(p);
+  }
+  doc.querySelectorAll = sel => doc.body.querySelectorAll(sel);
   const tarjeta = doc.createElement('section'); tarjeta.setAttribute('id', 'tarjeta'); tarjeta.hidden = true; doc.body.appendChild(tarjeta);
   const modal = doc.createElement('dialog'); modal.setAttribute('id', 'modal'); doc.body.appendChild(modal);
   const cuerpo = doc.createElement('div'); cuerpo.setAttribute('id', 'modal-cuerpo'); modal.appendChild(cuerpo);

@@ -35,16 +35,32 @@ const mesa = (extra = {}) => ({
 test('lectura: papel frente al histórico, con las cifras de los datos', () => {
   const sin = lectura(mesa({ sharpeBacktest: null, backtest: null }));
   assert.equal(sin.tipo, 'sin_backtest');
-  const pocas = lectura(mesa({ metricas: { operaciones: 3, sharpe: 2.5 } }));
+  const pocas = lectura(mesa({ metricas: { operaciones: 3, sharpe: 2.5 }, diasActiva: 90 }));
   assert.equal(pocas.tipo, 'pocas');
-  assert.match(pocas.texto, new RegExp(`menos de ${REGLAS.ascensoMinOperaciones}`));
-  assert.match(pocas.texto, /3 operaciones cerradas/);
-  const mejor = lectura(mesa());
+  assert.match(pocas.texto, new RegExp(`menos de ${REGLAS.ascensoMinOperaciones} operaciones y ${REGLAS.incubacionDias} días`));
+  assert.match(pocas.texto, /3 operaciones cerradas en 90 días/);
+  const mejor = lectura(mesa({ diasActiva: 90 }));
   assert.equal(mejor.tipo, 'mejor');
-  assert.equal(mejor.texto, 'En papel va mejor que en el histórico: Sharpe 1,20 frente a 0,80, con 12 operaciones.');
-  const peor = lectura(mesa({ metricas: { operaciones: 30, sharpe: -0.4 } }));
+  assert.equal(mejor.texto, 'En papel va mejor que en el histórico: Sharpe 1,20 frente a 0,80, con 12 operaciones en 90 días.');
+  const peor = lectura(mesa({ metricas: { operaciones: 30, sharpe: -0.4 }, diasActiva: 90 }));
   assert.equal(peor.tipo, 'peor');
-  assert.match(peor.texto, /Sharpe -0,40 frente a 0,80, con 30 operaciones/);
+  assert.match(peor.texto, /Sharpe -0,40 frente a 0,80, con 30 operaciones en 90 días/);
+});
+
+test('lectura: con las operaciones pero pocos días no hay veredicto (caso de la revisión: 10 operaciones en 4 días)', () => {
+  // El Sharpe de papel se anualiza desde retornos diarios: con 4 días es ruido.
+  const m = mesa({ estado: 'incubacion', metricas: { sharpe: 5.2, operaciones: 10 }, backtest: { sharpe: 0.4 }, sharpeBacktest: 0.4, diasActiva: 4 });
+  const l = lectura(m);
+  assert.equal(l.tipo, 'pocas', 'tono neutro: ni verde ni rojo');
+  assert.doesNotMatch(l.texto, /va mejor|va peor/);
+  assert.match(l.texto, /10 operaciones cerradas en 4 días de papel aún no se puede comparar/);
+  assert.match(l.texto, /de momento, 5,20/);
+  assert.match(regla(m).texto, /no se juzga hasta los 60/, 'lo mismo que dice la regla de la misma ficha');
+  // Una titular: el asignador no mueve su capital con menos de 20 operaciones o 60 días.
+  const t = lectura(mesa({ estado: 'titular', metricas: { sharpe: 1.2, operaciones: 15 }, diasActiva: 200 }));
+  assert.equal(t.tipo, 'pocas');
+  assert.match(t.texto, new RegExp(`menos de ${REGLAS.minOperaciones} operaciones y ${REGLAS.minDias} días`));
+  assert.equal(lectura(mesa({ estado: 'titular', metricas: { sharpe: 1.2, operaciones: 25 }, diasActiva: 61 })).tipo, 'mejor');
 });
 
 test('regla: incubación, titular y banquillo frente a las REGLAS del asignador', () => {

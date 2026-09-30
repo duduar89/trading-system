@@ -18,14 +18,21 @@ const FORMA = {
   comiteReal: ['sharpeFondo', 'sharpeSinComite', 'bate', 'texto'],
   fondo: ['nivel', 'motivo', 'multiplicadorCaida', 'factorTamano'],
   cabecera: ['patrimonio', 'pnlDia', 'pnlDiaPct', 'caida', 'exposicionBrutaPct', 'exposicionCriptoPct', 'posiciones', 'regimen', 'miedoCodicia', 'proximoComite', 'modoComite',
-    'sinAsignar', 'vigilancia'],
+    'sinAsignar', 'vigilancia', 'capital'],
   sinAsignar: ['fraccion', 'usd'],
+  capital: ['patrimonio', 'invertido', 'invertidoPct', 'efectivo', 'disponible', 'disponibleCripto', 'porTipo', 'limites'],
+  capitalTipo: ['tipo', 'nombre', 'importe', 'pct', 'activos', 'mesas'],
+  capitalActivo: ['simbolo', 'etiqueta', 'importe'],
+  capitalTope: ['maximo', 'tope', 'usado', 'queda'],
   vigilancia: ['perdidaDiaPct', 'caidaPct', 'desdeReapertura'],
   llm: ['activo', 'modeloComite', 'modeloAgentes', 'gastoHoyUsd', 'presupuestoDiaUsd'],
   curva: ['t', 'patrimonio'],
   cotizacion: ['simbolo', 'etiqueta', 'precio', 'var24hPct', 't'],
-  agente: ['id', 'nombre', 'departamento', 'rol', 'queDecide', 'usaLLM', 'sala', 'estado', 'bocadillo', 'mesaId', 'simbolo', 'etiqueta', 'puestoId'],
-  mesa: ['id', 'nombre', 'familia', 'marco', 'estado', 'peso', 'capital', 'multiplicador', 'universo', 'params', 'metricas', 'pnlDia', 'nota'],
+  agente: ['id', 'nombre', 'genero', 'departamento', 'rol', 'queDecide', 'queHace', 'usaLLM', 'sala', 'estado', 'bocadillo', 'mesaId', 'simbolo', 'etiqueta', 'puestoId'],
+  mesa: ['id', 'nombre', 'familia', 'marco', 'estado', 'peso', 'capital', 'multiplicador', 'universo', 'params', 'metricas', 'pnlDia', 'nota',
+    'diasActiva', 'explicacion', 'filtros', 'sharpeBacktest', 'backtest', 'estudio'],
+  explicacion: ['queMira', 'cuandoCompra', 'cuandoVende', 'cuandoNada', 'riesgo', 'filtros'],
+  backtest: ['sharpe', 'maxDD', 'operaciones', 'rentabilidad', 'vol', 'dias', 't'],
   metricas: ['operaciones', 'acierto', 'factorBeneficio', 'sharpe', 'sharpeAjustado', 'maxDD', 'adherencia', 'pnlTotal'],
   puesto: ['id', 'mesaId', 'simbolo', 'etiqueta', 'agenteId', 'posicion', 'pnlDia', 'operaciones', 'acierto', 'factorBeneficio', 'adherencia', 'estadoTexto', 'ultimaSenal', 'chispa'],
   posicionPuesto: ['cantidad', 'nocional', 'entrada', 'stop', 'objetivo', 'pnlAbierto', 'pnlAbiertoPct', 'abiertaT'],
@@ -33,7 +40,7 @@ const FORMA = {
   benchmark: ['id', 'nombre', 'valor', 'rentabilidad', 'sharpe90'],
   mejora: ['sharpe90Fondo', 'sharpe90SinComite', 'sharpe90Btc', 'texto'],
   directivas: ['modo', 'multiplicadores', 'activosVetados', 'mesasPausadas', 'soloCerrarHasta', 'reduccion'],
-  mensaje: ['id', 't', 'de', 'deNombre', 'departamento', 'para', 'canal', 'tipo', 'texto', 'datos', 'importancia', 'costeUsd'],
+  mensaje: ['id', 't', 'de', 'deNombre', 'departamento', 'para', 'respondeA', 'hilo', 'canal', 'tipo', 'texto', 'datos', 'importancia', 'costeUsd'],
   ejecucion: ['t', 'puestoId', 'simbolo', 'etiqueta', 'lado', 'cantidad', 'precio', 'nocional', 'comision', 'motivo'],
   laboratorio: ['ensayosTotales', 'hipotesis', 'proximaRevision'],
   hipotesis: ['id', 'descripcion', 'estado', 'criterios', 't'],
@@ -59,6 +66,14 @@ function comprobarForma(i) {
   assert.deepEqual(claves(i.cabecera.sinAsignar), FORMA.sinAsignar.slice().sort());
   assert.deepEqual(claves(i.cabecera.vigilancia), FORMA.vigilancia.slice().sort());
   assert.equal(typeof i.cabecera.vigilancia.desdeReapertura, 'boolean');
+  const cap = i.cabecera.capital;
+  assert.deepEqual(claves(cap), FORMA.capital.slice().sort());
+  for (const t of cap.porTipo) {
+    assert.deepEqual(claves(t), FORMA.capitalTipo.slice().sort());
+    for (const a of t.activos) assert.deepEqual(claves(a), FORMA.capitalActivo.slice().sort());
+  }
+  assert.deepEqual(claves(cap.limites), ['bruta', 'cripto']);
+  for (const k of ['bruta', 'cripto']) assert.deepEqual(claves(cap.limites[k]), FORMA.capitalTope.slice().sort());
   assert.ok(['NORMAL', 'DEFENSIVO', 'SOLO_CERRAR'].includes(i.cabecera.modoComite));
   assert.deepEqual(claves(i.llm), FORMA.llm.slice().sort());
   // §7: el semáforo «¿Listo para dinero real?», criterios a-g.
@@ -81,6 +96,8 @@ function comprobarForma(i) {
   assert.deepEqual(i.departamentos, DEPARTAMENTOS);
   for (const a of i.agentes) {
     assert.deepEqual(claves(a), FORMA.agente.slice().sort(), a.id);
+    assert.ok(a.genero === 'f' || a.genero === 'm', a.id);
+    assert.ok(typeof a.queHace === 'string' && a.queHace.length > 20, a.id);
     assert.ok(SALAS.includes(a.sala), a.sala);
     assert.ok(ESTADOS.includes(a.estado), a.estado);
     if (a.bocadillo) assert.deepEqual(claves(a.bocadillo), ['hasta', 'texto']);
@@ -88,6 +105,12 @@ function comprobarForma(i) {
   for (const m of i.mesas) {
     assert.deepEqual(claves(m), FORMA.mesa.slice().sort(), m.id);
     assert.deepEqual(claves(m.metricas), FORMA.metricas.slice().sort());
+    assert.deepEqual(claves(m.explicacion), FORMA.explicacion.slice().sort(), m.id);
+    assert.ok(Array.isArray(m.filtros) && Number.isInteger(m.diasActiva));
+    if (m.backtest) {
+      assert.deepEqual(claves(m.backtest), FORMA.backtest.slice().sort(), m.id);
+      assert.equal(m.sharpeBacktest, m.backtest.sharpe);
+    } else assert.equal(m.sharpeBacktest, null);
     assert.ok(m.universo.every(e => typeof e === 'string' && !e.includes('/')), 'universo por etiqueta');
   }
   for (const p of i.puestos) {
@@ -102,9 +125,18 @@ function comprobarForma(i) {
   assert.deepEqual(claves(i.mejora), FORMA.mejora.slice().sort());
   assert.deepEqual(claves(i.directivas), FORMA.directivas.slice().sort());
   assert.ok(i.mensajes.length <= 150);
+  const porId = new Map(i.mensajes.map(m => [m.id, m]));
   for (const m of i.mensajes) {
     assert.deepEqual(claves(m), FORMA.mensaje.slice().sort());
     assert.ok(CANALES.includes(m.canal), m.canal);
+    // Conversación (§6.2): quien responde lo hace a un mensaje anterior, y el
+    // hilo es el del mensaje al que contesta.
+    if (m.respondeA && porId.has(m.respondeA)) {
+      const r = porId.get(m.respondeA);
+      assert.ok(r.t <= m.t, `${m.id} contesta a uno posterior`);
+      assert.equal(m.hilo, r.hilo || r.id, m.id);
+    }
+    if (m.hilo === m.id) assert.equal(m.respondeA, null, `${m.id} abre su hilo y no contesta a nadie`);
   }
   assert.ok(i.ejecuciones.length <= 30);
   for (const e of i.ejecuciones) assert.deepEqual(claves(e), FORMA.ejecucion.slice().sort());
@@ -282,4 +314,83 @@ test('avisos: lo que bloquea el fondo va el primero (en el móvil se corta por e
   assert.match(s.instantanea().avisos[0], /^Fondo bloqueado por el kill switch/);
   assert.ok(s.comando('reabrir', { confirmacion: 'REABRIR' }).ok);
   assert.ok(!s.instantanea().avisos.some(a => /bloqueado|pausa/.test(a)));
+});
+
+test('la maqueta es la plantilla de verdad: departamentos, agentes fijos, parámetros y explicación de cada mesa', () => {
+  const registro = require('../src/agentes/registro');
+  const estrategias = require('../src/estrategias');
+  const { LIMITES_DUROS } = require('../src/config');
+  const i = crearMaqueta({ semilla: 7, ahora: T0 }).instantanea();
+  assert.deepEqual(i.departamentos, registro.DEPARTAMENTOS.map(d => ({ ...d })), 'mismos departamentos, con su queHace');
+  const FIJOS = ['cio', 'macro', 'riesgos', 'ejecutor', 'controller', 'laboratorio', 'auditor'];
+  const plantilla = registro.crearPlantilla({ universo: [], mesas: [] });
+  for (const f of plantilla.filter(x => FIJOS.includes(x.id))) {
+    const a = i.agentes.find(x => x.id === f.id);
+    for (const k of ['nombre', 'genero', 'rol', 'queDecide', 'queHace', 'usaLLM']) assert.equal(a[k], f[k], `${f.id}.${k}`);
+  }
+  // El género cuadra con el rol («Operadora» / «Operador»), como en registro.js.
+  for (const a of i.agentes.filter(x => x.puestoId)) assert.equal(a.rol.startsWith('Operadora'), a.genero === 'f', a.id);
+  const reales = estrategias.mesasIniciales({ hayAlpaca: false });
+  for (const m of i.mesas) {
+    const r = reales.find(x => x.id === m.id);
+    assert.deepEqual(m.params, r.params, `${m.id}: mismos parámetros`);
+    assert.deepEqual(m.universo, r.universo.map(s => s.split('/')[0]), m.id);
+    assert.equal(m.marco, r.marco, m.id);
+    assert.deepEqual(m.explicacion, estrategias.explicarMesa(r, { limites: LIMITES_DUROS }), `${m.id}: la explicación de explicarMesa`);
+  }
+});
+
+test('conversaciones: operaciones, comité, reunión y Megáfono van en hilos, cada respuesta a un mensaje que existe', () => {
+  const s = crearMaqueta({ semilla: 7, ahora: T0 });
+  const vistos = s.instantanea().mensajes.slice();
+  for (let k = 0; k < 8; k++) for (const e of s.avanzar(30000)) if (e.tipo === 'mensaje') vistos.push(e.datos);
+  const prop = s.comando('megafono', { texto: 'pausa SOL 6 h y reduce el riesgo' });
+  s.comando('megafono-aplicar', { id: prop.datos.id });
+  for (const m of s.instantanea().mensajes) if (!vistos.some(v => v.id === m.id)) vistos.push(m);
+  const porId = new Map(vistos.map(m => [m.id, m]));
+  for (const m of vistos) if (m.respondeA) assert.ok(porId.has(m.respondeA), `${m.id} contesta a ${m.respondeA}, que no existe`);
+  const hilos = new Map();
+  for (const m of vistos) if (m.hilo) (hilos.get(m.hilo) || hilos.set(m.hilo, []).get(m.hilo)).push(m);
+  const tipos = h => h.map(m => m.tipo).join(' ');
+  const lista = Array.from(hilos.values());
+  // Una compra entera: señal → propuesta (a Riesgos) → aprobación (al operador) → orden → ejecución.
+  const compra = lista.find(h => /^senal propuesta aprobacion orden ejecucion/.test(tipos(h)));
+  assert.ok(compra, 'hay una compra completa');
+  assert.equal(compra[1].para, 'riesgos');
+  assert.equal(compra[2].para, compra[0].de);
+  assert.match(compra[3].texto, /^Recibido, /);
+  // Un cierre con la lección del Auditor contestándole.
+  const leccion = vistos.find(m => m.tipo === 'leccion');
+  assert.ok(leccion && porId.get(leccion.respondeA).tipo === 'cierre', 'la lección contesta al cierre');
+  assert.equal(leccion.para, porId.get(leccion.respondeA).de);
+  // El comité: la apertura da la palabra y cada punto da las gracias a quien habló antes.
+  const comite = lista.find(h => h[0].canal === 'comite' && h[0].tipo === 'comite' && h.some(m => m.tipo === 'decision'));
+  assert.ok(comite, 'un comité entero en su hilo');
+  assert.match(comite[0].texto, /Inés, empiezas tú\./);
+  assert.match(comite[1].texto, /^Gracias, Carmen\./);
+  // Las reuniones informativas: apertura con su nombre y resumen de cierre.
+  const reuniones = lista.filter(h => h[0].canal === 'direccion' && h[0].tipo === 'reunion');
+  assert.ok(reuniones.length >= 2, 'la de partida y otra en vivo');
+  for (const h of reuniones) {
+    assert.equal(h[0].datos.fase, 'apertura');
+    assert.ok(['Reunión de la mañana', 'Cierre del día'].includes(h[0].datos.nombre));
+    assert.equal(h[h.length - 1].datos.fase, 'cierre');
+    assert.match(h[0].texto, /Es informativa: no cambia nada del fondo\./);
+  }
+  // El Megáfono: orden del humano → propuesta para el humano → directivas → respuesta de quien las cumple.
+  const meg = lista.find(h => h[0].de === 'humano');
+  assert.deepEqual(meg.map(m => m.tipo), ['megafono', 'propuesta', 'directiva', 'nota', 'directiva', 'nota']);
+  assert.equal(meg[1].para, 'humano');
+  assert.equal(meg[3].de, 'riesgos', 'reducir el riesgo lo cumple Riesgos');
+  assert.match(meg[5].de, /^puesto-.*-SOL$/, 'la pausa de SOL la cumple su primer operador');
+});
+
+test('la píldora del comité distingue la reunión informativa: los jefes van a la sala con una apertura de reunión', () => {
+  const s = crearMaqueta({ semilla: 7, ahora: T0 });
+  s.avanzar(60000); s.avanzar(21000);            // la reunión en vivo empieza a los 80 s
+  const i = s.instantanea();
+  const jefes = ['cio', 'controller', 'macro', 'riesgos', 'laboratorio'];
+  assert.ok(i.agentes.filter(a => jefes.includes(a.id)).every(a => a.sala === 'comite' && a.estado === 'reunion'));
+  const ultimaApertura = i.mensajes.filter(m => (m.canal === 'comite' && m.tipo === 'comite') || (m.canal === 'direccion' && m.tipo === 'reunion' && m.datos && m.datos.fase === 'apertura')).pop();
+  assert.equal(ultimaApertura.canal, 'direccion');
 });

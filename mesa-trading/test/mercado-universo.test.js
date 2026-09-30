@@ -11,7 +11,7 @@ test('20 activos: 10 cripto con barra, 9 ETF operables y VIXY solo como dato (30
   assert.deepEqual(u.CESTA_CRIPTO, ['BTC/USD', 'ETH/USD', 'SOL/USD', 'LINK/USD', 'AVAX/USD', 'DOGE/USD']);
   assert.deepEqual(u.ETF, ['SPY', 'QQQ', 'IWM', 'TLT', 'GLD', 'XLE', 'XLK', 'XLF', 'DIA']);
   assert.deepEqual(u.SOLO_DATO, ['VIXY']);
-  assert.deepEqual(u.porSimbolo('BTC/USD'), { simbolo: 'BTC/USD', etiqueta: 'BTC', clase: 'cripto', nombre: 'Bitcoin' });
+  assert.deepEqual(u.porSimbolo('BTC/USD'), { simbolo: 'BTC/USD', etiqueta: 'BTC', clase: 'cripto', tipo: 'cripto', nombre: 'Bitcoin' });
   assert.equal(u.porEtiqueta('eth').simbolo, 'ETH/USD');
   assert.equal(u.porSimbolo('XRP/USD').etiqueta, 'XRP');
   assert.equal(u.porSimbolo('SHIB/USD'), null);
@@ -20,6 +20,23 @@ test('20 activos: 10 cripto con barra, 9 ETF operables y VIXY solo como dato (30
   assert.equal(u.generacion('BTC/USD'), 1);
   assert.equal(u.generacion('ADA/USD'), 2);
   assert.equal(u.generacion('DIA'), 2);
+});
+
+test('tipo de activo (30-sep-2026): cripto, índices, bonos, materias primas y acciones; VIXY aparte; fuera del universo, «otros»', () => {
+  assert.deepEqual(u.TIPOS.map(t => t.id), ['cripto', 'indices', 'bonos', 'materias', 'acciones', 'volatilidad']);
+  const ids = new Set(u.TIPOS.map(t => t.id));
+  for (const a of u.UNIVERSO) assert.ok(ids.has(a.tipo), `${a.simbolo} tiene tipo`);
+  for (const s of u.CRIPTO) assert.equal(u.tipoDe(s), 'cripto');
+  for (const s of ['SPY', 'QQQ', 'IWM', 'DIA']) assert.equal(u.tipoDe(s), 'indices', s);
+  assert.equal(u.tipoDe('TLT'), 'bonos');
+  assert.equal(u.tipoDe('GLD'), 'materias');
+  for (const s of ['XLE', 'XLK', 'XLF']) assert.equal(u.tipoDe(s), 'acciones', s);
+  assert.equal(u.tipoDe('VIXY'), 'volatilidad');
+  assert.equal(u.tipoDe('BTCUSD'), 'cripto', 'también con la clave de Alpaca');
+  assert.equal(u.tipoDe('SHIB/USD'), 'otros', 'no se adivina');
+  assert.equal(u.nombreTipo('indices'), 'Índices');
+  assert.equal(u.nombreTipo('materias'), 'Materias primas');
+  assert.equal(u.nombreTipo('otros'), 'Otros');
 });
 
 test('clave y desdeClave: BTC/USD ↔ BTCUSD', () => {

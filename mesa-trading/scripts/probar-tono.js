@@ -13,6 +13,10 @@
 //    dirigiéndose al operador por su nombre; cada lección del Auditor contesta
 //    a un cierre; una reunión de la mañana a las 9:00 y un cierre del día a
 //    las 22:15 de Madrid cada día, sin cambiar el modo.
+// 3. (Revisión del 30-sep-2026) Tras un kill la reunión y el comité no dicen
+//    que se compra; el factor que se dice es el real; un modo, un voto o un
+//    régimen dichos en llano al revés que los datos, o un conteo inventado,
+//    se descartan.
 
 const fs = require('fs');
 const os = require('os');
@@ -72,6 +76,20 @@ function plantillas() {
   for (const [t, d] of reunion) mirar(`reunión ${t}`, p.reunion[t](d), d);
   caso(p.notaAnalista(ejemplos[0][1]) === 'Ethereum vale 2.560 $ y sigue en subida: está por encima de su precio medio de los últimos 50 días (2.480 $). Ojo: ha subido muy deprisa (RSI 71 de 100) y podría tomarse un respiro.',
     'la nota de ETH es la del ejemplo de Eduardo');
+  // Revisión del 30-sep-2026: lo que se dice del modo es lo que el fondo hace
+  // (tras un kill, nada), y un texto del LLM que dice otro modo, voto o régimen
+  // en llano, o un conteo que no está en sus datos, no llega a la pantalla.
+  const bloq = p.reunion.resumenManana({ patrimonio: 99622, posiciones: 0, modo: 'NORMAL', nivel: 'bloqueado', proximoComite: '10:00' });
+  caso(!/compras/.test(bloq) && /no compra nada: está bloqueado por el kill switch hasta Reabrir/.test(bloq), `resumen tras un kill: «${bloq}»`);
+  const dec = p.decisionComite({ modo: 'DEFENSIVO', multiplicadores: {}, vetos: [], fuente: 'defecto', nivel: 'bloqueado' });
+  caso(!/compras|a la mitad/.test(dec), `decisión del comité tras un kill: «${dec}»`);
+  const caida = p.reunion.resumenCierre({ patrimonio: 90500, pnlDia: -120, modo: 'NORMAL', nivel: 'normal', factor: { total: 0.5, comite: 1, megafono: 1, caida: 0.5 } });
+  caso(/a ×0,5 del tamaño normal por la caída del fondo/.test(caida), `con la caída del fondo, el factor real: «${caida}»`);
+  const { contradiceVocabulario } = require('../src/agentes/cifras');
+  for (const t of ['Seguimos con las compras nuevas a la mitad hasta el próximo comité.', 'Gracias. El mercado tiene miedo: yo pondría las compras nuevas a la mitad. Mi voto: NORMAL.']) {
+    caso(contradiceVocabulario(t, { modos: ['NORMAL'], regimen: 'RISK-ON' }), `con modo NORMAL y régimen RISK-ON se descarta «${t}»`);
+  }
+  caso(!verificarCifras('Esta noche hemos cerrado 4 operaciones, todas ganadoras.', { operaciones: 0 }, { conteos: true }).ok, 'un conteo inventado («4 operaciones» con 0) no pasa');
 }
 
 async function demo(dias) {

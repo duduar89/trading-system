@@ -122,8 +122,10 @@ function publicarInstantanea(config, orquestador) → void
 - En modo sintético, el reloj simulado se guarda en el estado (ya se hace) y cada
   latido avanza 5 min: así se puede probar el cron sin esperar minutos.
 - El comité en modo latido no hace pausas de pantalla. Para que se vea en el
-  panel, los jefes quedan en la sala de comité 5 min tras la reunión (estado
-  visual guardado con su «hasta»).
+  panel, los jefes quedan en la sala de comité 15 min tras la reunión
+  (`SALA_TRAS_REUNION_MS`; estado visual guardado con su «hasta»; con 5 min
+  Eduardo no llegaba a verlo, 30-sep-2026) y el panel reproduce sus mensajes
+  uno a uno en unos 2,5 min (`web/js/reproductor.js`, ARQUITECTURA §8).
 - Convocar el comité desde la web lo deja **pedido** en el estado; se celebra en
   el latido siguiente (≤ 1 min) y el panel dice «Convocado: empieza en el próximo
   latido».
@@ -175,7 +177,16 @@ web**:
   { interpretacion })`, la **revalida** (`megafono.revalidar`) contra el estado
   de ese momento y no vuelve a llamar al LLM. Una `interpretacion` que venga en
   el cuerpo de una petición se borra.
-- `GET /sw.js` se sirve con la versión dentro (`VERSION` + huella de la carcasa).
+- `GET /sw.js` se sirve con la versión dentro (`VERSION` + huella de la carcasa:
+  todos los html, css, js, png y el manifest de `web/`, así que cualquier
+  cambio en un fichero del panel renueva el service worker y su caché).
+- Los informes del panel (`/api/noticias`, `/api/historial`, `/api/decisiones`,
+  `/api/estrategias`, `/api/laboratorio`, ARQUITECTURA §7) se sirven con sesión
+  y por la misma entrada que en local (`src/informes`), con la instantánea que
+  publicó el último latido: sobre la misma carpeta, la web responde lo mismo
+  que el modo local (`test/informes-servidores.test.js`). También `/api/mensajes`,
+  `/api/operaciones`, `/api/costes-llm` y `/api/estado` (este, con lo suyo
+  añadido: `edadSeg`, `web`, `sesion` y `latidoMs`).
 
 **Login** (solo en modo web; el modo local sigue como está):
 
@@ -213,6 +224,13 @@ web**:
 - `web/sw.js`: caché de la «carcasa» (html, css, js, iconos) con versión;
   **nunca** cachea `/api/*` ni el SSE; sin red, la navegación cae en
   `web/sin-conexion.html`. Al publicar una versión nueva se actualiza sola.
+  Al instalar guarda lo público (login, iconos, página sin conexión); la
+  carcasa del panel (`PANEL`: cada css y js que enlaza `index.html`, con su
+  `<base href="/web/">`) pide sesión, así que se guarda entera, en segundo
+  plano, la primera vez que el panel abre con sesión con esa versión (sin
+  sesión el servidor redirige al login y no se guarda nada), y cada fichero,
+  además, al usarlo. Un fichero nuevo del panel entra en `PANEL`:
+  `test/web-pwa.test.js` compara la lista con `index.html`.
 - iOS: `apple-touch-icon` 180, `apple-mobile-web-app-capable`, barra de estado, y
   una pista «Compartir → Añadir a pantalla de inicio» la primera vez en Safari.
 - Iconos PNG generados por `scripts/generar-iconos.js` (con `zlib`, sin

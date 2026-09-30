@@ -25,6 +25,8 @@ const CADA_NOTA = 4 * HORA;
 const CADA_NOTICIAS = 4 * HORA;   // clasificación con LLM, en lote
 const CADA_TRAER = HORA;          // traer y guardar (solo con claves)
 const VETO_NOTICIA = 24 * HORA;
+// Noticias del final de noticias.jsonl que se contrastan con el estado (alinearConRegistro).
+const COLA_REGISTRO = 300;
 
 function ultimo(arr) {
   for (let i = arr.length - 1; i >= 0; i--) if (arr[i] !== null && arr[i] !== undefined) return arr[i];
@@ -206,6 +208,58 @@ async function clasificar(ctx, lote, ahora, simbolos) {
 // Solo se dan por vistas tras clasificarlas: si la llamada falla (presupuesto,
 // error, esquema), vuelven a entrar en el lote siguiente; si no, un evento
 // grave se escaparía para siempre.
+// Un latido puede escribir en noticias.jsonl y morir antes de guardar
+// estado.json (el vigía de scripts/latido.js, LiteSpeed): lo apuntado en el
+// fichero manda, como con el historial (orquestador._leerColaHistorial). Son
+// «huérfanas» las líneas posteriores a lo último que el estado sabe haber
+// escrito (ultimaTraida o ultima: las líneas se escriben con ese mismo `t`).
+// De cada noticia con una línea huérfana:
+//  - cuenta como guardada: no se vuelve a escribir cuando la fuente la trae;
+//  - sin clasificar y de las últimas 24 h, vuelve a esperar clasificación (si
+//    no, un evento grave se escaparía);
+//  - ya clasificada, cuenta como vista (no se vuelve a clasificar ni a pagar)
+//    y su veto, si sigue vigente, se repone en el estado sin publicarlo ni
+//    apuntar otra decisión (ya están en mensajes y en decisiones.jsonl).
+// Devuelve cuántas noticias alineó (0 si nada).
+function alinearConRegistro(ctx, ahora = ctx.reloj.ahora()) {
+  const ruta = rutaNoticias(ctx);
+  const n = ctx.estado.noticias;
+  if (!ruta) return 0;
+  const marca = Math.max(Number.isFinite(n.ultimaTraida) ? n.ultimaTraida : -Infinity, Number.isFinite(n.ultima) ? n.ultima : -Infinity);
+  let lista;
+  try { lista = registros.leerNoticias(ruta, { limite: COLA_REGISTRO, conHuerfanas: marca }); } catch (_) { return 0; }
+  const huerfanas = lista.filter(x => x.ultimaLineaT > marca);
+  if (!huerfanas.length) return 0;
+  const guardados = new Set(n.guardados);
+  const vistos = new Set(n.vistos);
+  const d = ctx.estado.directivas;
+  for (const x of huerfanas) {
+    const id = String(x.id);
+    guardados.add(id);
+    if (x.clasificacion === null || x.clasificacion === undefined) {
+      if (!vistos.has(id) && x.t > ahora - VETO_NOTICIA && !n.pendientes.some(p => p.id === id)) {
+        n.pendientes.push({ id, t: x.t, titular: x.titular, resumen: String(x.resumen || '').slice(0, 400), simbolos: x.simbolos || [], url: x.url || null });
+      }
+      continue;
+    }
+    if (vistos.has(id)) continue;
+    vistos.add(id);
+    n.pendientes = n.pendientes.filter(p => p.id !== id);
+    const v = x.veto;
+    if (!v || !(v.hasta > ahora)) continue;
+    for (const simbolo of v.simbolos || [v.simbolo]) {
+      const c = (x.clasificacion || []).find(k => k && k.simbolo === simbolo) || {};
+      d.activosVetados = (d.activosVetados || []).filter(a => !(a.simbolo === simbolo && a.origen === 'noticias'));
+      d.activosVetados.push({ simbolo, hasta: v.hasta, motivo: `noticia grave (${c.categoria || 'sin categoría'})`, origen: 'noticias' });
+      n.eventosGraves = (n.eventosGraves || []).filter(e => e.hasta > ahora && !(e.simbolo === simbolo && e.hasta === v.hasta));
+      n.eventosGraves.push({ simbolo, hasta: v.hasta, categoria: c.categoria || null, titular: x.titular, t: Number.isFinite(x.clasificadaT) ? x.clasificadaT : x.t });
+    }
+  }
+  n.guardados = [...guardados].slice(-1000);
+  n.vistos = [...vistos].slice(-500);
+  return huerfanas.length;
+}
+
 async function noticias(ctx) {
   if (!hayNoticias(ctx)) return null;
   const ahora = ctx.reloj.ahora();
@@ -218,6 +272,8 @@ async function noticias(ctx) {
   if (!tocaTraer && !tocaClasificar) return null;
   const simbolos = ctx.universo.map(a => a.simbolo);
   const ruta = rutaNoticias(ctx);
+  // Antes de nada: lo que un latido cortado dejó escrito y el estado no sabe.
+  alinearConRegistro(ctx, ahora);
 
   // 1. Traer y apuntar las nuevas.
   let nuevas = [];
@@ -293,4 +349,4 @@ async function noticias(ctx) {
   };
 }
 
-module.exports = { notas, noticias, sesgoDe, esquemaNoticias, CATEGORIAS_NOTICIA, hayNoticias, CADA_TRAER, CADA_NOTICIAS };
+module.exports = { notas, noticias, alinearConRegistro, sesgoDe, esquemaNoticias, CATEGORIAS_NOTICIA, hayNoticias, CADA_TRAER, CADA_NOTICIAS };

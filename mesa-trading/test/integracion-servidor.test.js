@@ -146,11 +146,8 @@ test('la instantánea tiene la misma forma que la maqueta de la interfaz', async
   const real = (await pedir(srv.base, '/api/estado')).json;
   const maq = crearMaqueta({ semilla: 7, ahora: real.ahora }).instantanea();
   mismasClaves(real, maq, '$');
-  // fondo.factorTamano es de la última ronda (§7): mientras la maqueta no lo
-  // traiga, la real puede llevarlo de más; en cuanto lo traiga, se compara igual.
-  const nuevos = { fondo: maq.fondo && 'factorTamano' in maq.fondo ? [] : ['factorTamano'] };
-  for (const k of ['fondo', 'cabecera', 'llm', 'mejora', 'directivas', 'laboratorio']) mismasClaves(real[k], maq[k], k, nuevos[k] || []);
-  if (maq.fondo && maq.fondo.factorTamano) mismasClaves(real.fondo.factorTamano, maq.fondo.factorTamano, 'fondo.factorTamano');
+  for (const k of ['fondo', 'cabecera', 'llm', 'mejora', 'directivas', 'laboratorio']) mismasClaves(real[k], maq[k], k);
+  mismasClaves(real.fondo.factorTamano, maq.fondo.factorTamano, 'fondo.factorTamano');
   mismasClaves(real.cabecera.regimen, maq.cabecera.regimen, 'cabecera.regimen');
   mismasClaves(real.cabecera.sinAsignar, maq.cabecera.sinAsignar, 'cabecera.sinAsignar');
   mismasClaves(real.cabecera.vigilancia, maq.cabecera.vigilancia, 'cabecera.vigilancia');
@@ -159,20 +156,18 @@ test('la instantánea tiene la misma forma que la maqueta de la interfaz', async
   mismasClaves(real.listoParaReal, maq.listoParaReal, 'listoParaReal');
   mismasClaves(real.listoParaReal.comite, maq.listoParaReal.comite, 'listoParaReal.comite');
   mismasClaves(real.listoParaReal.criterios[0], maq.listoParaReal.criterios[0], 'listoParaReal.criterios[0]');
-  // Campos de datos del 30-sep-2026 (§7: agentes[].queHace; mesas[].explicacion,
-  // filtros, diasActiva, sharpeBacktest y backtest): mientras la maqueta no los
-  // traiga, la real puede llevarlos de más; en cuanto los traiga, se comparan igual.
-  const aun = (lista, claves) => claves.filter(k => !(maq[lista].length && k in maq[lista][0]));
-  const pares = {
-    agentes: aun('agentes', ['queHace']), mesas: aun('mesas', ['explicacion', 'filtros', 'diasActiva', 'sharpeBacktest', 'backtest']),
-    puestos: [], posiciones: [], benchmarks: [], cotizaciones: [], departamentos: [], curva: [], ejecuciones: [],
-    // Conversación del 30-sep-2026 (§6.2): lo mismo, hasta que la maqueta traiga respondeA e hilo.
-    mensajes: aun('mensajes', ['respondeA', 'hilo']),
-  };
-  for (const [lista, extras] of Object.entries(pares)) {
+  // Sin excepciones: la maqueta trae todos los campos del 30-sep-2026 (§7:
+  // agentes[].genero y queHace; mesas[].explicacion, filtros, diasActiva,
+  // sharpeBacktest y backtest; mensajes[].respondeA e hilo; departamentos[].queHace).
+  for (const lista of ['agentes', 'mesas', 'puestos', 'posiciones', 'benchmarks', 'cotizaciones', 'departamentos', 'curva', 'ejecuciones', 'mensajes']) {
     if (!real[lista].length || !maq[lista].length) continue;
-    mismasClaves(real[lista][0], maq[lista][0], `${lista}[0]`, extras);
+    mismasClaves(real[lista][0], maq[lista][0], `${lista}[0]`);
   }
+  mismasClaves(real.mesas[0].explicacion, maq.mesas[0].explicacion, 'mesas[0].explicacion');
+  const conBacktest = real.mesas.find(m => m.backtest);
+  if (conBacktest) mismasClaves(conBacktest.backtest, maq.mesas.find(m => m.backtest).backtest, 'mesas[].backtest');
+  // Un mensaje de cada lado que contesta a otro (los dos traen conversación).
+  assert.ok(real.mensajes.some(m => m.respondeA) && maq.mensajes.some(m => m.respondeA), 'hay respuestas en los dos');
   mismasClaves(real.mesas[0].metricas, maq.mesas[0].metricas, 'mesas[0].metricas');
   const conPos = real.puestos.find(p => p.posicion);
   const maqPos = maq.puestos.find(p => p.posicion);

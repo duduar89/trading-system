@@ -37,7 +37,7 @@ const { EventEmitter } = require('events');
 const path = require('path');
 const universoMod = require('./mercado/universo');
 const calendario = require('./mercado/calendario');
-const { mesasIniciales, mesaAmpliada, explicarMesa, MESA_AMPLIADA } = require('./estrategias');
+const { mesasIniciales, mesaAmpliada, explicarMesa, MESA_AMPLIADA, notaEtfNueva, notaRevisada, estudioDeOtraCartera } = require('./estrategias');
 const registros = require('./registros');
 const { reasignar, REGLAS: REGLAS_ASIGNADOR } = require('./aprendizaje/asignador');
 const { metricasMesa, sharpeRodante } = require('./aprendizaje/evaluador');
@@ -79,6 +79,9 @@ const MAX_EN_DESCANSO = 2;
 // irían todos en fila y el chat sería solo descansos.
 const ENTRE_DESCANSOS = HORA;
 const CADA_RELOJ_MERCADO = 5 * MIN;
+// El bocadillo del operador que espera al Ejecutor se renueva en cada
+// instantánea; este es su «hasta» (de pantalla), para quien conecte a medias.
+const BOCADILLO_ESPERA_MS = MIN;
 const JEFES = comite.JEFES;
 const CANAL_DE = { direccion: 'direccion', macro: 'macro', analisis: 'analisis', mesas: 'parque', riesgos: 'riesgo', operaciones: 'ejecucion', laboratorio: 'laboratorio' };
 const MODELOS_DISPONIBLES = Object.keys(TARIFAS).filter(m => m !== 'claude-opus-4-8');
@@ -267,7 +270,8 @@ class Orquestador extends EventEmitter {
       this.libros = new Libros(guardado.libros);
       delete guardado.libros;
       this.estado = this._completar(guardado);
-      migracion = await this._migrarUniverso();
+      const hechos = { ...(await this._migrarUniverso()), ...this._migrarNotasEtf() };
+      migracion = Object.keys(hechos).length ? hechos : null;
     } else {
       this.libros = new Libros();
       this.estado = await this._estadoInicial();
@@ -439,6 +443,12 @@ class Orquestador extends EventEmitter {
   // datos lo permiten (la ampliada necesita sus 10 criptos; DIA, claves).
   // No toca ninguna posición: añade una mesa en incubación (2 %, del efectivo
   // sin asignar) y un símbolo más a Momentum ETF, que rota entre los que tiene.
+  // Con el universo cambia la referencia: el backtest de Momentum ETF era de
+  // los 5 ETF de antes y se rehace con los 6 (backtestsPendientes); si no, la
+  // columna «Histórico», la lectura y el umbral de ascenso (backtest − 1)
+  // comparaban el papel con otra cartera. Un fondo que ya había migrado DIA
+  // con el backtest viejo lo rehace una vez (`backtestEtf`, revisión del
+  // 30-sep-2026).
   // Devuelve lo que hizo (o null) para contarlo cuando el bus ya tenga agentes.
   async _migrarUniverso() {
     const e = this.estado;
@@ -461,17 +471,85 @@ class Orquestador extends EventEmitter {
       hechas.ampliada = ahora;
     }
     const etf = e.mesas.find(m => m.id === 'momentum-etf');
+    const resumenBt = bt => (bt ? { sharpe: bt.sharpe ?? null, operaciones: bt.operaciones ?? null, dias: bt.dias ?? null, t: bt.t ?? null, universo: bt.universo || null } : null);
     if (!hechas.dia && hay.has('DIA') && etf) {
       if (!etf.universo.includes('DIA')) {
+        const anterior = resumenBt(etf.backtest);
         etf.universo = [...etf.universo, 'DIA'];
-        hecho.dia = { mesaId: etf.id, universo: [...etf.universo] };
+        etf.backtest = null;
+        hecho.dia = { mesaId: etf.id, universo: [...etf.universo], backtestAnterior: anterior };
       }
       hechas.dia = ahora;
+    }
+    if (!hechas.backtestEtf && etf) {
+      if (etf.universo.includes('DIA') && etf.backtest && !(etf.backtest.universo || []).includes('DIA')) {
+        hecho.backtestEtf = { mesaId: etf.id, universo: [...etf.universo], backtestAnterior: resumenBt(etf.backtest) };
+        etf.backtest = null;
+      }
+      hechas.backtestEtf = ahora;
     }
     return Object.keys(hecho).length ? hecho : null;
   }
 
+  // Notas de las mesas de ETF (30-sep-2026): con 10 años de datos reales
+  // suspendieron el filtro del laboratorio y Eduardo decidió que sigan en
+  // prueba al 2 % para verlas en vivo. En un fondo que ya existía, la nota de
+  // antes del estudio se cambia por la nueva y la mesa lleva su estudio
+  // (§4.3, ESTUDIOS_ETF). Idempotente: solo si la mesa aún tiene la nota
+  // vieja (una nota ya cambiada, o la de una contratación, no se toca). No
+  // cambia ni el peso ni el estado.
+  // La revisión del 30-sep-2026 corrigió notas (la de Reversión ETF era el
+  // estudio de otra cartera; las de ETF comparaban rentabilidades con
+  // distinto dinero invertido; la de la ampliada no salía de ningún estudio
+  // guardado): una mesa con una nota superada la cambia también, y se cuenta
+  // aparte (`notasRevision`).
+  _migrarNotasEtf() {
+    const e = this.estado;
+    const cambiadas = [];
+    const revisadas = [];
+    for (const m of e.mesas) {
+      const nueva = notaEtfNueva(m) || notaRevisada(m);
+      if (!nueva) continue;
+      m.nota = nueva.nota;
+      if (nueva.estudio) m.estudio = nueva.estudio;
+      (nueva.revision ? revisadas : cambiadas).push(m.id);
+    }
+    if (!cambiadas.length && !revisadas.length) return {};
+    const hechas = e.migraciones || (e.migraciones = {});
+    const out = {};
+    if (cambiadas.length) { hechas.notasEtf = this.reloj.ahora(); out.notasEtf = cambiadas; }
+    if (revisadas.length) { hechas.notasRevision = this.reloj.ahora(); out.notasRevision = revisadas; }
+    return out;
+  }
+
+  // Las notas que corrigió la revisión: una línea por mesa (hito «estudio» en
+  // /api/estrategias) y un aviso del laboratorio. No cambia peso ni estado.
+  _contarRevisionNotas(ids) {
+    const mesas = ids.map(id => this.mesaPorId(id)).filter(Boolean);
+    for (const m of mesas) {
+      this.anotarDecision({
+        tipo: 'asignacion', quien: 'laboratorio', resumen: `Nota de ${m.nombre} corregida: ${m.nota}`,
+        datos: { migracion: 'notas-revision-2026-09-30', mesaId: m.id, peso: m.peso, estado: m.estado, nota: m.nota, ...(m.estudio ? { estudio: m.estudio } : {}) },
+      });
+    }
+    const partes = [];
+    if (mesas.some(m => m.estudio)) partes.push('la rentabilidad de un estudio va con el dinero que tenía invertido, no todo como comprar y mantener');
+    for (const m of mesas.filter(x => estudioDeOtraCartera(x))) partes.push(`el de ${m.nombre} era de otra cartera (${m.estudio.universo.join(', ')})`);
+    if (mesas.some(m => m.id === MESA_AMPLIADA.id)) partes.push('las cifras de la ampliada salen ahora de un estudio guardado');
+    const nombres = mesas.map(m => m.nombre);
+    const quienes = nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}` : nombres[0];
+    this.bus.publicar({
+      de: 'laboratorio', canal: 'laboratorio', tipo: 'nota', importancia: 2,
+      texto: plantillas.frase(`He corregido la nota de ${quienes}: ${partes.join('; ')}.`, 320),
+      datos: { migracion: 'notas-revision-2026-09-30', mesas: mesas.map(m => m.id) },
+    });
+  }
+
   _contarMigracion(hecho) {
+    if (hecho.notasEtf) this._contarNotasEtf(hecho.notasEtf);
+    if (hecho.notasRevision) this._contarRevisionNotas(hecho.notasRevision);
+    if (hecho.backtestEtf) this._contarBacktestEtf(hecho.backtestEtf);
+    if (!hecho.ampliada && !hecho.dia) return;
     const partes = [];
     if (hecho.ampliada) {
       const m = this.mesaPorId(hecho.ampliada.mesaId);
@@ -485,14 +563,42 @@ class Orquestador extends EventEmitter {
     if (hecho.dia) {
       partes.push('DIA entra en Momentum ETF');
       this.anotarDecision({
-        tipo: 'asignacion', quien: 'humano', resumen: 'DIA (Dow Jones 30) entra en el universo de Momentum ETF, sin tocar lo que ya tiene abierto.',
-        datos: { migracion: 'universo-2026-09-30', mesaId: hecho.dia.mesaId, universo: hecho.dia.universo },
+        tipo: 'asignacion', quien: 'humano',
+        resumen: `DIA (Dow Jones 30) entra en el universo de Momentum ETF, sin tocar lo que ya tiene abierto. Su backtest de referencia se rehace con los ${hecho.dia.universo.length} ETF.`,
+        datos: { migracion: 'universo-2026-09-30', mesaId: hecho.dia.mesaId, universo: hecho.dia.universo, backtestAnterior: hecho.dia.backtestAnterior },
       });
     }
     this.bus.publicar({
       de: 'cio', canal: 'direccion', tipo: 'contratacion', importancia: 3,
       texto: plantillas.frase(`Universo ampliado (decisión de Eduardo, 30-sep): ${partes.join('; ')}. Momentum cripto sigue con sus 6 y no se toca ninguna posición.`, 280),
       datos: { migracion: 'universo-2026-09-30', ...hecho },
+    });
+  }
+
+  // Un fondo que migró DIA con el backtest de los 5 ETF: se rehace y queda como hito de la mesa.
+  _contarBacktestEtf(h) {
+    const m = this.mesaPorId(h.mesaId);
+    if (!m) return;
+    const antes = h.backtestAnterior && Number.isFinite(h.backtestAnterior.sharpe) ? ` (Sharpe ${f.numero(h.backtestAnterior.sharpe, 2)})` : '';
+    const n = h.universo.length;
+    const texto = `El backtest de referencia de ${m.nombre} era de sus ${n - 1} ETF de antes de DIA${antes}: lo rehago con los ${n} que opera ahora (${h.universo.join(', ')}).`;
+    this.anotarDecision({ tipo: 'asignacion', quien: 'laboratorio', resumen: texto, datos: { migracion: 'backtest-etf-2026-09-30', mesaId: m.id, universo: h.universo, backtestAnterior: h.backtestAnterior } });
+    this.bus.publicar({ de: 'laboratorio', canal: 'laboratorio', tipo: 'nota', importancia: 2, texto: plantillas.frase(texto, 280), datos: { migracion: 'backtest-etf-2026-09-30', mesaId: m.id } });
+  }
+
+  _contarNotasEtf(ids) {
+    const mesas = ids.map(id => this.mesaPorId(id)).filter(Boolean);
+    for (const m of mesas) {
+      this.anotarDecision({
+        tipo: 'asignacion', quien: 'humano',
+        resumen: `${m.nombre} sigue en prueba con el ${f.pct(m.peso, { decimales: 0 })} por decisión de Eduardo, aunque suspendió el filtro. ${m.nota}`,
+        datos: { migracion: 'notas-etf-2026-09-30', mesaId: m.id, peso: m.peso, estado: m.estado, nota: m.nota, estudio: m.estudio },
+      });
+    }
+    this.bus.publicar({
+      de: 'cio', canal: 'direccion', tipo: 'nota', importancia: 3,
+      texto: plantillas.frase(`${mesas.map(m => m.nombre).join(' y ')}: con 10 años de datos reales ${mesas.length === 1 ? 'suspende' : 'suspenden'} el filtro del laboratorio. Por decisión de Eduardo ${mesas.length === 1 ? 'sigue' : 'siguen'} en prueba con el 2 %, para ${mesas.length === 1 ? 'verla' : 'verlas'} en vivo.`, 280),
+      datos: { migracion: 'notas-etf-2026-09-30', mesas: mesas.map(m => m.id) },
     });
   }
 
@@ -663,6 +769,26 @@ class Orquestador extends EventEmitter {
     if (!m) return null;
     const hasta = m.t + Math.min(12_000, 6_000 + 60 * m.texto.length) * this._factorPantalla();
     return hasta > ahora ? { texto: m.texto, hasta } : null;
+  }
+
+  // Operadores con una orden suya que aún no ha salido o no ha confirmado el
+  // bróker: aperturas y cierres por señal que esperan a la bolsa
+  // (estado.pendientes) u órdenes en vuelo sin estado final (ordenesEnVuelo).
+  // Los stops, el kill y los cierres del despido no los propuso el operador.
+  // → Map agenteId → { etiqueta, lado, hasta? } (hasta: cuándo sale, con la bolsa cerrada)
+  _esperandoOrden() {
+    const e = this.estado;
+    const out = new Map();
+    const propia = o => o && o.mesaId && o.mesaId !== 'sombra' && o.puestoId && o.simbolo
+      && (o.tipo === 'apertura' || o.tipo === 'cierre') && o.accion !== 'despido';
+    const poner = (o, hasta) => {
+      const id = agenteDePuesto(o.mesaId, o.simbolo);
+      if (out.has(id) || !this.agentePorId(id)) return;
+      out.set(id, { etiqueta: etiqueta(o.simbolo), lado: o.lado === 'venta' ? 'venta' : 'compra', ...(Number.isFinite(hasta) ? { hasta } : {}) });
+    };
+    for (const o of Object.values(e.ordenesEnVuelo || {})) if (propia(o)) poner(o, null);
+    for (const o of e.pendientes || []) if (propia(o)) poner(o, o.enviarDesde);
+    return out;
   }
 
   moverAgente(id, sala, estado, { forzar = false } = {}) {
@@ -906,7 +1032,7 @@ class Orquestador extends EventEmitter {
     await this._seguro('valoración', 'controller', () => this.refrescarCartera());
     // Modo latido: el backtest de referencia de una mesa sin él (la primera
     // vez y tras una contratación), dentro del paso: no hay fondo que lo espere.
-    if (this.opciones.latido && this.estado.mesas.some(m => !m.backtest)) {
+    if (this.opciones.latido && this.estado.mesas.some(m => !laboratorio.backtestVigente(m))) {
       await this._seguro('backtests de referencia', 'laboratorio', () => laboratorio.backtestsPendientes(this));
     }
     await this._cadenciaDiaria(ahora);
@@ -1123,8 +1249,11 @@ class Orquestador extends EventEmitter {
     if (e.ultimoDescanso !== undefined && e.ultimoDescanso !== null && ahora - e.ultimoDescanso < ENTRE_DESCANSOS) return;
     const enDescanso = this.plantilla.filter(a => e.agentes[a.id] && e.agentes[a.id].estado === 'descanso').length;
     if (enDescanso >= MAX_EN_DESCANSO) return;
+    // Quien espera de pie a que salga su orden no se va a descansar.
+    const esperando = this._esperandoOrden();
     const candidatos = this.plantilla
       .filter(a => {
+        if (esperando.has(a.id)) return false;
         const v = e.agentes[a.id] || {};
         const estado = v.estado || 'trabajando';
         if (estado !== 'trabajando' || (v.sala && v.sala !== this._casa(a))) return false;
@@ -1314,22 +1443,34 @@ class Orquestador extends EventEmitter {
           sharpe: m.backtest.sharpe ?? null, maxDD: m.backtest.maxDD ?? null, operaciones: m.backtest.operaciones ?? null,
           rentabilidad: m.backtest.rentabilidad ?? null, vol: m.backtest.vol ?? null, dias: m.backtest.dias ?? null, t: m.backtest.t ?? null,
         } : null,
+        estudio: m.estudio || null,
       };
     });
 
     // Modo latido: el comité se celebra entero dentro de un paso; para que se
     // vea en el panel, los jefes siguen en la sala hasta estado.comite.salaHasta.
     const enSala = !bloqueado && Number.isFinite(e.comite.salaHasta) && ahora < e.comite.salaHasta;
+    // El operador que propuso una orden espera de pie junto al Ejecutor hasta
+    // que sale (bolsa cerrada) o el bróker la confirma: sale del estado, así
+    // que es igual en el continuo y latido a latido.
+    const esperando = bloqueado ? new Map() : this._esperandoOrden();
     const agentes = this.plantilla.map(a => {
       const vis = e.agentes[a.id] || {};
       let estado = vis.estado || 'trabajando';
       let sala = vis.sala || this._casa(a);
+      let bocadillo = this._bocadillo(a.id, ahora);
       if (a.mesaId) { const m = this.mesaPorId(a.mesaId); if (m && m.estado === 'banquillo') estado = 'banquillo'; }
       if (bloqueado && estado !== 'banquillo' && estado !== 'reunion') estado = 'de_pie';
       if (enSala && JEFES.includes(a.id) && estado !== 'descanso') { sala = 'comite'; estado = 'reunion'; }
+      const espera = esperando.get(a.id);
+      if (espera && (estado === 'trabajando' || estado === 'descanso')) {
+        estado = 'ejecucion';
+        sala = this._casa(a);
+        bocadillo = { texto: plantillas.esperaOrden(espera), hasta: ahora + BOCADILLO_ESPERA_MS * this._factorPantalla() };
+      }
       return {
         id: a.id, nombre: a.nombre, genero: a.genero || null, departamento: a.departamento, rol: a.rol, queDecide: a.queDecide, queHace: a.queHace || null, usaLLM: a.usaLLM,
-        sala, estado, bocadillo: this._bocadillo(a.id, ahora),
+        sala, estado, bocadillo,
         mesaId: a.mesaId || null, simbolo: a.simbolo || null, etiqueta: a.etiqueta || null, puestoId: a.puestoId || null,
       };
     });
@@ -1378,6 +1519,7 @@ class Orquestador extends EventEmitter {
         modoComite: e.directivas.modo || 'NORMAL',
         sinAsignar,
         vigilancia: vig,
+        capital: this._capital(patrimonio, val),
       },
       llm: { activo: llm.activo, modeloComite: llm.modeloComite, modeloAgentes: llm.modeloAgentes, gastoHoyUsd: llm.gastoHoyUsd, presupuestoDiaUsd: llm.presupuestoDiaUsd },
       curva: e.curva.slice(-MAX_CURVA_INSTANTANEA).map(p => ({ t: p.t, patrimonio: p.patrimonio })),
@@ -1451,6 +1593,72 @@ class Orquestador extends EventEmitter {
       incidentes: this.incidentes ? this.incidentes.lista : [], incidentesDesde: e.incidentesDesde,
       costeLLMUsd: typeof this.llm.gastoTotal === 'function' ? this.llm.gastoTotal() : 0,
     });
+  }
+
+  // Capital del fondo para la barra de arriba (§7, cabecera.capital): cuánto
+  // hay invertido y en qué tipo de activo, cuánto en efectivo y cuánto dejan
+  // aún los límites duros. Invertido, efectivo y el desglose salen del bróker
+  // (cuenta y posiciones del último refresco): invertido + efectivo =
+  // patrimonio y Σ porTipo = invertido. Lo disponible usa la exposición que
+  // miran los topes de Riesgos (§5.3: por activo, el máximo entre libros y
+  // bróker), que es la que de verdad frena una compra; no hay otro tope.
+  _capital(patrimonio, val) {
+    const v = this.vivo;
+    const lim = this.limites;
+    const posiciones = v.posicionesBroker || [];
+    const porTipo = new Map();
+    let invertido = 0;
+    for (const q of posiciones) {
+      const importe = Math.abs(Number(q.valor) || 0);
+      if (!(importe > 0)) continue;
+      const simbolo = universoMod.desdeClave(q.simbolo);
+      const tipo = universoMod.tipoDe(simbolo);
+      const t = porTipo.get(tipo) || { importe: 0, activos: [] };
+      t.importe += importe;
+      t.activos.push({ simbolo, etiqueta: etiqueta(simbolo), importe });
+      porTipo.set(tipo, t);
+      invertido += importe;
+    }
+    // Los tipos que opera alguna mesa (fuera del banquillo) salen aunque no
+    // tengan nada invertido ahora.
+    const mesasDeTipo = new Map();
+    for (const m of this.estado.mesas) {
+      if (m.estado === 'banquillo') continue;
+      for (const tipo of new Set(m.universo.map(s => universoMod.tipoDe(s)))) {
+        if (!mesasDeTipo.has(tipo)) mesasDeTipo.set(tipo, []);
+        mesasDeTipo.get(tipo).push(m.id);
+      }
+    }
+    const orden = [...universoMod.TIPOS.map(t => t.id), universoMod.TIPO_OTROS.id];
+    const lista = orden
+      .filter(tipo => porTipo.has(tipo) || mesasDeTipo.has(tipo))
+      .map(tipo => {
+        const t = porTipo.get(tipo) || { importe: 0, activos: [] };
+        return {
+          tipo, nombre: universoMod.nombreTipo(tipo), importe: t.importe, pct: patrimonio > 0 ? t.importe / patrimonio : 0,
+          activos: t.activos.sort((a, b) => b.importe - a.importe || (a.etiqueta < b.etiqueta ? -1 : 1)),
+          mesas: mesasDeTipo.get(tipo) || [],
+        };
+      });
+    const cuenta = v.cuenta;
+    const efectivo = cuenta && Number.isFinite(cuenta.efectivo) ? cuenta.efectivo : patrimonio - invertido;
+    const P = patrimonio > 0 ? patrimonio : 0;
+    // Cada tope con sus cifras hechas (la interfaz las cuenta sin restar nada).
+    const tope = (maximo, usado) => {
+      const u = Math.max(0, usado || 0);
+      return { maximo, tope: maximo * P, usado: u, queda: Math.max(0, maximo * P - u) };
+    };
+    const limites = {
+      bruta: tope(lim.maxExposicionBruta, val && val.exposicionBruta),
+      cripto: tope(lim.maxExposicionCripto, val && val.exposicionCripto),
+    };
+    const disponible = Math.max(0, Math.min(efectivo, limites.bruta.queda));
+    const disponibleCripto = Math.min(disponible, limites.cripto.queda);
+    return {
+      patrimonio, invertido, invertidoPct: P > 0 ? invertido / P : 0, efectivo, disponible, disponibleCripto,
+      porTipo: lista,
+      limites,
+    };
   }
 
   // Capital que ninguna mesa tiene asignado: queda en efectivo. Con una sola

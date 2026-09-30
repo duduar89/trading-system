@@ -35,6 +35,7 @@ const { BrokerSimulado } = require('./broker/simulado');
 const { crearLLM } = require('./agentes/llm');
 const { Bus } = require('./agentes/bus');
 const { Orquestador } = require('./orquestador');
+const { SALA_TRAS_REUNION_MS } = require('./agentes/comite');
 const { crearServidor } = require('./servidor');
 const log = require('./util/log').crear('mesa');
 
@@ -201,6 +202,7 @@ async function main() {
     piezas = construir(config, {
       opciones: {
         pausaComiteMs: 1500,              // se ve a los jefes hablar uno detrás de otro
+        salaTrasComiteMs: SALA_TRAS_REUNION_MS,   // y siguen en la sala 15 min (de la mesa) tras la reunión
         descansoMinPantallaMs: sintetico ? 20_000 : 0,
         respetarVelocidadGuardada: !args.velocidad,
       },

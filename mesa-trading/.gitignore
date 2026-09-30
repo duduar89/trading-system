@@ -7,4 +7,6 @@ data-demo/
 VERSION
 # tmp/restart.txt de Passenger en el servidor.
 tmp/
-estudios/
+# La caché y la salida completa de los estudios (scripts/estudiar-*.js). La
+# copia que respalda las notas va en docs/estudios/, que SÍ se versiona.
+/estudios/

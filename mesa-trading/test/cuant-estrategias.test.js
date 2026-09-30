@@ -1,6 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { LIMITES_DUROS } = require('../src/config');
 const { FAMILIAS, mesasIniciales } = require('../src/estrategias');
 const filtros = require('../src/estrategias/filtros');
 const comun = require('../src/estrategias/comun');
@@ -381,8 +382,6 @@ test('mesasIniciales: 4 sin claves y 6 con claves, con la forma de Mesa', () => 
   assert.equal(ma.marco, '1Day');
   assert.equal(ma.estado, 'incubacion');
   assert.deepEqual(ma.universo, [...CRIPTO6, 'XRP/USD', 'LTC/USD', 'BCH/USD', 'ADA/USD']);
-  assert.match(ma.nota, /0,82 a 0,58/);
-  assert.match(ma.nota, /0,74 a 0,56/);
   assert.match(ma.nota, /7 meses/);
   // La titular no cambia: sus 6.
   assert.deepEqual(amp.find(m => m.id === 'momentum').universo, CRIPTO6);
@@ -396,7 +395,9 @@ test('mesasIniciales: 4 sin claves y 6 con claves, con la forma de Mesa', () => 
   assert.deepEqual(porId['momentum-etf'].params.lookbacks, [63, 126, 252]);
   assert.deepEqual(porId['reversion-etf'].universo, ['SPY', 'QQQ']);
   for (const m of con) {
-    assert.deepEqual(Object.keys(m).sort(), ['estado', 'familia', 'filtros', 'id', 'marco', 'nombre', 'nota', 'origen', 'params', 'universo']);
+    // Las de ETF llevan además el estudio que respalda su nota (30-sep-2026).
+    const campos = ['estado', 'familia', 'filtros', 'id', 'marco', 'nombre', 'nota', 'origen', 'params', 'universo'];
+    assert.deepEqual(Object.keys(m).sort(), (/-etf$/.test(m.id) ? [...campos, 'estudio'] : campos).sort());
     // Decisión del 30-sep-2026: Momentum cripto es la única titular. Tendencia
     // y Reversión cripto pierden con costes; Ruptura no diversifica frente a
     // Momentum (correlación 0,80); las de ETF no se pueden validar sin claves.
@@ -412,12 +413,138 @@ test('mesasIniciales: 4 sin claves y 6 con claves, con la forma de Mesa', () => 
   assert.match(porId.tendencia.nota, /Sharpe −0,53/);
   assert.match(porId.reversion.nota, /Sharpe −0,36/);
   assert.match(porId.momentum.nota, /0,91/);
-  for (const id of ['momentum-etf', 'reversion-etf']) assert.match(porId[id].nota, /Sin validar con datos reales/);
+  // Las de ETF: el estudio con 10 años de datos reales (30-sep-2026) y la decisión de Eduardo.
+  assert.match(porId['momentum-etf'].nota, /Sharpe 0,19 .*69 % de ventanas.*deflactado 0,48.*2,1 % al año con como mucho el 20 % del dinero invertido; comprar y mantener, con todo invertido, un 13,3 %: no se comparan tal cual\. Sigue en prueba con el 2 % por decisión de Eduardo/);
+  assert.match(porId['reversion-etf'].nota, /^Su cartera \(SPY y QQQ\) aún no se ha estudiado.*otra más grande, Reversión en índices \(SPY, QQQ, IWM y DIA\).*Sharpe 0,33 .*56 % de ventanas.*deflactado 0,59 .*puede ser más bajo.*0,3 % al año con como mucho el 40 % invertido; comprar y mantener, con todo invertido, un 15,3 %\. Sigue en prueba con el 2 % por decisión de Eduardo/);
+  for (const id of ['momentum-etf', 'reversion-etf']) {
+    assert.equal(porId[id].estado, 'incubacion');
+    assert.equal(porId[id].estudio.aprobada, false);
+    assert.equal(porId[id].estudio.decision.quien, 'Eduardo');
+  }
   // Sin claves no hay mesas de ETF, y el resto es igual.
   assert.deepEqual(sin.map(m => m.estado), ['incubacion', 'titular', 'incubacion', 'incubacion']);
   // Los params de una mesa no comparten arrays con los valores por defecto
   porId.momentum.params.lookbacks.push(99);
   assert.deepEqual([...momentum.parametrosPorDefecto.lookbacks], [28]);
+});
+
+test('estudio de las mesas de ETF (30-sep-2026): cifras del informe, umbrales del laboratorio y la nota dice lo mismo', () => {
+  const e = require('../src/estrategias');
+  const { CRITERIOS } = require('../src/cuant/laboratorio');
+  assert.deepEqual({ ...e.UMBRALES_FILTRO }, { sharpeFueraDeMuestra: CRITERIOS.sharpeMin, ventanasPositivas: CRITERIOS.fraccionVentanas, sharpeDeflactado: CRITERIOS.dsrMin },
+    'los umbrales son los del filtro del laboratorio');
+  const f = require('../src/util/formato');
+  for (const [id, est] of Object.entries(e.ESTUDIOS_ETF)) {
+    const nota = e.NOTAS_INICIALES[id];
+    const c = est.cifras;
+    // Suspende: alguna cifra por debajo de su umbral (aquí, las tres).
+    assert.ok(c.sharpeFueraDeMuestra < est.umbrales.sharpeFueraDeMuestra && c.ventanasPositivas < est.umbrales.ventanasPositivas && c.sharpeDeflactado < est.umbrales.sharpeDeflactado, id);
+    // La nota lleva exactamente las cifras del estudio y sus umbrales.
+    for (const x of [f.numero(c.sharpeFueraDeMuestra, 2), f.numero(c.sharpeDeflactado, 2), f.pct(c.ventanasPositivas, { decimales: 0 }),
+      f.pct(c.rentabilidadAnual, { decimales: 1 }), f.pct(c.comprarYMantenerAnual, { decimales: 1 }), f.numero(est.umbrales.sharpeFueraDeMuestra, 1),
+      f.pct(est.umbrales.ventanasPositivas, { decimales: 0 }), f.numero(est.umbrales.sharpeDeflactado, 2)]) assert.ok(nota.includes(x), `${id}: la nota dice ${x}`);
+    assert.match(nota, /[Ss]uspendió el filtro/);
+    assert.match(nota, /Sigue en prueba con el 2 % por decisión de Eduardo/);
+    // La rentabilidad va con el dinero que tenía invertido, que sale de la
+    // estrategia estudiada y los límites duros (los del motor en el estudio).
+    const mesa = e.mesasIniciales({ hayAlpaca: true }).find(m => m.id === id);
+    assert.equal(est.exposicionMaxima, e.exposicionMaximaEstudio(mesa.familia, est.universo, LIMITES_DUROS), `${id}: exposición máxima del estudio`);
+    assert.ok(nota.includes(`con como mucho el ${f.pct(est.exposicionMaxima, { decimales: 0 })}`), `${id}: la nota dice cuánto tenía invertido`);
+    assert.match(nota, /comprar y mantener, con todo invertido/);
+    for (const aviso of Object.keys(est.avisos || {})) assert.match(nota, /puede ser más bajo/, `${id}: la nota lleva el aviso de ${aviso}`);
+  }
+  // Migración: solo con la nota de antes del estudio.
+  assert.deepEqual(Object.keys(e.notaEtfNueva({ id: 'momentum-etf', nota: e.NOTA_ETF_ANTERIOR })).sort(), ['estudio', 'nota', 'revision']);
+  assert.equal(e.notaEtfNueva({ id: 'momentum-etf', nota: e.NOTA_ETF_ANTERIOR }).revision, false);
+  // Las notas que corrigió la revisión del 30-sep-2026 también se cambian (y se cuentan como revisión).
+  for (const id of ['momentum-etf', 'reversion-etf']) {
+    const r = e.notaEtfNueva({ id, nota: e.NOTAS_ETF_SUPERADAS[id][0] });
+    assert.equal(r.revision, true, id);
+    assert.equal(r.nota, e.NOTAS_INICIALES[id]);
+  }
+  assert.equal(e.notaEtfNueva({ id: 'momentum-etf', nota: e.NOTAS_INICIALES['momentum-etf'] }), null, 'ya cambiada');
+  assert.equal(e.notaEtfNueva({ id: 'momentum-etf', nota: 'Otra nota puesta a mano.' }), null, 'una nota distinta no se pisa');
+  assert.equal(e.notaEtfNueva({ id: 'momentum', nota: e.NOTA_ETF_ANTERIOR }), null, 'solo las de ETF');
+});
+
+test('nota de Momentum cripto ampliada: cada cifra sale del estudio guardado, con el tramo de cada par (docs/estudios)', () => {
+  const e = require('../src/estrategias');
+  const f = require('../src/util/formato');
+  const fs = require('fs');
+  const path = require('path');
+  const dir = path.join(__dirname, '..', 'docs', 'estudios');
+  const fichero = fs.readdirSync(dir).filter(x => /^ampliada-\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort().pop();
+  assert.ok(fichero, 'hay un estudio guardado de la ampliada');
+  const est = JSON.parse(fs.readFileSync(path.join(dir, fichero), 'utf8'));
+  assert.equal(est.fuente, 'scripts/estudiar-ampliada.js');
+  const nota = e.NOTAS_INICIALES.ampliada;
+  const mes = d => { const [a, m] = d.split('-'); return `${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][Number(m) - 1]}-${a}`; };
+  const par = id => est.comparaciones.find(c => c.id === id);
+  for (const id of ['ltc-bch', 'xrp']) {
+    const c = par(id);
+    assert.ok(c.suficiente, id);
+    const trozo = `de ${f.numero(c.titular.sharpe, 2)} a ${f.numero(c.conNuevas.sharpe, 2)} (${mes(c.desde)} → ${mes(c.hasta)})`;
+    assert.ok(nota.includes(trozo), `${id}: la nota dice «${trozo}»`);
+    assert.ok(c.conNuevas.sharpe < c.titular.sharpe, `${id}: añadirlas baja el Sharpe (la razón de la decisión)`);
+  }
+  const ada = par('ada');
+  assert.ok(nota.includes(`ADA cotiza desde ${mes(est.primerasVelas['ADA/USD'])}: con ${ada.meses} meses`), 'ADA, con su primera vela y sus meses');
+  // Ninguna cifra de la nota que no esté en el estudio.
+  const { verificarCifras } = require('../src/agentes/cifras');
+  // (salvo las de la mesa: sus 6, las 10 y el 2 % de la incubación).
+  const { REGLAS } = require('../src/aprendizaje/asignador');
+  const mesa = { titular: e.CRIPTO_TITULAR.length, ampliada: e.MESA_AMPLIADA.universo.length, incubacion: REGLAS.incubacion };
+  assert.deepEqual(verificarCifras(nota.replace(/\d{1,2}-sep-\d{4}/, ''), { ...est, mesa }, { conteos: true }).noEncontradas, []);
+  // Un fondo con la nota de antes la cambia (notaRevisada) y una nota distinta no se pisa.
+  assert.deepEqual(e.notaRevisada({ id: 'momentum-ampliada', nota: e.NOTAS_SUPERADAS['momentum-ampliada'][0] }), { nota, revision: true });
+  assert.equal(e.notaRevisada({ id: 'momentum-ampliada', nota }), null);
+  assert.equal(e.notaRevisada({ id: 'momentum-ampliada', nota: 'Otra nota.' }), null);
+});
+
+test('estudio y mesa son lo mismo: un estudio de otro universo lo dice (nota, vista) y la migración no lo esconde', () => {
+  const e = require('../src/estrategias');
+  const V = require('../web/js/vistas.js');
+  const { CANDIDATAS } = require('../scripts/estudiar-candidatas');
+  const mesas = e.mesasIniciales({ hayAlpaca: true }).filter(m => m.estudio);
+  // Las mismas, tras la migración de un fondo que ya existía (nota vieja o superada).
+  const migradas = mesas.flatMap(m => [e.NOTA_ETF_ANTERIOR, ...(e.NOTAS_ETF_SUPERADAS[m.id] || [])]
+    .map(nota => ({ ...m, ...e.notaEtfNueva({ ...m, nota, estudio: undefined }) })));
+  for (const m of [...mesas, ...migradas]) {
+    const mismo = !e.estudioDeOtraCartera(m);
+    const vista = V.textoEstudio(m.estudio, m.universo);
+    if (mismo) {
+      assert.deepEqual([...m.estudio.universo].sort(), [...m.universo].sort(), m.id);
+      assert.equal(vista.otraCartera, false);
+      continue;
+    }
+    // Otro universo: la nota y la vista lo dicen, y el estudio siguiente estudia la mesa tal cual.
+    assert.match(m.nota, /aún no se ha estudiado/, `${m.id}: la nota lo dice`);
+    assert.equal(vista.otraCartera, true);
+    assert.match(vista.titular, /^Su cartera \(SPY y QQQ\) aún no se ha estudiado/);
+    assert.match(vista.contexto, /fue de otra cartera, Reversión en índices, de SPY, QQQ, IWM y DIA, y suspendió el filtro\. Estas son sus cifras, no las de esta mesa\./);
+    assert.ok(CANDIDATAS.some(c => c.mesaId === m.id && [...c.universo].sort().join() === [...m.universo].sort().join()), `${m.id}: candidata con su universo en el estudio`);
+  }
+  assert.ok(mesas.some(m => e.estudioDeOtraCartera(m)), 'hoy Reversión ETF enseña el estudio de otra cartera (hasta que se estudie con claves)');
+  // La exposición máxima: top 2 → 20 %; cuatro activos → 40 %; dos → 20 %.
+  assert.equal(e.exposicionMaximaEstudio('momentum-rotacion', e.ETF_MOMENTUM, LIMITES_DUROS), 0.2);
+  assert.equal(e.exposicionMaximaEstudio('reversion-rsi', ['SPY', 'QQQ', 'IWM', 'DIA'], LIMITES_DUROS), 0.4);
+  assert.equal(e.exposicionMaximaEstudio('reversion-rsi', ['SPY', 'QQQ'], LIMITES_DUROS), 0.2);
+});
+
+test('plazo y tipo de activo de cada mesa (vista Estrategias): por marco y rebalanceo, y por su universo', () => {
+  const e = require('../src/estrategias');
+  const todas = e.mesasIniciales({ hayAlpaca: true, disponibles: require('../src/mercado/universo').UNIVERSO.map(a => a.simbolo) });
+  const plazo = Object.fromEntries(todas.map(m => [m.id, e.plazoMesa(m).id]));
+  assert.deepEqual(plazo, { tendencia: 'horas', momentum: 'dia', reversion: 'dia', ruptura: 'dia', 'momentum-ampliada': 'dia', 'momentum-etf': 'mes', 'reversion-etf': 'dia' });
+  assert.deepEqual(e.PLAZOS.map(p => p.nombre), ['Cada 4 horas', 'Cada día o semana', 'Cada mes']);
+  const tipos = Object.fromEntries(todas.map(m => [m.id, e.tiposMesa(m).map(t => t.id).join(',')]));
+  assert.equal(tipos['momentum-etf'], 'indices,bonos,materias');
+  assert.equal(tipos['reversion-etf'], 'indices');
+  assert.equal(tipos.momentum, 'cripto');
+  // Con el universo por etiqueta (como en la instantánea) sale lo mismo, y sin params explícitos manda el perfil.
+  assert.equal(e.plazoMesa({ familia: 'momentum-rotacion', marco: '1Day', universo: ['SPY', 'QQQ'], params: {} }).id, 'mes');
+  assert.equal(e.plazoMesa({ familia: 'momentum-rotacion', marco: '1Day', universo: ['BTC', 'ETH'], params: {} }).id, 'dia');
+  assert.deepEqual(e.tiposMesa({ universo: ['GLD', 'BTC'] }).map(t => t.nombre), ['Cripto', 'Materias primas']);
 });
 
 test('Señal: forma de §4.3 y peso 1/universo en familias por activo', () => {

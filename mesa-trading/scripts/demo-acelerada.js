@@ -11,7 +11,8 @@
 //     compra (la cantidad solo puede bajar, así que el valor está acotado por
 //     tope · patrimonio en la compra · precio ahora / precio en la compra);
 //   - Σ puestos no-sombra = posiciones del bróker por símbolo (1e-6 relativo);
-//   - patrimonio = efectivo + Σ valor de las posiciones;
+//   - patrimonio = efectivo + Σ valor de las posiciones, y el capital de la
+//     cabecera (§7) igual: invertido y efectivo del bróker, Σ porTipo = invertido;
 //   - hubo operaciones y hubo comités cada 4 h;
 //   - tras un reinicio simulado (guardar, otro orquestador desde el mismo
 //     data/) el estado se recupera igual;
@@ -162,6 +163,14 @@ async function ejecutarDemo({ dias = 60, semilla = 42, inicio = INICIO_POR_DEFEC
     const suma = cuenta.efectivo + posiciones.reduce((s, x) => s + x.valor, 0);
     if (!casiIgual(cuenta.patrimonio, suma, 1e-9, 1e-6)) fallar(`${cuando}: patrimonio ${cuenta.patrimonio} ≠ efectivo + posiciones ${suma}`);
     if (!casiIgual(orq.vivo.patrimonio, cuenta.patrimonio, 1e-9, 1e-6)) fallar(`${cuando}: la cabecera dice ${orq.vivo.patrimonio} y el bróker ${cuenta.patrimonio}`);
+    // El capital de la barra de arriba (§7, cabecera.capital) cuadra con el bróker.
+    const cap = orq.instantanea().cabecera.capital;
+    const invertido = posiciones.reduce((s, x) => s + Math.abs(x.valor), 0);
+    if (!casiIgual(cap.invertido, invertido, 1e-9, 1e-6)) fallar(`${cuando}: capital.invertido ${cap.invertido} ≠ Σ posiciones del bróker ${invertido}`);
+    if (!casiIgual(cap.efectivo, cuenta.efectivo, 1e-9, 1e-6)) fallar(`${cuando}: capital.efectivo ${cap.efectivo} ≠ efectivo del bróker ${cuenta.efectivo}`);
+    if (!casiIgual(cap.invertido + cap.efectivo, cap.patrimonio, 1e-9, 1e-6)) fallar(`${cuando}: invertido + efectivo ≠ patrimonio en el capital`);
+    const sumaTipos = cap.porTipo.reduce((s, x) => s + x.importe, 0);
+    if (!casiIgual(sumaTipos, cap.invertido, 1e-9, 1e-6)) fallar(`${cuando}: Σ porTipo ${sumaTipos} ≠ invertido ${cap.invertido}`);
   };
 
   let bloqueadoDesde = null;

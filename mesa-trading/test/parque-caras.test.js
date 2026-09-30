@@ -223,4 +223,8 @@ test('«→ Marta»: a quién va un mensaje (para), y a quién contesta una resp
   // r1 contesta a la raíz: el sangrado ya lo dice. r2 contesta a Carmen (r1), no a la raíz.
   assert.equal(caras.textoPara(lista[1], agentes, porId, lista[0]), null);
   assert.equal(caras.textoPara(lista[2], agentes, porId, lista[0]), '→ Carmen');
+  // La Presidenta que decide tras su propio punto (para 'todos') no va «→ Carmen».
+  const decide = M('r3', 4, { respondeA: 'r1', hilo: 'a', de: 'cio', deNombre: 'Carmen Aguirre', para: 'todos' });
+  porId.set('r3', decide);
+  assert.equal(caras.textoPara(decide, agentes, porId, lista[0]), null);
 });

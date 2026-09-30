@@ -167,6 +167,46 @@
 .v-nota { margin: 0; font-size: 12px; color: var(--secundario); line-height: 1.5; }
 .v-grafica.mini { margin: -2px 0; }
 
+/* Agrupar las estrategias por plazo o por tipo de activo, y quedarse con un grupo. */
+.v-agrupar .v-segmentos { flex-wrap: wrap; }
+.v-chips-filtro { gap: 6px; }
+.v-chip-filtro {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 32px; padding: 0 11px; border-radius: 999px;
+  border: 1px solid var(--borde-2); background: rgba(255, 255, 255, .03);
+  color: #c7cde0; font-size: 12.5px; font-weight: 700;
+}
+.v-chip-filtro:hover { background: rgba(255, 255, 255, .07); }
+.v-chip-filtro.activo { color: #fff; background: rgba(59, 130, 246, .18); border-color: rgba(59, 130, 246, .6); }
+.v-chip-n { color: var(--secundario); font-weight: 600; font-variant-numeric: tabular-nums; }
+.v-punto { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 2px; background: var(--c, #8a93b0); }
+.v-puntos { display: inline-flex; gap: 3px; }
+.v-grupo { display: flex; flex-direction: column; gap: 8px; }
+.v-grupo + .v-grupo { margin-top: 6px; }
+.v-grupo-cab { display: flex; align-items: center; gap: 9px; padding-bottom: 6px; border-bottom: 1px solid var(--borde); }
+.v-grupo-cab h3 { margin: 0; font-size: 15px; font-weight: 800; }
+.v-grupo > .v-sub { margin: 0; }
+.v-tipo { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px 0 6px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #d9deea; background: rgba(255, 255, 255, .05); }
+/* Estudio de una mesa (las de ETF): suspendió el filtro y sigue por decisión de Eduardo. Ámbar con su icono y su texto, nunca solo el color. */
+.v-estudio { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--borde-2); background: rgba(255, 255, 255, .03); }
+.v-estudio.suspendida { border-color: rgba(245, 158, 11, .6); background: rgba(245, 158, 11, .08); }
+.v-estudio-titular { margin: 0; display: flex; align-items: flex-start; gap: 8px; font-size: 13.5px; font-weight: 750; color: #fde7b0; line-height: 1.4; }
+.v-estudio:not(.suspendida) .v-estudio-titular { color: var(--texto); }
+.v-estudio-icono { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; background: #f59e0b; color: #1a1300; font-size: 12px; font-weight: 900; }
+.v-estudio:not(.suspendida) .v-estudio-icono { background: var(--positivo); }
+.v-estudio-contexto { margin: 0; font-size: 12px; color: #c1c8dc; line-height: 1.5; }
+.v-estudio-cifras { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+/* Una fila por cifra: nombre (se parte en dos líneas si hace falta), valor, mínimo y si pasa. */
+.v-estudio-cifras li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: baseline; gap: 2px 8px; font-size: 12.5px; }
+.v-estudio-nombre { color: #d9deea; }
+/* Lo que hay que saber de una cifra del estudio (p. ej. un deflactado sin todos los ensayos): debajo, a lo ancho. */
+.v-estudio-aviso { grid-column: 1 / -1; font-size: 11.5px; line-height: 1.4; }
+.v-estudio-cifras b { font-variant-numeric: tabular-nums; color: #fff; }
+.v-estudio-cifras .v-tenue { font-size: 11.5px; }
+.v-estudio-ok { font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.v-estudio-ok.bien { color: #86efac; }
+.v-estudio-ok.mal { color: #fca5a5; }
+
 /* ---------- Noticias ---------- */
 .v-noticias { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .v-noticia { background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
@@ -253,8 +293,10 @@
   .v-rejilla { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 767px) {
-  /* La hoja de mensajes no asoma por encima de las vistas. */
+  /* La hoja de mensajes no asoma por encima de las vistas, y la franja de
+     capital (lo de ahora) deja su sitio a los informes (lo de antes). */
   .app.vistas-abiertas .lateral { display: none; }
+  .app.vistas-abiertas .capital { display: none; }
   .vistas-cab { padding: 6px 8px; }
   .vistas-pestana { padding: 0 11px; height: 36px; }
   .vistas-contenido { padding: 12px 12px 32px; gap: 12px; }

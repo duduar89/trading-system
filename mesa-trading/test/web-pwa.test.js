@@ -93,7 +93,7 @@ test('service worker: carcasa con versión, nunca /api/*, sin conexión a su pá
   vm.runInNewContext(sw, ctx);
   const pedir = (url, extra = {}) => {
     let respuesta = null;
-    oyentes.fetch({ request: { url, method: 'GET', mode: 'cors', ...extra }, respondWith: (p) => { respuesta = p; } });
+    oyentes.fetch({ request: { url, method: 'GET', mode: 'cors', ...extra }, respondWith: (p) => { respuesta = p; }, waitUntil: () => {} });
     return respuesta;
   };
   assert.equal(pedir('https://mesa.example/api/estado'), null, '/api/estado ni se toca');
@@ -103,6 +103,52 @@ test('service worker: carcasa con versión, nunca /api/*, sin conexión a su pá
   assert.equal(pedir('https://mesa.example/api/comando/kill', { method: 'POST' }), null);
   assert.ok(pedir('https://mesa.example/web/js/app.js'), 'la carcasa sí');
   assert.ok(pedir('https://mesa.example/', { mode: 'navigate' }), 'la navegación sí (red primero)');
+});
+
+test('service worker: la carcasa del panel (todo lo que enlaza index.html) se guarda entera al abrir con sesión, no sin ella', async () => {
+  const sw = leer('sw.js');
+  const lista = /const PANEL = \[([\s\S]*?)\];/.exec(sw);
+  assert.ok(lista, 'sw.js declara PANEL');
+  const panel = Array.from(lista[1].matchAll(/'([^']+)'/g), m => m[1]);
+  // Cada css y js de index.html (relativos a su <base href="/web/">) está en PANEL, y nada más.
+  const html = leer('index.html');
+  const enlazados = Array.from(html.matchAll(/<(?:script src|link rel="stylesheet" href)="([^"]+\.(?:js|css))"/g), m => `/web/${m[1]}`);
+  assert.ok(enlazados.length >= 14, `${enlazados.length}`);
+  assert.deepEqual(panel.slice().sort(), enlazados.slice().sort(), 'PANEL = lo que enlaza index.html');
+  for (const f of ['/web/js/caras.js', '/web/js/graficas.js', '/web/js/vistas.js', '/web/css/vistas.css']) assert.ok(panel.includes(f), f);
+
+  const montar = ({ ok = true, redirected = false } = {}) => {
+    const oyentes = {};
+    const guardadas = [];
+    const pedidas = [];
+    const esperas = [];
+    const cache = { match: async () => undefined, put: async (req) => { guardadas.push(typeof req === 'string' ? req : req.url); }, addAll: async () => {} };
+    const ctx = {
+      self: { location: { origin: 'https://mesa.example' }, addEventListener: (ev, fn) => { oyentes[ev] = fn; }, skipWaiting: () => {}, clients: { claim: () => {} } },
+      URL, Response: class {},
+      caches: { open: async () => cache, match: async () => null, keys: async () => [], delete: async () => true },
+      fetch: async (req) => {
+        const url = typeof req === 'string' ? req : req.url;
+        pedidas.push(url);
+        return { ok: typeof req === 'string' ? true : ok, redirected: typeof req === 'string' ? false : redirected, type: 'basic', url, clone() { return this; } };
+      },
+    };
+    vm.runInNewContext(sw, ctx);
+    const navegar = async (url) => {
+      oyentes.fetch({ request: { url, method: 'GET', mode: 'navigate' }, respondWith: () => {}, waitUntil: (p) => esperas.push(p) });
+      await Promise.all(esperas);
+    };
+    return { navegar, guardadas, pedidas };
+  };
+  const conSesion = montar();
+  await conSesion.navegar('https://mesa.example/');
+  assert.deepEqual(conSesion.guardadas.slice().sort(), panel.slice().sort(), 'con sesión, la carcasa entera');
+  const sinSesion = montar({ ok: false });   // redirección al login (opaqueredirect: ok false)
+  await sinSesion.navegar('https://mesa.example/');
+  assert.deepEqual(sinSesion.guardadas, [], 'sin sesión no se guarda nada del panel');
+  const login = montar();
+  await login.navegar('https://mesa.example/login');
+  assert.deepEqual(login.guardadas, [], 'el login no guarda el panel');
 });
 
 test('las páginas traen manifest, apple-touch-icon 180, metas de iOS y el script de la PWA', () => {

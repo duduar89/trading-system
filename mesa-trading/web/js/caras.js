@@ -392,7 +392,8 @@
     const nombres = ids.map(id => nombreDe(id) || String(id)).filter(Boolean);
     if (nombres.length) return `→ ${nombres.join(', ')}`;
     const padre = m.respondeA && porId ? porId.get(m.respondeA) : null;
-    if (padre && raiz && padre !== raiz) {
+    // Quien sigue hablando tras su propio mensaje no se contesta a sí mismo.
+    if (padre && raiz && padre !== raiz && padre.de !== m.de) {
       const n = nombreDe(padre.de) || pila(padre.deNombre);
       if (n) return `→ ${n}`;
     }

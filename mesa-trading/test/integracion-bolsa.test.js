@@ -135,3 +135,30 @@ test('sombra «sin comité» con ETF: la decisión de la noche espera a la apert
   mesasDep.procesarPendientesSombra(o);
   assert.equal(o.libros.puesto(sid).cantidad, 0);
 });
+
+test('el operador que propone espera de pie junto al Ejecutor (estado «ejecucion») hasta que su orden sale a la apertura', async () => {
+  const { orquestador: o, irA } = await montarBolsa();
+  await irA(MIE_NOCHE, false);
+  const op = 'puesto-momentum-etf-SPY';
+  const r = await o.ejecutor.ejecutar({ puestoId: 'momentum-etf-SPY', mesaId: 'momentum-etf', simbolo: 'SPY', lado: 'compra', nocional: 3000, tipo: 'apertura', motivo: 'señal', accion: 'abrir', velaT: MIE_NOCHE, stop: 480 });
+  assert.equal(r.pendiente, true, 'con la bolsa cerrada queda en cola');
+  const enCola = o.instantanea().agentes.find(a => a.id === op);
+  assert.equal(enCola.estado, 'ejecucion');
+  assert.equal(enCola.sala, 'parque', 'sigue siendo de su sala: solo se pone de pie junto al Ejecutor');
+  const apertura = o.estado.pendientes[0].enviarDesde;
+  assert.equal(enCola.bocadillo.texto, `Espero junto al Ejecutor: la compra de SPY sale cuando abra la bolsa, a las ${require('../src/util/formato').hora(apertura)}.`);
+  assert.ok(enCola.bocadillo.hasta > o.reloj.ahora());
+  // Los demás operadores siguen trabajando, y un stop de noche (no lo propuso él) no lo pone de pie.
+  assert.equal(o.instantanea().agentes.find(a => a.id === 'puesto-reversion-etf-SPY').estado, 'trabajando');
+  // Tampoco se va a descansar mientras espera.
+  assert.equal(o._esperandoOrden().has(op), true);
+  // A la apertura el Ejecutor la manda y vuelve a su sitio.
+  await irA(JUE_APERTURA, true);
+  await o.ejecutor.procesarPendientes(x => o._reevaluarPendiente(x));
+  assert.equal(o.estado.pendientes.length, 0);
+  assert.equal(o.instantanea().agentes.find(a => a.id === op).estado, 'trabajando');
+  // Con el fondo bloqueado todos de pie por el kill, no «ejecucion».
+  o.estado.pendientes = [{ puestoId: 'momentum-etf-SPY', mesaId: 'momentum-etf', simbolo: 'SPY', lado: 'compra', nocional: 1000, tipo: 'apertura', accion: 'abrir', enviarDesde: JUE_APERTURA + 86400000 }];
+  o.estado.fondo.nivel = 'bloqueado';
+  assert.equal(o.instantanea().agentes.find(a => a.id === op).estado, 'de_pie');
+});
