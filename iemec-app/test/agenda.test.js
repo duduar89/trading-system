@@ -79,7 +79,7 @@ test('agenda en la base: huecos, reserva, concurrencia, retención y cancelació
       const ret = await agenda.reservar(pool, { pacienteId: pacientes[2], tratamientoId: 'toxina-facial', fecha: '2026-10-08', hora: '13:00', retener: true, ahora: AHORA });
       const conf = await agenda.confirmar(pool, { token: ret.token, ahora: new Date(AHORA.getTime() + 5 * 60000) });
       assert.equal(conf.estado, 'confirmada');
-      const canc = await agenda.cancelar(pool, { token: ret.token, por: 'paciente', motivo: 'no puede venir' });
+      const canc = await agenda.cancelar(pool, { token: ret.token, por: 'paciente', motivo: 'no puede venir', ahora: new Date(AHORA.getTime() + 10 * 60000) });
       assert.equal(canc.estado, 'cancelada');
       assert.equal(canc.secuencia_ics, 1);
       const [[ev]] = await pool.query("SELECT COUNT(*) AS n FROM eventos WHERE entidad = 'cita' AND entidad_id = ?", [String(ret.id)]);

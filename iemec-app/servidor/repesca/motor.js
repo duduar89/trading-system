@@ -18,8 +18,8 @@ const { proponer } = require('../../motor/agenda/huecos');
 const { decidir } = require('../../motor/repesca/decidir');
 const { calcularSeguimiento } = require('../../motor/repesca/plazos');
 const { comprobarOfertaPropuesta } = require('../../motor/repesca/ofertas');
-const { revisar } = require('../../motor/repesca/filtro-legal');
-const { elegirPlantilla, rellenar } = require('../../motor/repesca/plantillas');
+const { revisar, esSensible } = require('../../motor/repesca/filtro-legal');
+const { elegirPlantilla, rellenar, BIBLIOTECA } = require('../../motor/repesca/plantillas');
 const S = require('../../motor/repesca/secuencias');
 const { combinar, textoSimulado } = require('../integraciones/ia');
 const { cifrar, descifrar } = require('../cripto');
@@ -710,12 +710,14 @@ async function procesarSeguimientos(deps, { ahora = new Date(), limite = 20 } = 
   return resultados;
 }
 
-// Cómo se nombra su tratamiento en los mensajes que salen sin que el paciente pregunte. Los de
-// publicidad restringida (medicamentos con receta, productos sanitarios) no se nombran: se habla de
-// su familia («medicina estética facial»).
+// Cómo se nombra su tratamiento en los mensajes que salen sin que el paciente pregunte. Lo íntimo
+// (ginecoestética, sexualidad masculina, pérdida de peso o lo que marque la clínica) no se nombra, ni
+// por su familia: es un dato de salud y se lee en la pantalla bloqueada. Los de publicidad
+// restringida (medicamentos con receta, productos sanitarios) tampoco: se habla de su familia
+// («medicina estética facial»).
 async function nombreTratamiento(q, conv) {
   const t = (await cargarContexto(q, conv, new Date())).tratamiento;
-  if (!t) return 'tu tratamiento';
+  if (!t || esSensible(t)) return 'tu tratamiento';
   if (t.publicidad_restringida || t.regimen_legal === 'medicamento_receta') {
     const [[f]] = await q.query('SELECT nombre FROM familias WHERE codigo = ?', [t.familia]);
     return f ? enMinuscula(f.nombre) : 'tu tratamiento';
@@ -775,8 +777,16 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
       await avanzar({ tarea: paso.tarea });
       continue;
     }
-    const p = elegirPlantilla(paso.uso, plantillas);
-    const comercial = p?.categoria === 'marketing';
+    // Hay pasos que dicen una cosa u otra según cómo acabó su cita (a quien no vino no se le dice que
+    // canceló).
+    let uso = paso.uso;
+    if (paso.usoSegunCita && ins.cita_id) {
+      const [[cita]] = await pool.query('SELECT estado FROM citas WHERE id = ?', [ins.cita_id]);
+      uso = S.usoDelPaso(paso, cita?.estado);
+    }
+    const p = elegirPlantilla(uso, plantillas);
+    // Sin plantilla aprobada cuenta la de la biblioteca: la baja y el consentimiento se miran igual.
+    const comercial = (p || BIBLIOTECA.find((b) => b.uso === uso))?.categoria === 'marketing';
     if (comercial) {
       const permiso = await permisoComercial(pool, ins, ahora);
       if (!permiso.ok) {
@@ -791,7 +801,9 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
       }
     }
     if (!p) {
-      await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, vence_en) VALUES ('otro', ?, ?, ?)", [`Falta plantilla aprobada para «${paso.uso}»`, ins.paciente_id, new Date(ahora.getTime() + 3600000)]);
+      // Mientras Meta no apruebe la plantilla, le escribe o le llama una persona.
+      await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, vence_en) VALUES ('llamar', ?, ?, ?)",
+        [`${S.SECUENCIAS[ins.secuencia].nombre}: aún no hay plantilla aprobada («${uso}»), escribirle o llamarle a mano`, ins.paciente_id, new Date(ahora.getTime() + 3600000)]);
       await avanzar({ fallido: 'sin plantilla' });
       continue;
     }
@@ -808,13 +820,14 @@ async function avanzarSecuencias(deps, { ahora = new Date(), limite = 20 } = {})
     }
     const nombre = await nombreDe(pool, ins);
     const variables = [nombre, await nombreTratamiento(pool, conv)].slice(0, (p.cuerpo.match(/\{\{\d+\}\}/g) || []).length);
-    // Última red: un mensaje comercial no sale si, ya relleno, no pasa el filtro de publicidad
-    // sanitaria (la baja ya se comprobó al aprobar la plantilla; aquí cuenta lo que ponen las
-    // variables). Lo escribe una persona desde su conversación.
-    if (comercial && !revisar(rellenar(p, variables), { tipo: 'marketing', tieneBaja: true }).ok) {
+    // Última red: lo que ponen las variables de contenido (el tratamiento) tiene que pasar el filtro
+    // de publicidad sanitaria. La plantilla ya lo pasó al aprobarla y el nombre del paciente no se
+    // mira (a una Milagros no se le bloquea nada). Si no pasa, lo escribe una persona desde su
+    // conversación; no es una queja del paciente, así que la conversación no pasa a «espera persona».
+    const contenido = variables.slice(1).join(' ');
+    if (comercial && contenido && !revisar(contenido, { tipo: 'marketing', tieneBaja: true }).ok) {
       await pool.query("INSERT INTO tareas (tipo, titulo, paciente_id, conversacion_id, vence_en) VALUES ('revisar_ia', ?, ?, ?, ?)",
-        [`El mensaje «${paso.uso}» no pasa el filtro de publicidad sanitaria: escribir a mano`, ins.paciente_id, conv.id, new Date(ahora.getTime() + 3600000)]);
-      await pool.query("UPDATE conversaciones SET estado = 'espera_persona' WHERE id = ?", [conv.id]);
+        [`El mensaje «${uso}» no pasa el filtro de publicidad sanitaria: escribir a mano`, ins.paciente_id, conv.id, new Date(ahora.getTime() + 3600000)]);
       await avanzar({ bloqueado: 'filtro legal' });
       continue;
     }
@@ -880,5 +893,5 @@ async function sinProximoPaso(q, ahora = new Date()) {
 
 module.exports = {
   textoHuecos, textoDia, procesarEntrante, procesarSeguimientos, avanzarSecuencias, inscribir, sinProximoPaso, enviar, historial,
-  calendarioDesdeBd, cargarContexto, conversacionPara, datosCita, plantillasBd, enMinuscula,
+  calendarioDesdeBd, cargarContexto, conversacionPara, datosCita, plantillasBd, enMinuscula, nombreTratamiento, permisoComercial,
 };

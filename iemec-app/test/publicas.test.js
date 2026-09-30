@@ -1,10 +1,13 @@
 'use strict';
-// La cita que le llega al paciente: página, .ics para su calendario, confirmar y cancelar.
+// La cita que le llega al paciente: página, .ics para su calendario, confirmar y cancelar (solo antes
+// de que empiece: después, la página dice lo que toca y recepción marca «No vino»).
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const express = require('express');
 const { prepararBdDePrueba } = require('./ayuda-bd');
 const { crearApp } = require('../servidor/index');
 const agenda = require('../servidor/agenda');
+const T = require('../motor/tiempo');
 
 async function conServidor(app, fn) {
   const s = app.listen(0);
@@ -26,7 +29,12 @@ test('la cita del paciente, de WhatsApp a su calendario', async (t) => {
     const [p] = await pool.query("INSERT INTO pacientes (nombre, telefono) VALUES ('Laura', '+34611000200')");
     const cita = await agenda.reservar(pool, { pacienteId: p.insertId, tratamientoId: 'valoracion-facial', fecha: '2026-10-06', hora: '17:00', retener: false, ahora: new Date('2026-09-29T08:00:00Z') });
 
-    await conServidor(crearApp({ pool }), async (base) => {
+    // La app entera, con un reloj que el paciente no puede tocar (req.ahora solo lo pone el servidor).
+    const reloj = { ahora: new Date('2026-10-01T08:00:00Z') };
+    const app = express();
+    app.use((req, _res, next) => { req.ahora = reloj.ahora; next(); });
+    app.use(crearApp({ pool }));
+    await conServidor(app, async (base) => {
       const pag = await fetch(`${base}/c/${cita.token}`);
       assert.equal(pag.status, 200);
       const html = await pag.text();
@@ -57,6 +65,28 @@ test('la cita del paciente, de WhatsApp a su calendario', async (t) => {
       const r = await fetch(`${base}/r/abcdefghijklmnopqrstuv`, { redirect: 'manual' });
       assert.equal(r.status, 302);
       assert.equal(r.headers.get('location'), 'https://search.google.com/local/writereview?placeid=ChIJiemec');
+
+      // Una vez empezada, ni cancelar ni calendario: si no vino, que no convierta la falta en una
+      // cancelación suya (recepción la marca como «No vino» y se le ofrece otro hueco).
+      const otra = await agenda.reservar(pool, { pacienteId: p.insertId, tratamientoId: 'valoracion-facial', fecha: '2026-10-07', hora: '17:00', ahora: new Date('2026-09-29T08:00:00Z') });
+      reloj.ahora = T.desdeMadrid('2026-10-07', '17:10');
+      const empezada = await (await fetch(`${base}/c/${otra.token}`)).text();
+      assert.doesNotMatch(empezada, /Cancelar la cita|Añadir a mi calendario/);
+      assert.match(empezada, /Esta cita ya ha empezado/);
+      reloj.ahora = T.desdeMadrid('2026-10-07', '17:40');
+      const tarde = await (await fetch(`${base}/c/${otra.token}/cancelar`, { method: 'POST' })).text();
+      assert.match(tarde, /La cita ya ha empezado: desde aquí ya no se puede cancelar/);
+      const [[sigue]] = await pool.query('SELECT estado FROM citas WHERE id = ?', [otra.id]);
+      assert.equal(sigue.estado, 'confirmada');
+      await agenda.cambiarEstado(pool, { id: otra.id, a: 'no_presentada', actor: 'recepcion@iemec', ahora: reloj.ahora });
+      const noVino = await (await fetch(`${base}/c/${otra.token}`)).text();
+      assert.match(noVino, /Te echamos de menos en esta cita/);
+      assert.match(noVino, /Buscar otro hueco por WhatsApp/);
+      assert.doesNotMatch(noVino, /Cancelar la cita|Añadir a mi calendario/);
+      await agenda.cambiarEstado(pool, { id: otra.id, a: 'completada', actor: 'recepcion@iemec', ahora: reloj.ahora });
+      const hecha = await (await fetch(`${base}/c/${otra.token}`)).text();
+      assert.match(hecha, /¡Gracias por venir!/);
+      assert.doesNotMatch(hecha, /Cancelar la cita|Te echamos de menos/);
     });
   } finally {
     await pool.end();

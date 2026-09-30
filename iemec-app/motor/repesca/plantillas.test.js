@@ -13,9 +13,20 @@ test('toda la biblioteca de partida pasa el formato de Meta y el filtro legal', 
 test('la biblioteca cubre todos los usos de la repesca y de la agenda', () => {
   const usos = new Set(P.BIBLIOTECA.map((p) => p.uso));
   for (const u of ['cita_confirmacion', 'cita_recordatorio_24h', 'cita_cancelada', 'hueco_liberado', 'lead_primer_contacto', 'lead_sin_cita',
-    'cancelacion_recuperar', 'presupuesto_2d', 'presupuesto_7d', 'presupuesto_21d', 'como_quedamos', 'toca_repetir', 'paciente_dormido', 'vale_regalo', 'resena']) {
+    'cancelacion_recuperar', 'no_vino_recuperar', 'presupuesto_2d', 'presupuesto_7d', 'presupuesto_21d', 'como_quedamos', 'toca_repetir', 'paciente_dormido', 'vale_regalo', 'resena']) {
     assert.ok(usos.has(u), `falta ${u}`);
   }
+});
+
+test('lo que sale solo tras una cita no nombra el tratamiento ni dice lo que no ha pasado', () => {
+  const de = (uso) => P.BIBLIOTECA.find((p) => p.uso === uso);
+  // «No vino» y «toca repetir» llegan también a quien solo es cliente: sin {{2}} (el tratamiento).
+  for (const uso of ['no_vino_recuperar', 'toca_repetir']) assert.deepEqual(P.variablesDe(de(uso).cuerpo), [1], uso);
+  assert.doesNotMatch(de('no_vino_recuperar').cuerpo, /cancel/i, 'a quien no vino no se le dice que canceló');
+  assert.doesNotMatch(de('toca_repetir').cuerpo, /meses|semanas|años/i, 'los hay que se repiten cada mes');
+  assert.doesNotMatch(de('resena').cuerpo, /\bhoy\b/i, 'la de una cita de tarde sale al día siguiente');
+  assert.equal(P.rellenar(de('no_vino_recuperar'), ['Milagros']),
+    'Hola Milagros, te echamos de menos en tu última cita en IEMEC. ¿Te buscamos otro momento que te venga mejor? Si no quieres recibir más mensajes como este, responde BAJA.');
 });
 
 test('las de marketing llevan la baja y las de repesca, los tres botones', () => {

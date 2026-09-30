@@ -97,7 +97,9 @@ export default function Agenda() {
       : d.profesionales.filter((p) => p.turnos.length).map((p) => ({ id: p.id, nombre: p.nombre, color: p.color, citas: d.citas.filter((c) => c.profesionalId === p.id), bloqueos: p.pausas, turnos: p.turnos, flotantes: p.comidasFlotantes }));
   }, [d, vista]);
 
-  if (error) return <Error texto={error} />;
+  // Si falla una de las recargas, la agenda que ya se ve (y la cita abierta) se queda: el error va
+  // encima. Si lo que falla es otro día, no se deja a la vista el que había.
+  if (error && d?.fecha !== fecha) return <Error texto={error} />;
   const desde = d?.abierto?.length ? Math.min(...d.abierto.map((a) => a.desde)) - 30 : 600;
   const hasta = d?.abierto?.length ? Math.max(...d.abierto.map((a) => a.hasta)) + 30 : 1230;
   const horas = [];
@@ -119,6 +121,7 @@ export default function Agenda() {
           ))}
         </div>
       </Cabecera>
+      {error && d && <div className="mb-4"><Error texto={`No se ha podido actualizar la agenda (${error}). Se vuelve a intentar sola.`} /></div>}
       {d?.festivo && <Vacio titulo="Festivo: la clínica no abre">No se ofrecen huecos a los pacientes este día.</Vacio>}
       {d && !d.festivo && <ResumenDia citas={d.citas} />}
       {d && !d.festivo && (
@@ -211,13 +214,19 @@ function resumen(r) {
       `Deshecho: la cita vuelve a «${r.etiqueta}».`,
       a.resena?.anuladas ? 'La petición de reseña queda anulada.' : '',
       a.resena?.yaEnviada ? 'La petición de reseña ya había salido.' : '',
+      a.resenaOtraCita?.estado === 'programada' ? `Se le pedirá la opinión por su otra cita ${cuando(a.resenaOtraCita.cuando)}.` : '',
       a.secuencia === 'toca_repetir' ? 'Ya no se le avisará para repetir.' : '',
       a.secuencia === 'cancelacion' ? 'Ya no se le escribirá para recuperar la cita.' : '',
+      a.tarea ? 'La tarea de llamarle queda cancelada.' : '',
+      a.recuperacion?.inscripciones ? 'Vuelve a quedar pendiente escribirle para recuperar la cita.' : '',
+      a.recuperacion?.tarea ? 'Vuelve a quedar pendiente llamarle para recuperar la cita.' : '',
     ].filter(Boolean).join(' ');
   }
   const e = r.efectos || {};
   return [
     `Marcada como «${r.etiqueta}».`,
+    e.recuperacion?.inscripciones?.length ? 'Ya no se le escribirá para recuperar la cita.' : '',
+    e.recuperacion?.tarea ? 'La tarea de llamarle queda cancelada.' : '',
     e.resena?.estado === 'programada' ? `Le pediremos su opinión ${cuando(e.resena.cuando)}.` : '',
     e.resena?.estado === 'omitida' ? `No se le pide reseña: ${e.resena.motivo}.` : '',
     e.resena?.error ? `No se pudo programar la reseña: ${e.resena.error}.` : '',
@@ -225,6 +234,7 @@ function resumen(r) {
     e.tocaRepetir?.omitido ? `No se le avisa para repetir: ${e.tocaRepetir.omitido}.` : '',
     e.recuperar?.inscripcion ? `Le escribiremos para buscarle otro hueco ${cuando(e.recuperar.primerMensaje)}.` : '',
     e.recuperar?.omitido ? `No se le escribe para recuperarla: ${e.recuperar.omitido}.` : '',
+    e.recuperar?.tarea ? 'Queda una tarea para llamarle y buscarle otro hueco.' : '',
     e.tocaRepetir?.error || e.recuperar?.error ? `No se pudo programar el mensaje: ${e.tocaRepetir?.error || e.recuperar?.error}.` : '',
   ].filter(Boolean).join(' ');
 }
@@ -337,7 +347,7 @@ function DetalleCita({ id, alCerrar, alCambiar }) {
                   <Boton key={a} variante={i === 0 ? 'lleno' : 'contorno'} disabled={ocupado} onClick={() => cambiar({ estado: a })}>{BOTON[a]}</Boton>
                 ))}
                 {d.deshacer && (
-                  <Boton disabled={ocupado} onClick={() => cambiar({ deshacer: true })} aria-describedby="cita-deshacer">Deshacer «{d.deshacer.de}»</Boton>
+                  <Boton disabled={ocupado} onClick={() => cambiar({ deshacer: d.estado })} aria-describedby="cita-deshacer">Deshacer «{d.deshacer.de}»</Boton>
                 )}
               </div>
             ) : !d.espera && <p className="mt-2 text-sm" style={suave}>{nadaQueMarcar(d)}</p>}

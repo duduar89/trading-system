@@ -9,10 +9,10 @@ const { comprobarPlantilla } = require('../../motor/repesca/plantillas');
 const R = require('../../motor/resenas/resenas');
 const { ideasDelMes } = require('../../motor/resenas/publicaciones');
 const agenda = require('../agenda');
-const estados = require('../estados-cita');
 const repesca = require('../repesca/motor');
 const resenasSrv = require('../resenas');
 const { registrar } = require('../eventos');
+const estados = require('../estados-cita');
 
 const madrid = (d) => (d ? T.partesMadrid(new Date(d)) : null);
 const envolver = (fn) => (req, res, next) => fn(req, res).catch(next);
@@ -40,7 +40,7 @@ function rutasPanel({ pool, deps = null }) {
     const inicioMes = T.desdeMadrid(`${hoy.slice(0, 8)}01`, '00:00');
     const [recuperadas] = await q(
       `SELECT COUNT(*) AS n, COALESCE(SUM(t.precio_eur), 0) AS euros FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id
-        WHERE c.creado_en >= ? AND c.origen = 'ia_whatsapp' AND c.estado NOT IN ('cancelada','no_presentada')`, [inicioMes]);
+        WHERE c.creado_en >= ? AND c.origen = 'ia_whatsapp' AND c.estado NOT IN ('cancelada','reprogramada','retenida','no_presentada')`, [inicioMes]);
     const sinPaso = await repesca.sinProximoPaso(p(), ahora);
     res.json({
       fecha: hoy,
@@ -88,6 +88,35 @@ function rutasPanel({ pool, deps = null }) {
     res.json(await agenda.huecos(p(), { fecha: String(req.query.fecha), tratamientoId: String(req.query.tratamiento), ahora: req.ahora || new Date() }));
   }));
 
+  // ── La cita que abre recepción: detalle y estado (ha llegado, completada, no vino, deshacer) ─
+  const idCita = (req) => (/^\d{1,10}$/.test(req.params.id) ? Number(req.params.id) : null);
+  r.get('/citas/:id', envolver(async (req, res) => {
+    const d = idCita(req) && await estados.detalle(p(), idCita(req), { ahora: req.ahora || new Date() });
+    if (!d) return res.status(404).json({ error: 'No existe esa cita' });
+    res.json(d);
+  }));
+
+  // Cuerpo: { estado: 'llegada' | 'completada' | 'no_presentada' } o { deshacer: el estado que se ve }
+  // (así un «Deshacer» repetido, o desde una vista vieja, no deshace también el cambio de antes).
+  r.post('/citas/:id/estado', envolver(async (req, res) => {
+    const id = idCita(req);
+    if (!id) return res.status(404).json({ error: 'No existe esa cita', codigo: 'CITA_DESCONOCIDA' });
+    const ahora = req.ahora || new Date();
+    const actor = req.usuario?.email || 'panel';
+    let cita;
+    try {
+      cita = req.body?.deshacer !== undefined
+        ? await estados.deshacer(p(), { id, de: req.body.deshacer, actor, ahora })
+        : await estados.marcar(p(), { id, estado: String(req.body?.estado || ''), actor, ahora });
+    } catch (err) {
+      if (err.codigo === 'CITA_DESCONOCIDA') return res.status(404).json({ error: err.message, codigo: err.codigo });
+      if (err.codigo === 'ESTADO_DESCONOCIDO') return res.status(400).json({ error: err.message, codigo: err.codigo });
+      if (err.codigo) return res.status(409).json({ error: err.message, codigo: err.codigo });
+      throw err;
+    }
+    res.json({ ...(await estados.detalle(p(), id, { ahora })), efectos: cita.efectos || null, anulado: cita.anulado || null });
+  }));
+
   r.post('/citas', envolver(async (req, res) => {
     const b = req.body || {};
     try {
@@ -97,34 +126,6 @@ function rutasPanel({ pool, deps = null }) {
       if (err.codigo) return res.status(409).json({ error: err.message, codigo: err.codigo });
       throw err;
     }
-  }));
-
-  // ── La cita que abre recepción: detalle y estado (ha llegado, completada, no vino, deshacer) ─
-  const idCita = (req) => (/^\d{1,10}$/.test(req.params.id) ? Number(req.params.id) : null);
-  r.get('/citas/:id', envolver(async (req, res) => {
-    const d = idCita(req) && await estados.detalle(p(), idCita(req), { ahora: req.ahora || new Date() });
-    if (!d) return res.status(404).json({ error: 'No existe esa cita' });
-    res.json(d);
-  }));
-
-  // Cuerpo: { estado: 'llegada' | 'completada' | 'no_presentada' } o { deshacer: true }.
-  r.post('/citas/:id/estado', envolver(async (req, res) => {
-    const id = idCita(req);
-    if (!id) return res.status(404).json({ error: 'No existe esa cita', codigo: 'CITA_DESCONOCIDA' });
-    const ahora = req.ahora || new Date();
-    const actor = req.usuario?.email || 'panel';
-    let cita;
-    try {
-      cita = req.body?.deshacer
-        ? await estados.deshacer(p(), { id, actor, ahora })
-        : await estados.marcar(p(), { id, estado: String(req.body?.estado || ''), actor, ahora });
-    } catch (err) {
-      if (err.codigo === 'CITA_DESCONOCIDA') return res.status(404).json({ error: err.message, codigo: err.codigo });
-      if (err.codigo === 'ESTADO_DESCONOCIDO') return res.status(400).json({ error: err.message, codigo: err.codigo });
-      if (err.codigo) return res.status(409).json({ error: err.message, codigo: err.codigo });
-      throw err;
-    }
-    res.json({ ...(await estados.detalle(p(), id, { ahora })), efectos: cita.efectos || null, anulado: cita.anulado || null });
   }));
 
   // ── Bandeja de conversaciones ────────────────────────────────────────────────────────────

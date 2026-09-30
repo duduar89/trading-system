@@ -25,15 +25,19 @@ const ESTA = {
 
 // Para cada estado de destino: desde qué estados se llega, cuándo se puede (en hora de Madrid), qué
 // columna guarda el momento y si recepción lo puede deshacer.
+//   antes_de_inicio  antes de la hora de inicio: una cita empezada ya no se cancela ni se cambia de
+//                    día (lo que toca es «Ha llegado», «Completada» o «No vino»)
 //   dia_de_la_cita   solo el día de la cita
 //   desde_inicio     desde la hora de inicio
 //   pasado_inicio    pasada la hora de inicio
+// Si se marcó «No vino» y al final vino (llegó tarde o se marcó antes de tiempo), se marca su llegada
+// o se completa, aunque ya no se pueda deshacer: se para lo que se programó para recuperarla.
 const TRANSICIONES = {
   confirmada: { desde: ['retenida', 'confirmada'], columna: 'confirmada_en' },
-  cancelada: { desde: ['retenida', 'confirmada'], columna: 'cancelada_en' },
-  reprogramada: { desde: ['retenida', 'confirmada'] }, // la cita vieja, al pasarla a otro día
-  llegada: { desde: ['confirmada'], cuando: 'dia_de_la_cita', columna: 'llegada_en', deshacible: true },
-  completada: { desde: ['llegada', 'en_curso', 'confirmada'], cuando: 'desde_inicio', columna: 'completada_en', deshacible: true },
+  cancelada: { desde: ['retenida', 'confirmada'], cuando: 'antes_de_inicio', columna: 'cancelada_en' },
+  reprogramada: { desde: ['retenida', 'confirmada'], cuando: 'antes_de_inicio' }, // la cita vieja, al pasarla a otro día
+  llegada: { desde: ['confirmada', 'no_presentada'], cuando: 'dia_de_la_cita', columna: 'llegada_en', deshacible: true },
+  completada: { desde: ['llegada', 'en_curso', 'confirmada', 'no_presentada'], cuando: 'desde_inicio', columna: 'completada_en', deshacible: true },
   no_presentada: { desde: ['confirmada'], cuando: 'pasado_inicio', columna: 'no_presentada_en', deshacible: true },
 };
 
@@ -74,10 +78,13 @@ function comprobarCambio(cita, a, ahora = new Date(), { de = null } = {}) {
     return no('RETENCION_CADUCADA', 'El hueco se ha liberado: hay que elegir otro');
   }
   const inicio = new Date(cita.inicio);
+  if (regla.cuando === 'antes_de_inicio' && ahora >= inicio) {
+    return no('FUERA_DE_HORA', 'La cita ya ha empezado: ya no se puede cancelar ni cambiar de día');
+  }
   if (regla.cuando === 'dia_de_la_cita' && T.fechaMadrid(ahora) !== T.fechaMadrid(inicio)) {
     return no('FUERA_DE_HORA', ahora < inicio
       ? `Aún no es el día de la cita (el ${diaDe(inicio)}): la llegada se marca ese día`
-      : 'La llegada se marca el mismo día de la cita; ahora se puede marcar como completada o «No vino»');
+      : `La llegada se marca el mismo día de la cita; ahora se puede marcar como completada${cita.estado === 'no_presentada' ? '' : ' o «No vino»'}`);
   }
   if (regla.cuando === 'desde_inicio' && ahora < inicio) {
     return no('FUERA_DE_HORA', `Aún no ha empezado: se puede marcar como completada desde las ${horaDe(inicio)}`);

@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { prepararBdDePrueba } = require('./ayuda-bd');
 const { semillar } = require('../servidor/semillas');
 const agenda = require('../servidor/agenda');
+const { BIBLIOTECA } = require('../motor/repesca/plantillas');
 
 test('las semillas de la clínica cargan y se pueden repetir sin duplicar', async (t) => {
   const pool = await prepararBdDePrueba(t);
@@ -18,7 +19,7 @@ test('las semillas de la clínica cargan y se pueden repetir sin duplicar', asyn
     const [[n]] = await pool.query('SELECT (SELECT COUNT(*) FROM salas) AS salas, (SELECT COUNT(*) FROM profesionales) AS profs, (SELECT COUNT(*) FROM plantillas) AS plantillas, (SELECT COUNT(*) FROM ofertas WHERE activa) AS ofertas_activas');
     assert.equal(Number(n.salas), 7);
     assert.equal(Number(n.profs), 10);
-    assert.equal(Number(n.plantillas), 17);
+    assert.equal(Number(n.plantillas), BIBLIOTECA.length, 'cada plantilla de la biblioteca, una vez');
     assert.equal(Number(n.ofertas_activas), 0, 'las ofertas llegan desactivadas: las decide la clínica');
     const [[pl]] = await pool.query("SELECT COUNT(*) AS n FROM plantillas WHERE estado <> 'borrador'");
     assert.equal(Number(pl.n), 0, 'ninguna plantilla se da por aprobada sin Meta');

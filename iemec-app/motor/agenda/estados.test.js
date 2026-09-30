@@ -22,6 +22,16 @@ test('«Ha llegado»: de confirmada a llegada, solo el día de la cita', () => {
   assert.equal(E.comprobarCambio(cita('llegada'), 'llegada', en('12:00')).mensaje, 'La cita ya está marcada como «Ha llegado»');
 });
 
+test('se marcó «No vino» y al final vino: se marca su llegada ese día o se completa, aunque ya no se pueda deshacer', () => {
+  const noVino = cita('no_presentada', { estado_anterior: 'confirmada', estado_cambiado_en: en('12:02') });
+  assert.equal(E.comprobarDeshacer(noVino, en('12:40')).codigo, 'DESHACER_CADUCADO');
+  assert.equal(E.comprobarCambio(noVino, 'llegada', en('12:40')).ok, true);
+  assert.equal(E.comprobarCambio(noVino, 'completada', en('13:40')).ok, true);
+  assert.equal(E.comprobarCambio(noVino, 'completada', en('10:00', '2026-10-08')).ok, true, 'días después, completada sí');
+  assert.equal(E.comprobarCambio(noVino, 'llegada', en('10:00', '2026-10-08')).mensaje,
+    'La llegada se marca el mismo día de la cita; ahora se puede marcar como completada');
+});
+
 test('«Completada»: desde llegada, en curso o confirmada, y solo desde la hora de inicio', () => {
   for (const de of ['llegada', 'en_curso', 'confirmada']) {
     assert.equal(E.comprobarCambio(cita(de), 'completada', en('12:00')).ok, true, de);
@@ -30,7 +40,7 @@ test('«Completada»: desde llegada, en curso o confirmada, y solo desde la hora
   assert.equal(pronto.codigo, 'FUERA_DE_HORA');
   assert.equal(pronto.mensaje, 'Aún no ha empezado: se puede marcar como completada desde las 12:00');
   assert.equal(E.comprobarCambio(cita('confirmada'), 'completada', en('18:00', '2026-10-09')).ok, true, 'días después, también');
-  assert.equal(E.comprobarCambio(cita('no_presentada'), 'completada', en('13:00')).codigo, 'ESTADO_NO_VALIDO');
+  assert.equal(E.comprobarCambio(cita('no_presentada'), 'completada', en('11:59')).codigo, 'FUERA_DE_HORA');
   assert.equal(E.comprobarCambio(cita('cancelada'), 'completada', en('13:00')).mensaje, 'La cita está cancelada: no se puede marcar como «Completada»');
   assert.equal(E.comprobarCambio(cita('retenida'), 'completada', en('13:00')).codigo, 'ESTADO_NO_VALIDO');
 });
@@ -50,9 +60,19 @@ test('confirmar y cancelar siguen igual con la tabla (y una retención caducada 
   const caducada = cita('retenida', { retenida_hasta: en('08:55') });
   assert.equal(E.comprobarCambio(caducada, 'confirmada', en('09:00')).codigo, 'RETENCION_CADUCADA');
   assert.equal(E.comprobarCambio(cita('confirmada'), 'cancelada', en('09:00')).ok, true);
+  assert.equal(E.comprobarCambio(cita('confirmada'), 'cancelada', en('11:59')).ok, true, 'hasta el último minuto');
   assert.equal(E.comprobarCambio(cita('completada'), 'cancelada', en('14:00')).codigo, 'ESTADO_NO_VALIDO', 'lo hecho no se cancela');
   assert.equal(E.comprobarCambio(cita('retenida'), 'confirmada', en('09:00'), { de: ['confirmada'] }).codigo, 'ESTADO_NO_VALIDO', '«de» restringe la tabla');
   assert.equal(E.comprobarCambio(cita('confirmada'), 'volando', en('09:00')).codigo, 'ESTADO_DESCONOCIDO');
+});
+
+test('una cita empezada ya no se cancela ni se cambia de día: es «Ha llegado», «Completada» o «No vino»', () => {
+  for (const [ahora, que] of [[en('12:00'), 'a la hora justa'], [en('12:40'), 'sin venir'], [en('10:00', '2026-10-08'), 'días después']]) {
+    const r = E.comprobarCambio(cita('confirmada'), 'cancelada', ahora);
+    assert.deepEqual([r.codigo, r.mensaje], ['FUERA_DE_HORA', 'La cita ya ha empezado: ya no se puede cancelar ni cambiar de día'], que);
+    assert.equal(E.comprobarCambio(cita('confirmada'), 'reprogramada', ahora).codigo, 'FUERA_DE_HORA', que);
+  }
+  assert.equal(E.comprobarCambio(cita('confirmada'), 'no_presentada', en('12:40')).ok, true, 'lo que sí se puede es marcar «No vino»');
 });
 
 test('los botones que tocan según el estado y la hora', () => {
@@ -63,7 +83,9 @@ test('los botones que tocan según el estado y la hora', () => {
   assert.deepEqual(E.accionesPosibles(cita('confirmada'), en('10:00', '2026-10-05')), []);
   assert.deepEqual(E.accionesPosibles(cita('llegada'), en('11:50')), []);
   assert.deepEqual(E.accionesPosibles(cita('llegada'), en('12:00')), ['completada']);
-  for (const e of ['retenida', 'completada', 'no_presentada', 'cancelada']) assert.deepEqual(E.accionesPosibles(cita(e), en('12:30')), [], e);
+  assert.deepEqual(E.accionesPosibles(cita('no_presentada'), en('12:30')), ['llegada', 'completada'], 'al final vino');
+  assert.deepEqual(E.accionesPosibles(cita('no_presentada'), en('10:00', '2026-10-07')), ['completada']);
+  for (const e of ['retenida', 'completada', 'cancelada']) assert.deepEqual(E.accionesPosibles(cita(e), en('12:30')), [], e);
 });
 
 test('«Deshacer»: vuelve al estado anterior durante 30 minutos, y solo lo que marca recepción', () => {

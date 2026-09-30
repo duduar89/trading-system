@@ -202,15 +202,20 @@ async function ultimoCambio(con, citaId, estado) {
  * «Deshacer»: la cita vuelve al estado anterior si su último cambio se puede deshacer y aún no ha
  * pasado el rato (motor/agenda/estados.js). Si el estado al que vuelve también se marcó hace poco
  * (la llegada antes de «Completada»), se podrá deshacer a su vez.
- * @param {object} p id, actor, ahora, alDeshacer? (con, cita, { deshecho, efectos }) → anula lo que
- *   movió ese cambio (los efectos se leen del evento que lo anotó)
+ * @param {object} p id, de? (el estado que ve quien deshace: si la cita ya no está así, por un
+ *   reintento, otra pestaña u otra persona, no se deshace nada), actor, ahora,
+ *   alDeshacer? (con, cita, { deshecho, efectos }) → anula lo que movió ese cambio (los efectos se
+ *   leen del evento que lo anotó)
  */
-async function deshacerEstado(pool, { id, actor = 'sistema', ahora = new Date(), alDeshacer = null }) {
+async function deshacerEstado(pool, { id, de = null, actor = 'sistema', ahora = new Date(), alDeshacer = null }) {
   const con = await pool.getConnection();
   try {
     await con.beginTransaction();
     const [[cita]] = await con.query('SELECT * FROM citas WHERE id = ? FOR UPDATE', [id]);
     if (!cita) throw new ErrorAgenda('CITA_DESCONOCIDA', 'No existe esa cita');
+    if (de && cita.estado !== de) {
+      throw new ErrorAgenda('ESTADO_CAMBIADO', `La cita ya no está como «${E.ETIQUETA[de] || de}» (ahora: «${E.ETIQUETA[cita.estado] || cita.estado}»): no se ha deshecho nada`);
+    }
     const vale = E.comprobarDeshacer(cita, ahora);
     if (!vale.ok) throw new ErrorAgenda(vale.codigo, vale.mensaje);
     const deshecho = await ultimoCambio(con, cita.id, cita.estado);
@@ -244,4 +249,4 @@ async function caducarRetenciones(pool, ahora = new Date()) {
   return r.affectedRows;
 }
 
-module.exports = { huecos, proximosHuecos, reservar, cambiarEstado, deshacerEstado, confirmar, cancelar, caducarRetenciones, cargarDia, ErrorAgenda };
+module.exports = { huecos, proximosHuecos, reservar, cambiarEstado, deshacerEstado, ultimoCambio, confirmar, cancelar, caducarRetenciones, cargarDia, ErrorAgenda };
