@@ -9,8 +9,10 @@
 // (servidor/avisos-espera.js). Si dice que sí, la cita queda confirmada (y la que tenía, si era más
 // tarde, cambiada a esta); si dice que no o no contesta, el hueco vuelve a quedar libre y pasa al
 // siguiente. Un hueco guardado para alguien no se puede ofrecer a otro: la agenda ya no lo da por
-// libre. Aquí no se manda nada: solo la base y las reglas (así la repesca puede usarlo sin ciclos).
+// libre. Aquí no se manda nada: solo la base (las reglas puras, en motor/agenda/espera.js; así la
+// repesca puede usar esto sin ciclos).
 const T = require('../motor/tiempo');
+const { FRANJAS, leSirve, normalizarTelefono } = require('../motor/agenda/espera');
 const agenda = require('./agenda');
 const { registrar } = require('./eventos');
 
@@ -19,26 +21,10 @@ const ANTELACION_MIN = 120;     // un hueco que empieza en menos de 2 horas ya n
 const RECIENTES_H = 48;         // se miran las cancelaciones y cambios de las últimas 48 horas
 const MAX_SIN_CONTESTAR = 2;    // quien deja dos ofertas sin contestar sale de la lista
 const GRACIA_MIN = 60;          // un «sí» que llega tarde vale si el hueco sigue libre
-const FRANJAS = ['manana', 'tarde'];
 const { ErrorAgenda } = agenda;
 
 const fechaSql = (v) => (v == null ? null : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10));
 const esFecha = (f) => /^\d{4}-\d{2}-\d{2}$/.test(String(f || ''));
-
-// La franja que pidió («manana», «tarde» o nada = cualquiera). La tarde empieza a las 14:00.
-function encajaFranja(franjas, minutos) {
-  const lista = String(franjas || '').split(',').map((f) => f.trim()).filter((f) => FRANJAS.includes(f));
-  if (!lista.length || lista.length === FRANJAS.length) return true;
-  return lista.includes(minutos < 14 * 60 ? 'manana' : 'tarde');
-}
-
-// «611 22 33 44», «0034611223344» o «+34 611…» → «+34611223344». null si no parece un móvil.
-function normalizarTelefono(t) {
-  const limpio = String(t || '').replace(/[^\d+]/g, '').replace(/^00/, '+');
-  if (/^[6789]\d{8}$/.test(limpio)) return `+34${limpio}`;
-  if (/^34[6789]\d{8}$/.test(limpio)) return `+${limpio}`;
-  return /^\+\d{8,15}$/.test(limpio) ? limpio : null;
-}
 
 // Desde el panel se apunta a alguien por su móvil: si no tiene ficha, se le crea con su nombre.
 async function pacientePorTelefono(q, { telefono, nombre }) {
@@ -184,12 +170,9 @@ async function candidato(q, hueco, ahora = new Date()) {
     [hueco.tratamientoId, hueco.fecha, hueco.fecha, hueco.pacientes.length ? hueco.pacientes : [0], hueco.tratamientoId, hueco.inicio]);
   const minutos = T.minutosDe(hueco.hora);
   for (const le of filas) {
-    if (!encajaFranja(le.franjas, minutos)) continue;
+    // Su franja; y si ya tiene cita, solo si el hueco es antes (motor/agenda/espera.js).
     const actual = await citaActual(q, le, ahora);
-    // Con cita más tarde, se le ofrece adelantarla; con una antes, no le sirve. Lo de Treatwell se
-    // cambia en Treatwell.
-    if (actual && (new Date(actual.inicio) <= hueco.inicio || actual.origen === 'treatwell')) continue;
-    return { ...le, citaActual: actual };
+    if (leSirve({ inicio: hueco.inicio, minutos }, le, actual)) return { ...le, citaActual: actual };
   }
   return null;
 }
@@ -355,7 +338,7 @@ async function listar(q, { ahora = new Date() } = {}) {
 }
 
 module.exports = {
-  RETENCION_MIN, ANTELACION_MIN, encajaFranja, normalizarTelefono, pacientePorTelefono, citaActual, apuntar, quitar, quitarPorBaja,
+  RETENCION_MIN, ANTELACION_MIN, pacientePorTelefono, citaActual, apuntar, quitar, quitarPorBaja,
   cerrarConversacion, huecosLiberados, candidato, guardarHueco, anularOferta, ofertaParaResponder, aceptar, rechazar,
   caducarOfertas, listar,
 };
