@@ -81,7 +81,7 @@ const valor = inst.posiciones.reduce((s, p) => s + p.cantidad * p.precio, 0);
 caso('patrimonio = efectivo + Σ valor de posiciones', maqueta._interno.efectivo() + valor, maqueta._interno.patrimonio(), 1e-6);
 caso('exposición bruta = Σ valor / patrimonio', inst.cabecera.exposicionBrutaPct, valor / maqueta._interno.patrimonio(), 1e-9);
 // 25 desde el 30-sep-2026: se añade listoParaReal (el semáforo «¿Listo para dinero real?», §7).
-caso('25 campos de primer nivel en la instantánea', Object.keys(inst).length, 25);
+caso('26 campos de primer nivel en la instantánea (con actividad, §7)', Object.keys(inst).length, 26);
 caso('el semáforo trae los criterios a-g', inst.listoParaReal.criterios.map(k => k.id).join(''), 'abcdefg');
 caso('… y cuántos cumple', inst.listoParaReal.cumplidos, inst.listoParaReal.criterios.filter(k => k.ok).length);
 caso('puestos de la maqueta (3 + 6 + 2 + 3)', inst.puestos.length, 14);
