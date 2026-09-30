@@ -1,0 +1,370 @@
+{
+  "_nota": "Fotos propias de IEMEC (derechos «propia» en el inventario de iemec-clinic.com, 30-09-2026). En git solo va este fichero: las imágenes se generan con «npm run web:fotos» (WebP de 480, 960 y 1600 px, nunca más que el original) a partir de la carpeta del inventario, y están en .gitignore. «usar»: false = no se publica (defectos o pendiente de confirmar). Nunca fotos de pacientes ni de antes y después. «salidas» lo escribe web/fotos.js.",
+  "fotos": {
+    "clinica-recepcion": {
+      "origen": "fotos-origen/clinica-recepcion.png",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Recepción de IEMEC: sofá capitoné blanco, cuadro de terciopelo verde y mostrador con el logotipo",
+      "salidas": [
+        {
+          "archivo": "clinica-recepcion-480.webp",
+          "ancho": 480,
+          "alto": 480
+        },
+        {
+          "archivo": "clinica-recepcion-810.webp",
+          "ancho": 810,
+          "alto": 810
+        }
+      ]
+    },
+    "clinica-fachada": {
+      "origen": "fotos-origen/clinica-fachada.png",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Fachada de IEMEC en la avenida Siglo XXI de Boadilla del Monte",
+      "salidas": [
+        {
+          "archivo": "clinica-fachada-480.webp",
+          "ancho": 480,
+          "alto": 270
+        },
+        {
+          "archivo": "clinica-fachada-960.webp",
+          "ancho": 960,
+          "alto": 540
+        },
+        {
+          "archivo": "clinica-fachada-1440.webp",
+          "ancho": 1440,
+          "alto": 810
+        }
+      ]
+    },
+    "clinica-sala-de-procedimientos": {
+      "origen": "fotos-origen/clinica-sala-de-procedimientos.jpeg",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Sala de procedimientos de IEMEC con sillón clínico y lámparas",
+      "salidas": [
+        {
+          "archivo": "clinica-sala-de-procedimientos-480.webp",
+          "ancho": 480,
+          "alto": 270
+        },
+        {
+          "archivo": "clinica-sala-de-procedimientos-960.webp",
+          "ancho": 960,
+          "alto": 540
+        },
+        {
+          "archivo": "clinica-sala-de-procedimientos-1600.webp",
+          "ancho": 1600,
+          "alto": 900
+        }
+      ]
+    },
+    "clinica-cabina-tratamientos": {
+      "origen": "fotos-origen/clinica-cabina-tratamientos.jpeg",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Cabina de tratamientos de IEMEC con camilla y butacas",
+      "nota": "Manchas de color por la compresión de WhatsApp: repetir la foto.",
+      "salidas": [
+        {
+          "archivo": "clinica-cabina-tratamientos-480.webp",
+          "ancho": 480,
+          "alto": 360
+        },
+        {
+          "archivo": "clinica-cabina-tratamientos-960.webp",
+          "ancho": 960,
+          "alto": 720
+        },
+        {
+          "archivo": "clinica-cabina-tratamientos-1024.webp",
+          "ancho": 1024,
+          "alto": 768
+        }
+      ]
+    },
+    "clinica-consulta": {
+      "origen": "fotos-origen/clinica-consulta.jpg",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Consulta de IEMEC con mesa blanca y butacas de terciopelo turquesa",
+      "nota": "Vertical y con manchas de color: repetir la foto.",
+      "salidas": [
+        {
+          "archivo": "clinica-consulta-480.webp",
+          "ancho": 480,
+          "alto": 1040
+        },
+        {
+          "archivo": "clinica-consulta-554.webp",
+          "ancho": 554,
+          "alto": 1200
+        }
+      ]
+    },
+    "clinica-recepcion-panoramica": {
+      "origen": "fotos-origen/clinica-recepcion-panoramica.jpg",
+      "derechos": "propia",
+      "usar": false,
+      "alt": "Recepción y sala de espera de IEMEC",
+      "nota": "Manchas de color por la compresión de WhatsApp."
+    },
+    "clinica-sala-de-espera": {
+      "origen": "fotos-origen/clinica-sala-de-espera.jpeg",
+      "derechos": "propia",
+      "usar": false,
+      "alt": "Rincón de espera de IEMEC junto al ventanal",
+      "nota": "Bandas de color: retocar o repetir."
+    },
+    "equipo-maribel-perea": {
+      "origen": "fotos-origen/equipo-maribel-perea.png",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Retrato de la Dra. Maribel Perea Casado",
+      "salidas": [
+        {
+          "archivo": "equipo-maribel-perea-480.webp",
+          "ancho": 480,
+          "alto": 480
+        },
+        {
+          "archivo": "equipo-maribel-perea-810.webp",
+          "ancho": 810,
+          "alto": 810
+        }
+      ]
+    },
+    "equipo-paola-ranilla": {
+      "origen": "fotos-origen/equipo-paola-ranilla.png",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Retrato de Paola Ranilla",
+      "salidas": [
+        {
+          "archivo": "equipo-paola-ranilla-480.webp",
+          "ancho": 480,
+          "alto": 480
+        },
+        {
+          "archivo": "equipo-paola-ranilla-960.webp",
+          "ancho": 960,
+          "alto": 960
+        },
+        {
+          "archivo": "equipo-paola-ranilla-1000.webp",
+          "ancho": 1000,
+          "alto": 1000
+        }
+      ]
+    },
+    "equipo-luisa-alenar": {
+      "origen": "fotos-origen/equipo-luisa-alenar.png",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Retrato de la Dra. Luisa Aleñar",
+      "salidas": [
+        {
+          "archivo": "equipo-luisa-alenar-480.webp",
+          "ancho": 480,
+          "alto": 480
+        },
+        {
+          "archivo": "equipo-luisa-alenar-810.webp",
+          "ancho": 810,
+          "alto": 810
+        }
+      ]
+    },
+    "equipo-paula-vicent": {
+      "origen": "fotos-origen/equipo-paula-vicent.png",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Retrato de Paula Vicent Valverde",
+      "salidas": [
+        {
+          "archivo": "equipo-paula-vicent-480.webp",
+          "ancho": 480,
+          "alto": 480
+        },
+        {
+          "archivo": "equipo-paula-vicent-960.webp",
+          "ancho": 960,
+          "alto": 960
+        },
+        {
+          "archivo": "equipo-paula-vicent-1000.webp",
+          "ancho": 1000,
+          "alto": 1000
+        }
+      ]
+    },
+    "equipo-marco-vricella-480": {
+      "origen": "fotos-origen/equipo-marco-vricella-480.webp",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Retrato del Dr. Marco Vricella",
+      "nota": "Solo hay miniatura de 480 px: pedir un retrato nuevo.",
+      "salidas": [
+        {
+          "archivo": "equipo-marco-vricella-480-480.webp",
+          "ancho": 480,
+          "alto": 480
+        }
+      ]
+    },
+    "equipo-alfonso-navarro": {
+      "origen": "fotos-origen/equipo-alfonso-navarro.png",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Retrato de Alfonso Navarro Ramírez",
+      "salidas": [
+        {
+          "archivo": "equipo-alfonso-navarro-480.webp",
+          "ancho": 480,
+          "alto": 480
+        },
+        {
+          "archivo": "equipo-alfonso-navarro-960.webp",
+          "ancho": 960,
+          "alto": 960
+        },
+        {
+          "archivo": "equipo-alfonso-navarro-1000.webp",
+          "ancho": 1000,
+          "alto": 1000
+        }
+      ]
+    },
+    "equipo-gonzalo-orallo": {
+      "origen": "fotos-origen/equipo-gonzalo-orallo.png",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Retrato del Dr. Gonzalo Orallo",
+      "salidas": [
+        {
+          "archivo": "equipo-gonzalo-orallo-480.webp",
+          "ancho": 480,
+          "alto": 480
+        },
+        {
+          "archivo": "equipo-gonzalo-orallo-960.webp",
+          "ancho": 960,
+          "alto": 960
+        },
+        {
+          "archivo": "equipo-gonzalo-orallo-1080.webp",
+          "ancho": 1080,
+          "alto": 1080
+        }
+      ]
+    },
+    "equipo-marcela-pedraza-confirmar": {
+      "origen": "fotos-origen/equipo-marcela-pedraza-confirmar.png",
+      "derechos": "propia",
+      "usar": false,
+      "alt": "Retrato de la Dra. Marcela Pedraza",
+      "nota": "Su texto alternativo en la web actual dice «María Cerrato»: no se usa hasta que la clínica confirme quién es."
+    },
+    "vale-regalo-fisico-estuches": {
+      "origen": "fotos-origen/vale-regalo-fisico-estuches.jpeg",
+      "derechos": "propia",
+      "usar": true,
+      "alt": "Estuches blanco y negro de las tarjetas regalo de IEMEC",
+      "salidas": [
+        {
+          "archivo": "vale-regalo-fisico-estuches-480.webp",
+          "ancho": 480,
+          "alto": 360
+        },
+        {
+          "archivo": "vale-regalo-fisico-estuches-960.webp",
+          "ancho": 960,
+          "alto": 720
+        },
+        {
+          "archivo": "vale-regalo-fisico-estuches-1600.webp",
+          "ancho": 1600,
+          "alto": 1200
+        }
+      ]
+    },
+    "vale-regalo-fisico-caja": {
+      "origen": "fotos-origen/vale-regalo-fisico-caja.jpeg",
+      "derechos": "propia",
+      "usar": false,
+      "alt": "Caja negra con el logotipo de IEMEC"
+    },
+    "vale-regalo-fisico-cheque": {
+      "origen": "fotos-origen/vale-regalo-fisico-cheque.jpeg",
+      "derechos": "propia",
+      "usar": false,
+      "alt": "Tarjeta regalo impresa dentro de su caja"
+    },
+    "vale-regalo-fisico-interior": {
+      "origen": "fotos-origen/vale-regalo-fisico-interior.jpeg",
+      "derechos": "propia",
+      "usar": false,
+      "alt": "Interior de la caja de la tarjeta regalo"
+    },
+    "iemec-logotipo-completo-turquesa-810": {
+      "origen": "fotos-origen/iemec-logotipo-completo-turquesa-810.png",
+      "derechos": "propia",
+      "usar": true,
+      "logotipo": true,
+      "anchos": [
+        240,
+        480
+      ],
+      "alt": "IEMEC · Instituto Europeo de Medicina Estética y Capilar",
+      "nota": "Solo existe en PNG turquesa: pedir el vectorial (SVG o AI) para hacer la versión clara y la oscura.",
+      "salidas": [
+        {
+          "archivo": "iemec-logotipo-completo-turquesa-810-240.webp",
+          "ancho": 240,
+          "alto": 58
+        },
+        {
+          "archivo": "iemec-logotipo-completo-turquesa-810-480.webp",
+          "ancho": 480,
+          "alto": 117
+        }
+      ]
+    },
+    "iemec-isotipo-e-turquesa-810": {
+      "origen": "fotos-origen/iemec-isotipo-e-turquesa-810.png",
+      "derechos": "propia",
+      "usar": false,
+      "alt": "Isotipo de IEMEC",
+      "nota": "El favicon lo dibuja el generador en SVG con los colores nuevos."
+    },
+    "iemec-logotipo-completo-turquesa-300": {
+      "origen": "fotos-origen/iemec-logotipo-completo-turquesa-300.png",
+      "derechos": "propia",
+      "usar": false,
+      "alt": "IEMEC"
+    },
+    "iemec-logotipo-palabra-turquesa-300": {
+      "origen": "fotos-origen/iemec-logotipo-palabra-turquesa-300.png",
+      "derechos": "propia",
+      "usar": false,
+      "alt": "IEMEC"
+    }
+  },
+  "og": {
+    "archivo": "og-iemec.jpg",
+    "ancho": 1200,
+    "alto": 630,
+    "alt": "IEMEC, medicina estética y capilar en Boadilla del Monte"
+  },
+  "icono": {
+    "archivo": "icono-180.png",
+    "ancho": 180,
+    "alto": 180
+  }
+}

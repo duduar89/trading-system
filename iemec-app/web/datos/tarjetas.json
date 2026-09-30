@@ -1,0 +1,20 @@
+{
+  "_nota": "Tarjetas regalo de la web actual (45, 70, 140 y 250 €, y el vale físico en estuche). Se piden por WhatsApp con el importe escrito; el pago online queda pendiente (hoy lo cobra la tienda de SITE123). normas.md (e): producto de la clínica para estética y bienestar o pago a cuenta, nunca ligado a un medicamento o producto sanitario ni presentado como descuento.",
+  "importes": [45, 70, 140, 250],
+  "catalogo": "tarjeta-regalo-online",
+  "estuche": {
+    "texto": "También en estuche: la tarjeta impresa en una caja negra o blanca con el logotipo de IEMEC, para entregarla en mano.",
+    "foto": "vale-regalo-fisico-estuches"
+  },
+  "para_que": "Sirven para tratamientos de estética y bienestar, como un facial de cabina, un masaje o un head spa, o como pago a cuenta en la clínica.",
+  "condiciones": [
+    "Validez de 6 meses desde la fecha en que se emite.",
+    "Se canjean en IEMEC, en Boadilla del Monte, y la cita depende de la disponibilidad de la agenda.",
+    "No se cambian por dinero.",
+    "No se usan para tratamientos con medicamentos o productos sanitarios como obsequio ni con ventajas de precio."
+  ],
+  "condiciones_pendiente": "condiciones de compra (forma de pago, desistimiento de 14 días y confirmación del pedido) que revise el abogado; hoy la tienda de SITE123 dice que no se devuelve el saldo que no se use",
+  "antiguas": "¿Te regalaron una tarjeta en la web anterior? Sigue valiendo durante sus 6 meses. Escríbenos por WhatsApp con el nombre de quien te la regaló y la fecha, y te damos cita.",
+  "antiguas_pendiente": "cómo se comprueban las tarjetas ya vendidas, que no llevan código único",
+  "pago_pendiente": "pago online de las tarjetas (hoy lo cobra la tienda de SITE123, que desaparece con la web nueva)"
+}

@@ -1,0 +1,85 @@
+{
+  "_nota": "Equipo publicado hoy en iemec-clinic.com/nosotros, con las biografías reescritas sin medicamentos, marcas ni superlativos (normas.md). «especialista» solo con título oficial. «foto»: clave de web/fotos/fotos.json (si no hay foto, sale un monograma). «requiere_especialidad» o «requiere_catalogo»: la persona solo sale si esa especialidad o esos tratamientos tienen página publicada (lo que la autorización CS17886 no cubre todavía no se anuncia).",
+  "responsable_pendiente": "responsable asistencial (dirección médica): nombre, titulación, colegio y número de colegiado",
+  "personas": [
+    {
+      "codigo": "maribel-perea",
+      "nombre": "Dra. Maribel Perea Casado",
+      "cargo": "Medicina estética",
+      "bio": "Médica dedicada a la medicina estética facial: armonización del rostro, calidad de la piel y prevención del envejecimiento.",
+      "areas": ["medicina-estetica-facial"],
+      "foto": "equipo-maribel-perea",
+      "pendiente": "titulación, formación y n.º de colegiada"
+    },
+    {
+      "codigo": "paola-ranilla",
+      "nombre": "Paola Ranilla",
+      "cargo": "Medicina estética",
+      "bio": "Máster en Medicina Estética y Antienvejecimiento por la Universidad Complutense de Madrid, con más de diez años de experiencia. Trabaja la armonización facial, los tratamientos regenerativos y el láser médico en rostro y cuerpo.",
+      "areas": ["medicina-estetica-facial", "medicina-estetica-corporal"],
+      "foto": "equipo-paola-ranilla",
+      "pendiente": "profesión y título («Dra.»), y n.º de colegiada"
+    },
+    {
+      "codigo": "luisa-alenar",
+      "nombre": "Dra. Luisa Aleñar",
+      "cargo": "Medicina estética",
+      "bio": "Licenciada en Medicina, con máster en Medicina Estética y formación en nutrigenómica. Se ocupa de tratamientos corporales y de rejuvenecimiento.",
+      "areas": ["medicina-estetica-corporal", "medicina-estetica-facial"],
+      "foto": "equipo-luisa-alenar",
+      "pendiente": "n.º de colegiada y retrato nuevo en alta resolución"
+    },
+    {
+      "codigo": "marcela-pedraza",
+      "nombre": "Dra. Marcela Pedraza",
+      "cargo": "Medicina estética",
+      "bio": "Más de quince años de experiencia en medicina estética facial y corporal. Trabaja la armonización facial, la bioestimulación y otros procedimientos mínimamente invasivos, con planes personalizados.",
+      "areas": ["medicina-estetica-facial"],
+      "foto": null,
+      "pendiente": "titulación, n.º de colegiada y retrato (la foto de la web actual lleva el nombre de otra persona)"
+    },
+    {
+      "codigo": "paula-vicent",
+      "nombre": "Paula Vicent Valverde",
+      "cargo": "Medicina y cirugía capilar",
+      "bio": "Estudia cada caso de forma individual, explica con detalle el diagnóstico, los objetivos y lo que se puede esperar, y adapta el tratamiento a cada persona.",
+      "areas": ["medicina-capilar", "cirugia-capilar"],
+      "foto": "equipo-paula-vicent",
+      "pendiente": "profesión, título y, si procede, n.º de colegiada"
+    },
+    {
+      "codigo": "marco-vricella",
+      "nombre": "Dr. Marco Vricella",
+      "cargo": "Cirugía plástica, reparadora y estética",
+      "bio": "Médico con la especialidad de Cirugía Plástica, Reparadora y Estética por la Universidad Católica del Sagrado Corazón de Roma (1992), con más de treinta años de experiencia.",
+      "areas": ["cirugia-estetica"],
+      "foto": "equipo-marco-vricella-480",
+      "pendiente": "reconocimiento del título de especialista en España, n.º de colegiado y retrato en alta resolución"
+    },
+    {
+      "codigo": "alfonso-navarro",
+      "nombre": "Alfonso Navarro Ramírez",
+      "cargo": "Estética íntima femenina",
+      "bio": "Atiende la consulta de estética íntima femenina: cirugía íntima y tratamientos de la zona íntima externa.",
+      "areas": ["ginecologia-estetica"],
+      "requiere_especialidad": "ginecologia-estetica",
+      "foto": "equipo-alfonso-navarro",
+      "pendiente": "profesión, especialidad oficial («Dr.») y n.º de colegiado"
+    },
+    {
+      "codigo": "gonzalo-orallo",
+      "nombre": "Dr. Gonzalo Orallo",
+      "cargo": "Flebología y linfología",
+      "bio": "Médico cirujano con formación en flebología y linfología. Miembro de la Sociedad Argentina de Flebología y Linfología.",
+      "areas": ["medicina-estetica-corporal"],
+      "requiere_catalogo": ["varices-ecoesclerosis", "laser-vascular-piernas"],
+      "foto": "equipo-gonzalo-orallo",
+      "pendiente": "homologación o reconocimiento del título en España y n.º de colegiado"
+    }
+  ],
+  "estetica": {
+    "nombre": "Equipo de estética",
+    "texto": "Faciales de cabina, masajes, aparatología corporal y head spa.",
+    "pendiente": "nombres y titulación del equipo de estética y de enfermería"
+  }
+}

@@ -1,0 +1,806 @@
+{
+ "_nota": "Generado por web/construir.js: la app traduce la «ref. web-…» de cada WhatsApp y de cada formulario a su tratamiento (id del catálogo), su página y su especialidad. Las páginas de lo íntimo y del peso llevan un código en vez del slug.",
+ "referencias": {
+  "web-abdominoplastia": {
+   "catalogo": "abdominoplastia",
+   "pagina": "/cirugia-estetica/abdominoplastia/",
+   "especialidad": "cirugia-estetica",
+   "ids": [
+    "abdominoplastia"
+   ]
+  },
+  "web-accesibilidad": {
+   "catalogo": null,
+   "pagina": "/accesibilidad/",
+   "especialidad": null
+  },
+  "web-arrugas-de-expresion": {
+   "catalogo": "toxina-botulinica-facial",
+   "pagina": "/medicina-estetica-facial/arrugas-de-expresion/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "toxina-botulinica-facial",
+    "toxina-botulinica-cuello"
+   ]
+  },
+  "web-arrugas-del-labio-superior": {
+   "catalogo": "codigo-barras-ah",
+   "pagina": "/medicina-estetica-facial/arrugas-del-labio-superior/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "codigo-barras-ah"
+   ]
+  },
+  "web-aumento-de-gluteos": {
+   "catalogo": "aumento-gluteos-ah",
+   "pagina": "/medicina-estetica-corporal/aumento-de-gluteos/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "aumento-gluteos-ah"
+   ]
+  },
+  "web-aumento-de-pecho": {
+   "catalogo": "aumento-pecho",
+   "pagina": "/cirugia-estetica/aumento-de-pecho/",
+   "especialidad": "cirugia-estetica",
+   "ids": [
+    "aumento-pecho"
+   ]
+  },
+  "web-aumento-y-perfilado-de-labios": {
+   "catalogo": "aumento-labios-ah",
+   "pagina": "/medicina-estetica-facial/aumento-y-perfilado-de-labios/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "aumento-labios-ah",
+    "perfilado-labios-ah",
+    "hidratacion-labios-ah"
+   ]
+  },
+  "web-aviso-legal": {
+   "catalogo": null,
+   "pagina": "/aviso-legal/",
+   "especialidad": null
+  },
+  "web-bb-glow": {
+   "catalogo": "bb-glow",
+   "pagina": "/medicina-estetica-facial/bb-glow/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "bb-glow"
+   ]
+  },
+  "web-bb-lips": {
+   "catalogo": "bb-lips",
+   "pagina": "/medicina-estetica-facial/bb-lips/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "bb-lips"
+   ]
+  },
+  "web-bioestimulacion-facial": {
+   "catalogo": "inductor-colageno",
+   "pagina": "/medicina-estetica-facial/bioestimulacion-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "inductor-colageno"
+   ]
+  },
+  "web-blefaroplastia": {
+   "catalogo": "blefaroplastia-quirurgica",
+   "pagina": "/cirugia-estetica/blefaroplastia/",
+   "especialidad": "cirugia-estetica",
+   "ids": [
+    "blefaroplastia-quirurgica"
+   ]
+  },
+  "web-caida-del-cabello": {
+   "catalogo": "prp-capilar",
+   "pagina": "/medicina-capilar/caida-del-cabello/",
+   "especialidad": "medicina-capilar",
+   "ids": [
+    "prp-capilar",
+    "mesoterapia-capilar",
+    "recuperacion-capilar-sin-injerto",
+    "hair-filler"
+   ]
+  },
+  "web-carboxiterapia": {
+   "catalogo": "carboxiterapia",
+   "pagina": "/medicina-estetica-corporal/carboxiterapia/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "carboxiterapia"
+   ]
+  },
+  "web-cicatrices-del-cuero-cabelludo": {
+   "catalogo": "cicatrices-capilares",
+   "pagina": "/cirugia-capilar/cicatrices-del-cuero-cabelludo/",
+   "especialidad": "cirugia-capilar",
+   "ids": [
+    "cicatrices-capilares"
+   ]
+  },
+  "web-cirugia-capilar": {
+   "catalogo": null,
+   "pagina": "/cirugia-capilar/",
+   "especialidad": "cirugia-capilar"
+  },
+  "web-cirugia-estetica": {
+   "catalogo": null,
+   "pagina": "/cirugia-estetica/",
+   "especialidad": "cirugia-estetica"
+  },
+  "web-clinica": {
+   "catalogo": null,
+   "pagina": "/clinica/",
+   "especialidad": null
+  },
+  "web-consulta-con-el-cirujano": {
+   "catalogo": "valoracion-cirugia-plastica",
+   "pagina": "/cirugia-estetica/consulta-con-el-cirujano/",
+   "especialidad": "cirugia-estetica",
+   "ids": [
+    "valoracion-cirugia-plastica"
+   ]
+  },
+  "web-cookies": {
+   "catalogo": null,
+   "pagina": "/cookies/",
+   "especialidad": null
+  },
+  "web-correccion-de-rellenos-previos": {
+   "catalogo": "hialuronidasa",
+   "pagina": "/medicina-estetica-facial/correccion-de-rellenos-previos/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "hialuronidasa"
+   ]
+  },
+  "web-depilacion-laser": {
+   "catalogo": "depilacion-laser",
+   "pagina": "/medicina-estetica-corporal/depilacion-laser/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "depilacion-laser",
+    "depilacion-cuerpo-completo-mujer",
+    "depilacion-cuerpo-completo-hombre"
+   ]
+  },
+  "web-diagnostico-capilar": {
+   "catalogo": "diagnostico-capilar",
+   "pagina": "/medicina-capilar/diagnostico-capilar/",
+   "especialidad": "medicina-capilar",
+   "ids": [
+    "diagnostico-capilar",
+    "trichotest"
+   ]
+  },
+  "web-diagnostico-de-lipolaser": {
+   "catalogo": "diagnostico-lipolaser",
+   "pagina": "/medicina-estetica-corporal/diagnostico-de-lipolaser/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "diagnostico-lipolaser"
+   ]
+  },
+  "web-diagnostico-facial": {
+   "catalogo": "diagnostico-facial",
+   "pagina": "/medicina-estetica-facial/diagnostico-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "diagnostico-facial"
+   ]
+  },
+  "web-drenaje-linfatico": {
+   "catalogo": "drenaje-linfatico-manual",
+   "pagina": "/medicina-estetica-corporal/drenaje-linfatico/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "drenaje-linfatico-manual"
+   ]
+  },
+  "web-elevacion-de-pecho": {
+   "catalogo": "mastopexia",
+   "pagina": "/cirugia-estetica/elevacion-de-pecho/",
+   "especialidad": "cirugia-estetica",
+   "ids": [
+    "mastopexia"
+   ]
+  },
+  "web-equipo": {
+   "catalogo": null,
+   "pagina": "/equipo/",
+   "especialidad": null
+  },
+  "web-fototerapia-led-capilar": {
+   "catalogo": "fototerapia-led-capilar",
+   "pagina": "/medicina-capilar/fototerapia-led-capilar/",
+   "especialidad": "medicina-capilar",
+   "ids": [
+    "fototerapia-led-capilar"
+   ]
+  },
+  "web-fototerapia-led-facial": {
+   "catalogo": "fototerapia-led-facial",
+   "pagina": "/medicina-estetica-facial/fototerapia-led-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "fototerapia-led-facial"
+   ]
+  },
+  "web-frontoplastia-capilar": {
+   "catalogo": "frontoplastia",
+   "pagina": "/cirugia-capilar/frontoplastia-capilar/",
+   "especialidad": "cirugia-capilar",
+   "ids": [
+    "frontoplastia"
+   ]
+  },
+  "web-ginecologia-estetica": {
+   "catalogo": null,
+   "pagina": "/ginecologia-estetica/",
+   "especialidad": "ginecologia-estetica"
+  },
+  "web-gracias": {
+   "catalogo": null,
+   "pagina": "/gracias/",
+   "especialidad": null
+  },
+  "web-head-spa": {
+   "catalogo": "head-spa-express",
+   "pagina": "/medicina-capilar/head-spa/",
+   "especialidad": "medicina-capilar",
+   "ids": [
+    "head-spa-express",
+    "head-spa-detox",
+    "head-spa-synergie",
+    "head-spa-zen-premium"
+   ]
+  },
+  "web-hidratacion-profunda-de-la-piel": {
+   "catalogo": "skinbooster-facial",
+   "pagina": "/medicina-estetica-facial/hidratacion-profunda-de-la-piel/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "skinbooster-facial",
+    "skinbooster-cuello-escote",
+    "profhilo",
+    "redensificacion-facial"
+   ]
+  },
+  "web-hifu-corporal": {
+   "catalogo": "hifu-corporal",
+   "pagina": "/medicina-estetica-corporal/hifu-corporal/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "hifu-corporal"
+   ]
+  },
+  "web-hifu-facial": {
+   "catalogo": "hifu-facial",
+   "pagina": "/medicina-estetica-facial/hifu-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "hifu-facial",
+    "valoracion-hifu"
+   ]
+  },
+  "web-hilos-tensores": {
+   "catalogo": "hilos-tensores",
+   "pagina": "/medicina-estetica-facial/hilos-tensores/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "hilos-tensores"
+   ]
+  },
+  "web-inicio": {
+   "catalogo": null,
+   "pagina": "/",
+   "especialidad": null
+  },
+  "web-injerto-capilar-fue": {
+   "catalogo": "injerto-capilar-fue",
+   "pagina": "/cirugia-capilar/injerto-capilar-fue/",
+   "especialidad": "cirugia-capilar",
+   "ids": [
+    "injerto-capilar-fue"
+   ]
+  },
+  "web-intima-f-1voghip": {
+   "catalogo": "cirugia-capuchon-clitoris",
+   "pagina": "/ginecologia-estetica/cirugia-del-capuchon-del-clitoris/",
+   "especialidad": "ginecologia-estetica",
+   "ids": [
+    "cirugia-capuchon-clitoris"
+   ]
+  },
+  "web-intima-f-6mlx46": {
+   "catalogo": "labioplastia",
+   "pagina": "/ginecologia-estetica/labioplastia/",
+   "especialidad": "ginecologia-estetica",
+   "ids": [
+    "labioplastia"
+   ]
+  },
+  "web-intima-f-uugwi2": {
+   "catalogo": "remodelacion-intima-ah",
+   "pagina": "/ginecologia-estetica/remodelacion-intima/",
+   "especialidad": "ginecologia-estetica",
+   "ids": [
+    "remodelacion-intima-ah"
+   ]
+  },
+  "web-intima-f-zqz54s": {
+   "catalogo": "blanqueamiento-intimo",
+   "pagina": "/ginecologia-estetica/aclarado-de-la-zona-intima/",
+   "especialidad": "ginecologia-estetica",
+   "ids": [
+    "blanqueamiento-intimo"
+   ]
+  },
+  "web-intima-m-jo0m9h": {
+   "catalogo": "engrosamiento-pene-ah",
+   "pagina": "/salud-sexual-masculina/engrosamiento-del-pene/",
+   "especialidad": "salud-sexual-masculina",
+   "ids": [
+    "engrosamiento-pene-ah"
+   ]
+  },
+  "web-intralipoterapia": {
+   "catalogo": "intralipoterapia",
+   "pagina": "/medicina-estetica-corporal/intralipoterapia/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "intralipoterapia"
+   ]
+  },
+  "web-limpieza-facial": {
+   "catalogo": "limpieza-facial-profunda",
+   "pagina": "/medicina-estetica-facial/limpieza-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "limpieza-facial-profunda",
+    "higiene-facial-triacidos"
+   ]
+  },
+  "web-lipofilling-de-gluteos": {
+   "catalogo": "lipofilling-gluteos",
+   "pagina": "/cirugia-estetica/lipofilling-de-gluteos/",
+   "especialidad": "cirugia-estetica",
+   "ids": [
+    "lipofilling-gluteos"
+   ]
+  },
+  "web-lipolaser": {
+   "catalogo": "lipolaser",
+   "pagina": "/medicina-estetica-corporal/lipolaser/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "lipolaser"
+   ]
+  },
+  "web-liposuccion": {
+   "catalogo": "liposuccion",
+   "pagina": "/cirugia-estetica/liposuccion/",
+   "especialidad": "cirugia-estetica",
+   "ids": [
+    "liposuccion"
+   ]
+  },
+  "web-liposuccion-de-papada": {
+   "catalogo": "liposuccion-papada",
+   "pagina": "/cirugia-estetica/liposuccion-de-papada/",
+   "especialidad": "cirugia-estetica",
+   "ids": [
+    "liposuccion-papada"
+   ]
+  },
+  "web-lipotransferencia-facial": {
+   "catalogo": "lipotransferencia-facial",
+   "pagina": "/cirugia-estetica/lipotransferencia-facial/",
+   "especialidad": "cirugia-estetica",
+   "ids": [
+    "lipotransferencia-facial"
+   ]
+  },
+  "web-lunares-y-lesiones-cutaneas": {
+   "catalogo": "plexr-lesiones-cutaneas",
+   "pagina": "/medicina-estetica-facial/lunares-y-lesiones-cutaneas/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "plexr-lesiones-cutaneas"
+   ]
+  },
+  "web-luz-pulsada-intensa-ipl": {
+   "catalogo": "ipl-facial",
+   "pagina": "/medicina-estetica-facial/luz-pulsada-intensa-ipl/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "ipl-facial"
+   ]
+  },
+  "web-maderoterapia": {
+   "catalogo": "maderoterapia",
+   "pagina": "/medicina-estetica-corporal/maderoterapia/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "maderoterapia"
+   ]
+  },
+  "web-masaje-facial": {
+   "catalogo": "gua-sha-lift",
+   "pagina": "/medicina-estetica-facial/masaje-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "gua-sha-lift",
+    "masaje-facial-kobido"
+   ]
+  },
+  "web-masaje-relajante": {
+   "catalogo": "masaje-relajante",
+   "pagina": "/medicina-estetica-corporal/masaje-relajante/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "masaje-relajante",
+    "protocolo-masaje-facial"
+   ]
+  },
+  "web-masajes-corporales": {
+   "catalogo": "masaje-anticelulitico",
+   "pagina": "/medicina-estetica-corporal/masajes-corporales/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "masaje-anticelulitico",
+    "masaje-reductor",
+    "masaje-anticelulitico-reductor-reafirmante"
+   ]
+  },
+  "web-medicina-capilar": {
+   "catalogo": null,
+   "pagina": "/medicina-capilar/",
+   "especialidad": "medicina-capilar"
+  },
+  "web-medicina-estetica-corporal": {
+   "catalogo": null,
+   "pagina": "/medicina-estetica-corporal/",
+   "especialidad": "medicina-estetica-corporal"
+  },
+  "web-medicina-estetica-facial": {
+   "catalogo": null,
+   "pagina": "/medicina-estetica-facial/",
+   "especialidad": "medicina-estetica-facial"
+  },
+  "web-mesoterapia-corporal": {
+   "catalogo": "mesoterapia-corporal",
+   "pagina": "/medicina-estetica-corporal/mesoterapia-corporal/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "mesoterapia-corporal",
+    "mesoterapia-alidya"
+   ]
+  },
+  "web-mesoterapia-facial": {
+   "catalogo": "mesoterapia-facial",
+   "pagina": "/medicina-estetica-facial/mesoterapia-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "mesoterapia-facial",
+    "mesoterapia-papada"
+   ]
+  },
+  "web-microinjerto-de-barba": {
+   "catalogo": "microinjerto-barba",
+   "pagina": "/cirugia-capilar/microinjerto-de-barba/",
+   "especialidad": "cirugia-capilar",
+   "ids": [
+    "microinjerto-barba"
+   ]
+  },
+  "web-microinjerto-de-cejas": {
+   "catalogo": "microinjerto-cejas",
+   "pagina": "/cirugia-capilar/microinjerto-de-cejas/",
+   "especialidad": "cirugia-capilar",
+   "ids": [
+    "microinjerto-cejas"
+   ]
+  },
+  "web-microneedling-capilar": {
+   "catalogo": "dermapen-capilar",
+   "pagina": "/medicina-capilar/microneedling-capilar/",
+   "especialidad": "medicina-capilar",
+   "ids": [
+    "dermapen-capilar"
+   ]
+  },
+  "web-microneedling-corporal": {
+   "catalogo": "microneedling-corporal-estrias",
+   "pagina": "/medicina-estetica-corporal/microneedling-corporal/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "microneedling-corporal-estrias",
+    "microneedling-celulitis"
+   ]
+  },
+  "web-microneedling-facial": {
+   "catalogo": "dermapen-facial",
+   "pagina": "/medicina-estetica-facial/microneedling-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "dermapen-facial",
+    "microneedling-cuello-escote",
+    "exosomas-faciales"
+   ]
+  },
+  "web-otoplastia": {
+   "catalogo": "otoplastia",
+   "pagina": "/cirugia-estetica/otoplastia/",
+   "especialidad": "cirugia-estetica",
+   "ids": [
+    "otoplastia"
+   ]
+  },
+  "web-oxigenoterapia-capilar": {
+   "catalogo": "oxigenoterapia-capilar",
+   "pagina": "/medicina-capilar/oxigenoterapia-capilar/",
+   "especialidad": "medicina-capilar",
+   "ids": [
+    "oxigenoterapia-capilar"
+   ]
+  },
+  "web-oxigenoterapia-facial": {
+   "catalogo": "oxigenoterapia-facial",
+   "pagina": "/medicina-estetica-facial/oxigenoterapia-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "oxigenoterapia-facial"
+   ]
+  },
+  "web-parpados-con-plasma": {
+   "catalogo": "plexr-blefaroplastia",
+   "pagina": "/medicina-estetica-facial/parpados-con-plasma/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "plexr-blefaroplastia"
+   ]
+  },
+  "web-pedir-cita": {
+   "catalogo": null,
+   "pagina": "/pedir-cita/",
+   "especialidad": null
+  },
+  "web-peeling-medico-corporal": {
+   "catalogo": "peeling-medico-cicatrices-estrias",
+   "pagina": "/medicina-estetica-corporal/peeling-medico-corporal/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "peeling-medico-cicatrices-estrias"
+   ]
+  },
+  "web-peeling-medico-facial": {
+   "catalogo": "peeling-medico-facial",
+   "pagina": "/medicina-estetica-facial/peeling-medico-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "peeling-medico-facial",
+    "peeling-medico-cuello-escote",
+    "peeling-periocular",
+    "peeling-bbc"
+   ]
+  },
+  "web-perdida-de-peso": {
+   "catalogo": null,
+   "pagina": "/perdida-de-peso/",
+   "especialidad": "perdida-de-peso"
+  },
+  "web-peso-14ctfn8": {
+   "catalogo": "balon-gastrico",
+   "pagina": "/perdida-de-peso/balon-gastrico/",
+   "especialidad": "perdida-de-peso",
+   "ids": [
+    "balon-gastrico"
+   ]
+  },
+  "web-peso-8qkgyo": {
+   "catalogo": "neuroline-t6",
+   "pagina": "/perdida-de-peso/neuroestimulacion-control-del-apetito/",
+   "especialidad": "perdida-de-peso",
+   "ids": [
+    "neuroline-t6"
+   ]
+  },
+  "web-presoterapia": {
+   "catalogo": "presoterapia",
+   "pagina": "/medicina-estetica-corporal/presoterapia/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "presoterapia"
+   ]
+  },
+  "web-privacidad": {
+   "catalogo": null,
+   "pagina": "/privacidad/",
+   "especialidad": null
+  },
+  "web-protocolos-con-microneedling": {
+   "catalogo": "protocolo-dermapeel-exosomas",
+   "pagina": "/medicina-estetica-facial/protocolos-con-microneedling/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "protocolo-dermapeel-exosomas",
+    "protocolo-adn-salmon-glow"
+   ]
+  },
+  "web-protocolos-faciales": {
+   "catalogo": "protocolo-pure-glow-up",
+   "pagina": "/medicina-estetica-facial/protocolos-faciales/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "protocolo-pure-glow-up",
+    "protocolo-glass-skin",
+    "protocolo-oxyglow",
+    "lifting-ah-topico"
+   ]
+  },
+  "web-radiofrecuencia-corporal": {
+   "catalogo": "radiofrecuencia-corporal",
+   "pagina": "/medicina-estetica-corporal/radiofrecuencia-corporal/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "radiofrecuencia-corporal"
+   ]
+  },
+  "web-radiofrecuencia-facial": {
+   "catalogo": "radiofrecuencia-facial",
+   "pagina": "/medicina-estetica-facial/radiofrecuencia-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "radiofrecuencia-facial",
+    "radiofrecuencia-papada"
+   ]
+  },
+  "web-reduccion-de-pecho": {
+   "catalogo": "reduccion-pecho",
+   "pagina": "/cirugia-estetica/reduccion-de-pecho/",
+   "especialidad": "cirugia-estetica",
+   "ids": [
+    "reduccion-pecho"
+   ]
+  },
+  "web-rejuvenecimiento-facial-medico": {
+   "catalogo": "prp-facial",
+   "pagina": "/medicina-estetica-facial/rejuvenecimiento-facial-medico/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "prp-facial",
+    "prp-cuello-escote"
+   ]
+  },
+  "web-relleno-de-ojeras": {
+   "catalogo": "relleno-ojeras-ah",
+   "pagina": "/medicina-estetica-facial/relleno-de-ojeras/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "relleno-ojeras-ah"
+   ]
+  },
+  "web-remodelacion-corporal": {
+   "catalogo": "tecnologia-evo-corporal",
+   "pagina": "/medicina-estetica-corporal/remodelacion-corporal/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "tecnologia-evo-corporal",
+    "protocolo-evosculpt"
+   ]
+  },
+  "web-reparacion-de-injertos-previos": {
+   "catalogo": "reparacion-trasplante-capilar",
+   "pagina": "/cirugia-capilar/reparacion-de-injertos-previos/",
+   "especialidad": "cirugia-capilar",
+   "ids": [
+    "reparacion-trasplante-capilar"
+   ]
+  },
+  "web-salud-sexual-masculina": {
+   "catalogo": null,
+   "pagina": "/salud-sexual-masculina/",
+   "especialidad": "salud-sexual-masculina"
+  },
+  "web-subcision": {
+   "catalogo": "subcision-celulitis",
+   "pagina": "/medicina-estetica-corporal/subcision/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "subcision-celulitis",
+    "subcision-cicatrices-estrias"
+   ]
+  },
+  "web-sudoracion-excesiva": {
+   "catalogo": "toxina-hiperhidrosis",
+   "pagina": "/medicina-estetica-corporal/sudoracion-excesiva/",
+   "especialidad": "medicina-estetica-corporal",
+   "ids": [
+    "toxina-hiperhidrosis"
+   ]
+  },
+  "web-tarjeta-140": {
+   "catalogo": "tarjeta-regalo-online",
+   "pagina": "/tarjetas-regalo/",
+   "especialidad": null,
+   "importe": 140
+  },
+  "web-tarjeta-250": {
+   "catalogo": "tarjeta-regalo-online",
+   "pagina": "/tarjetas-regalo/",
+   "especialidad": null,
+   "importe": 250
+  },
+  "web-tarjeta-45": {
+   "catalogo": "tarjeta-regalo-online",
+   "pagina": "/tarjetas-regalo/",
+   "especialidad": null,
+   "importe": 45
+  },
+  "web-tarjeta-70": {
+   "catalogo": "tarjeta-regalo-online",
+   "pagina": "/tarjetas-regalo/",
+   "especialidad": null,
+   "importe": 70
+  },
+  "web-tarjeta-canje": {
+   "catalogo": "tarjeta-regalo-online",
+   "pagina": "/tarjetas-regalo/",
+   "especialidad": null,
+   "canje": true
+  },
+  "web-tarjeta-regalo": {
+   "catalogo": "tarjeta-regalo-online",
+   "pagina": "/tarjetas-regalo/",
+   "especialidad": null
+  },
+  "web-tensado-facial-con-laser": {
+   "catalogo": "fotona-4d-facial",
+   "pagina": "/medicina-estetica-facial/tensado-facial-con-laser/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "fotona-4d-facial"
+   ]
+  },
+  "web-tratamiento-del-acne": {
+   "catalogo": "perfect-skin-acne",
+   "pagina": "/medicina-estetica-facial/tratamiento-del-acne/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "perfect-skin-acne",
+    "peeling-acne",
+    "acne-xebor"
+   ]
+  },
+  "web-tratamientos": {
+   "catalogo": null,
+   "pagina": "/tratamientos/",
+   "especialidad": null
+  },
+  "web-valoracion-medica": {
+   "catalogo": "valoracion-medica",
+   "pagina": "/medicina-estetica-facial/valoracion-medica/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "valoracion-medica"
+   ]
+  },
+  "web-volumen-y-contorno-facial": {
+   "catalogo": "relleno-pomulos-ah",
+   "pagina": "/medicina-estetica-facial/volumen-y-contorno-facial/",
+   "especialidad": "medicina-estetica-facial",
+   "ids": [
+    "relleno-pomulos-ah",
+    "relleno-menton-ah",
+    "marcacion-mandibular-ah",
+    "surcos-nasogenianos-ah",
+    "rinomodelacion-ah",
+    "masculinizacion-facial"
+   ]
+  }
+ }
+}

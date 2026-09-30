@@ -1,0 +1,379 @@
+{
+  "_nota": "Páginas provisionales para los tratamientos activos del catálogo que todavía no están en ningún fichero de web/contenido (ni en variantes ni en sin_pagina). Nombres y agrupación según el anexo B de normas.md: sin medicamentos ni marcas. Solo se usan los ids que ningún contenido cubre: cuando llega el texto definitivo de un grupo, sus provisionales desaparecen solas. «tipo» elige el texto genérico (medico, cirugia, estetica); los tratamientos con publicidad restringida no usan la descripción ni las preguntas del catálogo. «unir_a»: el id se suma a esa página en vez de tener una propia. «sin_pagina»: lo que no se publica hasta que la clínica lo confirme.",
+  "paginas": [
+    {
+      "slug": "valoracion-medica", "especialidad": "medicina-estetica-facial", "catalogo": ["valoracion-medica"], "tipo": "medico", "orden": 1, "destacado": true,
+      "nombre": "Primera valoración médica", "titulo": "Primera valoración médica",
+      "entradilla": "Una consulta con el médico antes de cualquier tratamiento médico: revisa tu salud, escucha lo que te preocupa y te explica las opciones.",
+      "descripcion": "Es la primera visita para cualquier tratamiento médico. El médico revisa tu salud, tus antecedentes y lo que te gustaría mejorar, y te explica las opciones que encajan contigo, con sus riesgos y el presupuesto.",
+      "preocupaciones": ["arrugas", "flacidez", "volumen-y-contorno", "calidad-de-piel"]
+    },
+    {
+      "slug": "diagnostico-facial", "especialidad": "medicina-estetica-facial", "catalogo": ["diagnostico-facial"], "tipo": "estetica", "orden": 5, "destacado": true,
+      "nombre": "Diagnóstico facial", "titulo": "Diagnóstico facial: el punto de partida",
+      "entradilla": "Un análisis de tu piel para saber qué necesita y diseñar un plan de cuidados y tratamientos a tu medida.",
+      "preocupaciones": ["calidad-de-piel", "manchas", "acne-y-poros"]
+    },
+    { "unir_a": "hifu-facial", "catalogo": ["valoracion-hifu"] },
+    { "unir_a": "microneedling-facial", "catalogo": ["exosomas-faciales"] },
+    {
+      "slug": "arrugas-de-expresion", "especialidad": "medicina-estetica-facial", "catalogo": ["toxina-botulinica-facial", "toxina-botulinica-cuello"], "tipo": "medico", "orden": 12, "destacado": true,
+      "nombre": "Arrugas de expresión", "titulo": "Arrugas de expresión: valoración médica",
+      "entradilla": "Frente, entrecejo o patas de gallo: si te preocupan las arrugas que aparecen al gesticular, empieza por una valoración médica y un plan personalizado.",
+      "problema": "Las arrugas de expresión se forman por el movimiento repetido de los músculos de la cara al gesticular. Con los años dejan de desaparecer cuando el gesto se relaja.",
+      "variantes": [
+        { "catalogo": "toxina-botulinica-facial", "nombre": "Frente, entrecejo y patas de gallo", "texto": "Las zonas por las que más se consulta." },
+        { "catalogo": "toxina-botulinica-cuello", "nombre": "Cuello", "texto": "Bandas y líneas del cuello: también empiezan por una valoración médica." }
+      ],
+      "preocupaciones": ["arrugas"]
+    },
+    {
+      "slug": "aumento-y-perfilado-de-labios", "especialidad": "medicina-estetica-facial", "catalogo": ["aumento-labios-ah", "perfilado-labios-ah", "hidratacion-labios-ah"], "tipo": "medico", "orden": 22, "destacado": true,
+      "nombre": "Aumento y perfilado de labios", "titulo": "Aumento y perfilado de labios: valoración médica",
+      "entradilla": "Para dar volumen, definir el contorno o hidratar los labios, empezamos por una valoración médica que respete tus proporciones.",
+      "problema": "Con los años, o por su forma natural, los labios pueden perder volumen, hidratación o definición del contorno. También hay pequeñas asimetrías que se pueden suavizar.",
+      "variantes": [
+        { "catalogo": "aumento-labios-ah", "nombre": "Aumento de labios", "texto": "Aporta volumen de forma progresiva y proporcionada." },
+        { "catalogo": "perfilado-labios-ah", "nombre": "Perfilado de labios", "texto": "Define el contorno y ayuda a suavizar pequeñas asimetrías." },
+        { "catalogo": "hidratacion-labios-ah", "nombre": "Hidratación de labios", "texto": "Mejora la hidratación y la textura sin buscar más volumen." }
+      ],
+      "preocupaciones": ["labios"]
+    },
+    {
+      "slug": "arrugas-del-labio-superior", "especialidad": "medicina-estetica-facial", "catalogo": ["codigo-barras-ah"], "tipo": "medico", "orden": 32,
+      "nombre": "Arrugas del labio superior", "titulo": "Arrugas del labio superior: valoración médica",
+      "entradilla": "Las líneas verticales sobre el labio superior se pueden suavizar. En la valoración te explicamos cómo y qué puedes esperar.",
+      "problema": "Son las líneas finas que aparecen sobre el labio superior con el paso del tiempo, el sol o gestos repetidos, como fruncir los labios.",
+      "preocupaciones": ["arrugas", "labios"]
+    },
+    {
+      "slug": "relleno-de-ojeras", "especialidad": "medicina-estetica-facial", "catalogo": ["relleno-ojeras-ah"], "tipo": "medico", "orden": 42,
+      "nombre": "Relleno de ojeras", "titulo": "Relleno de ojeras: valoración médica",
+      "entradilla": "Si la ojera se debe a un surco marcado bajo el ojo, se puede suavizar con un tratamiento médico. Primero valoramos el origen de tu ojera.",
+      "problema": "No todas las ojeras son iguales: unas se deben a un hundimiento bajo el ojo, otras al color de la piel o a las bolsas. Saber cuál es la tuya decide el tratamiento.",
+      "preocupaciones": ["mirada-y-ojeras"]
+    },
+    {
+      "slug": "volumen-y-contorno-facial", "especialidad": "medicina-estetica-facial", "catalogo": ["relleno-pomulos-ah", "relleno-menton-ah", "marcacion-mandibular-ah", "surcos-nasogenianos-ah", "rinomodelacion-ah", "masculinizacion-facial"], "tipo": "medico", "orden": 52, "destacado": true,
+      "nombre": "Volumen y contorno facial", "titulo": "Volumen y contorno facial: valoración médica",
+      "entradilla": "Pómulos, mentón, mandíbula, surcos o nariz: tratamientos médicos para devolver volumen y definir el contorno, siempre en proporción con tu rostro.",
+      "problema": "Con el tiempo el rostro pierde volumen y los contornos se desdibujan. Otras veces se busca proyectar o definir un rasgo. El objetivo es un resultado proporcionado y acorde con tus facciones.",
+      "variantes": [
+        { "catalogo": "relleno-pomulos-ah", "nombre": "Pómulos", "texto": "Devuelve volumen al tercio medio del rostro." },
+        { "catalogo": "relleno-menton-ah", "nombre": "Mentón", "texto": "Proyecta el mentón para equilibrar el perfil." },
+        { "catalogo": "marcacion-mandibular-ah", "nombre": "Mandíbula", "texto": "Define el borde de la mandíbula." },
+        { "catalogo": "surcos-nasogenianos-ah", "nombre": "Surcos nasogenianos", "texto": "Suaviza los pliegues que van de la nariz a las comisuras de los labios." },
+        { "catalogo": "rinomodelacion-ah", "nombre": "Rinomodelación", "texto": "Corrige pequeñas irregularidades del dorso de la nariz; no sustituye a una rinoplastia." },
+        { "catalogo": "masculinizacion-facial", "nombre": "Masculinización facial", "texto": "Marca mandíbula, mentón y pómulos para unos rasgos más masculinos." }
+      ],
+      "preocupaciones": ["volumen-y-contorno"]
+    },
+    {
+      "slug": "bioestimulacion-facial", "especialidad": "medicina-estetica-facial", "catalogo": ["inductor-colageno"], "tipo": "medico", "orden": 62,
+      "nombre": "Bioestimulación facial", "titulo": "Bioestimulación facial: valoración médica",
+      "entradilla": "Un tratamiento médico que estimula la piel para que gane firmeza y calidad de forma progresiva.",
+      "problema": "Con la edad la piel produce menos colágeno y pierde firmeza y densidad. La bioestimulación busca que la propia piel mejore poco a poco.",
+      "preocupaciones": ["flacidez", "calidad-de-piel"]
+    },
+    {
+      "slug": "rejuvenecimiento-facial-medico", "especialidad": "medicina-estetica-facial", "catalogo": ["prp-facial", "prp-cuello-escote"], "tipo": "medico", "orden": 64,
+      "nombre": "Rejuvenecimiento facial médico", "titulo": "Rejuvenecimiento facial médico: valoración",
+      "entradilla": "Un tratamiento médico para mejorar la textura, la elasticidad y el aspecto de la piel del rostro, el cuello y el escote.",
+      "problema": "Con el tiempo la piel pierde calidad: textura irregular, líneas finas y menos elasticidad. El médico valora tu piel y te propone el tratamiento que encaja contigo.",
+      "variantes": [
+        { "catalogo": "prp-facial", "nombre": "Rostro", "texto": "Textura, elasticidad y aspecto de la piel de la cara." },
+        { "catalogo": "prp-cuello-escote", "nombre": "Cuello y escote", "texto": "Una zona que suele acusar el paso del tiempo y el sol." }
+      ],
+      "preocupaciones": ["calidad-de-piel", "arrugas"]
+    },
+    {
+      "slug": "hidratacion-profunda-de-la-piel", "especialidad": "medicina-estetica-facial", "catalogo": ["skinbooster-facial", "skinbooster-cuello-escote", "profhilo", "redensificacion-facial"], "tipo": "medico", "orden": 66,
+      "nombre": "Hidratación profunda de la piel", "titulo": "Hidratación profunda con microinyecciones: valoración médica",
+      "entradilla": "Microinyecciones para mejorar la hidratación, la elasticidad y la luminosidad de la piel del rostro, el cuello y el escote.",
+      "problema": "La piel deshidratada se ve apagada, con líneas finas y menos elástica. Este tratamiento médico actúa desde dentro de la piel.",
+      "variantes": [
+        { "catalogo": "skinbooster-facial", "nombre": "Rostro", "texto": "Hidratación y luminosidad de la piel de la cara." },
+        { "catalogo": "skinbooster-cuello-escote", "nombre": "Cuello y escote", "texto": "Una zona que suele delatar la deshidratación y el sol." },
+        { "catalogo": "redensificacion-facial", "nombre": "Redensificación", "texto": "Para pieles finas que han perdido densidad y firmeza." }
+      ],
+      "preocupaciones": ["calidad-de-piel", "flacidez"]
+    },
+    {
+      "slug": "hilos-tensores", "especialidad": "medicina-estetica-facial", "catalogo": ["hilos-tensores"], "tipo": "medico", "orden": 68,
+      "nombre": "Hilos tensores", "titulo": "Hilos tensores: valoración médica",
+      "entradilla": "Hilos reabsorbibles que se colocan bajo la piel para reafirmar zonas con flacidez leve o moderada.",
+      "problema": "La flacidez del óvalo y de las mejillas es una de las consultas más habituales. En casos leves o moderados, los hilos pueden ser una opción; el médico valora si es la tuya.",
+      "preocupaciones": ["flacidez"]
+    },
+    {
+      "slug": "mesoterapia-facial", "especialidad": "medicina-estetica-facial", "catalogo": ["mesoterapia-facial", "mesoterapia-papada"], "tipo": "medico", "orden": 72,
+      "nombre": "Mesoterapia facial", "titulo": "Mesoterapia facial: valoración médica",
+      "entradilla": "Microinyecciones en la piel del rostro para mejorar su hidratación y su luminosidad, en varias sesiones.",
+      "problema": "Cuando la piel se ve apagada o deshidratada, la mesoterapia aporta activos directamente en la piel, en varias sesiones.",
+      "variantes": [
+        { "catalogo": "mesoterapia-facial", "nombre": "Rostro", "texto": "Hidratación y luminosidad de la piel de la cara." },
+        { "catalogo": "mesoterapia-papada", "nombre": "Papada", "texto": "Calidad de la piel de la zona bajo el mentón." }
+      ],
+      "preocupaciones": ["calidad-de-piel"]
+    },
+    {
+      "slug": "correccion-de-rellenos-previos", "especialidad": "medicina-estetica-facial", "catalogo": ["hialuronidasa"], "tipo": "medico", "orden": 90,
+      "nombre": "Corrección de rellenos previos", "titulo": "Corrección de rellenos previos: valoración médica",
+      "entradilla": "Si un relleno anterior no te convence o te da problemas, el médico valora si se puede corregir y cómo.",
+      "problema": "A veces un relleno queda desigual, se nota más de lo que querías o forma un bulto. En la consulta el médico estudia qué ocurre y te explica las opciones.",
+      "preocupaciones": ["volumen-y-contorno"]
+    },
+    {
+      "slug": "micropigmentacion", "especialidad": "medicina-estetica-facial", "catalogo": ["micropigmentacion"], "tipo": "estetica", "orden": 180,
+      "nombre": "Micropigmentación", "titulo": "Micropigmentación de cejas, ojos y labios",
+      "entradilla": "Pigmento semipermanente para definir las cejas, marcar el contorno de los ojos o dar color a los labios.",
+      "problema": "Para quien quiere unas cejas más definidas, un contorno de ojos marcado o más color en los labios sin maquillarse cada día.",
+      "preocupaciones": ["mirada-y-ojeras", "labios"]
+    },
+    {
+      "slug": "diagnostico-capilar", "especialidad": "medicina-capilar", "catalogo": ["diagnostico-capilar", "trichotest"], "tipo": "capilar", "orden": 1, "destacado": true,
+      "nombre": "Diagnóstico capilar", "titulo": "Diagnóstico capilar",
+      "entradilla": "El primer paso si notas caída o pérdida de densidad: estudiamos tu cuero cabelludo para saber qué está pasando y qué opciones tienes.",
+      "descripcion": "Estudiamos tu cuero cabelludo con un tricoscopio, te preguntamos por tu historia y tus hábitos y te explicamos qué está pasando y qué opciones tienes. A partir de ahí, si hace falta, te proponemos un plan.",
+      "variantes": [
+        { "catalogo": "trichotest", "nombre": "Estudio capilar personalizado", "texto": "Si se considera útil, un estudio complementario para personalizar el plan. Te lo explicamos y lo autorizas por escrito en la clínica." }
+      ],
+      "preocupaciones": ["caida-del-cabello"]
+    },
+    {
+      "slug": "caida-del-cabello", "especialidad": "medicina-capilar", "catalogo": ["prp-capilar", "mesoterapia-capilar", "recuperacion-capilar-sin-injerto", "hair-filler", "exosomas-capilares"], "tipo": "medico", "orden": 10, "destacado": true,
+      "nombre": "Caída del cabello: tratamiento médico", "titulo": "Caída del cabello: tratamiento médico tras el diagnóstico",
+      "entradilla": "Tratamiento médico de la caída del cabello, pautado tras el diagnóstico capilar y con revisiones periódicas.",
+      "problema": "La caída del cabello tiene causas distintas y cada una se trata de forma diferente. Por eso el tratamiento se decide después del diagnóstico capilar, nunca antes.",
+      "preocupaciones": ["caida-del-cabello"]
+    },
+    {
+      "slug": "microneedling-capilar", "especialidad": "medicina-capilar", "catalogo": ["dermapen-capilar"], "tipo": "medico", "orden": 20,
+      "nombre": "Microneedling capilar", "titulo": "Microneedling capilar: valoración",
+      "entradilla": "Microagujas sobre el cuero cabelludo como parte de un plan capilar, siempre después del diagnóstico.",
+      "problema": "El microneedling capilar se usa como complemento dentro de un plan para la caída del cabello; su indicación depende del diagnóstico.",
+      "preocupaciones": ["caida-del-cabello"]
+    },
+    {
+      "slug": "fototerapia-led-capilar", "especialidad": "medicina-capilar", "catalogo": ["fototerapia-led-capilar"], "tipo": "estetica", "orden": 30,
+      "nombre": "Fototerapia LED capilar", "titulo": "Fototerapia LED capilar",
+      "entradilla": "Luz LED roja e infrarroja de baja intensidad sobre el cuero cabelludo, como complemento dentro de un plan capilar.",
+      "descripcion": "Luz LED roja e infrarroja de baja intensidad sobre el cuero cabelludo. No es invasiva y se suele combinar con otros tratamientos del plan capilar.",
+      "preocupaciones": ["caida-del-cabello"]
+    },
+    {
+      "slug": "oxigenoterapia-capilar", "especialidad": "medicina-capilar", "catalogo": ["oxigenoterapia-capilar"], "tipo": "estetica", "orden": 40,
+      "nombre": "Oxigenoterapia capilar", "titulo": "Oxigenoterapia capilar",
+      "entradilla": "Oxígeno a presión con activos cosméticos para limpiar, hidratar y revitalizar el cuero cabelludo.",
+      "descripcion": "Oxígeno a presión con activos cosméticos que limpia, hidrata y revitaliza el cuero cabelludo, como cuidado o como complemento de un plan capilar.",
+      "preocupaciones": ["caida-del-cabello", "bienestar"]
+    },
+    {
+      "slug": "laser-capilar", "especialidad": "medicina-capilar", "catalogo": ["laser-capilar"], "tipo": "medico", "orden": 50,
+      "nombre": "Láser capilar", "titulo": "Láser capilar: valoración",
+      "entradilla": "Láser de baja potencia sobre el cuero cabelludo, como complemento dentro de un plan capilar.",
+      "problema": "Se usa como complemento de otros tratamientos capilares; su indicación depende del diagnóstico.",
+      "preocupaciones": ["caida-del-cabello"]
+    },
+    {
+      "slug": "head-spa", "especialidad": "medicina-capilar", "catalogo": ["head-spa-express", "head-spa-detox", "head-spa-synergie", "head-spa-zen-premium"], "tipo": "estetica", "orden": 60, "destacado": true,
+      "nombre": "Head spa", "titulo": "Head spa: rituales para el cuero cabelludo",
+      "entradilla": "Rituales de limpieza, masaje y cuidado del cuero cabelludo para desconectar y cuidar tu pelo.",
+      "descripcion": "Inspirado en los rituales japoneses: limpieza del cuero cabelludo, exfoliación, mascarilla y masaje, con agua templada, aromas y luz suave.",
+      "variantes": [
+        { "catalogo": "head-spa-express", "nombre": "Head spa express", "texto": "Champú aromático, mascarilla, lluvia de agua templada y masaje capilar." },
+        { "catalogo": "head-spa-detox", "nombre": "Head spa purificante", "texto": "Champú personalizado, exfoliación del cuero cabelludo, vapor, mascarilla y masaje craneal con aceites esenciales." },
+        { "catalogo": "head-spa-synergie", "nombre": "Head spa Synergie", "texto": "Ritual completo de limpieza, exfoliación, mascarilla, vapor y masaje, con aromaterapia, cromoterapia y masaje cervical." },
+        { "catalogo": "head-spa-zen-premium", "nombre": "Head spa Zen Premium", "texto": "Limpieza, mascarilla y masaje craneal, facial y cervical, con sonido y aromaterapia." }
+      ],
+      "preocupaciones": ["bienestar"]
+    },
+    {
+      "slug": "injerto-capilar-fue", "especialidad": "cirugia-capilar", "catalogo": ["injerto-capilar-fue"], "tipo": "cirugia", "orden": 1, "destacado": true,
+      "nombre": "Injerto capilar FUE", "titulo": "Injerto capilar FUE",
+      "entradilla": "Se extraen una a una unidades foliculares de la zona donante y se implantan en las zonas con menos densidad.",
+      "descripcion": "Se extraen una a una unidades foliculares de la zona donante, normalmente la nuca, y se implantan en las zonas con menos densidad.",
+      "preocupaciones": ["injerto", "caida-del-cabello"]
+    },
+    {
+      "slug": "microinjerto-de-cejas", "especialidad": "cirugia-capilar", "catalogo": ["microinjerto-cejas"], "tipo": "cirugia", "orden": 20, "destacado": true,
+      "nombre": "Microinjerto de cejas", "titulo": "Microinjerto de cejas",
+      "entradilla": "Folículos de tu propio pelo implantados en las cejas para darles densidad o redefinir su forma.",
+      "preocupaciones": ["injerto", "mirada-y-ojeras"]
+    },
+    {
+      "slug": "microinjerto-de-barba", "especialidad": "cirugia-capilar", "catalogo": ["microinjerto-barba"], "tipo": "cirugia", "orden": 30, "destacado": true,
+      "nombre": "Microinjerto de barba", "titulo": "Microinjerto de barba",
+      "entradilla": "Folículos de tu propio pelo implantados en la barba para darle densidad o cubrir zonas con poco pelo.",
+      "preocupaciones": ["injerto"]
+    },
+    {
+      "slug": "frontoplastia-capilar", "especialidad": "cirugia-capilar", "catalogo": ["frontoplastia"], "tipo": "cirugia", "orden": 40,
+      "nombre": "Frontoplastia capilar", "titulo": "Frontoplastia capilar: la línea frontal",
+      "entradilla": "Injerto para rediseñar la línea frontal del cabello y armonizar la frente.",
+      "preocupaciones": ["injerto"]
+    },
+    {
+      "slug": "reparacion-de-injertos-previos", "especialidad": "cirugia-capilar", "catalogo": ["reparacion-trasplante-capilar"], "tipo": "cirugia", "orden": 50,
+      "nombre": "Reparación de injertos previos", "titulo": "Reparación de injertos capilares previos",
+      "entradilla": "Corrección de injertos capilares anteriores: línea frontal, densidad o marcas.",
+      "preocupaciones": ["injerto"]
+    },
+    {
+      "slug": "cicatrices-del-cuero-cabelludo", "especialidad": "cirugia-capilar", "catalogo": ["cicatrices-capilares"], "tipo": "medico", "orden": 60,
+      "nombre": "Cicatrices del cuero cabelludo", "titulo": "Cicatrices del cuero cabelludo: valoración",
+      "entradilla": "Opciones para disimular cicatrices en el cuero cabelludo, tras una valoración.",
+      "problema": "Las cicatrices de cirugías, accidentes o quemaduras pueden dejar zonas sin pelo. En la valoración estudiamos la cicatriz y te explicamos las opciones.",
+      "preocupaciones": ["injerto"]
+    },
+    {
+      "slug": "labioplastia", "especialidad": "ginecologia-estetica", "catalogo": ["labioplastia"], "tipo": "cirugia", "orden": 10, "destacado": true, "profesional": "Médico",
+      "nombre": "Labioplastia", "titulo": "Labioplastia: cirugía de los labios menores",
+      "entradilla": "Cirugía de los labios menores, por motivos funcionales o estéticos, siempre tras una valoración médica.",
+      "problema": "Algunas mujeres sienten molestias con la ropa, el deporte o la higiene por el tamaño o la forma de los labios menores; otras quieren cambiar su aspecto. La labioplastia los reduce o los remodela.",
+      "preocupaciones": ["zona-intima"]
+    },
+    {
+      "slug": "cirugia-del-capuchon-del-clitoris", "especialidad": "ginecologia-estetica", "catalogo": ["cirugia-capuchon-clitoris"], "tipo": "cirugia", "orden": 20, "profesional": "Médico",
+      "nombre": "Cirugía del capuchón del clítoris", "titulo": "Cirugía del capuchón del clítoris",
+      "entradilla": "Cirugía ambulatoria del capuchón cuando su tamaño causa molestias o por motivos estéticos, tras una valoración médica.",
+      "problema": "Un capuchón grande puede causar molestias o no gustar por su aspecto. En la consulta el médico valora tu caso y te explica la intervención.",
+      "preocupaciones": ["zona-intima"]
+    },
+    {
+      "slug": "aclarado-de-la-zona-intima", "especialidad": "ginecologia-estetica", "catalogo": ["blanqueamiento-intimo"], "tipo": "medico", "orden": 30,
+      "nombre": "Aclarado de la zona íntima", "titulo": "Aclarado de la piel de la zona íntima externa",
+      "entradilla": "Tratamiento para unificar el tono de la piel de la zona íntima externa, con valoración médica.",
+      "problema": "Es habitual que la piel de la zona íntima externa sea más oscura que la del resto del cuerpo. Si te preocupa, en la valoración te explicamos las opciones y sus cuidados.",
+      "preocupaciones": ["zona-intima", "manchas"]
+    },
+    {
+      "slug": "remodelacion-intima", "especialidad": "ginecologia-estetica", "catalogo": ["remodelacion-intima-ah"], "tipo": "medico", "orden": 40,
+      "nombre": "Remodelación íntima", "titulo": "Remodelación íntima: valoración médica",
+      "entradilla": "Tratamiento médico de la zona íntima externa para devolver volumen o mejorar su aspecto, tras una valoración.",
+      "problema": "Con el tiempo, los cambios hormonales o los partos, la zona íntima externa puede perder volumen. Si te preocupa, el médico valora tu caso y te explica las opciones.",
+      "preocupaciones": ["zona-intima"]
+    },
+    {
+      "slug": "engrosamiento-del-pene", "especialidad": "salud-sexual-masculina", "catalogo": ["engrosamiento-pene-ah"], "tipo": "medico", "orden": 10, "destacado": true,
+      "nombre": "Engrosamiento del pene", "titulo": "Engrosamiento del pene con relleno: valoración médica",
+      "entradilla": "Un procedimiento médico de la zona íntima masculina, con valoración previa, información clara y total discreción.",
+      "problema": "Es una consulta más habitual de lo que parece. El médico valora tu caso y te explica si el tratamiento es adecuado para ti, sus riesgos y sus alternativas.",
+      "preocupaciones": ["zona-intima"]
+    },
+    {
+      "slug": "consulta-con-el-cirujano", "especialidad": "cirugia-estetica", "catalogo": ["valoracion-cirugia-plastica"], "tipo": "cirugia", "orden": 1, "destacado": true,
+      "nombre": "Consulta con el cirujano", "titulo": "Consulta de valoración con el cirujano plástico",
+      "entradilla": "El primer paso antes de cualquier cirugía: el cirujano valora tu caso, te explica las opciones y resuelve tus dudas.",
+      "descripcion": "Es la primera consulta para cualquier intervención. El cirujano escucha lo que te gustaría cambiar, te explora y te explica qué se puede hacer, cómo y con qué riesgos.",
+      "preocupaciones": ["cirugia"]
+    },
+    {
+      "slug": "aumento-de-pecho", "especialidad": "cirugia-estetica", "catalogo": ["aumento-pecho"], "tipo": "cirugia", "orden": 10, "destacado": true,
+      "nombre": "Aumento de pecho", "titulo": "Aumento de pecho: valoración con el cirujano",
+      "entradilla": "Cirugía para aumentar el volumen del pecho, mejorar su forma o corregir asimetrías.",
+      "preocupaciones": ["cirugia", "volumen-y-contorno"]
+    },
+    {
+      "slug": "elevacion-de-pecho", "especialidad": "cirugia-estetica", "catalogo": ["mastopexia"], "tipo": "cirugia", "orden": 20,
+      "nombre": "Elevación de pecho", "titulo": "Elevación de pecho (mastopexia): valoración con el cirujano",
+      "entradilla": "Cirugía para elevar y remodelar el pecho, incluida la areola.",
+      "preocupaciones": ["cirugia", "flacidez"]
+    },
+    {
+      "slug": "reduccion-de-pecho", "especialidad": "cirugia-estetica", "catalogo": ["reduccion-pecho"], "tipo": "cirugia", "orden": 30,
+      "nombre": "Reducción de pecho", "titulo": "Reducción de pecho: valoración con el cirujano",
+      "entradilla": "Cirugía para reducir y remodelar un pecho grande, por motivos estéticos o por molestias físicas.",
+      "preocupaciones": ["cirugia"]
+    },
+    {
+      "slug": "ginecomastia", "especialidad": "cirugia-estetica", "catalogo": ["ginecomastia"], "tipo": "cirugia", "orden": 40,
+      "nombre": "Ginecomastia", "titulo": "Ginecomastia: valoración con el cirujano",
+      "entradilla": "Cirugía de la mama masculina, tras una valoración con el cirujano.",
+      "problema": "El aumento del tejido mamario en el hombre es una consulta frecuente. El cirujano valora su origen y te explica si la cirugía es una opción para ti.",
+      "preocupaciones": ["cirugia"]
+    },
+    {
+      "slug": "reconstruccion-mamaria", "especialidad": "cirugia-estetica", "catalogo": ["reconstruccion-mamaria"], "tipo": "cirugia", "orden": 50,
+      "nombre": "Reconstrucción mamaria", "titulo": "Reconstrucción mamaria: valoración con el cirujano",
+      "entradilla": "Consulta con el cirujano para valorar la reconstrucción del pecho.",
+      "problema": "Cada reconstrucción es distinta y depende de tu historia. En la consulta, el cirujano valora tu caso con calma y te explica las opciones.",
+      "preocupaciones": ["cirugia"]
+    },
+    {
+      "slug": "liposuccion", "especialidad": "cirugia-estetica", "catalogo": ["liposuccion"], "tipo": "cirugia", "orden": 60, "destacado": true,
+      "nombre": "Liposucción", "titulo": "Liposucción: valoración con el cirujano",
+      "entradilla": "Cirugía para retirar depósitos de grasa localizada que no mejoran con dieta y ejercicio.",
+      "descripcion": "Cirugía para retirar depósitos de grasa localizada del abdomen, las caderas, los muslos, los brazos o la espalda. No es un método para bajar de peso.",
+      "preocupaciones": ["cirugia", "grasa-localizada"]
+    },
+    {
+      "slug": "abdominoplastia", "especialidad": "cirugia-estetica", "catalogo": ["abdominoplastia"], "tipo": "cirugia", "orden": 70,
+      "nombre": "Abdominoplastia", "titulo": "Abdominoplastia: valoración con el cirujano",
+      "entradilla": "Cirugía que retira el exceso de piel y grasa del abdomen y, si hace falta, repara la separación de los músculos.",
+      "preocupaciones": ["cirugia", "flacidez"]
+    },
+    {
+      "slug": "lipofilling-de-gluteos", "especialidad": "cirugia-estetica", "catalogo": ["lipofilling-gluteos"], "tipo": "cirugia", "orden": 80,
+      "nombre": "Lipofilling de glúteos", "titulo": "Lipofilling de glúteos: valoración con el cirujano",
+      "entradilla": "Cirugía que usa grasa de tu propio cuerpo para dar volumen y forma a los glúteos.",
+      "preocupaciones": ["cirugia", "volumen-y-contorno"]
+    },
+    {
+      "slug": "otoplastia", "especialidad": "cirugia-estetica", "catalogo": ["otoplastia"], "tipo": "cirugia", "orden": 90,
+      "nombre": "Otoplastia", "titulo": "Otoplastia: cirugía de las orejas",
+      "entradilla": "Cirugía de las orejas prominentes, separadas o asimétricas.",
+      "descripcion": "Cirugía de las orejas prominentes, separadas o asimétricas. La cicatriz suele quedar detrás de la oreja.",
+      "preocupaciones": ["cirugia"]
+    },
+    {
+      "slug": "blefaroplastia", "especialidad": "cirugia-estetica", "catalogo": ["blefaroplastia-quirurgica"], "tipo": "cirugia", "orden": 100,
+      "nombre": "Blefaroplastia", "titulo": "Blefaroplastia: cirugía de los párpados",
+      "entradilla": "Cirugía de los párpados superiores, inferiores o ambos, para retirar el exceso de piel o las bolsas.",
+      "preocupaciones": ["cirugia", "mirada-y-ojeras"]
+    },
+    {
+      "slug": "rinoplastia", "especialidad": "cirugia-estetica", "catalogo": ["rinoplastia"], "tipo": "cirugia", "orden": 110,
+      "nombre": "Rinoplastia", "titulo": "Rinoplastia: valoración con el cirujano",
+      "entradilla": "Cirugía de la nariz, tras una valoración con el cirujano.",
+      "problema": "La rinoplastia cambia la forma o el tamaño de la nariz y, a veces, mejora también la respiración. El cirujano valora tu caso y te explica qué se puede hacer.",
+      "preocupaciones": ["cirugia", "volumen-y-contorno"]
+    },
+    {
+      "slug": "lipotransferencia-facial", "especialidad": "cirugia-estetica", "catalogo": ["lipotransferencia-facial"], "tipo": "cirugia", "orden": 120,
+      "nombre": "Lipotransferencia facial", "titulo": "Lipotransferencia facial: valoración con el cirujano",
+      "entradilla": "Cirugía que usa grasa de tu propio cuerpo para devolver volumen al rostro.",
+      "preocupaciones": ["cirugia", "volumen-y-contorno"]
+    },
+    {
+      "slug": "liposuccion-de-papada", "especialidad": "cirugia-estetica", "catalogo": ["liposuccion-papada"], "tipo": "cirugia", "orden": 130,
+      "nombre": "Liposucción de papada", "titulo": "Liposucción de papada: valoración",
+      "entradilla": "Para la grasa bajo el mentón: el cirujano valora si conviene una liposucción o una opción menos invasiva.",
+      "descripcion": "Para la grasa acumulada bajo el mentón. Según tu caso, el cirujano valora si conviene una liposucción o un tratamiento menos invasivo.",
+      "preocupaciones": ["cirugia", "grasa-localizada"]
+    },
+    {
+      "slug": "bichectomia", "especialidad": "cirugia-estetica", "catalogo": ["bichectomia"], "tipo": "cirugia", "orden": 140,
+      "nombre": "Bichectomía", "titulo": "Bichectomía: valoración con el cirujano",
+      "entradilla": "Cirugía de las bolsas de grasa de las mejillas, tras una valoración con el cirujano.",
+      "problema": "La bichectomía retira parte de las bolsas de grasa de las mejillas para afinar el rostro. No es adecuada para todo el mundo: el cirujano valora si lo es para ti.",
+      "preocupaciones": ["cirugia", "volumen-y-contorno"]
+    }
+  ],
+  "sin_pagina": [
+    { "catalogo": "natulift", "motivo": "Tratamiento sin confirmar por la clínica y que puede ser un nombre comercial: sin página hasta que llegue el texto del grupo facial-medica." },
+    { "catalogo": "pack-injerto-francia", "motivo": "Mercado francés: la web nueva no tiene versión en francés y el pack lleva precio. Decide la clínica (y qué pasa con cliniquecapillaire-iemec.es)." },
+    { "catalogo": "valoracion-injerto-francia", "motivo": "Mercado francés: la web nueva no tiene versión en francés. Decide la clínica." },
+    { "catalogo": "laser-incontinencia-urinaria", "motivo": "Ginecología (U.26): la autorización CS17886 no la incluye (normas.md, apartado a). Sin página hasta que la clínica lo confirme." },
+    { "catalogo": "laser-atrofia-vaginal", "motivo": "Ginecología (U.26): la autorización CS17886 no la incluye. Sin página hasta que la clínica lo confirme." },
+    { "catalogo": "laser-hiperlaxitud-vaginal", "motivo": "Ginecología (U.26): la autorización CS17886 no la incluye. Sin página hasta que la clínica lo confirme." },
+    { "catalogo": "laser-liquen-escleroatrofico", "motivo": "Ginecología (U.26): la autorización CS17886 no la incluye. Sin página hasta que la clínica lo confirme." },
+    { "catalogo": "laser-condilomas", "motivo": "Enfermedad de transmisión sexual: no se anuncia (RD 1907/1996, art. 4.1)." },
+    { "catalogo": "radiofrecuencia-intima", "motivo": "Ginecología funcional (U.26): la autorización CS17886 no la incluye. Sin página hasta que la clínica lo confirme." },
+    { "catalogo": "prp-intimo", "motivo": "Medicamento de receta y ginecología (U.26): no se anuncia." },
+    { "catalogo": "cirugia-suelo-pelvico", "motivo": "Ginecología (U.26): la autorización CS17886 no la incluye. Sin página hasta que la clínica lo confirme." },
+    { "catalogo": "perineoplastia-apertura", "motivo": "Ginecología (U.26): cirugía funcional que la autorización CS17886 no incluye. Sin página hasta que la clínica lo confirme." },
+    { "catalogo": "perineoplastia-cierre", "motivo": "Ginecología (U.26): reparación posparto que la autorización CS17886 no incluye. Sin página hasta que la clínica lo confirme." },
+    { "catalogo": "vaginoplastia", "motivo": "Ginecología (U.26) sin confirmar y solo en Multiestetica, sin descripción. Sin página hasta que la clínica lo confirme." }
+  ]
+}

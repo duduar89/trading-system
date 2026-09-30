@@ -1,0 +1,1555 @@
+{
+ "grupo": "corporal-y-peso",
+ "paginas": [
+  {
+   "slug": "diagnostico-de-lipolaser",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "diagnostico-lipolaser"
+   ],
+   "orden": 10,
+   "destacado": false,
+   "nombre": "Diagnóstico de lipoláser",
+   "titulo": "Diagnóstico de lipoláser para la grasa localizada",
+   "titulo_seo": "Diagnóstico de lipoláser en Boadilla · IEMEC",
+   "descripcion_seo": "Consulta médica de 15 minutos para saber si el lipoláser es adecuado para tu grasa localizada. En IEMEC, en Boadilla del Monte.",
+   "entradilla": "Una consulta breve con el médico para ver la zona que te preocupa, resolver tus dudas y saber si el lipoláser encaja en tu caso antes de decidir nada.",
+   "para_quien": [
+    "Tienes grasa localizada en abdomen, flancos, muslos, brazos o papada.",
+    "Te interesa el lipoláser y quieres saber si es adecuado para ti.",
+    "Prefieres una valoración médica antes de elegir un tratamiento."
+   ],
+   "texto": [
+    "El diagnóstico de lipoláser es una consulta de 15 minutos con el médico. Sirve para ver la zona que quieres tratar, conocer tu historia de salud y valorar si el lipoláser es una opción adecuada para ti.",
+    "El lipoláser trata la grasa localizada en zonas como abdomen, flancos, muslos, brazos o papada. No es un tratamiento para perder peso, sino para mejorar el contorno de una zona concreta.",
+    "En la consulta te explicamos cómo se hace, sus riesgos, los cuidados que necesitarás y qué puedes esperar, ya que el resultado varía según cada persona. Si vemos que otra opción te conviene más, te lo decimos con claridad: la indicación final es siempre médica."
+   ],
+   "sesion": {
+    "duracion": "15 minutos",
+    "sesiones": "Una consulta",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "Sales de la consulta sabiendo si el lipoláser encaja contigo y qué alternativas tienes.",
+   "preguntas": [
+    {
+     "p": "¿Qué pasa en el diagnóstico?",
+     "r": "El médico te pregunta por tu salud, tu medicación y tus objetivos, explora la zona que quieres tratar y te explica si el lipoláser es adecuado para ti, cómo se hace y qué cuidados necesitarías después."
+    },
+    {
+     "p": "¿Me comprometo a hacerme el tratamiento?",
+     "r": "No. Es una primera valoración sin compromiso: sirve para que tengas información clara y decidas con calma. Si el lipoláser no encaja contigo, te lo diremos y te hablaremos de otras opciones de la clínica que puedan ayudarte."
+    },
+    {
+     "p": "¿El lipoláser sirve para perder peso?",
+     "r": "No. Está pensado para la grasa localizada que es difícil reducir con dieta y ejercicio, no para bajar de peso. Si lo que buscas es otra cosa, en la consulta te orientamos sobre las opciones que encajan contigo."
+    }
+   ],
+   "preocupaciones": [
+    "grasa-localizada"
+   ],
+   "relacionados": [
+    "lipolaser",
+    "intralipoterapia",
+    "remodelacion-corporal"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/lipolaser-agenda-tu-cita",
+    "https://iemec-clinic.com/corporal#lipolisis"
+   ],
+   "pendiente": [
+    "La web actual lo anuncia como «diagnóstico gratuito»: confirmar si sigue siendo gratuito y cómo decirlo (en esta versión no se publican precios).",
+    "Confirmar quién lo pasa: la página actual nombra al Dr. Javier del Monte, que no aparece en /nosotros.",
+    "La web actual solo permite reservarlo los martes, de 11:00 a 20:00, con un widget que no está conectado con la agenda: confirmar días antes de publicarlo."
+   ]
+  },
+  {
+   "slug": "lipolaser",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "lipolaser"
+   ],
+   "orden": 20,
+   "destacado": true,
+   "nombre": "Lipoláser",
+   "titulo": "Lipoláser para la grasa localizada",
+   "titulo_seo": "Lipoláser en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Lipoláser en IEMEC Boadilla: láser médico para tratar la grasa localizada de abdomen, flancos, muslos, brazos o papada, con valoración médica previa.",
+   "entradilla": "Un procedimiento médico mínimamente invasivo que trata con láser la grasa localizada y ayuda a mejorar el contorno de zonas concretas del cuerpo.",
+   "para_quien": [
+    "Tienes grasa localizada que no mejora con dieta y ejercicio.",
+    "Quieres tratar zonas como abdomen, flancos, muslos, brazos o papada.",
+    "Buscas un procedimiento mínimamente invasivo y con una recuperación corta."
+   ],
+   "texto": [
+    "El lipoláser, también llamado lipólisis láser, es un procedimiento médico mínimamente invasivo para tratar la grasa localizada. La energía del láser actúa sobre la grasa de la zona y, además, estimula la producción de colágeno en la piel.",
+    "Se usa en zonas como abdomen, flancos, muslos, brazos o papada, y lo realiza un médico en la clínica con un láser médico.",
+    "Requiere valoración médica previa: el médico revisa tu salud, explora la zona y te explica la idoneidad, los riesgos y las alternativas. Normalmente se hace en una sesión y la recuperación es corta, aunque depende de cada caso.",
+    "No es un tratamiento para perder peso. Para mantener el resultado, ayudan una alimentación equilibrada y la actividad física."
+   ],
+   "sesion": {
+    "duracion": "Unos 60 minutos",
+    "sesiones": "Normalmente una sesión",
+    "anestesia": null,
+    "recuperacion": "Corta; te indicamos cuándo retomar tu rutina y el ejercicio",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "El cambio en el contorno se aprecia de forma progresiva en las semanas siguientes y varía según la zona y cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Normalmente se hace en una sesión. En la valoración, el médico te confirma si tu caso lo permite o si conviene combinarlo con otros tratamientos corporales para trabajar también la piel."
+    },
+    {
+     "p": "¿Es lo mismo que una liposucción?",
+     "r": "No. La liposucción es una cirugía que hace un cirujano plástico en un centro autorizado. El lipoláser es un procedimiento médico mínimamente invasivo que se hace en la clínica. En la valoración te explicamos qué opción encaja con tu caso."
+    },
+    {
+     "p": "¿Sirve para perder peso?",
+     "r": "No. Está pensado para la grasa localizada que es difícil reducir con dieta y ejercicio, no para bajar de peso. Si lo que buscas es otra cosa, en la valoración te orientamos sobre las opciones que encajan contigo."
+    },
+    {
+     "p": "¿Cuándo se nota el resultado?",
+     "r": "El cambio se aprecia poco a poco, a medida que el cuerpo procesa la grasa tratada y la piel responde. Varía según la zona, tus hábitos y cada persona."
+    }
+   ],
+   "preocupaciones": [
+    "grasa-localizada"
+   ],
+   "relacionados": [
+    "diagnostico-de-lipolaser",
+    "intralipoterapia",
+    "drenaje-linfatico",
+    "remodelacion-corporal"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#lipolisis",
+    "https://iemec-clinic.com/lipolaser-agenda-tu-cita",
+    "https://iemec-clinic.com/aprende",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Confirmar anestesia, duración real, cuidados y tiempo de recuperación.",
+    "La web actual promete «elimina la grasa localizada en 1 sola sesión» y muestra antes y después en /portafolio: no se trasladan.",
+    "La marca del láser (Fotona) no se anuncia: es un equipo de uso profesional (normas.json); aquí solo se dice «láser médico»."
+   ]
+  },
+  {
+   "slug": "remodelacion-corporal",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "tecnologia-evo-corporal",
+    "protocolo-evosculpt"
+   ],
+   "orden": 30,
+   "destacado": true,
+   "nombre": "Remodelación corporal y EvoSculpt",
+   "titulo": "Remodelación corporal con aparatología y protocolo EvoSculpt",
+   "titulo_seo": "Remodelación corporal y EvoSculpt en Boadilla · IEMEC",
+   "descripcion_seo": "Remodelación corporal y protocolo EvoSculpt en IEMEC Boadilla: radiofrecuencia y vacuum para la grasa localizada, la flacidez y la celulitis.",
+   "entradilla": "Aparatología corporal no invasiva que combina radiofrecuencia y vacuum para trabajar la grasa localizada, la flacidez y la celulitis, sola o dentro del protocolo EvoSculpt.",
+   "para_quien": [
+    "Quieres mejorar el contorno de abdomen, piernas, glúteos o brazos.",
+    "Te preocupan la celulitis, la flacidez o la grasa localizada.",
+    "Notas las piernas pesadas o con retención de líquidos.",
+    "Buscas un tratamiento no invasivo."
+   ],
+   "texto": [
+    "Usamos un equipo de remodelación corporal que reúne varias técnicas de estética avanzada. Entre ellas, la radiofrecuencia, que calienta de forma controlada las capas profundas de la piel, y el vacuum, una succión suave que moviliza el tejido. Así trabaja a la vez la grasa localizada, la flacidez y la celulitis.",
+    "Antes de empezar hacemos un diagnóstico corporal para adaptar el tratamiento a tu cuerpo y a tus objetivos. Cada sesión puede centrarse en una zona o en dos.",
+    "EvoSculpt es el protocolo corporal completo de IEMEC. En una misma cita une el diagnóstico corporal, una sesión de aparatología, un masaje drenante manual y presoterapia, con asesoramiento personalizado para acompañarte durante el proceso."
+   ],
+   "sesion": {
+    "duracion": "1 hora por zona; EvoSculpt, 1 hora y 45 minutos",
+    "sesiones": "Varias, según el diagnóstico",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Sesión de aparatología",
+     "texto": "Trabaja una o dos zonas por sesión, con diagnóstico previo. Una zona dura 1 hora y dos zonas, 2 horas.",
+     "catalogo": "tecnologia-evo-corporal"
+    },
+    {
+     "nombre": "Protocolo EvoSculpt",
+     "texto": "Diagnóstico corporal, aparatología de remodelación, masaje drenante manual y presoterapia en una cita de 1 hora y 45 minutos, con asesoramiento personalizado.",
+     "catalogo": "protocolo-evosculpt"
+    }
+   ],
+   "resultados": "Muchas personas notan sensación de ligereza desde las primeras sesiones; los cambios en el contorno y en la piel se aprecian tras varias sesiones y varían según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué diferencia hay entre una sesión de aparatología y EvoSculpt?",
+     "r": "La sesión de aparatología trabaja una o dos zonas con el equipo. EvoSculpt es un protocolo más completo: añade diagnóstico corporal, masaje drenante manual, presoterapia y asesoramiento personalizado en una misma cita de 1 hora y 45 minutos."
+    },
+    {
+     "p": "¿Cuándo se notan los resultados?",
+     "r": "Muchas personas notan una sensación de ligereza desde las primeras sesiones. Los cambios en el contorno y en la textura de la piel se aprecian de forma progresiva, tras varias sesiones seguidas, y varían según cada persona."
+    },
+    {
+     "p": "¿Qué zonas se pueden tratar?",
+     "r": "Se suele trabajar en abdomen, piernas, glúteos y brazos. En el diagnóstico decidimos contigo qué zonas priorizar y cuántas sesiones tienen sentido en tu caso."
+    },
+    {
+     "p": "¿Con cuánta antelación conviene empezar?",
+     "r": "Con tiempo suficiente. Los resultados de la aparatología corporal, la presoterapia o el HIFU corporal se desarrollan de forma progresiva, así que conviene empezar con margen si tienes una fecha en mente, como el verano."
+    }
+   ],
+   "preocupaciones": [
+    "grasa-localizada",
+    "celulitis",
+    "flacidez",
+    "retencion-de-liquidos"
+   ],
+   "relacionados": [
+    "radiofrecuencia-corporal",
+    "presoterapia",
+    "hifu-corporal",
+    "masajes-corporales"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#tecnologia-evo",
+    "https://iemec-clinic.com/corporal#tecnologia-evo-para-grasa-localizada",
+    "https://iemec-clinic.com/promociones",
+    "https://iemec-clinic.com/blog/evosculpt-que-es-como-funciona-y-cuando-se-notan-los-resultados",
+    "https://iemec-clinic.com/blog/tratamientos-corporales-para-preparar-el-verano",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/"
+   ],
+   "pendiente": [
+    "EVO es la marca del equipo (plataforma D-finitive EVO) y las normas no permiten anunciarla: aquí se habla de aparatología. EvoSculpt, como nombre de protocolo de IEMEC, vale si no es marca de terceros: confirmar.",
+    "Confirmar las tecnologías del equipo: Treatwell dice radiofrecuencia, vacuum y electroestimulación; la ficha del equipo, endotermia.",
+    "EvoSculpt se vende como promoción: en esta versión no se publican precios ni descuentos.",
+    "La sección «Tecnología EVO» de /corporal tiene por error el texto de la subcisión; aquí se ha corregido."
+   ]
+  },
+  {
+   "slug": "depilacion-laser",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "depilacion-laser",
+    "depilacion-cuerpo-completo-mujer",
+    "depilacion-cuerpo-completo-hombre"
+   ],
+   "orden": 40,
+   "destacado": true,
+   "nombre": "Depilación láser",
+   "titulo": "Depilación láser de diodo para mujer y hombre",
+   "titulo_seo": "Depilación láser en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Depilación láser de diodo en IEMEC Boadilla: reducción progresiva del vello por zonas o en cuerpo completo, para mujer y hombre, con enfriamiento.",
+   "entradilla": "Depilación con láser de diodo que reduce el vello de forma progresiva, por zonas o en cuerpo completo, con un sistema de enfriamiento que hace la sesión más cómoda.",
+   "para_quien": [
+    "Quieres dejar de depilarte con cuchilla o cera con tanta frecuencia.",
+    "Tienes vello en zonas concretas o quieres tratar el cuerpo completo.",
+    "Buscas un tratamiento adaptado a tu tipo de piel y de vello."
+   ],
+   "texto": [
+    "La depilación láser actúa sobre la raíz del vello para reducirlo de forma progresiva. En IEMEC usamos un láser de diodo cuatriondas, que combina cuatro longitudes de onda para adaptarse a distintos tipos de piel y de vello.",
+    "El equipo incorpora un sistema de enfriamiento que hace la sesión más cómoda. Puedes tratar zonas concretas o el cuerpo completo, tanto si eres mujer como si eres hombre.",
+    "Como el vello crece por ciclos, hacen falta varias sesiones, normalmente entre 5 y 8, separadas unas semanas. Con el tiempo puede ser necesaria alguna sesión de mantenimiento."
+   ],
+   "sesion": {
+    "duracion": "Según la zona; el cuerpo completo, alrededor de una hora",
+    "sesiones": "Entre 5 y 8, separadas unas semanas",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Por zonas",
+     "texto": "Tratas solo las zonas que te interesan, por separado o combinadas.",
+     "catalogo": "depilacion-laser"
+    },
+    {
+     "nombre": "Cuerpo completo mujer",
+     "texto": "Tratamiento de todo el cuerpo. El número de sesiones se decide en la valoración y las condiciones te las explicamos en la clínica.",
+     "catalogo": "depilacion-cuerpo-completo-mujer"
+    },
+    {
+     "nombre": "Cuerpo completo hombre",
+     "texto": "Tratamiento de todo el cuerpo. El número de sesiones se decide en la valoración y las condiciones te las explicamos en la clínica.",
+     "catalogo": "depilacion-cuerpo-completo-hombre"
+    }
+   ],
+   "resultados": "El vello se reduce de forma progresiva a lo largo de las sesiones; el resultado varía según tu piel, tu vello y cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Normalmente entre 5 y 8, porque el vello crece por ciclos y cada sesión actúa sobre el que está en fase de crecimiento. El número depende de la zona, del tipo de vello y de cada persona."
+    },
+    {
+     "p": "¿Sirve para mi tipo de piel?",
+     "r": "El láser de diodo cuatriondas está pensado para adaptarse a distintos tipos de piel y de vello. En la primera cita revisamos tu piel y tu vello para ajustar el tratamiento a tu caso."
+    },
+    {
+     "p": "¿Es molesta?",
+     "r": "Suele ser bien tolerada, porque el equipo tiene un sistema de enfriamiento que hace la sesión más cómoda. La sensación varía según la zona y cada persona, y puedes decirnos en todo momento cómo te encuentras."
+    },
+    {
+     "p": "¿Se puede tratar el cuerpo completo?",
+     "r": "Sí, tanto en mujeres como en hombres. En la primera cita revisamos las zonas, decidimos contigo el número de sesiones y te explicamos las condiciones, para que puedas planificar el tratamiento desde el principio."
+    }
+   ],
+   "preocupaciones": [
+    "vello"
+   ],
+   "relacionados": [
+    "remodelacion-corporal",
+    "presoterapia",
+    "sudoracion-excesiva"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://iemec-clinic.com/promociones",
+    "https://iemec-clinic.com/",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "La web actual la llama «depilación definitiva», dice que es «prácticamente indoloro» y que «garantiza» eficacia: aquí se evita.",
+    "La web actual vende bonos de cuerpo completo con precio por sesión: las normas no permiten bonos ni precios en la web, así que aquí se habla de «cuerpo completo». Confirmar sesiones y condiciones.",
+    "Confirmar las zonas que se ofrecen por separado y la duración de cada una."
+   ]
+  },
+  {
+   "slug": "radiofrecuencia-corporal",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "radiofrecuencia-corporal"
+   ],
+   "orden": 50,
+   "destacado": false,
+   "nombre": "Radiofrecuencia corporal",
+   "titulo": "Radiofrecuencia corporal para la flacidez y la celulitis",
+   "titulo_seo": "Radiofrecuencia corporal en Boadilla · IEMEC",
+   "descripcion_seo": "Radiofrecuencia corporal en IEMEC Boadilla: calor controlado que ayuda a reafirmar la piel y a mejorar la celulitis en abdomen, muslos, glúteos o brazos.",
+   "entradilla": "Una técnica no invasiva que aplica calor controlado en las capas profundas de la piel para ayudar a reafirmarla y a mejorar el aspecto de la celulitis.",
+   "para_quien": [
+    "Notas la piel del cuerpo menos firme, por ejemplo tras cambios de peso o con los años.",
+    "Te preocupa la celulitis en muslos, glúteos o abdomen.",
+    "Buscas un tratamiento sin agujas que te permita seguir con tu rutina."
+   ],
+   "texto": [
+    "La radiofrecuencia corporal usa una energía que se transforma en calor en las capas profundas de la piel. Ese calor controlado estimula la producción de colágeno y elastina, las fibras que dan firmeza a la piel, y activa la circulación de la zona.",
+    "Se aplica en abdomen, muslos, glúteos, brazos y espalda. Es un tratamiento no invasivo y cómodo, y al terminar puedes seguir con tu rutina.",
+    "Suele plantearse como un ciclo de 6 a 10 sesiones, una por semana. Se puede combinar con otras técnicas, como la mesoterapia corporal o el drenaje linfático, según lo que necesites."
+   ],
+   "sesion": {
+    "duracion": "Unos 45 minutos",
+    "sesiones": "Entre 6 y 10, una por semana",
+    "anestesia": "No necesita",
+    "recuperacion": "No necesita; puedes seguir con tu rutina",
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "Los cambios son progresivos: se empiezan a notar desde las primeras sesiones y varían según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿En qué zonas se aplica?",
+     "r": "En abdomen, muslos, glúteos, brazos y espalda. En la primera cita vemos contigo qué zonas te preocupan más y cómo organizar las sesiones para que el plan se ajuste a ti."
+    },
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Lo habitual es un ciclo de 6 a 10 sesiones, una por semana. El número exacto depende de la zona, del estado de la piel y de lo que quieras conseguir."
+    },
+    {
+     "p": "¿Es molesta? ¿Tiene recuperación?",
+     "r": "Es un tratamiento cómodo: durante la sesión notas calor en la zona tratada. No necesita tiempo de recuperación, así que puedes volver a tus actividades al salir, y es apto para todos los tipos de piel."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Puede combinarse con la mesoterapia corporal o con el drenaje linfático para trabajar a la vez la firmeza de la piel y la retención de líquidos. Te proponemos la combinación que tenga sentido para ti."
+    }
+   ],
+   "preocupaciones": [
+    "flacidez",
+    "celulitis"
+   ],
+   "relacionados": [
+    "remodelacion-corporal",
+    "hifu-corporal",
+    "microneedling-corporal",
+    "mesoterapia-corporal"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#radiofrecuencia-corporal",
+    "https://iemec-clinic.com/blog/que-es-la-radiofrecuencia-corporal-y-como-ayuda-a-combatir-la-flacidez-antes-del-verano",
+    "https://iemec-clinic.com/blog/radiofrecuencia-corporal-beneficios-y-resultados"
+   ],
+   "pendiente": [
+    "Confirmar el equipo (el catálogo lo asigna a la plataforma EVO) y la duración real de la sesión."
+   ]
+  },
+  {
+   "slug": "hifu-corporal",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "hifu-corporal"
+   ],
+   "orden": 60,
+   "destacado": false,
+   "nombre": "HIFU corporal",
+   "titulo": "HIFU corporal para la flacidez del cuerpo",
+   "titulo_seo": "HIFU corporal en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "HIFU corporal en IEMEC Boadilla: ultrasonido focalizado para trabajar la flacidez del cuerpo sin agujas, con valoración previa para ver si es para ti.",
+   "entradilla": "Ultrasonido focalizado de alta intensidad aplicado a la flacidez del cuerpo: actúa en profundidad, sin agujas, para estimular el colágeno de forma progresiva.",
+   "para_quien": [
+    "Notas la piel del cuerpo menos firme y quieres mejorarla sin cirugía.",
+    "Has perdido peso y te preocupa la flacidez de la piel.",
+    "Buscas un tratamiento sin agujas ni tiempo de recuperación."
+   ],
+   "texto": [
+    "El HIFU, siglas en inglés de ultrasonido focalizado de alta intensidad, concentra la energía en puntos concretos bajo la piel. Ese calor controlado estimula la producción de colágeno y elastina, que dan firmeza al tejido.",
+    "En IEMEC usamos para el cuerpo el mismo equipo de HIFU que para el rostro, adaptado a la flacidez corporal. No usa agujas y no necesita tiempo de recuperación.",
+    "Antes de tratarte hacemos una valoración para ver si es adecuado en tu caso, qué zonas conviene trabajar, cuántas sesiones son recomendables y qué puedes esperar."
+   ],
+   "sesion": {
+    "duracion": "Unos 60 minutos",
+    "sesiones": "Entre 2 y 3, según la valoración",
+    "anestesia": null,
+    "recuperacion": "No necesita",
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "Los resultados aparecen de forma progresiva durante los meses siguientes, a medida que se forma colágeno nuevo, y varían según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Es el mismo HIFU que el facial?",
+     "r": "Usa la misma tecnología de ultrasonido focalizado, aplicada a la flacidez del cuerpo. Cambian la zona y el plan de sesiones, que ajustamos en la valoración según tu piel y lo que quieras mejorar."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Suelen recomendarse entre 2 y 3 sesiones. En la valoración te decimos cuántas tienen sentido en tu caso, según la zona, el grado de flacidez y la respuesta de tu piel."
+    },
+    {
+     "p": "¿Cuándo se notan los resultados?",
+     "r": "La mejora es progresiva: el colágeno nuevo tarda en formarse, así que el efecto se va apreciando durante los meses siguientes. Varía según cada persona, su piel y sus hábitos."
+    },
+    {
+     "p": "¿Tiene recuperación?",
+     "r": "No usa agujas ni necesita tiempo de recuperación, así que puedes seguir con tu rutina al salir. Si tienes cualquier duda después de la sesión, puedes escribirnos."
+    }
+   ],
+   "preocupaciones": [
+    "flacidez"
+   ],
+   "relacionados": [
+    "radiofrecuencia-corporal",
+    "remodelacion-corporal",
+    "microneedling-corporal"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/facial#hifu-rejuvenecimiento-facial",
+    "https://iemec-clinic.com/blog/tratamientos-corporales-para-preparar-el-verano",
+    "https://iemec-clinic.com/blog/hifu-facial-el-lifting-sin-cirugia",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "En la web actual el HIFU corporal no tiene sección propia (solo una línea en el HIFU facial): confirmar zonas, duración y número de sesiones.",
+    "La valoración de HIFU se anuncia como gratuita en la web actual: decidir cómo comunicarlo (sin precios en esta versión)."
+   ]
+  },
+  {
+   "slug": "intralipoterapia",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "intralipoterapia"
+   ],
+   "orden": 70,
+   "destacado": false,
+   "nombre": "Intralipoterapia",
+   "titulo": "Intralipoterapia: lipólisis inyectable para la grasa localizada",
+   "titulo_seo": "Intralipoterapia en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Intralipoterapia en IEMEC Boadilla: infiltraciones médicas para tratar la grasa localizada sin cirugía, en sesiones cortas y con valoración previa.",
+   "entradilla": "Un procedimiento médico que trata la grasa localizada con infiltraciones en la zona, sin cirugía, en sesiones cortas y con resultados graduales.",
+   "para_quien": [
+    "Tienes acúmulos de grasa en zonas como abdomen, flancos, brazos o papada.",
+    "Buscas una opción sin cirugía.",
+    "Quieres mejorar el contorno de una zona concreta, no perder peso."
+   ],
+   "texto": [
+    "La intralipoterapia, también llamada lipólisis inyectable, consiste en aplicar infiltraciones en la grasa localizada para ayudar a reducirla. La hace un médico en consulta, en sesiones cortas y sin cirugía.",
+    "Se usa en zonas como abdomen, flancos, brazos o papada. Durante la sesión se nota un pinchazo y algo de presión; en las zonas más sensibles se puede aplicar anestesia local o tópica.",
+    "Requiere valoración médica previa: el médico estudia tu caso y te explica la idoneidad, los riesgos y las alternativas. No está pensada para perder peso, sino para mejorar el contorno. Después puedes seguir con tu día, evitando el ejercicio intenso."
+   ],
+   "sesion": {
+    "duracion": "Unos 45 minutos",
+    "sesiones": "Entre 2 y 4, según la zona",
+    "anestesia": "Local o tópica en zonas sensibles, si hace falta",
+    "recuperacion": "Puedes seguir con tu día; evita el ejercicio intenso",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "Los cambios empiezan a notarse entre 2 y 4 semanas después y el resultado se aprecia a las 6-8 semanas; varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Duele?",
+     "r": "Es un procedimiento mínimamente invasivo: se nota un pinchazo y algo de presión. En zonas sensibles puede aplicarse anestesia local o tópica. Después puede haber sensibilidad o una molestia leve, parecida a unas agujetas."
+    },
+    {
+     "p": "¿Es lo mismo que una liposucción?",
+     "r": "No. La liposucción es una cirugía. La intralipoterapia se hace en consulta, sin cirugía y sin una recuperación larga, y está pensada para acúmulos de grasa localizada, no para perder peso."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Depende de la zona y de la cantidad de grasa. En general se plantean entre 2 y 4 sesiones, que el médico ajusta tras la valoración y según tu evolución."
+    },
+    {
+     "p": "¿Es normal tener hinchazón o moratones?",
+     "r": "Sí. Puede aparecer inflamación leve, calor, sensibilidad o algún moratón en la zona, que suelen desaparecer en pocos días. Si algo te preocupa, escríbenos y lo revisamos."
+    },
+    {
+     "p": "¿Qué cuidados debo tener después?",
+     "r": "Bebe agua, no expongas la zona al sol durante 48 horas y evita los masajes intensos, el calor local, el alcohol y el tabaco tras la sesión. Puedes ducharte con agua templada, sin frotar la zona."
+    }
+   ],
+   "preocupaciones": [
+    "grasa-localizada"
+   ],
+   "relacionados": [
+    "lipolaser",
+    "drenaje-linfatico",
+    "mesoterapia-corporal",
+    "diagnostico-de-lipolaser"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#intralipoterapia",
+    "https://iemec-clinic.com/blog/que-es-la-lipolisis-y-cuanto-tarda-en-hacer-efecto",
+    "https://iemec-clinic.com/blog/la-lipolisis-duele-todo-lo-que-debes-saber-sobre-el-tratamiento-para-grasa-localizada",
+    "https://iemec-clinic.com/blog/que-cuidados-debo-tener-despues-de-la-lipolisis"
+   ],
+   "pendiente": [
+    "Producto sanitario de uso profesional: no se nombra el producto; confirmar cuál se usa y su régimen legal.",
+    "Confirmar la duración real de la sesión (la del catálogo es estimada).",
+    "El blog llama «lipólisis» tanto a este tratamiento como al lipoláser: conviene aclararlo."
+   ]
+  },
+  {
+   "slug": "mesoterapia-corporal",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "mesoterapia-corporal",
+    "mesoterapia-alidya"
+   ],
+   "orden": 80,
+   "destacado": false,
+   "nombre": "Mesoterapia corporal",
+   "titulo": "Mesoterapia corporal para la celulitis y la grasa localizada",
+   "titulo_seo": "Mesoterapia corporal en Boadilla · IEMEC",
+   "descripcion_seo": "Mesoterapia corporal en IEMEC Boadilla: microinyecciones aplicadas por un médico para la celulitis y la grasa localizada, con valoración previa.",
+   "entradilla": "Microinyecciones en la capa media de la piel para tratar la celulitis, la grasa localizada y la falta de firmeza, siempre tras una valoración médica.",
+   "para_quien": [
+    "Te preocupa la celulitis o la piel de naranja.",
+    "Tienes grasa localizada en zonas concretas.",
+    "Quieres un tratamiento médico sin cirugía que puedas combinar con otros corporales."
+   ],
+   "texto": [
+    "La mesoterapia corporal consiste en aplicar en la capa media de la piel, mediante microinyecciones, una mezcla de sustancias que el médico elige para tu caso. Allí actúan de forma localizada sobre la celulitis, la grasa acumulada o la falta de firmeza.",
+    "Tiene dos enfoques: uno para la celulitis, que busca mejorar la textura de la piel de naranja, y otro para la grasa localizada y la firmeza. En la valoración el médico decide cuál encaja contigo.",
+    "Se hace una sesión por semana, durante varias semanas. La aplica siempre un médico, que antes te explica la idoneidad, los riesgos y las alternativas. Acompañarlo de hábitos saludables ayuda a mantener el resultado."
+   ],
+   "sesion": {
+    "duracion": "Unos 20 minutos",
+    "sesiones": "Varias, una por semana",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Mesoterapia para la celulitis",
+     "texto": "Microinyecciones en las zonas con piel de naranja para mejorar su textura y su aspecto, una vez por semana.",
+     "catalogo": "mesoterapia-alidya"
+    },
+    {
+     "nombre": "Mesoterapia para grasa localizada",
+     "texto": "Microinyecciones en zonas con acúmulos de grasa para ayudar a reducirlos y reafirmar la piel, en un ciclo de sesiones semanales.",
+     "catalogo": "mesoterapia-corporal"
+    }
+   ],
+   "resultados": "La mejora es progresiva a lo largo de las sesiones y varía según cada persona; los hábitos saludables ayudan a mantenerla.",
+   "preguntas": [
+    {
+     "p": "¿Quién aplica la mesoterapia?",
+     "r": "Siempre un médico, en consulta y después de valorar tu caso. En esa valoración te explica qué zonas tratar, si el tratamiento es adecuado para ti, sus riesgos y las alternativas que tienes."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Se hace una sesión por semana. El número total depende de la zona y de lo que quieras mejorar; el médico te propone un plan concreto en la valoración y lo ajusta según tu evolución."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Se combina a menudo con la radiofrecuencia corporal o con la presoterapia, para trabajar también la firmeza de la piel y la retención de líquidos. Te proponemos la combinación que tenga sentido para ti."
+    }
+   ],
+   "preocupaciones": [
+    "celulitis",
+    "grasa-localizada"
+   ],
+   "relacionados": [
+    "intralipoterapia",
+    "radiofrecuencia-corporal",
+    "presoterapia",
+    "carboxiterapia"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#mesoterapia-corporal",
+    "https://iemec-clinic.com/corporal#celulitis",
+    "https://iemec-clinic.com/blog/como-eliminar-la-retencion-de-liquidos-antes-del-verano-tratamientos-recomendados",
+    "https://iemec-clinic.com/blog/que-es-la-presoterapia-y-como-puede-ayudarte-a-reducir-la-retencion-de-liquidos-en-verano"
+   ],
+   "pendiente": [
+    "La web actual llama a la variante de celulitis «Mesoterapia con Alidya»: es un producto sanitario de uso profesional y la marca no puede usarse como reclamo; aquí va como «Mesoterapia para la celulitis».",
+    "Confirmar qué productos se usan en la mesoterapia de grasa localizada y su régimen legal.",
+    "Confirmar la duración y el número de sesiones de cada variante."
+   ]
+  },
+  {
+   "slug": "presoterapia",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "presoterapia"
+   ],
+   "orden": 90,
+   "destacado": false,
+   "nombre": "Presoterapia",
+   "titulo": "Presoterapia para la retención de líquidos y las piernas cansadas",
+   "titulo_seo": "Presoterapia en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Presoterapia en IEMEC Boadilla: presión de aire secuencial que activa la circulación, ayuda con la retención de líquidos y alivia las piernas cansadas.",
+   "entradilla": "Un drenaje mecánico con presión de aire que activa la circulación sanguínea y linfática, ayuda a reducir la retención de líquidos y alivia la sensación de piernas pesadas.",
+   "para_quien": [
+    "Notas las piernas hinchadas o pesadas, sobre todo con el calor.",
+    "Pasas muchas horas de pie o llevas una vida sedentaria.",
+    "Quieres complementar otros tratamientos corporales.",
+    "Te preocupa la celulitis asociada a la retención de líquidos."
+   ],
+   "texto": [
+    "La presoterapia es un drenaje mecánico. Un traje especial se infla y se desinfla por zonas, de forma secuencial. Esa presión de aire estimula la circulación sanguínea y linfática y ayuda al cuerpo a drenar los líquidos retenidos.",
+    "Es un tratamiento cómodo y relajante. Ayuda con la retención de líquidos, la sensación de piernas cansadas, la inflamación y la celulitis, y es un buen complemento de otros tratamientos corporales y de la recuperación tras una cirugía.",
+    "No se recomienda en caso de trombosis venosa profunda, infecciones de la piel o insuficiencia cardíaca. Por eso, antes de empezar te preguntamos por tu salud."
+   ],
+   "sesion": {
+    "duracion": "40 minutos",
+    "sesiones": "Entre 6 y 12, según cada caso",
+    "anestesia": "No necesita",
+    "recuperacion": "No necesita",
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "La sensación de alivio suele notarse desde la primera sesión; los cambios estéticos son progresivos y varían según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Cuántas sesiones se recomiendan?",
+     "r": "Se nota mejoría desde la primera, pero suelen recomendarse entre 6 y 12 sesiones, según tus necesidades. El mantenimiento y los buenos hábitos ayudan a conservar el efecto."
+    },
+    {
+     "p": "¿Es molesta?",
+     "r": "No suele serlo: es un tratamiento cómodo y relajante. Durante unos 40 minutos notarás cómo el traje presiona y suelta por zonas, de forma secuencial, y muchas personas aprovechan para descansar."
+    },
+    {
+     "p": "¿Tiene contraindicaciones?",
+     "r": "Sí. No se recomienda si tienes trombosis venosa profunda, infecciones en la piel o insuficiencia cardíaca. Si tienes cualquier problema de circulación o de salud, cuéntanoslo antes de empezar."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Se combina con la mesoterapia, la radiofrecuencia o el drenaje linfático manual, y forma parte del protocolo EvoSculpt. También es compatible con hacer ejercicio con regularidad."
+    }
+   ],
+   "preocupaciones": [
+    "retencion-de-liquidos",
+    "celulitis",
+    "bienestar"
+   ],
+   "relacionados": [
+    "drenaje-linfatico",
+    "remodelacion-corporal",
+    "maderoterapia",
+    "masajes-corporales"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#presoterapia-celulitis",
+    "https://iemec-clinic.com/blog/que-es-la-presoterapia-y-como-puede-ayudarte-a-reducir-la-retencion-de-liquidos-en-verano",
+    "https://iemec-clinic.com/blog/como-eliminar-la-retencion-de-liquidos-antes-del-verano-tratamientos-recomendados",
+    "https://iemec-clinic.com/blog/como-eliminar-la-retencion-de-liquidos-en-piernas",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Confirmar si se quiere nombrar el equipo (Pro Ballancer) y su grafía; aquí no se nombra."
+   ]
+  },
+  {
+   "slug": "drenaje-linfatico",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "drenaje-linfatico-manual"
+   ],
+   "orden": 100,
+   "destacado": false,
+   "nombre": "Drenaje linfático manual",
+   "titulo": "Drenaje linfático manual para la retención de líquidos",
+   "titulo_seo": "Drenaje linfático en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Drenaje linfático manual en IEMEC Boadilla: masaje suave para la retención de líquidos, las piernas cansadas y la recuperación tras una lipólisis.",
+   "entradilla": "Un masaje suave y rítmico que estimula el sistema linfático para ayudar a drenar los líquidos retenidos y aliviar la sensación de piernas pesadas.",
+   "para_quien": [
+    "Tienes retención de líquidos o sensación de piernas cansadas.",
+    "Te has hecho una lipólisis o una cirugía y quieres acompañar la recuperación.",
+    "Buscas un tratamiento suave y relajante para la circulación."
+   ],
+   "texto": [
+    "El drenaje linfático manual es una técnica de masaje suave, con movimientos lentos y rítmicos, que estimula el sistema linfático. Ayuda al cuerpo a movilizar los líquidos retenidos y deja una sensación de ligereza.",
+    "Está indicado para la retención de líquidos y las piernas cansadas, como complemento de los tratamientos para la celulitis y para acompañar la recuperación tras procedimientos médico-estéticos y cirugías.",
+    "Tras una lipólisis, lo ideal es empezar entre 24 y 72 horas después. Cada sesión se adapta a lo que necesitas en ese momento, y se puede combinar con la presoterapia, que hace un drenaje mecánico con presión de aire."
+   ],
+   "sesion": {
+    "duracion": "Unos 60 minutos",
+    "sesiones": "Entre 6 y 10 para la retención de líquidos; tras una lipólisis, entre 3 y 8",
+    "anestesia": "No necesita",
+    "recuperacion": "No necesita",
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "La sensación de ligereza suele notarse desde las primeras sesiones; el efecto sobre la hinchazón varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Duele el drenaje linfático?",
+     "r": "No. Es una técnica suave, con presiones ligeras y movimientos rítmicos, y suele resultar agradable. Si estás en plena recuperación de un tratamiento, adaptamos las maniobras a cómo se encuentra la zona."
+    },
+    {
+     "p": "¿Cuándo empiezo el drenaje después de una lipólisis?",
+     "r": "Lo ideal es empezar entre 24 y 72 horas después de la sesión de lipólisis. El número de sesiones depende de la zona tratada; suelen recomendarse entre 3 y 8."
+    },
+    {
+     "p": "¿Es obligatorio hacerlo después de la lipólisis?",
+     "r": "No es obligatorio, pero se recomienda mucho: ayuda a reducir la hinchazón y las molestias y favorece la recuperación. El médico que te trata te dirá si en tu caso conviene y cuántas sesiones hacer."
+    },
+    {
+     "p": "¿Es lo mismo que la presoterapia?",
+     "r": "Las dos técnicas favorecen el drenaje. El manual lo hace un profesional con las manos, de forma muy precisa y suave; la presoterapia usa un traje con presión de aire. A veces se combinan."
+    }
+   ],
+   "preocupaciones": [
+    "retencion-de-liquidos",
+    "bienestar"
+   ],
+   "relacionados": [
+    "presoterapia",
+    "intralipoterapia",
+    "lipolaser",
+    "maderoterapia"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://iemec-clinic.com/blog/por-que-es-importante-hacer-drenaje-linfatico-despues-de-una-sesion-de-lipolisis",
+    "https://iemec-clinic.com/blog/como-eliminar-la-retencion-de-liquidos-antes-del-verano-tratamientos-recomendados",
+    "https://iemec-clinic.com/blog/como-eliminar-la-retencion-de-liquidos-en-piernas",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "No tiene sección en la web actual (sale en el blog y en Multiestetica): confirmar la duración y el número de sesiones.",
+    "Confirmar si se ofrece como postoperatorio de las cirugías de la clínica (Multiestetica lo cita con la abdominoplastia)."
+   ]
+  },
+  {
+   "slug": "maderoterapia",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "maderoterapia"
+   ],
+   "orden": 110,
+   "destacado": false,
+   "nombre": "Maderoterapia",
+   "titulo": "Maderoterapia para la celulitis y el contorno corporal",
+   "titulo_seo": "Maderoterapia en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Maderoterapia en IEMEC Boadilla: masaje con instrumentos de madera que ayuda con la celulitis, la circulación y la retención de líquidos.",
+   "entradilla": "Un masaje con instrumentos de madera que trabaja en profundidad para mejorar el aspecto de la celulitis, activar la circulación y aportar una sensación de bienestar.",
+   "para_quien": [
+    "Te preocupa la celulitis o la retención de líquidos.",
+    "Quieres trabajar el contorno y la firmeza de la piel.",
+    "Buscas un tratamiento manual que además te ayude a relajarte."
+   ],
+   "texto": [
+    "La maderoterapia es una técnica de masaje que usa rodillos, palas y otros instrumentos de madera, diseñados para adaptarse a cada zona del cuerpo. Con presión y movimiento, trabaja el tejido en profundidad.",
+    "Ayuda a mejorar el aspecto de la celulitis, activa la circulación, favorece el drenaje de líquidos y relaja la musculatura. En IEMEC adaptamos las maniobras al tipo de celulitis o de retención de cada persona.",
+    "Es una técnica manual y relajante que se puede combinar con otros tratamientos corporales. Antes de empezar te preguntamos por tu salud para confirmar que es adecuada para ti."
+   ],
+   "sesion": {
+    "duracion": "1 hora",
+    "sesiones": null,
+    "anestesia": "No necesita",
+    "recuperacion": "No necesita",
+    "profesional": "Esteticista"
+   },
+   "variantes": [],
+   "resultados": "Tras la sesión se nota una sensación de ligereza y bienestar; los cambios en la piel son progresivos y varían según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué beneficios tiene la maderoterapia?",
+     "r": "Ayuda a mejorar el aspecto de la celulitis, activa la circulación y el drenaje linfático, relaja la musculatura y mejora el tono de la piel. Antes de empezar conviene que un profesional valore si es adecuada para ti."
+    },
+    {
+     "p": "¿Cuánto dura una sesión?",
+     "r": "La sesión dura una hora. El número de sesiones depende de lo que quieras mejorar: lo vemos contigo en la primera cita y lo ajustamos según cómo responda tu piel."
+    },
+    {
+     "p": "¿Se puede combinar con otros tratamientos?",
+     "r": "Sí. Puede formar parte de un plan para la celulitis y la retención de líquidos junto a la presoterapia, el drenaje linfático o la radiofrecuencia corporal. Te proponemos la combinación en la primera cita."
+    }
+   ],
+   "preocupaciones": [
+    "celulitis",
+    "retencion-de-liquidos",
+    "bienestar"
+   ],
+   "relacionados": [
+    "masajes-corporales",
+    "presoterapia",
+    "drenaje-linfatico"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#maderoterapia",
+    "https://iemec-clinic.com/corporal#maderoterapia-para-reducir-grasa-acumulada",
+    "https://iemec-clinic.com/blog/descubre-los-beneficios-de-la-maderoterapia-bienestar-natural-a-traves-de-la-madera",
+    "https://www.treatwell.es/establecimiento/clinica-iemec/"
+   ],
+   "pendiente": [
+    "Confirmar el número de sesiones recomendado."
+   ]
+  },
+  {
+   "slug": "masajes-corporales",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "masaje-anticelulitico",
+    "masaje-reductor",
+    "masaje-anticelulitico-reductor-reafirmante"
+   ],
+   "orden": 120,
+   "destacado": false,
+   "nombre": "Masajes corporales",
+   "titulo": "Masajes corporales para la celulitis, el contorno y la firmeza",
+   "titulo_seo": "Masajes corporales en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Masajes corporales en IEMEC Boadilla: para la celulitis, de contorno o combinado con efecto reafirmante, de 30 minutos o de una hora.",
+   "entradilla": "Masajes manuales intensos para trabajar la celulitis, las zonas con grasa acumulada y la firmeza de la piel, en sesiones de 30 minutos o de una hora.",
+   "para_quien": [
+    "Te preocupa la piel de naranja.",
+    "Quieres complementar otros tratamientos corporales.",
+    "Buscas trabajar abdomen, caderas o muslos con técnicas manuales."
+   ],
+   "texto": [
+    "Son masajes manuales de movimientos intensos que activan la circulación y la microcirculación y movilizan el tejido graso. Los adaptamos a tu objetivo y al tipo de celulitis: blanda, dura o edematosa, es decir, con retención de líquidos.",
+    "El masaje para la celulitis se centra en mejorar la textura de la piel de naranja. El de contorno trabaja zonas con grasa acumulada, como abdomen, caderas o muslos, y complementa otros tratamientos corporales. El combinado une los dos con un efecto reafirmante.",
+    "La sesión combinada incluye limpieza de la piel, hidratación y masaje. Puedes elegir sesiones de 30 minutos o de una hora."
+   ],
+   "sesion": {
+    "duracion": "30 minutos o 1 hora",
+    "sesiones": null,
+    "anestesia": "No necesita",
+    "recuperacion": "No necesita",
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Masaje para la celulitis",
+     "texto": "Para la piel de naranja: estimula la microcirculación y el drenaje, y se adapta al tipo de celulitis. De 30 minutos o una hora.",
+     "catalogo": "masaje-anticelulitico"
+    },
+    {
+     "nombre": "Masaje de contorno",
+     "texto": "Trabajo manual profundo en zonas con grasa acumulada, como abdomen, caderas o muslos. Complementa otros tratamientos corporales.",
+     "catalogo": "masaje-reductor"
+    },
+    {
+     "nombre": "Masaje combinado con efecto reafirmante",
+     "texto": "Los tres enfoques en una sesión: limpieza de la piel, hidratación y masaje de movimientos intensos.",
+     "catalogo": "masaje-anticelulitico-reductor-reafirmante"
+    }
+   ],
+   "resultados": "Los cambios en la celulitis y en el contorno son progresivos, a lo largo de las sesiones, y varían según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué masaje me conviene?",
+     "r": "Si lo que más te preocupa es la piel de naranja, el masaje para la celulitis. Si quieres trabajar zonas con grasa acumulada, el de contorno. Si buscas los dos efectos y más firmeza, el combinado. Te orientamos en la primera cita."
+    },
+    {
+     "p": "¿Cuánto dura cada sesión?",
+     "r": "Puedes elegir entre sesiones de 30 minutos o de una hora. La de una hora permite trabajar más zonas o hacerlo con más calma; te recomendamos la que encaje con tu objetivo."
+    },
+    {
+     "p": "¿Sirven para perder peso?",
+     "r": "Por sí solos no son un tratamiento para perder peso. El masaje de contorno es un buen complemento de otros tratamientos corporales, junto a una alimentación equilibrada y la actividad física."
+    }
+   ],
+   "preocupaciones": [
+    "celulitis",
+    "grasa-localizada",
+    "flacidez"
+   ],
+   "relacionados": [
+    "maderoterapia",
+    "presoterapia",
+    "remodelacion-corporal",
+    "drenaje-linfatico"
+   ],
+   "restringida": false,
+   "revision_medica": false,
+   "fuentes": [
+    "https://www.treatwell.es/establecimiento/clinica-iemec/"
+   ],
+   "pendiente": [
+    "Estos masajes solo aparecen en Treatwell, no en la web actual: confirmar que se quieren publicar y el número de sesiones recomendado.",
+    "Los nombres actuales («anticelulítico», «reductor») sugieren propiedades reductoras, que las normas no permiten (RD 1907/1996, art. 4.2): aquí son «masaje para la celulitis» y «masaje de contorno». Confirmar los nombres."
+   ]
+  },
+  {
+   "slug": "subcision",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "subcision-celulitis",
+    "subcision-cicatrices-estrias"
+   ],
+   "orden": 130,
+   "destacado": false,
+   "nombre": "Subcisión",
+   "titulo": "Subcisión para la celulitis, las cicatrices y las estrías",
+   "titulo_seo": "Subcisión de celulitis en Boadilla · IEMEC",
+   "descripcion_seo": "Subcisión en IEMEC Boadilla: técnica médica con aguja que libera las bandas fibrosas de la celulitis, las cicatrices y las estrías. Con valoración previa.",
+   "entradilla": "Una técnica médica que libera con una aguja las bandas fibrosas que hunden la piel, para mejorar los hoyuelos de la celulitis y algunas cicatrices y estrías.",
+   "para_quien": [
+    "Tienes celulitis con hoyuelos marcados que no mejora con dieta, ejercicio ni tratamientos superficiales.",
+    "Tienes cicatrices hundidas, por ejemplo de acné o quirúrgicas.",
+    "Quieres mejorar el relieve de estrías o cicatrices."
+   ],
+   "texto": [
+    "Algunos hoyuelos de la celulitis y algunas cicatrices aparecen porque unas bandas fibrosas bajo la piel tiran de ella hacia dentro. La subcisión consiste en liberar esas bandas con una aguja para que la superficie de la piel quede más uniforme.",
+    "Está indicada sobre todo en la celulitis estructural, la que no mejora con dieta, ejercicio ni tratamientos superficiales, y también en cicatrices de acné o quirúrgicas y en estrías. Además, estimula la producción de colágeno.",
+    "La hace un médico tras una valoración médica personalizada, en la que te explica si tu caso es adecuado, los riesgos, la recuperación y las alternativas."
+   ],
+   "sesion": {
+    "duracion": "Unos 60 minutos",
+    "sesiones": "Según la valoración",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [
+    {
+     "nombre": "Subcisión de celulitis",
+     "texto": "Para los hoyuelos y los hundimientos de la celulitis estructural.",
+     "catalogo": "subcision-celulitis"
+    },
+    {
+     "nombre": "Subcisión de estrías y cicatrices",
+     "texto": "Para cicatrices hundidas, como las de acné o las quirúrgicas, y para estrías: libera la piel y estimula el colágeno.",
+     "catalogo": "subcision-cicatrices-estrias"
+    }
+   ],
+   "resultados": "La piel se ve más uniforme de forma progresiva, a medida que se recupera y se forma colágeno nuevo; el resultado varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Qué tipo de celulitis mejora con la subcisión?",
+     "r": "Sobre todo la celulitis estructural: la de hoyuelos y hundimientos causados por bandas fibrosas bajo la piel, que no mejora con dieta, ejercicio ni tratamientos superficiales. En la valoración el médico te dice si es tu caso."
+    },
+    {
+     "p": "¿Sirve también para cicatrices y estrías?",
+     "r": "Sí. Se usa en cicatrices hundidas, como las de acné o las quirúrgicas, y en estrías. Al liberar la piel y estimular el colágeno, ayuda a mejorar su relieve y su textura."
+    },
+    {
+     "p": "¿Quién hace la subcisión?",
+     "r": "Un médico de la clínica, siempre después de una valoración personalizada en la que te explica la idoneidad del tratamiento, los riesgos, cómo será la recuperación y otras alternativas."
+    }
+   ],
+   "preocupaciones": [
+    "celulitis",
+    "calidad-de-piel"
+   ],
+   "relacionados": [
+    "microneedling-corporal",
+    "peeling-medico-corporal",
+    "mesoterapia-corporal",
+    "carboxiterapia"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#subcision",
+    "https://iemec-clinic.com/corporal#subcision-para-estrias-y-cicatrices",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Régimen legal sin confirmar: confirmar si se infiltra algún producto durante la subcisión.",
+    "Confirmar duración, número de sesiones, anestesia y recuperación (la web actual dice «sin tiempo de recuperación»; conviene que lo valide el médico).",
+    "La web actual usa el mismo texto, de cicatrices de acné, para las dos subcisiones; aquí se ha separado."
+   ]
+  },
+  {
+   "slug": "microneedling-corporal",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "microneedling-corporal-estrias",
+    "microneedling-celulitis"
+   ],
+   "orden": 140,
+   "destacado": false,
+   "nombre": "Microneedling corporal",
+   "titulo": "Microneedling corporal para estrías, cicatrices y flacidez",
+   "titulo_seo": "Microneedling corporal en Boadilla · IEMEC",
+   "descripcion_seo": "Microneedling corporal en IEMEC Boadilla: microagujas que estimulan el colágeno para mejorar estrías, cicatrices, flacidez y celulitis, con crema anestésica.",
+   "entradilla": "Microagujas que estimulan la regeneración de la piel del cuerpo para mejorar su textura y su firmeza, el aspecto de estrías y cicatrices y la celulitis.",
+   "para_quien": [
+    "Tienes estrías o cicatrices en el cuerpo y quieres mejorar su aspecto.",
+    "Notas la piel menos firme o con celulitis.",
+    "Buscas un tratamiento que mejore la calidad de la piel de forma progresiva."
+   ],
+   "texto": [
+    "El microneedling hace microperforaciones controladas en la piel con un dispositivo de microagujas. Esas pequeñas lesiones activan los mecanismos de reparación de la piel y la producción de colágeno y elastina, que mejoran su textura y su firmeza.",
+    "En el cuerpo lo usamos para estrías y cicatrices, y también para la flacidez, la celulitis y la retención de líquidos. Se puede aplicar en distintas zonas.",
+    "Antes de la sesión aplicamos crema anestésica para que las molestias sean mínimas. Suelen hacerse entre 3 y 6 sesiones, con unas cuatro semanas entre una y otra."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos, más el tiempo de la crema anestésica",
+    "sesiones": "Entre 3 y 6, cada 4 semanas aproximadamente",
+    "anestesia": "Crema anestésica",
+    "recuperacion": null,
+    "profesional": "Esteticista"
+   },
+   "variantes": [
+    {
+     "nombre": "Para estrías y cicatrices",
+     "texto": "Trabaja la textura de la piel para atenuar estrías y cicatrices de forma progresiva.",
+     "catalogo": "microneedling-corporal-estrias"
+    },
+    {
+     "nombre": "Para flacidez y celulitis",
+     "texto": "Estimula el colágeno para mejorar la firmeza de la piel y el aspecto de la celulitis.",
+     "catalogo": "microneedling-celulitis"
+    }
+   ],
+   "resultados": "La mejora es progresiva y se aprecia a lo largo de las sesiones; varía según cada persona y el tipo de estría o cicatriz.",
+   "preguntas": [
+    {
+     "p": "¿Es molesto?",
+     "r": "Aplicamos crema anestésica antes de empezar para que las molestias sean mínimas. La sensación depende de la zona y de cada persona, y puedes decirnos en todo momento cómo te encuentras."
+    },
+    {
+     "p": "¿Cuántas sesiones hacen falta?",
+     "r": "Suelen recomendarse entre 3 y 6 sesiones, con unas cuatro semanas entre una y otra para que la piel se regenere. El número depende de la zona y de lo que quieras mejorar."
+    },
+    {
+     "p": "¿Qué zonas se pueden tratar?",
+     "r": "Se puede aplicar en distintas zonas del cuerpo donde haya estrías, cicatrices, flacidez o celulitis. En la primera cita vemos contigo las zonas y el plan que tiene sentido para ti."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel",
+    "flacidez",
+    "celulitis"
+   ],
+   "relacionados": [
+    "peeling-medico-corporal",
+    "subcision",
+    "radiofrecuencia-corporal"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#microneedling-corporal-para-estrias-y-cicatrices",
+    "https://iemec-clinic.com/corporal#microneedling-para-la-flacidez-retencion-liquidos-y-celulitis"
+   ],
+   "pendiente": [
+    "Confirmar quién lo realiza (el catálogo indica esteticista), la duración real y los cuidados posteriores."
+   ]
+  },
+  {
+   "slug": "peeling-medico-corporal",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "peeling-medico-cicatrices-estrias"
+   ],
+   "orden": 150,
+   "destacado": false,
+   "nombre": "Peeling médico corporal",
+   "titulo": "Peeling médico para cicatrices y estrías",
+   "titulo_seo": "Peeling médico corporal en Boadilla · IEMEC",
+   "descripcion_seo": "Peeling médico para cicatrices y estrías en IEMEC Boadilla: renueva la piel del cuerpo y mejora su textura y su tono de forma progresiva.",
+   "entradilla": "Una exfoliación médica controlada que renueva la piel, ayuda a atenuar cicatrices y estrías y unifica el tono, sesión a sesión.",
+   "para_quien": [
+    "Tienes cicatrices o estrías y quieres mejorar su aspecto.",
+    "Notas la piel del cuerpo con textura irregular o con el tono poco uniforme.",
+    "Prefieres un tratamiento progresivo y sin agujas."
+   ],
+   "texto": [
+    "El peeling médico aplica sobre la piel una solución que produce una exfoliación controlada. La piel se renueva, mejora su textura y su tono se vuelve más uniforme.",
+    "En el cuerpo lo usamos para atenuar cicatrices y estrías de forma progresiva. Lo indica y lo aplica un médico, que elige el tipo de peeling según tu piel y la zona.",
+    "Suelen hacerse entre 4 y 6 sesiones, con unas dos semanas entre una y otra. Según el tipo, el color y la antigüedad de las estrías o cicatrices, puede combinarse con otras técnicas, como el microneedling o la subcisión."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Entre 4 y 6, cada dos semanas aproximadamente",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "La mejora es progresiva con cada sesión y varía según cada persona y el tipo de cicatriz o estría.",
+   "preguntas": [
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Suelen recomendarse entre 4 y 6 sesiones, con unas dos semanas entre una y otra. El médico ajusta el plan según tu piel, la zona y cómo responda a las primeras sesiones."
+    },
+    {
+     "p": "¿Sirve para todas las estrías y cicatrices?",
+     "r": "Depende de su tipo, color y antigüedad. Por eso empezamos con una valoración médica: a veces conviene combinar el peeling con otras técnicas, como el microneedling o la subcisión, para mejorar el resultado."
+    },
+    {
+     "p": "¿Quién aplica el peeling?",
+     "r": "Un médico de la clínica, que elige el tipo de peeling y su intensidad según tu piel y la zona. En la valoración te explica qué puedes esperar, los cuidados, los riesgos y las alternativas."
+    }
+   ],
+   "preocupaciones": [
+    "calidad-de-piel",
+    "manchas"
+   ],
+   "relacionados": [
+    "microneedling-corporal",
+    "subcision",
+    "carboxiterapia"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#peeling-medico-para-cicatrices-y-estrias",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Confirmar el tipo de peeling, la duración, los cuidados posteriores (sol, descamación) y el tiempo de recuperación."
+   ]
+  },
+  {
+   "slug": "carboxiterapia",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "carboxiterapia"
+   ],
+   "orden": 160,
+   "destacado": false,
+   "nombre": "Carboxiterapia",
+   "titulo": "Carboxiterapia para la celulitis, la flacidez y las estrías",
+   "titulo_seo": "Carboxiterapia en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Carboxiterapia en IEMEC Boadilla: aplicación médica de CO₂ para la celulitis, la grasa localizada, la flacidez o las estrías, tras una valoración.",
+   "entradilla": "Un tratamiento médico que aplica dióxido de carbono en la zona para favorecer la circulación y el colágeno, siempre tras una valoración personalizada.",
+   "para_quien": [
+    "Te preocupan la celulitis o la grasa localizada.",
+    "Notas flacidez o tienes estrías.",
+    "Quieres una valoración médica para elegir el tratamiento corporal adecuado."
+   ],
+   "texto": [
+    "La carboxiterapia es un tratamiento médico que aplica dióxido de carbono (CO₂) en la zona a tratar. Su objetivo es mejorar la circulación, estimular la producción de colágeno y favorecer la regeneración de los tejidos.",
+    "Se usa para la celulitis, la grasa localizada, la flacidez y las estrías, entre otras alteraciones estéticas. La realiza un médico tras una valoración personalizada, en la que te explica la idoneidad, los riesgos y las alternativas.",
+    "Suele plantearse como un ciclo de sesiones semanales. La mejora de la piel es progresiva y se revisa a lo largo del tratamiento."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Un ciclo de sesiones semanales",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "La mejora de la piel es progresiva a lo largo del ciclo de sesiones y varía según cada persona.",
+   "preguntas": [
+    {
+     "p": "¿Para qué sirve la carboxiterapia?",
+     "r": "Se utiliza para la celulitis, la grasa localizada, la flacidez y las estrías, y también en otras zonas, como las ojeras. En la valoración el médico te dice si es una opción adecuada para lo que te preocupa."
+    },
+    {
+     "p": "¿Cuántas sesiones se necesitan?",
+     "r": "Suele plantearse un ciclo de varias sesiones, normalmente una por semana. El número exacto depende de la zona y de tu piel, y el médico te lo concreta tras valorarte."
+    },
+    {
+     "p": "¿Quién la realiza?",
+     "r": "Un médico de la clínica, después de una valoración personalizada. En esa consulta revisa tu historia de salud y te explica qué puedes esperar, los riesgos y otras alternativas."
+    }
+   ],
+   "preocupaciones": [
+    "celulitis",
+    "grasa-localizada",
+    "flacidez"
+   ],
+   "relacionados": [
+    "mesoterapia-corporal",
+    "subcision",
+    "microneedling-corporal"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Solo aparece en Multiestetica, no en la web actual: confirmar que se ofrece y que se quiere publicar.",
+    "Régimen legal sin confirmar (CO₂ de uso médico): confirmarlo antes de publicar.",
+    "Confirmar zonas, duración, número de sesiones y cómo se aplica."
+   ]
+  },
+  {
+   "slug": "aumento-de-gluteos",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "aumento-gluteos-ah"
+   ],
+   "orden": 170,
+   "destacado": false,
+   "nombre": "Aumento de glúteos",
+   "titulo": "Aumento de glúteos sin cirugía",
+   "titulo_seo": "Aumento de glúteos en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Aumento de glúteos sin cirugía en IEMEC Boadilla: procedimiento médico con infiltraciones para dar volumen y forma, con valoración médica previa.",
+   "entradilla": "Un procedimiento médico sin cirugía que aporta volumen y mejora la forma de los glúteos con un relleno específico para el cuerpo, buscando un resultado discreto.",
+   "para_quien": [
+    "Quieres más volumen o proyección en los glúteos sin cirugía.",
+    "Buscas mejorar su forma de manera discreta y personalizada.",
+    "Prefieres un procedimiento ambulatorio que te permita volver pronto a tu rutina."
+   ],
+   "texto": [
+    "El aumento de glúteos sin cirugía es un procedimiento médico para dar volumen, proyección y forma a los glúteos. Se usa un ácido hialurónico reticulado, es decir, más consistente, diseñado para zonas del cuerpo.",
+    "Lo aplica un médico con cánula y anestesia local, en una sesión. Es ambulatorio: puedes caminar desde el primer día y volver a tu rutina, evitando unos días la presión directa sobre la zona y el ejercicio intenso de glúteo.",
+    "Requiere valoración médica previa: el médico estudia tu caso y te explica la idoneidad, los riesgos y las alternativas, incluida la cirugía. El efecto es temporal, porque el cuerpo reabsorbe el producto con el tiempo."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Una sesión",
+    "anestesia": "Anestesia local",
+    "recuperacion": "Puedes caminar desde el primer día; sin presión directa durante 48 horas ni ejercicio de glúteo entre 5 y 7 días",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "El resultado se aprecia cuando el producto se asienta, en los días siguientes, y varía según cada persona; el efecto suele durar entre 12 y 18 meses, según el producto.",
+   "preguntas": [
+    {
+     "p": "¿Duele?",
+     "r": "Se aplica anestesia local, así que las molestias durante el procedimiento son mínimas. Después puede notarse una ligera molestia en la zona durante los primeros días."
+    },
+    {
+     "p": "¿Puedo sentarme y hacer vida normal después?",
+     "r": "Sí. Puedes caminar desde el primer día y sentarte, aunque conviene evitar la presión directa sobre la zona durante las primeras 48 horas. Usa ropa cómoda y evita los masajes en la zona esos días."
+    },
+    {
+     "p": "¿Cuándo puedo volver a entrenar?",
+     "r": "Espera entre 5 y 7 días para los ejercicios que trabajan el glúteo, como sentadillas o spinning. El entrenamiento completo suele poder retomarse hacia las 2 semanas, según tu evolución."
+    },
+    {
+     "p": "¿Cuánto dura el efecto?",
+     "r": "Suele durar entre 12 y 18 meses, según el producto, tu estilo de vida y cada persona. El ácido hialurónico se reabsorbe poco a poco, así que el tratamiento puede repetirse si lo deseas, tras valorarlo con el médico."
+    },
+    {
+     "p": "¿Se nota el producto?",
+     "r": "El producto se integra en el tejido y el resultado busca ser discreto y acorde con tu figura. En la valoración decidimos contigo el volumen adecuado para ti."
+    }
+   ],
+   "preocupaciones": [
+    "volumen-y-contorno"
+   ],
+   "relacionados": [
+    "subcision",
+    "radiofrecuencia-corporal",
+    "remodelacion-corporal"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#aumento-de-gluteos-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/es-seguro-el-aumento-de-gluteos-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/es-posible-aumentar-gluteos-sin-cirugia-antes-del-verano-tratamiento-con-acido-hialuronico",
+    "https://iemec-clinic.com/blog/cuanto-tiempo-debo-esperar-para-hacer-ejercicio-despues-del-aumento-de-gluteos-con-acido-hialuronico"
+   ],
+   "pendiente": [
+    "La sección actual de glúteos muestra por error el texto del Dermapen; aquí se ha redactado con los datos del blog.",
+    "Producto sanitario de uso profesional: no se nombra la marca; confirmar el producto y que pueden publicarse la duración del efecto (12-18 meses) y los plazos de recuperación.",
+    "Normas: el material (ácido hialurónico) solo aparece como dato informativo en el cuerpo del texto, no en el título, la entradilla ni la descripción SEO."
+   ]
+  },
+  {
+   "slug": "sudoracion-excesiva",
+   "especialidad": "medicina-estetica-corporal",
+   "catalogo": [
+    "toxina-hiperhidrosis"
+   ],
+   "orden": 180,
+   "destacado": false,
+   "nombre": "Sudoración excesiva",
+   "titulo": "Sudoración excesiva: valoración médica",
+   "titulo_seo": "Sudoración excesiva en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Sudoración excesiva en IEMEC Boadilla: valoración médica para estudiar tu caso y proponerte un plan personalizado, con sus riesgos y alternativas.",
+   "entradilla": "Si sudas mucho más de lo que tu cuerpo necesita, en la consulta médica estudiamos tu caso y te explicamos qué opciones tienes.",
+   "para_quien": [
+    "Sudas en exceso aunque no haga calor ni estés haciendo ejercicio.",
+    "El sudor te condiciona en el trabajo o en tu vida social.",
+    "Quieres saber qué opciones médicas tienes."
+   ],
+   "texto": [
+    "La hiperhidrosis es una sudoración mayor de la que el cuerpo necesita para regular su temperatura. No es solo una cuestión estética: puede afectar a la calidad de vida y hacer incómodas situaciones cotidianas.",
+    "En la valoración médica, el médico te pregunta por tus síntomas, las zonas afectadas, tu salud y tu medicación, y te explica qué opciones de tratamiento hay en tu caso, cómo son, sus riesgos y sus alternativas.",
+    "Si está indicado, el tratamiento se hace en la propia consulta y el médico te dice cada cuánto conviene revisarlo. El resultado varía según cada persona."
+   ],
+   "sesion": {
+    "duracion": null,
+    "sesiones": "Según la valoración",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "El resultado y cuánto se mantiene varían según cada persona; el médico te lo explica en la valoración.",
+   "preguntas": [
+    {
+     "p": "¿Qué es la hiperhidrosis?",
+     "r": "Es una sudoración mayor de la que el cuerpo necesita para regular su temperatura. Puede aparecer aunque no haga calor ni estés haciendo ejercicio, y a menudo condiciona el trabajo o la vida social."
+    },
+    {
+     "p": "¿Qué pasa en la valoración?",
+     "r": "El médico te pregunta por tus síntomas, las zonas afectadas, tu salud y tu medicación, confirma el diagnóstico y te explica qué opciones tienes, sus riesgos, sus alternativas y qué puedes esperar en tu caso."
+    },
+    {
+     "p": "¿Cuánto dura el efecto?",
+     "r": "Depende del tratamiento que se indique y de cada persona. En la valoración, el médico te explica qué puedes esperar y cada cuánto conviene revisarlo para mantener el resultado."
+    }
+   ],
+   "preocupaciones": [
+    "bienestar"
+   ],
+   "relacionados": [
+    "depilacion-laser",
+    "drenaje-linfatico"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/corporal#sudor",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Medicamento de receta: no se nombra, ni se describe su mecanismo ni la duración de su efecto, porque sería una referencia indirecta (normas.md, apartado b); tampoco en el mensaje de WhatsApp (el actual lo nombra, igual que el id principal del catálogo).",
+    "Normas: comprobar que la autorización del centro (CS17886) cubre el tratamiento de la hiperhidrosis, que es un problema de salud.",
+    "Confirmar las zonas que se tratan y la duración de la consulta."
+   ]
+  },
+  {
+   "slug": "balon-gastrico",
+   "especialidad": "perdida-de-peso",
+   "catalogo": [
+    "balon-gastrico"
+   ],
+   "orden": 10,
+   "destacado": true,
+   "nombre": "Balón gástrico",
+   "titulo": "Balón gástrico: valoración y seguimiento médico",
+   "titulo_seo": "Balón gástrico en Boadilla del Monte · IEMEC",
+   "descripcion_seo": "Balón gástrico en IEMEC Boadilla: valoración médica, colocación por un cirujano de aparato digestivo y seguimiento médico y nutricional.",
+   "entradilla": "Una opción sin cirugía para el control del peso: un balón ocupa parte del estómago durante un tiempo y ayuda a sentir saciedad antes, con seguimiento médico y nutricional.",
+   "para_quien": [
+    "Tienes exceso de peso y otras medidas no te han funcionado.",
+    "Buscas una opción sin cirugía, con acompañamiento médico.",
+    "Quieres cambiar tus hábitos con apoyo nutricional durante el proceso."
+   ],
+   "texto": [
+    "El balón gástrico es un dispositivo que se coloca en el estómago y ocupa parte de su espacio. Así se come menos cantidad y la sensación de saciedad llega antes. Es una opción no quirúrgica y reversible.",
+    "En IEMEC empieza con una valoración médica: revisamos tu salud, tus antecedentes y tus objetivos, y te explicamos la idoneidad, los riesgos y las alternativas. La colocación la hace un cirujano de aparato digestivo en un centro hospitalario autorizado, fuera de la clínica.",
+    "El balón se mantiene un tiempo limitado, de unos meses según el tipo, y después se retira o el propio cuerpo lo expulsa. Durante el proceso tienes seguimiento médico y nutricional para cambiar hábitos y mantenerlos después."
+   ],
+   "sesion": {
+    "duracion": "Valoración de unos 45 minutos",
+    "sesiones": "Una colocación, con seguimiento durante varios meses",
+    "anestesia": null,
+    "recuperacion": null,
+    "profesional": "Equipo médico (valoración) y cirujano de aparato digestivo (colocación)"
+   },
+   "variantes": [],
+   "resultados": "La evolución varía según cada persona y depende sobre todo de los hábitos que se consolidan durante el seguimiento.",
+   "preguntas": [
+    {
+     "p": "¿Cómo se coloca?",
+     "r": "Depende del tipo de balón indicado en tu caso. La colocación la hace un cirujano de aparato digestivo en un centro hospitalario autorizado; en la valoración te explicamos paso a paso cómo será el procedimiento."
+    },
+    {
+     "p": "¿Cuánto tiempo se lleva?",
+     "r": "Un tiempo limitado, de unos meses según el tipo de balón. Después se retira o el propio cuerpo lo expulsa, y el seguimiento médico y nutricional continúa para ayudarte a mantener los nuevos hábitos."
+    },
+    {
+     "p": "¿Qué incluye el seguimiento?",
+     "r": "Revisiones médicas y asesoramiento nutricional personalizado durante el proceso, para que aprendas a comer de otra forma y adquieras hábitos saludables que te ayuden a mantener los cambios a largo plazo."
+    },
+    {
+     "p": "¿Es para mí?",
+     "r": "Está pensado para personas con exceso de peso que buscan una opción menos invasiva que la cirugía. La indicación la decide el médico tras valorar tu salud, tu peso y tus antecedentes."
+    }
+   ],
+   "preocupaciones": [
+    "peso"
+   ],
+   "relacionados": [
+    "neuroestimulacion-control-del-apetito",
+    "radiofrecuencia-corporal",
+    "hifu-corporal"
+   ],
+   "restringida": true,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/perdida-de-peso",
+    "https://www.multiestetica.com/centros/instituto-europeo-de-medicina-estetica-y-capilar-iemec"
+   ],
+   "pendiente": [
+    "Producto sanitario de uso profesional: no se nombra la marca del balón (la web actual pone «Allurion» en el título y en el mensaje de WhatsApp).",
+    "Confirmar el tipo de balón, el centro autorizado donde se coloca (normas: decir cuál) y quién lo hace: Multiestetica habla de colocación y retirada por un cirujano de aparato digestivo en hospital, y el blog, de una cápsula que se traga.",
+    "Normas: sin «obesidad» ni cifras o promesas de pérdida de peso (la web actual da porcentajes).",
+    "Área de peso: confirmar que la autorización del centro (CS17886) cubre la valoración y el seguimiento; normas.md deja pendiente de autorización (U.10/U.11) el control de peso."
+   ]
+  },
+  {
+   "slug": "neuroestimulacion-control-del-apetito",
+   "especialidad": "perdida-de-peso",
+   "catalogo": [
+    "neuroline-t6"
+   ],
+   "orden": 20,
+   "destacado": true,
+   "nombre": "Neuroestimulación para el apetito",
+   "titulo": "Neuroestimulación para el control del apetito",
+   "titulo_seo": "Neuroestimulación para el apetito en Boadilla · IEMEC",
+   "descripcion_seo": "Neuroestimulación del dermatoma T6 en IEMEC Boadilla: técnica médica que ayuda a controlar el apetito, dentro de un plan con supervisión médica.",
+   "entradilla": "Una técnica médica que aplica un estímulo eléctrico mínimo en un punto del abdomen para ayudar a reducir el apetito y a seguir tu plan de alimentación.",
+   "para_quien": [
+    "Tienes sobrepeso y te resulta difícil controlar el apetito.",
+    "Mantener una dieta en el día a día se te complica.",
+    "Buscas una ayuda sin fármacos ni cirugía, supervisada por un médico."
+   ],
+   "texto": [
+    "La neuroestimulación del dermatoma T6 es una técnica médica que actúa sobre el apetito. Un dermatoma es la zona de piel que corresponde a un nervio concreto; el T6 está en el abdomen y se relaciona con funciones digestivas.",
+    "Con una aguja muy fina se aplica en ese punto una corriente eléctrica mínima. El objetivo es disminuir la grelina, la hormona que provoca la sensación de hambre, para que te resulte más fácil seguir una alimentación equilibrada.",
+    "La indica y la supervisa un médico, tras una valoración médica y dentro de un plan integral con cambios de hábitos. Es compatible con cualquier tipo de dieta y puede combinarse con el balón gástrico u otros tratamientos que indique el médico."
+   ],
+   "sesion": {
+    "duracion": "Unos 30 minutos",
+    "sesiones": "Un ciclo de sesiones semanales que marca el médico",
+    "anestesia": null,
+    "recuperacion": "Ambulatorio: sigues con tu día al salir",
+    "profesional": "Equipo médico"
+   },
+   "variantes": [],
+   "resultados": "El efecto sobre el apetito varía según cada persona y depende de que lo acompañes de cambios en la alimentación.",
+   "preguntas": [
+    {
+     "p": "¿Cómo funciona?",
+     "r": "Con una aguja fina se aplica una estimulación eléctrica de baja intensidad en un punto del abdomen relacionado con el dermatoma T6. Busca reducir la grelina, la hormona del hambre, para ayudarte a controlar el apetito."
+    },
+    {
+     "p": "¿Para quién está indicada?",
+     "r": "Para personas con sobrepeso a las que les resulta difícil seguir una dieta, o que prefieren evitar fármacos o cirugía. También puede combinarse con el balón gástrico u otros tratamientos, si el médico lo ve adecuado."
+    },
+    {
+     "p": "¿Tiene efectos secundarios?",
+     "r": "Como cualquier técnica médica, puede producir molestias o efectos no deseados y tiene contraindicaciones, que el médico te explica en la valoración antes de empezar. La sesión es ambulatoria y puedes seguir con tu día al salir."
+    },
+    {
+     "p": "¿Cuántas sesiones necesito?",
+     "r": "Se plantea como un ciclo de sesiones semanales. El número lo decide el médico según tu caso y tu evolución, y se revisa durante el seguimiento junto con tu plan de alimentación."
+    }
+   ],
+   "preocupaciones": [
+    "peso"
+   ],
+   "relacionados": [
+    "balon-gastrico",
+    "radiofrecuencia-corporal",
+    "hifu-corporal"
+   ],
+   "restringida": false,
+   "revision_medica": true,
+   "fuentes": [
+    "https://iemec-clinic.com/perdida-de-peso#neuroline-t6",
+    "https://iemec-clinic.com/blog/que-es-neuroline-t6-y-como-ayuda-a-controlar-el-apetito-y-perder-peso"
+   ],
+   "pendiente": [
+    "La web actual promete «10 kg en 10 semanas» y «sin efectos secundarios»: no se traslada.",
+    "Confirmar el número de sesiones (el catálogo dice 10, semanales) y la duración.",
+    "Neuroline T6 es la marca del equipo: las normas no permiten anunciarla, así que aquí no se nombra (tampoco «T6» en el título, como propone el anexo B).",
+    "Normas (apartado d): pendiente también de que se confirme la autorización del área de peso (U.10/U.11)."
+   ]
+  }
+ ],
+ "sin_pagina": [
+  {
+   "catalogo": "semaglutida",
+   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte.",
+   "va_en": null
+  },
+  {
+   "catalogo": "tirzepatida-mounjaro",
+   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte. Además, oferta sin confirmar: solo sale en el blog.",
+   "va_en": null
+  },
+  {
+   "catalogo": "liraglutida-saxenda",
+   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte. Además, oferta sin confirmar: solo sale en el blog.",
+   "va_en": null
+  },
+  {
+   "catalogo": "reducomplex",
+   "motivo": "Medicamento de receta del control de peso. Según normas.md (anexo B), iría en la página «Control de peso con supervisión médica» (control-de-peso), que queda en sin_pagina hasta que la clínica confirme la autorización de Endocrinología (U.10) y Nutrición y dietética (U.11). Borrador preparado aparte. Además, nombre y pauta sin confirmar: en la web actual solo sale en /portafolio, con cifras de kilos y antes y después.",
+   "va_en": null
+  },
+  {
+   "catalogo": "easy-diet",
+   "motivo": "Programa médico-nutricional que solo sale en el blog (oferta sin confirmar). Según normas.md (anexo B), va con «Control de peso con supervisión médica», en sin_pagina hasta que se confirme la autorización U.10/U.11. Borrador preparado aparte, como variante de «Dietética y nutrición».",
+   "va_en": null
+  },
+  {
+   "catalogo": "dietetica-nutricion",
+   "motivo": "La autorización del centro (CS17886) no incluye Nutrición y dietética (U.11) ni Endocrinología (U.10); normas.md (anexo B y apartado k) la deja sin página hasta que la clínica lo confirme. Borrador de «Dietética y nutrición» preparado aparte.",
+   "va_en": null
+  },
+  {
+   "catalogo": "varices-ecoesclerosis",
+   "motivo": "La autorización del centro no incluye Angiología y cirugía vascular (U.39); normas.md (apartado k y anexo B) deja «Varices y arañas vasculares» sin página hasta que la clínica lo confirme. Además, el esclerosante es un medicamento de receta. Borrador preparado aparte.",
+   "va_en": null
+  },
+  {
+   "catalogo": "laser-vascular-piernas",
+   "motivo": "Va con «Varices y arañas vasculares», pendiente de la autorización U.39. Según normas.md, las arañas vasculares con fin estético podrían ir en medicina estética (U.48) si la clínica quiere publicarlas antes; faltan equipo y número de sesiones.",
+   "va_en": null
+  },
+  {
+   "catalogo": "criolipolisis",
+   "motivo": "Oferta sin confirmar: solo se cita en un post del blog como combinable con la presoterapia; la web actual no presenta el servicio ni el equipo.",
+   "va_en": null
+  },
+  {
+   "catalogo": "cirugia-bariatrica",
+   "motivo": "No se hace en IEMEC (normas.md, anexo B) y solo figura en la lista de Multiestetica, sin descripción: oferta sin confirmar.",
+   "va_en": null
+  }
+ ]
+}
