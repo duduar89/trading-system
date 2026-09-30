@@ -598,6 +598,8 @@ mark.pendiente { background: #fff1c2; color: #5a3f00; border: 1px dashed #b88a1a
 .tabla-legal th, .tabla-legal td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--borde); }
 .tabla-legal thead th { font-size: .7rem; letter-spacing: .16em; text-transform: uppercase; color: var(--suave); font-weight: 500; }
 .tabla-legal.clave-valor th { width: 34%; font-weight: 600; }
+/* Un correo solo en su celda (aviso legal, privacidad): zona de toque de 44 px. */
+.tabla-legal td > a:only-child { display: inline-block; min-height: 44px; }
 @media (max-width: 719px) {
   .tabla-legal thead { display: none; }
   .tabla-legal tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--borde); }
@@ -631,7 +633,8 @@ mark.pendiente { background: #fff1c2; color: #5a3f00; border: 1px dashed #b88a1a
 .enlaces-legales { list-style: none; display: flex; flex-wrap: wrap; column-gap: 20px; }
 .fse { display: grid; gap: 14px; grid-template-columns: 1fr; align-items: center; padding: 16px; border: 1px solid rgba(201, 164, 92, .22); border-radius: var(--radio-p); background: rgba(7, 30, 29, .35); }
 @media (min-width: 720px) { .fse { grid-template-columns: 200px 1fr; } }
-.fse-emblema { display: grid; place-items: center; min-height: 64px; padding: 8px; border: 1px dashed rgba(217, 191, 143, .6); border-radius: 8px; text-align: center; font-size: .72rem; color: var(--champan); }
+/* El emblema oficial de la UE, en negativo para el fondo oscuro: 48 px de alto (más de 1 cm). */
+.fse-emblema img { display: block; height: 48px; width: auto; }
 .fse p { margin: 0; line-height: 1.6; }
 .pie .copy { margin: 0; color: #9fb7b3; font-size: .8rem; }
 

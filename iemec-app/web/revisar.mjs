@@ -4,10 +4,12 @@
 // Mira todas las páginas del sitemap (y la 404) de 320 a 1440 px: que ninguna caja se salga por los
 // lados (por su rectángulo: con overflow-x: clip no hay barra horizontal que avise), que no
 // haya errores de consola ni imágenes rotas y que las zonas de toque midan al menos 44 px. Prueba el
-// menú del móvil (abre, atrapa el foco, se cierra con Escape) y guarda capturas a página completa de
-// las cinco páginas clave en móvil (390 × 844) y escritorio (1440 × 900).
+// menú del móvil (abre, atrapa el foco, se cierra con Escape), comprueba lo que dice la política de
+// cookies (ninguna cookie, nada en el almacenamiento local y, en el de sesión, solo «iemec-campana» y
+// solo si se llega con un código de campaña) y guarda capturas a página completa de las cinco páginas
+// clave en móvil (390 × 844) y escritorio (1440 × 900).
 // Si no hay nada escuchando en el puerto, arranca web/servir.js y lo para al acabar (por su PID).
-/* global document, getComputedStyle -- lo de pagina.evaluate corre en el navegador */
+/* global document, getComputedStyle, window -- lo de pagina.evaluate corre en el navegador */
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -129,6 +131,25 @@ async function probarMenu(navegador, problemas) {
   return { abierto, cerrado };
 }
 
+// La tabla de /cookies/: después de recorrer las páginas no hay cookies ni almacenamiento local, y en
+// el de sesión solo la campaña, cuando se llega con ?utm_campaign=….
+async function probarAlmacenamiento(navegador, rutas, problemas) {
+  const ctx = await navegador.newContext({ viewport: { width: 390, height: 844 } });
+  const p = await ctx.newPage();
+  const guardado = () => p.evaluate(() => ({ local: Object.keys(window.localStorage), sesion: Object.keys(window.sessionStorage) }));
+  for (const ruta of rutas.slice(0, 12)) await p.goto(`${BASE}${ruta}`, { waitUntil: 'load' });
+  const sin = await guardado();
+  await p.goto(`${BASE}/medicina-estetica-corporal/lipolaser/?utm_source=prueba&utm_campaign=revision`, { waitUntil: 'load' });
+  await p.goto(`${BASE}/pedir-cita/`, { waitUntil: 'load' });
+  const con = await guardado();
+  const cookies = await ctx.cookies();
+  if (cookies.length) problemas.push({ pagina: '*', ancho: 390, problema: `cookies: ${cookies.map((c) => c.name).join(', ')}` });
+  if (sin.local.length || sin.sesion.length) problemas.push({ pagina: '*', ancho: 390, problema: `guarda sin campaña: ${JSON.stringify(sin)}` });
+  if (con.local.length || con.sesion.join() !== 'iemec-campana') problemas.push({ pagina: '*', ancho: 390, problema: `con campaña guarda ${JSON.stringify(con)} (la política de cookies solo dice «iemec-campana»)` });
+  await ctx.close();
+  return { cookies: cookies.length, sin_campana: sin, con_campana: con };
+}
+
 async function main() {
   const servidor = await asegurarServidor();
   const navegador = await lanzar();
@@ -160,6 +181,7 @@ async function main() {
       await ctx.close();
     }
     const menu = await probarMenu(navegador, problemas);
+    const almacenamiento = await probarAlmacenamiento(navegador, rutas, problemas);
     // Capturas a página completa.
     fs.mkdirSync(CAPTURAS, { recursive: true });
     const hechas = [];
@@ -175,7 +197,7 @@ async function main() {
       }
       await ctx.close();
     }
-    const resumen = { fecha_revision: 'local', paginas: rutas.length, anchos: ANCHOS, cargas, menu, problemas, capturas: hechas.map((h) => path.basename(h)) };
+    const resumen = { fecha_revision: 'local', paginas: rutas.length, anchos: ANCHOS, cargas, menu, almacenamiento, problemas, capturas: hechas.map((h) => path.basename(h)) };
     fs.writeFileSync(path.join(CAPTURAS, 'revisar.json'), `${JSON.stringify(resumen, null, 1)}\n`);
     console.log(`${rutas.length} páginas × ${ANCHOS.length} anchos (${cargas} cargas) · problemas: ${problemas.length} · capturas en ${CAPTURAS}`);
     for (const p of problemas.slice(0, 60)) console.log(`  ${p.pagina} @${p.ancho}: ${p.problema}`);

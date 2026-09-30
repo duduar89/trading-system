@@ -4,9 +4,10 @@
 > terceros que necesiten consentimiento** (fuentes alojadas en el propio servidor, sin Google
 > Analytics, sin píxel de Meta, sin mapas ni vídeos incrustados, sin reCAPTCHA). Así no hace falta
 > banner (LSSI, art. 22.2; [Guía sobre el uso de las cookies de la AEPD, mayo de 2024](https://www.aepd.es/guias/guia-cookies.pdf)).
-> Antes de publicar, el desarrollo confirma la tabla del apartado 2 con el inventario real del
-> navegador `[PENDIENTE]`. Si algún día se añade analítica, mapas o vídeos, se usa la variante B
-> del final.
+> La tabla del apartado 2 la comprueba `node web/revisar.mjs` en un Chromium de verdad: después de
+> recorrer todas las páginas no queda ninguna cookie ni nada en el almacenamiento local, y en el de
+> sesión solo `iemec-campana`, y solo si se llega con un código de campaña. Si algún día se añade
+> analítica, mapas o vídeos, se usa la variante B del final.
 > Hoy iemec-clinic.com carga dos propiedades de Google Analytics, dos píxeles de Meta, Google
 > Fonts y reCAPTCHA, con un banner de SITE123: nada de eso pasa a la web nueva.
 
@@ -48,7 +49,7 @@ privacidad o datos de sitios). La web seguirá funcionando igual.
 Si algún día usamos cookies que necesiten tu consentimiento, te lo pediremos antes con un aviso
 claro y podrás rechazarlas con la misma facilidad que aceptarlas.
 
-Última actualización: `[PENDIENTE: fecha de publicación]`
+Última actualización: {{fecha_textos}}
 
 ---
 

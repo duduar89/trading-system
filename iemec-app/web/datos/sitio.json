@@ -1,5 +1,5 @@
 {
-  "_nota": "Datos de la clínica para la web nueva. Fuentes: semillas/iemec/clinica.json, el inventario de iemec-clinic.com (30-09-2026) y normas.md. Lo que falta confirmar va en «pendiente» y sale resaltado en la web como [PENDIENTE: …] hasta que la clínica lo resuelva.",
+  "_nota": "Datos de la clínica para la web nueva. Fuentes: semillas/iemec/clinica.json, el inventario de iemec-clinic.com (30-09-2026), normas.md, el BORME y el Registro de centros sanitarios de la Comunidad de Madrid. Lo que falta confirmar sale resaltado en la vista previa como [PENDIENTE: …]; qué es imprescindible y cómo se publica mientras tanto: web/datos/lanzamiento.json.",
   "dominio": "https://iemec-clinic.com",
   "con_www": false,
   "idioma": "es-ES",
@@ -9,7 +9,10 @@
   "frase": "IEMEC es un centro sanitario de medicina estética, cirugía estética y medicina capilar en Boadilla del Monte: te valoramos antes de proponerte nada y te acompañamos en cada paso.",
   "titular": {
     "razon_social": "Aneco AP Consulting, S.L.",
-    "nif": "B88613492"
+    "nif": "B88613492",
+    "domicilio_social": "Calle Morella, 6, 2, Boadilla del Monte (Madrid)",
+    "registro_mercantil": "Registro Mercantil de Madrid, tomo 40334, folio 7, sección 8.ª, hoja M-716525, inscripción 1.ª",
+    "_fuente": "BORME, sección primera, Madrid: núm. 49, 11-03-2020, anuncio 112305 (constitución; «Domicilio: CALLE MORELLA Número6 2 (BOADILLA DEL MONTE)… Datos registrales. T 40334, F 7, S 8, H M 716525, I/A 1»), https://www.boe.es/borme/dias/2020/03/11/pdfs/BORME-A-2020-49-28.pdf; sin cambio de domicilio en los actos posteriores (núm. 149, 05-08-2021, anuncio 371652; núm. 233, 05-12-2025, anuncio 542275). Consultado el 30-09-2026."
   },
   "registro_sanitario": {
     "numero": "CS17886",
@@ -22,9 +25,12 @@
     "municipio": "Boadilla del Monte",
     "provincia": "Madrid",
     "pais": "ES",
-    "pendiente": "confirmar si es «local 35» o «locales 35-36», como figura en el Registro de centros sanitarios"
+    "_registro_centros": "En el Registro de centros sanitarios de la Comunidad de Madrid (ficha CS17886, consultada el 30-09-2026) figura como «Avenida Siglo Xxi Nº 13, Piso/Puerta PTA 35 -36»: el aviso legal lo dice; el resto de la web usa «local 35», como la clínica."
   },
-  "coordenadas": { "lat": 40.4066059, "lng": -3.9001441 },
+  "coordenadas": {
+    "lat": 40.4066059,
+    "lng": -3.9001441
+  },
   "como_llegar": {
     "google": "https://www.google.com/maps/dir/?api=1&destination=IEMEC%2C%20Av.%20Siglo%20XXI%2013%2C%2028660%20Boadilla%20del%20Monte&destination_place_id=ChIJB6Pn5d2FQQ0ReZ4Qoqe8gtg",
     "apple": "https://maps.apple.com/?daddr=Av.%20Siglo%20XXI%2013%2C%2028660%20Boadilla%20del%20Monte&ll=40.4066059%2C-3.9001441",
@@ -35,23 +41,62 @@
     "ficha": "https://www.google.com/maps/place/?q=place_id:ChIJB6Pn5d2FQQ0ReZ4Qoqe8gtg",
     "_nota": "Solo un enlace neutro a la ficha («Nuestra ficha en Google»), en /pedir-cita/. Ni la nota ni el número de opiniones: normas.md (apartado d) no permite reseñas como reclamo en la web de un centro sanitario (RD 1907/1996, art. 4.7; CDM 2022, art. 89.3), y normas.json lo prueba."
   },
-  "telefono": { "e164": "+34722833285", "visible": "722 83 32 85", "internacional": "+34 722 83 32 85" },
+  "telefono": {
+    "e164": "+34722833285",
+    "visible": "722 83 32 85",
+    "internacional": "+34 722 83 32 85"
+  },
   "telefono_fijo": null,
   "whatsapp": {
     "numero": "34722833285",
     "plantilla": "Hola, vengo de la web y me interesa: {tratamiento}. (ref. {ref})"
   },
   "correo": null,
-  "correo_pendiente": "correo del dominio de la clínica; hoy solo hay un Gmail",
+  "_correo": "Correo propio del dominio de la clínica (no un Gmail): imprescindible (lanzamiento.json → correo). Hoy el dominio no tiene correo (sin registros MX).",
+  "dpd": null,
+  "_dpd": "Delegado de protección de datos: {\"nombre\": \"persona o empresa\", \"correo\": \"…\"}. Imprescindible (lanzamiento.json → dpd).",
   "horario": [
-    { "dias": "Lunes a viernes", "abre": "11:00", "cierra": "20:00", "schema": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] },
-    { "dias": "Sábado", "pendiente": "horario del sábado", "_detalle": "Google dice de 11:00 a 20:00 y Treatwell, de 10:00 a 20:00" }
+    {
+      "dias": "Lunes a viernes",
+      "abre": "11:00",
+      "cierra": "20:00",
+      "schema": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday"
+      ]
+    },
+    {
+      "dias": "Sábado",
+      "pendiente": "horario del sábado",
+      "_detalle": "Google dice de 11:00 a 20:00 y Treatwell, de 10:00 a 20:00"
+    }
   ],
+  "politica_menores": null,
+  "_politica_menores": "Frase que sale en el recuadro de las cirugías cuando la clínica fije su política con menores (p. ej. «Solo para mayores de edad.»). Mientras, en la vista previa sale el hueco y al publicar no se dice nada.",
   "redes": [
-    { "red": "Instagram", "url": "https://www.instagram.com/iemec_clinic/", "icono": "instagram" },
-    { "red": "Facebook", "url": "https://www.facebook.com/IEMECClinic", "icono": "facebook" },
-    { "red": "TikTok", "url": "https://www.tiktok.com/@iemec_clinic", "icono": "tiktok" },
-    { "red": "LinkedIn", "url": "https://www.linkedin.com/company/iemecclinicmadrid", "icono": "linkedin" }
+    {
+      "red": "Instagram",
+      "url": "https://www.instagram.com/iemec_clinic/",
+      "icono": "instagram"
+    },
+    {
+      "red": "Facebook",
+      "url": "https://www.facebook.com/IEMECClinic",
+      "icono": "facebook"
+    },
+    {
+      "red": "TikTok",
+      "url": "https://www.tiktok.com/@iemec_clinic",
+      "icono": "tiktok"
+    },
+    {
+      "red": "LinkedIn",
+      "url": "https://www.linkedin.com/company/iemecclinicmadrid",
+      "icono": "linkedin"
+    }
   ],
   "api": {
     "base": "https://agenda.iemec-clinic.com",
@@ -65,8 +110,15 @@
   "fse": {
     "titulo": "FSE+ · Fondo Social Europeo Plus · «Cofinanciado por la Unión Europea».",
     "texto": "De acuerdo con las obligaciones de publicidad de la subvención recibida, informamos de que Aneco AP Consulting, S.L. ha sido beneficiaria de una ayuda destinada a la contratación de una joven trabajadora, para fomentar el empleo juvenil y mejorar sus oportunidades de inserción laboral.",
-    "emblema": null,
-    "pendiente": "emblema oficial «Cofinanciado por la Unión Europea» (el de la web actual está dañado) y fecha hasta la que hay que mantener el aviso"
+    "emblema": {
+      "archivo": "emblemas/cofinanciado-por-la-union-europea.png",
+      "alt": "Cofinanciado por la Unión Europea",
+      "ancho": 397,
+      "alto": 96,
+      "_fuente": "Emblema oficial en español, versión horizontal en negativo (para fondo oscuro), del centro de descargas de la Comisión Europea (https://ec.europa.eu/regional_policy/information-sources/logo-download-center_en → co-funded_es.zip, archivo horizontal/RGB/PNG/ES_Co-fundedbytheEU_RGB_NEG.png), al que remite la UAFSE (https://www.mites.gob.es/UAFSE/es/FSE21_27/emblemas/index.htm). Solo reducido a 397 × 96 px: el emblema no se modifica. Consultado el 30-09-2026."
+    },
+    "_pendiente": "Convocatoria, organismo y fecha hasta la que hay que mantener el aviso (lanzamiento.json → fse-convocatoria). Mientras, se publica el aviso de la web actual con el emblema oficial."
   },
-  "asistente_virtual_pendiente": "si responde el asistente virtual de la app, decir aquí que es una IA que se presenta como tal y te pasa con una persona (Reglamento (UE) 2024/1689, art. 50.1)"
+  "asistente_virtual_pendiente": "si responde el asistente virtual de la app, decir aquí que es una IA que se presenta como tal y te pasa con una persona (Reglamento (UE) 2024/1689, art. 50.1)",
+  "accesibilidad_revisada": "2026-09-30"
 }

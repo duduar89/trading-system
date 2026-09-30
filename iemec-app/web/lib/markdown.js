@@ -68,8 +68,8 @@ function lista(lineas, ordenada) {
 }
 
 // Convierte un documento. `nivelBase`: el «# Título» del documento pasa a ser el H1 de la página, y
-// los «##» son H2.
-function markdownAHtml(md, { citaComoNota = true } = {}) {
+// los «##» son H2. Las citas son notas para la revisión: con `publicar` no salen.
+function markdownAHtml(md, { citaComoNota = true, publicar = false } = {}) {
   const lineas = md.replace(/\r\n/g, '\n').split('\n');
   const salida = [];
   let i = 0;
@@ -94,6 +94,7 @@ function markdownAHtml(md, { citaComoNota = true } = {}) {
     if (/^>\s?/.test(l)) {
       const bloque = [];
       while (i < lineas.length && /^>\s?/.test(lineas[i])) bloque.push(lineas[i++].replace(/^>\s?/, ''));
+      if (publicar && citaComoNota) continue;
       const dentro = markdownAHtml(bloque.join('\n'), { citaComoNota: false });
       salida.push(citaComoNota
         ? `<aside class="nota-interna"><p class="etiqueta">Nota para la revisión · no se publicará</p>${dentro}</aside>`

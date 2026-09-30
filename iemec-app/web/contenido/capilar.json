@@ -874,7 +874,7 @@
     },
     {
      "p": "¿Dónde se hace la intervención?",
-     "r": "En un centro sanitario autorizado para cirugía [PENDIENTE: cuál]. En la valoración te explicamos dónde se hará la tuya, con qué anestesia y cómo será la recuperación."
+     "r": "{donde_cirugia}. En la valoración te explicamos con qué anestesia y cómo será la recuperación."
     }
    ],
    "preocupaciones": [

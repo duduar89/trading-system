@@ -8,11 +8,15 @@ const os = require('os');
 const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
-const { construir } = require('../construir');
+const { construir, explicarImprescindibles } = require('../construir');
 const { cargarNormas, prohibidasEn } = require('../lib/normas');
 const { huellaCorta } = require('../lib/modelo');
 const R = require('../lib/revision');
 const { crearServidor } = require('../servir');
+const { textosDeTrabajo } = require('../lib/lanzamiento');
+const { leerZip, archivosDe } = require('../lib/zip');
+const { resolverImprescindibles, sinResolver } = require('./fixtures/lanzamiento-resuelto');
+const LANZAMIENTO = require('../datos/lanzamiento.json');
 
 const CATALOGO = require('../../semillas/iemec/tratamientos.json');
 const REDIRECCIONES = require('../datos/redirecciones.json');
@@ -20,24 +24,53 @@ const SITIO = require('../datos/sitio.json');
 const normas = cargarNormas();
 const temporal = (n) => fs.mkdtempSync(path.join(os.tmpdir(), `iemec-web-${n}-`));
 
+// Las páginas de una carpeta construida: ruta → html.
+function leerPaginas(carpeta) {
+  const paginas = new Map();
+  const recorrer = (dir) => {
+    for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+      const ruta = path.join(dir, f.name);
+      if (f.isDirectory()) recorrer(ruta);
+      else if (f.name.endsWith('.html')) {
+        const rel = `/${path.relative(carpeta, ruta).split(path.sep).join('/')}`;
+        paginas.set(rel === '/404.html' ? rel : rel.replace(/index\.html$/, ''), fs.readFileSync(ruta, 'utf8'));
+      }
+    }
+  };
+  recorrer(carpeta);
+  return paginas;
+}
+
+// Cada enlace interno de cada página lleva a una página, un recurso o un ancla que existe.
+function comprobarEnlaces(carpeta, paginas) {
+  const existe = (url) => {
+    const [ruta] = url.split(/[?#]/);
+    if (ruta === '/' || ruta.endsWith('/')) return fs.existsSync(path.join(carpeta, ruta, 'index.html'));
+    return fs.existsSync(path.join(carpeta, ruta));
+  };
+  for (const [ruta, h] of paginas) {
+    const ids = new Set([...h.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+    for (const e of R.enlaces(h)) {
+      const v = e.valor;
+      if (v.startsWith('#')) { assert.ok(ids.has(v.slice(1)), `${ruta}: ancla rota ${v}`); continue; }
+      if (!v.startsWith('/')) continue;
+      assert.ok(existe(v), `${ruta}: enlace roto ${v}`);
+      const ancla = v.split('#')[1];
+      if (ancla && v.split('#')[0] !== '') {
+        const destino = paginas.get(v.split('#')[0].split('?')[0]);
+        assert.ok(destino && destino.includes(`id="${ancla}"`), `${ruta}: ancla rota ${v}`);
+      }
+    }
+  }
+}
+
 let SALIDA;
 let INFORME;
 let PAGINAS; // ruta → html
 test.before(() => {
   SALIDA = temporal('dist');
   INFORME = construir({ salida: SALIDA, referencias: path.join(SALIDA, '..', `${path.basename(SALIDA)}-referencias.json`) });
-  PAGINAS = new Map();
-  const recorrer = (dir) => {
-    for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
-      const ruta = path.join(dir, f.name);
-      if (f.isDirectory()) recorrer(ruta);
-      else if (f.name.endsWith('.html')) {
-        const rel = `/${path.relative(SALIDA, ruta).split(path.sep).join('/')}`;
-        PAGINAS.set(rel === '/404.html' ? rel : rel.replace(/index\.html$/, ''), fs.readFileSync(ruta, 'utf8'));
-      }
-    }
-  };
-  recorrer(SALIDA);
+  PAGINAS = leerPaginas(SALIDA);
 });
 
 test('el generador construye sin errores y el informe lo cuenta todo', () => {
@@ -99,25 +132,7 @@ test('lo que la autorización no cubre, lo que no se confirma y lo pendiente no 
 });
 
 test('cada enlace interno lleva a una página, un recurso o un ancla que existe', () => {
-  const existe = (url) => {
-    const [ruta] = url.split(/[?#]/);
-    if (ruta === '/' || ruta.endsWith('/')) return fs.existsSync(path.join(SALIDA, ruta, 'index.html'));
-    return fs.existsSync(path.join(SALIDA, ruta));
-  };
-  for (const [ruta, h] of PAGINAS) {
-    const ids = new Set([...h.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
-    for (const e of R.enlaces(h)) {
-      const v = e.valor;
-      if (v.startsWith('#')) { assert.ok(ids.has(v.slice(1)), `${ruta}: ancla rota ${v}`); continue; }
-      if (!v.startsWith('/')) continue;
-      assert.ok(existe(v), `${ruta}: enlace roto ${v}`);
-      const ancla = v.split('#')[1];
-      if (ancla && v.split('#')[0] !== '') {
-        const destino = PAGINAS.get(v.split('#')[0].split('?')[0]);
-        assert.ok(destino && destino.includes(`id="${ancla}"`), `${ruta}: ancla rota ${v}`);
-      }
-    }
-  }
+  comprobarEnlaces(SALIDA, PAGINAS);
 });
 
 test('cada página: un H1, título de 65 caracteres o menos, descripción de 70 a 160, canonical y lang="es"', () => {
@@ -238,15 +253,126 @@ test('revisión legal final: peso en borrador, sin nota de Google, avisos que cu
   assert.ok(![...PAGINAS.values()].some((h) => /\[PENDIENTE[^\]]*normas\.md/.test(R.textoVisible(h))), 'un [PENDIENTE] cita un archivo interno');
 });
 
-test('--publicar: cualquier [PENDIENTE] a la vista o dato obligatorio sin rellenar es un error', () => {
-  const c = temporal('publicar');
-  const inf = construir({ salida: c, referencias: null, publicar: true });
-  assert.ok(inf.errores.some((e) => e.tipo === 'pendiente_visible'));
-  assert.ok(inf.errores.some((e) => e.tipo === 'obligatoria' && /@/.test(e.patron)), 'el correo del aviso legal');
-  assert.ok(inf.pendientes_textos.length > 5 && inf.pendientes_textos.every((p) => p.paginas >= 1 && p.ejemplo));
-  // Sin --publicar, la vista previa para la clínica se construye igual.
+test('lanzamiento.json clasifica cada [PENDIENTE] que se ve, y cada dato lleva lo que pide su clase', () => {
+  const ids = new Set();
+  for (const d of LANZAMIENTO.datos) {
+    assert.ok(!ids.has(d.id), `dato repetido: ${d.id}`);
+    ids.add(d.id);
+    assert.ok(['a', 'b', 'c'].includes(d.clase), `${d.id}: clase ${d.clase}`);
+    assert.ok(d.titulo && d.falta && d.donde && d.donde.length, `${d.id}: sin título, qué falta o dónde`);
+    if (d.clase === 'a') assert.ok(d.por_que && d.responsable && d.como_completar, `${d.id}: imprescindible sin por qué, responsable o dónde se pone`);
+    if (d.clase === 'b') assert.ok(d.publicado && d.en_publicacion && d.responsable && d.como_completar, `${d.id}: sin cómo queda publicado`);
+    if (d.clase === 'c') {
+      assert.ok(d.valor && d.fuente && d.fuente.length, `${d.id}: sin el dato o sin su fuente`);
+      for (const f of d.fuente) assert.ok(/^https:\/\//.test(f.url) && f.dice && f.consultado, `${d.id}: fuente sin enlace, cita o fecha`);
+    }
+  }
+  // Una marca pertenece a un solo dato.
+  const marcas = LANZAMIENTO.datos.flatMap((d) => d.marcas || []);
+  assert.equal(new Set(marcas).size, marcas.length, 'una marca en dos datos');
+  // Toda marca de la vista previa está clasificada; las de «c» ya no se ven (están completadas).
+  assert.deepEqual(INFORME.lanzamiento.sin_clasificar, []);
+  for (const p of INFORME.pendientes_textos) assert.ok(p.dato && p.clase, `${p.texto} sin clasificar`);
+  for (const d of INFORME.lanzamiento.datos.filter((x) => x.clase === 'c')) assert.equal(d.marcas_visibles, 0, d.id);
+  // El informe dice qué imprescindibles quedan, con quién y dónde se ponen.
+  for (const i of INFORME.lanzamiento.imprescindibles) assert.ok(ids.has(i.dato) && i.titulo && i.falta && i.responsable && i.como_completar, i.dato);
+  if (!SITIO.correo) assert.ok(INFORME.lanzamiento.imprescindibles.some((i) => i.dato === 'correo'));
+  // Sin --publicar, la vista previa para la clínica se construye igual y enseña los huecos.
   assert.deepEqual(INFORME.errores, []);
+  assert.equal(INFORME.lanzamiento.publicable, null);
+  for (const [ruta, h] of PAGINAS) assert.ok(!/\{\{[a-z_]+\}\}|\{donde_cirugia\}/.test(h), `${ruta}: dato de plantilla sin rellenar`);
+});
+
+test('--publicar con lo imprescindible sin resolver: falla con su lista y no deja nada que subir', () => {
+  const c = temporal('publicar');
+  const zip = `${c}.zip`;
+  const inf = construir({ salida: c, referencias: null, publicar: true, zip, ajustarDatos: sinResolver });
+  const imp = inf.errores.filter((e) => e.tipo === 'imprescindible');
+  for (const dato of ['correo', 'dpd', 'cirugias', 'visto-bueno-medico', 'visto-bueno-legal']) assert.ok(imp.some((e) => e.dato === dato), `falta ${dato} en la lista`);
+  // Solo falla por lo imprescindible: todo lo que puede esperar ya sale con su redacción neutra.
+  assert.deepEqual(inf.errores.filter((e) => e.tipo !== 'imprescindible'), []);
+  for (const e of imp) assert.ok(e.titulo && e.falta && e.responsable && e.como_completar, JSON.stringify(e));
+  const lista = explicarImprescindibles(inf).join('\n');
+  for (const e of imp) assert.ok(lista.includes(e.titulo) && lista.includes(e.como_completar), e.dato);
+  // Nada que se pueda subir por error: solo el informe, y sin zip.
+  assert.deepEqual(fs.readdirSync(c), ['informe.json']);
+  assert.ok(!fs.existsSync(zip));
+  const informe = JSON.parse(fs.readFileSync(path.join(c, 'informe.json'), 'utf8'));
+  assert.equal(informe.lanzamiento.publicable, false);
+  assert.deepEqual(informe.lanzamiento.imprescindibles.map((i) => i.dato), imp.map((e) => e.dato));
+  // Tampoco se publica nunca la vista previa con borradores.
+  const b = temporal('publicar-borradores');
+  const conBorradores = construir({ salida: b, referencias: null, publicar: true, borradores: true, ajustarDatos: resolverImprescindibles });
+  assert.ok(conBorradores.errores.some((e) => e.tipo === 'borradores'));
+  assert.deepEqual(fs.readdirSync(b), ['informe.json']);
   fs.rmSync(c, { recursive: true, force: true });
+  fs.rmSync(b, { recursive: true, force: true });
+});
+
+test('--publicar: los vistos buenos son imprescindibles y una marca nueva sin clasificar no pasa', () => {
+  const c = temporal('publicar-vb');
+  const sinMedico = construir({ salida: c, referencias: null, publicar: true, ajustarDatos: (d) => { resolverImprescindibles(d); d.lanzamiento.vistos_buenos.medico.fecha = null; } });
+  assert.deepEqual(sinMedico.errores.map((e) => `${e.tipo}:${e.dato}`), ['imprescindible:visto-bueno-medico']);
+  const nueva = construir({
+    salida: c, referencias: null, publicar: true,
+    ajustarDatos: (d) => { resolverImprescindibles(d); d.contenidos[0].paginas[0].texto.push('Algo que falta [PENDIENTE: dato nuevo sin clasificar].'); },
+  });
+  assert.ok(nueva.errores.some((e) => e.tipo === 'sin_clasificar' && e.marca === '[PENDIENTE: dato nuevo sin clasificar]'), JSON.stringify(nueva.errores));
+  fs.rmSync(c, { recursive: true, force: true });
+});
+
+test('--publicar con lo imprescindible resuelto (datos inventados): sin marcas ni textos de trabajo, enlaces y normas bien y el zip para subir', () => {
+  const c = temporal('publicable');
+  const zip = `${c}.zip`;
+  const inf = construir({ salida: c, referencias: null, publicar: true, zip, ajustarDatos: resolverImprescindibles });
+  assert.deepEqual(inf.errores, [], JSON.stringify(inf.errores.slice(0, 5)));
+  assert.equal(inf.lanzamiento.publicable, true);
+  // Cada redacción neutra encuentra su texto: ninguna se ha quedado vieja.
+  for (const r of inf.lanzamiento.redacciones) assert.ok(r.veces > 0, `redacción sin efecto: ${JSON.stringify(r)}`);
+  const paginas = leerPaginas(c);
+  assert.equal(paginas.size, INFORME.paginas);
+  for (const [ruta, h] of paginas) {
+    assert.deepEqual(textosDeTrabajo(h), [], ruta);
+    assert.ok(!/PENDIENTE|<mark|nota-interna|aviso-borrador-legal|franja-borrador|aviso-provisional|no se publicará|\{\{/.test(h), `${ruta}: texto de trabajo`);
+    const permitir = ruta === '/tarjetas-regalo/' ? ['precio'] : [];
+    assert.deepEqual(R.revisarPagina(h, ruta, normas, { permitir }), [], ruta);
+  }
+  comprobarEnlaces(c, paginas);
+  // Ni borradores ni enlaces a ellos.
+  for (const [ruta, h] of paginas) assert.ok(!/href="\/(control-de-peso|medicina-estetica-corporal\/varices)/.test(h), ruta);
+  // Las obligatorias, todas: también el correo del aviso legal.
+  const visible = (r) => R.textoVisible(paginas.get(r));
+  for (const o of normas.obligatorias.filter((x) => x.donde === 'aviso_legal')) assert.match(visible('/aviso-legal/'), o.re, o.patron);
+  // Lo completado con fuentes oficiales (c) y las redacciones neutras (b).
+  assert.match(visible('/aviso-legal/'), /Inscrita en el Registro Mercantil de Madrid, tomo 40334, folio 7, sección 8\.ª, hoja M-716525, inscripción 1\.ª/);
+  assert.match(visible('/aviso-legal/'), /Domicilio social Calle Morella, 6, 2, Boadilla del Monte/);
+  assert.match(visible('/aviso-legal/'), /puerta 35-36/);
+  assert.match(visible('/aviso-legal/'), /te los damos si nos los pides/);
+  assert.match(visible('/aviso-legal/'), /Última actualización: 2 de octubre de 2026/);
+  assert.ok(!/Compra de tarjetas regalo|Códigos de conducta/.test(visible('/aviso-legal/')));
+  assert.match(visible('/privacidad/'), /Versión de la cláusula del formulario: 2026-09-30/);
+  assert.ok(!/Asistente virtual/.test(visible('/privacidad/')));
+  assert.match(visible('/accesibilidad/'), /Última revisión: 30 de septiembre de 2026/);
+  assert.match(visible('/'), /Lunes a viernes, de 11:00 a 20:00\. Otros horarios, consúltanos\./);
+  assert.ok(!/Sábado/.test(visible('/')));
+  assert.match(paginas.get('/'), /<div class="fse-emblema"><img src="\/recursos\/cofinanciado-por-la-union-europea\.[0-9a-f]{10}\.png" width="397" height="96" alt="Cofinanciado por la Unión Europea"/);
+  const oto = visible('/cirugia-estetica/otoplastia/');
+  assert.match(oto, /Lo realiza: Dra\. Cirujana de Prueba, especialista en Cirugía Plástica, Estética y Reparadora \(n\.º de colegiado 00\/00000, Colegio de Médicos de Prueba\)\. Dónde: quirófano de un centro hospitalario autorizado\./);
+  assert.ok(!/mayores de edad/.test(oto), 'la edad no se afirma hasta que la clínica fije su política');
+  assert.match(visible('/cirugia-capilar/'), /¿Dónde se hace la intervención\? En la sala de procedimientos de la clínica de prueba/);
+  assert.match(visible('/medicina-capilar/diagnostico-capilar/'), /Lo realiza El equipo del área capilar de IEMEC/);
+  assert.match(visible('/medicina-estetica-facial/luz-pulsada-intensa-ipl/'), /Lo realiza: personal sanitario, con valoración médica previa/);
+  assert.ok(!/La valoración la hace/.test(visible('/medicina-estetica-facial/bb-lips/')));
+  assert.ok(!/colegiad/.test(visible('/equipo/').split('Dra. Cirujana de Prueba')[0]), 'colegiación que no consta');
+  // El zip: el contenido de la carpeta, con el .htaccess y sin informe.json.
+  const z = leerZip(zip);
+  assert.ok(z.has('.htaccess') && z.has('index.html') && z.has('404.html') && z.has('sitemap.xml') && z.has('robots.txt'));
+  assert.ok(!z.has('informe.json'));
+  assert.deepEqual([...z.keys()].sort(), archivosDe(c, ['informe.json']).sort());
+  assert.ok(z.get('.htaccess').equals(fs.readFileSync(path.join(c, '.htaccess'))));
+  assert.equal(inf.zip.archivos, z.size);
+  fs.rmSync(c, { recursive: true, force: true });
+  fs.rmSync(zip, { force: true });
 });
 
 test('cada WhatsApp lleva «(ref. web-…)», un texto limpio y una referencia que la app sabe traducir', () => {
@@ -404,15 +530,19 @@ test('obligatorias de normas.json: pie, tratamiento médico, formulario y aviso 
   }
   const aviso = R.textoVisible(PAGINAS.get('/aviso-legal/'));
   const faltan = ob('aviso_legal').filter((o) => !o.re.test(aviso)).map((o) => o.patron);
-  assert.deepEqual(faltan, ['[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}'], 'solo puede faltar el correo propio, pendiente de la clínica');
-  assert.match(aviso, /\[PENDIENTE: correo propio del dominio/);
+  if (SITIO.correo) assert.deepEqual(faltan, []);
+  else {
+    assert.deepEqual(faltan, ['[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}'], 'solo puede faltar el correo propio, pendiente de la clínica');
+    assert.match(aviso, /Correo electrónico \[PENDIENTE: correo\]/);
+  }
   assert.ok(!/@gmail\.com/i.test([...PAGINAS.values()].join('')));
 });
 
-test('los [PENDIENTE] se ven: sábado, correo, colegiados y emblema del FSE+', () => {
+test('los [PENDIENTE] se ven en la vista previa (sábado, colegiados…) y el emblema oficial del FSE+ ya está', () => {
   const inicio = R.textoVisible(PAGINAS.get('/'));
   assert.match(inicio, /Sábado:? ?\[PENDIENTE: horario del sábado/);
-  assert.match(inicio, /\[PENDIENTE: emblema oficial de la UE\]/);
+  assert.ok(!/emblema oficial de la UE/.test(inicio));
+  for (const [ruta, h] of PAGINAS) assert.match(h, /<div class="fse-emblema"><img src="\/recursos\/cofinanciado-por-la-union-europea\.[0-9a-f]{10}\.png"[^>]* alt="Cofinanciado por la Unión Europea"/, ruta);
   assert.match(R.textoVisible(PAGINAS.get('/equipo/')), /\[PENDIENTE: .*colegiad/);
   assert.match(PAGINAS.get('/privacidad/'), /<mark class="pendiente">\[PENDIENTE/);
   assert.ok(!/Notas internas/.test(PAGINAS.get('/privacidad/')), 'las notas internas no se publican');
@@ -566,7 +696,8 @@ test('la web no depende de las fotos: sin ellas se construye igual, con el logot
   assert.deepEqual(inf.errores, []);
   assert.deepEqual(inf.fotos, []);
   const inicio = fs.readFileSync(path.join(c, 'index.html'), 'utf8');
-  assert.ok(!/<img\s/.test(inicio));
+  // Solo queda el emblema de la UE, que no es una foto (web/emblemas, en git).
+  assert.deepEqual([...inicio.matchAll(/<img\s[^>]*>/g)].filter((m) => !/cofinanciado-por-la-union-europea/.test(m[0])), []);
   assert.match(inicio, /<span class="marca-texto">IEMEC<\/span><span class="marca-linea">Instituto Europeo de Medicina Estética y Capilar<\/span>/);
   assert.ok(!/og:image/.test(inicio));
   fs.rmSync(c, { recursive: true, force: true });

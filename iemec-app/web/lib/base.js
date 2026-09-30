@@ -92,11 +92,18 @@ function barraMovil(ctx, whatsapp) {
 }
 
 // ── Horario y dirección ─────────────────────────────────────────────────────────────────────
+// Un día sin horario confirmado sale como hueco en la vista previa; al publicar, solo lo confirmado y
+// «Otros horarios, consúltanos» (lanzamiento.json → sabado).
+const OTROS_HORARIOS = 'Otros horarios, consúltanos.';
 function horario(ctx) {
-  return html`<table class="horario"><tbody>${ctx.sitio.horario.map((h) => html`<tr><th scope="row">${h.dias}</th><td>${h.abre ? `${h.abre} a ${h.cierra}` : pendiente(h.pendiente)}</td></tr>`)}</tbody></table>`;
+  const dias = ctx.publicar ? ctx.sitio.horario.filter((h) => h.abre) : ctx.sitio.horario;
+  const otros = dias.length < ctx.sitio.horario.length;
+  return html`<table class="horario"><tbody>${dias.map((h) => html`<tr><th scope="row">${h.dias}</th><td>${h.abre ? `${h.abre} a ${h.cierra}` : pendiente(h.pendiente)}</td></tr>`)}${otros ? html`<tr><td colspan="2">${OTROS_HORARIOS}</td></tr>` : ''}</tbody></table>`;
 }
 function horarioCorto(ctx) {
-  return ctx.sitio.horario.map((h) => (h.abre ? html`${h.dias}, de ${h.abre} a ${h.cierra}.` : html` ${h.dias}: ${pendiente('horario del sábado')}`));
+  const confirmados = ctx.sitio.horario.filter((h) => h.abre).map((h) => html`${h.dias}, de ${h.abre} a ${h.cierra}.`);
+  if (ctx.publicar) return confirmados.length < ctx.sitio.horario.length ? [...confirmados, ` ${OTROS_HORARIOS}`] : confirmados;
+  return ctx.sitio.horario.map((h) => (h.abre ? html`${h.dias}, de ${h.abre} a ${h.cierra}.` : html` ${h.dias}: ${pendiente(h.pendiente)}`));
 }
 function direccion(ctx, { pendienteLocal = false } = {}) {
   const d = ctx.sitio.direccion;
@@ -143,7 +150,7 @@ ${marca(ctx, { diferida: true })}
 <li><a href="/accesibilidad/">Accesibilidad</a></li>
 </ul>
 <div class="fse">
-<div class="fse-emblema">${s.fse.emblema ? '' : pendiente('emblema oficial de la UE')}</div>
+<div class="fse-emblema">${ctx.recursos.emblema ? html`<img src="${ctx.recursos.emblema}" width="${s.fse.emblema.ancho}" height="${s.fse.emblema.alto}" alt="${s.fse.emblema.alt}" loading="lazy" decoding="async">` : pendiente('emblema oficial de la UE')}</div>
 <p><strong>${s.fse.titulo}</strong> ${s.fse.texto}</p>
 </div>
 <p class="copy">© 2026 ${s.titular.razon_social} · IEMEC, ${s.nombre}</p>

@@ -4,6 +4,7 @@
 const { html, crudo, texto, pendiente } = require('./html');
 const { icono } = require('./iconos');
 const B = require('./base');
+const L = require('./legal');
 
 const recortar = (s, n) => {
   const t = String(s || '').trim();
@@ -213,7 +214,7 @@ function especialidad(ctx, e) {
   const preguntasEsp = html`<div class="preguntas-especialidad"><h2 class="solo-lector">Preguntas frecuentes</h2>${B.preguntas(e.preguntas)}</div>`;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: 'Especialidad', titulo: e.titulo, entradilla: e.entradilla, adorno: e.slug,
-    extra: e.pendiente ? html`<p class="entrada">${pendiente(e.pendiente)}</p>` : '',
+    extra: e.pendiente && !ctx.publicar ? html`<p class="entrada">${pendiente(e.pendiente)}</p>` : '',
     acciones: html`${botonWhatsapp(wa)}<a class="boton boton-claro" href="#tratamientos">${e.paginas.length === 1 ? 'Ver el tratamiento' : 'Ver los tratamientos'}</a>`,
   })}
 <section class="seccion" id="tratamientos" aria-labelledby="t-lista">
@@ -246,16 +247,28 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
 }
 
 // ── Tratamiento ─────────────────────────────────────────────────────────────────────────────
-// Quién la opera: hasta que la clínica dé nombre, especialidad oficial y número de colegiado
-// (normas.md, apartado j), se ve el hueco.
+// Quién la opera: quien diga operarla en web/datos/equipo.json («opera») con su número de colegiado
+// (normas.md, apartado j). Hasta entonces se ve el hueco, que es imprescindible para publicar
+// (lanzamiento.json → cirugias).
 const PENDIENTE_CIRUJANO = 'nombre, especialidad oficial y n.º de colegiado';
-const quienOpera = (p) => (/\[PENDIENTE|colegiad/i.test(p.profesional || '') ? p.profesional : `${p.profesional || 'Cirujano'} [PENDIENTE: ${PENDIENTE_CIRUJANO}]`);
-const dondeOpera = (p) => p.sesion?.donde || '[PENDIENTE: centro donde se opera]';
+function quienOpera(p) {
+  const conDatos = (p.operan || []).filter((x) => L.tiene(x.colegiado));
+  if (conDatos.length) return conDatos.map(L.quienEs).join(' o ');
+  return /\[PENDIENTE|colegiad/i.test(p.profesional || '') ? p.profesional : `${p.profesional || 'Cirujano'} [PENDIENTE: ${PENDIENTE_CIRUJANO}]`;
+}
+const dondeOpera = (p, e) => p.sesion?.donde || e?.donde_cirugia || '[PENDIENTE: dónde se opera]';
+
+// La política con menores (sitio.json → politica_menores): hasta tenerla, en la vista previa sale el
+// hueco y al publicar no se dice nada de la edad (lanzamiento.json → menores).
+function edad(ctx) {
+  if (ctx.sitio.politica_menores) return ` ${ctx.sitio.politica_menores}`;
+  return ctx.publicar ? '' : ' Solo para mayores de edad [PENDIENTE: política con menores].';
+}
 
 // El recuadro del principio según la clase de la página (web/lib/modelo.js): la cirugía, lo médico y
 // lo que requiere una valoración previa sin que conste quién la hace. En la propia consulta de
 // valoración no sale (sería «antes de la valoración, una valoración»).
-function aviso(p) {
+function aviso(ctx, p, e) {
   // «Lo realiza: equipo médico.»: en minúscula tras los dos puntos, salvo un nombre propio («Dr. …»).
   const minuscula = (s) => (s && !/^(Dr|Dra)\b/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
   if (p.clase === 'cirugia') {
@@ -263,7 +276,7 @@ function aviso(p) {
     return html`<div class="aviso-medico" role="note">
 <p class="aviso-titulo">${icono('medico')}Cirugía: requiere una consulta previa</p>
 <p>Antes de operarte tienes una consulta de valoración: ${quien} estudia tu caso y te explica la técnica, la anestesia, la recuperación, los riesgos y las alternativas. Antes de la intervención firmas el consentimiento informado por escrito. El resultado varía según cada persona.</p>
-<p>${texto(`Lo realiza: ${minuscula(quienOpera(p))}. Dónde: ${minuscula(dondeOpera(p))}. Solo para mayores de edad [PENDIENTE: política con menores].`)}</p>
+<p>${texto(`Lo realiza: ${minuscula(quienOpera(p))}. Dónde: ${minuscula(dondeOpera(p, e))}.${edad(ctx)}`)}</p>
 </div>`;
   }
   if (p.clase === 'medico') {
@@ -273,9 +286,11 @@ function aviso(p) {
 </div>`;
   }
   if (p.clase === 'previa') {
+    // Quién valora depende del producto (lanzamiento.json → valoracion-previa): sesion.valoracion.
+    const valora = p.sesion?.valoracion ? ` La valoración la hace ${p.sesion.valoracion}.` : ctx.publicar ? '' : ' La valoración la hace [PENDIENTE: médico o equipo de estética, según el producto].';
     return html`<div class="aviso-medico aviso-previa" role="note">
 <p class="aviso-titulo">${icono('valoracion')}Requiere valoración previa</p>
-<p>${texto(`Antes de hacerlo valoramos tu caso y te explicamos la técnica, el producto que se usa, los cuidados, los riesgos y las contraindicaciones. El resultado varía según cada persona.${p.profesional ? ` Lo realiza: ${minuscula(p.profesional)}.` : ''} La valoración la hace [PENDIENTE: médico o equipo de estética, según el producto].`)}</p>
+<p>${texto(`Antes de hacerlo valoramos tu caso y te explicamos la técnica, el producto que se usa, los cuidados, los riesgos y las contraindicaciones. El resultado varía según cada persona.${p.profesional ? ` Lo realiza: ${minuscula(p.profesional)}.` : ''}${valora}`)}</p>
 </div>`;
   }
   return '';
@@ -290,14 +305,14 @@ function tratamiento(ctx, p) {
     ['reloj', 'Duración', s.duracion], ['calendario', 'Sesiones', s.sesiones], ['tratamiento', 'Anestesia', s.anestesia],
     // En la cirugía y en la consulta con el cirujano, «Lo realiza» lleva el hueco del cirujano.
     ['seguimiento', 'Recuperación', s.recuperacion], ['medico', 'Lo realiza', p.cirugia || /cirujan/i.test(p.profesional || '') ? quienOpera(p) : p.profesional],
-    ['pin', 'Dónde', p.cirugia ? dondeOpera(p) : s.donde],
+    ['pin', 'Dónde', p.cirugia ? dondeOpera(p, e) : s.donde],
   ].filter(([, , v]) => v);
   const rapidos = [];
   if (s.duracion) rapidos.push(html`<li>${icono('reloj')}${s.duracion}</li>`);
   if (s.sesiones) rapidos.push(html`<li>${icono('calendario')}${s.sesiones}</li>`);
   // Primero el aviso (y, en el móvil, la ficha justo después: van antes que el texto en el HTML y,
   // en escritorio, la ficha pasa a la columna de la derecha).
-  const avisos = `${p.origen === 'provisional' ? html`<div class="aviso-provisional" role="note"><p>${pendiente('página provisional hecha desde el catálogo; la sustituye el texto final de su grupo cuando llegue')}</p></div>` : ''}${aviso(p)}`;
+  const avisos = `${p.origen === 'provisional' ? html`<div class="aviso-provisional" role="note"><p>${pendiente('página provisional hecha desde el catálogo; la sustituye el texto final de su grupo cuando llegue')}</p></div>` : ''}${aviso(ctx, p, e)}`;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: e.nombre, titulo: p.titulo, entradilla: p.entradilla, adorno: (p.preocupaciones || [])[0] || e.slug,
     extra: rapidos.length ? html`<ul class="datos-rapidos">${rapidos}</ul>` : '',
@@ -387,10 +402,23 @@ ${llamadaFinal(ctx, { whatsapp: wa })}`;
 function iniciales(nombre) {
   return nombre.replace(/^(Dra?\.)\s+/, '').split(/\s+/).slice(0, 2).map((x) => x[0]).join('');
 }
+// Titulación y colegiación de cada persona (web/datos/equipo.json): lo que consta; lo que falta, como
+// hueco en la vista previa y sin decir nada al publicar (lanzamiento.json → equipo).
+function colegiado(ctx, p) {
+  const datos = L.datosProfesionales(p);
+  const falta = !ctx.publicar && p.pendiente ? pendiente(p.pendiente) : '';
+  if (!datos && !falta) return '';
+  return html`<p class="colegiado">${datos}${datos && falta ? ' ' : ''}${falta}</p>`;
+}
+
 function equipoPagina(ctx) {
   const wa = B.urlWhatsapp(ctx, B.INTERES_GENERAL, 'web-equipo');
   const pasos = [{ nombre: 'Inicio', ruta: '/' }, { nombre: 'Equipo', ruta: '/equipo/' }];
   const est = ctx.datos.equipo.estetica;
+  const resp = L.responsable(ctx.datos);
+  const responsableEquipo = resp
+    ? html`<p class="nota-equipo">Responsable asistencial (dirección médica): ${L.quienEs(resp)}</p>`
+    : ctx.publicar ? '' : html`<p class="nota-equipo">Responsable asistencial (dirección médica): ${pendiente(ctx.datos.equipo.responsable_pendiente)}</p>`;
   const cuerpo = html`${cabeceraPagina({
     pasos, etiqueta: 'El equipo', titulo: html`Las personas <em>de IEMEC</em>`, adorno: 'medico',
     entradilla: 'Cada tratamiento lo hace el profesional que le corresponde, siempre con una valoración previa.',
@@ -404,17 +432,17 @@ ${ctx.equipoVisible.map((p) => html`<li class="tarjeta persona">
 <h3>${p.nombre}</h3>
 <p class="cargo">${p.cargo}</p>
 <p class="bio">${texto(p.bio)}</p>
-<p class="colegiado">${pendiente(p.pendiente)}</p>
+${colegiado(ctx, p)}
 </li>`)}
 <li class="tarjeta persona">
 <div class="retrato"><span class="monograma" aria-hidden="true">${icono('tratamiento')}</span></div>
 <h3>${est.nombre}</h3>
 <p class="cargo">Cabina y head spa</p>
 <p class="bio">${est.texto}</p>
-<p class="colegiado">${pendiente(est.pendiente)}</p>
+${ctx.publicar || !est.pendiente ? '' : html`<p class="colegiado">${pendiente(est.pendiente)}</p>`}
 </li>
 </ul>
-<p class="nota-equipo">Responsable asistencial (dirección médica): ${pendiente(ctx.datos.equipo.responsable_pendiente)}</p>
+${responsableEquipo}
 </div>
 </section>
 ${llamadaFinal(ctx, { whatsapp: wa })}`;
@@ -490,7 +518,7 @@ function tarjetasRegalo(ctx) {
   })}
 <section class="seccion" aria-labelledby="t-importes">
 <div class="contenedor">
-<div class="titulo-seccion"><p class="etiqueta">Importes</p><h2 id="t-importes">Elige el importe</h2><p class="entrada">Pídela por WhatsApp con el importe ya escrito y te explicamos cómo recibirla. ${pendiente(t.pago_pendiente)}</p></div>
+<div class="titulo-seccion"><p class="etiqueta">Importes</p><h2 id="t-importes">Elige el importe</h2><p class="entrada">Pídela por WhatsApp con el importe ya escrito y te explicamos cómo recibirla.${ctx.publicar ? '' : html` ${pendiente(t.pago_pendiente)}`}</p></div>
 <ul class="importes">${t.importes.map((i) => html`<li class="tarjeta importe">
 <div class="tarjeta-regalo-visual terciopelo" aria-hidden="true"><span class="marca-mini">IEMEC</span><span class="cifra-mini">${i} €</span></div>
 <h3>${i} €</h3>
@@ -506,7 +534,7 @@ function tarjetasRegalo(ctx) {
 <p>${t.estuche.texto}</p>
 <h3>Condiciones</h3>
 <ul class="lista-rombo lista-condiciones">${t.condiciones.map((c) => html`<li>${c}</li>`)}</ul>
-<p>${pendiente(t.condiciones_pendiente)}</p>
+${ctx.publicar ? '' : html`<p>${pendiente(t.condiciones_pendiente)}</p>`}
 </div>
 ${ctx.foto(t.estuche.foto) ? html`<figure class="foto-marco"><div class="marco-dorado">${B.imagen(ctx, t.estuche.foto, { tamanos: '(min-width: 900px) 560px, 92vw' })}</div><figcaption>Los estuches de las tarjetas regalo.</figcaption></figure>` : ''}
 </div>
@@ -516,7 +544,7 @@ ${ctx.foto(t.estuche.foto) ? html`<figure class="foto-marco"><div class="marco-d
 <p class="etiqueta">Tarjetas de la web anterior</p>
 <h2 id="t-antiguas">¿Ya tienes una tarjeta?</h2>
 <p>${t.antiguas}</p>
-<p>${pendiente(t.antiguas_pendiente)}</p>
+${ctx.publicar ? '' : html`<p>${pendiente(t.antiguas_pendiente)}</p>`}
 <div class="acciones">${botonWhatsapp(B.urlWhatsapp(ctx, 'canjear una tarjeta regalo', 'web-tarjeta-canje'), 'Canjear mi tarjeta', 'boton-oscuro')}</div>
 </div>
 </section>`;
@@ -596,7 +624,7 @@ function legal(ctx, { ruta, titulo, tituloSeo: tSeo, descripcion, contenido, eti
   const pasos = [{ nombre: 'Inicio', ruta: '/' }, { nombre: titulo, ruta }];
   const cuerpo = html`${cabeceraPagina({ pasos, etiqueta, titulo, adorno: 'escudo' })}
 <div class="contenedor prosa">
-<div class="aviso-borrador-legal" role="note"><p>${pendiente('revisión del abogado sanitario y del DPD')}</p></div>
+${ctx.publicar ? '' : html`<div class="aviso-borrador-legal" role="note"><p>${pendiente('revisión del abogado sanitario y del DPD')}</p></div>`}
 ${contenido}
 </div>`;
   return { ruta, tipo: 'legal', migas: pasos, titulo: tSeo, descripcion, cuerpo, ref: `web-${ruta.replace(/\//g, '')}` };

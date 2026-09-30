@@ -6,8 +6,14 @@
 //   node web/construir.js --borradores    → web/dist-borradores: además, los borradores de
 //                                           web/contenido/pendientes con la franja «Borrador»
 //   node web/construir.js --salida <dir>  → otra carpeta (las pruebas construyen en una temporal)
-//   node web/construir.js --publicar      → además, error si queda algún «[PENDIENTE…]» a la vista o
-//                                           algún dato obligatorio sin rellenar: así no se sube a medias
+//   node web/construir.js --publicar      → la versión para subir: aplica las redacciones neutras de lo
+//                                           que puede esperar (web/datos/lanzamiento.json, clase «b»),
+//                                           sin marcas amarillas, notas ni borradores; si falta algo
+//                                           imprescindible (clase «a»), falla con la lista y no deja
+//                                           nada que subir (solo informe.json)
+//   node web/construir.js --publicar --zip <archivo.zip>
+//                                         → además, el .zip para «Cargar» y «Extraer» en public_html
+//                                           (con el .htaccess y sin informe.json)
 //
 // Lee web/datos/*.json, web/contenido/*.json, los textos legales y el catálogo de la app, y escribe
 // páginas con URL limpias, recursos con huella, .htaccess, sitemap.xml, robots.txt e informe.json.
@@ -23,6 +29,9 @@ const P = require('./lib/paginas');
 const { htaccess } = require('./lib/htaccess');
 const R = require('./lib/revision');
 const { avisosEn } = require('./lib/normas');
+const { rellenarLegal } = require('./lib/legal');
+const LZ = require('./lib/lanzamiento');
+const { crearZip } = require('./lib/zip');
 
 const FUENTES = [
   ['montserrat-latin-300-normal.woff2', 'Montserrat', 'normal', 300],
@@ -58,6 +67,8 @@ function argumentos(argv) {
   if (i !== -1) o.salida = path.resolve(argv[i + 1]);
   const j = argv.indexOf('--referencias');
   if (j !== -1) o.referencias = path.resolve(argv[j + 1]);
+  const k = argv.indexOf('--zip');
+  if (k !== -1) o.zip = path.resolve(argv[k + 1]);
   return o;
 }
 
@@ -76,11 +87,14 @@ function textoLegal(md, { quitar = [], desenvolver = null } = {}) {
 
 function construir(opciones = {}) {
   const borradores = !!opciones.borradores;
+  const publicar = !!opciones.publicar;
   const salida = opciones.salida || path.join(WEB, borradores ? 'dist-borradores' : 'dist');
   // Las referencias van con la app (semillas/, que se despliega; web/ no): las usa POST /web/contacto.
   const rutaReferencias = opciones.referencias !== undefined ? opciones.referencias : (opciones.salida || borradores ? null : path.join(RAIZ, 'semillas', 'iemec', 'referencias-web.json'));
   const datos = cargarDatos({ borradores });
   if (opciones.ajustarDatos) opciones.ajustarDatos(datos); // solo para las pruebas
+  // Al publicar, lo que puede esperar (clase «b») sale con su redacción neutra.
+  const redacciones = publicar ? LZ.aplicarRedacciones(datos, datos.lanzamiento) : [];
   const modelo = construirModelo(datos);
   const { sitio, normas } = datos;
 
@@ -134,6 +148,9 @@ function construir(opciones = {}) {
   const apple = datos.fotos.icono && fs.existsSync(path.join(WEB, 'fotos', datos.fotos.icono.archivo))
     ? conHuella('fotos', datos.fotos.icono.archivo, fs.readFileSync(path.join(WEB, 'fotos', datos.fotos.icono.archivo)))
     : null;
+  // El emblema oficial «Cofinanciado por la Unión Europea» del aviso del FSE+ (web/emblemas/, en git).
+  const rutaEmblema = sitio.fse && sitio.fse.emblema ? path.join(WEB, sitio.fse.emblema.archivo) : null;
+  const emblema = rutaEmblema && fs.existsSync(rutaEmblema) ? conHuella('recursos', path.basename(rutaEmblema), fs.readFileSync(rutaEmblema)) : null;
 
   // Equipo visible y tecnología publicada.
   const conPagina = new Set(modelo.paginas.flatMap((p) => p.ids));
@@ -144,11 +161,11 @@ function construir(opciones = {}) {
   const tecnologia = datos.tecnologia.aparatos.filter((a) => aparatosUsados.has(a.codigo));
 
   const ctx = {
-    sitio, datos, modelo, borradores,
+    sitio, datos, modelo, borradores, publicar,
     especialidades: modelo.publicadas,
     preocupaciones: modelo.preocupaciones,
     equipoVisible, tecnologia, og,
-    recursos: { css: conHuella('recursos', 'estilos.css', Buffer.from(css)), js: conHuella('recursos', 'web.js', js), favicon: conHuella('recursos', 'icono.svg', Buffer.from(FAVICON)), apple },
+    recursos: { css: conHuella('recursos', 'estilos.css', Buffer.from(css)), js: conHuella('recursos', 'web.js', js), favicon: conHuella('recursos', 'icono.svg', Buffer.from(FAVICON)), apple, emblema },
     fuentes: { precarga: fuentes.filter((f) => f.precarga).map((f) => f.url) },
     foto: (clave) => {
       const f = fotos.get(clave);
@@ -162,15 +179,13 @@ function construir(opciones = {}) {
   const rutas = new Set(['/', ...modelo.publicadas.map((e) => e.ruta), ...modelo.paginas.map((p) => p.ruta), '/tratamientos/', '/equipo/', '/clinica/', '/tarjetas-regalo/', '/pedir-cita/', ...rutasLegales, '/gracias/']);
   const red = resolverRedirecciones(datos, modelo, rutas);
 
-  // Textos legales.
-  const leerLegal = (n) => fs.readFileSync(path.join(WEB, 'contenido', 'legal', n), 'utf8');
+  // Textos legales, con sus datos: correo, DPD, profesionales (solo quien sale en la web, como en
+  // «Equipo»), responsable asistencial y fechas (web/lib/legal.js).
+  const leerLegal = (n) => rellenarLegal(datos.legales[n], datos, { personas: equipoVisible, publicar });
   const avisoMd = leerLegal('aviso-legal.md');
   const anexoAcc = secciones(avisoMd).find((s) => s.titulo && /Accesibilidad/.test(s.titulo));
-  // En la tabla de profesionales del aviso legal, solo quien sale en la web (como en «Equipo»).
-  const ocultos = datos.equipo.personas.filter((p) => !equipoVisible.includes(p)).map((p) => p.nombre);
-  const sinOcultos = (md) => md.split('\n').filter((l) => !ocultos.some((n) => l.startsWith(`| ${n} |`))).join('\n');
   const legales = [
-    { ruta: '/aviso-legal/', titulo: 'Aviso legal', tituloSeo: 'Aviso legal · IEMEC', descripcion: 'Aviso legal de IEMEC: titular, datos de contacto, autorización sanitaria CS17886, profesiones sanitarias, uso de la web y ayudas públicas.', md: sinOcultos(textoLegal(avisoMd, { quitar: [/^Anexo/] })) },
+    { ruta: '/aviso-legal/', titulo: 'Aviso legal', tituloSeo: 'Aviso legal · IEMEC', descripcion: 'Aviso legal de IEMEC: titular, datos de contacto, autorización sanitaria CS17886, profesiones sanitarias, uso de la web y ayudas públicas.', md: textoLegal(avisoMd, { quitar: [/^Anexo/] }) },
     { ruta: '/privacidad/', titulo: 'Política de privacidad', tituloSeo: 'Política de privacidad · IEMEC', descripcion: 'Cómo trata IEMEC tus datos: responsable, finalidades, bases legales, plazos, destinatarios, transferencias y cómo ejercer tus derechos.', md: textoLegal(leerLegal('privacidad.md'), { quitar: [/no se publican/i] }) },
     { ruta: '/cookies/', titulo: 'Política de cookies', tituloSeo: 'Política de cookies · IEMEC', descripcion: 'Esta web no usa cookies de analítica, de publicidad ni de redes sociales, y no necesita tu consentimiento. Qué guarda y cómo borrarlo.', md: textoLegal(leerLegal('cookies.md'), { quitar: [/^Variante B/i], desenvolver: /^Variante A/i }) },
     { ruta: '/accesibilidad/', titulo: 'Accesibilidad', tituloSeo: 'Accesibilidad · IEMEC', descripcion: 'Cómo hemos hecho accesible la web de IEMEC (pautas WCAG 2.2, nivel AA) y cómo avisarnos si encuentras alguna barrera.', md: anexoAcc ? anexoAcc.md.replace(/^##\s+.*\n/, '').replace(/^\s*\*\*Accesibilidad\.\*\*\s*/, '') : '' },
@@ -195,7 +210,7 @@ function construir(opciones = {}) {
   pintar(hacer(P.pedirCita));
   for (const l of legales) {
     B.empezarPagina();
-    const p = P.legal(ctx, { ...l, contenido: crudo(markdownAHtml(l.md)) });
+    const p = P.legal(ctx, { ...l, contenido: crudo(markdownAHtml(l.md, { publicar })) });
     p.whatsapp = B.urlWhatsapp(ctx, B.INTERES_GENERAL, p.ref);
     pintar(p);
   }
@@ -227,14 +242,25 @@ function construir(opciones = {}) {
     const av = avisosEn(visible, normas).map((a) => a.coincidencia);
     if (av.length) avisos.push({ ruta: p.ruta, avisos: [...new Set(av)] });
   }
-  // Lo que falta por confirmar y se ve en la web. Con --publicar, cada hueco es un error.
+  // Lo que falta por confirmar y se ve en la web, clasificado con web/datos/lanzamiento.json.
   const marcas = paginas.map((p) => ({ ruta: p.ruta, lista: R.textoVisible(p.html).match(/\[PENDIENTE[^\]]*\]/g) || [] })).filter((x) => x.lista.length);
   const porTexto = new Map();
   for (const x of marcas) for (const m of x.lista) { if (!porTexto.has(m)) porTexto.set(m, new Set()); porTexto.get(m).add(x.ruta); }
-  if (opciones.publicar) {
-    for (const x of marcas) errores.push({ tipo: 'pendiente_visible', ruta: x.ruta, n: x.lista.length, primero: x.lista[0] });
-    for (const o of pendientesObligatorios) errores.push({ tipo: 'obligatoria', ...o });
+  const lanzamiento = LZ.estado(datos.lanzamiento, { marcas, obligatoriasPendientes: pendientesObligatorios, publicar });
+  const datoDe = LZ.clasificador(datos.lanzamiento);
+  if (publicar) {
+    // Lo imprescindible que falta, una vez por dato (con cuántas páginas y dónde se pone).
+    for (const i of lanzamiento.imprescindibles) errores.push({ tipo: 'imprescindible', ...i });
+    for (const x of lanzamiento.sin_neutralizar) errores.push({ tipo: 'sin_redaccion_neutra', ...x, nota: 'Una marca de un dato que no es imprescindible sigue a la vista: falta su redacción neutra en lanzamiento.json o en el generador.' });
+    for (const x of lanzamiento.sin_clasificar) errores.push({ tipo: 'sin_clasificar', ...x, nota: 'Marca [PENDIENTE] que no está en web/datos/lanzamiento.json: clasifícala (a, b o c).' });
     if (borradores) errores.push({ tipo: 'borradores', nota: 'La vista previa con borradores no se publica nunca.' });
+    // Nada de trabajo a la vista: notas, franjas, provisionales, plantillas sin rellenar (y marcas en
+    // atributos o en el <head>, que no son texto visible).
+    for (const p of paginas) {
+      const visibles = marcas.some((x) => x.ruta === p.ruta);
+      const trabajo = LZ.textosDeTrabajo(p.html).filter((t) => !(visibles && /marca/.test(t)));
+      if (trabajo.length) errores.push({ tipo: 'texto_de_trabajo', ruta: p.ruta, textos: trabajo });
+    }
   }
   if (Buffer.byteLength(css) > 45 * 1024) errores.push({ tipo: 'tamaño', ruta: ctx.recursos.css, bytes: Buffer.byteLength(css), limite: 45 * 1024 });
   if (Buffer.byteLength(js) > 20 * 1024) errores.push({ tipo: 'tamaño', ruta: ctx.recursos.js, bytes: Buffer.byteLength(js), limite: 20 * 1024 });
@@ -242,6 +268,19 @@ function construir(opciones = {}) {
   // Escribir páginas y las fotos que usan.
   for (const p of paginas) escribir(p.ruta === '/404.html' ? '404.html' : `${p.ruta.replace(/^\//, '')}index.html`, p.html);
   for (const clave of [...fotosUsadas].sort()) for (const s of fotos.get(clave).salidas) escribir(s.url.slice(1), s.buf);
+  // Al publicar, cada enlace interno lleva a una página o un recurso que se sube (ni borradores ni
+  // páginas que no existen).
+  if (publicar) {
+    const existe = (u) => {
+      const [ruta] = u.split(/[?#]/);
+      if (!ruta || ruta === '/') return true;
+      return ruta.endsWith('/') ? fs.existsSync(path.join(salida, ruta, 'index.html')) : fs.existsSync(path.join(salida, ruta));
+    };
+    for (const p of paginas) {
+      const rotos = [...new Set(R.enlaces(p.html).map((e) => e.valor).filter((v) => v.startsWith('/') && !v.startsWith('//') && !existe(v)))];
+      if (rotos.length) errores.push({ tipo: 'enlace_roto', ruta: p.ruta, enlaces: rotos.slice(0, 5) });
+    }
+  }
 
   // .htaccess, sitemap y robots.
   escribir('.htaccess', htaccess(sitio, red.reglas));
@@ -283,7 +322,22 @@ function construir(opciones = {}) {
     contenido_pendiente: modelo.paginas.filter((p) => p.origen !== 'provisional' && p.pendiente && p.pendiente.length).map((p) => ({ ruta: p.ruta, pendiente: p.pendiente })),
     revision_medica: modelo.paginas.filter((p) => p.revision_medica).map((p) => p.ruta),
     pendientes_visibles: marcas.map((x) => ({ ruta: x.ruta, n: x.lista.length })),
-    pendientes_textos: [...porTexto].map(([texto, rutas]) => ({ texto, paginas: rutas.size, ejemplo: [...rutas][0] })).sort((a, b) => b.paginas - a.paginas || a.texto.localeCompare(b.texto, 'es')),
+    pendientes_textos: [...porTexto].map(([texto, rutas]) => {
+      const d = datoDe(texto);
+      return { texto, paginas: rutas.size, ejemplo: [...rutas][0], dato: d ? d.id : null, clase: d ? d.clase : null };
+    }).sort((a, b) => b.paginas - a.paginas || a.texto.localeCompare(b.texto, 'es')),
+    // Qué falta para publicar (web/datos/lanzamiento.json): cada dato con su clase y cuántas marcas
+    // quedan, los imprescindibles sin resolver y, al publicar, las redacciones neutras aplicadas.
+    lanzamiento: {
+      publicar,
+      publicable: null,
+      clases: LZ.CLASES,
+      imprescindibles: lanzamiento.imprescindibles,
+      datos: lanzamiento.resumen,
+      sin_clasificar: lanzamiento.sin_clasificar,
+      vistos_buenos: datos.lanzamiento.vistos_buenos,
+      redacciones: redacciones.map((r) => ({ dato: r.dato, ...(r.archivo ? { archivo: r.archivo } : { quitar: r.quitar }), veces: r.veces })),
+    },
     redirecciones: red.reglas.map((r) => ({ desde: r.desde, hacia: r.hacia, motivo: r.motivo })),
     anclas: red.anclas,
     errores,
@@ -298,26 +352,70 @@ function construir(opciones = {}) {
     fotos: [...fotosUsadas].sort(),
     recursos: ctx.recursos,
   };
+  informe.lanzamiento.publicable = publicar ? errores.length === 0 : null;
+  // Si no se puede publicar, no se deja nada que se pueda subir por error: solo el informe.
+  if (publicar && errores.length) {
+    fs.rmSync(salida, { recursive: true, force: true });
+    fs.mkdirSync(salida, { recursive: true });
+    escritos.length = 0;
+  }
   escribir('informe.json', `${JSON.stringify(informe, null, 1)}\n`);
+  let zip = null;
+  if (opciones.zip) {
+    if (!publicar) throw new Error('--zip solo con --publicar: el .zip es la versión para subir.');
+    if (!errores.length) zip = { archivo: opciones.zip, ...crearZip(salida, opciones.zip, { excluir: ['informe.json'], fecha: sitio.actualizado }) };
+  }
   const grupos = Object.fromEntries(B.gruposInteres(ctx).map((g) => [g.valor, g.texto]));
   if (rutaReferencias) fs.writeFileSync(rutaReferencias, `${JSON.stringify({ _nota: 'Generado por web/construir.js (no se edita a mano): la app traduce la «ref. web-…» de cada WhatsApp y de cada formulario a su tratamiento (id del catálogo), su página y su especialidad. Las páginas de lo íntimo y del peso llevan un código en vez del slug. «grupos»: los valores del «¿Qué te interesa?» del formulario y su texto neutro.', referencias: refsOrdenadas, grupos }, null, 1)}\n`);
-  return { ...informe, salida, archivos: escritos.sort(), referencias: refsOrdenadas, grupos };
+  return { ...informe, salida, archivos: escritos.sort(), referencias: refsOrdenadas, grupos, zip };
+}
+
+// La lista de lo imprescindible, para leerla en la terminal.
+function explicarImprescindibles(inf) {
+  const lineas = [];
+  const imp = inf.errores.filter((e) => e.tipo === 'imprescindible');
+  if (imp.length) {
+    lineas.push(`No se puede publicar todavía: falta lo imprescindible (${imp.length}).`);
+    imp.forEach((e, i) => {
+      lineas.push(`  ${i + 1}. ${e.titulo} · ${e.responsable}${e.paginas ? ` · ${e.paginas} ${e.paginas === 1 ? 'página' : 'páginas'} (p. ej. ${e.ejemplo})` : ''}`);
+      lineas.push(`     Falta: ${e.falta}`);
+      lineas.push(`     Se pone en: ${e.como_completar}`);
+    });
+    lineas.push('  Qué pedir y a quién: docs/LANZAR-WEB.md · detalle: informe.json → lanzamiento.');
+  }
+  return lineas;
 }
 
 if (require.main === module) {
   const o = argumentos(process.argv.slice(2));
   const inf = construir(o);
   if (!o.silencio) {
-    console.log(`Web construida en ${path.relative(process.cwd(), inf.salida) || '.'}: ${inf.paginas} páginas (${inf.tratamientos} de tratamiento, ${inf.provisionales.length} provisionales).`);
-    console.log(`Catálogo: ${inf.cobertura.con_pagina}/${inf.cobertura.activos} tratamientos activos con página; ${inf.cobertura.sin_pagina} sin página con su motivo; ${inf.cobertura.sin_cubrir.length} sin cubrir.`);
-    console.log(`Tamaños: HTML máx. ${(inf.tamanos.html_max / 1024).toFixed(1)} KB · CSS ${(inf.tamanos.css / 1024).toFixed(1)} KB · JS ${(inf.tamanos.js / 1024).toFixed(1)} KB · fotos: ${inf.fotos.length}`);
-    if (inf.avisos_generador.length) console.log(`Avisos del generador:\n  ${inf.avisos_generador.join('\n  ')}`);
-    if (inf.errores.length) {
-      console.error(`ERRORES (${inf.errores.length}):`);
-      for (const e of inf.errores.slice(0, 40)) console.error(`  ${JSON.stringify(e)}`);
+    const donde = path.relative(process.cwd(), inf.salida) || '.';
+    if (o.publicar && inf.errores.length) {
+      console.error(explicarImprescindibles(inf).join('\n'));
+      const otros = inf.errores.filter((e) => e.tipo !== 'imprescindible');
+      if (otros.length) {
+        console.error(`Otros errores (${otros.length}):`);
+        for (const e of otros.slice(0, 40)) console.error(`  ${JSON.stringify(e)}`);
+      }
+      console.error(`${donde} se ha vaciado (solo queda informe.json) para que no se suba nada a medias; «npm run web» vuelve a hacer la vista previa.`);
+    } else {
+      console.log(`Web ${o.publicar ? 'publicable ' : ''}construida en ${donde}: ${inf.paginas} páginas (${inf.tratamientos} de tratamiento, ${inf.provisionales.length} provisionales).`);
+      console.log(`Catálogo: ${inf.cobertura.con_pagina}/${inf.cobertura.activos} tratamientos activos con página; ${inf.cobertura.sin_pagina} sin página con su motivo; ${inf.cobertura.sin_cubrir.length} sin cubrir.`);
+      console.log(`Tamaños: HTML máx. ${(inf.tamanos.html_max / 1024).toFixed(1)} KB · CSS ${(inf.tamanos.css / 1024).toFixed(1)} KB · JS ${(inf.tamanos.js / 1024).toFixed(1)} KB · fotos: ${inf.fotos.length}`);
+      if (inf.avisos_generador.length) console.log(`Avisos del generador:\n  ${inf.avisos_generador.join('\n  ')}`);
+      if (!o.publicar) {
+        const a = inf.lanzamiento.imprescindibles.length;
+        console.log(`Lanzamiento: ${a ? `faltan ${a} imprescindibles (${inf.lanzamiento.imprescindibles.map((i) => i.dato).join(', ')})` : 'no falta nada imprescindible'}; «node web/construir.js --publicar» hace la versión para subir.`);
+      }
+      if (inf.zip) console.log(`Zip para subir: ${path.relative(process.cwd(), inf.zip.archivo)} (${inf.zip.archivos} archivos, ${(inf.zip.bytes / 1024 / 1024).toFixed(1)} MB, con el .htaccess y sin informe.json).`);
+      if (inf.errores.length) {
+        console.error(`ERRORES (${inf.errores.length}):`);
+        for (const e of inf.errores.slice(0, 40)) console.error(`  ${JSON.stringify(e)}`);
+      }
     }
   }
   process.exitCode = inf.errores.length ? 1 : 0;
 }
 
-module.exports = { construir, minificarCss, minificarJs, textoLegal };
+module.exports = { construir, minificarCss, minificarJs, textoLegal, explicarImprescindibles };

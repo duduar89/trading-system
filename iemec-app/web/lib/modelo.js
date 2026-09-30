@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { cargarNormas, prohibidasEn, avisosEn } = require('./normas');
+const { cargarLanzamiento } = require('./lanzamiento');
 
 const WEB = path.join(__dirname, '..');
 const RAIZ = path.join(WEB, '..');
@@ -31,9 +32,13 @@ function cargarDatos({ borradores = false } = {}) {
     catalogo: leer(path.join(RAIZ, 'semillas', 'iemec', 'tratamientos.json')),
     fotos: leer(path.join(WEB, 'fotos', 'fotos.json')),
     normas: cargarNormas(),
+    lanzamiento: cargarLanzamiento(),
+    legales: {},
     contenidos: [],
     borradores: [],
   };
+  const dirLegal = path.join(WEB, 'contenido', 'legal');
+  for (const f of ['aviso-legal.md', 'privacidad.md', 'cookies.md']) datos.legales[f] = fs.readFileSync(path.join(dirLegal, f), 'utf8');
   const carpeta = path.join(WEB, 'contenido');
   for (const f of fs.readdirSync(carpeta).filter((x) => x.endsWith('.json')).sort()) {
     datos.contenidos.push({ fichero: f, ...leer(path.join(carpeta, f)) });
@@ -150,8 +155,16 @@ function construirModelo(datos) {
   }
 
   // Derivados de cada página.
+  // Dónde se opera: el de la página, si no el de su especialidad (el de la cirugía capilar) y, si
+  // falta, el hueco (lanzamiento.json → cirugias). Las preguntas lo dicen con {donde_cirugia}.
+  const huecoDonde = '[PENDIENTE: dónde se opera]';
+  const lugar = (p, esp) => p.sesion?.donde || esp?.donde_cirugia || huecoDonde;
+  const conLugar = (lista, donde) => (lista || []).map((q) => (q.r.includes('{donde_cirugia}') ? { ...q, r: q.r.split('{donde_cirugia}').join(donde) } : q));
   for (const p of paginas) {
     const esp = espPorSlug.get(p.especialidad);
+    p.preguntas = conLugar(p.preguntas, lugar(p, esp));
+    // Quién opera: las personas del equipo que dicen operar esta página o su especialidad.
+    p.operan = (datos.equipo?.personas || []).filter((x) => (x.opera || []).some((o) => o === p.especialidad || o === p.slug));
     p.ruta = `/${p.especialidad}/${p.slug}/`;
     p.principal = p.catalogo[0] || p.ids[0];
     const cats = p.ids.map((id) => porId.get(id)).filter(Boolean);
@@ -179,7 +192,7 @@ function construirModelo(datos) {
     // Lo íntimo y el peso tampoco se nombran en la referencia de su especialidad: un código.
     let ref = e.sensible ? `web-${e.codigo_ref}-${huellaCorta(e.slug)}` : `web-${e.slug}`;
     if (refs.has(ref)) ref = `${ref}-${huellaCorta(`/${e.slug}/`).slice(0, 3)}`;
-    return { ...e, ruta: `/${e.slug}/`, paginas: suyas, ref };
+    return { ...e, ruta: `/${e.slug}/`, paginas: suyas, ref, preguntas: conLugar(e.preguntas, e.donde_cirugia || huecoDonde) };
   }).filter((e) => e.paginas.length);
 
   // Relacionados: los que pide el contenido (si existen) o, en las provisionales, los de su especialidad
