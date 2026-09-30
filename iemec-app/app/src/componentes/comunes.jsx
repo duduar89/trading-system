@@ -49,7 +49,7 @@ const ESTADOS = {
   ia_activa: ['IA atendiendo', 'bg-aqua text-terciopelo-800'],
   esperando_paciente: ['Esperando al paciente', 'bg-[var(--superficie-2)] text-[var(--texto-suave)]'],
   espera_persona: ['Espera a una persona', 'bg-rosa/20 text-rosa'],
-  persona: ['La lleva una persona', 'bg-oro/20 text-[#8a6a2a]'],
+  persona: ['La lleva una persona', 'bg-oro/20 text-[#7a5a1f] dark:text-champan'],
   pausada: ['Pausada', 'bg-[var(--superficie-2)] text-[var(--texto-suave)]'],
   cerrada: ['Cerrada', 'bg-[var(--superficie-2)] text-[var(--texto-suave)]'],
 };

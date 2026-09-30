@@ -30,29 +30,37 @@
   --borde: #dfe6e4;
   --acento: var(--color-terciopelo-800);
   --dorado: var(--color-oro);
+  /* El texto en oro o en rosa y el contorno del foco, en el tono que se lee sobre el fondo de cada
+     tema (AA: 4,5:1 el texto y 3:1 el foco). El oro de la marca, tal cual, se queda en 2,3:1 sobre blanco. */
+  --oro-texto: #7a5a1f; --rosa-texto: #8e4f48; --foco: #7a5a1f;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --fondo: #0a1f1e; --superficie: #102a29; --superficie-2: #15343277; --texto: #eef3f1; --texto-suave: #a7bbb8;
     --borde: #22403e; --acento: var(--color-turquesa); --dorado: var(--color-champan); color-scheme: dark;
+    --oro-texto: var(--color-champan); --rosa-texto: #e0b1aa; --foco: var(--color-champan);
   }
 }
 :root[data-theme="dark"] {
   --fondo: #0a1f1e; --superficie: #102a29; --superficie-2: #15343277; --texto: #eef3f1; --texto-suave: #a7bbb8;
   --borde: #22403e; --acento: var(--color-turquesa); --dorado: var(--color-champan); color-scheme: dark;
+  --oro-texto: var(--color-champan); --rosa-texto: #e0b1aa; --foco: var(--color-champan);
 }
 
 html, body, #raiz { height: 100%; }
 body { margin: 0; background: var(--fondo); color: var(--texto); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 
-/* Terciopelo: degradado profundo con un grano muy fino, como la tela a contraluz. */
+/* Terciopelo: degradado profundo con un grano muy fino, como la tela a contraluz. El brillo de arriba
+   es el terciopelo 700: más claro, la marca y los rótulos que van encima dejan de leerse. Siempre es
+   oscuro: dentro, el oro, el rosa y el foco del tema oscuro. */
 .terciopelo {
   background:
-    radial-gradient(120% 90% at 15% 0%, #25706c 0%, transparent 55%),
+    radial-gradient(120% 90% at 15% 0%, var(--color-terciopelo-700) 0%, transparent 55%),
     radial-gradient(90% 80% at 100% 100%, #071e1d 0%, transparent 60%),
     linear-gradient(160deg, #164b49 0%, #0f3634 45%, #0b2b2a 100%);
   position: relative;
+  --oro-texto: var(--color-champan); --rosa-texto: #e0b1aa; --foco: var(--color-champan);
 }
 .terciopelo::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .18; mix-blend-mode: overlay;
@@ -65,5 +73,12 @@ body { margin: 0; background: var(--fondo); color: var(--texto); font-family: va
 .tarjeta { background: var(--superficie); border: 1px solid var(--borde); border-radius: 16px; }
 .cifras { font-variant-numeric: tabular-nums; }
 .rayado { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-champan) 45%, transparent) 0 6px, transparent 6px 12px); }
-:focus-visible { outline: 2px solid var(--dorado); outline-offset: 2px; }
+/* text-oro y text-rosa son texto: con el tono de su tema (los puntos, filetes y fondos siguen en el
+   color de la marca). Fuera de las capas de Tailwind, así mandan sobre su utilidad. */
+.text-oro { color: var(--oro-texto); }
+.text-rosa { color: var(--rosa-texto); }
+:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+/* Filas de una lista que recorta su contenido (la bandeja): por fuera, el contorno lo cortaría la
+   lista y lo taparía la fila de al lado. Va por dentro. */
+.foco-dentro:focus-visible { outline-offset: -3px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

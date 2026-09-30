@@ -23,13 +23,15 @@ export default function Hoy() {
   const { datos: d, error } = useDatos('/panel/hoy', { cadaMs: 30000 });
   if (error) return <Error texto={error} />;
   if (!d) return null;
+  // «1 tarea vencida», «3 tareas vencidas».
+  const n = (cuantas, una, varias) => `${cuantas} ${cuantas === 1 ? una : varias}`;
   const pendientes = [
-    d.conversaciones.urgentes && { texto: `${d.conversaciones.urgentes} conversación urgente esperando a una persona`, ir: '#conversaciones', alerta: true },
-    d.conversaciones.esperaPersona && { texto: `${d.conversaciones.esperaPersona} conversaciones esperan a una persona`, ir: '#conversaciones' },
-    d.sinProximoPaso && { texto: `${d.sinProximoPaso} conversaciones sin próximo paso (tiene que ser cero)`, ir: '#conversaciones', alerta: true },
-    d.tareas.vencidas && { texto: `${d.tareas.vencidas} tareas vencidas (llamadas, aprobaciones)`, ir: '#tareas', alerta: true },
-    d.tareas.abiertas > d.tareas.vencidas && { texto: `${d.tareas.abiertas - d.tareas.vencidas} tareas abiertas (leads por llamar, conversaciones por contestar)`, ir: '#tareas' },
-    d.resenasPorResponder && { texto: `${d.resenasPorResponder} reseñas de Google con respuesta preparada para aprobar`, ir: '#resenas' },
+    d.conversaciones.urgentes && { texto: `${n(d.conversaciones.urgentes, 'conversación urgente espera', 'conversaciones urgentes esperan')} a una persona`, ir: '#conversaciones', alerta: true },
+    d.conversaciones.esperaPersona && { texto: `${n(d.conversaciones.esperaPersona, 'conversación espera', 'conversaciones esperan')} a una persona`, ir: '#conversaciones' },
+    d.sinProximoPaso && { texto: `${n(d.sinProximoPaso, 'conversación', 'conversaciones')} sin próximo paso (tiene que ser cero)`, ir: '#conversaciones', alerta: true },
+    d.tareas.vencidas && { texto: `${n(d.tareas.vencidas, 'tarea vencida', 'tareas vencidas')} (llamadas, aprobaciones)`, ir: '#tareas', alerta: true },
+    d.tareas.abiertas > d.tareas.vencidas && { texto: `${n(d.tareas.abiertas - d.tareas.vencidas, 'tarea abierta', 'tareas abiertas')} (leads por llamar, conversaciones por contestar)`, ir: '#tareas' },
+    d.resenasPorResponder && { texto: `${n(d.resenasPorResponder, 'reseña', 'reseñas')} de Google con respuesta preparada para aprobar`, ir: '#resenas' },
   ].filter(Boolean);
   return (
     <>

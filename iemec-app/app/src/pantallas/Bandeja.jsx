@@ -54,7 +54,7 @@ export default function Bandeja() {
           {convs.map((c) => (
             <li key={c.id}>
               <button type="button" onClick={() => { setSel(c.id); window.location.hash = `conversaciones/${c.id}`; }}
-                className={`w-full px-4 py-3 text-left hover:bg-[var(--superficie-2)] ${sel === c.id ? 'bg-[var(--superficie-2)]' : ''}`}>
+                className={`foco-dentro w-full px-4 py-3 text-left hover:bg-[var(--superficie-2)] ${sel === c.id ? 'bg-[var(--superficie-2)]' : ''}`}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium truncate">{c.nombre}</span>
                   <span className="text-xs shrink-0" style={{ color: 'var(--texto-suave)' }}>{fechaHora(c.actualizado)}</span>
