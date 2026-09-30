@@ -143,7 +143,9 @@ test('cambiar y cancelar la cita por WhatsApp', async (t) => {
 
       const r2 = await R.procesarEntrante(deps, { telefono: '+34611000304', texto: 'Sí, cancélala', ahora: mas(martes, 4) });
       assert.equal(r2.sobreCita, 'cancelada');
-      assert.equal(r2.respuesta, 'Hecho, Elena: tu cita del lunes 19 de octubre a las 12:00 queda cancelada. ¿Quieres que te busque otro momento más adelante?');
+      // Apple no actualiza un evento importado: si se la llevó al calendario, que la borre (si no, le
+      // avisaría la víspera y 2 horas antes de una cita que ya no existe).
+      assert.equal(r2.respuesta, 'Hecho, Elena: tu cita del lunes 19 de octubre a las 12:00 queda cancelada. Si la tenías en tu calendario, bórrala. ¿Quieres que te busque otro momento más adelante?');
       const cancelada = await cita(pool, c.id);
       assert.deepEqual([cancelada.estado, cancelada.cancelada_por, cancelada.secuencia_ics], ['cancelada', 'paciente', 1]);
       const [[conv]] = await pool.query('SELECT estado, motivo_cierre FROM conversaciones WHERE id = ?', [r.conversacionId]);

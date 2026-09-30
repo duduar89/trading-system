@@ -138,11 +138,7 @@ async function avisar(deps, citaId, tipo, { ahora = new Date() } = {}) {
   }
   // Un aviso no deja trabajo en la bandeja: si la conversación no tiene nada más en marcha, se
   // cierra «con cita». Si contesta, se reabre (ver conversacionPara).
-  await pool.query(
-    `UPDATE conversaciones c SET c.estado = 'cerrada', c.motivo_cierre = 'cita', c.proximo_paso = 'cita', c.proximo_paso_en = ?
-      WHERE c.id = ? AND c.estado IN ('ia_activa','esperando_paciente')
-        AND NOT EXISTS (SELECT 1 FROM seguimientos s WHERE s.conversacion_id = c.id AND s.estado = 'pendiente')
-        AND NOT EXISTS (SELECT 1 FROM tareas t WHERE t.conversacion_id = c.id AND t.estado = 'abierta')`, [c.inicio, conv.id]);
+  await R.cerrarConCita(pool, conv.id, c.inicio);
   // La víspera le pregunta si viene: su «sí» a secas (o su «no») contesta a eso.
   if (tipo === 'vispera' && envio.estado === 'enviado') {
     await R.ponerPregunta(pool, conv.id, { tipo: 'confirmar_cita', citaId, mensajeId: envio.mensajeId }, ahora);

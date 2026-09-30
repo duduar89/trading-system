@@ -242,6 +242,10 @@ test('WhatsApp sin tratamiento: la confirmación de la IA, los avisos y las vari
       assert.deepEqual(whatsapp.enviados.at(-1).botones, [], 'la víspera, solo respuestas rápidas (se ven también en el ordenador)');
       await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-15T13:05:00Z') });
       assert.equal(whatsapp.enviados.at(-1).nombre, 'iemec_recordatorio_2h');
+      // Con un solo botón de enlace, en la conversación queda el enlace a secas (como siempre); con
+      // dos, cada uno con lo que dice su botón.
+      assert.equal((await textos(pool, p.telefono)).at(-1), `[Mapa: IEMEC · ${DIRECCION}]\n`
+        + `Hola Laura, hoy a las 17:00 te esperamos en ${SEDE}. Si te surge algo, responde a este mensaje.\n\nhttps://agenda.iemec-clinic.com/c/${cita.token}`);
 
       const llegados = whatsapp.enviados.filter((x) => x.telefono === p.telefono);
       assert.equal(llegados.length, 3);
@@ -387,6 +391,66 @@ test('la víspera: sus dos respuestas rápidas llegan por el webhook y se entien
   }
 });
 
+test('su «sí» a la víspera (o su «gracias») en una conversación con algo pendiente no la cierra: el seguimiento sale a su hora', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const whatsapp = crearWhatsApp('simulado');
+  const deps = { pool, ia: crearIa('simulado'), whatsapp };
+  try {
+    await sembrar(pool);
+    const dada = new Date('2026-10-09T08:00:00Z'); // viernes: recepción le da cita para el jueves 15
+    const lunes = new Date('2026-10-19T08:00:00Z'); // «te escribimos el lunes» por su presupuesto
+    // Habla con la clínica de otra cosa (un presupuesto) y quedaron en escribirle el lunes 19.
+    const conAlgoPendiente = async (nombre, hora) => {
+      const p = await paciente(pool, nombre);
+      const [cv] = await pool.query(
+        "INSERT INTO conversaciones (telefono, paciente_id, contexto, estado, proximo_paso, proximo_paso_en) VALUES (?, ?, 'general', 'esperando_paciente', 'seguimiento', ?)",
+        [p.telefono, p.id, lunes]);
+      const [s] = await pool.query(
+        "INSERT INTO seguimientos (paciente_id, conversacion_id, contexto, motivo, plazo_tipo, programado_para, creado_por, creado_en) VALUES (?, ?, 'general', 'como_quedamos', 'fecha', ?, 'ia', ?)",
+        [p.id, cv.insertId, lunes, dada]);
+      const c = await agenda.reservar(pool, { pacienteId: p.id, tratamientoId: 'laser-intimo', fecha: '2026-10-15', hora, origen: 'recepcion', ahora: dada });
+      await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [dada, c.id]);
+      return { ...p, conv: cv.insertId, seguimiento: s.insertId, cita: c };
+    };
+    const estado = async (convId) => (await pool.query('SELECT estado, proximo_paso FROM conversaciones WHERE id = ?', [convId]))[0][0];
+    const laura = await conAlgoPendiente('Laura', '12:00');
+    const marta = await conAlgoPendiente('Marta', '16:00');
+
+    // Marta, el martes, escribe por su cita (sin que le hayamos preguntado nada).
+    const m = await R.procesarEntrante(deps, { telefono: marta.telefono, texto: 'Confirmo la cita del jueves, gracias', ahora: new Date('2026-10-13T09:00:00Z') });
+    assert.equal(m.sobreCita, 'confirma');
+    assert.deepEqual({ ...(await estado(marta.conv)) }, { estado: 'esperando_paciente', proximo_paso: 'seguimiento' }, 'lo del presupuesto sigue en marcha');
+
+    // La víspera entra en su conversación (que tiene algo pendiente: no se cierra) y Laura dice «Sí».
+    const vispera = new Date('2026-10-14T08:05:00Z');
+    assert.deepEqual((await avisos.enviarPendientes(deps, { ahora: vispera })).map((x) => [x.citaId, x.tipo]), [[laura.cita.id, 'vispera'], [marta.cita.id, 'vispera']]);
+    assert.equal((await estado(laura.conv)).estado, 'esperando_paciente');
+    const l = await R.procesarEntrante(deps, { telefono: laura.telefono, texto: 'Sí', ahora: mas(vispera, 30) });
+    assert.equal(l.conversacionId, laura.conv);
+    assert.equal(l.respuesta, '¡Perfecto, Laura! Queda confirmada: te esperamos el jueves 15 de octubre a las 12:00.');
+    assert.deepEqual({ ...(await estado(laura.conv)) }, { estado: 'esperando_paciente', proximo_paso: 'seguimiento' }, 'confirma la cita, pero la conversación sigue abierta');
+
+    // El lunes, el «como quedamos» de los dos sale (no se pierde con la conversación cerrada).
+    const r = await R.procesarSeguimientos(deps, { ahora: lunes });
+    for (const x of [laura, marta]) {
+      const hecho = r.find((y) => y.id === x.seguimiento);
+      assert.ok(hecho?.envio, `${x.telefono}: ${JSON.stringify(hecho)}`);
+      assert.equal(hecho.envio.estado, 'enviado');
+    }
+
+    // Sin nada pendiente, su «sí» sí cierra la conversación «con cita» (como hasta ahora).
+    const nuria = await paciente(pool, 'Nuria');
+    const cn = await agenda.reservar(pool, { pacienteId: nuria.id, tratamientoId: 'laser-intimo', fecha: '2026-10-22', hora: '12:00', origen: 'recepcion', ahora: dada });
+    await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [dada, cn.id]);
+    await avisos.enviarPendientes(deps, { ahora: new Date('2026-10-21T08:05:00Z') });
+    const n = await R.procesarEntrante(deps, { telefono: nuria.telefono, texto: 'Sí', ahora: new Date('2026-10-21T09:00:00Z') });
+    assert.deepEqual({ ...(await estado(n.conversacionId)) }, { estado: 'cerrada', proximo_paso: 'cita' });
+  } finally {
+    await pool.end();
+  }
+});
+
 test('un hueco de la lista de espera, confirmado desde «Tu cita»: acepta la oferta, cambia la cita que tenía y le avisa de que ha cambiado', async (t) => {
   const pool = await prepararBdDePrueba(t);
   if (!pool) return;
@@ -407,7 +471,9 @@ test('un hueco de la lista de espera, confirmado desde «Tu cita»: acepta la of
     assert.equal((await espera.vuelta(deps, { ahora: mas(ahora, 1) })).ofrecidas, 1);
     const aviso = whatsapp.enviados.filter((x) => x.telefono === b.telefono).at(-1);
     assert.equal(aviso.nombre, 'iemec_hueco_liberado');
-    assert.deepEqual(aviso.variables, ['Berta', 'tu tratamiento', 'jueves 15 de octubre', '17:00'], 'lo íntimo tampoco se nombra en la oferta del hueco');
+    // Cómo se nombra el tratamiento en la oferta ({{2}}) es cosa de la lista de espera y la repesca
+    // (servidor/avisos-espera.js): aquí, el resto.
+    assert.deepEqual([aviso.variables[0], ...aviso.variables.slice(2)], ['Berta', 'jueves 15 de octubre', '17:00']);
     const [[oferta]] = await pool.query('SELECT * FROM lista_espera_ofertas');
     const [[retenida]] = await pool.query('SELECT * FROM citas WHERE id = ?', [oferta.cita_id]);
     assert.equal(retenida.estado, 'retenida');
@@ -498,6 +564,17 @@ test('un hueco de la lista de espera, desde «Tu cita»: «No me viene bien» lo
       assert.match(pag, new RegExp(`action="/c/${token}/cancelar"><button class="btn" type="submit">No me viene bien</button>`));
       const no = await (await fetch(`${base}/c/${token}/cancelar`, { method: 'POST' })).text();
       assert.match(no, /De acuerdo: el hueco queda libre para otra persona\. Sigues en la lista de espera/);
+      // Nunca fue su cita (no la confirmó, ni tuvo con qué añadirla a su calendario): ni «Cita
+      // cancelada» ni «bórrala de tu calendario».
+      for (const html of [no, await (await fetch(`${base}/c/${token}`)).text()]) {
+        assert.match(html, /<h1>Hueco liberado<\/h1>/);
+        assert.doesNotMatch(html, /Cita cancelada|Esta cita está cancelada|calendario/);
+      }
+      assert.match(await (await fetch(`${base}/c/${token}`)).text(), /No reservaste este hueco: ha quedado libre para otra persona\. Sigues en la lista de espera/);
+      // Un doble toque en «No me viene bien»: lo mismo, sin error.
+      const otraVez = await (await fetch(`${base}/c/${token}/cancelar`, { method: 'POST' })).text();
+      assert.match(otraVez, /De acuerdo: el hueco queda libre para otra persona\./);
+      assert.doesNotMatch(otraVez, /No se ha podido/);
     });
     const [[o]] = await pool.query('SELECT estado FROM lista_espera_ofertas WHERE id = ?', [oferta.id]);
     assert.equal(o.estado, 'rechazada');

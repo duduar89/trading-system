@@ -763,6 +763,19 @@ async function citasProximas(q, pacienteId, ahora) {
   return filas.map((c) => ({ id: c.id, fecha: T.fechaMadrid(new Date(c.inicio)), hora: T.hhmm(T.minutosMadrid(new Date(c.inicio))) }));
 }
 
+// Lo que queda de la conversación es su cita: se cierra «con cita» (si vuelve a escribir, se reabre:
+// ver conversacionPara). Solo si no tiene nada más en marcha: con un seguimiento pendiente (el «como
+// quedamos» de un presupuesto) o una tarea abierta, se queda como está; cerrada, procesarSeguimientos
+// se saltaría ese seguimiento. Lo usan también los avisos de cita. Devuelve si la ha cerrado.
+async function cerrarConCita(q, conversacionId, inicio) {
+  const [r] = await q.query(
+    `UPDATE conversaciones c SET c.estado = 'cerrada', c.motivo_cierre = 'cita', c.proximo_paso = 'cita', c.proximo_paso_en = ?
+      WHERE c.id = ? AND c.estado IN ('ia_activa','esperando_paciente')
+        AND NOT EXISTS (SELECT 1 FROM seguimientos s WHERE s.conversacion_id = c.id AND s.estado = 'pendiente')
+        AND NOT EXISTS (SELECT 1 FROM tareas t WHERE t.conversacion_id = c.id AND t.estado = 'abierta')`, [inicio, conversacionId]);
+  return r.affectedRows === 1;
+}
+
 async function atenderSobreCita(deps, conv, { texto, ahora, datos, nombre, hola = '', hist }) {
   const { pool } = deps;
   const t = normalizar(texto);
@@ -789,7 +802,7 @@ async function atenderSobreCita(deps, conv, { texto, ahora, datos, nombre, hola 
   // Un «gracias» al «gracias» no hace falta: si ya le contestamos hace poco, no se repite.
   const ultimo = [...hist].reverse().find((m) => m.autor !== 'paciente');
   const reciente = ultimo && /^(¡A ti|¡Perfecto)/.test(ultimo.texto) && ahora - new Date(ultimo.en) < 30 * 60000;
-  await pool.query("UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cita', proximo_paso = 'cita', proximo_paso_en = ? WHERE id = ?", [c.inicio, conv.id]);
+  await cerrarConCita(pool, conv.id, c.inicio);
   if (reciente) return { conversacionId: conv.id, sobreCita: confirma ? 'confirma' : 'agradece', respuesta: null };
   const respuesta = confirma
     ? `¡Perfecto${n}! Queda confirmada: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`
@@ -922,7 +935,7 @@ async function cancelarPorWhatsapp(deps, conv, c, { ahora, nombre, hola = '' }) 
   await pool.query(`UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cancelada', proximo_paso = 'cerrada', proximo_paso_en = NULL,
                       reprograma_cita_id = NULL, huecos_ofrecidos = NULL, huecos_ofrecidos_en = NULL WHERE id = ?`, [conv.id]);
   await anotar(pool, conv, 'cita', [{ tipo: 'cancelar_cita', citaId: c.id }], 'cerrada');
-  return preguntar(deps, conv, `${hola}Hecho${nombre ? `, ${nombre}` : ''}: tu cita del ${textoDia(c.fecha).slice(3)} a las ${c.hora} queda cancelada. ¿Quieres que te busque otro momento más adelante?`,
+  return preguntar(deps, conv, `${hola}Hecho${nombre ? `, ${nombre}` : ''}: tu cita del ${textoDia(c.fecha).slice(3)} a las ${c.hora} queda cancelada. Si la tenías en tu calendario, bórrala. ¿Quieres que te busque otro momento más adelante?`,
     { tipo: 'buscar_otro', tratamientoId: c.tratamiento_id }, ahora, { sobreCita: 'cancelada' });
 }
 
@@ -945,7 +958,8 @@ async function atenderPregunta(deps, conv, pregunta, { texto, ahora, datos, regl
       await registrar(pool, { tipo: 'cita_confirmada_paciente', entidad: 'cita', entidadId: c.id, actor: 'paciente', datos: { por: 'whatsapp' } });
       const confirmada = `¡Perfecto${n}! Queda confirmada: te esperamos ${textoDia(c.fecha)} a las ${c.hora}.`;
       if (SI_A_SECAS.test(t.replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim())) {
-        await pool.query("UPDATE conversaciones SET estado = 'cerrada', motivo_cierre = 'cita', proximo_paso = 'cita', proximo_paso_en = ? WHERE id = ?", [c.inicio, conv.id]);
+        // La víspera puede haber entrado en una conversación con algo en marcha: entonces sigue abierta.
+        await cerrarConCita(pool, conv.id, c.inicio);
         return contestar(deps, conv, confirmada, ahora, { sobreCita: 'confirma' });
       }
       const decision = { intencion: 'cita', acciones: [{ tipo: 'pasar_a_persona', motivo: `Confirma su cita del ${textoDia(c.fecha).slice(3)} a las ${c.hora} y añade algo: leer su mensaje` }], proximoPaso: 'persona' };
@@ -1232,10 +1246,11 @@ async function enviar(deps, conv, { texto = null, plantilla = null, variables = 
     estado = 'fallido';
     error = err.message;
   }
-  // En la conversación queda el texto tal y como lo lee el paciente (con el mapa y los enlaces de los botones).
+  // En la conversación queda el texto tal y como lo lee el paciente, con el mapa y los enlaces de los
+  // botones: uno solo, a secas (como siempre); con dos, cada uno con lo que dice su botón.
+  const enlaces = conBotones.length === 1 ? conBotones[0].enlace : conBotones.map((b) => `${b.texto}: ${b.enlace}`).join('\n');
   const cuerpo = plantilla
-    ? `${conCabecera ? `[Mapa: ${conCabecera.nombre} · ${conCabecera.direccion}]\n` : ''}${rellenar(plantilla, variables)}`
-      + `${conBotones.length ? `\n\n${conBotones.map((b) => `${b.texto}: ${b.enlace}`).join('\n')}` : ''}`
+    ? `${conCabecera ? `[Mapa: ${conCabecera.nombre} · ${conCabecera.direccion}]\n` : ''}${rellenar(plantilla, variables)}${enlaces ? `\n\n${enlaces}` : ''}`
     : texto;
   const id = await guardarMensaje(pool, { conversacionId: conv.id, direccion: 'saliente', autor, tipo: plantilla ? 'plantilla' : 'texto', texto: cuerpo, waId: r?.waId, estado, plantillaId: plantilla?.id, creadoEn: ahora });
   // Lo que le preguntamos antes ya no es lo último que ha leído (un recordatorio, lo que escribe
@@ -1608,7 +1623,7 @@ async function sinProximoPaso(q, ahora = new Date()) {
 }
 
 module.exports = {
+  ponerPregunta, textoCitaReservada, enlacesCita, cerrarConCita,
   textoHuecos, textoDia, procesarEntrante, procesarSeguimientos, avanzarSecuencias, inscribir, sinProximoPaso, enviar, historial,
   calendarioDesdeBd, cargarContexto, conversacionPara, datosCita, plantillasBd, enMinuscula, nombreTratamiento, permisoComercial,
-  ponerPregunta, textoCitaReservada, enlacesCita,
 };
