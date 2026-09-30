@@ -123,7 +123,7 @@ test('passkeys de punta a punta en Chromium', { timeout: 180000 }, async (t) => 
       await enlaceDeLaSeccion(r, 'Reseñas y Google').click();
       await r.getByText('¡Gracias por tu reseña!').waitFor();
       assert.equal(await r.getByRole('button', { name: 'Aprobar y publicar' }).count(), 0);
-      await r.getByText(/la aprueba dirección o marketing/).waitFor();
+      await r.getByText(/la aprueba dirección o marketing/i).waitFor();
       // Aunque escriba la dirección de una sección que no es suya, se queda en «Hoy».
       await r.goto(`${base}/#ajustes`);
       await r.getByRole('heading', { name: /IEMEC$/ }).waitFor();

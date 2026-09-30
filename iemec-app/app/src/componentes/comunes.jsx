@@ -54,7 +54,7 @@ const ESTADOS = {
   cerrada: ['Cerrada', 'bg-[var(--superficie-2)] text-[var(--texto-suave)]'],
 };
 // Lo que la repesca entiende de cada respuesta, en palabras de recepción.
-export const INTENCION = { aplazar: 'Aplaza («el mes que viene»…)', precio: 'Le parece caro', competencia_precio: 'Lo ha visto más barato', pensar: 'Lo tiene que pensar', duda_medica: 'Duda (dolor, riesgos…)', salud_personal: 'Cuenta algo de su salud', ocupado_ahora: 'Ahora no puede', reservar: 'Quiere cita', no_interesa: 'No le interesa', ya_hecho: 'Ya se lo hizo', baja: 'Pide la baja', queja: 'Queja', pregunta: 'Pregunta', evento: 'Tiene un evento', preferencia_horario: 'Prefiere un horario', acepta: 'Dice que sí', otro: 'Otras', eleccion_hueco: 'Elige hueco', cita: 'Sobre su cita', lista_espera: 'Lista de espera' };
+export const INTENCION = { aplazar: 'Aplaza («el mes que viene»…)', precio: 'Le parece caro', competencia_precio: 'Lo ha visto más barato', pensar: 'Lo tiene que pensar', duda_medica: 'Duda (dolor, riesgos…)', salud_personal: 'Cuenta algo de su salud', salud_urgente: 'Posible urgencia de salud', informacion: 'Pide información', ocupado_ahora: 'Ahora no puede', reservar: 'Quiere cita', no_interesa: 'No le interesa', ya_hecho: 'Ya se lo hizo', baja: 'Pide la baja', queja: 'Queja', pregunta: 'Pregunta', evento: 'Tiene un evento', preferencia_horario: 'Prefiere un horario', acepta: 'Dice que sí', otro: 'Otras', eleccion_hueco: 'Elige hueco', cita: 'Sobre su cita', lista_espera: 'Lista de espera' };
 
 export function EstadoConversacion({ estado, urgente, motivoCierre }) {
   const [texto, clase] = estado === 'cerrada' && motivoCierre === 'cita'

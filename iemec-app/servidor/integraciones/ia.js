@@ -10,7 +10,7 @@
 const { interpretar } = require('../../motor/repesca/interpretar');
 
 const INTENCIONES = ['aplazar', 'ocupado_ahora', 'precio', 'competencia_precio', 'pensar', 'duda_medica', 'salud_personal',
-  'queja', 'ya_hecho', 'no_interesa', 'baja', 'reservar', 'evento', 'pregunta', 'preferencia_horario', 'acepta', 'otro'];
+  'queja', 'ya_hecho', 'no_interesa', 'baja', 'reservar', 'evento', 'pregunta', 'preferencia_horario', 'acepta', 'informacion', 'otro'];
 const PLAZOS = ['ninguno', 'hoy_tarde', 'manana', 'pasado_manana', 'dias', 'semanas', 'semana_siguiente', 'dia_semana', 'mes_siguiente',
   'meses', 'mes', 'fecha', 'tras_fecha', 'inicio_mes', 'fin_mes', 'cobro', 'tras_hito', 'vago'];
 
@@ -39,9 +39,10 @@ Intenciones:
 - aplazar: pide que se le escriba o dar la cita más adelante (y el plazo dice cuándo).
 - ocupado_ahora: ahora no puede hablar (trabajando, conduciendo…).
 - precio: le parece caro o no se lo puede permitir. competencia_precio: lo compara con otro sitio más barato.
-- pensar: lo tiene que pensar o consultar. duda_medica: duda general (dolor, miedo, riesgos, recuperación).
+- pensar: lo tiene que pensar o consultar. duda_medica: duda general (dolor, miedo, riesgos, recuperación), también si la pide como información («¿me das info sobre los efectos secundarios?»).
 - salud_personal: cuenta algo de SU salud (embarazo, lactancia, medicación, alergias, enfermedades, operación) o una posible complicación (bulto, mucha hinchazón, dolor fuerte, fiebre): en ese caso urgente=true.
-- queja, ya_hecho (ya se lo hizo en otro sitio), no_interesa, baja (no quiere más mensajes), reservar (quiere cita), evento (quiere estar bien para una fecha), pregunta, preferencia_horario, acepta, otro.
+- informacion: pide información o el precio sin más, lo típico del primer mensaje de un anuncio («quiero más información», «¿me das info?», «¿qué precio tiene?», «me interesa»). Si además elige uno de los huecos que se le ofrecieron («me interesa el del martes»), es reservar. Ante la duda entre informacion y duda_medica, duda_medica.
+- queja, ya_hecho (ya se lo hizo en otro sitio), no_interesa, baja (no quiere más mensajes), reservar (quiere cita o una valoración: «quisiera pedir cita», «me gustaría reservar una valoración», «¿podría agendar…?»), evento (quiere estar bien para una fecha), pregunta (una pregunta concreta: horario, financiación…), preferencia_horario, acepta, otro.
 
 Plazos: la fecha NO la calculas tú; solo dices el tipo y los números que dijo el paciente.
 - «el mes que viene» → mes_siguiente; «la semana que viene» → semana_siguiente; «en dos semanas» → semanas n=2; «en 10 días» → dias n=10.
@@ -61,6 +62,31 @@ Reglas que no se rompen:
 Devuelve solo el texto del mensaje.`;
 
 // ── Modo simulado ────────────────────────────────────────────────────────────────────────────
+const FRANJA = { manana: 'mañana', tarde: 'tarde' };
+
+// Los huecos que se le ofrecen, diciéndole antes si en la franja que pidió no quedaba nada.
+function huecosConFranja(d, huecos) {
+  if (!d.franjaSinHuecos) return huecos;
+  return `por la ${FRANJA[d.franjaSinHuecos]} no me queda nada estos días, pero por la ${FRANJA[d.franjaOfrecida]} tengo ${huecos}`;
+}
+
+// «Quiero más información», «¿qué precio tiene?»: lo aprobado del tratamiento (si lo hay), una
+// valoración o primera visita con el equipo (a quien ya es cliente, sin «primera») y, si la IA puede
+// darle cita, huecos. Sin tratamiento, se le pregunta cuál le interesa. Si ya tiene cita de eso, lo
+// aprobado y su cita (d.citaPendiente: «el miércoles 14 de octubre a las 12:00»).
+function textoInformacion(d, nombre, huecos) {
+  if (!d.conTratamiento) {
+    return `Gracias${nombre}. ¿Qué tratamiento te interesa? Te cuento lo que necesites y, si quieres, te busco hueco${d.esCliente ? '' : ' para una primera valoración con nuestro equipo, sin compromiso'}.`;
+  }
+  const aprobada = d.respuestaAprobada ? `${d.respuestaAprobada} ` : '';
+  if (d.citaPendiente) return `Gracias${nombre}. ${aprobada}Te esperamos ${d.citaPendiente}.`;
+  if (huecos) {
+    const para = d.esCliente ? '' : ' para una primera visita con nuestro equipo, que te lo explica todo en persona y sin compromiso';
+    return `Gracias${nombre}. ${aprobada}Si quieres, te busco hueco${para}: ${huecosConFranja(d, huecos)}. ¿Te reservo alguno?`;
+  }
+  return `Gracias${nombre}. ${aprobada}Lo mejor es verlo en una valoración con nuestro equipo, sin compromiso. ¿Quieres que te busquemos hueco?`;
+}
+
 function textoSimulado(decision, d = {}) {
   const nombre = d.nombre ? `, ${d.nombre}` : '';
   const presentacion = d.primerMensajeIa ? 'Soy el asistente virtual de IEMEC. ' : '';
@@ -77,11 +103,15 @@ function textoSimulado(decision, d = {}) {
   else if (tipos.has('cerrar') && decision.intencion === 'ya_hecho') t = `¡Qué bien${nombre}! Gracias por contárnoslo. Si no es indiscreción, ¿qué te hizo decidirte? Nos ayuda a mejorar.`;
   else if (tipos.has('cerrar')) t = `Gracias por decírnoslo${nombre}. Si en otro momento te apetece, aquí estaremos.`;
   else if (oferta) t = `Te entiendo${nombre}. ${d.ofertaTexto || 'Tenemos una opción que puede encajarte.'} ¿Te encaja así?`;
+  else if (tipos.has('preguntar_opcion')) t = `Tenemos varias opciones${nombre}: ${d.opcionesTexto}. ¿Cuál te interesa? Así te busco hueco.`;
+  else if (decision.intencion === 'informacion') t = textoInformacion(d, nombre, huecos);
   else if (tipos.has('preguntar_cuando')) t = `Sin problema${nombre}. ¿Cuándo te vendría mejor que te escribamos?`;
   else if (decision.intencion === 'ocupado_ahora' && seg) t = `Sin problema${nombre}, te escribo ${seg.texto}.`;
-  else if (decision.intencion === 'aplazar' && tipos.has('proponer_huecos') && seg && huecos) t = `¡Claro${nombre}! Si quieres, te dejo ya guardado un hueco: ${huecos}. Si prefieres esperar, te escribo ${seg.texto}.`;
+  else if (decision.intencion === 'aplazar' && tipos.has('proponer_huecos') && seg && huecos) t = `¡Claro${nombre}! Si quieres, te dejo ya guardado un hueco: ${huecosConFranja(d, huecos)}. Si prefieres esperar, te escribo ${seg.texto}.`;
   else if (seg && decision.intencion === 'aplazar') t = `Perfecto${nombre}. Te escribo ${seg.texto} y lo vemos con calma.`;
-  else if (tipos.has('proponer_huecos') && huecos) t = `¡Genial${nombre}! Tengo estos huecos para ti: ${huecos}. ¿Cuál te viene mejor?`;
+  else if (tipos.has('proponer_huecos') && huecos && d.franjaSinHuecos) {
+    t = `Por la ${FRANJA[d.franjaSinHuecos]} no me queda nada estos días${nombre}; por la ${FRANJA[d.franjaOfrecida]} te puedo ofrecer ${huecos}. ¿Te viene bien alguno?`;
+  } else if (tipos.has('proponer_huecos') && huecos) t = `¡Genial${nombre}! Tengo estos huecos para ti: ${huecos}. ¿Cuál te viene mejor?`;
   else if (tipos.has('proponer_huecos')) t = `Ahora mismo no veo huecos en esas fechas${nombre}; una persona del equipo te propone alternativas.`;
   else if (decision.intencion === 'pensar') t = `Claro${nombre}, tómate tu tiempo. ¿Hay algo que te frene o que quieras que te aclare?${seg ? ` Si te parece, te escribo ${seg.texto}.` : ''}`;
   else if (d.respuestaAprobada) t = `${d.respuestaAprobada} Si quieres, lo vemos en una valoración con el equipo médico.`;
@@ -168,11 +198,13 @@ function crearReal(env = process.env) {
 }
 
 // Junta lo que dice la IA con el intérprete de reglas. Las reglas mandan en seguridad (bajas y
-// salud); si los dos ven plazos distintos, se pregunta al paciente en vez de adivinar.
+// salud, y una duda médica que la IA toma por una petición de información: la contesta el equipo
+// médico); si los dos ven plazos distintos, se pregunta al paciente en vez de adivinar.
 function combinar(reglas, ia) {
   if (!ia) return { ...reglas, fuente: 'reglas', aviso: 'sin IA' };
   if (['baja', 'salud_personal'].includes(reglas.intencion)) return { ...reglas, fuente: 'reglas' };
   if (['baja', 'salud_personal'].includes(ia.intencion)) return { ...ia, fuente: 'ia' };
+  if (reglas.intencion === 'duda_medica' && ['informacion', 'pregunta'].includes(ia.intencion)) return { ...ia, intencion: 'duda_medica', fuente: 'reglas' };
   if (reglas.plazo && ia.plazo && reglas.plazo.tipo !== ia.plazo.tipo && ia.intencion === 'aplazar') {
     return { intencion: 'aplazar', plazo: { tipo: 'vago' }, franja: ia.franja, urgente: false, fuente: 'conflicto', aviso: `reglas: ${reglas.plazo.tipo} · ia: ${ia.plazo.tipo}` };
   }

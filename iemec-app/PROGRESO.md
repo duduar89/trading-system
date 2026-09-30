@@ -1,10 +1,11 @@
 # PROGRESO — app de IEMEC
 
 **Estado:** todas las fases con su núcleo hecho y probado en demostración; entran de verdad
-WhatsApp y los leads; el personal entra con passkeys y el importador de Flowww espera su primera
-exportación. En marcha, la web nueva. Falta conectar las cuentas reales (envío de WhatsApp, Google, IA)
+WhatsApp y los leads; el personal entra con passkeys; la cita llega al paciente sin decir el
+tratamiento; reseñas con las normas de Google y adaptadores reales de Google y DataForSEO; el importador
+de Flowww espera su primera exportación. En marcha, la web nueva. Falta conectar las cuentas reales (envío de WhatsApp, Google, IA)
 y los datos de la clínica, que esperan las puertas ⛔.
-**Última actualización:** 30-sep-2026 · **591 pruebas en verde** · ESLint limpio
+**Última actualización:** 30-sep-2026 · **895 pruebas en verde** · ESLint limpio
 
 El encargo completo está en [`docs/ENCARGO.md`](docs/ENCARGO.md). Este fichero dice dónde estamos:
 se lee al empezar cada vuelta del loop y se actualiza al terminarla.
@@ -15,16 +16,16 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
 |---|---|---|---|
 | F0 · Investigación y propuesta | hecha | Catálogo consolidado (172 entradas con fuentes), directorios, Google, posiciones en Maps desde 7 puntos, SEO de la web, calendario. **Entregados a Eduardo, fuera del repo:** propuesta para la clínica (HTML + PDF con la estética de la marca) e informe de búsqueda local y APIs (HTML + PDF, verificado) | — |
 | F1 · Esqueleto y base de datos | hecha | Migraciones 001-009, 013 y 014, semillas con el **catálogo consolidado** (`scripts/importar-catalogo.js`, repetible): 172 tratamientos (157 se reservan, 67 los reserva la IA, 71 con publicidad restringida), 26 aparatos, 351 preguntas sin aprobar, cada tratamiento con su sala | Salas, aparatos y profesionales reales (⛔ 2) |
-| F2 · Agenda y cita | hecha | Huecos por sala, profesional y aparato; «Tu cita» y `.ics`; el paciente elige hueco por WhatsApp; avisos de confirmación, víspera y 2 horas; **estados** (ha llegado, completada, no vino, deshacer); **cambiar y cancelar la cita por WhatsApp**; **lista de espera** que ofrece los huecos liberados con retención; **importador de Flowww** (pacientes y citas futuras, ensayo sin datos personales y deshacer) | Privacidad de la cita (vuelta 8c); primer ensayo con la exportación real de Flowww (⛔ 8) |
-| F3 · Repesca | hecha | Excusas (130 frases), seguimientos con fecha, ofertas con límites legales, plantillas con reserva, IA real con respaldo; **webhook de WhatsApp** (firma, estados de entrega, audios y fotos a una persona, anuncios que abren WhatsApp → lead), **leads de Meta Lead Ads, de la web y de GHL** (`POST /api/leads`), bajas por teléfono, pantalla de tareas | Envío real de WhatsApp (⛔ 5); medios (audio, foto); intenciones «más información» y «reservar una valoración» (vuelta 8c) |
-| F4 · Reseñas + Google | en marcha | Petición a todos tras **completar** la cita, enlace corto, temas, respuestas con aprobación, ideas de publicación | Normas de Google (sin exclusión por queja, 30 días de texto, alerta clínica, recordatorio) y adaptadores reales (vuelta 8c) |
+| F2 · Agenda y cita | hecha | Huecos por sala, profesional y aparato; «Tu cita» y `.ics` **privados** («Cita en IEMEC», token solo como huella y cifrado, sedes, **/cal/ abre el calendario de cada móvil de un toque**, WhatsApp sin nombrar el tratamiento); el paciente elige hueco por WhatsApp; avisos de confirmación, víspera y 2 horas; **estados** (ha llegado, completada, no vino, deshacer); **cambiar y cancelar la cita por WhatsApp**; **lista de espera** que ofrece los huecos liberados con retención; **importador de Flowww** (pacientes y citas futuras, ensayo sin datos personales y deshacer) | Primer ensayo con la exportación real de Flowww (⛔ 8); las plantillas de cita nuevas, aprobadas en Meta (⛔ 5) |
+| F3 · Repesca | hecha | Excusas (130 frases), seguimientos con fecha, ofertas con límites legales, plantillas con reserva, IA real con respaldo; **webhook de WhatsApp** (firma, estados de entrega, audios y fotos a una persona, anuncios que abren WhatsApp → lead), **leads de Meta Lead Ads, de la web y de GHL** (`POST /api/leads`), bajas por teléfono, pantalla de tareas; **intenciones «más información», «reservar una valoración» y urgencias de salud**, tratamiento de interés recordado, recuperar la cita cancelada por WhatsApp | Envío real de WhatsApp (⛔ 5); medios (audio, foto); el primer WhatsApp desde la web nueva como lead (vuelta 9) |
+| F4 · Reseñas + Google | hecha | Petición a todos tras **completar** la cita (sin filtrar por queja), enlace corto, un recordatorio, temas, respuestas con aprobación, **texto y autor borrados a los 29 días**, **alerta clínica para dirección médica**, historial poco a poco, ideas de publicación; **adaptadores reales** de Business Profile (reseñas, respuestas, métricas, avisos por Pub/Sub), Places y **posiciones en Maps con DataForSEO** (malla y tope de gasto) | Accesos de Google y cuenta de DataForSEO (⛔ 6, pasos en docs/GOOGLE.md) |
 | F5 · Panel | hecha | Hoy, agenda con detalle de cita y estados, bandeja con estado de entrega, seguimientos, repesca, plantillas, reseñas, tareas, lista de espera, salas × tratamientos; PWA; fuentes propias; **entrada con passkeys**, roles y permisos por ruta, pantalla «Equipo»; **pruebas de flujo con Playwright** (15 flujos; contraste AA, foco y 390 px en cada pantalla) | Enlazar cada persona con su profesional («mis citas»); marcar en la agenda las citas importadas para revisar |
 | F6 · Despliegue | hecha | Workflows comprobar y desplegar, copia previa, recuperación de `node_modules`, comprobación del commit, copias cifradas | Workflow en la rama por defecto; secretos reales; primera alta de dirección con `npm run invitar` y quitar PANEL_CLAVE cuando todos tengan passkey |
 | F7 · Web nueva | en marcha | Vuelta 9: inventario de iemec-clinic.com, normas de publicidad sanitaria, textos de los 157 tratamientos, diseño terciopelo y generador estático | Integrar, revisar (legal y móvil) y el formulario conectado a la app |
 
 ## Pruebas
 
-`npm test` con MariaDB local (10.11): **591 pruebas en verde**. Lo más importante:
+`npm test` con MariaDB local (10.11): **895 pruebas en verde**. Lo más importante:
 
 - **Agenda:** hora de Madrid, limpiezas, crema anestésica, comidas, aparatos, festivos, diez reservas
   a la vez → una; horas redondas.
@@ -45,6 +46,12 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
   punta con el autenticador virtual de Chromium.
 - **Flowww:** CSV de verdad (separador, codificación, BOM), ensayo sin datos personales, aplicar y
   deshacer, citas que desaparecen o se mueven, el «no» a la publicidad que siempre gana.
+- **Calendario:** el `.ics` leído con ical.js como lo lee un calendario (hora de Madrid, privado,
+  avisos, anulación), enlaces de Google y Outlook, /cal/ con 12 navegadores y cada estado de «Tu cita».
+- **Reseñas:** a todos sin filtrar, el borrado a los 29 días, la alerta clínica y quién la contesta,
+  el historial por turnos y lo que hace Google al rechazar una respuesta.
+- **Google y DataForSEO:** los adaptadores con respuestas grabadas (sin red): OAuth, reseñas, avisos
+  firmados de Pub/Sub, Places, malla de posiciones y el tope de gasto.
 - **Panel en un navegador:** 15 flujos con la demo a una hora fija; en cada pantalla, contraste AA en
   claro y oscuro, nombres accesibles, foco visible y nada que desborde a 390 px.
 
@@ -59,8 +66,13 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
 4. **Calendario laboral 2027** de Madrid y Boadilla: cuando salga en el BOCM.
 5. **WhatsApp:** dónde está hoy el 722 83 32 85, proveedor (coexistencia) y si 360dialog admite la
    cabecera `X-Clave`; plantillas nuevas o cambiadas que hay que aprobar en Meta
-   (`iemec_no_vino_nuevo_hueco`, `iemec_toca_repetir`, `iemec_opinion_visita`, `hueco_liberado`).
-6. **Acceso de gestor** a la ficha de Google; Search Console y Analytics a través de Uebea.
+   (`iemec_no_vino_nuevo_hueco`, `iemec_toca_repetir`, `hueco_liberado`; las de la cita con mapa y
+   botones: `iemec_cita_confirmada`, `iemec_cita_cambiada`, `iemec_recordatorio_24h`,
+   `iemec_recordatorio_2h`, `iemec_cita_cancelada`; y `iemec_opinion_visita` e
+   `iemec_opinion_recordatorio`).
+6. **Google:** acceso de gestor a la ficha, formulario de acceso a la API (Google contesta en unos
+   14 días), OAuth en producción, Pub/Sub y clave de Places (pasos en `docs/GOOGLE.md`); cuenta de
+   DataForSEO (50 $ de saldo, tope de 3 $ al mes); Search Console y Analytics a través de Uebea.
 7. **Ofertas permitidas**, **20-30 conversaciones reales**, **respuestas del equipo médico**
    (25 preguntas del catálogo esperan validación) y **plantillas de hoy**.
 8. **Exportación de Flowww** para el primer ensayo (con código de cita y de cliente), fecha de
@@ -105,3 +117,16 @@ se lee al empezar cada vuelta del loop y se actualiza al terminarla.
     manda nada comercial a quien pidió la baja o no dio su consentimiento.
   - Cuadro «Qué tenéis, qué necesitáis y dónde falla hoy» entregado a Eduardo (PDF). Empieza la web
     nueva (vuelta 9).
+- **30-sep · vuelta 8c (en paralelo, con revisión adversaria).** Cuatro piezas, cada una revisada
+  por dos agentes y arreglada (las cortó el límite de uso a mitad del arreglo y siguieron desde sus
+  commits).
+  - **Privacidad de la cita** (migración 010): `.ics` «Cita en IEMEC» privado y con UID estable,
+    token solo como huella y cifrado, sedes, /cal/ que abre el calendario de cada dispositivo y
+    «Tu cita» según su estado. El WhatsApp dice día, hora y sede, nunca el tratamiento.
+  - **Reseñas con las normas de Google** (migración 011): a todos, texto y autor fuera a los 29 días,
+    alerta clínica para dirección médica (de la tabla de permisos: dirección o médico), un
+    recordatorio y el historial poco a poco.
+  - **Google y DataForSEO reales** (migración 012), detrás del modo simulado; guía en docs/GOOGLE.md.
+  - **Repesca**: intenciones nuevas, tratamiento de interés, recuperar la cita cancelada por WhatsApp
+    y privacidad en todo lo que se manda.
+  - La prueba del foco de la e2e ya no se equivoca con la máquina cargada.

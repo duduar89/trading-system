@@ -9,6 +9,10 @@ const { calcularSeguimiento } = require('./plazos');
 const { elegirOferta } = require('./ofertas');
 
 const PLAZOS_SOLO_SEGUIMIENTO = new Set(['hoy_tarde', 'manana', 'pasado_manana']);
+// Con un tratamiento que agrupa varios (Head Spa japonés, programa de acné…), lo que necesita saber
+// el nivel o la técnica: contarle, darle cita o proponerle huecos. Una pregunta concreta («¿hacéis
+// financiación?», «¿dónde estáis?») no: se contesta con lo aprobado o la contesta una persona.
+const NECESITA_OPCION = new Set(['informacion', 'reservar', 'acepta', 'preferencia_horario']);
 
 function seguimiento(ctx, plazo, motivo, frase, franja) {
   const s = calcularSeguimiento(plazo, {
@@ -26,7 +30,10 @@ function persona(motivo, urgente = false) {
  * @param {object} interp  salida de interpretar() o de la IA: { intencion, plazo, franja, urgente }
  * @param {object} ctx     { hoy, ahoraMin, calendario, frase, tratamiento, importe, ofertas, hechas,
  *                           yaPreguntoCuando, ofertasRechazadas, umbralImporteAlto, margenEventoDias,
- *                           tieneRespuestaAprobada, reservable, horaHabitual, franjaPreferida, reglas }
+ *                           tieneRespuestaAprobada, reservable, horaHabitual, franjaPreferida, reglas,
+ *                           agrupador: { nombre, opciones: [{ id, nombre }] } si su tratamiento agrupa
+ *                           varios (sin opciones: no se le pueden preguntar),
+ *                           citaPendiente: { id } su próxima cita de ese tratamiento, esCliente }
  */
 function decidir(interp, ctx) {
   const frase = ctx.frase || '';
@@ -34,6 +41,20 @@ function decidir(interp, ctx) {
   const acciones = [];
   let proximo;
   let guia;
+
+  // Le interesa algo que agrupa varias técnicas o niveles: antes de contarle o darle cita, cuál. Si
+  // no se le pueden preguntar (son muchas, lo íntimo, lo de publicidad restringida), recepción.
+  if (ctx.agrupador && NECESITA_OPCION.has(interp.intencion)) {
+    if (ctx.agrupador.opciones?.length) {
+      acciones.push({ tipo: 'preguntar_opcion', opciones: ctx.agrupador.opciones.map((o) => o.id) });
+      acciones.push(seguimiento(ctx, { tipo: 'dias', n: 2 }, 'sin_respuesta_a_opcion', frase));
+      return { intencion: interp.intencion, acciones, proximoPaso: 'espera_respuesta',
+        guia: 'Pregúntale qué nivel o técnica le interesa, nombrando solo las opciones de los DATOS; después le propones huecos.' };
+    }
+    acciones.push(persona(`Le interesa «${ctx.agrupador.nombre}», que agrupa varias técnicas: contarle las opciones y proponerle cita`));
+    return { intencion: interp.intencion, acciones, proximoPaso: 'persona',
+      guia: 'Dile que una persona del equipo le cuenta las opciones y le propone cita por aquí.' };
+  }
 
   switch (interp.intencion) {
     case 'baja':
@@ -79,6 +100,41 @@ function decidir(interp, ctx) {
       proximo = 'espera_respuesta';
       guia = 'Ofrece 2 o 3 huecos reales con día y hora, y reserva el que elija.';
       break;
+
+    case 'informacion': {
+      // Ya tiene cita de esto: lo aprobado y su cita, sin darle otra; si no hay nada aprobado, se lo
+      // cuenta una persona.
+      if (ctx.citaPendiente && !ctx.tieneRespuestaAprobada) {
+        acciones.push(persona('pregunta sin respuesta aprobada (ya tiene cita)'));
+        proximo = 'persona';
+        guia = 'Dile que se lo cuenta una persona del equipo enseguida y que su cita sigue en pie.';
+        break;
+      }
+      if (ctx.citaPendiente) {
+        acciones.push({ tipo: 'responder', tema: 'informacion' });
+        acciones.push({ tipo: 'recordar_cita', citaId: ctx.citaPendiente.id });
+        proximo = 'cita';
+        guia = 'Cuéntale solo lo aprobado por el equipo médico (viene en los DATOS), sin precios ni promesas que no estén ahí, y recuérdale su cita (el día y la hora de los DATOS). No le ofrezcas otra cita.';
+        break;
+      }
+      // «Quiero más información», «¿qué precio tiene?»: lo aprobado por el equipo médico (si lo hay),
+      // una valoración y, si la IA puede darle cita, huecos (desde cuando diga, si lo dice: «para el
+      // mes que viene»). Y un seguimiento por si no contesta: cuando dijo o, si no, a los 2 días. Si lo
+      // que dice es para más de dos meses (o «mañana te digo»), sin huecos: el seguimiento.
+      const s = seguimiento(ctx, interp.plazo || { tipo: 'dias', n: 2 }, 'informacion', frase, interp.franja);
+      if (ctx.tieneRespuestaAprobada) acciones.push({ tipo: 'responder', tema: 'informacion' });
+      acciones.push({ tipo: 'ofrecer_valoracion' });
+      const conHuecos = !interp.plazo || (!PLAZOS_SOLO_SEGUIMIENTO.has(interp.plazo.tipo) && T.diasEntre(ctx.hoy, s.fecha) <= 60);
+      if (ctx.reservable && conHuecos) {
+        acciones.push({ tipo: 'proponer_huecos', desdeFecha: interp.plazo ? s.fecha : ctx.hoy, franja: interp.franja || ctx.franjaPreferida, opcional: true });
+      }
+      acciones.push(s);
+      proximo = 'seguimiento';
+      guia = ctx.tratamiento?.id
+        ? `Cuéntale solo lo aprobado por el equipo médico (si viene en los DATOS), sin precios ni promesas que no estén ahí. Ofrécele una valoración con el equipo, sin compromiso, y los huecos de los DATOS si los hay.${ctx.esCliente ? ' Ya es cliente de la clínica: no le hables de primera visita.' : ''}`
+        : `Pregúntale qué tratamiento le interesa y ofrécele ${ctx.esCliente ? 'una valoración' : 'una primera valoración'} con el equipo, sin compromiso.`;
+      break;
+    }
 
     case 'ocupado_ahora':
       acciones.push(seguimiento(ctx, interp.plazo || { tipo: 'hoy_tarde' }, 'ocupado', frase, interp.franja));

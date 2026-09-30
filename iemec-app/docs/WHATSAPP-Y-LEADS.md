@@ -235,6 +235,31 @@ Por este orden:
 4. El catálogo: el nombre o un **alias** del tratamiento dentro del nombre del anuncio, del conjunto
    o de la campaña (o del titular del anuncio de WhatsApp). Si dos tratamientos empatan, ninguno.
 
+Valen los tratamientos que se reservan y los **agrupadores** (Head Spa japonés, programa de acné…:
+los que el importador deja inactivos con la nota «No se reserva: agrupa varias técnicas»); lo
+retirado del catálogo, no. Si un agrupador empata con sus técnicas (las de su misma familia y
+subfamilia), gana el agrupador: «Head Spa» es el Head Spa japonés. Si empata con otros, ninguno. Un
+agrupador íntimo o de publicidad restringida no gana nunca por empate ni por un trozo de su nombre
+(«Láser», «Radiofrecuencia» o «Fotona» no son el rejuvenecimiento vaginal): solo si se nombra
+entero. Con un agrupador, la conversación le pregunta qué nivel o técnica quiere (de 2 a 5 opciones
+de su familia y subfamilia, ninguna íntima ni de publicidad restringida) y le busca hueco para esa;
+si no, pasa a recepción. Una pregunta concreta («¿hacéis financiación?») no: se contesta con lo
+aprobado o la contesta una persona.
+
+En la conversación, además:
+
+- El **botón de WhatsApp de la web** («Hola vengo de la web quisiera reservar una cita para…») dice
+  el tratamiento que tiene ese texto en el catálogo. Si lo mandan varias páginas y una es la de un
+  agrupador (el del Head Spa japonés es el mismo que el del Detox; el del programa de acné, el de
+  Perfect Skin: lo dice la nota «El botón de WhatsApp de la web manda el mismo texto que…»), el
+  agrupador, y se le pregunta el nivel.
+- Si ya sabemos qué le interesa y **pregunta por otro** («¿qué precio tiene el Head Spa Express?»,
+  con su nombre o un alias enteros), en esa vuelta se le contesta de ese, y queda como su interés.
+- **«Quiero más información»** sin decir de qué: del tratamiento del que se está hablando (su lead,
+  su presupuesto, su cita), nunca del de una cita que ya pasó; si no hay ninguno, se le pregunta
+  cuál. De lo íntimo o de publicidad restringida que no nombra él, ni lo aprobado ni huecos: se le
+  ofrece la valoración. Si ya tiene cita de eso, lo aprobado y su cita, sin darle otra.
+
 Para configurar una campaña:
 
 ```sql
@@ -291,8 +316,6 @@ vez (`repetido`), **400** faltan datos, **401** clave mala, **503** sin `LEADS_C
 ## Pendiente
 
 - Envío real (`servidor/integraciones/whatsapp.js` en modo `real`): hoy solo entra.
-- Una plantilla de bienvenida sin tratamiento: a un lead sin tratamiento identificado le llega
-  «Gracias por tu interés en tu tratamiento».
 - Sacar a alguien de la lista de bajas si vuelve a dar su consentimiento (hoy, a mano en la base).
 - Estados de las plantillas (`message_template_status_update`, calidad) y, con coexistencia, los
   mensajes que manda el equipo desde el móvil (`smb_message_echoes`): se guardan, pero aún no se

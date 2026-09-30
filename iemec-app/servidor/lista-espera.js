@@ -301,14 +301,17 @@ async function anularOferta(q, ofertaId, { ahora = new Date(), motivo }) {
 }
 
 // Meta avisa de que el aviso de un hueco no le ha llegado (no tiene WhatsApp, número mal…). No se le
-// puede avisar de este: pasa al siguiente y recepción le llama. Lo llama la entrada de estados de
-// WhatsApp (el «fallido» llega después, no al mandarlo). Devuelve la oferta anulada o null.
+// puede avisar de este: pasa al siguiente y recepción le llama. La conversación del aviso ya no espera
+// nada (como cuando caduca la oferta): se cierra antes de la tarea, que queda enlazada a ella para
+// verla. Lo llama la entrada de estados de WhatsApp (el «fallido» llega después, no al mandarlo).
+// Devuelve la oferta anulada o null.
 async function ofertaNoEntregada(q, { mensajeId, ahora = new Date() }) {
   const [[o]] = await q.query(
     `SELECT o.*, le.paciente_id FROM lista_espera_ofertas o JOIN lista_espera le ON le.id = o.lista_espera_id
       WHERE o.mensaje_id = ? AND o.estado = 'ofrecida'`, [mensajeId]);
   if (!o) return null;
   await anularOferta(q, o.id, { ahora, motivo: 'no le llegó el aviso' });
+  await cerrarConversacion(q, o.conversacion_id, 'lista_espera');
   await q.query("INSERT INTO tareas (tipo, titulo, paciente_id, conversacion_id, vence_en) VALUES ('llamar', ?, ?, ?, ?)",
     [`Lista de espera: no le ha llegado por WhatsApp el aviso del hueco del ${cuando(o.inicio)}. Llamarle (el hueco ha pasado al siguiente)`,
       o.paciente_id, o.conversacion_id, new Date(ahora.getTime() + 2 * 3600000)]);

@@ -59,7 +59,7 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
     entrada: await entrada.procesarPendientes(d, { ahora }),
     retencionesCaducadas: await agenda.caducarRetenciones(pool, ahora),
     // Los huecos que se acaban de liberar, al primero de la lista de espera que encaja. Va después de
-    // leer lo que ha llegado (la entrada de WhatsApp, cuando esté): un «sí» que llegó a tiempo cuenta
+    // leer lo que ha llegado (la entrada de WhatsApp): un «sí» que llegó a tiempo cuenta
     // antes de que caduque lo que se le guardaba. Aun así, lo que caduca espera un par de minutos
     // antes de pasar al siguiente.
     listaEspera: await espera.vuelta(d, { ahora }),

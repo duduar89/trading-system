@@ -11,7 +11,9 @@
 //   referral (anuncio que abre WhatsApp)      → lead «meta_ctwa» ANTES de procesar el mensaje, para
 //                                               que la repesca lo trate como lead
 //   estados (enviado, entregado, leído,        → mensajes.estado y el error, por wa_id; el 131050 (ha
-//   fallido)                                     dejado de recibir marketing) es una baja comercial
+//   fallido)                                     dejado de recibir marketing) es una baja comercial; el
+//                                               aviso de un hueco que no llega pasa al siguiente de la
+//                                               lista de espera
 //   leadgen (formulario de Meta)              → se pide el lead a Meta → alta → secuencia «lead»; si
 //                                               Meta no deja leerlo, tarea para recepción
 // Los mensajes de un mismo teléfono se procesan de uno en uno y por orden, aunque haya dos cron a la
@@ -19,6 +21,7 @@
 const cola = require('./cola');
 const config = require('./config');
 const R = require('./repesca/motor');
+const LE = require('./lista-espera');
 const { altaLead } = require('./leads');
 const { apuntarBaja } = require('./bajas');
 const { crearMeta } = require('./integraciones/meta');
@@ -401,15 +404,18 @@ async function aplicarEstado(deps, e, { ahora }) {
 
 // Lo que no llega queda a la vista en la bandeja. Si era una respuesta escrita (de la IA o del
 // equipo, no una plantilla), además pasa a una persona con tarea: el paciente cree que no le hemos
-// contestado, o no tiene el enlace de su cita. Una baja ya confirmada no hace falta repetirla.
+// contestado, o no tiene el enlace de su cita. Una baja ya confirmada no hace falta repetirla. Si era
+// el aviso de un hueco de la lista de espera, no se le guarda un hueco que no sabe que tiene: pasa al
+// siguiente y recepción le llama (esa tarea basta).
 async function trasUnFallo(pool, e, ahora) {
   const [[m]] = await pool.query(
     `SELECT m.id, m.tipo, c.id AS conversacion_id, c.telefono, c.paciente_id, c.lead_id, c.motivo_cierre
        FROM mensajes m JOIN conversaciones c ON c.id = m.conversacion_id WHERE m.wa_id = ?`, [e.waId]);
   if (!m) return;
   await registrar(pool, { tipo: 'whatsapp_no_entregado', entidad: 'conversacion', entidadId: m.conversacion_id, actor: 'meta', datos: { mensaje: m.id, codigo: e.error?.codigo || null } });
+  const oferta = await LE.ofertaNoEntregada(pool, { mensajeId: m.id, ahora });
   if (e.error?.codigo === '131050') return bajaDeMarketing(pool, m, e, ahora);
-  if (m.tipo !== 'plantilla' && m.motivo_cierre !== 'baja') {
+  if (!oferta && m.tipo !== 'plantilla' && m.motivo_cierre !== 'baja') {
     await aUnaPersona(pool, m.conversacion_id, { titulo: `No le ha llegado nuestro mensaje (${e.error?.texto || 'error de WhatsApp'}): revisarlo`, ahora });
   }
 }

@@ -214,7 +214,8 @@ test('seguridad del acceso', async (t) => {
           const galleta = res.headers.get('set-cookie');
           for (const trozo of ['HttpOnly', 'SameSite=Strict', 'Path=/', 'Secure', 'Max-Age=7200']) assert.ok(galleta.includes(trozo), `${trozo} en ${galleta}`);
         } finally { prod(); }
-        // El panel compilado lleva su política de contenido; la página «Tu cita», las cabeceras generales.
+        // El panel compilado lleva su política de contenido; la página «Tu cita», las cabeceras generales y
+        // la suya propia, más estricta (nada de terceros), también en el 404.
         const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'iemec-panel-'));
         fs.writeFileSync(path.join(carpeta, 'index.html'), '<!doctype html><title>Panel</title>');
         const app = express();
@@ -225,7 +226,10 @@ test('seguridad del acceso', async (t) => {
               assert.equal((await fetch(`${otra}${ruta}`)).headers.get('content-security-policy'), CSP_PANEL, ruta);
             }
             const cita = await fetch(`${otra}/c/${'x'.repeat(43)}`);
-            assert.deepEqual([cita.status, cita.headers.get('x-frame-options'), cita.headers.get('content-security-policy')], [404, 'DENY', null]);
+            assert.deepEqual([cita.status, cita.headers.get('x-frame-options')], [404, 'DENY']);
+            const politica = cita.headers.get('content-security-policy');
+            assert.match(politica, /^default-src 'none'/);
+            assert.notEqual(politica, CSP_PANEL);
           });
         } finally { fs.rmSync(carpeta, { recursive: true, force: true }); }
       });

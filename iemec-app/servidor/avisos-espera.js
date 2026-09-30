@@ -23,25 +23,24 @@ const HORARIO = { desde: 9 * 60, hasta: 21 * 60 };
 const PAUSA_MIN = 5;            // si WhatsApp no responde, se reintenta a los 5 minutos
 const PAUSA = 'lista-espera-pausa';
 
+// tratamiento: ya dicho para el aviso («tu limpieza facial profunda», «tu tratamiento»). Sin nombre,
+// «Hola, …».
 function textoOferta(c, { nombre, actual, tratamiento }) {
   const hola = `Hola${nombre ? ` ${nombre}` : ''}`;
   if (actual) {
-    return `${hola}, se ha liberado un hueco antes para tu ${tratamiento}: ${R.textoDia(c.fecha)} a las ${c.hora} (ahora tienes cita ${R.textoDia(actual.fecha)} a las ${actual.hora}). `
+    return `${hola}, se ha liberado un hueco antes para ${tratamiento}: ${R.textoDia(c.fecha)} a las ${c.hora} (ahora tienes cita ${R.textoDia(actual.fecha)} a las ${actual.hora}). `
       + `Te lo guardo ${LE.RETENCION_MIN} minutos: ¿te cambio la cita?`;
   }
-  return `${hola}, estabas en nuestra lista de espera para tu ${tratamiento}: se ha liberado un hueco ${R.textoDia(c.fecha)} a las ${c.hora}. `
+  return `${hola}, estabas en nuestra lista de espera para ${tratamiento}: se ha liberado un hueco ${R.textoDia(c.fecha)} a las ${c.hora}. `
     + `Te lo guardo ${LE.RETENCION_MIN} minutos: ¿te lo reservo?`;
 }
 
-// Cómo se nombra su tratamiento en un aviso que le llega sin haber preguntado: los de publicidad
-// restringida (medicamentos con receta, productos sanitarios) no se nombran, se habla de su familia.
+// Cómo se nombra su tratamiento en un aviso que le llega sin haber preguntado (y que se lee en la
+// pantalla bloqueada): lo íntimo no se nombra, ni por su familia; los de publicidad restringida
+// (medicamentos con receta, productos sanitarios), por su familia (repesca/motor.js → referenciaDe).
 async function nombreEnAviso(q, tratamientoId) {
-  const [[t]] = await q.query(
-    'SELECT t.nombre, t.regimen_legal, t.publicidad_restringida, f.nombre AS familia FROM tratamientos t LEFT JOIN familias f ON f.codigo = t.familia WHERE t.id = ?',
-    [tratamientoId]);
-  if (!t) return 'tratamiento';
-  if (t.publicidad_restringida || t.regimen_legal === 'medicamento_receta') return t.familia ? R.enMinuscula(t.familia) : 'tratamiento';
-  return R.enMinuscula(t.nombre);
+  const [[t]] = await q.query('SELECT nombre, familia, sensible, regimen_legal, publicidad_restringida FROM tratamientos WHERE id = ?', [tratamientoId]);
+  return R.fraseTratamiento('hueco_liberado', t ? await R.referenciaDe(q, t) : { oculto: true });
 }
 
 async function enPausa(pool, ahora) {
@@ -96,9 +95,12 @@ async function ofrecer(deps, hueco, entrada, { ahora, plantilla }) {
   const c = await R.datosCita(pool, guardado.citaId);
   const actual = entrada.citaActual ? await R.datosCita(pool, entrada.citaActual.id) : null;
   const tratamiento = await nombreEnAviso(pool, hueco.tratamientoId);
+  // El nombre de su ficha, si vale para saludar («Paciente», el de quien reservó sin dar su nombre, no).
+  // La plantilla dice «Hola {{1}}, …»: sin nombre, «Hola buenos días, …», nunca «Hola hola».
+  const nombre = await R.nombreParaSaludar(pool, { pacienteId: entrada.paciente_id });
   const envio = abierta
-    ? await R.enviar(deps, conv, { texto: textoOferta(c, { nombre: entrada.nombre, actual, tratamiento }), autor: 'sistema', ahora })
-    : await R.enviar(deps, conv, { plantilla, variables: [entrada.nombre || 'hola', `tu ${tratamiento}`, R.textoDia(c.fecha).slice(3), c.hora], autor: 'sistema', ahora });
+    ? await R.enviar(deps, conv, { texto: textoOferta(c, { nombre, actual, tratamiento }), autor: 'sistema', ahora })
+    : await R.enviar(deps, conv, { plantilla, variables: [nombre || R.saludoSinNombre(ahora), tratamiento, R.textoDia(c.fecha).slice(3), c.hora], autor: 'sistema', ahora });
   if (envio.estado !== 'enviado') {
     // No le ha llegado: no se le guarda un hueco que no sabe que tiene, pero conserva su turno.
     await LE.soltarOferta(pool, guardado, { ahora });
