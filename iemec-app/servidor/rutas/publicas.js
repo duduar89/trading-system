@@ -14,13 +14,19 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 
 async function citaPorToken(pool, token) {
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+  // Si se cambió a otra (reprogramada), también la nueva: la página le lleva a ella.
   const [[c]] = await pool.query(
-    `SELECT c.*, t.nombre AS tratamiento, p.nombre AS paciente, pr.nombre AS profesional, s.nombre AS sala
+    `SELECT c.*, t.nombre AS tratamiento, p.nombre AS paciente, pr.nombre AS profesional, s.nombre AS sala,
+            n.token AS nueva_token, n.inicio AS nueva_inicio
        FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id JOIN pacientes p ON p.id = c.paciente_id
        LEFT JOIN profesionales pr ON pr.id = c.profesional_id LEFT JOIN salas s ON s.id = c.sala_id
+       LEFT JOIN citas n ON n.id = c.reprograma_a_id
       WHERE c.token = ?`, [token]);
   return c || null;
 }
+
+// Cancelada o cambiada a otra: en el calendario sale anulada.
+const anulada = (cita) => ['cancelada', 'reprogramada'].includes(cita.estado);
 
 async function datosClinica(pool) {
   const [[cl]] = await pool.query('SELECT * FROM clinica WHERE id = 1');
@@ -33,11 +39,13 @@ function eventoDe(cita, clinica) {
     uid: `cita-${cita.id}@iemec-clinic.com`,
     inicio: cita.inicio, fin: cita.fin,
     titulo: `${clinica.nombre_corto || 'IEMEC'} · ${cita.tratamiento}`,
-    descripcion: `Tu cita en ${clinica.nombre_corto || 'IEMEC'}. Para cambiarla o cancelarla: ${config.urlPublica}/c/${cita.token}`,
+    descripcion: cita.estado === 'reprogramada' && cita.nueva_token
+      ? `Esta cita se ha cambiado. Tu nueva cita: ${config.urlPublica}/c/${cita.nueva_token}`
+      : `Tu cita en ${clinica.nombre_corto || 'IEMEC'}. Para cambiarla o cancelarla: ${config.urlPublica}/c/${cita.token}`,
     lugar, lat: clinica.lat, lng: clinica.lng,
     url: `${config.urlPublica}/c/${cita.token}`,
     secuencia: cita.secuencia_ics,
-    cancelada: cita.estado === 'cancelada',
+    cancelada: anulada(cita),
   };
 }
 
@@ -48,7 +56,9 @@ function textoFechaHora(inicio) {
 
 function paginaCita(cita, clinica, mensaje = '') {
   const ev = eventoDe(cita, clinica);
-  const cancelada = cita.estado === 'cancelada';
+  const cancelada = anulada(cita);
+  const cambiada = cita.estado === 'reprogramada' && cita.nueva_token;
+  if (cambiada && !mensaje) mensaje = `Esta cita se cambió al ${textoFechaHora(cita.nueva_inicio)}.`;
   const whatsapp = String(clinica.whatsapp || '34722833285').replace(/\D/g, '');
   const cambiar = `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hola, quiero cambiar mi cita del ${textoFechaHora(cita.inicio)}`)}`;
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -68,9 +78,10 @@ h1{font-family:"Playfair Display",Georgia,serif;font-style:italic;font-weight:50
 form{margin:0}button.btn{width:100%;cursor:pointer;font-family:inherit}.aviso{background:#f3ead8;border:1px solid var(--oro);border-radius:12px;padding:12px;font-size:14px}
 .pie{font-size:12px;color:var(--suave);text-align:center}
 </style></head><body><main class="tarjeta">
-<header class="cab"><div class="marca">IEMEC</div><h1>${cancelada ? 'Cita cancelada' : 'Tu cita'}</h1><div class="cuando">${esc(textoFechaHora(cita.inicio))}</div></header>
+<header class="cab"><div class="marca">IEMEC</div><h1>${cambiada ? 'Cita cambiada' : cancelada ? 'Cita cancelada' : 'Tu cita'}</h1><div class="cuando">${esc(textoFechaHora(cita.inicio))}</div></header>
 <section class="cuerpo">
 ${mensaje ? `<div class="aviso">${esc(mensaje)}</div>` : ''}
+${cambiada ? `<a class="btn lleno" href="/c/${esc(cita.nueva_token)}">Ver mi nueva cita</a>` : ''}
 <div class="dato"><span>Tratamiento</span><span>${esc(cita.tratamiento)}</span></div>
 ${cita.profesional ? `<div class="dato"><span>Con</span><span>${esc(cita.profesional)}</span></div>` : ''}
 <div class="dato"><span>Dónde</span><span>${esc(ev.lugar)}</span></div>

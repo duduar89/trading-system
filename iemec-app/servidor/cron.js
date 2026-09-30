@@ -11,6 +11,7 @@ const agenda = require('./agenda');
 const repesca = require('./repesca/motor');
 const resenas = require('./resenas');
 const avisos = require('./avisos-cita');
+const espera = require('./avisos-espera');
 const { crearIa } = require('./integraciones/ia');
 const { crearWhatsApp } = require('./integraciones/whatsapp');
 const T = require('../motor/tiempo');
@@ -20,6 +21,8 @@ async function vuelta({ pool = db.pool(), ahora = new Date(), deps = null } = {}
   const informe = { rescatados: await cola.rescatarAtascados(pool, ahora) };
   const r = await cola.conCandado(pool, 'cron-minuto', 55000, async () => ({
     retencionesCaducadas: await agenda.caducarRetenciones(pool, ahora),
+    // Los huecos que se acaban de liberar, al primero de la lista de espera que encaja.
+    listaEspera: await espera.vuelta(d, { ahora }),
     seguimientos: (await repesca.procesarSeguimientos(d, { ahora })).length,
     secuencias: (await repesca.avanzarSecuencias(d, { ahora })).length,
     avisosCita: (await avisos.enviarPendientes(d, { ahora })).length,

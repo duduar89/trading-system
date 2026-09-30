@@ -9,6 +9,7 @@ const { comprobarPlantilla } = require('../../motor/repesca/plantillas');
 const R = require('../../motor/resenas/resenas');
 const { ideasDelMes } = require('../../motor/resenas/publicaciones');
 const agenda = require('../agenda');
+const listaEspera = require('../lista-espera');
 const repesca = require('../repesca/motor');
 const resenasSrv = require('../resenas');
 const { registrar } = require('../eventos');
@@ -36,7 +37,7 @@ function rutasPanel({ pool, deps = null }) {
     const inicioMes = T.desdeMadrid(`${hoy.slice(0, 8)}01`, '00:00');
     const [recuperadas] = await q(
       `SELECT COUNT(*) AS n, COALESCE(SUM(t.precio_eur), 0) AS euros FROM citas c JOIN tratamientos t ON t.id = c.tratamiento_id
-        WHERE c.creado_en >= ? AND c.origen = 'ia_whatsapp' AND c.estado NOT IN ('cancelada')`, [inicioMes]);
+        WHERE c.creado_en >= ? AND c.origen = 'ia_whatsapp' AND c.estado NOT IN ('cancelada','reprogramada','retenida')`, [inicioMes]);
     const sinPaso = await repesca.sinProximoPaso(p(), ahora);
     res.json({
       fecha: hoy,
@@ -90,6 +91,36 @@ function rutasPanel({ pool, deps = null }) {
       if (err.codigo) return res.status(409).json({ error: err.message, codigo: err.codigo });
       throw err;
     }
+  }));
+
+  // ── Lista de espera: quién espera, las ofertas en curso, apuntar y quitar ──────────────────
+  r.get('/lista-espera', envolver(async (req, res) => {
+    const datos = await listaEspera.listar(p(), { ahora: req.ahora || new Date() });
+    const [tratamientos] = await p().query('SELECT id, nombre FROM tratamientos WHERE activo = TRUE ORDER BY nombre');
+    res.json({ ...datos, tratamientos });
+  }));
+
+  r.post('/lista-espera', envolver(async (req, res) => {
+    const b = req.body || {};
+    const [[trat]] = await p().query('SELECT id FROM tratamientos WHERE id = ? AND activo = TRUE', [String(b.tratamientoId || '')]);
+    if (!trat) return res.status(400).json({ error: 'Elige un tratamiento de la lista', codigo: 'TRATAMIENTO_DESCONOCIDO' });
+    try {
+      const pacienteId = b.pacienteId ? Number(b.pacienteId) : await listaEspera.pacientePorTelefono(p(), { telefono: b.telefono, nombre: b.nombre });
+      const r2 = await listaEspera.apuntar(p(), {
+        pacienteId, tratamientoId: b.tratamientoId, desdeFecha: b.desde || null, hastaFecha: b.hasta || null, franja: b.franja || null,
+        citaActualId: b.citaActualId || null, notas: b.notas || null, origen: 'panel', creadoPor: req.usuario?.email || 'panel', ahora: req.ahora || new Date(),
+      });
+      res.status(r2.nueva ? 201 : 200).json(r2);
+    } catch (err) {
+      if (err.codigo) return res.status(400).json({ error: err.message, codigo: err.codigo });
+      throw err;
+    }
+  }));
+
+  r.delete('/lista-espera/:id', envolver(async (req, res) => {
+    const ok = await listaEspera.quitar(p(), Number(req.params.id), { motivo: req.body?.motivo || 'quitado desde el panel', actor: req.usuario?.email || 'panel', ahora: req.ahora || new Date() });
+    if (!ok) return res.status(404).json({ error: 'No está en la lista de espera' });
+    res.json({ ok: true });
   }));
 
   // ── Bandeja de conversaciones ────────────────────────────────────────────────────────────
