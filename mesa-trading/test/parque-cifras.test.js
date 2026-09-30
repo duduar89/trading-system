@@ -140,14 +140,15 @@ test('bloqueos de un puesto: activo vetado, mesa en pausa y ×0 del comité', ()
 });
 
 test('capital sin asignar: 1 − Σ pesos de las mesas fuera del banquillo', () => {
-  // Arranque real: 2 % + 40 % + 2 % + 40 % = 84 % → 16 % en efectivo.
-  const mesas = [{ estado: 'incubacion', peso: 0.02 }, { estado: 'titular', peso: 0.4 }, { estado: 'incubacion', peso: 0.02 }, { estado: 'titular', peso: 0.4 }];
+  // Arranque real (30-sep-2026): 2 % + 40 % + 2 % + 2 % = 46 % → 54 % en efectivo
+  // (antes, con Ruptura titular al 40 %, 84 % → 16 %).
+  const mesas = [{ estado: 'incubacion', peso: 0.02 }, { estado: 'titular', peso: 0.4 }, { estado: 'incubacion', peso: 0.02 }, { estado: 'incubacion', peso: 0.02 }];
   const sa = cifras.sinAsignar({ mesas, cabecera: { patrimonio: 100000 } });
-  assert.ok(Math.abs(sa.fraccion - 0.16) < 1e-12);
-  assert.ok(Math.abs(sa.usd - 16000) < 1e-6);
-  // Las dos incubadas al banquillo (peso 0): queda el 20 %.
-  const sb = cifras.sinAsignar({ mesas: [{ estado: 'banquillo', peso: 0 }, { estado: 'titular', peso: 0.4 }, { estado: 'banquillo', peso: 0.02 }, { estado: 'titular', peso: 0.4 }], cabecera: {} });
-  assert.ok(Math.abs(sb.fraccion - 0.2) < 1e-12);
+  assert.ok(Math.abs(sa.fraccion - 0.54) < 1e-12);
+  assert.ok(Math.abs(sa.usd - 54000) < 1e-6);
+  // Dos incubadas al banquillo (una con el peso aún sin poner a 0): no cuentan; queda el 58 %.
+  const sb = cifras.sinAsignar({ mesas: [{ estado: 'banquillo', peso: 0 }, { estado: 'titular', peso: 0.4 }, { estado: 'banquillo', peso: 0.02 }, { estado: 'incubacion', peso: 0.02 }], cabecera: {} });
+  assert.ok(Math.abs(sb.fraccion - 0.58) < 1e-12);
   assert.equal(sb.usd, null);
   assert.equal(cifras.sinAsignar({ mesas: [] }), null);
   // Si la instantánea trae cabecera.sinAsignar (§7), manda la del servidor.

@@ -25,16 +25,28 @@ claves hay más (analistas y operadores de ETF).
 | **Laboratorio** | Álvaro Medina, director de laboratorio | Qué variantes se prueban (solo dentro de una lista cerrada) y si pasan las pruebas para entrar en incubación. | No | Cada lunes |
 | | Julián Prieto, auditor post-mortem | Clasifica cada operación cerrada (señal falsa, stop estrecho, contra régimen, noticia, ejecución, acierto de libro, suerte) y escribe la lección. Si una categoría se repite 5 veces en 30 días en una mesa, abre una hipótesis en el laboratorio. | Sí, en lote diario | Cada día |
 
+Con clave de Claude, el comité decide con **Claude Opus 5.5**; los demás que
+usan IA (noticias, lecciones, Megáfono) solo redactan o clasifican con listas
+cerradas y van con **Claude Haiku 4.5**, que cuesta la cuarta parte por token.
+Tope de gasto: **1 $ al día** (se cambia en Ajustes o en el `.env`).
+
 ## Las mesas (estrategias)
 
 | Mesa | Estrategia | Vela | Activos | Estado inicial | Por qué |
 |---|---|---|---|---|---|
-| Momentum cripto | Cada lunes compra las 2 cripto con mejor rentabilidad de 28 días ajustada por volatilidad, solo si suben | 1 día | BTC, ETH, SOL, LINK, AVAX, DOGE | **Titular** | Backtest real 2021-2026 con costes: Sharpe 0,83 frente a 0,63 de comprar y mantener, con menos de un tercio de su caída (28 % frente a 95 %) |
-| Ruptura Donchian | Compra al romper el máximo de 20 días, vende al perder el mínimo de 10 | 1 día | BTC, ETH, SOL | **Titular** | Sharpe 0,64, algo por debajo del 0,66 de comprar y mantener, con algo más de un tercio de su caída (36 % frente a 95 %). Si sigue de titular lo decide Eduardo |
-| Tendencia SMA | SMA 7 > SMA 25 con el precio sobre la SMA 200 (la del vídeo) | 4 horas | BTC, ETH, SOL | **Incubación (2 %)** | Pierde con costes: Sharpe −0,52; en 539 operaciones se deja en comisiones 4.434 $ de cada 10.000 $ |
-| Reversión RSI | Compra caídas extremas (RSI(2) < 10) en tendencia alcista | 1 día | BTC, ETH | **Incubación (2 %)** | Pierde con costes: Sharpe −0,42 |
-| Momentum ETF (con claves) | Rotación mensual entre SPY, QQQ, IWM, TLT y GLD | 1 día | ETF | Titular | Sin comprobar con datos reales (necesita claves) |
-| Reversión ETF (con claves) | RSI(2) en SPY y QQQ | 1 día | ETF | Titular | Sin comprobar con datos reales (necesita claves) |
+| Momentum cripto | Cada lunes compra las 2 cripto con mejor rentabilidad de 28 días ajustada por volatilidad, solo si suben | 1 día | BTC, ETH, SOL, LINK, AVAX, DOGE | **Titular (40 %), la única** | Backtest real 2021-2026 con costes y riesgo del 1 %: Sharpe 0,91 frente a 0,63 de comprar y mantener, con menos de la mitad de su caída (40 % frente a 95 %) |
+| Ruptura Donchian | Compra al romper el máximo de 20 días, vende al perder el mínimo de 10 | 1 día | BTC, ETH, SOL | **Incubación (2 %)** | Sola, Sharpe 0,65, justo por debajo del 0,66 de comprar y mantener. En el fondo no diversifica: su correlación diaria con Momentum es 0,80 y juntas dan Sharpe 0,58 y caída 26,0 %, frente a 0,72 y 11,2 % de Momentum sola |
+| Tendencia SMA | SMA 7 > SMA 25 con el precio sobre la SMA 200 (la del vídeo) | 4 horas | BTC, ETH, SOL | **Incubación (2 %)** | Pierde con costes: Sharpe −0,53; en 539 operaciones se deja en comisiones 4.423 $ de cada 10.000 $ |
+| Reversión RSI | Compra caídas extremas (RSI(2) < 10) en tendencia alcista | 1 día | BTC, ETH | **Incubación (2 %)** | Pierde con costes: Sharpe −0,36 |
+| Momentum ETF (con claves) | Rotación mensual entre SPY, QQQ, IWM, TLT y GLD | 1 día | ETF | **Incubación (2 %)** | Sin validar con datos reales: sin claves no hay datos de ETF |
+| Reversión ETF (con claves) | RSI(2) en SPY y QQQ | 1 día | ETF | **Incubación (2 %)** | Sin validar con datos reales: sin claves no hay datos de ETF |
+
+Así arrancó el fondo el 30 de septiembre de 2026 (decisión de Eduardo,
+delegada en el director). Las cifras salen de `node scripts/probar-backtest.js
+--real` y `node scripts/estudiar-limites.js`. Una mesa en incubación opera de
+verdad con el 2 % y puede ascender a titular por la regla del asignador
+(`04-riesgo-y-mejora.md`). El capital que no se reparte queda en efectivo: el
+54 % sin claves.
 
 Además hay **carteras sombra**, que no operan: solo miden. Son comprar y
 mantener BTC, la cesta de las 6 cripto y, con claves, SPY y 50/50 BTC-SPY. La

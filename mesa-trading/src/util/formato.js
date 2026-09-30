@@ -80,6 +80,14 @@ function fechaCorta(t, zona = 'Europe/Madrid') {
   return new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', timeZone: zona }).format(new Date(t)).replace(/\.$/, '');
 }
 
+// «5 oct 2026»: la fecha para leer en frases (el semáforo). «2026-10-05» se
+// corta mal en el móvil y se lee peor.
+function fechaLarga(t, zona = 'Europe/Madrid') {
+  const partes = {};
+  for (const p of new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: zona }).formatToParts(new Date(t))) partes[p.type] = p.value;
+  return `${partes.day} ${String(partes.month).replace(/\.$/, '')} ${partes.year}`;
+}
+
 // Un instante contado para quien mira «ahora» (el reloj de la mesa): «21:55»
 // si es del mismo día y «3 oct 21:55» si no. El mismo formato que el feed
 // (cifras.momento): una directiva de 72 h que acaba «a las 21:55» se leía
@@ -95,4 +103,4 @@ function hastaLas(t, ahora, zona = 'Europe/Madrid') {
   return `el ${momento(t, ahora, zona)}`;
 }
 
-module.exports = { usd, pct, precio, cantidad, numero, factor, hora, dia, fechaCorta, momento, hastaLas };
+module.exports = { usd, pct, precio, cantidad, numero, factor, hora, dia, fechaCorta, fechaLarga, momento, hastaLas };

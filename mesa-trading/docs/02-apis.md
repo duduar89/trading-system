@@ -9,7 +9,7 @@ una tercera (Claude) los agentes redactan y el comité decide con IA.
 | **Alpaca — datos de cripto** | No lleva clave | Gratis | Precios y velas de BTC, ETH, SOL, LINK, AVAX y DOGE | Nada: es pública |
 | **alternative.me — miedo y codicia** | No lleva clave | Gratis | El índice F&G de la barra superior y su histórico (para probar filtros en el laboratorio) | Nada: es pública |
 | **Alpaca — trading paper** | Para operar en Alpaca | Gratis | Cuenta demo con 100.000 $: órdenes, posiciones, cuenta. Da también acciones/ETF (feed IEX) y noticias | alpaca.markets → crear cuenta → «Paper Trading» → «API Keys» → generar. Son dos cadenas: *Key ID* y *Secret Key* |
-| **Anthropic (Claude)** | Opcional | De pago por uso, con tope diario que tú fijas (2 $/día por defecto) | Comité de inversión, clasificación de noticias, lecciones del post-mortem, interpretar el Megáfono | console.anthropic.com → API Keys |
+| **Anthropic (Claude)** | Opcional | De pago por uso, con tope diario que tú fijas (1 $/día por defecto) | Comité de inversión, clasificación de noticias, lecciones del post-mortem, interpretar el Megáfono | console.anthropic.com → API Keys |
 
 ## Qué pasa con cada combinación
 
@@ -29,12 +29,17 @@ se sube a git** (está en `.gitignore`).
 ALPACA_API_KEY_ID=PK...
 ALPACA_API_SECRET_KEY=...
 ANTHROPIC_API_KEY=sk-ant-...
-LLM_PRESUPUESTO_DIA_USD=2
+LLM_PRESUPUESTO_DIA_USD=1
 ```
 
-Opcionales: `LLM_MODELO_COMITE` y `LLM_MODELO_AGENTES` (por defecto
-`claude-opus-5-5`; con `claude-haiku-4-5` en los agentes el gasto baja unas
-cuatro veces), `PUERTO` (8765), `HOST` (127.0.0.1: el panel solo se abre desde
+Opcionales: `LLM_MODELO_COMITE` (por defecto `claude-opus-5-5`: el comité es
+el único que decide algo) y `LLM_MODELO_AGENTES` (por defecto
+`claude-haiku-4-5`: solo redactan y clasifican con listas cerradas; Haiku
+cuesta 1 $ y 5 $ por millón de tokens de entrada y salida, frente a 4 $ y 20 $
+de Opus 5.5). Lo gastado de verdad queda en `data/llm-costes.jsonl` y se ve en
+Ajustes. Si tu `.env` es de antes del 30 de septiembre de 2026 y dice
+`LLM_PRESUPUESTO_DIA_USD=2`, manda el `.env`: cámbialo a 1 si quieres el tope
+nuevo. `PUERTO` (8765), `HOST` (127.0.0.1: el panel solo se abre desde
 este ordenador), `PANEL_TOKEN`, `COMITE_HORAS` (4). Abrir el panel a la red
 (`HOST=0.0.0.0` o una IP de la wifi) exige un `PANEL_TOKEN` largo: sin él la
 mesa no arranca, porque cualquiera en la misma red podría pausar, reabrir o

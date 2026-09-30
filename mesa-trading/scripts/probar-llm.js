@@ -164,7 +164,8 @@ async function main() {
   if (!apiKey || sinClave) {
     console.log(`— Sin llamada real (${sinClave ? '--sin-clave' : 'no hay ANTHROPIC_API_KEY en el .env'}): coste 0 $.`);
   } else {
-    const modelo = process.env.LLM_MODELO_AGENTES || 'claude-opus-5-5';
+    // El de los agentes, como lo arranca la mesa (src/config.js: Haiku 4.5 por defecto desde el 30-sep-2026).
+    const modelo = process.env.LLM_MODELO_AGENTES || 'claude-haiku-4-5';
     console.log(`— Llamada REAL a ${modelo}. AVISO: cuesta dinero, del orden de 0,01 $. Ctrl+C en 3 s para cancelar…`);
     await new Promise(res => setTimeout(res, 3000));
     const llm = crearLLM({ apiKey, modeloAgentes: modelo, modeloComite: modelo, presupuestoDiaUsd: 0.10 });

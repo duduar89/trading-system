@@ -43,7 +43,7 @@ test('kill switch (manual o del vigilante): un incidente «kill» en disco y el 
   const f = criterio(o, 'f');
   assert.equal(f.ok, false);
   assert.equal(f.valor, 1);
-  assert.match(f.detalle, /^1 kill switch\. El último, el \d{4}-\d{2}-\d{2}: kill switch manual desde el panel$/);
+  assert.match(f.detalle, /^1 kill switch\. El último, el \d{1,2} \S+ \d{4}: kill switch manual desde el panel$/);
   await o.detener();
 });
 

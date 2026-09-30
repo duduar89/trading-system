@@ -51,7 +51,7 @@ necesita algo de él, lo pide ajustando este documento.
 | `src/util/{almacen,reloj,log,numeros,formato}.js`, `src/config.js` | YA ESCRITOS (base) |
 | `src/mercado/indicadores.js`, `src/mercado/regimen.js`, `src/estrategias/*.js`, `src/cuant/dimensionado.js`, `src/cuant/laboratorio.js`, `src/backtest/{motor,metricas,walkforward}.js`, `test/cuant-*.test.js`, `scripts/probar-indicadores.js`, `scripts/probar-backtest.js` | **A · Cuant** |
 | `src/mercado/{universo,calendario,alpaca-datos,sintetico,sentimiento,limitador}.js`, `src/broker/{alpaca-broker,simulado,errores}.js`, `test/mercado-*.test.js`, `test/broker-*.test.js`, `scripts/probar-alpaca.js`, `scripts/probar-broker-simulado.js` | **B · Mercado y bróker** |
-| `src/riesgo/{limites,vigilante}.js`, `src/cartera/{libros,conciliacion,benchmarks}.js`, `src/aprendizaje/{evaluador,asignador}.js`, `test/riesgo-*.test.js`, `test/cartera-*.test.js`, `test/aprendizaje-*.test.js`, `scripts/probar-riesgo.js`, `scripts/probar-contabilidad.js` | **C · Riesgo, cartera y aprendizaje** |
+| `src/riesgo/{limites,vigilante,incidentes}.js`, `src/cartera/{libros,conciliacion,benchmarks}.js`, `src/aprendizaje/{evaluador,asignador,paso-a-real}.js`, `test/riesgo-*.test.js`, `test/cartera-*.test.js`, `test/aprendizaje-*.test.js`, `scripts/probar-riesgo.js`, `scripts/probar-contabilidad.js`, `scripts/estudiar-limites.js` | **C · Riesgo, cartera y aprendizaje** |
 | `src/agentes/{bus,llm,plantillas,megafono,postmortem,registro,cifras}.js`, `test/agentes-*.test.js`, `scripts/probar-llm.js` | **D · Agentes (infraestructura)** |
 | `web/**` | **E · Parqué (interfaz)** |
 | `src/agentes/departamentos/*.js`, `src/agentes/comite.js`, `src/orquestador.js`, `src/servidor.js`, `src/index.js`, `scripts/demo-acelerada.js`, `scripts/probar-todo.js`, `test/integracion-*.test.js` | **F · Integración** (después de A–D) |
@@ -301,11 +301,16 @@ volatilidad 30 d en su propia historia). Cada filtro: `{ id, parametros, permite
 `mesasIniciales({ hayAlpaca }) → Mesa[]`:
 
 ```js
-Mesa = { id, nombre, familia, marco, universo: [simbolo], params, filtros: [{id, parametro}], estado: 'titular'|'incubacion'|'banquillo', origen: 'inicial'|'laboratorio' }
+Mesa = { id, nombre, familia, marco, universo: [simbolo], params, filtros: [{id, parametro}], estado: 'titular'|'incubacion'|'banquillo', origen: 'inicial'|'laboratorio', nota }
 ```
 Iniciales: `tendencia` (BTC, ETH, SOL · 4Hour), `momentum` (6 cripto), `reversion` (BTC, ETH),
 `ruptura` (BTC, ETH, SOL); con claves además `momentum-etf` (SPY, QQQ, IWM, TLT, GLD) y
-`reversion-etf` (SPY, QQQ).
+`reversion-etf` (SPY, QQQ). Estado de arranque (decisión del 30-sep-2026):
+`momentum` es la única **titular**; todas las demás arrancan en **incubación**
+(2 %) y su `nota` dice por qué con la cifra: tendencia y reversión pierden con
+costes, ruptura no diversifica frente a momentum (correlación diaria 0,80,
+`scripts/estudiar-limites.js`) y las de ETF no se pueden validar sin claves.
+Pueden ascender por la regla del asignador (§5.7).
 
 ### 4.4 Dimensionado (`src/cuant/dimensionado.js`) — lo usan backtest y vivo
 
@@ -474,8 +479,10 @@ vigilar({ ahora, patrimonio, patrimonioInicioDia, pico, puestos /* con stop y pr
   → { nivel, multiplicadorCaida, acciones: [{tipo:'stop', puestoId, simbolo, precio, stop} | {tipo:'kill', motivo} | {tipo:'solo_cerrar', motivo, hasta}], alertas: [texto] }
 ```
 Pérdida del día ≤ −2 % → `solo_cerrar` hasta las 00:00 UTC siguientes;
-≤ −3,5 % → kill. Caída desde el máximo ≤ −10 % → `multiplicadorCaida` 0,5;
-≤ −15 % → kill. `bloqueado` es pegajoso: solo sale con Reabrir humano.
+≤ −7 % → kill. Caída desde el máximo ≤ −10 % → `multiplicadorCaida` 0,5;
+≤ −25 % → kill. `bloqueado` es pegajoso: solo sale con Reabrir humano.
+Umbrales en `config.limites` (decisión del 30-sep-2026, antes −3,5 % y −15 %;
+el porqué con cifras en `src/config.js` y `scripts/estudiar-limites.js`).
 
 ### 5.5 Carteras sombra (`src/cartera/benchmarks.js`)
 
@@ -550,7 +557,36 @@ Despido (→ banquillo, peso 0: cierra sus puestos reales y no abre nada nuevo,
 tampoco en la sombra «sin comité», que dimensiona con 0 $; lo que tenga
 abierto en sombra se cierra por su regla): sharpeAjustado < −0,5 con ≥ 40
 operaciones, o maxDD de la mesa > 25 %. Incubación ≥ 60 días: asciende si
-sharpe papel > sharpeBacktest − 1 y ≥ 10 operaciones; si no, se descarta.
+sharpe papel > máx(0, sharpeBacktest − 1) y ≥ 10 operaciones; con menos de 10
+sigue incubando hasta 180 días; si no, se descarta.
+Con el techo del 40 %, lo que los titulares no pueden tomar queda en efectivo
+(`cabecera.sinAsignar`, §7): en el arranque sin claves, una titular al 40 % y
+tres incubadas al 2 % dejan el 54 %.
+
+### 5.8 Semáforo «¿Listo para dinero real?» (`src/aprendizaje/paso-a-real.js`)
+
+```js
+evaluarPasoAReal({ ahora, creado, capitalInicial, patrimonio, operaciones, operacionesSombra, curvaDiaria,
+                   curvasSombra /* sombras.curvas: btc, cesta-cripto, spy?, sin-comite */, hayAlpaca, penalizacionPapel,
+                   caidaMaximaVista, incidentes, incidentesDesde, costeLLMUsd })
+  → { listo, cumplidos, total, criterios: [Criterio], comite: { sharpeFondo, sharpeSinComite, bate, texto }, nota }
+Criterio = { id: 'a'…'g', nombre, valor /* number|null */, umbral /* number|null */, ok, valorTexto, umbralTexto, detalle /* string|null */ }
+```
+Criterios de Eduardo (30-sep-2026); `listo` solo si se cumplen TODOS:
+a) ≥ 180 días desde `creado`; b) ≥ 100 operaciones cerradas del fondo real
+(sin `prueba` ni sombra); c) Sharpe anualizado (√365) de `curvaDiaria` desde el
+arranque ≥ 0,7, con la penalización de papel de sus operaciones y al menos 30
+retornos (si no, `valor` null y en rojo); d) ese Sharpe ≥ el mejor de comprar y
+mantener BTC y la cesta cripto (con claves, también SPY; una curva que falta
+deja el criterio en rojo); e) caída máxima ≤ 20 %: la peor de
+`estado.caidaMaxima` (latido a latido) y de la curva diaria penalizada;
+f) cero incidentes (§6.10) con `t` en los últimos 90 días y el registro
+cubriéndolos (`ahora − incidentesDesde ≥ 90 días`); g) coste acumulado del LLM
+(`llm.gastoTotal()`) < 10 % de `patrimonio − capitalInicial`; con beneficio ≤ 0
+solo se cumple si el coste es 0. `comite` es informativo y no bloquea: si el
+Sharpe del fondo no supera al de «mismas mesas sin comité» (también con la
+penalización), el texto recomienda pasar a real sin comité. `nota` dice
+siempre que el semáforo no activa nada: el código sigue siendo solo papel.
 
 ---
 
@@ -612,10 +648,16 @@ crearLLM({ apiKey, modeloComite, modeloAgentes, presupuestoDiaUsd, reloj, rutaCo
     gastoHoy() → usd, estado() → { activo, modeloComite, modeloAgentes, gastoHoyUsd, presupuestoDiaUsd, llamadasHoy, ultimoError },
     gastoDelDia(dia /* 'AAAA-MM-DD' UTC, de los últimos 8 */) → usd,   // día del DINERO (tiempo real), no el simulado
     gastoEntre(desde, hasta) → usd,                                     // desde < t ≤ hasta, ms de tiempo real
+    gastoTotal() → usd,                       // todo llm-costes.jsonl + lo de la sesión (criterio g del semáforo, §5.8)
     fijarModelos({ modeloComite, modeloAgentes }), fijarPresupuesto(usd),
   }
 ```
-Forma de la petición (verificada contra la referencia de la API, 29-sep-2026):
+Por defecto (`src/config.js`, 30-sep-2026): comité `claude-opus-5-5`, agentes
+`claude-haiku-4-5` (solo redactan y clasifican con listas cerradas) y tope de
+1 $/día (`LLM_MODELO_COMITE`, `LLM_MODELO_AGENTES`, `LLM_PRESUPUESTO_DIA_USD`).
+Forma de la petición (verificada contra la referencia de la API, 29-sep-2026;
+Haiku 4.5 comprobado el 30-sep: admite `output_config.format`, rechaza `effort`
+y no tiene salvavidas del servidor):
 - `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-opus-5`, `claude-fable-5-1`:
   `client.beta.messages.create({ model, max_tokens, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default', output_config: { effort, format: { type: 'json_schema', schema } }, system: [{ type: 'text', text: sistema, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content }] })`.
   Sin `thinking`, sin `temperature`. Esfuerzo por defecto: comité `medium`, agentes `low`.
@@ -874,9 +916,23 @@ visual), próximas cadencias. Campos añadidos después del primer contrato:
 - `puestos[id].espera`: la espera de la estrategia en la última vela (solo si
   entonces no tenía posición ni iba a abrir), para rehacer la tarjeta del
   puesto en el acto cuando cambia el nivel del fondo (§7, `estadoTexto`).
+- `caidaMaxima`: la peor caída vista desde el máximo histórico (fracción ≥ 0),
+  actualizada en cada valoración (criterio e, §5.8). Un estado anterior la
+  toma de sus curvas guardadas.
+- `incidentesDesde`: desde cuándo hay registro de incidentes (el arranque del
+  fondo; en un estado anterior al registro, el primer arranque con él). El
+  criterio f no se da por cumplido hasta que cubre 90 días.
 Además `data/.proceso` (el bloqueo de la carpeta, con el pid), `mensajes.jsonl`,
 `ordenes.jsonl`, `operaciones.jsonl`, `operaciones-sombra.jsonl`,
-`llm-costes.jsonl`, `informes.jsonl`, `broker-simulado.json`, `cache/`.
+`llm-costes.jsonl`, `informes.jsonl`, `broker-simulado.json`, `cache/` e
+`incidentes.jsonl`: el registro de incidentes (`src/riesgo/incidentes.js`),
+**solo se añade, nunca se borra**. Una línea `{ t, tipo, detalle, datos? }` por
+situación, al aparecer: `kill` (el kill switch, manual o del vigilante),
+`conciliacion_grave` (descuadre grave o puesto sin posición en el bróker),
+`orden_huerfana` (posición del bróker sin puesto, u orden aceptada que luego
+el bróker no conoce), `orden_duplicada` (el bróker ya tenía otra orden con ese
+`idCliente`) y `error_departamento` (lo que captura `_error`, una vez por error
+y hora, también los de red).
 
 Arranque (`src/index.js`), en este orden:
 1. HOST abierto a la red sin `PANEL_TOKEN` → no arranca.
@@ -1000,6 +1056,11 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
   ejecuciones: [{ t, puestoId, simbolo, etiqueta, lado, cantidad, precio, nocional, comision, motivo }],   // últimas 30
   laboratorio: { ensayosTotales, hipotesis: [{ id, descripcion, estado: 'pendiente'|'evaluando'|'aprobada'|'rechazada', criterios, t }], proximaRevision },
   limites,
+  listoParaReal: { listo, cumplidos, total, criterios: [Criterio], comite: { sharpeFondo, sharpeSinComite, bate, texto }, nota },
+  // Semáforo «¿Listo para dinero real?» (§5.8, desde el 30-sep-2026): los criterios a-g con
+  //   Criterio = { id, nombre, valor, umbral, ok, valorTexto, umbralTexto, detalle }; valorTexto y
+  //   umbralTexto ya vienen escritos (la interfaz no recalcula unidades). comite es informativo (bate:
+  //   true|false|null). nota: el semáforo no activa nada, el código sigue siendo solo papel.
   avisos: [texto]    // Un «hasta» que no es hoy lleva la fecha, como el feed («hasta el 3 oct 21:55»;
                      // hoy, «hasta las 21:55»).
                      // Lo que bloquea o limita al fondo va delante (en el móvil se corta por el final): nivel
@@ -1007,7 +1068,9 @@ GET salvo `ajustes`; 413 cuerpo de más de 64 KB; 415 sin application/json).
                      // Megáfono; con el fondo en normal, los activos vetados (Megáfono, comité, noticia grave) y las
                      // mesas sin abrir (pausa del Megáfono o ×0 del comité), con quién y hasta cuándo; caída
                      // histórica por encima del límite del kill tras reabrir, precios sin actualizar (> 3 min, fuera
-                     // del sintético), conciliación con incidencias, capital sin asignar; al final
+                     // del sintético), conciliación con incidencias, capital sin asignar con el porqué («54 % del
+                     // capital sin asignar: queda en efectivo. Hay solo 1 mesa titular (techo del 40 %) y 3 en
+                     // prueba al 2 %: mejor efectivo que capital en estrategias sin ventaja demostrada.»); al final
                      // 'Con el ordenador apagado no hay stops…' y el modo (sintético / bróker simulado)
 }
 ```
@@ -1061,7 +1124,12 @@ abra también desde `file://` en modo maqueta).
   Resultados, Prueba, Pausar todo, Reabrir (escribir REABRIR), Kill switch
   (rojo, escribir KILL), Ajustes (modal). Controles de cámara y zoom; arrastrar
   para mover, rueda o pellizco para zoom.
-- Resultados (modal ancho): el fondo frente a cada cartera sombra (valor,
+- Resultados (modal ancho): arriba del todo, el semáforo «¿Listo para dinero
+  real?» (`listoParaReal`): veredicto («Todavía no: n de 7» o «Sí: cumple
+  todos»), cada criterio a-g con ✓/✗ (y «cumple» / «no cumple» para el lector
+  de pantalla), su valor, su umbral y su detalle, la nota del comité y lo que
+  no hace; sin el campo (servidor anterior) no se pinta. Después, el fondo
+  frente a cada cartera sombra (valor,
   rentabilidad, Sharpe 90 d y diferencia en dólares), incluida «mismas mesas
   sin comité»; «¿Aporta algo el comité?» con el bloque `mejora`; las mesas con
   estado, peso, Sharpe y P&L total, el capital sin asignar (queda en efectivo)
@@ -1115,13 +1183,21 @@ código ≠ 0 si falla. Obligatorio como mínimo:
   timeout en envío → consulta por idCliente y no duplica; bróker simulado:
   comprar 1.000 $ de BTC a 100.000 con 0,25 % → 0,009975 BTC; vender → efectivo exacto.
 - C: libros: compra, compra, venta parcial, venta total → realizado exacto;
-  límites: cada motivo de veto y de reducción con su caso; vigilante: −2 %,
-  −3,5 %, −10 %, −15 %; conciliación: escalar vs grave; asignador con casos de
-  suelo, techo, muestra mínima, despido.
+  límites: cada motivo de veto y de reducción con su caso (riesgo por
+  operación del 1 %); vigilante: −2 %, −7 %, −10 %, −25 % y lo que queda entre
+  medias (−3,5 % solo cierra, −15 % va a ×0,5); conciliación: escalar vs
+  grave; asignador con casos de suelo, techo, muestra mínima, despido;
+  semáforo: cada criterio a-g en verde y en rojo; registro de incidentes.
 - D: petición al LLM con cliente falso → forma exacta por modelo (opus vs
-  haiku), cálculo de coste, tope diario, `refusal`, esquema inválido,
+  haiku, y la config por defecto: comité Opus, agentes Haiku, 1 $/día),
+  cálculo de coste, tope diario, gasto acumulado, `refusal`, esquema inválido,
   `verificarCifras` con cifras buenas y malas; Megáfono por palabras clave.
 - F: demo acelerada de 60 días sintéticos sin fallos: hay operaciones, ningún
   límite duro violado, `Σ puestos = posiciones del bróker`, `patrimonio =
   efectivo + Σ valor de posiciones`, el comité se reúne, el kill switch cierra
-  todo; servidor responde `/api/estado` con la forma de §7.
+  todo; servidor responde `/api/estado` con la forma de §7; cada incidente
+  entra una vez en `incidentes.jsonl` desde donde pasa y el semáforo lo cuenta.
+
+`scripts/estudiar-limites.js` no es un caso conocido (no está en
+`probar-todo`): repite con las velas de `data/cache/probar/` el estudio con el
+que se eligieron los límites y las mesas iniciales del 30-sep-2026.

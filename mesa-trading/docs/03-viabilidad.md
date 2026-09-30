@@ -37,34 +37,42 @@ Lo que dicen los datos públicos (fuentes en
 Velas reales de Alpaca del 1 de enero de 2021 al 29 de septiembre de 2026, con
 comisión de Alpaca (0,25 %), deslizamiento y una penalización extra de papel
 del 0,1 %. Cada mesa se simula con el 25 % del fondo y los límites de riesgo
-activos (`node scripts/probar-backtest.js --real`). Comprar y mantener es el
-mismo universo a partes iguales desde la misma fecha y con los mismos costes.
+activos, con el riesgo por operación del 1 % decidido el 30 de septiembre
+(`node scripts/probar-backtest.js --real`; con `--usar-cache` repite las
+cifras sin red). Comprar y mantener es el mismo universo a partes iguales
+desde la misma fecha y con los mismos costes. Momentum va con BTC, ETH y SOL,
+las tres con histórico; en vivo rota entre seis cripto.
 
 | Mesa | Rentabilidad | Sharpe | Caída máx. | Comprar y mantener: rentabilidad / Sharpe / caída |
 |---|---|---|---|---|
-| Momentum cripto | +120 % | **0,83** | 28 % | +167 % / 0,63 / 95 % |
-| Ruptura Donchian | +88 % | **0,64** | 36 % | +207 % / 0,66 / 95 % |
-| Tendencia SMA 4H (la del vídeo) | −41 % | −0,52 | 55 % | +121 % / 0,58 / 95 % |
-| Reversión RSI cripto | −10 % | −0,42 | 12 % | +114 % / 0,54 / 77 % |
+| Momentum cripto | +290 % | **0,91** | 40 % | +167 % / 0,63 / 95 % |
+| Ruptura Donchian | +98 % | **0,65** | 39 % | +207 % / 0,66 / 95 % |
+| Tendencia SMA 4H (la del vídeo) | −42 % | −0,53 | 55 % | +121 % / 0,58 / 95 % |
+| Reversión RSI cripto | −16 % | −0,36 | 20 % | +114 % / 0,54 / 77 % |
 
 Cómo leerlo:
 
-- **En dinero, ninguna mesa llega a comprar y mantener** en estos cinco
-  años, que han sido muy alcistas para la cripto: momentum hace +120 % frente
-  a +167 %, y ruptura +88 % frente a +207 %. Pasan la mayor parte del tiempo
-  en liquidez.
+- **Son cifras de cada mesa sobre su propio capital.** El fondo entero lleva
+  además mucho efectivo: con Momentum al 40 % y las demás en prueba al 2 %,
+  el backtest da un 6,5 % anual, Sharpe 0,72 y una caída máxima del 12,2 %;
+  con la protección de la mitad de tamaño al −10 % (aproximada), 5,3 %, 0,62
+  y 12,0 % (`node scripts/estudiar-limites.js`, tabla 5; más en
+  `04-riesgo-y-mejora.md`).
+- **En dinero, solo momentum supera a comprar y mantener** en estos cinco
+  años, que han sido muy alcistas para la cripto: +290 % frente a +167 %, con
+  menos de la mitad de su caída (40 % frente a 95 %). Ruptura hace +98 %
+  frente a +207 %. Pasan buena parte del tiempo en liquidez.
 - **Ajustado por riesgo, solo momentum mejora a comprar y mantener** (Sharpe
-  0,83 frente a 0,63) y con menos de un tercio de su caída (28 % frente a
-  95 %). Ruptura se queda justo por debajo (0,64 frente a 0,66), con algo más
-  de un tercio de la caída (36 % frente a 95 %). Esa es toda la ventaja
-  posible, y es modesta.
+  0,91 frente a 0,63). Ruptura se queda justo por debajo (0,65 frente a 0,66).
+  Esa es toda la ventaja posible, y es modesta.
 - **La estrategia del vídeo pierde por costes:** hace 539 operaciones y se
-  deja 4.434 $ en comisiones sobre 10.000 $. Sin costes (ni comisión, ni
-  deslizamiento, ni penalización) ganaría un 63 %; con ellos pierde un 41 %.
+  deja 4.423 $ en comisiones sobre 10.000 $. Sin costes (ni comisión, ni
+  deslizamiento, ni penalización) ganaría un 62 %; con ellos pierde un 42 %.
+  Las columnas «comisiones» y «sin costes» del script lo enseñan para cada mesa.
 - **Fuera de muestra**, validando con datos que la estrategia no vio al
   diseñarse, ninguna mesa pasa el listón estadístico del laboratorio (Sharpe
-  deflactado ≥ 0,90; la mejor saca 0,54). Traducido: no hay pruebas
-  suficientes de que ninguna tenga ventaja real.
+  deflactado ≥ 0,90; la mejor, ruptura, saca 0,58, y momentum 0,31).
+  Traducido: no hay pruebas suficientes de que ninguna tenga ventaja real.
 - **El hueco de SOL.** Alpaca no tiene cotizaciones de SOL del 6 de julio de
   2023 al 26 de agosto de 2024. La primera vela de vuelta abre a 18,14 $, el
   precio de julio de 2023, y cierra a 157,25 $. Antes, una orden decidida
@@ -78,9 +86,20 @@ Cómo leerlo:
   operar sin datos; antes solo la sumaba comprar y mantener, que salía entre
   +734 % y +1.252 %.
 
-Por eso Tendencia y Reversión arrancan en incubación con el 2 % y no como
-titulares. Que Ruptura siga de titular con un Sharpe por debajo del de
-comprar y mantener lo decides tú.
+Por eso, desde el 30 de septiembre de 2026, **Momentum es la única titular**
+y todas las demás arrancan en incubación, con el 2 % y la obligación de
+ganarse el puesto en papel:
+
+- Tendencia y Reversión pierden con costes.
+- Ruptura gana sola, pero no diversifica: en el fondo, su correlación diaria
+  con Momentum es 0,80. Momentum sola (40 %) da Sharpe 0,72 y caída 11,2 %;
+  con Ruptura al lado (40 % y 40 %), 0,58 y 26,0 %. Añade caída sin añadir
+  rentabilidad por riesgo (`node scripts/estudiar-limites.js`, tabla 3).
+- Las de ETF (con claves de Alpaca) no se pueden validar: sin claves no hay
+  datos de ETF (Stooq pide JavaScript y Yahoo responde 429).
+
+El capital que no se reparte, un 54 % sin claves, queda en efectivo: mejor
+eso que capital en estrategias que no han probado ventaja.
 
 ## ¿Aporta algo la IA?
 
@@ -91,21 +110,28 @@ El panel enseña las dos curvas.
 
 ## Qué habría que ver antes de pensar en dinero real
 
-Los umbrales los tienes que fijar tú por escrito **antes** de empezar (son
-reglas de negocio, no se inventan aquí). Como referencia, lo que proponen las
-fuentes:
+Los criterios ya están fijados (30 de septiembre de 2026) y el panel los
+calcula solo: botón Resultados, «¿Listo para dinero real?». Todos a la vez:
 
-1. **Semanas 1 a 6 (funciona técnicamente):** cada día cuadran posiciones y
-   caja con Alpaca; ninguna orden duplicada ni huérfana; kill switch probado;
-   coste de Claude por debajo del tope.
-2. **Mínimo 6 meses, mejor 12 (gana dinero):** más de 100 operaciones cerradas;
-   bate en neto a comprar y mantener con la misma exposición **y** a «mismas
-   mesas sin comité»; caída máxima dentro de tu límite; que el resultado no
-   dependa de 2 operaciones.
-3. **Aviso estadístico:** con un año de datos, el margen de error del Sharpe es
-   de ±1. Para demostrar con un 95 % de confianza que un Sharpe de 1 es real
-   hacen falta unos 4 años. La cuenta paper sirve para filtrar y matar ideas
-   rápido, no para demostrar que hay ventaja.
+1. 180 días o más en papel.
+2. 100 operaciones cerradas o más.
+3. Sharpe del fondo desde el arranque de 0,7 o más.
+4. Ese Sharpe, igual o mejor que el de comprar y mantener BTC y la cesta
+   cripto (con claves, también SPY) en el mismo periodo.
+5. Caída máxima del 20 % o menos.
+6. Ningún incidente en 90 días: kill switch, conciliación grave, orden
+   duplicada o huérfana, o error en un departamento.
+7. Gasto en IA por debajo del 10 % del beneficio neto.
 
-Y si algún día se pasa a real: una cantidad que se pueda perder entera, y 1 a
-3 meses comparando ejecuciones reales con las de papel.
+Si el fondo no bate a «mismas mesas sin comité», se recomienda pasar a real
+sin comité. El detalle y el porqué de cada uno, en `05-paso-a-real.md`.
+
+**Aviso estadístico:** con un año de datos, el margen de error del Sharpe es
+de ±1. Para demostrar con un 95 % de confianza que un Sharpe de 1 es real
+hacen falta unos 4 años. La cuenta paper sirve para filtrar y matar ideas
+rápido, no para demostrar que hay ventaja.
+
+El semáforo no activa nada. Si algún día se pasa a real, lo decides tú por
+escrito, hace falta un cambio de código a propósito y el primer tramo es una
+cantidad que se pueda perder entera (como mucho 2.000 €), con 3 meses
+comparando las ejecuciones reales con las de papel.

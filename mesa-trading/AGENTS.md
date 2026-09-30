@@ -8,6 +8,9 @@ no programa: Claude escribe, prueba y documenta todo, en español.
 
 - **Solo papel.** `AlpacaBroker` acepta únicamente `https://paper-api.alpaca.markets`.
   Cualquier camino a dinero real lo decide Eduardo por escrito, nunca una sesión.
+  El semáforo «¿Listo para dinero real?» (`docs/05-paso-a-real.md`) solo
+  informa: en verde tampoco autoriza nada. `data/incidentes.jsonl`, su prueba
+  del criterio f, solo crece.
 - **El LLM habla; el código decide los números.** Tamaños, stops, límites, P&L
   y señales son código determinista. El LLM solo redacta, elige de listas
   cerradas o clasifica; todo su texto pasa por `verificarCifras` antes de
@@ -15,7 +18,8 @@ no programa: Claude escribe, prueba y documenta todo, en español.
 - **Los límites duros (`src/config.js`) solo se aprietan.** El comité y el
   Megáfono no pueden aflojarlos. Sus valores, los criterios de kill y qué mesa
   arranca como titular son reglas de negocio de Eduardo: si falta una, se
-  pregunta.
+  pregunta. Las del 30-sep-2026 salen de `node scripts/estudiar-limites.js`;
+  una propuesta de cambio trae sus cifras de ahí.
 - **El contrato manda.** `docs/ARQUITECTURA.md` fija la firma y la forma de
   datos de cada módulo y la instantánea que lee la interfaz. Un cambio de forma
   se escribe primero allí.

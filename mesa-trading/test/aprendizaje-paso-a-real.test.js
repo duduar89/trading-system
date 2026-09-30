@@ -175,7 +175,7 @@ test('f) incidentes: ninguno en 90 días con el registro cubriéndolos, verde; u
   const rojo = crit(evaluarPasoAReal(base({ incidentes: reciente })), 'f');
   assert.equal(rojo.ok, false);
   assert.equal(rojo.valor, 2);
-  assert.match(rojo.detalle, /1 error en un departamento, 1 kill switch\. El último, el 2027-04-14: kill switch manual desde el panel/);
+  assert.match(rojo.detalle, /1 error en un departamento, 1 kill switch\. El último, el 14 abr 2027: kill switch manual desde el panel/);
   // Registro que empezó hace 30 días: cero incidentes, pero no cubre los 90.
   const nuevo = crit(evaluarPasoAReal(base({ incidentesDesde: T0 + 170 * DIA })), 'f');
   assert.equal(nuevo.ok, false);

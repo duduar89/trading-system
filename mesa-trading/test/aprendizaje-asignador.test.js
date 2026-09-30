@@ -115,11 +115,11 @@ test('incubación ≥ 60 días: asciende con Sharpe papel > backtest − 1 y ≥
   assert.match(r.cambios.find(x => x.id === 'n').motivo, /Asciende/);
 });
 
-test('incubación ≥ 60 días que no llega: se descarta (Sharpe o número de operaciones)', () => {
+test('incubación ≥ 60 días que no llega: se descarta (Sharpe, o pocas operaciones pasados 180 días)', () => {
   const r = reasignar({ mesas: [
     tit('a', 0.4, 0, 0.49), tit('b', 0.4, 0, 0.49),
     incu('x', { dias: 61, sharpe: 0.3, ops: 25 }),     // 0,3 ≤ 1,5 − 1
-    incu('y', { dias: 61, sharpe: 0.9, ops: 7 }),      // 7 < 10 operaciones
+    incu('y', { dias: 181, sharpe: 0.9, ops: 7 }),     // 7 < 10 operaciones y ya pasó el plazo
     incu('z', { dias: 59, sharpe: -3, ops: 1 }),       // aún en incubación
   ] });
   assert.deepEqual(r.descartes, ['x', 'y']);
@@ -127,6 +127,29 @@ test('incubación ≥ 60 días que no llega: se descarta (Sharpe o número de op
   assert.equal(r.pesos.y, 0);
   cerca(r.pesos.z, 0.02);
   assert.match(r.cambios.find(c => c.id === 'y').motivo, /7 operaciones/);
+});
+
+test('incubación con pocas operaciones antes de 180 días: sigue incubando al 2 %, aunque el Sharpe salga negativo', () => {
+  // Ruptura hace 2–3 operaciones cada 60 días: con 3 operaciones el Sharpe es ruido y no se juzga.
+  const r = reasignar({ mesas: [
+    tit('a', 0.4, 0, 0.49), tit('b', 0.4, 0, 0.49),
+    incu('ruptura', { dias: 90, sharpe: -0.4, ops: 3, sharpeBacktest: 0.65 }),
+  ] });
+  assert.deepEqual(r.descartes, []);
+  assert.deepEqual(r.ascensos, []);
+  cerca(r.pesos.ruptura, 0.02);
+});
+
+test('suelo 0: una mesa con backtest negativo no asciende perdiendo dinero', () => {
+  // Tendencia: backtest −0,53. Antes bastaba un papel > −1,53, y ascendía con Sharpe −0,2.
+  const r = reasignar({ mesas: [
+    tit('a', 0.4, 0, 0.49), tit('b', 0.4, 0, 0.49),
+    incu('tendencia', { dias: 70, sharpe: -0.2, ops: 15, sharpeBacktest: -0.53 }),
+    incu('buena', { dias: 70, sharpe: 0.3, ops: 15, sharpeBacktest: -0.53 }),
+  ] });
+  assert.deepEqual(r.descartes, ['tendencia']);
+  assert.deepEqual(r.ascensos, ['buena']);
+  assert.match(r.cambios.find(c => c.id === 'tendencia').motivo, /no supera 0 \(backtest -0,53\)/);
 });
 
 test('primer reparto (sin peso actual): paridad de riesgo; banquillo a 0', () => {

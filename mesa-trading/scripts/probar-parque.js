@@ -80,7 +80,10 @@ caso('cruza fila 16 dentro de la puerta del comité (15 ± 0,75)', Math.abs(puer
 const valor = inst.posiciones.reduce((s, p) => s + p.cantidad * p.precio, 0);
 caso('patrimonio = efectivo + Σ valor de posiciones', maqueta._interno.efectivo() + valor, maqueta._interno.patrimonio(), 1e-6);
 caso('exposición bruta = Σ valor / patrimonio', inst.cabecera.exposicionBrutaPct, valor / maqueta._interno.patrimonio(), 1e-9);
-caso('24 campos de primer nivel en la instantánea', Object.keys(inst).length, 24);
+// 25 desde el 30-sep-2026: se añade listoParaReal (el semáforo «¿Listo para dinero real?», §7).
+caso('25 campos de primer nivel en la instantánea', Object.keys(inst).length, 25);
+caso('el semáforo trae los criterios a-g', inst.listoParaReal.criterios.map(k => k.id).join(''), 'abcdefg');
+caso('… y cuántos cumple', inst.listoParaReal.cumplidos, inst.listoParaReal.criterios.filter(k => k.ok).length);
 caso('puestos de la maqueta (3 + 6 + 2 + 3)', inst.puestos.length, 14);
 const comprado = maqueta.comando('megafono', { texto: 'pausa SOL 6 h' });
 caso('Megáfono «pausa SOL 6 h»', comprado.datos.directivas, [{ tipo: 'pausar_activo', simbolo: 'SOL/USD', horas: 6 }]);

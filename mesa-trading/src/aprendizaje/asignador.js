@@ -11,8 +11,12 @@
 // - Incubación fija 2 %; los titulares se reparten 1 − Σ incubación.
 // - Despido (banquillo, peso 0; su sombra ya no abre nada): sharpeAjustado < −0,5 con
 //   ≥ 40 operaciones, o caída máxima de la mesa > 25 %.
-// - Incubación de ≥ 60 días: asciende si Sharpe de papel > Sharpe de
-//   backtest − 1 con ≥ 10 operaciones; si no, se descarta.
+// - Incubación de ≥ 60 días: asciende si Sharpe de papel > máx(0, Sharpe de
+//   backtest − 1) con ≥ 10 operaciones. El suelo 0 importa: sin él, una mesa
+//   con backtest negativo (Tendencia, −0,53) ascendía perdiendo dinero. Si aún
+//   no llega a 10 operaciones sigue incubando hasta 180 días (Ruptura hace 2–3
+//   cada 60 días; con 3 operaciones el Sharpe es ruido); con ≥ 10 y el Sharpe
+//   por debajo, o a los 180 días, se descarta.
 //
 // El objetivo se normaliza al presupuesto de titulares ANTES de mezclarlo con
 // el peso actual: así 0,7/0,3 pesan de verdad 0,7/0,3 (dos repartos que suman
@@ -35,6 +39,7 @@ const REGLAS = Object.freeze({
   despidoMinOperaciones: 40,
   despidoMaxDD: 0.25,
   incubacionDias: 60,
+  incubacionMaxDias: 180,
   ascensoMinOperaciones: 10,
   ascensoMargenSharpe: 1,
 });
@@ -128,17 +133,24 @@ function reasignar({ mesas = [], ahora = null } = {}) {
 
     if (estado === 'incubacion') {
       if (dias < R.incubacionDias) { incubando.push(m); continue; }
-      const umbral = esNumero(m.sharpeBacktest) ? m.sharpeBacktest - R.ascensoMargenSharpe : null;
+      const umbral = esNumero(m.sharpeBacktest) ? Math.max(0, m.sharpeBacktest - R.ascensoMargenSharpe) : null;
       const sharpeOk = umbral !== null && esNumero(met.sharpe) && met.sharpe > umbral;
+      const textoUmbral = esNumero(m.sharpeBacktest)
+        ? (umbral > 0 ? `backtest ${n2(m.sharpeBacktest)} − 1` : `0 (backtest ${n2(m.sharpeBacktest)})`)
+        : 'backtest sin dato';
       if (sharpeOk && ops >= R.ascensoMinOperaciones) {
         ascensos.push(m.id);
-        motivos[m.id] = `Asciende tras ${dias} días: Sharpe de papel ${n2(met.sharpe)} > backtest ${n2(m.sharpeBacktest)} − 1 con ${ops} operaciones.`;
+        motivos[m.id] = `Asciende tras ${dias} días: Sharpe de papel ${n2(met.sharpe)} > ${textoUmbral} con ${ops} operaciones.`;
         titulares.push({ m, ops, dias });
+      } else if (ops < R.ascensoMinOperaciones && dias < R.incubacionMaxDias) {
+        // Muestra corta: aún no se puede juzgar. Sigue incubando.
+        incubando.push(m);
+        motivos[m.id] = `Sigue incubando: ${ops} operaciones en ${dias} días (hacen falta ${R.ascensoMinOperaciones}; plazo ${R.incubacionMaxDias} días).`;
       } else {
         descartes.push(m.id);
         pesos[m.id] = 0;
         motivos[m.id] = !sharpeOk
-          ? `Descartada tras ${dias} días: Sharpe de papel ${esNumero(met.sharpe) ? n2(met.sharpe) : 'sin dato'} no supera backtest ${esNumero(m.sharpeBacktest) ? n2(m.sharpeBacktest) : 'sin dato'} − 1.`
+          ? `Descartada tras ${dias} días: Sharpe de papel ${esNumero(met.sharpe) ? n2(met.sharpe) : 'sin dato'} no supera ${textoUmbral}.`
           : `Descartada tras ${dias} días: ${ops} operaciones (mínimo ${R.ascensoMinOperaciones}).`;
       }
       continue;

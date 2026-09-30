@@ -76,7 +76,7 @@ function evaluarPasoAReal({
   lista.push(criterio('a', 'Días en papel', {
     valor: dias, umbral: C.diasPapel, ok: dias >= C.diasPapel,
     valorTexto: `${f.numero(dias)} ${dias === 1 ? 'día' : 'días'}`, umbralTexto: `≥ ${C.diasPapel} días`,
-    detalle: esNumero(creado) ? `Desde el arranque del fondo (${f.dia(creado)}).` : null,
+    detalle: esNumero(creado) ? `Desde el arranque del fondo (${f.fechaLarga(creado)}).` : null,
   }));
 
   // b) Operaciones cerradas del fondo real.
@@ -130,9 +130,9 @@ function evaluarPasoAReal({
   let detalleF;
   if (recientes.length) {
     const ultimo = recientes[recientes.length - 1];
-    detalleF = `${Object.entries(porTipo).map(([t, n]) => `${n} ${NOMBRE_TIPO[t] || t}`).join(', ')}. El último, el ${f.dia(ultimo.t)}: ${ultimo.detalle || NOMBRE_TIPO[ultimo.tipo] || ultimo.tipo}`;
+    detalleF = `${Object.entries(porTipo).map(([t, n]) => `${n} ${NOMBRE_TIPO[t] || t}`).join(', ')}. El último, el ${f.fechaLarga(ultimo.t)}: ${ultimo.detalle || NOMBRE_TIPO[ultimo.tipo] || ultimo.tipo}`;
   } else if (!cubre) {
-    detalleF = `El registro de incidentes empezó ${esNumero(incidentesDesde) ? `el ${f.dia(incidentesDesde)}` : 'hoy'}: cubre ${f.numero(cobertura)} de ${C.diasSinIncidentes} días.`;
+    detalleF = `El registro de incidentes empezó ${esNumero(incidentesDesde) ? `el ${f.fechaLarga(incidentesDesde)}` : 'hoy'}: cubre ${f.numero(cobertura)} de ${C.diasSinIncidentes} días.`;
   } else {
     detalleF = 'Ni kill switch, ni conciliación grave, ni órdenes duplicadas o huérfanas, ni errores en los departamentos.';
   }
@@ -150,7 +150,7 @@ function evaluarPasoAReal({
   const okG = coste === 0 || (fraccion !== null && fraccion < C.costeLLMMax);
   lista.push(criterio('g', 'Coste del LLM', {
     valor: fraccion, umbral: C.costeLLMMax, ok: okG,
-    valorTexto: fraccion !== null ? `${f.pct(fraccion, { decimales: 1 })} (${f.usd(coste)})` : f.usd(coste),
+    valorTexto: fraccion !== null && coste > 0 ? `${f.pct(fraccion, { decimales: 1 })} (${f.usd(coste)})` : f.usd(coste),
     umbralTexto: `< ${f.pct(C.costeLLMMax, { decimales: 0 })} del beneficio`,
     detalle: beneficio === null
       ? null

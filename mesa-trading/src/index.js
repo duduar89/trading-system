@@ -119,6 +119,9 @@ function avisosDeArranque({ config, llm, orquestador, entorno = process.env }) {
   if (!sintetico && !proxy.activo && hayProxyEnEntorno(entorno)) {
     avisos.push(`Hay un proxy en el entorno y Node no lo usa: si no llegan precios, ${CONSEJO_PROXY}.`);
   }
+  if (config.limitesIgnorados && config.limitesIgnorados.length) {
+    avisos.push(`ajustes.json intenta aflojar ${config.limitesIgnorados.join(', ')}: no se aplica. Ahí solo se pueden apretar los límites; para aflojarlos hay que editar src/config.js.`);
+  }
   if (!sintetico && proxy.ignoradasEnEnv && proxy.ignoradasEnEnv.length) {
     avisos.push(`El .env trae ${proxy.ignoradasEnEnv.join(', ')}, que ahí no valen: Node lee el proxy al arrancar. Ponlas en las variables del sistema y ${CONSEJO_PROXY}.`);
   }

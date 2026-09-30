@@ -2,7 +2,7 @@
 // Configuración: variables de entorno (.env) + valores por defecto razonados.
 //
 // Los LÍMITES DUROS de riesgo viven aquí y solo se cambian editando este
-// fichero o data/ajustes.json. Ni el comité (LLM) ni el Megáfono pueden
+// fichero, o apretarlos con ajustes.json en la carpeta de datos. Ni el comité (LLM) ni el Megáfono pueden
 // subirlos: como mucho los aprietan, y esa directiva caduca en el comité
 // siguiente.
 
@@ -117,6 +117,22 @@ const LIMITES_DUROS = Object.freeze({
   penalizacionPapel: 0.001,        // 0,1 % por lado que se resta al medir mesas: el papel llena mejor que la realidad
 });
 
+// En estos dos, más es más prudente; en todos los demás, menos.
+const MAS_ES_PRUDENTE = new Set(['minNocionalOrden', 'penalizacionPapel']);
+
+// Límites de ajustes.json: solo valen si aprietan. Un valor que afloja, que no
+// es un número o que no es un límite conocido se ignora y se avisa.
+function apretarLimites(base, propuestos = {}) {
+  const limites = { ...base };
+  const ignorados = [];
+  for (const [k, v] of Object.entries(propuestos || {})) {
+    if (!(k in base) || typeof v !== 'number' || !Number.isFinite(v) || v < 0) { ignorados.push(k); continue; }
+    const aprieta = MAS_ES_PRUDENTE.has(k) ? v >= base[k] : v <= base[k];
+    if (aprieta) limites[k] = v; else ignorados.push(k);
+  }
+  return { limites: Object.freeze(limites), ignorados };
+}
+
 function crearConfig(args = leerArgs()) {
   const { ignoradas } = cargarEnv();
   const alpacaId = process.env.ALPACA_API_KEY_ID || '';
@@ -132,12 +148,14 @@ function crearConfig(args = leerArgs()) {
     throw new Error('MODO=alpaca necesita ALPACA_API_KEY_ID y ALPACA_API_SECRET_KEY en el .env');
   }
 
+  const carpetaDatos = String(args.datos || process.env.CARPETA_DATOS || path.join(RAIZ, 'data'));
   let ajustes = {};
-  try { ajustes = JSON.parse(fs.readFileSync(path.join(RAIZ, 'data', 'ajustes.json'), 'utf8')); } catch (_) { /* sin ajustes */ }
+  try { ajustes = JSON.parse(fs.readFileSync(path.join(carpetaDatos, 'ajustes.json'), 'utf8')); } catch (_) { /* sin ajustes */ }
+  const { limites, ignorados: limitesIgnorados } = apretarLimites(LIMITES_DUROS, ajustes.limites);
 
   return {
     raiz: RAIZ,
-    carpetaDatos: String(args.datos || process.env.CARPETA_DATOS || path.join(RAIZ, 'data')),
+    carpetaDatos,
     modo,
     puerto: num('PUERTO', puertoDeArgs(args.puerto)),
     host: process.env.HOST || '127.0.0.1',
@@ -154,7 +172,9 @@ function crearConfig(args = leerArgs()) {
       modeloAgentes: process.env.LLM_MODELO_AGENTES || 'claude-haiku-4-5',
       presupuestoDiaUsd: num('LLM_PRESUPUESTO_DIA_USD', 1),
     },
-    limites: Object.freeze({ ...LIMITES_DUROS, ...(ajustes.limites || {}) }),
+    limites,
+    // Límites de ajustes.json que no se aplicaron porque aflojaban (el arranque lo dice).
+    limitesIgnorados,
     cadencias: {
       latidoMs: num('LATIDO_SEG', 60) * 1000,
       comiteHoras: num('COMITE_HORAS', 4),
@@ -165,4 +185,4 @@ function crearConfig(args = leerArgs()) {
   };
 }
 
-module.exports = { crearConfig, cargarEnv, leerArgs, num, esLoopback, LIMITES_DUROS, RAIZ, PROXY_ACTIVO, CLAVES_PROXY };
+module.exports = { crearConfig, apretarLimites, cargarEnv, leerArgs, num, esLoopback, LIMITES_DUROS, RAIZ, PROXY_ACTIVO, CLAVES_PROXY };
