@@ -10,6 +10,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
+const express = require('express');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -40,6 +41,16 @@ async function conServidor(app, fn) {
   const s = app.listen(0);
   await new Promise((r) => s.once('listening', r));
   try { return await fn(`http://127.0.0.1:${s.address().port}`); } finally { s.close(); }
+}
+
+// La app entera con el reloj parado en «ahora» (req.ahora solo lo pone el servidor, como en
+// publicas.test.js): «Tu cita» y el .ics dependen de la hora, y las pruebas no pueden depender del día
+// en que se lanzan (desplegar.sh las pasa antes de subir).
+function appConReloj(pool, ahora, deps = null) {
+  const app = express();
+  app.use((req, _res, next) => { req.ahora = ahora; next(); });
+  app.use(crearApp({ pool, deps }));
+  return app;
 }
 
 async function sembrar(pool) {
@@ -121,7 +132,11 @@ test('el token de «Tu cita» solo se guarda como huella y cifrado', async (t) =
   }
 });
 
-// Una base con las migraciones hasta la 009 (la de antes de esta vuelta) y la carpeta con ellas.
+const SQL = path.join(__dirname, '..', 'sql');
+const LA_010 = '010-privacidad-cita.sql';
+
+// Una base con las migraciones hasta la 009 (la de antes de esta vuelta) y una carpeta solo con ellas,
+// a la que la prueba añade la 010: así se prueba justo la 010, vengan las que vengan después en sql/.
 async function baseHastaLa009(t) {
   let con;
   try {
@@ -135,16 +150,16 @@ async function baseHastaLa009(t) {
   await con.query(`CREATE DATABASE \`${BD_PRUEBAS.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
   await con.end();
   const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'iemec-sql-'));
-  const sql = path.join(__dirname, '..', 'sql');
-  for (const f of fs.readdirSync(sql).filter((x) => /^00\d-.*\.sql$/.test(x))) fs.copyFileSync(path.join(sql, f), path.join(carpeta, f));
+  for (const f of fs.readdirSync(SQL).filter((x) => /^00\d-.*\.sql$/.test(x))) fs.copyFileSync(path.join(SQL, f), path.join(carpeta, f));
   t.after(() => fs.rmSync(carpeta, { recursive: true, force: true }));
   await migrar({ bd: BD_PRUEBAS, carpeta, log: () => {} });
-  return crearPool({ database: BD_PRUEBAS.database });
+  return { pool: crearPool({ database: BD_PRUEBAS.database }), carpeta };
 }
 
 test('los tokens de antes se migran: huella y cifrado, sin el claro, y su enlace sigue valiendo', async (t) => {
-  const pool = await baseHastaLa009(t);
-  if (!pool) return;
+  const base009 = await baseHastaLa009(t);
+  if (!base009) return;
+  const { pool, carpeta } = base009;
   try {
     // Una cita de antes de esta vuelta, con su token en claro y sin sede.
     await pool.query("INSERT INTO clinica (id, nombre, nombre_corto) VALUES (1, 'IEMEC', 'IEMEC')");
@@ -158,7 +173,8 @@ test('los tokens de antes se migran: huella y cifrado, sin el claro, y su enlace
        VALUES (?, 'limpieza-facial', 1, '2026-10-06 15:00', '2026-10-06 16:00', '2026-10-06 15:00', '2026-10-06 16:10', '2026-10-06 15:00', '2026-10-06 16:00', 'confirmada', ?)`,
       [p.insertId, antiguo]);
 
-    assert.deepEqual(await migrar({ bd: BD_PRUEBAS, log: () => {} }), ['010-privacidad-cita.sql']);
+    fs.copyFileSync(path.join(SQL, LA_010), path.join(carpeta, LA_010));
+    assert.deepEqual(await migrar({ bd: BD_PRUEBAS, carpeta, log: () => {} }), [LA_010]);
     const [[fila]] = await pool.query('SELECT * FROM citas WHERE id = ?', [c.insertId]);
     assert.equal(fila.token_antiguo, null, 'el claro, fuera');
     assert.ok(!('token' in fila), 'y su columna ya no se llama así: nada vuelve a escribirla');
@@ -169,10 +185,13 @@ test('los tokens de antes se migran: huella y cifrado, sin el claro, y su enlace
     const [[sede]] = await pool.query('SELECT codigo, nombre, direccion, lat, lng, principal FROM sedes');
     assert.deepEqual({ ...sede, lat: Number(sede.lat), lng: Number(sede.lng) },
       { codigo: 'iemec', nombre: 'IEMEC', direccion: 'Av. Siglo XXI, 13, local 35', lat: 40.4066059, lng: -3.9001441, principal: 1 });
-    assert.deepEqual(await migrar({ bd: BD_PRUEBAS, log: () => {} }), [], 'otra pasada no hace nada');
+    assert.deepEqual(await migrar({ bd: BD_PRUEBAS, carpeta, log: () => {} }), [], 'otra pasada no hace nada');
     assert.equal(await agenda.cifrarTokensAntiguos(pool), 0);
+    // Y las que vengan detrás en sql/ (las de otras vueltas): con ellas, la app entera.
+    assert.ok(!(await migrar({ bd: BD_PRUEBAS, log: () => {} })).includes(LA_010));
 
-    await conServidor(crearApp({ pool }), async (base) => {
+    // El 1 de octubre, antes de su cita del 6.
+    await conServidor(appConReloj(pool, new Date('2026-10-01T08:00:00Z')), async (base) => {
       const pag = await fetch(`${base}/c/${antiguo}`);
       assert.equal(pag.status, 200, 'el enlace que ya tenía sigue valiendo');
       assert.match(await pag.text(), /Av\. Siglo XXI, 13, local 35/, 'y su cita está en la sede de IEMEC');
@@ -479,11 +498,7 @@ test('un hueco de la lista de espera, confirmado desde «Tu cita»: acepta la of
     assert.equal(retenida.estado, 'retenida');
     const token = agenda.tokenDe(retenida);
 
-    const reloj = { ahora: mas(ahora, 5) };
-    const app = require('express')();
-    app.use((req, _res, next) => { req.ahora = reloj.ahora; next(); });
-    app.use(crearApp({ pool, deps }));
-    await conServidor(app, async (base) => {
+    await conServidor(appConReloj(pool, mas(ahora, 5), deps), async (base) => {
       const pag = await (await fetch(`${base}/c/${token}`)).text();
       assert.match(pag, /<h1>Confirma tu cita<\/h1>/);
       assert.match(pag, /Al confirmarla, tu cita del lunes 19 de octubre, a las 12:00 queda anulada\./);
@@ -556,10 +571,7 @@ test('un hueco de la lista de espera, desde «Tu cita»: «No me viene bien» lo
     const [[oferta]] = await pool.query('SELECT * FROM lista_espera_ofertas');
     const [[retenida]] = await pool.query('SELECT * FROM citas WHERE id = ?', [oferta.cita_id]);
     const token = agenda.tokenDe(retenida);
-    const app = require('express')();
-    app.use((req, _res, next) => { req.ahora = mas(ahora, 5); next(); });
-    app.use(crearApp({ pool, deps }));
-    await conServidor(app, async (base) => {
+    await conServidor(appConReloj(pool, mas(ahora, 5), deps), async (base) => {
       const pag = await (await fetch(`${base}/c/${token}`)).text();
       assert.match(pag, new RegExp(`action="/c/${token}/cancelar"><button class="btn" type="submit">No me viene bien</button>`));
       const no = await (await fetch(`${base}/c/${token}/cancelar`, { method: 'POST' })).text();
@@ -597,7 +609,7 @@ test('cambiar de cabina en la misma sede no toca el calendario del paciente ni l
     const cita = await agenda.reservar(pool, { pacienteId: p.id, tratamientoId: 'laser-intimo', fecha: '2026-10-16', hora: '12:00', origen: 'recepcion', ahora: dada });
     await pool.query('UPDATE citas SET aviso_confirmacion_en = ? WHERE id = ?', [mas(dada, 3), cita.id]);
     const ahora = mas(dada, 60);
-    await conServidor(crearApp({ pool }), async (base) => {
+    await conServidor(appConReloj(pool, ahora), async (base) => {
       const ics = async () => (await (await fetch(`${base}/c/${cita.token}.ics`)).text()).replace(/DTSTAMP:\S+/, 'DTSTAMP');
       const antes = await ics();
       await pool.query('UPDATE citas SET sala_id = ? WHERE id = ?', [cita.salaId === 1 ? 2 : 1, cita.id]);

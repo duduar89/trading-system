@@ -5,6 +5,7 @@
 // pasa a una persona, como antes.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const express = require('express');
 const { prepararBdDePrueba } = require('./ayuda-bd');
 const R = require('../servidor/repesca/motor');
 const agenda = require('../servidor/agenda');
@@ -101,7 +102,12 @@ test('cambiar y cancelar la cita por WhatsApp', async (t) => {
       assert.deepEqual({ ...conv2 }, { estado: 'cerrada', motivo_cierre: 'cita', reprograma_cita_id: null, huecos_ofrecidos: null });
       assert.ok(!(await avisos.pendientes(pool, mas(martes, 10))).some((a) => a.id === nueva.id));
 
-      await conServidor(crearApp({ pool }), async (base) => {
+      // La app entera con el reloj parado justo después del cambio: la página y el .ics dependen de la
+      // hora, y las pruebas no pueden depender del día en que se lanzan.
+      const app = express();
+      app.use((req, _res, next) => { req.ahora = mas(martes, 10); next(); });
+      app.use(crearApp({ pool }));
+      await conServidor(app, async (base) => {
         const ics = await (await fetch(`${base}/c/${tokenAntigua}.ics`)).text();
         assert.match(ics, /STATUS:CANCELLED/);
         assert.match(ics, /SEQUENCE:1/);
