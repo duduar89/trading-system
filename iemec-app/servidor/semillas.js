@@ -1,8 +1,9 @@
 'use strict';
 // Carga los datos de la clínica (semillas/iemec/*.json) de forma idempotente: se puede ejecutar
 // las veces que haga falta sin duplicar nada ni pisar lo que la clínica ya ha cambiado a mano
-// (estado de las plantillas, ofertas aprobadas, tratamientos validados, aparatos confirmados).
-// El catálogo de tratamientos lo genera scripts/importar-catalogo.js.
+// (estado de las plantillas, ofertas aprobadas, tratamientos validados, aparatos confirmados, las
+// salas que puso en «Cabinas y tratamientos»). El catálogo de tratamientos lo genera
+// scripts/importar-catalogo.js. Devuelve { avisos }: lo que se quedaría sin huecos, también en el log.
 const fs = require('fs');
 const path = require('path');
 const { BIBLIOTECA } = require('../motor/repesca/plantillas');
@@ -38,6 +39,7 @@ const APARATO_EN_SALA = {
   'neuroline-t6': 'consulta-2', 'head-spa': 'head-spa',
 };
 const SALA_POR_TIPO = { head_spa: ['head-spa'], sala_capilar: ['sala-capilar'], cabina_aparatologia: ['cabina-laser'], consulta_medica: ['consulta-1', 'consulta-2'] };
+const MOTIVO_RETIRADO = 'Retirado del catálogo; por su régimen legal (medicamento, producto sanitario o sin confirmar) no se anuncia al público.';
 
 // El catálogo dice si un aparato es portátil; si no lo dice, es fijo si tiene cabina asignada.
 function ubicacion(eq) {
@@ -87,13 +89,21 @@ async function semillar(pool, { demo = false, log = () => {}, carpeta = CARPETA 
     }
     log(`${e.salas.length} salas y ${e.profesionales.length} profesionales (sin confirmar)`);
   }
+  const avisos = [];
   if (t) {
-    // Aparatos: lo que la clínica no ha confirmado se pone al día con el catálogo.
+    const [salasBd] = await q('SELECT id, codigo FROM salas');
+    const idSala = Object.fromEntries(salasBd.map((s) => [s.codigo, s.id]));
+    const codigoSala = Object.fromEntries(salasBd.map((s) => [s.id, s.codigo]));
+    // Aparatos: lo que la clínica no ha confirmado se pone al día con el catálogo, también la cabina
+    // de los fijos (el motor solo ofrece esa cabina para lo que los usa). Del confirmado, solo se
+    // rellena la cabina si no la tiene.
     for (const eq of t.aparatos || []) {
-      await q(`INSERT INTO equipos (codigo, nombre, tipo, movil, unidades, notas) VALUES (?, ?, ?, ?, ?, ?)
+      const { movil, sala } = ubicacion(eq);
+      await q(`INSERT INTO equipos (codigo, nombre, tipo, movil, unidades, notas, sala_id) VALUES (?, ?, ?, ?, ?, ?, ?)
                ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), tipo = VALUES(tipo), movil = IF(confirmado, movil, VALUES(movil)),
-                 unidades = IF(confirmado, unidades, VALUES(unidades)), notas = IF(confirmado, notas, VALUES(notas)), activo = IF(confirmado, activo, TRUE)`,
-      [eq.codigo, eq.nombre, eq.tipo || null, ubicacion(eq).movil, eq.unidades || 1, corta(eq.notas, 255)]);
+                 unidades = IF(confirmado, unidades, VALUES(unidades)), notas = IF(confirmado, notas, VALUES(notas)), activo = IF(confirmado, activo, TRUE),
+                 sala_id = IF(confirmado AND sala_id IS NOT NULL, sala_id, COALESCE(VALUES(sala_id), sala_id))`,
+      [eq.codigo, eq.nombre, eq.tipo || null, movil, eq.unidades || 1, corta(eq.notas, 255), (sala && idSala[sala]) || null]);
     }
     for (const x of t.tratamientos) {
       const fila = {
@@ -116,29 +126,74 @@ async function semillar(pool, { demo = false, log = () => {}, carpeta = CARPETA 
     }
     // Lo que ya no está en el catálogo (el provisional de la F1, versiones anteriores) se retira: se
     // desactiva, no se borra (puede tener citas), salvo que la clínica lo haya validado. Y la IA
-    // deja de ofrecerlo aunque un lead antiguo lo tenga como tratamiento de interés.
+    // deja de ofrecerlo aunque un lead antiguo lo tenga como tratamiento de interés. Si su régimen
+    // es de riesgo (medicamento, producto sanitario o sin confirmar), tampoco se anuncia: ni una
+    // plantilla ni una publicación lo nombran por una cita antigua.
     const retirados = t.retirados || {};
-    if (retirados.tratamientos?.length) await q('UPDATE tratamientos SET activo = FALSE, reservable_ia = FALSE WHERE id IN (?) AND NOT validado_clinica', [retirados.tratamientos]);
-    if (retirados.aparatos?.length) await q('UPDATE equipos SET activo = FALSE WHERE codigo IN (?) AND NOT confirmado', [retirados.aparatos]);
-    // Aparatos fijos: viven en su cabina (el motor solo ofrece esa cabina para lo que los usa).
-    const equipoSala = Object.fromEntries((t.aparatos || []).map((eq) => [eq.codigo, ubicacion(eq).sala]));
-    for (const [codigo, sala] of Object.entries(equipoSala)) {
-      if (sala) await q('UPDATE equipos SET sala_id = (SELECT id FROM salas WHERE codigo = ?) WHERE codigo = ? AND sala_id IS NULL', [sala, codigo]);
+    if (retirados.tratamientos?.length) {
+      await q(`UPDATE tratamientos SET publicidad_restringida = TRUE, motivo_restriccion = COALESCE(motivo_restriccion, ?)
+               WHERE id IN (?) AND NOT validado_clinica AND NOT publicidad_restringida AND regimen_legal IN ('medicamento_receta','producto_sanitario','desconocido')`,
+      [MOTIVO_RETIRADO, retirados.tratamientos]);
+      await q('UPDATE tratamientos SET activo = FALSE, reservable_ia = FALSE WHERE id IN (?) AND NOT validado_clinica', [retirados.tratamientos]);
     }
-    // Sala concreta por tratamiento que se reserva. Solo si todavía no tiene: lo que marque la
-    // clínica en el panel manda.
-    const [salasBd] = await q('SELECT id, codigo FROM salas');
-    const idSala = Object.fromEntries(salasBd.map((s) => [s.codigo, s.id]));
-    const [yaAsignados] = await q('SELECT DISTINCT tratamiento_id FROM tratamiento_salas');
-    const conSalas = new Set(yaAsignados.map((r) => r.tratamiento_id));
+    // Un aparato retirado sigue si aún lo usa un tratamiento activo (uno que validó la clínica): sin
+    // él, ese tratamiento se quedaría sin huecos.
+    if (retirados.aparatos?.length) {
+      const [enUso] = await q('SELECT DISTINCT equipo_codigo AS codigo FROM tratamientos WHERE activo AND equipo_codigo IN (?) ORDER BY equipo_codigo', [retirados.aparatos]);
+      for (const { codigo } of enUso) avisos.push(`el aparato «${codigo}» ya no está en el catálogo, pero lo usa un tratamiento activo: sigue activo`);
+      await q(`UPDATE equipos SET activo = FALSE WHERE codigo IN (?) AND NOT confirmado
+                 AND codigo NOT IN (SELECT equipo_codigo FROM tratamientos WHERE activo AND equipo_codigo IS NOT NULL)`, [retirados.aparatos]);
+    }
+
+    // Sala concreta de cada tratamiento que se reserva. Las que puso la clínica (en «Cabinas y
+    // tratamientos», que deja el hecho «ajuste_salas_tratamiento», o en un tratamiento que validó)
+    // no se tocan. Las demás son de las semillas y se ponen al día con el catálogo: si no, un
+    // tratamiento que ahora usa un aparato fijo de otra cabina se quedaría en la vieja, sin huecos.
+    // Lo que no se reserva (o se ha retirado) se queda sin sala.
+    const [fijos] = await q('SELECT codigo, sala_id FROM equipos WHERE activo AND NOT movil AND sala_id IS NOT NULL');
+    const equipoSala = Object.fromEntries(fijos.map((e) => [e.codigo, codigoSala[e.sala_id]]));
+    const [deLaClinica] = await q(`SELECT id FROM tratamientos WHERE validado_clinica
+      UNION SELECT entidad_id FROM eventos WHERE tipo = 'ajuste_salas_tratamiento' AND entidad = 'tratamiento'`);
+    const respetar = new Set(deLaClinica.map((r) => r.id));
+    const [pares] = await q('SELECT tratamiento_id, sala_id FROM tratamiento_salas ORDER BY tratamiento_id, sala_id');
+    const actuales = new Map();
+    for (const p of pares) (actuales.get(p.tratamiento_id) || actuales.set(p.tratamiento_id, []).get(p.tratamiento_id)).push(p.sala_id);
     let asignados = 0;
-    for (const x of t.tratamientos) {
-      if (conSalas.has(x.id) || x.activo === false) continue;
-      const salas = salasPorDefecto(x, equipoSala).map((c) => idSala[c]).filter(Boolean);
-      for (const s of salas) await q('INSERT IGNORE INTO tratamiento_salas (tratamiento_id, sala_id) VALUES (?, ?)', [x.id, s]);
-      if (salas.length) asignados++;
+    let puestosAlDia = 0;
+    for (const x of [...t.tratamientos, ...(retirados.tratamientos || []).map((id) => ({ id, activo: false }))]) {
+      if (respetar.has(x.id)) continue;
+      let codigos = [];
+      if (x.activo !== false) {
+        const propias = (x.salas || []).filter((c) => idSala[c]);
+        if (propias.length < (x.salas || []).length) {
+          avisos.push(`«${x.id}» va a una sala que no está en la agenda (${x.salas.filter((c) => !idSala[c]).join(', ')})${propias.length ? '' : ': se usa la sala por defecto'}`);
+        }
+        codigos = propias.length ? propias : salasPorDefecto({ ...x, salas: [] }, equipoSala);
+      }
+      const quiere = [...new Set(codigos.map((c) => idSala[c]).filter(Boolean))].sort((a, b) => a - b);
+      const tiene = actuales.get(x.id) || [];
+      if (quiere.join() === tiene.join()) continue;
+      if (tiene.length) await q('DELETE FROM tratamiento_salas WHERE tratamiento_id = ?', [x.id]);
+      for (const s of quiere) await q('INSERT INTO tratamiento_salas (tratamiento_id, sala_id) VALUES (?, ?)', [x.id, s]);
+      if (!quiere.length) continue;
+      if (tiene.length) puestosAlDia++; else asignados++;
     }
-    log(`${asignados} tratamientos con su sala asignada (editable en «Cabinas y tratamientos»)`);
+    log(`${asignados} tratamientos con su sala asignada y ${puestosAlDia} puestos al día con el catálogo (editable en «Cabinas y tratamientos»)`);
+
+    // Lo que se quedaría sin huecos por cómo está puesto (salas de la clínica que no casan con el
+    // aparato, un aparato que no está, un rol que no tiene nadie): no se corrige solo, se avisa.
+    const [sinCabina] = await q(`SELECT t.id, e.codigo, s.codigo AS sala FROM tratamientos t JOIN equipos e ON e.codigo = t.equipo_codigo AND e.activo
+        JOIN salas s ON s.id = e.sala_id
+      WHERE t.activo AND NOT e.movil AND EXISTS (SELECT 1 FROM tratamiento_salas ts WHERE ts.tratamiento_id = t.id)
+        AND NOT EXISTS (SELECT 1 FROM tratamiento_salas ts WHERE ts.tratamiento_id = t.id AND ts.sala_id = e.sala_id) ORDER BY t.id`);
+    for (const r of sinCabina) avisos.push(`«${r.id}» usa el aparato «${r.codigo}», que está en «${r.sala}», fuera de sus salas: sin huecos hasta que se corrija en «Cabinas y tratamientos»`);
+    const [sinAparato] = await q(`SELECT t.id, t.equipo_codigo AS codigo FROM tratamientos t
+      WHERE t.activo AND t.equipo_codigo IS NOT NULL AND NOT EXISTS (SELECT 1 FROM equipos e WHERE e.codigo = t.equipo_codigo AND e.activo) ORDER BY t.id`);
+    for (const r of sinAparato) avisos.push(`«${r.id}» usa el aparato «${r.codigo}», que no está activo: sin huecos`);
+    const [sinRol] = await q(`SELECT t.id, t.rol_profesional AS rol FROM tratamientos t
+      WHERE t.activo AND t.rol_profesional IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tratamiento_profesionales tp WHERE tp.tratamiento_id = t.id)
+        AND NOT EXISTS (SELECT 1 FROM profesionales p WHERE p.rol = t.rol_profesional AND p.activo) ORDER BY t.id`);
+    for (const r of sinRol) avisos.push(`«${r.id}» lo hace el rol «${r.rol}» y nadie del equipo lo tiene: sin huecos`);
     // Preguntas frecuentes, sin aprobar. Mientras nadie las apruebe, se ponen al día con el catálogo.
     for (const f of t.faqs || []) {
       const [trat, pregunta, respuesta, url] = [f.tratamiento_id || null, corta(f.pregunta, 255), corta(f.respuesta, 800), f.url || null];
@@ -161,6 +216,8 @@ async function semillar(pool, { demo = false, log = () => {}, carpeta = CARPETA 
     [o.codigo, o.nombre, o.tipo, o.texto_paciente, o.familias ? JSON.stringify(o.familias) : null, o.importe_min || null, Boolean(o.requiere_aprobacion), demo]);
   }
   log(`${BIBLIOTECA.length} plantillas${demo ? ' (aprobadas, demo)' : ' (borrador)'} y ${OFERTAS.length} ofertas propuestas`);
+  for (const a of avisos) log(`aviso: ${a}`);
+  return { avisos };
 }
 
 module.exports = { semillar, FAMILIAS, salasPorDefecto, ubicacion, APARATO_EN_SALA };

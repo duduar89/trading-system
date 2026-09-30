@@ -2,17 +2,21 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { prepararBdDePrueba } = require('./ayuda-bd');
 const { semillar, FAMILIAS } = require('../servidor/semillas');
+const { registrar } = require('../servidor/eventos');
 const { MEDICAMENTOS } = require('../motor/repesca/filtro-legal');
 const { normalizar } = require('../motor/repesca/interpretar');
 const agenda = require('../servidor/agenda');
 
 // El catálogo consolidado de la F0, tal como lo deja scripts/importar-catalogo.js. Si llega una
 // versión revisada y se vuelve a importar, los recuentos se ponen al día aquí.
-const CATALOGO = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'semillas', 'iemec', 'tratamientos.json'), 'utf8'));
+const SEMILLAS = path.join(__dirname, '..', 'semillas', 'iemec');
+const CATALOGO = JSON.parse(fs.readFileSync(path.join(SEMILLAS, 'tratamientos.json'), 'utf8'));
 const RECUENTO = { tratamientos: 169, seReservan: 155, reservaLaIa: 67, restringidos: 54, quirofanoExterno: 17, aparatos: 26, preguntas: 327 };
+const MARTES = { fecha: '2026-10-06', ahora: new Date('2026-09-29T08:00:00Z') };
 
 test('el fichero del catálogo: ids únicos, familias conocidas y un texto de WhatsApp para un solo tratamiento', () => {
   const ids = CATALOGO.tratamientos.map((t) => t.id);
@@ -42,7 +46,8 @@ test('las semillas de la clínica cargan y se pueden repetir sin duplicar', asyn
   if (!pool) return;
   try {
     await semillar(pool);
-    await semillar(pool);
+    const { avisos } = await semillar(pool);
+    assert.deepEqual(avisos, [], 'nada se queda sin huecos por sala, aparato o rol');
     const [[cl]] = await pool.query('SELECT nombre_corto, google_place_id, municipio FROM clinica');
     assert.deepEqual({ ...cl }, { nombre_corto: 'IEMEC', google_place_id: 'ChIJB6Pn5d2FQQ0ReZ4Qoqe8gtg', municipio: 'Boadilla del Monte' });
     const [[f]] = await pool.query("SELECT nombre FROM festivos WHERE fecha = '2026-10-05'");
@@ -158,19 +163,27 @@ test('cada tratamiento tiene su sala concreta y el motor solo ofrece esa', async
     }
     assert.deepEqual(sinHueco, [], 'ningún tratamiento reservable se queda sin huecos por falta de sala, aparato o profesional');
 
-    // Fijar un tratamiento a UNA sala concreta: aunque la otra consulta esté libre, solo se ofrece esa.
+    // Fijar un tratamiento a UNA sala concreta desde el panel («Cabinas y tratamientos», que deja
+    // el hecho): aunque la otra consulta esté libre, solo se ofrece esa.
     const medico = trats.find((x) => salasDe.get(x.id).length === 2);
     assert.ok(medico);
     const c2 = salas.find((s) => s.codigo === 'consulta-2').id;
     await pool.query('DELETE FROM tratamiento_salas WHERE tratamiento_id = ?', [medico.id]);
     await pool.query('INSERT INTO tratamiento_salas (tratamiento_id, sala_id) VALUES (?, ?)', [medico.id, c2]);
-    const h = await agenda.huecos(pool, { fecha: '2026-10-06', tratamientoId: medico.id, ahora: new Date('2026-09-29T08:00:00Z') });
+    await registrar(pool, { tipo: 'ajuste_salas_tratamiento', entidad: 'tratamiento', entidadId: medico.id, actor: 'recepcion@iemec', datos: { salas: [c2] } });
+    const h = await agenda.huecos(pool, { ...MARTES, tratamientoId: medico.id });
     assert.ok(h.length > 0);
     assert.ok(h.every((x) => x.salaId === c2), 'solo en la consulta 2');
+    // Una sala cambiada a mano sin pasar por el panel es de las semillas: se pone al día.
+    const otro = trats.find((x) => x.id !== medico.id && salasDe.get(x.id).length === 2);
+    await pool.query('DELETE FROM tratamiento_salas WHERE tratamiento_id = ?', [otro.id]);
+    await pool.query('INSERT INTO tratamiento_salas (tratamiento_id, sala_id) VALUES (?, ?)', [otro.id, c2]);
     // Y volver a sembrar no pisa lo que la clínica cambió.
     await semillar(pool);
     const [[n]] = await pool.query('SELECT COUNT(*) AS n FROM tratamiento_salas WHERE tratamiento_id = ?', [medico.id]);
     assert.equal(Number(n.n), 1);
+    const [[m]] = await pool.query('SELECT COUNT(*) AS n FROM tratamiento_salas WHERE tratamiento_id = ?', [otro.id]);
+    assert.equal(Number(m.n), 2);
   } finally {
     await pool.end();
   }
@@ -195,6 +208,66 @@ test('el catálogo provisional se retira al sembrar el consolidado, salvo lo que
     assert.equal(Boolean(porCodigo[CATALOGO.retirados.aparatos[0]].activo), false, 'el aparato que ya no está, retirado');
     assert.equal(Boolean(porCodigo.plexr.movil), true, 'el Plexr sin confirmar se pone al día: es de mano');
   } finally {
+    await pool.end();
+  }
+});
+
+test('del provisional al consolidado: las salas de las semillas se ponen al día; las de la clínica, no', async (t) => {
+  const pool = await prepararBdDePrueba(t);
+  if (!pool) return;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'iemec-semillas-'));
+  try {
+    // Primero la clínica, las salas y el equipo (sin catálogo), como en una base ya en marcha.
+    for (const f of ['clinica.json', 'equipo.json']) fs.copyFileSync(path.join(SEMILLAS, f), path.join(dir, f));
+    await semillar(pool, { carpeta: dir });
+    const [salas] = await pool.query('SELECT id, codigo FROM salas');
+    const sala = Object.fromEntries(salas.map((s) => [s.codigo, s.id]));
+    // Lo que dejaba el provisional: la presoterapia (sigue en el catálogo) en la cabina de
+    // aparatología con su aparato de entonces; el HIFU corporal validado por la clínica con el
+    // aparato «hifu» (retirado del catálogo); la radiofrecuencia facial en la cabina facial, que
+    // eligió la clínica en el panel; y un retirado de régimen sin confirmar, sin restringir.
+    const retirado = 'dermapen-capilar-con-exosomas';
+    assert.ok(CATALOGO.retirados.tratamientos.includes(retirado) && CATALOGO.retirados.aparatos.includes('hifu'));
+    await pool.query("INSERT INTO equipos (codigo, nombre, movil, sala_id) VALUES ('presoterapia', 'Presoterapia', FALSE, ?), ('hifu', 'HIFU', FALSE, ?)", [sala['cabina-laser'], sala['cabina-laser']]);
+    await pool.query(`INSERT INTO tratamientos (id, nombre, familia, duracion_min, rol_profesional, sala_tipo, equipo_codigo, regimen_legal, publicidad_restringida, validado_clinica) VALUES
+      ('presoterapia', 'Presoterapia', 'corporal', 40, 'esteticista', 'cabina_aparatologia', 'presoterapia', 'aparatologia', FALSE, FALSE),
+      ('hifu-corporal', 'HIFU corporal', 'corporal', 60, 'esteticista', 'cabina_aparatologia', 'hifu', 'aparatologia', FALSE, TRUE),
+      ('radiofrecuencia-facial', 'Radiofrecuencia facial', 'facial', 45, 'esteticista', 'cabina_aparatologia', 'radiofrecuencia', 'aparatologia', FALSE, FALSE),
+      (?, 'Dermapen capilar con exosomas', 'medicina_capilar', 30, 'tricologo', 'sala_capilar', NULL, 'desconocido', FALSE, FALSE)`, [retirado]);
+    await pool.query('INSERT INTO tratamiento_salas (tratamiento_id, sala_id) VALUES (?, ?), (?, ?), (?, ?), (?, ?)',
+      ['presoterapia', sala['cabina-laser'], 'hifu-corporal', sala['cabina-laser'], 'radiofrecuencia-facial', sala['cabina-facial'], retirado, sala['sala-capilar']]);
+    await registrar(pool, { tipo: 'ajuste_salas_tratamiento', entidad: 'tratamiento', entidadId: 'radiofrecuencia-facial', actor: 'recepcion@iemec', datos: { salas: [sala['cabina-facial']] } });
+
+    // Llega el catálogo consolidado.
+    const { avisos } = await semillar(pool);
+    const salasDe = async (id) => (await pool.query('SELECT s.codigo FROM tratamiento_salas ts JOIN salas s ON s.id = ts.sala_id WHERE ts.tratamiento_id = ? ORDER BY s.codigo', [id]))[0].map((r) => r.codigo);
+    // La presoterapia usa ahora el Pro Ballancer, fijo en la cabina corporal: allí va, y tiene huecos.
+    assert.deepEqual(await salasDe('presoterapia'), ['cabina-corporal']);
+    await pool.query("INSERT INTO profesional_horarios (profesional_id, dia_semana, inicio, fin) SELECT id, 2, '11:00', '20:00' FROM profesionales");
+    assert.ok((await agenda.huecos(pool, { ...MARTES, tratamientoId: 'presoterapia' })).length > 0, 'con la sala vieja no habría huecos');
+    // Lo validado sigue como estaba y su aparato, aunque ya no esté en el catálogo, sigue activo.
+    const [[hifu]] = await pool.query("SELECT t.equipo_codigo, t.activo, e.activo AS aparato FROM tratamientos t JOIN equipos e ON e.codigo = t.equipo_codigo WHERE t.id = 'hifu-corporal'");
+    assert.deepEqual({ ...hifu }, { equipo_codigo: 'hifu', activo: 1, aparato: 1 });
+    assert.ok((await agenda.huecos(pool, { ...MARTES, tratamientoId: 'hifu-corporal' })).length > 0);
+    const [[preso]] = await pool.query("SELECT activo FROM equipos WHERE codigo = 'presoterapia'");
+    assert.equal(preso.activo, 0, 'el aparato viejo que ya no usa nadie, retirado');
+    // Lo que eligió la clínica no se toca, aunque ya no case con su aparato: se avisa.
+    assert.deepEqual(await salasDe('radiofrecuencia-facial'), ['cabina-facial']);
+    assert.deepEqual(avisos, [
+      'el aparato «hifu» ya no está en el catálogo, pero lo usa un tratamiento activo: sigue activo',
+      '«radiofrecuencia-facial» usa el aparato «evo-dfinitive», que está en «cabina-corporal», fuera de sus salas: sin huecos hasta que se corrija en «Cabinas y tratamientos»',
+    ]);
+    // El retirado: fuera de la agenda y de la IA, sin sala y, por su régimen, sin anunciarse.
+    const [[ret]] = await pool.query('SELECT activo, reservable_ia, publicidad_restringida, motivo_restriccion FROM tratamientos WHERE id = ?', [retirado]);
+    assert.deepEqual([ret.activo, ret.reservable_ia, ret.publicidad_restringida], [0, 0, 1]);
+    assert.match(ret.motivo_restriccion, /Retirado del catálogo/);
+    assert.deepEqual(await salasDe(retirado), []);
+    // Todo lo demás, como en una base nueva.
+    const [[n]] = await pool.query(`SELECT COUNT(*) AS n FROM tratamientos t WHERE t.activo AND t.id NOT IN ('hifu-corporal', 'radiofrecuencia-facial')
+      AND NOT EXISTS (SELECT 1 FROM tratamiento_salas ts WHERE ts.tratamiento_id = t.id)`);
+    assert.equal(Number(n.n), 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
     await pool.end();
   }
 });
