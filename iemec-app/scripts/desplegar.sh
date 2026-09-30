@@ -14,6 +14,7 @@
 #   PROTOCOLO=https                          para comprobar /api/version
 #   REINICIAR='…'                            orden de reinicio si no es cPanel (plan B: VPS con pm2/systemd)
 set -euo pipefail
+trap 'echo "✗ El despliegue se ha parado en la línea $LINENO. El servidor sigue con la versión anterior salvo que ya se hubiera subido el código (ver ~/respaldo-iemec)." >&2' ERR
 cd "$(dirname "$0")/.."
 [ -f "$HOME/.iemec-despliegue" ] && source "$HOME/.iemec-despliegue"
 
@@ -72,7 +73,7 @@ echo "▸ Dependencias, migraciones y reinicio"
     cp package.json .package-instalado.json && echo '   dependencias actualizadas'
   fi
   node scripts/migrar.js
-  if [ -n '${REINICIAR:-}' ]; then ${REINICIAR:-true}; else
+  if [ -n '${REINICIAR:-}' ]; then ( ${REINICIAR:-true} ) || echo '   aviso: la orden de reinicio devolvió error'; else
     mkdir -p tmp && touch tmp/restart.txt
     (cloudlinux-selector restart --json --interpreter nodejs --domain $DOMINIO --app-root $APP_DIR 2>/dev/null | grep -oE '\"result\": \"[^\"]*\"') || true
   fi
