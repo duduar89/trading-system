@@ -29,9 +29,9 @@
   const SALA_DE = Object.fromEntries(DEPARTAMENTOS.map(d => [d.id, d.sala]));
 
   const LIMITES = {
-    maxPesoPorActivo: 0.10, maxExposicionBruta: 0.80, maxExposicionCripto: 0.50, riesgoPorOperacion: 0.005,
-    maxPosiciones: 12, perdidaDiariaSoloCerrar: 0.02, perdidaDiariaKill: 0.035, caidaReducir: 0.10, caidaKill: 0.15,
-    maxOrdenesMinuto: 10, maxOrdenesMesaHora: 4, minNocionalOrden: 10, maxAntiguedadPrecioSegCripto: 180,
+    maxPesoPorActivo: 0.10, maxExposicionBruta: 0.80, maxExposicionCripto: 0.50, riesgoPorOperacion: 0.01,
+    maxPosiciones: 12, perdidaDiariaSoloCerrar: 0.02, perdidaDiariaKill: 0.07, caidaReducir: 0.10, caidaKill: 0.25,
+    maxOrdenesMinuto: 10, maxOrdenesMesaHora: 4, minNocionalOrden: 10, maxAntiguedadPrecioSegCripto: 900,
     maxAntiguedadPrecioSegAcciones: 120, desvioMaxPrecio: 0.02, penalizacionPapel: 0.001,
   };
 
@@ -47,19 +47,22 @@
   ];
   const POR_ETIQUETA = Object.fromEntries(ACTIVOS.map(a => [a.etiqueta, a]));
 
-  // Como en el arranque real (src/estrategias/index.js): dos titulares al 40 %
-  // (techo del asignador) y dos en incubación al 2 %; el 16 % queda sin asignar.
+  // Como en el arranque real (src/estrategias/index.js, 30-sep-2026): una
+  // titular al 40 % (techo del asignador) y tres en incubación al 2 %; el 54 %
+  // queda sin asignar, en efectivo.
   const MESAS = [
     { id: 'tendencia', nombre: 'Tendencia SMA', familia: 'tendencia-sma', marco: '4Hour', universo: ['BTC', 'ETH', 'SOL'],
       params: { rapida: 7, lenta: 25, filtro: 200, atrStop: 2.5 }, peso: 0.02, estado: 'incubacion',
-      nota: 'Backtest real 2021-2026 con costes: Sharpe −0,52. Empieza en prueba con el 2 %.' },
+      nota: 'Backtest real 2021-2026 con costes: Sharpe −0,53. Empieza en prueba con el 2 %.' },
     { id: 'momentum', nombre: 'Momentum cripto', familia: 'momentum-rotacion', marco: '1Day', universo: ['BTC', 'ETH', 'SOL', 'LINK', 'AVAX', 'DOGE'],
-      params: { lookback: 28, top: 2, rebalanceo: 'lunes' }, peso: 0.4, estado: 'titular', nota: null },
+      params: { lookback: 28, top: 2, rebalanceo: 'lunes' }, peso: 0.4, estado: 'titular',
+      nota: 'Backtest real 2021-2026 con costes: Sharpe 0,91 frente a 0,63 de comprar y mantener. Única titular.' },
     { id: 'reversion', nombre: 'Reversión RSI', familia: 'reversion-rsi', marco: '1Day', universo: ['BTC', 'ETH'],
       params: { rsi: 2, umbral: 10, salidaSma: 5, maxVelas: 5 }, peso: 0.02, estado: 'incubacion',
-      nota: 'Backtest real 2021-2026 con costes: Sharpe −0,42. Empieza en prueba con el 2 %.' },
+      nota: 'Backtest real 2021-2026 con costes: Sharpe −0,36. Empieza en prueba con el 2 %.' },
     { id: 'ruptura', nombre: 'Ruptura Donchian', familia: 'ruptura-donchian', marco: '1Day', universo: ['BTC', 'ETH', 'SOL'],
-      params: { entrada: 20, salida: 10, atrStop: 2 }, peso: 0.4, estado: 'titular', nota: null },
+      params: { entrada: 20, salida: 10, atrStop: 2 }, peso: 0.02, estado: 'incubacion',
+      nota: 'Correlación diaria con Momentum 0,80: juntas, Sharpe 0,58 y caída 26,0 %; Momentum sola, 0,72 y 11,2 %. No diversifica: empieza en prueba con el 2 %.' },
   ];
 
   const FIJOS = [
@@ -224,9 +227,9 @@
     let proximoComite = inicio + 25 * SEG;
     let modoComite = 'NORMAL';
     let gastoLLM = 0.1243;
-    let presupuesto = 2;
+    let presupuesto = 1;
     let modeloComite = 'claude-opus-5-5';
-    let modeloAgentes = 'claude-opus-5-5';
+    let modeloAgentes = 'claude-haiku-4-5';
     let velocidad = 1;
     const directivas = { modo: 'NORMAL', multiplicadores: Object.fromEntries(MESAS.map(m => [m.id, 1])), activosVetados: [],
       mesasPausadas: [], soloCerrarHasta: null, reduccion: null };
@@ -513,10 +516,44 @@
       else if (fondo.nivel === 'pausado') lista.push('Fondo en pausa: solo cierra posiciones hasta Reabrir.');
       else if (fondo.nivel === 'solo_cerrar') lista.push(`Solo cerrar hasta las 00:00 UTC: ${fondo.motivo || 'límite de pérdida del día'}`);
       const sa = capitalSinAsignar(patrimonio());
-      if (sa.fraccion > 0.0005) lista.push(`${pct(sa.fraccion, 0)} del capital sin asignar: queda en efectivo (techo del 40 % por mesa).`);
+      if (sa.fraccion > 0.0005) {
+        const titulares = MESAS.filter(m => m.estado === 'titular' && m.peso > 0).length;
+        const enPrueba = MESAS.filter(m => m.estado === 'incubacion').length;
+        const quien = titulares === 0 ? 'ninguna mesa titular'
+          : titulares === 1 ? 'solo 1 mesa titular (techo del 40 %)' : `solo ${titulares} mesas titulares (techo del 40 % cada una)`;
+        lista.push(`${pct(sa.fraccion, 0)} del capital sin asignar: queda en efectivo. Hay ${quien}${enPrueba ? ` y ${enPrueba} en prueba al 2 %` : ''}: mejor efectivo que capital en estrategias sin ventaja demostrada.`);
+      }
       lista.push('Con el ordenador apagado no hay stops: en cripto no existen órdenes stop simples.');
       lista.push('Maqueta: todos los datos de esta pantalla son inventados.');
       return lista;
+    }
+
+    // Semáforo «¿Listo para dinero real?» (§5.8) con la forma del servidor.
+    // Inventado como todo: un fondo de 41 días que cumple unos criterios y otros no.
+    function listoParaReal(cab) {
+      const DIAS = 41;
+      const COSTE_LLM = 3.12;
+      const beneficio = cab.patrimonio - CAPITAL;
+      const fraccion = beneficio > 0 ? COSTE_LLM / beneficio : null;
+      const n2 = x => nf(2).format(x);
+      const criterios = [
+        { id: 'a', nombre: 'Días en papel', valor: DIAS, umbral: 180, ok: false, valorTexto: `${DIAS} días`, umbralTexto: '≥ 180 días', detalle: 'Desde el arranque del fondo (2026-08-20).' },
+        { id: 'b', nombre: 'Operaciones cerradas', valor: 23, umbral: 100, ok: false, valorTexto: '23', umbralTexto: '≥ 100', detalle: 'Del fondo real, sin la orden de prueba.' },
+        { id: 'c', nombre: 'Sharpe del fondo', valor: 1.02, umbral: 0.7, ok: true, valorTexto: n2(1.02), umbralTexto: `≥ ${n2(0.7)}`, detalle: 'Anualizado, retornos diarios desde el arranque, con la penalización de papel.' },
+        { id: 'd', nombre: 'Bate a comprar y mantener', valor: 1.02, umbral: 0.84, ok: true, valorTexto: n2(1.02), umbralTexto: `≥ ${n2(0.84)} (BTC)`, detalle: `Sharpe en el mismo periodo: BTC ${n2(0.84)}, cesta cripto ${n2(0.52)}.` },
+        { id: 'e', nombre: 'Caída máxima', valor: 0.018, umbral: 0.2, ok: true, valorTexto: pct(0.018, 1), umbralTexto: '≤ 20 %', detalle: 'Desde el máximo histórico del fondo, la peor vista.' },
+        { id: 'f', nombre: 'Sin incidentes en 90 días', valor: 0, umbral: 0, ok: false, valorTexto: `0 en ${DIAS} días`, umbralTexto: '0 en 90 días', detalle: `El registro de incidentes empezó el 2026-08-20: cubre ${DIAS} de 90 días.` },
+        { id: 'g', nombre: 'Coste del LLM', valor: fraccion, umbral: 0.1, ok: fraccion !== null && fraccion < 0.1,
+          valorTexto: fraccion !== null ? `${pct(fraccion, 1)} (${usd(COSTE_LLM)})` : usd(COSTE_LLM), umbralTexto: '< 10 % del beneficio',
+          detalle: beneficio > 0 ? `Acumulado ${usd(COSTE_LLM)} sobre un beneficio neto de ${usd(beneficio)}.` : `El fondo no gana (${usd(beneficio, true)}): cualquier gasto en IA (${usd(COSTE_LLM)}) es demasiado.` },
+      ];
+      const cumplidos = criterios.filter(k => k.ok).length;
+      return {
+        listo: cumplidos === criterios.length, cumplidos, total: criterios.length, criterios,
+        comite: { sharpeFondo: 1.02, sharpeSinComite: 0.91, bate: true, texto: `El comité aporta: Sharpe del fondo ${n2(1.02)} frente a ${n2(0.91)} de «mismas mesas sin comité».` },
+        nota: 'El semáforo no activa nada: el código sigue siendo solo papel. Pasar a real exige una decisión escrita de Eduardo y un cambio deliberado de código. '
+          + 'Primer tramo recomendado: una cantidad que se pueda perder entera (como mucho 2.000 €) y 3 meses comparando las ejecuciones reales con las de papel.',
+      };
     }
 
     function instantanea() {
@@ -598,6 +635,7 @@
         ejecuciones: copia(ejecuciones.slice(0, 30)),
         laboratorio: copia(laboratorio),
         limites: Object.assign({}, LIMITES),
+        listoParaReal: listoParaReal(cab),
         avisos: avisos(),
       };
     }

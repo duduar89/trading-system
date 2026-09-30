@@ -43,7 +43,12 @@ const FORMA = {
   megafonoPendiente: 'object|null', mensajes: 'array', ejecuciones: 'array',
   laboratorio: { ensayosTotales: 'number', hipotesis: 'array', proximaRevision: 'number' },
   limites: 'object', avisos: 'array',
+  listoParaReal: {
+    listo: 'boolean', cumplidos: 'number', total: 'number', criterios: 'array', nota: 'string',
+    comite: { sharpeFondo: 'number|null', sharpeSinComite: 'number|null', bate: 'boolean|null', texto: 'string' },
+  },
 };
+const CRITERIO_REAL = { id: 'string', nombre: 'string', valor: 'number|null', umbral: 'number|null', ok: 'boolean', valorTexto: 'string', umbralTexto: 'string', detalle: 'string|null' };
 const ELEMENTOS = {
   curva: { t: 'number', patrimonio: 'number' },
   cotizaciones: { simbolo: 'string', etiqueta: 'string', precio: 'number', var24hPct: 'number|null', t: 'number' },
@@ -118,9 +123,16 @@ test('GET /api/estado trae todas las claves de §7 con sus tipos', async () => {
   assert.equal(i.broker, 'simulado');
   assert.ok(i.benchmarks.some(b => b.id === 'sin-comite'));
   assert.ok(i.benchmarks.some(b => b.id === 'btc') && i.benchmarks.some(b => b.id === 'cesta-cripto'));
+  // Arranque del 30-sep-2026: Momentum titular; Tendencia, Reversión y Ruptura en incubación.
   const incubando = i.mesas.filter(m => m.estado === 'incubacion');
-  assert.deepEqual(incubando.map(m => m.id).sort(), ['reversion', 'tendencia']);
+  assert.deepEqual(incubando.map(m => m.id).sort(), ['reversion', 'ruptura', 'tendencia']);
   for (const m of incubando) { assert.equal(m.peso, 0.02); assert.match(m.nota, /Sharpe/); }
+  assert.deepEqual(i.mesas.filter(m => m.estado === 'titular').map(m => m.id), ['momentum']);
+  // Semáforo: los siete criterios con su forma. Con 3 días de papel no está listo.
+  assert.deepEqual(i.listoParaReal.criterios.map(k => k.id), ['a', 'b', 'c', 'd', 'e', 'f', 'g']);
+  for (const k of i.listoParaReal.criterios) comprobarForma(k, CRITERIO_REAL, `listoParaReal.${k.id}`);
+  assert.equal(i.listoParaReal.listo, false);
+  assert.equal(i.listoParaReal.criterios[0].valor, 3);
   for (const p of i.puestos) assert.ok(i.agentes.some(a => a.id === p.agenteId), `sin agente para ${p.id}`);
   for (const k of ['operaciones', 'acierto', 'factorBeneficio', 'sharpe', 'sharpeAjustado', 'maxDD', 'adherencia', 'pnlTotal']) assert.ok(k in i.mesas[0].metricas);
   // Patrimonio = efectivo + posiciones, y cuadra con el bróker.
@@ -142,6 +154,9 @@ test('la instantánea tiene la misma forma que la maqueta de la interfaz', async
   mismasClaves(real.cabecera.vigilancia, maq.cabecera.vigilancia, 'cabecera.vigilancia');
   mismasClaves(real.cabecera.miedoCodicia, maq.cabecera.miedoCodicia, 'cabecera.miedoCodicia');
   mismasClaves(real.limites, maq.limites, 'limites');
+  mismasClaves(real.listoParaReal, maq.listoParaReal, 'listoParaReal');
+  mismasClaves(real.listoParaReal.comite, maq.listoParaReal.comite, 'listoParaReal.comite');
+  mismasClaves(real.listoParaReal.criterios[0], maq.listoParaReal.criterios[0], 'listoParaReal.criterios[0]');
   const pares = { agentes: [], mesas: [], puestos: [], posiciones: [], benchmarks: [], cotizaciones: [], departamentos: [], curva: [], ejecuciones: [], mensajes: [] };
   for (const [lista, extras] of Object.entries(pares)) {
     if (!real[lista].length || !maq[lista].length) continue;

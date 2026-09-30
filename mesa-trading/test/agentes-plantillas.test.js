@@ -69,7 +69,7 @@ const CASOS = {
   informeDiario: [{ dia: '2026-09-29', patrimonio: 100234.5, pnlDia: 234.5, pnlDiaPct: 0.00234, operaciones: 4, acierto: 0.5, gastoLLMUsd: 0.84 }],
   informeSemanal: [{ rentabilidad: 0.012, sharpe90Fondo: 0.85, sharpe90SinComite: 0.8, sharpe90Btc: 0.6 }],
   descanso: [{ minutos: 15 }],
-  killSwitch: [{ motivo: 'caída del 15,2 % desde el máximo (límite 15 %)' }],
+  killSwitch: [{ motivo: 'caída del 25,2 % desde el máximo (límite 25 %)' }],
   soloCerrar: [{ motivo: 'pérdida del día −2,10 % (límite −2 %)', hasta: T }],
   reabrir: [{ quien: 'Eduardo' }],
   conciliacion: [

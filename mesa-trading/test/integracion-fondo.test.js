@@ -46,9 +46,10 @@ test('reabrir tras un kill no borra el máximo histórico: el vigilante mide des
   const { orquestador: o, reloj } = await crearOrquestador({ pasos: 2 });
   await comprar(o, 'ruptura-BTC', 'ruptura', 'BTC/USD', 5000);
   await o.refrescarCartera();
-  o.estado.pico = o.vivo.patrimonio / 0.83;               // caída histórica del −17 %
+  // Caída histórica del −27 %: más allá del kill del −25 % (antes era −17 % con el kill al −15 %).
+  o.estado.pico = o.vivo.patrimonio / 0.73;
   await pasos(o, reloj, 1);
-  assert.equal(o.estado.fondo.nivel, 'bloqueado', 'caída ≤ −15 %: kill');
+  assert.equal(o.estado.fondo.nivel, 'bloqueado', 'caída ≤ −25 %: kill');
   const pico = o.estado.pico;
   const inicioDia = o.estado.patrimonioInicioDia;
   const r = await o.comando('reabrir', { confirmacion: 'REABRIR' });
@@ -60,10 +61,13 @@ test('reabrir tras un kill no borra el máximo histórico: el vigilante mide des
   await pasos(o, reloj, 12);
   assert.equal(o.estado.fondo.nivel, 'normal', 'el vigilante no vuelve a disparar al instante');
   const i = o.instantanea();
-  assert.ok(i.cabecera.caida < -0.15, 'la cabecera sigue midiendo desde el máximo histórico');
+  assert.ok(i.cabecera.caida < -0.25, 'la cabecera sigue midiendo desde el máximo histórico');
   assert.ok(i.cabecera.vigilancia.desdeReapertura);
   assert.ok(i.cabecera.vigilancia.caidaPct > -0.05);
-  assert.ok(i.avisos.some(a => /máximo histórico/.test(a) && /15 %/.test(a)), i.avisos.join(' | '));
+  assert.ok(i.avisos.some(a => /máximo histórico/.test(a) && /límite de caída del 25 %/.test(a)), i.avisos.join(' | '));
+  // El kill queda en el registro de incidentes (criterio f del semáforo).
+  assert.ok(o.incidentes.lista.some(x => x.tipo === 'kill' && /Caída desde el máximo/.test(x.detalle)));
+  assert.equal(i.listoParaReal.criterios.find(c => c.id === 'f').ok, false);
 });
 
 test('reabrir en «solo cerrar» por la pérdida del día se niega (dura hasta las 00:00 UTC); desde la pausa, sí', async () => {
@@ -183,7 +187,10 @@ test('portátil dormido de martes noche a jueves: el cierre dice el tramo real, 
   const { orquestador: o, reloj } = await crearOrquestador({ pasos: 288 + 240 });     // lunes 00:00 → martes 20:00
   const mensajes = oir(o);
   const ultimo = o.estado.curva[o.estado.curva.length - 1];
-  ultimo.patrimonio = o.vivo.patrimonio * 1.05;          // el martes a las 20:00 valía un 5 % más
+  // El martes a las 20:00 valía un 11 % más: 1/1,11 − 1 = −9,9 % con los precios de
+  // entonces, más allá del kill del −7 % aunque el mercado se mueva un poco de
+  // martes a jueves (antes, un 5 % más contra el kill del −3,5 %).
+  ultimo.patrimonio = o.vivo.patrimonio * 1.11;
   reloj.fijar(Date.UTC(2026, 5, 4, 8, 0));
   await o.paso();
   const inf = mensajes.find(m => m.tipo === 'informe' && /^Cierre/.test(m.texto));
@@ -193,7 +200,10 @@ test('portátil dormido de martes noche a jueves: el cierre dice el tramo real, 
   assert.ok(o.estado.curvaDiaria.some(p => p.dia === '2026-06-02'), 'el martes está en la curva diaria');
   assert.equal(o.estado.diaInicio, '2026-06-04');
   assert.ok(Math.abs(o.estado.patrimonioInicioDia - ultimo.patrimonio) < 1e-9, 'el día nuevo arranca desde lo último visto antes de las 00:00');
-  assert.equal(o.estado.fondo.nivel, 'bloqueado', 'la caída de la noche (−4,8 %) hace saltar el kill al despertar');
+  const perdida = o.vivo.patrimonio / ultimo.patrimonio - 1;
+  assert.ok(perdida <= -0.07, `la noche perdió ${perdida}`);
+  assert.equal(o.estado.fondo.nivel, 'bloqueado', `la caída de la noche (${f.pct(perdida)}) hace saltar el kill al despertar`);
+  assert.match(o.estado.fondo.motivo, /^Pérdida del día .* \(límite -7,00 %\): kill switch/);
 });
 
 test('informe diario: en sintético no se dice un gasto de LLM (sería el del día real); con reloj real, el de lo que cubre el cierre', async () => {
@@ -244,12 +254,18 @@ test('una posición del bróker sin puesto (huérfana) cuenta para los topes y p
   assert.ok(r.motivos.some(m => m.limite === 'maxPesoPorActivo'));
 });
 
-test('capital sin asignar: la instantánea lo da en la cabecera y lo avisa (techo del 40 % con dos titulares)', async () => {
+test('capital sin asignar: la instantánea lo da en la cabecera y lo avisa con el porqué (una titular al 40 % y tres en prueba)', async () => {
   const { orquestador: o } = await crearOrquestador({ pasos: 1 });
   const i = o.instantanea();
-  assert.ok(Math.abs(i.cabecera.sinAsignar.fraccion - 0.16) < 1e-9);
-  assert.ok(Math.abs(i.cabecera.sinAsignar.usd - i.cabecera.patrimonio * 0.16) < 1e-6);
-  assert.ok(i.avisos.some(a => /^16 % del capital sin asignar: queda en efectivo/.test(a)), i.avisos.join(' | '));
+  // Arranque del 30-sep-2026: Momentum 40 % (techo del asignador) y Tendencia,
+  // Reversión y Ruptura en incubación al 2 %: 1 − 0,40 − 3 × 0,02 = 0,54.
+  assert.deepEqual(i.mesas.map(m => [m.id, m.estado, m.peso]),
+    [['tendencia', 'incubacion', 0.02], ['momentum', 'titular', 0.4], ['reversion', 'incubacion', 0.02], ['ruptura', 'incubacion', 0.02]]);
+  assert.ok(Math.abs(i.cabecera.sinAsignar.fraccion - 0.54) < 1e-9);
+  assert.ok(Math.abs(i.cabecera.sinAsignar.usd - i.cabecera.patrimonio * 0.54) < 1e-6);
+  const aviso = i.avisos.find(a => /^54 % del capital sin asignar: queda en efectivo\./.test(a));
+  assert.ok(aviso, i.avisos.join(' | '));
+  assert.match(aviso, /solo 1 mesa titular \(techo del 40 %\) y 3 en prueba al 2 %: mejor efectivo que capital en estrategias sin ventaja demostrada\.$/);
   o.estado.fondo.nivel = 'pausado';
   assert.match(o.instantanea().avisos[0], /^Fondo en pausa/, 'lo que bloquea va delante');
 });
@@ -393,7 +409,7 @@ test('comité: el voto publicado es el del código y la razón no contradice lo 
     razon: 'Mantenemos NORMAL: el régimen acompaña.',
     intervenciones: [
       { agente: 'riesgos', texto: 'Nivel normal, sin vetos en el periodo. Voto NORMAL.' },
-      { agente: 'controller', texto: 'Exposición bruta del 80 % y caída del 15 %.' },
+      { agente: 'controller', texto: 'Exposición bruta del 80 % y caída del 25 %.' },
     ],
   }));
   const { orquestador: o } = await crearOrquestador({ llm, pasos: 2 });
@@ -405,7 +421,7 @@ test('comité: el voto publicado es el del código y la razón no contradice lo 
   assert.doesNotMatch(voto.texto, /Voto NORMAL/);
   assert.match(voto.texto, /DEFENSIVO/);
   const controller = mensajes.find(m => m.canal === 'comite' && m.datos && m.datos.punto === 'controller');
-  assert.equal(controller.datos.fuente, 'plantilla', 'el 80 % y el 15 % son límites, no la exposición del fondo');
+  assert.equal(controller.datos.fuente, 'plantilla', 'el 80 % y el 25 % son límites, no la exposición del fondo');
   const decision = mensajes.find(m => m.canal === 'comite' && m.tipo === 'decision');
   assert.match(decision.texto, /modo DEFENSIVO/);
   assert.doesNotMatch(decision.texto, /Mantenemos/);

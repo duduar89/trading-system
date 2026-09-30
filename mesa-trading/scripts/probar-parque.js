@@ -94,7 +94,9 @@ caso('ejecución de hace 66 h con fecha', cifras.momento(Date.UTC(2026, 9, 5, 8,
 caso('estado de mesa con tilde', cifras.estadoMesa('incubacion'), 'Incubación');
 caso('modo del comité sin guion bajo', cifras.modoComite('SOLO_CERRAR'), 'SOLO CERRAR');
 const sa = cifras.sinAsignar(inst);
-caso('capital sin asignar en el arranque (1 − 0,02 − 0,40 − 0,02 − 0,40)', sa.fraccion, 0.16, 1e-12);
+// Arranque del 30-sep-2026: Momentum 40 % y Tendencia, Reversión y Ruptura en prueba al 2 % (antes Ruptura era titular al 40 %: 16 %).
+caso('capital sin asignar en el arranque (1 − 0,02 − 0,40 − 0,02 − 0,02)', sa.fraccion, 0.54, 1e-12);
+caso('… y lo mismo contado desde los pesos de las mesas', cifras.sinAsignar({ ...inst, cabecera: { ...inst.cabecera, sinAsignar: undefined } }).fraccion, 0.54, 1e-12);
 const soloMeg = cifras.nivelEfectivo({ ...inst, directivas: { ...inst.directivas, soloCerrarHasta: T0 + 6 * 3600000 } }, T0);
 caso('«solo cerrar 6 h» del Megáfono con fondo normal', [soloMeg.nivel, soloMeg.origen], ['solo_cerrar', 'Megáfono']);
 const conMesas = n => {

@@ -374,6 +374,28 @@ table.resultados .fila-sin-comite th { color: #fcd34d; }
 .criterios li.error b::before { content: "✗ "; color: var(--negativo); }
 .criterios span { color: #c1c8dc; text-align: right; font-variant-numeric: tabular-nums; }
 .notas-reabrir { margin: 0; padding-left: 18px; color: #fcd34d; font-size: 12.5px; display: grid; gap: 3px; }
+/* Semáforo «¿Listo para dinero real?» (Resultados, arriba del todo). */
+.listo-real { border-color: var(--borde-2); background: var(--panel-2); }
+.listo-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.listo-veredicto { font-size: 11.5px; font-weight: 800; letter-spacing: .03em; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.listo-no .listo-veredicto { color: #fcd34d; background: rgba(245, 158, 11, .12); border: 1px solid rgba(245, 158, 11, .45); }
+.listo-si .listo-veredicto { color: #86efac; background: rgba(34, 197, 94, .12); border: 1px solid rgba(34, 197, 94, .45); }
+.criterios-real { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.criterios-real li { display: grid; grid-template-columns: 16px 1fr; gap: 6px; align-items: start; padding-bottom: 6px; border-bottom: 1px solid var(--borde); }
+.criterios-real li:last-child { border-bottom: 0; padding-bottom: 0; }
+.criterios-real .marca { font-weight: 800; line-height: 1.35; text-align: center; }
+.criterios-real li.ok .marca { color: var(--positivo); }
+.criterios-real li.error .marca { color: var(--negativo); }
+.criterio-cuerpo { min-width: 0; }
+.criterio-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12.5px; }
+.criterio-fila b { font-weight: 650; }
+.criterio-letra { color: var(--secundario); font-weight: 700; }
+.criterio-valor { display: flex; flex-direction: column; align-items: flex-end; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.criterio-umbral { font-size: 11px; font-weight: 500; color: var(--secundario); }
+.criterio-detalle { margin: 2px 0 0; font-size: 11.5px; color: var(--secundario); overflow-wrap: anywhere; }
+.listo-comite { margin: 0; font-size: 12.5px; color: #c1c8dc; }
+.listo-comite.sin-comite { color: #fcd34d; font-weight: 650; }
+.listo-nota { margin: 0; }
 
 /* ---------- tostadas ---------- */
 .tostadas { position: fixed; left: 50%; top: calc(var(--alto-barra) + 14px); transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; z-index: 50; pointer-events: none; }

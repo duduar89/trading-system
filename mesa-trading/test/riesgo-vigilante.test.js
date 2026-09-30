@@ -59,14 +59,23 @@ test('entre las 00:00 y el cierre diario, la referencia de ayer no vuelve a disp
   assert.deepEqual(r.acciones, []);
 });
 
-test('−3,5 % en el día → kill switch y bloqueado', () => {
-  // 96.500 / 100.000 − 1 = −3,5 %.
-  const r = vigilar(entrada({ patrimonio: 96500, puestos: [{ puestoId: 'p', simbolo: 'BTC/USD', cantidad: 1, stop: 99000 }], precios: { 'BTC/USD': 90000 } }));
+test('−7 % en el día → kill switch y bloqueado', () => {
+  // 93.000 / 100.000 − 1 = −7 % (límite del 30-sep-2026; antes −3,5 %).
+  const r = vigilar(entrada({ patrimonio: 93000, puestos: [{ puestoId: 'p', simbolo: 'BTC/USD', cantidad: 1, stop: 99000 }], precios: { 'BTC/USD': 90000 } }));
   assert.equal(r.nivel, 'bloqueado');
   assert.equal(r.acciones.length, 1, 'solo el kill: vender también por stop duplicaría la venta');
   assert.equal(r.acciones[0].tipo, 'kill');
-  assert.match(r.acciones[0].motivo, /-3,50 %/);
+  assert.match(r.acciones[0].motivo, /Pérdida del día -7,00 % \(límite -7,00 %\)/);
   assert.match(r.acciones[0].motivo, /Reabre un humano/);
+});
+
+test('entre −2 % y −7 % en el día: solo cerrar, sin kill (el peor día del backtest real fue −6,39 %)', () => {
+  // −3,5 % era el kill anterior: ahora es un día malo que solo frena las aperturas.
+  for (const patrimonio of [96500, 93610, 93010]) {
+    const r = vigilar(entrada({ patrimonio }));
+    assert.equal(r.nivel, 'solo_cerrar', String(patrimonio));
+    assert.deepEqual(r.acciones.map(a => a.tipo), ['solo_cerrar'], String(patrimonio));
+  }
 });
 
 test('−10 % desde el máximo → multiplicadorCaida 0,5; sigue normal', () => {
@@ -88,11 +97,22 @@ test('aviso de caída solo al cambiar si se pasa el multiplicador anterior', () 
   assert.match(sale.alertas[0], /tamaño normal/);
 });
 
-test('−15 % desde el máximo → kill switch', () => {
-  const r = vigilar(entrada({ patrimonio: 85000, patrimonioInicioDia: 86000 }));
+test('−25 % desde el máximo → kill switch', () => {
+  // Límite del 30-sep-2026 (antes −15 %). El día empezó en 76.000: −1,3 % hoy, no es la pérdida del día.
+  const r = vigilar(entrada({ patrimonio: 75000, patrimonioInicioDia: 76000 }));
   assert.equal(r.nivel, 'bloqueado');
   assert.equal(r.acciones[0].tipo, 'kill');
-  assert.match(r.acciones[0].motivo, /-15,00 %/);
+  assert.match(r.acciones[0].motivo, /Caída desde el máximo -25,00 % \(límite -25,00 %\)/);
+});
+
+test('entre −10 % y −25 % desde el máximo: ×0,5, sin kill (el bajista de 2022 llegó al −21,5 %)', () => {
+  // −15 % era el kill anterior; ahora lo gestiona el ×0,5 de las posiciones nuevas.
+  for (const patrimonio of [85000, 78500, 75100]) {
+    const r = vigilar(entrada({ patrimonio, patrimonioInicioDia: patrimonio }));
+    assert.equal(r.nivel, 'normal', String(patrimonio));
+    assert.equal(r.multiplicadorCaida, 0.5, String(patrimonio));
+    assert.deepEqual(r.acciones, [], String(patrimonio));
+  }
 });
 
 test('bloqueado es pegajoso: aunque todo se recupere, sigue bloqueado y no relanza el kill', () => {
@@ -105,8 +125,20 @@ test('bloqueado es pegajoso: aunque todo se recupere, sigue bloqueado y no relan
 });
 
 test('pausado (botón Pausar) se mantiene; un kill lo supera', () => {
+  // −3 % y −6,5 % en el día no llegan al kill del −7 %; −7,5 % sí.
   assert.equal(vigilar(entrada({ patrimonio: 97000, nivelActual: 'pausado' })).nivel, 'pausado');
-  assert.equal(vigilar(entrada({ patrimonio: 96000, nivelActual: 'pausado' })).nivel, 'bloqueado');
+  assert.equal(vigilar(entrada({ patrimonio: 93500, nivelActual: 'pausado' })).nivel, 'pausado');
+  assert.equal(vigilar(entrada({ patrimonio: 92500, nivelActual: 'pausado' })).nivel, 'bloqueado');
+});
+
+test('los límites del vigilante son los del 30-sep-2026: kill a −7 % en el día y a −25 % desde el máximo', () => {
+  assert.equal(LIMITES_DUROS.perdidaDiariaSoloCerrar, 0.02);
+  assert.equal(LIMITES_DUROS.perdidaDiariaKill, 0.07);
+  assert.equal(LIMITES_DUROS.caidaReducir, 0.10);
+  assert.equal(LIMITES_DUROS.caidaKill, 0.25);
+  // Justo por encima de cada umbral no salta (−6,99 % y −24,99 %).
+  assert.equal(vigilar(entrada({ patrimonio: 93010 })).nivel, 'solo_cerrar');
+  assert.equal(vigilar(entrada({ patrimonio: 75010, patrimonioInicioDia: 75010 })).nivel, 'normal');
 });
 
 test('stop saltado → acción de venta con precio y stop; el que no ha saltado, nada', () => {

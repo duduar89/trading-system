@@ -32,13 +32,16 @@ function aperturaBTC(o, nocional = 1000) {
 test('factorTamano: la instantánea da el recorte que se aplica de verdad (DEFENSIVO × Megáfono × caída), el mismo que usan las mesas y Riesgos', async () => {
   const { orquestador: o } = await crearOrquestador();
   assert.deepEqual(o.instantanea().fondo.factorTamano, { total: 1, comite: 1, megafono: 1, caida: 1 });
-  const mesa = o.mesaPorId('ruptura');
+  // Momentum, la titular (40 %): Ruptura arranca en incubación desde el 30-sep-2026.
+  const mesa = o.mesaPorId('momentum');
   const q = o.vivo.precios['BTC/USD'];
-  // Stop al 10 %: manda el riesgo por operación (el caso en que el recorte al
-  // capital no llegaba al nocional).
-  const tamano = () => mesasDep.tamanoApertura(o, mesa, { peso: 1, precio: q.precio, stop: q.precio * 0.9, volAnual: 0.3 });
+  // Stop al 20 %: manda el riesgo por operación, 1 % · 100.000 / 0,20 = 5.000 $
+  // (el caso en que el recorte al capital no llegaba al nocional). Con el 1 %,
+  // un stop al 10 % empataría con el tope por activo (10.000 $).
+  const tamano = () => mesasDep.tamanoApertura(o, mesa, { peso: 1, precio: q.precio, stop: q.precio * 0.8, volAnual: 0.3 });
   const nocionalNormal = tamano().nocional;
   assert.equal(tamano().limitadoPor, 'riesgo');
+  cerca(nocionalNormal, 5000);
 
   // El caso del informe: DEFENSIVO del comité y «reduce el riesgo a la mitad 3 horas».
   o.estado.directivas.modo = 'DEFENSIVO';
@@ -48,9 +51,9 @@ test('factorTamano: la instantánea da el recorte que se aplica de verdad (DEFEN
   cerca(tamano().nocional / nocionalNormal, ft.total);
   // Riesgos lo comprueba sin volver a multiplicar.
   const t = tamano();
-  cerca(riesgos.evaluar(o, { ...aperturaBTC(o, t.nocional), stop: q.precio * 0.9, factorTamano: t.factor.total }).nocional, t.nocional);
+  cerca(riesgos.evaluar(o, { ...aperturaBTC(o, t.nocional), puestoId: 'momentum-BTC', mesaId: 'momentum', stop: q.precio * 0.8, factorTamano: t.factor.total }).nocional, t.nocional);
   // La capital de la mesa en la instantánea también lleva el DEFENSIVO.
-  const m = o.instantanea().mesas.find(x => x.id === 'ruptura');
+  const m = o.instantanea().mesas.find(x => x.id === 'momentum');
   cerca(m.capital, mesasDep.capitalMesa(o, mesa) * 0.5);
 
   // Con la caída desde el máximo (×0,5 del vigilante).

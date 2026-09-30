@@ -195,15 +195,64 @@ test('Resultados se abre por arriba: foco en el título, no en el «Cerrar» del
   assert.equal(foco.id, 'modal-titulo');
   assert.equal(foco.getAttribute('tabindex'), '-1');
   assert.equal($('modal').scrollTop, 0);
-  // Lo primero después de la cabecera es «¿Aporta algo el comité?», con qué compara.
+  // Lo primero después de la cabecera es el semáforo «¿Listo para dinero real?»
+  // (30-sep-2026: arriba del todo); después, «¿Aporta algo el comité?», con qué compara.
   const bloques = $('modal-cuerpo').children.filter(n => n.tagName === 'SECTION');
-  assert.equal(bloques[0].querySelector('h3').textContent, '¿Aporta algo el comité?');
-  assert.equal(bloques[0].querySelector('.que-compara').textContent,
+  assert.equal(bloques[0].querySelector('h3').textContent, '¿Listo para dinero real?');
+  assert.equal(bloques[1].querySelector('h3').textContent, '¿Aporta algo el comité?');
+  assert.equal(bloques[1].querySelector('.que-compara').textContent,
     'Mismas mesas, mismos límites y mismas órdenes tuyas (kill, pausa, Megáfono); solo cambia lo que decide el comité.');
   paneles.cerrarModal();
   // Los modales con campo siguen poniendo el foco en el campo.
   paneles.abrirModal('kill');
   assert.equal(DOC.activeElement.tagName, 'INPUT');
+  paneles.cerrarModal();
+});
+
+test('Resultados: el semáforo enseña los criterios a-g con valor, umbral y ✓/✗, el veredicto, el comité y que no activa nada', () => {
+  const i = nuevaInst();
+  instActual = i;
+  paneles.abrirModal('resultados');
+  const sec = $('modal-cuerpo').querySelector('.listo-real');
+  assert.ok(sec, 'hay semáforo');
+  assert.ok(sec.classList.contains('listo-no'));
+  const lr = i.listoParaReal;
+  assert.equal(sec.querySelector('.listo-veredicto').textContent, `Todavía no: ${lr.cumplidos} de 7`);
+  const filas = sec.querySelectorAll('li');
+  assert.equal(filas.length, 7);
+  filas.forEach((li, k) => {
+    const c = lr.criterios[k];
+    assert.ok(li.classList.contains(c.ok ? 'ok' : 'error'), c.id);
+    assert.equal(li.querySelector('.marca').textContent, c.ok ? '✓' : '✗');
+    // El lector de pantalla no depende del símbolo: lo dice con palabras.
+    assert.equal(li.querySelector('.visualmente-oculto').textContent, c.ok ? ': cumple.' : ': no cumple.');
+    assert.match(li.querySelector('b').textContent, new RegExp(`^${c.id}\\) ${c.nombre}`));
+    assert.equal(li.querySelector('.criterio-valor').textContent, c.valorTexto + c.umbralTexto);
+    assert.equal(li.querySelector('.criterio-detalle').textContent, c.detalle);
+  });
+  assert.equal(sec.querySelector('.listo-comite').textContent, lr.comite.texto);
+  assert.match(sec.querySelector('.listo-nota').textContent, /no activa nada: el código sigue siendo solo papel/);
+  paneles.cerrarModal();
+  // Todo en verde: «Sí: cumple todos»; el comité que no aporta se marca.
+  const verde = nuevaInst();
+  for (const c of verde.listoParaReal.criterios) c.ok = true;
+  Object.assign(verde.listoParaReal, { listo: true, cumplidos: 7 });
+  verde.listoParaReal.comite = { sharpeFondo: 0.8, sharpeSinComite: 0.9, bate: false, texto: 'El fondo no bate a «mismas mesas sin comité».' };
+  instActual = verde;
+  paneles.abrirModal('resultados');
+  const sv = $('modal-cuerpo').querySelector('.listo-real');
+  assert.ok(sv.classList.contains('listo-si'));
+  assert.equal(sv.querySelector('.listo-veredicto').textContent, 'Sí: cumple todos');
+  assert.equal(sv.querySelectorAll('li.error').length, 0);
+  assert.ok(sv.querySelector('.listo-comite').classList.contains('sin-comite'));
+  paneles.cerrarModal();
+  // Un servidor sin el campo (anterior al semáforo): Resultados se abre igual, sin semáforo.
+  const vieja = nuevaInst();
+  delete vieja.listoParaReal;
+  instActual = vieja;
+  paneles.abrirModal('resultados');
+  assert.equal($('modal-cuerpo').querySelector('.listo-real'), null);
+  assert.equal($('modal-cuerpo').children.filter(n => n.tagName === 'SECTION')[0].querySelector('h3').textContent, '¿Aporta algo el comité?');
   paneles.cerrarModal();
 });
 

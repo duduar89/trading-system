@@ -53,8 +53,11 @@ caso('cripto: hay 48.000, tope 50.000 → caben 2.000',
   decision(evaluarPropuesta(prop(), ctx({ valoracion: { ...vacio, exposicionBruta: 48000, exposicionCripto: 48000 } }))), 'reducir 2000');
 caso('caída: 5.000 × 0,5', decision(evaluarPropuesta(prop(), ctx({ multiplicadorCaida: 0.5 }))), 'reducir 2500');
 caso('Megáfono reducir ×0,25', decision(evaluarPropuesta(prop(), ctx({ directivas: [{ tipo: 'reducir_riesgo', factor: 0.25, hasta: AHORA + HORA }] }))), 'reducir 1250');
-// Stop al 10 %: 8.000 arriesgarían 800 > 500 → 500 / 0,10 = 5.000.
-caso('riesgo por operación: 8.000 con stop al 10 % → 5.000', decision(evaluarPropuesta(prop({ nocional: 8000, stop: 90000 }), ctx())), 'reducir 5000');
+// Riesgo por operación 1 % (30-sep-2026; antes 0,5 %, que con el stop al 10 % daba estos mismos 5.000).
+// Stop al 20 %: 8.000 arriesgarían 1.600 > 1.000 → 1.000 / 0,20 = 5.000.
+caso('riesgo por operación: 8.000 con stop al 20 % → 5.000', decision(evaluarPropuesta(prop({ nocional: 8000, stop: 80000 }), ctx())), 'reducir 5000');
+// Stop al 10 %: 8.000 arriesgan 800 < 1.000: cabe entera (con el 0,5 % se recortaba a 5.000).
+caso('riesgo por operación: 8.000 con stop al 10 % → cabe', decision(evaluarPropuesta(prop({ nocional: 8000, stop: 90000 }), ctx())), 'aprobar 8000');
 const encadenado = evaluarPropuesta(prop({ tipo: 'aumento', nocional: 6000 }), ctx({ multiplicadorCaida: 0.5, valoracion: { ...vacio, exposicionBruta: 8000, exposicionCripto: 8000, exposicionPorActivo: { 'BTC/USD': 8000 }, posicionesAbiertas: 1 } }));
 caso('encadenado: 6.000 × 0,5 = 3.000 → tope del activo deja 2.000', decision(encadenado), 'reducir 2000');
 const texto = evaluarPropuesta(prop({ tipo: 'aumento' }), ctx({ valoracion: { ...vacio, exposicionBruta: 7000, exposicionCripto: 7000, exposicionPorActivo: { 'BTC/USD': 7000 }, posicionesAbiertas: 1 } })).motivos[0].texto;
@@ -99,14 +102,14 @@ const ctxFondo = (directivas, multiplicadorCaida) => ({ estado: { directivas, fo
 const conMegafono = { ...dirs, modo: 'DEFENSIVO', multiplicadores: {}, activosVetados: [] };
 caso('DEFENSIVO × Megáfono ×0,5 × caída ×0,5 = 0,125', factorTamano(ctxFondo(conMegafono, 0.5), AHORA), { total: 0.125, comite: 0.5, megafono: 0.5, caida: 0.5 });
 caso('la reducción del Megáfono caduca a su hora', factorTamano(ctxFondo(conMegafono, 1), AHORA + 3 * HORA), { total: 0.5, comite: 0.5, megafono: 1, caida: 1 });
-// Capital de mesa 40.000 $ (peso 0,4), BTC a 100.000 con stop 90.000 (10 %):
-// dimensionar da min(40.000, 0,5 % · 100.000 / 0,10 = 5.000, 10.000) = 5.000 (riesgo).
+// Capital de mesa 40.000 $ (peso 0,4), BTC a 100.000 con stop 80.000 (20 %):
+// dimensionar da min(40.000, 1 % · 100.000 / 0,20 = 5.000, 10.000) = 5.000 (riesgo).
 // Con el DEFENSIVO en el capital salía min(20.000, 5.000, 10.000) = 5.000: ×1.
-const dimRiesgo = dimensionar({ capitalMesa: 40000, peso: 1, precio: 100000, stop: 90000, volAnual: 0.3, patrimonio: 100000, limites: L });
-caso('dimensionar con el stop al 10 %: 5.000 por riesgo', `${dimRiesgo.nocional} ${dimRiesgo.limitadoPor}`, '5000 riesgo');
+const dimRiesgo = dimensionar({ capitalMesa: 40000, peso: 1, precio: 100000, stop: 80000, volAnual: 0.3, patrimonio: 100000, limites: L });
+caso('dimensionar con el stop al 20 %: 5.000 por riesgo', `${dimRiesgo.nocional} ${dimRiesgo.limitadoPor}`, '5000 riesgo');
 const fDef = factorTamanoMesa({ directivas: { modo: 'DEFENSIVO' }, multiplicadorCaida: 1, mesaId: 'tendencia', ahora: AHORA });
 caso('… × DEFENSIVO 0,5 sobre ese nocional final = 2.500 (×0,5 exacto)', dimRiesgo.nocional * fDef.total, 2500);
-caso('… y Riesgos no lo vuelve a multiplicar', decision(evaluarPropuesta(prop({ nocional: 2500, stop: 90000, factorTamano: fDef.total }), ctx({ directivas: { modo: 'DEFENSIVO' } }))), 'aprobar 2500');
+caso('… y Riesgos no lo vuelve a multiplicar', decision(evaluarPropuesta(prop({ nocional: 2500, stop: 80000, factorTamano: fDef.total }), ctx({ directivas: { modo: 'DEFENSIVO' } }))), 'aprobar 2500');
 caso('sin factor declarado, Riesgos aplica el entero: 5.000 × 0,125', decision(evaluarPropuesta(prop(), ctx({ directivas: conMegafono, multiplicadorCaida: 0.5 }))), 'reducir 625');
 caso('declarado ×0,5 cuando toca ×0,25 (llegó el Megáfono): recorta lo que falta, 2.500 → 1.250',
   decision(evaluarPropuesta(prop({ nocional: 2500, factorTamano: 0.5 }), ctx({ directivas: { modo: 'DEFENSIVO', reduccion: { factor: 0.5, hasta: AHORA + HORA } } }))), 'reducir 1250');
@@ -117,13 +120,20 @@ const r2 = v({ patrimonio: 98000 });
 caso('−2 % en el día → solo cerrar', r2.nivel, 'solo_cerrar');
 caso('… hasta las 00:00 UTC del miércoles', new Date(r2.soloCerrarHasta).toISOString(), '2026-09-30T00:00:00.000Z');
 caso('−1,99 % → normal', v({ patrimonio: 98010 }).nivel, 'normal');
+// Kills del 30-sep-2026: −7 % en el día (antes −3,5 %) y −25 % desde el máximo (antes −15 %).
 const r35 = v({ patrimonio: 96500 });
-caso('−3,5 % en el día → kill', `${r35.nivel} ${r35.acciones.map(a => a.tipo).join(',')}`, 'bloqueado kill');
+caso('−3,5 % en el día → solo cerrar, ya no kill', `${r35.nivel} ${r35.acciones.map(a => a.tipo).join(',')}`, 'solo_cerrar solo_cerrar');
+caso('−6,99 % en el día → solo cerrar', v({ patrimonio: 93010 }).nivel, 'solo_cerrar');
+const r7 = v({ patrimonio: 93000 });
+caso('−7 % en el día → kill', `${r7.nivel} ${r7.acciones.map(a => a.tipo).join(',')}`, 'bloqueado kill');
 const r10 = v({ patrimonio: 90000, patrimonioInicioDia: 90500 });
 caso('−10 % desde el máximo → multiplicador 0,5', `${r10.nivel} ${r10.multiplicadorCaida}`, 'normal 0.5');
 caso('−9,9 % → multiplicador 1', v({ patrimonio: 90100, patrimonioInicioDia: 90500 }).multiplicadorCaida, 1);
 const r15 = v({ patrimonio: 85000, patrimonioInicioDia: 86000 });
-caso('−15 % desde el máximo → kill', `${r15.nivel} ${r15.acciones.map(a => a.tipo).join(',')}`, 'bloqueado kill');
+caso('−15 % desde el máximo → ×0,5, ya no kill', `${r15.nivel} ${r15.multiplicadorCaida} ${r15.acciones.length}`, 'normal 0.5 0');
+caso('−24,99 % desde el máximo → ×0,5', `${v({ patrimonio: 75010, patrimonioInicioDia: 76000 }).nivel}`, 'normal');
+const r25 = v({ patrimonio: 75000, patrimonioInicioDia: 76000 });
+caso('−25 % desde el máximo → kill', `${r25.nivel} ${r25.acciones.map(a => a.tipo).join(',')}`, 'bloqueado kill');
 caso('bloqueado es pegajoso aunque se recupere', v({ patrimonio: 120000, nivelActual: 'bloqueado' }).nivel, 'bloqueado');
 const stop = v({ puestos: [{ puestoId: 'tendencia-BTC', mesaId: 'tendencia', simbolo: 'BTC/USD', cantidad: 0.05, stop: 95000 }], precios: { 'BTC/USD': 94800 } });
 caso('stop saltado: 94.800 ≤ 95.000', stop.acciones, [{ tipo: 'stop', puestoId: 'tendencia-BTC', simbolo: 'BTC/USD', precio: 94800, stop: 95000 }]);

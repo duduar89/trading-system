@@ -377,13 +377,24 @@ test('mesasIniciales: 4 sin claves y 6 con claves, con la forma de Mesa', () => 
   assert.deepEqual(porId['reversion-etf'].universo, ['SPY', 'QQQ']);
   for (const m of con) {
     assert.deepEqual(Object.keys(m).sort(), ['estado', 'familia', 'filtros', 'id', 'marco', 'nombre', 'nota', 'origen', 'params', 'universo']);
-    // Tendencia y Reversión cripto pierden en el backtest real con costes:
-    // arrancan en incubación (2 %) y tienen que ganarse el puesto.
-    assert.equal(m.estado, ['tendencia', 'reversion'].includes(m.id) ? 'incubacion' : 'titular');
+    // Decisión del 30-sep-2026: Momentum cripto es la única titular. Tendencia
+    // y Reversión cripto pierden con costes; Ruptura no diversifica frente a
+    // Momentum (correlación 0,80); las de ETF no se pueden validar sin claves.
+    // Todas las demás arrancan en incubación (2 %) y se ganan el puesto.
+    assert.equal(m.estado, m.id === 'momentum' ? 'titular' : 'incubacion', m.id);
+    assert.equal(typeof m.nota, 'string', `${m.id}: toda mesa inicial dice por qué arranca así`);
     assert.equal(m.origen, 'inicial');
     assert.deepEqual(m.filtros, []);
     assert.equal(m.marco, FAMILIAS[m.familia].marco);
   }
+  // Cada nota cuenta su porqué con la cifra (las de ETF, que no hay datos).
+  assert.match(porId.ruptura.nota, /0,80/);
+  assert.match(porId.tendencia.nota, /Sharpe −0,53/);
+  assert.match(porId.reversion.nota, /Sharpe −0,36/);
+  assert.match(porId.momentum.nota, /0,91/);
+  for (const id of ['momentum-etf', 'reversion-etf']) assert.match(porId[id].nota, /Sin validar con datos reales/);
+  // Sin claves no hay mesas de ETF, y el resto es igual.
+  assert.deepEqual(sin.map(m => m.estado), ['incubacion', 'titular', 'incubacion', 'incubacion']);
   // Los params de una mesa no comparten arrays con los valores por defecto
   porId.momentum.params.lookbacks.push(99);
   assert.deepEqual([...momentum.parametrosPorDefecto.lookbacks], [28]);

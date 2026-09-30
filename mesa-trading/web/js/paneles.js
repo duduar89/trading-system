@@ -870,7 +870,7 @@
     return { input, valor: () => input.value.trim(), campo: el('label', { class: 'confirmar' }, el('span', {}, 'Escribe ', el('b', { text: palabra }), ' para confirmar'), input) };
   }
 
-  // ---------- resultados: sombras, mejora, mesas, capital sin asignar, laboratorio ----------
+  // ---------- resultados: ¿listo para real?, sombras, mejora, mesas, capital sin asignar, laboratorio ----------
 
   const ESTADO_HIPOTESIS = { pendiente: 'Pendiente', evaluando: 'Evaluando', aprobada: 'Aprobada', rechazada: 'Rechazada' };
   const QUE_COMPARA_COMITE = 'Mismas mesas, mismos límites y mismas órdenes tuyas (kill, pausa, Megáfono); solo cambia lo que decide el comité.';
@@ -893,6 +893,30 @@
     return null;
   }
 
+  // Semáforo «¿Listo para dinero real?» (§5.8): los criterios a-g con su
+  // valor, su umbral y si pasan, la nota del comité y lo que NO hace. Va el
+  // primero: es la pregunta que Eduardo se hace al abrir Resultados.
+  function seccionListoParaReal(lr) {
+    const criterios = Array.isArray(lr.criterios) ? lr.criterios : [];
+    const veredicto = lr.listo
+      ? 'Sí: cumple todos'
+      : `Todavía no: ${cifras.numero(lr.cumplidos)} de ${cifras.numero(lr.total || criterios.length)}`;
+    return el('section', { class: 'bloque listo-real ' + (lr.listo ? 'listo-si' : 'listo-no'), 'aria-labelledby': 'res-real' },
+      el('div', { class: 'listo-cab' },
+        el('h3', { id: 'res-real', text: '¿Listo para dinero real?' }),
+        el('span', { class: 'listo-veredicto', text: veredicto })),
+      el('ul', { class: 'criterios-real' }, criterios.map(k => el('li', { class: k.ok ? 'ok' : 'error' },
+        el('span', { class: 'marca', 'aria-hidden': 'true', text: k.ok ? '✓' : '✗' }),
+        el('div', { class: 'criterio-cuerpo' },
+          el('div', { class: 'criterio-fila' },
+            el('b', {}, el('span', { class: 'criterio-letra', text: `${k.id}) ` }), k.nombre || k.id,
+              el('span', { class: 'visualmente-oculto', text: k.ok ? ': cumple.' : ': no cumple.' })),
+            el('span', { class: 'criterio-valor' }, el('span', { text: k.valorTexto || '—' }), el('span', { class: 'criterio-umbral', text: k.umbralTexto || '' }))),
+          k.detalle ? el('p', { class: 'criterio-detalle', text: k.detalle }) : null)))),
+      lr.comite && lr.comite.texto ? el('p', { class: 'listo-comite' + (lr.comite.bate === false ? ' sin-comite' : ''), text: lr.comite.texto }) : null,
+      lr.nota ? el('p', { class: 'nota listo-nota', text: lr.nota }) : null);
+  }
+
   function construirResultados(c, inst) {
     poner(c, ...cabModal('Resultados', `Lo que gana el fondo frente a sus carteras sombra, todas con costes. Datos de las ${inst ? cifras.hora(inst.ahora) : '—'}.`, { lectura: true }));
     if (!inst) { poner(c, el('p', { class: 'vacio', text: 'Todavía no hay datos de la mesa.' }), el('div', { class: 'modal-pie' }, el('button', { class: 'boton primario', type: 'button', text: 'Cerrar', onclick: cerrarModal }))); return; }
@@ -900,6 +924,8 @@
     const mejora = inst.mejora || {};
     const capital = capitalDe(inst);
     const rentFondo = Number.isFinite(capital) && capital > 0 && Number.isFinite(cab.patrimonio) ? cab.patrimonio / capital - 1 : null;
+
+    if (inst.listoParaReal) poner(c, seccionListoParaReal(inst.listoParaReal));
 
     // ¿Aporta algo el comité? (principio 7: se mide contra las mismas mesas sin él).
     const dif = Number.isFinite(mejora.sharpe90Fondo) && Number.isFinite(mejora.sharpe90SinComite) ? mejora.sharpe90Fondo - mejora.sharpe90SinComite : null;
@@ -935,7 +961,7 @@
     poner(c, el('section', { class: 'bloque', 'aria-labelledby': 'res-mesas' },
       el('h3', { id: 'res-mesas', text: 'Mesas' }),
       sa && sa.fraccion > 0.0005 ? el('p', { class: 'aviso-sin-asignar',
-        text: `Sin asignar: ${cifras.pct(sa.fraccion, { decimales: 0 })} del patrimonio${Number.isFinite(sa.usd) ? ` (${cifras.usd(sa.usd)})` : ''}. Queda en efectivo: ninguna mesa lo usa.` }) : null,
+        text: `Sin asignar: ${cifras.pct(sa.fraccion, { decimales: 0 })} del patrimonio${Number.isFinite(sa.usd) ? ` (${cifras.usd(sa.usd)})` : ''}. Queda en efectivo: solo las titulares han probado ventaja y el resto está en prueba; mejor efectivo que capital en estrategias sin ventaja.` }) : null,
       el('div', { class: 'tabla-scroll' }, el('table', { class: 'resultados' },
         el('thead', {}, el('tr', {}, ['Mesa', 'Estado', 'Peso', 'Sharpe', 'P&L total'].map(x => el('th', { scope: 'col', text: x })))),
         el('tbody', {}, (inst.mesas || []).map(m => el('tr', {},

@@ -270,13 +270,17 @@ function crearLLM({
   // diario de las 00:05 pregunta por el día que cierra, cuando gastoHoy() ya
   // se ha puesto a cero.
   let historial = [];
+  // Todo lo gastado desde que existe la carpeta de datos (el criterio g del
+  // semáforo «¿Listo para dinero real?» lo compara con el beneficio del fondo).
+  let gastoTotalUsd = 0;
   // Tras un reinicio, el gasto del día sale del registro: si no, cada arranque
-  // regalaría otro presupuesto entero.
+  // regalaría otro presupuesto entero. Se lee entero por el acumulado.
   if (rutaCostes) {
     try {
       const desde = ahoraGasto() - DIAS_HISTORIAL * DIA;
-      for (const r of leerJSONL(rutaCostes, 5000)) {
+      for (const r of leerJSONL(rutaCostes)) {
         if (!r || !Number.isFinite(r.t)) continue;
+        gastoTotalUsd += n0(r.costeUsd);
         if (diaUTC(r.t) === cuenta.dia) {
           cuenta.gastoUsd += n0(r.costeUsd);
           cuenta.llamadas += 1;
@@ -295,6 +299,7 @@ function crearLLM({
 
   function anotarGasto(t, costeUsd) {
     if (!(costeUsd > 0)) return;
+    gastoTotalUsd += costeUsd;
     historial.push({ t, costeUsd });
     const limite = ahoraGasto() - DIAS_HISTORIAL * DIA;
     if (historial.length && historial[0].t < limite) historial = historial.filter(x => x.t >= limite);
@@ -418,6 +423,8 @@ function crearLLM({
       for (const x of historial) if (x.t > desde && x.t <= hasta) s += x.costeUsd;
       return s;
     },
+    // Todo lo apuntado en llm-costes.jsonl más lo de esta sesión.
+    gastoTotal() { return gastoTotalUsd; },
     estado() {
       alDia();
       return {

@@ -37,25 +37,39 @@ function mesa(id, nombre, estrategia, universo, params, estado = 'titular', nota
   };
 }
 
-// Tendencia 4H y Reversión cripto arrancan en incubación (2 % del capital) y no
-// como titulares: con velas reales de Alpaca de 2021 a sep-2026 y costes
-// incluidos pierden (Sharpe −0,52 y −0,42; tendencia pagó 4.434 $ de
-// comisiones sobre 10.000 $ en 539 operaciones). Tienen que ganarse el puesto
-// en papel como cualquier estrategia nueva. Ver scripts/probar-backtest.js --real.
-// Cifras con el motor que trata el hueco de SOL en Alpaca (jul-2023 → ago-2024);
-// antes de ese arreglo salían −0,51, 4.478 $ y 548.
+// Qué arranca de titular y qué en incubación (2 % del capital) es decisión de
+// Eduardo (30-sep-2026, delegada en el director), con velas reales de Alpaca
+// de 2021 a sep-2026, costes incluidos y riesgo por operación del 1 %:
+// - Momentum cripto, única titular: Sharpe 0,91 como mesa del 25 % frente a
+//   0,63 de comprar y mantener (scripts/probar-backtest.js --real).
+// - Tendencia 4H y Reversión cripto pierden (Sharpe −0,53 y −0,36; tendencia
+//   pagó 4.423 $ de comisiones sobre 10.000 $ en 539 operaciones).
+// - Ruptura gana sola (0,65), pero en la cartera del fondo su correlación
+//   diaria con Momentum es 0,80: Momentum sola (40 %) da Sharpe 0,72 y caída
+//   11,2 %; con Ruptura (40 + 40), 0,58 y 26,0 % (scripts/estudiar-limites.js).
+//   No diversifica y añade caída.
+// - Las de ETF no se pueden validar sin claves (Stooq pide JavaScript y Yahoo
+//   da 429): empiezan en prueba como cualquier estrategia sin datos.
+// Todas tienen que ganarse el puesto en papel con la regla de ascenso del
+// asignador; el capital que no se reparte queda en efectivo.
+const NOTAS = Object.freeze({
+  momentum: 'Backtest real 2021-2026 con costes: Sharpe 0,91 frente a 0,63 de comprar y mantener. Única titular.',
+  tendencia: 'Backtest real 2021-2026 con costes: Sharpe −0,53. Empieza en prueba con el 2 %.',
+  reversion: 'Backtest real 2021-2026 con costes: Sharpe −0,36. Empieza en prueba con el 2 %.',
+  ruptura: 'Correlación diaria con Momentum 0,80: juntas, Sharpe 0,58 y caída 26,0 %; Momentum sola, 0,72 y 11,2 %. No diversifica: empieza en prueba con el 2 %.',
+  etf: 'Sin validar con datos reales: empieza en prueba con el 2 %.',
+});
+
 function mesasIniciales({ hayAlpaca = false } = {}) {
   const mesas = [
-    mesa('tendencia', 'Tendencia SMA', tendenciaSma, ['BTC/USD', 'ETH/USD', 'SOL/USD'], null, 'incubacion',
-      'Backtest real 2021-2026 con costes: Sharpe −0,52. Empieza en prueba con el 2 %.'),
-    mesa('momentum', 'Momentum cripto', momentumRotacion, CRIPTO),
-    mesa('reversion', 'Reversión RSI', reversionRsi, ['BTC/USD', 'ETH/USD'], null, 'incubacion',
-      'Backtest real 2021-2026 con costes: Sharpe −0,42. Empieza en prueba con el 2 %.'),
-    mesa('ruptura', 'Ruptura Donchian', rupturaDonchian, ['BTC/USD', 'ETH/USD', 'SOL/USD']),
+    mesa('tendencia', 'Tendencia SMA', tendenciaSma, ['BTC/USD', 'ETH/USD', 'SOL/USD'], null, 'incubacion', NOTAS.tendencia),
+    mesa('momentum', 'Momentum cripto', momentumRotacion, CRIPTO, null, 'titular', NOTAS.momentum),
+    mesa('reversion', 'Reversión RSI', reversionRsi, ['BTC/USD', 'ETH/USD'], null, 'incubacion', NOTAS.reversion),
+    mesa('ruptura', 'Ruptura Donchian', rupturaDonchian, ['BTC/USD', 'ETH/USD', 'SOL/USD'], null, 'incubacion', NOTAS.ruptura),
   ];
   if (hayAlpaca) {
-    mesas.push(mesa('momentum-etf', 'Momentum ETF', momentumRotacion, ['SPY', 'QQQ', 'IWM', 'TLT', 'GLD'], momentumRotacion.parametrosEtf));
-    mesas.push(mesa('reversion-etf', 'Reversión ETF', reversionRsi, ['SPY', 'QQQ']));
+    mesas.push(mesa('momentum-etf', 'Momentum ETF', momentumRotacion, ['SPY', 'QQQ', 'IWM', 'TLT', 'GLD'], momentumRotacion.parametrosEtf, 'incubacion', NOTAS.etf));
+    mesas.push(mesa('reversion-etf', 'Reversión ETF', reversionRsi, ['SPY', 'QQQ'], null, 'incubacion', NOTAS.etf));
   }
   return mesas;
 }
@@ -72,4 +86,4 @@ function velasNecesarias(mesa) {
   return comun.velasMemoria(e, p, mesa.filtros || []);
 }
 
-module.exports = { FAMILIAS, mesasIniciales, velasNecesarias };
+module.exports = { FAMILIAS, mesasIniciales, velasNecesarias, NOTAS_INICIALES: NOTAS };

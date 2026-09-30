@@ -78,17 +78,32 @@ function leerArgs(argv = process.argv.slice(2)) {
   return args;
 }
 
-// Valores elegidos en docs/investigacion/critica-sintesis (ver docs/04-riesgo.md).
+// Valores de docs/investigacion/critica-sintesis, revisados el 30-sep-2026 con
+// velas reales de Alpaca (BTC/ETH/SOL, 2021 → sep-2026, costes y penalización
+// de papel): riesgo por operación, kill por caída y kill por pérdida del día.
+// Las cifras salen de `node scripts/estudiar-limites.js` (docs/04-riesgo-y-mejora.md).
 const LIMITES_DUROS = Object.freeze({
-  maxPesoPorActivo: 0.10,          // ningún activo pesa más del 10 % del patrimonio
+  maxPesoPorActivo: 0.10,          // ningún activo pesa más del 10 % del patrimonio. Con 15 % o 20 % momentum
+                                   // no mejora (Sharpe 0,72 → 0,71 / 0,70): manda el objetivo de volatilidad
   maxExposicionBruta: 0.80,        // sin apalancamiento y con un 20 % en efectivo de colchón
   maxExposicionCripto: 0.50,       // las criptos se mueven juntas: como mucho la mitad del fondo
-  riesgoPorOperacion: 0.005,       // si salta el stop, se pierde como mucho el 0,5 % del patrimonio
+  // Si salta el stop, se pierde como mucho el 1 % del patrimonio (Eduardo puso el techo en 2 %).
+  // Cartera de arranque anterior sin protección: 0,5 % → CAGR 4,9 %, Sharpe 0,56, caída 16,8 %;
+  // 1 % → 8,5 %, 0,61, 26,7 %; 1,5 % → 10,3 %, 0,65, 29,5 %; 2 % → 10,0 %, 0,63, 30,9 %. Con el
+  // ×0,5 a −10 %, 1 % da CAGR 6,5 % y caída 21,5 %, y 1,5 % ya no rinde más (6,3 %): el tope por
+  // activo satura. Los huecos saltan el stop: con 2 % la peor operación costó un 3,31 % del fondo.
+  riesgoPorOperacion: 0.01,
   maxPosiciones: 12,
   perdidaDiariaSoloCerrar: 0.02,   // -2 % en el día: solo se cierran posiciones hasta las 00:00 UTC
-  perdidaDiariaKill: 0.035,        // -3,5 % en el día: kill switch
+  // -7 % en el día: kill switch. Con riesgo 1 % y el ×0,5, el peor día de 5 años fue −6,39 %: el kill
+  // es para cuando algo se rompe (bucle, datos malos, hueco extremo), no para un mal día de la
+  // cripto, que ya lo frena el solo cerrar del −2 %. Con −3,5 % habría saltado 3 veces.
+  perdidaDiariaKill: 0.07,
   caidaReducir: 0.10,              // -10 % desde el máximo: posiciones nuevas a la mitad
-  caidaKill: 0.15,                 // -15 % desde el máximo: kill switch, reabre un humano
+  // -25 % desde el máximo: kill switch, reabre un humano. Con riesgo 1 % y el ×0,5, en 5 años la
+  // caída cruzó −15 % y −20 % una vez (el bajista de 2022) y −25 % ninguna (máxima 21,5 %): un
+  // bajista normal lo gestiona el ×0,5; el kill queda para lo que no es normal.
+  caidaKill: 0.25,
   maxOrdenesMinuto: 10,            // protege de un bucle que dispare órdenes (Alpaca admite 200/min)
   maxOrdenesMesaHora: 4,           // una mesa que se vuelve loca se congela sola
   minNocionalOrden: 10,            // por debajo de 10 $ la comisión de cripto se come la operación
@@ -133,9 +148,11 @@ function crearConfig(args = leerArgs()) {
     alpaca: { claveId: alpacaId, secreto: alpacaSecreto, hay: hayAlpaca },
     llm: {
       apiKey: process.env.ANTHROPIC_API_KEY || '',
+      // El comité decide (Opus); los agentes solo redactan y clasifican con
+      // listas cerradas: Haiku 4.5 cuesta 1/5 $ por MTok frente a 4/20 $.
       modeloComite: process.env.LLM_MODELO_COMITE || 'claude-opus-5-5',
-      modeloAgentes: process.env.LLM_MODELO_AGENTES || 'claude-opus-5-5',
-      presupuestoDiaUsd: num('LLM_PRESUPUESTO_DIA_USD', 2),
+      modeloAgentes: process.env.LLM_MODELO_AGENTES || 'claude-haiku-4-5',
+      presupuestoDiaUsd: num('LLM_PRESUPUESTO_DIA_USD', 1),
     },
     limites: Object.freeze({ ...LIMITES_DUROS, ...(ajustes.limites || {}) }),
     cadencias: {

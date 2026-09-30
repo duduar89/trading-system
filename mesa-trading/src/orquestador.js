@@ -40,6 +40,8 @@ const calendario = require('./mercado/calendario');
 const { mesasIniciales } = require('./estrategias');
 const { reasignar, REGLAS: REGLAS_ASIGNADOR } = require('./aprendizaje/asignador');
 const { metricasMesa, sharpeRodante } = require('./aprendizaje/evaluador');
+const { evaluarPasoAReal } = require('./aprendizaje/paso-a-real');
+const { RegistroIncidentes } = require('./riesgo/incidentes');
 const { crearBenchmarks, valorarBenchmarks } = require('./cartera/benchmarks');
 const { exposicionConBroker } = require('./cartera/conciliacion');
 const { Libros } = require('./cartera/libros');
@@ -103,6 +105,18 @@ function siguienteMes(t) {
   return esteMes > t ? esteMes : Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 15);
 }
 
+// Peor caída desde el máximo de una serie de patrimonios (fracción ≥ 0).
+function caidaMaximaDe(valores) {
+  let pico = 0;
+  let peor = 0;
+  for (const v of valores || []) {
+    if (!(v > 0)) continue;
+    if (v > pico) pico = v;
+    else peor = Math.max(peor, 1 - v / pico);
+  }
+  return peor;
+}
+
 const valoracionVacia = () => ({
   porPuesto: {}, porMesa: {}, exposicionBruta: 0, exposicionCripto: 0, exposicionPorActivo: {}, posicionesAbiertas: 0, puestosAbiertos: 0, valorTotal: 0, pnlAbierto: 0,
 });
@@ -119,7 +133,7 @@ class Orquestador extends EventEmitter {
     this.broker = broker;
     this.llm = llm || {
       activo: false, estado: () => ({ activo: false, modeloComite: null, modeloAgentes: null, gastoHoyUsd: 0, presupuestoDiaUsd: 0 }),
-      gastoHoy: () => 0, gastoDelDia: () => 0, gastoEntre: () => 0,
+      gastoHoy: () => 0, gastoDelDia: () => 0, gastoEntre: () => 0, gastoTotal: () => 0,
     };
     this.fg = fg || { actual: async () => null, historico: async () => [] };
     this.bus = bus;
@@ -142,7 +156,9 @@ class Orquestador extends EventEmitter {
       operaciones: path.join(this.carpeta, 'operaciones.jsonl'),
       operacionesSombra: path.join(this.carpeta, 'operaciones-sombra.jsonl'),
       informes: path.join(this.carpeta, 'informes.jsonl'),
+      incidentes: path.join(this.carpeta, 'incidentes.jsonl'),
     };
+    this.incidentes = null;          // RegistroIncidentes, al arrancar (tras tomar la carpeta)
     this.estado = null;
     this.libros = null;
     this.plantilla = [];
@@ -208,6 +224,7 @@ class Orquestador extends EventEmitter {
 
   async _iniciar() {
     const guardado = leerJSON(this.rutas.estado, null, { critico: true });
+    this.incidentes = new RegistroIncidentes({ ruta: this.rutas.incidentes });
     // Un estado de la demo sintética no vale para el papel (ni al revés): sus
     // posiciones y su curva son de otros precios.
     if (guardado && guardado.modo && guardado.modo !== this.modo) {
@@ -290,6 +307,13 @@ class Orquestador extends EventEmitter {
       if (!Array.isArray(m.curvaDiaria)) m.curvaDiaria = [];
       if (!Number.isFinite(m.capitalBase)) m.capitalBase = (e2.capitalInicial || 0) * (m.peso || 0);
     }
+    // Un estado de antes del registro de incidentes lo empieza ahora: el
+    // criterio f cuenta desde aquí (no se puede afirmar lo que no se apuntó).
+    if (!Number.isFinite(e2.incidentesDesde)) e2.incidentesDesde = this.reloj.ahora();
+    // La peor caída vista (desde el máximo histórico): de antes, la de las curvas guardadas.
+    if (!Number.isFinite(e2.caidaMaxima)) {
+      e2.caidaMaxima = Math.max(caidaMaximaDe((e2.curva || []).map(p => p.patrimonio)), caidaMaximaDe((e2.curvaDiaria || []).map(p => p.valor)));
+    }
     return e2;
   }
 
@@ -326,6 +350,8 @@ class Orquestador extends EventEmitter {
       patrimonioInicioDia: capital,
       diaInicio: diaUTC(ahora),
       pico: capital,
+      caidaMaxima: 0,
+      incidentesDesde: ahora,
       curva: [{ t: ahora, patrimonio: capital }],
       sombras: { benchmarks, curvas: {} },
       sombra: { efectivo: capital, pendientes: [] },
@@ -455,6 +481,8 @@ class Orquestador extends EventEmitter {
     const ahora = this.reloj.ahora();
     if (this._erroresVistos[texto] !== undefined && ahora - this._erroresVistos[texto] < HORA) return;
     this._erroresVistos[texto] = ahora;
+    // Como la alerta: el mismo error, una vez por hora.
+    this.registrarIncidente('error_departamento', texto, { departamento: nombre });
     try {
       this.bus.publicar({ de: this.agentePorId(agente) ? agente : 'sistema', canal: 'sistema', tipo: 'alerta', texto: plantillas.frase(texto, 280), datos: { departamento: nombre }, importancia: 3 });
     } catch (_) { /* el bus no debe tumbar el latido */ }
@@ -537,6 +565,23 @@ class Orquestador extends EventEmitter {
     this.vivo.carteraOkPaso = this.pasos;
     this.revalorarSombra();
     if (this.estado && cuenta.patrimonio > (this.estado.pico || 0)) this.estado.pico = cuenta.patrimonio;
+    // La peor caída desde el máximo histórico, latido a latido (criterio e del semáforo).
+    if (this.estado && cuenta.patrimonio > 0 && this.estado.pico > 0) {
+      const caida = 1 - cuenta.patrimonio / this.estado.pico;
+      if (caida > (this.estado.caidaMaxima || 0)) this.estado.caidaMaxima = caida;
+    }
+  }
+
+  // Apunta un incidente (§6.10, data/incidentes.jsonl). Nunca lanza: el
+  // registro no puede tumbar un kill ni un latido.
+  registrarIncidente(tipo, detalle, datos = null) {
+    try {
+      if (!this.incidentes) this.incidentes = new RegistroIncidentes({ ruta: this.rutas.incidentes });
+      return this.incidentes.registrar({ t: this.reloj.ahora(), tipo, detalle, datos });
+    } catch (e) {
+      log.error(`incidente ${tipo} sin apuntar: ${e.message}`);
+      return null;
+    }
   }
 
   // Valoración con lo que ya se sabe (sin pedir nada al bróker): tras una
@@ -582,6 +627,7 @@ class Orquestador extends EventEmitter {
 
   async killSwitch(motivo) {
     this.estado.contadores.kills = (this.estado.contadores.kills || 0) + 1;
+    this.registrarIncidente('kill', motivo);
     let r = null;
     try {
       r = await operaciones.killSwitch(this, motivo);
@@ -1049,17 +1095,48 @@ class Orquestador extends EventEmitter {
         proximaRevision: e.cadencias.proximoSemanal,
       },
       limites: { ...this.limites },
+      listoParaReal: this._listoParaReal(patrimonio, ahora),
       avisos,
     };
   }
 
-  // Capital que ninguna mesa tiene asignado: queda en efectivo (el techo del
-  // 40 % por mesa del asignador no deja repartirlo con solo dos titulares).
+  // Semáforo «¿Listo para dinero real?» (§5.8, §7). Solo informa: no activa nada.
+  _listoParaReal(patrimonio, ahora) {
+    const e = this.estado;
+    const curvas = e.sombras.curvas || {};
+    return evaluarPasoAReal({
+      ahora, creado: e.creado, capitalInicial: e.capitalInicial, patrimonio,
+      operaciones: this.operaciones, operacionesSombra: this.operacionesSombra,
+      curvaDiaria: e.curvaDiaria, curvasSombra: curvas, hayAlpaca: this.hayAlpaca,
+      penalizacionPapel: this.limites.penalizacionPapel, caidaMaximaVista: e.caidaMaxima || 0,
+      incidentes: this.incidentes ? this.incidentes.lista : [], incidentesDesde: e.incidentesDesde,
+      costeLLMUsd: typeof this.llm.gastoTotal === 'function' ? this.llm.gastoTotal() : 0,
+    });
+  }
+
+  // Capital que ninguna mesa tiene asignado: queda en efectivo. Con una sola
+  // titular (techo del 40 % del asignador) y el resto en incubación al 2 %,
+  // en el arranque sin claves es el 54 %.
   _sinAsignar(patrimonio) {
     let asignado = 0;
     for (const m of this.estado.mesas) if (m.estado !== 'banquillo' && m.peso > 0) asignado += m.peso;
     const fraccion = Math.max(0, 1 - asignado);
     return { fraccion, usd: patrimonio > 0 ? patrimonio * fraccion : 0 };
+  }
+
+  // El aviso dice por qué se queda en efectivo: solo las titulares tienen
+  // pruebas de ventaja (backtest real con costes) y cada una tiene techo; lo
+  // demás está en prueba. Mejor efectivo que capital en estrategias sin ventaja.
+  _textoSinAsignar(sinAsignar) {
+    const titulares = this.estado.mesas.filter(m => m.estado === 'titular' && m.peso > 0).length;
+    const enPrueba = this.estado.mesas.filter(m => m.estado === 'incubacion').length;
+    const techo = f.pct(REGLAS_ASIGNADOR.techo, { decimales: 0 });
+    const incubacion = f.pct(REGLAS_ASIGNADOR.incubacion, { decimales: 0 });
+    const quien = titulares === 0 ? 'ninguna mesa titular'
+      : titulares === 1 ? `solo 1 mesa titular (techo del ${techo})`
+        : `solo ${titulares} mesas titulares (techo del ${techo} cada una)`;
+    const prueba = enPrueba ? ` y ${enPrueba} en prueba al ${incubacion}` : '';
+    return `${f.pct(sinAsignar.fraccion, { decimales: 0 })} del capital sin asignar: queda en efectivo. Hay ${quien}${prueba}: mejor efectivo que capital en estrategias sin ventaja demostrada.`;
   }
 
   // Lo que mide el vigilante contra sus límites (tras una reapertura, desde
@@ -1102,9 +1179,7 @@ class Orquestador extends EventEmitter {
       avisos.push(`Sin precios nuevos desde las ${f.hora(this.vivo.preciosOkT)}: stops y cifras van con el último precio conocido.`);
     }
     if (!e.conciliacion.limpia) avisos.push(plantillas.frase(`Conciliación con incidencias: ${e.conciliacion.resumen}`));
-    if (sinAsignar.fraccion > 0.0005) {
-      avisos.push(`${f.pct(sinAsignar.fraccion, { decimales: 0 })} del capital sin asignar: queda en efectivo (techo del ${f.pct(REGLAS_ASIGNADOR.techo, { decimales: 0 })} por mesa).`);
-    }
+    if (sinAsignar.fraccion > 0.0005) avisos.push(this._textoSinAsignar(sinAsignar));
     avisos.push('Con el ordenador apagado no hay stops: en cripto no existen órdenes stop simples.');
     if (this.modo === 'sintetico') avisos.push('Precios sintéticos: la demo no usa el mercado real.');
     else if (this.broker.nombre === 'simulado') avisos.push('Bróker simulado con precios reales de cripto (sin claves de Alpaca).');

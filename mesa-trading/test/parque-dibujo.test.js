@@ -126,17 +126,20 @@ test('límites: con el fondo en su máximo y sin pérdida no sale «-0,00 %»', 
 
 test('límites: las barras son lo que mide el vigilante (cabecera.vigilancia), no el resultado histórico', () => {
   const i = instBase();
-  // Tras reabrir un kill: la cabecera cuenta −16 % desde el máximo histórico y
-  // −3 % en el día real; el vigilante mide −1 % y −0,5 % desde la reapertura.
-  i.cabecera.caida = -0.16;
+  // Tras reabrir un kill: la cabecera cuenta −27 % desde el máximo histórico
+  // (más allá del kill del −25 %) y −3 % en el día real; el vigilante mide −1 %
+  // y −0,5 % desde la reapertura.
+  i.cabecera.caida = -0.27;
   i.cabecera.pnlDiaPct = -0.03;
   i.cabecera.vigilancia = { perdidaDiaPct: -0.005, caidaPct: -0.01, desdeReapertura: true };
   const tex = lienzoFalso(480, 270);
   dibujo.pintarLimites(tex, i);
   const todo = tex.textos.map(x => x.texto).join(' | ');
   assert.ok(tex.hay(/^-0,50 % \/ -2,00 %$/), todo);
-  assert.ok(tex.hay(/^-1,00 % \/ -15 %$/), todo);
-  assert.ok(!tex.hay(/-16|-3,00/), todo);
+  // El límite de la barra es el caidaKill de la instantánea: −25 % desde el 30-sep-2026 (antes −15 %).
+  assert.equal(i.limites.caidaKill, 0.25);
+  assert.ok(tex.hay(/^-1,00 % \/ -25 %$/), todo);
+  assert.ok(!tex.hay(/-27|-3,00/), todo);
   assert.ok(tex.hay(/^medido desde la reapertura$/), todo);
   // Antes del cierre diario del día (sin referencia del día) no se inventa un 0.
   i.cabecera.vigilancia = { perdidaDiaPct: null, caidaPct: 0, desdeReapertura: false };

@@ -98,23 +98,34 @@ caso('régimen: BTC subiendo (cierres 100..349) → +1 +1 0 = RISK-ON; con SPY b
   assert.deepEqual(regimenEnFecha(sube, null, sube[249].t + DIA), r);
 });
 
+// Límites del fondo (src/config.js): riesgo por operación 1 % desde el 30-sep-2026 (antes 0,5 %).
+const LIM_FONDO = { riesgoPorOperacion: 0.01, maxPesoPorActivo: 0.10 };
+
 caso('dimensionado: 10.000·0,5 con vol 80 % y objetivo 40 % → 2.500 $ (volatilidad)', () => {
   const r = dimensionar({ capitalMesa: 10000, peso: 0.5, precio: 100, stop: 95, volAnual: 0.8, patrimonio: 100000,
-    limites: { riesgoPorOperacion: 0.005, maxPesoPorActivo: 0.10 } });
+    limites: LIM_FONDO });
   cerca(r.nocional, 2500);
   assert.equal(r.limitadoPor, 'volatilidad');
 });
 
-caso('dimensionado: stop al 25 % → 0,5 % de 100.000 / 0,25 = 2.000 $ (riesgo)', () => {
-  const r = dimensionar({ capitalMesa: 10000, peso: 0.5, precio: 100, stop: 75, volAnual: 0.8, patrimonio: 100000,
-    limites: { riesgoPorOperacion: 0.005, maxPesoPorActivo: 0.10 } });
+caso('dimensionado: stop al 50 % → 1 % de 100.000 / 0,50 = 2.000 $ (riesgo)', () => {
+  // Con el 1 %, el stop al 25 % daría 4.000 $ y mandaría la volatilidad (2.500 $).
+  const r = dimensionar({ capitalMesa: 10000, peso: 0.5, precio: 100, stop: 50, volAnual: 0.8, patrimonio: 100000,
+    limites: LIM_FONDO });
   cerca(r.nocional, 2000);
+  assert.equal(r.limitadoPor, 'riesgo');
+});
+
+caso('dimensionado: stop al 25 % con vol 10 % → 1 % de 100.000 / 0,25 = 4.000 $ (riesgo)', () => {
+  const r = dimensionar({ capitalMesa: 10000, peso: 0.5, precio: 100, stop: 75, volAnual: 0.1, patrimonio: 100000,
+    limites: LIM_FONDO });
+  cerca(r.nocional, 4000);
   assert.equal(r.limitadoPor, 'riesgo');
 });
 
 caso('dimensionado: tope por activo 10 % de 100.000 = 10.000 $ (maxActivo)', () => {
   const r = dimensionar({ capitalMesa: 200000, peso: 1, precio: 50, stop: null, volAnual: 0.2, patrimonio: 100000,
-    limites: { riesgoPorOperacion: 0.005, maxPesoPorActivo: 0.10 } });
+    limites: LIM_FONDO });
   cerca(r.nocional, 10000);
   assert.equal(r.limitadoPor, 'maxActivo');
 });

@@ -213,6 +213,11 @@ class Ejecutor {
         return { ok: false, motivo: 'incierta', error: err };
       }
       this._registrar({ estado: 'ERROR', idCliente, tipoError: err.tipo || 'desconocido', mensaje });
+      // El bróker ya tenía otra orden con este idCliente (otra carpeta sobre la
+      // misma cuenta, o una orden que no es la pedida): orden duplicada.
+      if (/ya usado por otra orden/.test(mensaje) && typeof ctx.registrarIncidente === 'function') {
+        ctx.registrarIncidente('orden_duplicada', `Orden de ${e} rechazada: ${mensaje}`, { idCliente });
+      }
       ctx.bus.publicar({
         de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
         texto: plantillas.frase(`El bróker rechazó la orden de ${e} (${err.tipo || 'error'}): ${String(err.message).slice(0, 80)}`),
@@ -256,6 +261,9 @@ class Ejecutor {
     // Un 404 de una orden que el bróker había aceptado es anómalo; el de una
     // que se quedó sin respuesta o en INTENCIÓN, no.
     const aceptada = Boolean(reg) && !reg.incierta && (reg.enviadaT !== undefined || reg.estado === 'ENVIADA');
+    if (aceptada && typeof ctx.registrarIncidente === 'function') {
+      ctx.registrarIncidente('orden_huerfana', `Orden ${idCliente} aceptada por el bróker y luego sin rastro.`, { idCliente });
+    }
     ctx.bus.publicar({
       de: 'ejecutor', canal: 'ejecucion', tipo: 'alerta',
       texto: plantillas.frase(`Orden ${idCliente} sin rastro en el bróker: no se envió y no se repite.`),
@@ -499,6 +507,15 @@ function conciliarCadaLatido(ctx) {
   const clave = r.limpia ? 'limpia' : JSON.stringify([r.grave, incidencias.map(a => [a.tipo, a.simbolo]), (r.descuadres || []).map(d => d.simbolo)]);
   if (!r.limpia && clave !== c.clave) {
     ctx.bus.publicar({ de: 'controller', canal: 'riesgo', tipo: 'alerta', texto: plantillas.frase(r.resumen, 280), datos: { acciones: incidencias, descuadres: r.descuadres, grave: r.grave }, importancia: 3 });
+    // Registro de incidentes (§6.10), una vez por situación: una posición del
+    // bróker sin puesto es una orden huérfana; un descuadre grave o un puesto
+    // sin posición en el bróker, una conciliación grave.
+    if (typeof ctx.registrarIncidente === 'function') {
+      const huerfanas = incidencias.filter(a => a.tipo === 'huerfana').map(a => a.simbolo);
+      const fantasmas = incidencias.filter(a => a.tipo === 'fantasma').map(a => a.simbolo);
+      if (huerfanas.length) ctx.registrarIncidente('orden_huerfana', `Posición en el bróker sin puesto: ${huerfanas.map(etiqueta).join(', ')}.`, { simbolos: huerfanas });
+      if (r.grave || fantasmas.length) ctx.registrarIncidente('conciliacion_grave', plantillas.frase(r.resumen, 280), { grave: r.grave, simbolos: [...(r.descuadres || []).map(d => d.simbolo), ...fantasmas] });
+    }
   } else if (r.limpia && c.clave && c.clave !== 'limpia') {
     ctx.bus.publicar({ de: 'controller', canal: 'riesgo', tipo: 'nota', texto: 'Conciliación limpia otra vez: los libros cuadran con el bróker.' });
   }

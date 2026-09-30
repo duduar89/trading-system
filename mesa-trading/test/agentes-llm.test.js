@@ -115,6 +115,51 @@ test('los cuatro modelos con salvavidas van por beta; el resto no', () => {
   }
 });
 
+test('config por defecto (30-sep-2026): comité en Opus 5.5 con su forma, agentes en Haiku 4.5 sin effort ni salvavidas, tope 1 $/día', async () => {
+  const { crearConfig } = require('../src/config');
+  // Vacías ganan al .env (cargarEnv no pisa lo definido) y dan el valor por defecto.
+  const claves = ['LLM_MODELO_COMITE', 'LLM_MODELO_AGENTES', 'LLM_PRESUPUESTO_DIA_USD'];
+  const antes = Object.fromEntries(claves.map(k => [k, process.env[k]]));
+  for (const k of claves) process.env[k] = '';
+  let c;
+  try { c = crearConfig({ modo: 'sintetico' }); } finally {
+    for (const k of claves) { if (antes[k] === undefined) delete process.env[k]; else process.env[k] = antes[k]; }
+  }
+  assert.deepEqual({ ...c.llm, apiKey: undefined }, { apiKey: undefined, modeloComite: 'claude-opus-5-5', modeloAgentes: 'claude-haiku-4-5', presupuestoDiaUsd: 1 });
+  const { llm, fetch } = llmCon([mensaje({ texto: BUENO, model: 'claude-haiku-4-5' }), mensaje({ texto: BUENO })],
+    { modeloComite: c.llm.modeloComite, modeloAgentes: c.llm.modeloAgentes, presupuestoDiaUsd: c.llm.presupuestoDiaUsd });
+  assert.equal((await llm.pedirJSON({ ...PETICION, uso: 'agentes' })).ok, true);
+  const agentes = fetch.llamadas[0];
+  assert.match(agentes.url, /\/v1\/messages$/);
+  assert.equal(agentes.cabeceras['anthropic-beta'], undefined);
+  assert.equal(agentes.cuerpo.model, 'claude-haiku-4-5');
+  assert.deepEqual(Object.keys(agentes.cuerpo.output_config), ['format']);
+  assert.equal('fallbacks' in agentes.cuerpo, false);
+  assert.equal((await llm.pedirJSON({ ...PETICION, uso: 'comite' })).ok, true);
+  const comite = fetch.llamadas[1];
+  assert.equal(comite.cuerpo.model, 'claude-opus-5-5');
+  assert.equal(comite.cuerpo.output_config.effort, 'medium');
+  assert.equal(comite.cuerpo.fallbacks, 'default');
+  assert.equal(llm.estado().presupuestoDiaUsd, 1);
+  // Haiku 4.5 está en la tabla con su tarifa (1/5/0,10/1,25 $ por MTok), no en la de «desconocido».
+  assert.equal(tarifaDe('claude-haiku-4-5').conocida, true);
+  assert.deepEqual({ ...tarifaDe('claude-haiku-4-5').tarifa }, { entrada: 1, salida: 5, cacheLectura: 0.10, cacheEscritura: 1.25 });
+});
+
+test('gastoTotal: todo lo apuntado en llm-costes.jsonl (no solo los últimos días) más lo de la sesión', async () => {
+  const dir = carpetaTemporal();
+  const rutaCostes = path.join(dir, 'llm-costes.jsonl');
+  // Uno de hace 400 días, fuera del historial de 8 días de gastoEntre, cuenta igual.
+  fs.writeFileSync(rutaCostes, `${JSON.stringify({ t: T0 - 400 * DIA, costeUsd: 0.5 })}\n${JSON.stringify({ t: T0 - DIA, costeUsd: 0.25 })}\n`);
+  const usage = { input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  const llm = crearLLM({ apiKey: 'sk-prueba', reloj: relojFijo(T0), presupuestoDiaUsd: 5, fetch: fetchFalso(mensaje({ texto: BUENO, usage })), rutaCostes });
+  assert.ok(Math.abs(llm.gastoTotal() - 0.75) < 1e-12);
+  await llm.pedirJSON({ ...PETICION, uso: 'comite' });
+  // opus-5-5: 1000·4 + 500·20 = 14.000 $/MTok → 0,014 $.
+  assert.ok(Math.abs(llm.gastoTotal() - 0.764) < 1e-12);
+  assert.equal(crearLLM({ apiKey: '' }).gastoTotal(), 0);
+});
+
 test('coste con usage y la tabla: casos calculados a mano', () => {
   const usage = { input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 2000, cache_creation_input_tokens: 1000 };
   // opus-5-5: 1000·4 + 500·20 + 2000·0,20 + 1000·5 = 4000 + 10000 + 400 + 5000 = 19.400 $/MTok → 0,0194 $

@@ -3,13 +3,15 @@
 // último precio y decide el nivel del fondo y qué stops han saltado.
 //
 // - Pérdida del día ≤ −perdidaDiariaSoloCerrar (−2 %) → solo cerrar hasta las
-//   00:00 UTC siguientes; ≤ −perdidaDiariaKill (−3,5 %) → kill switch.
+//   00:00 UTC siguientes; ≤ −perdidaDiariaKill (−7 %) → kill switch.
 // - Caída desde el máximo ≤ −caidaReducir (−10 %) → posiciones nuevas a la
-//   mitad (multiplicadorCaida 0,5); ≤ −caidaKill (−15 %) → kill switch.
+//   mitad (multiplicadorCaida 0,5); ≤ −caidaKill (−25 %) → kill switch.
+// Los kills son para cuando algo se rompe; un mal día o un bajista los frenan
+// el solo cerrar y el ×0,5 (src/config.js, scripts/estudiar-limites.js).
 // - `bloqueado` es pegajoso: de ahí solo se sale con Reabrir humano, nunca
 //   porque el patrimonio se recupere. `pausado` (botón Pausar) también: solo
 //   un humano lo quita. Un kill los supera a los dos.
-// Umbrales en `limites` (config.limites); por qué cada valor: critica-sintesis §1.
+// Umbrales en `limites` (config.limites); por qué cada valor: src/config.js y docs/04-riesgo-y-mejora.md.
 //
 // Los stops cripto viven aquí, en software (no hay órdenes stop simples en
 // cripto): con el ordenador apagado no hay stops.

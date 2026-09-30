@@ -11,7 +11,11 @@ const claves = o => Object.keys(o).sort();
 // Forma de §7 de ARQUITECTURA.md, campo a campo.
 const FORMA = {
   raiz: ['version', 'ahora', 'modo', 'broker', 'velocidad', 'fondo', 'cabecera', 'llm', 'curva', 'cotizaciones', 'departamentos', 'agentes',
-    'mesas', 'puestos', 'posiciones', 'benchmarks', 'mejora', 'directivas', 'megafonoPendiente', 'mensajes', 'ejecuciones', 'laboratorio', 'limites', 'avisos'],
+    'mesas', 'puestos', 'posiciones', 'benchmarks', 'mejora', 'directivas', 'megafonoPendiente', 'mensajes', 'ejecuciones', 'laboratorio', 'limites',
+    'listoParaReal', 'avisos'],
+  listoParaReal: ['listo', 'cumplidos', 'total', 'criterios', 'comite', 'nota'],
+  criterioReal: ['id', 'nombre', 'valor', 'umbral', 'ok', 'valorTexto', 'umbralTexto', 'detalle'],
+  comiteReal: ['sharpeFondo', 'sharpeSinComite', 'bate', 'texto'],
   fondo: ['nivel', 'motivo', 'multiplicadorCaida', 'factorTamano'],
   cabecera: ['patrimonio', 'pnlDia', 'pnlDiaPct', 'caida', 'exposicionBrutaPct', 'exposicionCriptoPct', 'posiciones', 'regimen', 'miedoCodicia', 'proximoComite', 'modoComite',
     'sinAsignar', 'vigilancia'],
@@ -57,6 +61,20 @@ function comprobarForma(i) {
   assert.equal(typeof i.cabecera.vigilancia.desdeReapertura, 'boolean');
   assert.ok(['NORMAL', 'DEFENSIVO', 'SOLO_CERRAR'].includes(i.cabecera.modoComite));
   assert.deepEqual(claves(i.llm), FORMA.llm.slice().sort());
+  // §7: el semáforo «¿Listo para dinero real?», criterios a-g.
+  const lr = i.listoParaReal;
+  assert.deepEqual(claves(lr), FORMA.listoParaReal.slice().sort());
+  assert.deepEqual(lr.criterios.map(k => k.id), ['a', 'b', 'c', 'd', 'e', 'f', 'g']);
+  for (const k of lr.criterios) {
+    assert.deepEqual(claves(k), FORMA.criterioReal.slice().sort());
+    assert.equal(typeof k.ok, 'boolean');
+    assert.equal(typeof k.valorTexto, 'string');
+    assert.equal(typeof k.umbralTexto, 'string');
+  }
+  assert.equal(lr.cumplidos, lr.criterios.filter(k => k.ok).length);
+  assert.equal(lr.listo, lr.cumplidos === lr.total);
+  assert.deepEqual(claves(lr.comite), FORMA.comiteReal.slice().sort());
+  assert.match(lr.nota, /no activa nada/);
   assert.ok(i.curva.length <= 500);
   for (const p of i.curva) assert.deepEqual(claves(p), FORMA.curva.slice().sort());
   for (const c of i.cotizaciones) assert.deepEqual(claves(c), FORMA.cotizacion.slice().sort());
@@ -218,26 +236,35 @@ test('ajustes: se ven los límites; se cambian presupuesto, modelos y velocidad;
   const v = s.comando('ajustes');
   assert.ok(v.ok);
   assert.equal(v.datos.limites.maxExposicionBruta, 0.8);
-  const r = s.comando('ajustes', { presupuestoDiaUsd: 3.5, modeloAgentes: 'claude-haiku-4-5', velocidad: 60 });
+  // De partida, como el servidor (30-sep-2026): agentes en Haiku 4.5 y tope de 1 $/día.
+  assert.equal(s.instantanea().llm.modeloAgentes, 'claude-haiku-4-5');
+  assert.equal(s.instantanea().llm.presupuestoDiaUsd, 1);
+  // Un modelo distinto del de partida, para que el cambio se vea.
+  const r = s.comando('ajustes', { presupuestoDiaUsd: 3.5, modeloAgentes: 'claude-sonnet-5-5', velocidad: 60 });
   assert.ok(r.ok);
   const i = s.instantanea();
   assert.equal(i.llm.presupuestoDiaUsd, 3.5);
-  assert.equal(i.llm.modeloAgentes, 'claude-haiku-4-5');
+  assert.equal(i.llm.modeloAgentes, 'claude-sonnet-5-5');
   assert.equal(i.velocidad, 60);
   const mal = s.comando('ajustes', { modeloComite: 'gpt-9' });
   assert.equal(mal.ok, false);
   assert.equal(s.instantanea().llm.modeloComite, 'claude-opus-5-5');
 });
 
-test('mesas como en el arranque real: incubadas al 2 % con su nota y el 16 % sin asignar avisado', () => {
+test('mesas como en el arranque real: una titular al 40 %, tres incubadas al 2 % con su nota y el 54 % sin asignar avisado', () => {
   const i = crearMaqueta({ semilla: 7, ahora: T0 }).instantanea();
   const inc = i.mesas.filter(m => m.estado === 'incubacion');
-  assert.deepEqual(inc.map(m => m.id), ['tendencia', 'reversion']);
+  assert.deepEqual(inc.map(m => m.id), ['tendencia', 'reversion', 'ruptura']);
   for (const m of inc) { assert.equal(m.peso, 0.02); assert.match(m.nota, /Sharpe/); }
-  assert.ok(i.mesas.filter(m => m.estado === 'titular').every(m => m.peso === 0.4 && m.nota === null));
-  assert.ok(i.avisos.some(a => /^16 % del capital sin asignar/.test(a)), i.avisos.join(' | '));
-  assert.ok(Math.abs(i.cabecera.sinAsignar.fraccion - 0.16) < 1e-9);
-  assert.ok(Math.abs(i.cabecera.sinAsignar.usd - i.cabecera.patrimonio * 0.16) < 0.01);
+  assert.deepEqual(i.mesas.filter(m => m.estado === 'titular').map(m => [m.id, m.peso]), [['momentum', 0.4]]);
+  const aviso = i.avisos.find(a => /^54 % del capital sin asignar: queda en efectivo\./.test(a));
+  assert.ok(aviso, i.avisos.join(' | '));
+  assert.match(aviso, /solo 1 mesa titular \(techo del 40 %\) y 3 en prueba al 2 %/);
+  assert.ok(Math.abs(i.cabecera.sinAsignar.fraccion - 0.54) < 1e-9);
+  assert.ok(Math.abs(i.cabecera.sinAsignar.usd - i.cabecera.patrimonio * 0.54) < 0.01);
+  // Los límites de la maqueta son los del servidor (src/config.js).
+  const { LIMITES_DUROS } = require('../src/config');
+  assert.deepEqual(i.limites, { ...LIMITES_DUROS });
   // Las notas y los nombres son los del arranque real (src/estrategias/index.js).
   const reales = require('../src/estrategias').mesasIniciales({ hayAlpaca: false });
   for (const m of i.mesas) {

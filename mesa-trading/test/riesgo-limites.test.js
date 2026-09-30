@@ -233,14 +233,33 @@ test('recorte: directiva del Megáfono reducir_riesgo ×0,25 (manda la más dura
   cerca(evaluarPropuesta(prop(), ctx({ directivas: { reduccion: { factor: 0.5, hasta: AHORA - 1 } } })).nocional, 5000);
 });
 
-test('recorte: riesgo por operación (0,5 %) — stop al 10 % con 8.000 $ arriesgaría 800 $, caben 5.000', () => {
-  const r = evaluarPropuesta(prop({ nocional: 8000, stop: 90000 }), ctx());
+test('recorte: riesgo por operación (1 %) — stop al 20 % con 8.000 $ arriesgaría 1.600 $, caben 5.000', () => {
+  // Límite del 30-sep-2026 (antes 0,5 %, con el stop al 10 % para el mismo 5.000).
+  assert.equal(LIMITES_DUROS.riesgoPorOperacion, 0.01);
+  const r = evaluarPropuesta(prop({ nocional: 8000, stop: 80000 }), ctx());
   assert.equal(r.decision, 'reducir');
   cerca(r.nocional, 5000);
   const m = r.motivos.find(x => x.limite === 'riesgoPorOperacion');
-  cerca(m.valor, 0.008);
-  assert.match(m.texto, /800,00 \$ \(0,80 % del patrimonio\)/);
-  assert.match(m.texto, /0,50 % \(500,00 \$\)/);
+  cerca(m.valor, 0.016);
+  cerca(m.maximo, 0.01);
+  assert.match(m.texto, /1\.600 \$ \(1,60 % del patrimonio\)/);
+  assert.match(m.texto, /máximo 1,00 % \(1\.000 \$\)/);
+  assert.match(m.texto, /se recorta de 8\.000 \$ a 5\.000 \$/);
+});
+
+test('riesgo por operación (1 %): lo que el 0,5 % recortaba ahora cabe entero, y el 1 % justo también', () => {
+  // Stop al 10 % con 8.000 $: 800 $ (0,8 %) de riesgo, por debajo del 1 %.
+  const r = evaluarPropuesta(prop({ nocional: 8000, stop: 90000 }), ctx());
+  assert.equal(r.decision, 'aprobar');
+  cerca(r.nocional, 8000);
+  // 10.000 $ con el stop al 10 %: 1.000 $, justo el 1 % (y justo el tope por activo): cabe.
+  const justo = evaluarPropuesta(prop({ nocional: 10000, stop: 90000 }), ctx());
+  assert.equal(justo.decision, 'aprobar', JSON.stringify(justo.motivos));
+  cerca(justo.nocional, 10000);
+  // 1 $ más de riesgo ya recorta: 5.000 $ con el stop al 20,02 % → 1.001 $.
+  const encima = evaluarPropuesta(prop({ nocional: 5000, stop: 79980 }), ctx());
+  assert.equal(encima.decision, 'reducir');
+  cerca(encima.nocional, 1000 / 0.2002, 1e-6);
 });
 
 test('recortes encadenados: primero ×0,5 de caída y luego el tope del activo', () => {

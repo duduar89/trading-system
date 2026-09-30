@@ -3,22 +3,31 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { dimensionar } = require('../src/cuant/dimensionado');
 
-const LIM = { riesgoPorOperacion: 0.005, maxPesoPorActivo: 0.10 };
+// Los del fondo (src/config.js): riesgo por operación 1 % desde el 30-sep-2026 (antes 0,5 %).
+const LIM = { riesgoPorOperacion: 0.01, maxPesoPorActivo: 0.10 };
 const cerca = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol, `${a} ≠ ${b}`);
 
 test('recorta por volatilidad: 5.000 × min(1, 0,40/0,80) = 2.500', () => {
   // peso 10.000·0,5 = 5.000 · volatilidad 5.000·0,5 = 2.500 ·
-  // riesgo 0,005·100.000/0,05 = 10.000 · maxActivo 0,10·100.000 = 10.000
+  // riesgo 0,01·100.000/0,05 = 20.000 · maxActivo 0,10·100.000 = 10.000
   const r = dimensionar({ capitalMesa: 10000, peso: 0.5, precio: 100, stop: 95, volAnual: 0.8, patrimonio: 100000, limites: LIM });
   cerca(r.nocional, 2500);
   cerca(r.cantidad, 25);
   assert.equal(r.limitadoPor, 'volatilidad');
 });
 
-test('recorta por riesgo: stop al 25 % → 500 $ de riesgo / 0,25 = 2.000', () => {
-  const r = dimensionar({ capitalMesa: 10000, peso: 0.5, precio: 100, stop: 75, volAnual: 0.8, patrimonio: 100000, limites: LIM });
+test('recorta por riesgo: stop al 50 % → 1.000 $ de riesgo / 0,50 = 2.000', () => {
+  // Con el 1 %, el stop al 25 % daría 4.000 y mandaría la volatilidad (2.500): hace falta un stop más lejano.
+  const r = dimensionar({ capitalMesa: 10000, peso: 0.5, precio: 100, stop: 50, volAnual: 0.8, patrimonio: 100000, limites: LIM });
   cerca(r.nocional, 2000);
   assert.equal(r.limitadoPor, 'riesgo');
+  // El 1 % es el doble que el 0,5 %: el mismo stop al 25 % pasa de 2.000 a 4.000 $ de tope por riesgo.
+  const antes = dimensionar({ capitalMesa: 10000, peso: 0.5, precio: 100, stop: 75, volAnual: 0.8, patrimonio: 100000, limites: { ...LIM, riesgoPorOperacion: 0.005 } });
+  const ahora = dimensionar({ capitalMesa: 10000, peso: 0.5, precio: 100, stop: 75, volAnual: 0.1, patrimonio: 100000, limites: LIM });
+  cerca(antes.nocional, 2000);
+  assert.equal(antes.limitadoPor, 'riesgo');
+  cerca(ahora.nocional, 4000);
+  assert.equal(ahora.limitadoPor, 'riesgo');
 });
 
 test('recorta por máximo por activo: 10 % de 100.000 = 10.000', () => {

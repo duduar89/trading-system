@@ -24,7 +24,7 @@ test('A · tras un kill y Reabrir, la sombra «sin comité» mide la caída desd
   const paso = async () => { reloj.avanzar(PASO); await o.paso(); };
   for (let i = 0; i < 3; i++) await paso();
   // El caso del verificador: los dos vienen de un máximo un 12 % más alto
-  // (entre el ×0,5 del −10 % y el kill del −15 %).
+  // (entre el ×0,5 del −10 % y el kill, del −25 % desde el 30-sep-2026).
   o.estado.pico = o.vivo.patrimonio / 0.88;
   o.estado.sombra.pico = o.vivo.patrimonioSombra / 0.88;
   await paso();
@@ -71,11 +71,12 @@ test('A · Reabrir desde una pausa no pone referencia aparte, ni al fondo ni a l
 // ---------- B: el factor de tamaño, sobre el nocional final ----------
 
 // Lo que propone el operador (bus 'propuesta') para una apertura de BTC en
-// ruptura con el stop a `stopFrac` del precio, en un orquestador recién hecho.
+// momentum (la titular, 40 %) con el stop a `stopFrac` del precio, en un
+// orquestador recién hecho. Antes era Ruptura, titular hasta el 30-sep-2026.
 async function propuestaBTC({ stopFrac, preparar = () => {} }) {
   const { orquestador: o } = await crearOrquestador();
   preparar(o);
-  const mesa = o.mesaPorId('ruptura');
+  const mesa = o.mesaPorId('momentum');
   const q = o.vivo.precios['BTC/USD'];
   let prop = null;
   let respuesta = null;
@@ -91,11 +92,14 @@ async function propuestaBTC({ stopFrac, preparar = () => {} }) {
 const DEFENSIVO = o => comite.aplicarDecision(o, { modo: 'DEFENSIVO', multiplicadores: {}, vetos: [] }, o.reloj.ahora());
 
 test('B · con DEFENSIVO la apertura sale a ×0,5 exacto aunque mande el riesgo por operación (antes salía a ×1)', async () => {
-  // Stop al 10 %: el riesgo por operación (0,5 % del patrimonio) deja 5.000 $,
-  // menos que el capital de la mesa: dimensionar() se queda con él.
-  const normal = await propuestaBTC({ stopFrac: 0.10 });
-  const def = await propuestaBTC({ stopFrac: 0.10, preparar: DEFENSIVO });
+  // Stop al 20 %: el riesgo por operación (1 % del patrimonio) deja 5.000 $,
+  // menos que el capital de la mesa y que el tope por activo: dimensionar() se
+  // queda con él. (Con el 0,5 % el caso era el stop al 10 %; con el 1 %, el
+  // stop al 10 % empata con el tope por activo, 10.000 $.)
+  const normal = await propuestaBTC({ stopFrac: 0.20 });
+  const def = await propuestaBTC({ stopFrac: 0.20, preparar: DEFENSIVO });
   assert.equal(normal.prop.limitadoPor, 'riesgo');
+  cerca(normal.prop.nocional, 5000);
   cerca(def.prop.nocional / normal.prop.nocional, 0.5, 1e-9);
   assert.equal(def.prop.factorTamano, 0.5);
   // Riesgos lo comprueba sin volver a multiplicar: aprueba el ×0,5 tal cual.
@@ -104,16 +108,17 @@ test('B · con DEFENSIVO la apertura sale a ×0,5 exacto aunque mande el riesgo 
 });
 
 test('B · con DEFENSIVO la apertura sale a ×0,5 exacto aunque mande el tope por activo', async () => {
-  // Stop al 2 %: el riesgo deja 25.000 $ y el tope por activo (10 %) 10.000 $.
+  // Stop al 2 %: el riesgo (1 %) deja 50.000 $, la mesa 40.000 $ y el tope por activo (10 %) 10.000 $.
   const normal = await propuestaBTC({ stopFrac: 0.02 });
   const def = await propuestaBTC({ stopFrac: 0.02, preparar: DEFENSIVO });
   assert.equal(normal.prop.limitadoPor, 'maxActivo');
+  cerca(normal.prop.nocional, 10000);
   cerca(def.prop.nocional / normal.prop.nocional, 0.5, 1e-9);
 });
 
 test('B · el multiplicador ×0,5 de la mesa, el Megáfono y la caída multiplican lo mismo, una sola vez', async () => {
   const conTodo = o => {
-    comite.aplicarDecision(o, { modo: 'DEFENSIVO', multiplicadores: { ruptura: 0.5 }, vetos: [] }, o.reloj.ahora());
+    comite.aplicarDecision(o, { modo: 'DEFENSIVO', multiplicadores: { momentum: 0.5 }, vetos: [] }, o.reloj.ahora());
     o.estado.directivas = megafono.aplicarDirectiva(o.estado.directivas, { tipo: 'reducir_riesgo', factor: 0.5, horas: 3 }, o.reloj.ahora());
     o.estado.fondo.multiplicadorCaida = 0.5;
   };
@@ -127,7 +132,7 @@ test('B · el multiplicador ×0,5 de la mesa, el Megáfono y la caída multiplic
 });
 
 test('B · la mesa a ×0 del comité: se propone y la veta Riesgos con su motivo', async () => {
-  const cero = await propuestaBTC({ stopFrac: 0.10, preparar: o => comite.aplicarDecision(o, { modo: 'NORMAL', multiplicadores: { ruptura: 0 }, vetos: [] }, o.reloj.ahora()) });
+  const cero = await propuestaBTC({ stopFrac: 0.10, preparar: o => comite.aplicarDecision(o, { modo: 'NORMAL', multiplicadores: { momentum: 0 }, vetos: [] }, o.reloj.ahora()) });
   assert.ok(cero.prop.nocional > 0);
   assert.equal(cero.respuesta.decision, 'vetar');
   assert.ok(cero.respuesta.motivos.some(m => m.limite === 'multiplicadorComite'));
@@ -135,13 +140,14 @@ test('B · la mesa a ×0 del comité: se propone y la veta Riesgos con su motivo
 
 test('B · la sombra aplica lo suyo: Megáfono y caída sí (×0,5 exacto con el riesgo mandando), comité no', async () => {
   const { orquestador: o } = await crearOrquestador();
-  const mesa = o.mesaPorId('ruptura');
+  // Momentum, la titular; stop al 20 % para que mande el riesgo por operación (1 %).
+  const mesa = o.mesaPorId('momentum');
   const q = o.vivo.precios['BTC/USD'];
-  const pedir = () => mesasDep.tamanoApertura(o, mesa, { peso: 1, precio: q.precio, stop: q.precio * 0.9, volAnual: 0.3 }, { sombra: true });
+  const pedir = () => mesasDep.tamanoApertura(o, mesa, { peso: 1, precio: q.precio, stop: q.precio * 0.8, volAnual: 0.3 }, { sombra: true });
   const base = pedir();
   assert.equal(base.limitadoPor, 'riesgo');
   cerca(base.nocional, base.nocionalBase);
-  comite.aplicarDecision(o, { modo: 'DEFENSIVO', multiplicadores: { ruptura: 0.5 }, vetos: [] }, o.reloj.ahora());
+  comite.aplicarDecision(o, { modo: 'DEFENSIVO', multiplicadores: { momentum: 0.5 }, vetos: [] }, o.reloj.ahora());
   cerca(pedir().nocional, base.nocional, 1e-12);
   o.estado.directivas = megafono.aplicarDirectiva(o.estado.directivas, { tipo: 'reducir_riesgo', factor: 0.5, horas: 3 }, o.reloj.ahora());
   cerca(pedir().nocional / base.nocional, 0.5, 1e-12);
@@ -150,8 +156,8 @@ test('B · la sombra aplica lo suyo: Megáfono y caída sí (×0,5 exacto con el
   // Riesgos (contexto de la sombra) no lo vuelve a multiplicar.
   const t = pedir();
   const r = riesgos.evaluar(o, {
-    puestoId: 'ruptura-BTC@sombra', mesaId: 'ruptura', simbolo: 'BTC/USD', clase: 'cripto', lado: 'compra', tipo: 'apertura',
-    nocional: t.nocional, precio: q.precio, precioT: q.t, stop: q.precio * 0.9, precioDecision: q.precio, factorTamano: t.factor.total,
+    puestoId: 'momentum-BTC@sombra', mesaId: 'momentum', simbolo: 'BTC/USD', clase: 'cripto', lado: 'compra', tipo: 'apertura',
+    nocional: t.nocional, precio: q.precio, precioT: q.t, stop: q.precio * 0.8, precioDecision: q.precio, factorTamano: t.factor.total,
   }, { sombra: true });
   assert.equal(r.decision, 'aprobar', JSON.stringify(r.motivos));
   cerca(r.nocional, t.nocional);

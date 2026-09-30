@@ -310,12 +310,16 @@ async function comprobacionReal() {
     const desde = velas[plan.universo[0]][est.calentamiento(params)].t; // tras calentar, igual para la sombra
     const marcoMs = comun.MARCOS[est.marco];
     const mesa = backtest({ velas, estrategia: est, capital: 10000, costes, limites: LIMITES_DUROS, desde, pesoMesa: PESO_MESA });
+    // La misma mesa sin ningún coste (ni comisión, ni deslizamiento, ni penalización):
+    // cuánto se lleva el coste de operar. Y lo pagado en comisiones.
+    const sinCostes = backtest({ velas, estrategia: est, capital: 10000, costes: { comision: () => 0, deslizamiento: () => 0, penalizacion: 0 }, limites: LIMITES_DUROS, desde, pesoMesa: PESO_MESA });
+    const comisiones = mesa.operaciones.reduce((a, o) => a + (o.comisiones || 0), 0);
     const senal = backtest({ velas, estrategia: est, capital: 10000, costes, limites: { minNocionalOrden: 10 }, desde, volObjetivo: Infinity });
     const bh = compraYMantener({ velas, capital: 10000, costes, desde, marcoMs });
     const nombre = `${plan.familia} ${comun.textoMarco(est.marco)} (${plan.universo.map(comun.etiqueta).join('/')})`;
     const m = mesa.metricas; const s = senal.metricas; const b = bh.metricas;
     filasMesa.push([nombre, F.pct(m.rentabilidad), F.pct(m.cagr), F.num(m.sharpe), F.pct(m.maxDD), m.operaciones, F.pct(m.acierto), F.pct(m.exposicionMedia),
-      F.pct(b.rentabilidad), F.num(b.sharpe), F.pct(b.maxDD)]);
+      `${F.num(comisiones, 0)} $`, F.pct(sinCostes.metricas.rentabilidad), F.pct(b.rentabilidad), F.num(b.sharpe), F.pct(b.maxDD)]);
     filasSenal.push([nombre, F.pct(s.rentabilidad), F.num(s.sharpe), F.pct(s.maxDD), s.operaciones, F.pct(s.exposicionMedia), F.num(s.factorBeneficio)]);
 
     const t0 = Date.now();
@@ -336,13 +340,14 @@ async function comprobacionReal() {
     console.log(`  ${nombre}: tramo ${F.fecha(desde)} → ${F.fecha(mesa.curva[mesa.curva.length - 1].t)}`);
   }
 
-  console.log('\n1) Parámetros por defecto, como una mesa con el 25 % del fondo (límites del fondo, costes de §3.4 + penalización 0,1 %):');
-  tabla(filasMesa, ['familia', 'rent.', 'CAGR', 'Sharpe', 'maxDD', 'ops', 'acierto', 'expos.', 'C&M rent.', 'C&M Sharpe', 'C&M maxDD']);
+  console.log(`\n1) Parámetros por defecto, como una mesa con el 25 % del fondo (límites del fondo con riesgo por operación del ${F.pct(LIMITES_DUROS.riesgoPorOperacion)}, costes de §3.4 + penalización 0,1 %):`);
+  tabla(filasMesa, ['familia', 'rent.', 'CAGR', 'Sharpe', 'maxDD', 'ops', 'acierto', 'expos.', 'comisiones', 'sin costes', 'C&M rent.', 'C&M Sharpe', 'C&M maxDD']);
   console.log('\n2) Calidad de la señal: la misma estrategia sin límites del fondo (peso completo por activo), mismos costes:');
   tabla(filasSenal, ['familia', 'rent.', 'Sharpe', 'maxDD', 'ops', 'expos.', 'factor']);
   console.log('\n3) Walk-forward fuera de muestra (rejilla completa, mesa al 25 %):');
   tabla(filasWf, ['familia', 'ventanas', 'combos', 'Sharpe OOS', 'rent. OOS', 'maxDD OOS', 'ops', 'ventanas +', 'DSR', 'tiempo']);
   console.log('\nC&M = comprar y mantener a partes iguales el mismo universo desde la misma fecha, con los mismos costes.');
+  console.log('sin costes = la misma mesa sin comisión, deslizamiento ni penalización; comisiones = lo pagado sobre 10.000 $.');
 }
 
 (async () => {
