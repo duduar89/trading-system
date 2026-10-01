@@ -1,5 +1,5 @@
 'use strict';
-// Cola de trabajos en MariaDB. La vacía el cron cada minuto: cada trabajador coge los suyos con
+// Cola de trabajos en PostgreSQL. La vacía el cron cada minuto: cada trabajador coge los suyos con
 // SELECT … FOR UPDATE SKIP LOCKED, así dos cron a la vez nunca hacen el mismo trabajo dos veces.
 // Si un trabajo falla, se reintenta con espera creciente (1, 2, 4, 8… minutos) hasta max_intentos.
 // Un trabajo que todavía no puede hacerse (p. ej., espera a otro del mismo paciente) se aplaza: vuelve
@@ -8,10 +8,12 @@
 const APLAZADO = Symbol('aplazado');
 const aplazar = ({ minutos = 1 } = {}) => ({ [APLAZADO]: true, minutos });
 
+// Con la misma clave única, el segundo encolado no hace nada y devuelve el id del primero: el «UPDATE»
+// del ON CONFLICT no cambia nada, solo hace que RETURNING (que db.js añade) devuelva la fila que ya estaba.
 async function encolar(con, tipo, carga = {}, { ejecutarEn = new Date(), claveUnica = null, maxIntentos = 5 } = {}) {
   const [r] = await con.query(
     `INSERT INTO cola (tipo, carga, ejecutar_en, clave_unica, max_intentos) VALUES (?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)`,
+     ON CONFLICT (clave_unica) DO UPDATE SET id = cola.id`,
     [tipo, JSON.stringify(carga), ejecutarEn, claveUnica, maxIntentos]);
   return r.insertId;
 }
@@ -84,7 +86,8 @@ async function conCandado(pool, nombre, ms, fn, { ahora = new Date(), dueno = `$
   const hasta = new Date(ahora.getTime() + ms);
   await pool.query(
     `INSERT INTO candados (nombre, dueno, hasta) VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE dueno = IF(hasta < ?, VALUES(dueno), dueno), hasta = IF(hasta < ?, VALUES(hasta), hasta)`,
+     ON CONFLICT (nombre) DO UPDATE SET dueno = CASE WHEN candados.hasta < ? THEN EXCLUDED.dueno ELSE candados.dueno END,
+                                        hasta = CASE WHEN candados.hasta < ? THEN EXCLUDED.hasta ELSE candados.hasta END`,
     [nombre, dueno, hasta, ahora, ahora]);
   const [[fila]] = await pool.query('SELECT dueno FROM candados WHERE nombre = ?', [nombre]);
   if (fila.dueno !== dueno) return { ejecutado: false };
@@ -97,7 +100,7 @@ async function conCandado(pool, nombre, ms, fn, { ahora = new Date(), dueno = `$
 
 // Trabajo que se hace una sola vez por clave (p. ej. la revisión diaria): la marca no se libera.
 async function unaVez(pool, clave, hasta, fn) {
-  const [r] = await pool.query('INSERT IGNORE INTO candados (nombre, dueno, hasta) VALUES (?, ?, ?)', [clave, 'hecho', hasta]);
+  const [r] = await pool.query('INSERT INTO candados (nombre, dueno, hasta) VALUES (?, ?, ?) ON CONFLICT DO NOTHING', [clave, 'hecho', hasta]);
   if (r.affectedRows !== 1) return { ejecutado: false };
   return { ejecutado: true, resultado: await fn() };
 }

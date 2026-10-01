@@ -186,7 +186,7 @@ test('lo legal: restringidos marcados y fuera de la IA; el quirófano externo, v
 
     // Sala de procedimientos (cirugía menor): el tipo existe (migración 006) y el injerto va, de
     // momento, a la sala capilar.
-    const [[injerto]] = await pool.query(`SELECT t.sala_tipo, t.duracion_min, GROUP_CONCAT(s.codigo) AS salas FROM tratamientos t
+    const [[injerto]] = await pool.query(`SELECT t.sala_tipo, t.duracion_min, string_agg(s.codigo, ',') AS salas FROM tratamientos t
       JOIN tratamiento_salas ts ON ts.tratamiento_id = t.id JOIN salas s ON s.id = ts.sala_id WHERE t.id = 'injerto-capilar-fue' GROUP BY t.id`);
     assert.deepEqual({ ...injerto }, { sala_tipo: 'sala_procedimientos', duracion_min: 480, salas: 'sala-capilar' });
   } finally {

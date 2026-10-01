@@ -68,23 +68,23 @@ async function semillar(pool, { demo = false, log = () => {}, carpeta = CARPETA 
     const d = c.clinica;
     const cols = Object.keys(d);
     await q(`INSERT INTO clinica (id, ${cols.join(', ')}) VALUES (1, ${cols.map(() => '?').join(', ')})
-             ON DUPLICATE KEY UPDATE ${cols.map((k) => `${k} = VALUES(${k})`).join(', ')}`, cols.map((k) => d[k]));
+             ON CONFLICT (id) DO UPDATE SET ${cols.map((k) => `${k} = EXCLUDED.${k}`).join(', ')}`, cols.map((k) => d[k]));
     await q('DELETE FROM horario_clinica');
     for (const h of c.horario) await q('INSERT INTO horario_clinica (dia_semana, abre, cierra) VALUES (?, ?, ?)', [h.dia_semana, h.abre, h.cierra]);
-    for (const f of c.festivos) await q('INSERT INTO festivos (fecha, nombre, ambito) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), ambito = VALUES(ambito)', [f.fecha, f.nombre, f.ambito]);
+    for (const f of c.festivos) await q('INSERT INTO festivos (fecha, nombre, ambito) VALUES (?, ?, ?) ON CONFLICT (fecha) DO UPDATE SET nombre = EXCLUDED.nombre, ambito = EXCLUDED.ambito', [f.fecha, f.nombre, f.ambito]);
     log(`clínica, horario y ${c.festivos.length} festivos`);
   }
   for (const [codigo, nombre, orden] of FAMILIAS) {
-    await q('INSERT INTO familias (codigo, nombre, orden) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), orden = VALUES(orden)', [codigo, nombre, orden]);
+    await q('INSERT INTO familias (codigo, nombre, orden) VALUES (?, ?, ?) ON CONFLICT (codigo) DO UPDATE SET nombre = EXCLUDED.nombre, orden = EXCLUDED.orden', [codigo, nombre, orden]);
   }
   if (e) {
     for (const s of e.salas) {
-      await q('INSERT INTO salas (codigo, nombre, tipo, color, orden) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), tipo = VALUES(tipo), color = VALUES(color), orden = VALUES(orden)',
+      await q('INSERT INTO salas (codigo, nombre, tipo, color, orden) VALUES (?, ?, ?, ?, ?) ON CONFLICT (codigo) DO UPDATE SET nombre = EXCLUDED.nombre, tipo = EXCLUDED.tipo, color = EXCLUDED.color, orden = EXCLUDED.orden',
         [s.codigo, s.nombre, s.tipo, s.color, s.orden]);
     }
     let orden = 0;
     for (const p of e.profesionales) {
-      await q('INSERT INTO profesionales (codigo, nombre, rol, especialidad, color, orden) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), especialidad = VALUES(especialidad), color = VALUES(color)',
+      await q('INSERT INTO profesionales (codigo, nombre, rol, especialidad, color, orden) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (codigo) DO UPDATE SET nombre = EXCLUDED.nombre, especialidad = EXCLUDED.especialidad, color = EXCLUDED.color',
         [p.codigo, p.nombre, p.rol, p.especialidad, p.color, orden++]);
     }
     log(`${e.salas.length} salas y ${e.profesionales.length} profesionales (sin confirmar)`);
@@ -100,9 +100,12 @@ async function semillar(pool, { demo = false, log = () => {}, carpeta = CARPETA 
     for (const eq of t.aparatos || []) {
       const { movil, sala } = ubicacion(eq);
       await q(`INSERT INTO equipos (codigo, nombre, tipo, movil, unidades, notas, sala_id) VALUES (?, ?, ?, ?, ?, ?, ?)
-               ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), tipo = VALUES(tipo), movil = IF(confirmado, movil, VALUES(movil)),
-                 unidades = IF(confirmado, unidades, VALUES(unidades)), notas = IF(confirmado, notas, VALUES(notas)), activo = IF(confirmado, activo, TRUE),
-                 sala_id = IF(confirmado AND sala_id IS NOT NULL, sala_id, COALESCE(VALUES(sala_id), sala_id))`,
+               ON CONFLICT (codigo) DO UPDATE SET nombre = EXCLUDED.nombre, tipo = EXCLUDED.tipo,
+                 movil = CASE WHEN equipos.confirmado THEN equipos.movil ELSE EXCLUDED.movil END,
+                 unidades = CASE WHEN equipos.confirmado THEN equipos.unidades ELSE EXCLUDED.unidades END,
+                 notas = CASE WHEN equipos.confirmado THEN equipos.notas ELSE EXCLUDED.notas END,
+                 activo = CASE WHEN equipos.confirmado THEN equipos.activo ELSE TRUE END,
+                 sala_id = CASE WHEN equipos.confirmado AND equipos.sala_id IS NOT NULL THEN equipos.sala_id ELSE COALESCE(EXCLUDED.sala_id, equipos.sala_id) END`,
       [eq.codigo, eq.nombre, eq.tipo || null, movil, eq.unidades || 1, corta(eq.notas, 255), (sala && idSala[sala]) || null]);
     }
     for (const x of t.tratamientos) {
@@ -121,7 +124,7 @@ async function semillar(pool, { demo = false, log = () => {}, carpeta = CARPETA 
       const cols = Object.keys(fila);
       // Lo que la clínica ya validó a mano no se pisa.
       await q(`INSERT INTO tratamientos (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})
-               ON DUPLICATE KEY UPDATE ${cols.filter((k) => k !== 'id').map((k) => `${k} = IF(validado_clinica, ${k}, VALUES(${k}))`).join(', ')}`,
+               ON CONFLICT (id) DO UPDATE SET ${cols.filter((k) => k !== 'id').map((k) => `${k} = CASE WHEN tratamientos.validado_clinica THEN tratamientos.${k} ELSE EXCLUDED.${k} END`).join(', ')}`,
       cols.map((k) => fila[k]));
     }
     // Lo que ya no está en el catálogo (el provisional de la F1, versiones anteriores) se retira: se
@@ -197,8 +200,8 @@ async function semillar(pool, { demo = false, log = () => {}, carpeta = CARPETA 
     // Preguntas frecuentes, sin aprobar. Mientras nadie las apruebe, se ponen al día con el catálogo.
     for (const f of t.faqs || []) {
       const [trat, pregunta, respuesta, url] = [f.tratamiento_id || null, corta(f.pregunta, 255), corta(f.respuesta, 800), f.url || null];
-      await q('UPDATE respuestas_aprobadas SET respuesta = ?, fuente_url = ? WHERE pregunta = ? AND tratamiento_id <=> ? AND NOT aprobada', [respuesta, url, pregunta, trat]);
-      await q('INSERT INTO respuestas_aprobadas (tratamiento_id, pregunta, respuesta, fuente_url) SELECT ?, ?, ?, ? FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM respuestas_aprobadas WHERE pregunta = ? AND tratamiento_id <=> ?)',
+      await q('UPDATE respuestas_aprobadas SET respuesta = ?, fuente_url = ? WHERE pregunta = ? AND tratamiento_id IS NOT DISTINCT FROM ? AND NOT aprobada', [respuesta, url, pregunta, trat]);
+      await q('INSERT INTO respuestas_aprobadas (tratamiento_id, pregunta, respuesta, fuente_url) SELECT ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM respuestas_aprobadas WHERE pregunta = ? AND tratamiento_id IS NOT DISTINCT FROM ?)',
         [trat, pregunta, respuesta, url, pregunta, trat]);
     }
     const reservables = t.tratamientos.filter((x) => x.activo !== false).length;
@@ -210,18 +213,18 @@ async function semillar(pool, { demo = false, log = () => {}, carpeta = CARPETA 
   // que aprobó Meta: si cambia, se vuelve a mandar), salvo en la demo, donde «aprobada» es de mentira: si
   // no, una base de demostración sembrada antes se quedaría con los textos viejos y los avisos que
   // ahora llevan otros datos no saldrían.
-  const alDia = demo ? 'TRUE' : "estado = 'borrador'";
+  const alDia = demo ? 'TRUE' : "plantillas.estado = 'borrador'";
   for (const p of BIBLIOTECA) {
     await q(`INSERT INTO plantillas (nombre, uso, categoria, cabecera, cuerpo, botones, ejemplos, estado, calidad)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE
-               cabecera = IF(${alDia}, VALUES(cabecera), cabecera), botones = IF(${alDia}, VALUES(botones), botones),
-               ejemplos = IF(${alDia}, VALUES(ejemplos), ejemplos), cuerpo = IF(${alDia}, VALUES(cuerpo), cuerpo)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (nombre, idioma) DO UPDATE SET
+               cabecera = CASE WHEN ${alDia} THEN EXCLUDED.cabecera ELSE plantillas.cabecera END, botones = CASE WHEN ${alDia} THEN EXCLUDED.botones ELSE plantillas.botones END,
+               ejemplos = CASE WHEN ${alDia} THEN EXCLUDED.ejemplos ELSE plantillas.ejemplos END, cuerpo = CASE WHEN ${alDia} THEN EXCLUDED.cuerpo ELSE plantillas.cuerpo END`,
     [p.nombre, p.uso, p.categoria, p.cabecera ? JSON.stringify(p.cabecera) : null, p.cuerpo, JSON.stringify(p.botones || []), JSON.stringify(p.ejemplos || []),
       demo ? 'aprobada' : 'borrador', demo ? 'verde' : 'pendiente']);
   }
   for (const o of OFERTAS) {
     await q(`INSERT INTO ofertas (codigo, nombre, tipo, texto_paciente, familias, importe_min, requiere_aprobacion, activa)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nombre = IF(activa, nombre, VALUES(nombre))`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (codigo) DO UPDATE SET nombre = CASE WHEN ofertas.activa THEN ofertas.nombre ELSE EXCLUDED.nombre END`,
     [o.codigo, o.nombre, o.tipo, o.texto_paciente, o.familias ? JSON.stringify(o.familias) : null, o.importe_min || null, Boolean(o.requiere_aprobacion), demo]);
   }
   log(`${BIBLIOTECA.length} plantillas${demo ? ' (aprobadas, demo)' : ' (borrador)'} y ${OFERTAS.length} ofertas propuestas`);
