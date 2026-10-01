@@ -4,4 +4,4 @@
 -- motor/repesca/filtro-legal.js); TRUE o FALSE: lo ha decidido la clínica para ese tratamiento.
 
 ALTER TABLE tratamientos
-  ADD COLUMN IF NOT EXISTS sensible BOOLEAN NULL AFTER publicidad_restringida;
+  ADD COLUMN IF NOT EXISTS sensible BOOLEAN;

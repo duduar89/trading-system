@@ -9,23 +9,27 @@
 -- vuelve a enviar y, si DataForSEO la tenía, la recogida le pone su id por la etiqueta.
 -- intentos: las veces que ha fallado ella sola al recogerla (a la tercera, fallida).
 CREATE TABLE IF NOT EXISTS posiciones_tareas (
-  id VARCHAR(64) NOT NULL PRIMARY KEY,
+  id VARCHAR(64) PRIMARY KEY,
   pasada DATE NOT NULL,
   palabra VARCHAR(160) NOT NULL,
   punto VARCHAR(40) NOT NULL,
-  lat DECIMAL(10,7) NOT NULL,
-  lng DECIMAL(10,7) NOT NULL,
-  zoom TINYINT UNSIGNED NOT NULL,
-  profundidad TINYINT UNSIGNED NOT NULL,
-  coste_usd DECIMAL(10,6) NOT NULL DEFAULT 0,
-  estado ENUM('enviada','incierta','recogida','fallida','caducada') NOT NULL DEFAULT 'enviada',
-  intentos TINYINT UNSIGNED NOT NULL DEFAULT 0,
-  error VARCHAR(300) NULL,
-  enviada_en DATETIME NOT NULL,
-  recogida_en DATETIME NULL,
-  UNIQUE KEY posicion_tarea_unica (pasada, palabra, punto),
-  KEY posicion_tarea_estado (estado, enviada_en)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  lat NUMERIC(10,7) NOT NULL,
+  lng NUMERIC(10,7) NOT NULL,
+  zoom SMALLINT NOT NULL,
+  profundidad SMALLINT NOT NULL,
+  coste_usd NUMERIC(10,6) NOT NULL DEFAULT 0,
+  estado TEXT NOT NULL DEFAULT 'enviada',
+  intentos SMALLINT NOT NULL DEFAULT 0,
+  error VARCHAR(300),
+  enviada_en TIMESTAMPTZ NOT NULL,
+  recogida_en TIMESTAMPTZ,
+  CONSTRAINT posiciones_tareas_zoom_pos CHECK (zoom >= 0),
+  CONSTRAINT posiciones_tareas_profundidad_pos CHECK (profundidad >= 0),
+  CONSTRAINT posiciones_tareas_estado_chk CHECK (estado IN ('enviada','incierta','recogida','fallida','caducada')),
+  CONSTRAINT posiciones_tareas_intentos_pos CHECK (intentos >= 0)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS posicion_tarea_unica ON posiciones_tareas (pasada, palabra, punto);
+CREATE INDEX IF NOT EXISTS posicion_tarea_estado ON posiciones_tareas (estado, enviada_en);
 
 -- Dónde sale la clínica: puesto NULL si no sale entre los «profundidad» primeros (o si no sale nadie:
 -- resultados 0). Del 1.º solo lo público de su ficha (nombre, categoría, nota y número de reseñas; sin
@@ -34,13 +38,16 @@ CREATE TABLE IF NOT EXISTS posiciones_maps (
   pasada DATE NOT NULL,
   palabra VARCHAR(160) NOT NULL,
   punto VARCHAR(40) NOT NULL,
-  puesto TINYINT UNSIGNED NULL,
-  resultados TINYINT UNSIGNED NOT NULL DEFAULT 0,
-  primero VARCHAR(200) NULL,
-  primero_categoria VARCHAR(120) NULL,
-  primero_nota DECIMAL(2,1) NULL,
-  primero_resenas INT UNSIGNED NULL,
-  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (pasada, palabra, punto),
-  KEY posicion_palabra (palabra, pasada)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  puesto SMALLINT,
+  resultados SMALLINT NOT NULL DEFAULT 0,
+  primero VARCHAR(200),
+  primero_categoria VARCHAR(120),
+  primero_nota NUMERIC(2,1),
+  primero_resenas INTEGER,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT posiciones_maps_puesto_pos CHECK (puesto >= 0),
+  CONSTRAINT posiciones_maps_resultados_pos CHECK (resultados >= 0),
+  CONSTRAINT posiciones_maps_primero_resenas_pos CHECK (primero_resenas >= 0),
+  PRIMARY KEY (pasada, palabra, punto)
+);
+CREATE INDEX IF NOT EXISTS posicion_palabra ON posiciones_maps (palabra, pasada);

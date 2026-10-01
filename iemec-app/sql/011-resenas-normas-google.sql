@@ -10,24 +10,27 @@
 --     poco y la moderación de nuestras respuestas (reviewReplyState y policyViolation);
 --   · las reseñas que Google ya no da (las borró quien las escribió o las retiró Google): fuera de la
 --     bandeja y de las cifras, y vuelven si reaparecen.
--- Los valores nuevos de los ENUM van al final. Todo con IF NOT EXISTS: se puede repetir.
+-- Los valores nuevos de los ENUM van al final de la lista del CHECK. Esta migración va entera en una
+-- transacción: o se aplica toda o no se aplica nada.
 
 -- La ficha: su enlace para reseñar, cuándo se leyó y qué momentos de la prueba están en marcha
--- (si la clínica se queda con uno, deja solo ese).
+-- (si la clínica se queda con uno, deja solo ese). resenas_momentos era un SET de MariaDB: aquí, texto
+-- con los momentos separados por comas (el código ya lo lee así) y un CHECK de que son los conocidos.
 ALTER TABLE clinica
-  ADD COLUMN IF NOT EXISTS google_enlace_resena VARCHAR(500) NULL AFTER google_place_id,
-  ADD COLUMN IF NOT EXISTS google_ficha_leida_en DATETIME NULL AFTER google_enlace_resena,
-  ADD COLUMN IF NOT EXISTS resenas_momentos SET('2h','dia_siguiente','tres_dias') NOT NULL DEFAULT '2h,dia_siguiente,tres_dias' AFTER google_ficha_leida_en;
+  ADD COLUMN IF NOT EXISTS google_enlace_resena VARCHAR(500),
+  ADD COLUMN IF NOT EXISTS google_ficha_leida_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS resenas_momentos TEXT NOT NULL DEFAULT '2h,dia_siguiente,tres_dias'
+    CONSTRAINT clinica_resenas_momentos_chk CHECK (resenas_momentos ~ '^((2h|dia_siguiente|tres_dias)(,(2h|dia_siguiente|tres_dias))*)?$');
 
 -- Cada petición, con su variante del momento y su recordatorio.
 ALTER TABLE peticiones_resena
-  ADD COLUMN IF NOT EXISTS variante ENUM('2h','dia_siguiente','tres_dias') NULL AFTER programada_para,
-  ADD COLUMN IF NOT EXISTS recordatorio_para DATETIME NULL AFTER pulsada_en,
-  ADD COLUMN IF NOT EXISTS recordatorio_estado ENUM('programado','enviado','omitido','fallido') NULL AFTER recordatorio_para,
-  ADD COLUMN IF NOT EXISTS recordatorio_enviado_en DATETIME NULL AFTER recordatorio_estado,
-  ADD COLUMN IF NOT EXISTS recordatorio_motivo VARCHAR(160) NULL AFTER recordatorio_enviado_en,
-  ADD KEY IF NOT EXISTS peticion_recordatorio (recordatorio_estado, recordatorio_para),
-  ADD KEY IF NOT EXISTS peticion_enviada (enviada_en);
+  ADD COLUMN IF NOT EXISTS variante TEXT CONSTRAINT peticiones_resena_variante_chk CHECK (variante IN ('2h','dia_siguiente','tres_dias')),
+  ADD COLUMN IF NOT EXISTS recordatorio_para TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS recordatorio_estado TEXT CONSTRAINT peticiones_resena_recordatorio_estado_chk CHECK (recordatorio_estado IN ('programado','enviado','omitido','fallido')),
+  ADD COLUMN IF NOT EXISTS recordatorio_enviado_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS recordatorio_motivo VARCHAR(160);
+CREATE INDEX IF NOT EXISTS peticion_recordatorio ON peticiones_resena (recordatorio_estado, recordatorio_para);
+CREATE INDEX IF NOT EXISTS peticion_enviada ON peticiones_resena (enviada_en);
 
 -- Las reseñas:
 --   con_texto               si la reseña traía texto (se sabe aunque el texto ya se haya borrado)
@@ -43,26 +46,27 @@ ALTER TABLE peticiones_resena
 --   respuestas_rechazadas   cuántas veces nos ha rechazado Google una respuesta a esta reseña
 --   retirada_en             Google ya no la da (una lectura completa sin ella, o un 404 al contestarla)
 ALTER TABLE resenas
-  MODIFY COLUMN estado ENUM('nueva','borrador','aprobada','publicada','ignorada','historial') NOT NULL DEFAULT 'nueva',
-  ADD COLUMN IF NOT EXISTS con_texto BOOLEAN NOT NULL DEFAULT FALSE AFTER texto,
-  ADD COLUMN IF NOT EXISTS actualizada_en DATETIME NULL AFTER publicada_en,
-  ADD COLUMN IF NOT EXISTS contenido_leido_en DATETIME NULL AFTER actualizada_en,
-  ADD COLUMN IF NOT EXISTS contenido_borrado_en DATETIME NULL AFTER contenido_leido_en,
-  ADD COLUMN IF NOT EXISTS historial BOOLEAN NOT NULL DEFAULT FALSE AFTER prioridad,
-  ADD COLUMN IF NOT EXISTS liberada_en DATETIME NULL AFTER historial,
-  ADD COLUMN IF NOT EXISTS alerta_clinica BOOLEAN NOT NULL DEFAULT FALSE AFTER liberada_en,
-  ADD COLUMN IF NOT EXISTS alerta_tarea_id INT UNSIGNED NULL AFTER alerta_clinica,
-  ADD COLUMN IF NOT EXISTS publicar_en DATETIME NULL AFTER aprobada_por,
-  ADD COLUMN IF NOT EXISTS primera_respuesta_en DATETIME NULL AFTER respondida_en,
-  ADD COLUMN IF NOT EXISTS respuesta_estado ENUM('pendiente','aprobada','rechazada') NULL AFTER primera_respuesta_en,
-  ADD COLUMN IF NOT EXISTS respuesta_motivo_rechazo VARCHAR(60) NULL AFTER respuesta_estado,
-  ADD COLUMN IF NOT EXISTS respuesta_revisada_en DATETIME NULL AFTER respuesta_motivo_rechazo,
-  ADD COLUMN IF NOT EXISTS respuestas_rechazadas TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER respuesta_revisada_en,
-  ADD COLUMN IF NOT EXISTS error_publicar VARCHAR(255) NULL AFTER respuestas_rechazadas,
-  ADD COLUMN IF NOT EXISTS retirada_en DATETIME NULL AFTER error_publicar,
-  ADD KEY IF NOT EXISTS resena_contenido (contenido_borrado_en, contenido_leido_en),
-  ADD KEY IF NOT EXISTS resena_publicada (publicada_en),
-  ADD KEY IF NOT EXISTS resena_historial (historial, estado, publicar_en);
+  DROP CONSTRAINT resenas_estado_chk,
+  ADD CONSTRAINT resenas_estado_chk CHECK (estado IN ('nueva','borrador','aprobada','publicada','ignorada','historial')),
+  ADD COLUMN IF NOT EXISTS con_texto BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS actualizada_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS contenido_leido_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS contenido_borrado_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS historial BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS liberada_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS alerta_clinica BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS alerta_tarea_id INTEGER,
+  ADD COLUMN IF NOT EXISTS publicar_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS primera_respuesta_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS respuesta_estado TEXT CONSTRAINT resenas_respuesta_estado_chk CHECK (respuesta_estado IN ('pendiente','aprobada','rechazada')),
+  ADD COLUMN IF NOT EXISTS respuesta_motivo_rechazo VARCHAR(60),
+  ADD COLUMN IF NOT EXISTS respuesta_revisada_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS respuestas_rechazadas SMALLINT NOT NULL DEFAULT 0 CONSTRAINT resenas_respuestas_rechazadas_pos CHECK (respuestas_rechazadas >= 0),
+  ADD COLUMN IF NOT EXISTS error_publicar VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS retirada_en TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS resena_contenido ON resenas (contenido_borrado_en, contenido_leido_en);
+CREATE INDEX IF NOT EXISTS resena_publicada ON resenas (publicada_en);
+CREATE INDEX IF NOT EXISTS resena_historial ON resenas (historial, estado, publicar_en);
 
 -- Lo que ya estaba guardado cuenta desde que se guardó, y nuestras respuestas ya publicadas cuentan
 -- como primera respuesta. Solo se rellena lo que falta: repetirlo no cambia nada.

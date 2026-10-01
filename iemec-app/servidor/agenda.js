@@ -116,7 +116,7 @@ function uidIcs(cita) {
 const enPruebas = () => process.env.NODE_ENV === 'test' || Boolean(process.env.NODE_TEST_CONTEXT);
 async function cifrarTokensAntiguos(q, { log = () => {}, claveDeDesarrollo = enPruebas() } = {}) {
   const [[columna]] = await q.query(
-    "SELECT COUNT(*) AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'citas' AND COLUMN_NAME = 'token_antiguo'");
+    "SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'citas' AND column_name = 'token_antiguo'");
   if (!Number(columna.n)) return 0;
   const [filas] = await q.query('SELECT id, token_antiguo FROM citas WHERE token_antiguo IS NOT NULL');
   if (filas.length && !tieneClave() && !claveDeDesarrollo) {

@@ -2,13 +2,13 @@
 -- elija), de qué conversación sale cada cita y qué avisos se le han mandado.
 
 ALTER TABLE conversaciones
-  ADD COLUMN IF NOT EXISTS huecos_ofrecidos JSON NULL AFTER ya_pregunto_cuando,
-  ADD COLUMN IF NOT EXISTS huecos_tratamiento_id VARCHAR(80) NULL AFTER huecos_ofrecidos,
-  ADD COLUMN IF NOT EXISTS huecos_ofrecidos_en DATETIME NULL AFTER huecos_tratamiento_id;
+  ADD COLUMN IF NOT EXISTS huecos_ofrecidos TEXT CONSTRAINT conversaciones_huecos_ofrecidos_json CHECK (huecos_ofrecidos IS NULL OR huecos_ofrecidos::jsonb IS NOT NULL),
+  ADD COLUMN IF NOT EXISTS huecos_tratamiento_id VARCHAR(80),
+  ADD COLUMN IF NOT EXISTS huecos_ofrecidos_en TIMESTAMPTZ;
 
 ALTER TABLE citas
-  ADD COLUMN IF NOT EXISTS conversacion_id INT UNSIGNED NULL AFTER origen,
-  ADD COLUMN IF NOT EXISTS aviso_confirmacion_en DATETIME NULL AFTER confirmada_en,
-  ADD COLUMN IF NOT EXISTS aviso_24h_en DATETIME NULL AFTER aviso_confirmacion_en,
-  ADD COLUMN IF NOT EXISTS aviso_2h_en DATETIME NULL AFTER aviso_24h_en,
-  ADD KEY IF NOT EXISTS cita_avisos (estado, inicio);
+  ADD COLUMN IF NOT EXISTS conversacion_id INTEGER,
+  ADD COLUMN IF NOT EXISTS aviso_confirmacion_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS aviso_24h_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS aviso_2h_en TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS cita_avisos ON citas (estado, inicio);

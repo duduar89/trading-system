@@ -10,19 +10,19 @@
 --   servidor/migraciones.js cifra las que hubiera). version_conocida: si la versión de los textos que
 --   mandó el navegador es una de las que publicó la web (semillas/iemec/textos-formulario.json). Cuándo
 --   se verificó o se rechazó («No fui yo»): la casilla comercial solo cuenta verificada.
--- Idempotente: se puede pasar dos veces.
+-- Va entera en una transacción: o se aplica toda o no se aplica nada.
 
 ALTER TABLE leads
-  ADD COLUMN IF NOT EXISTS sin_verificar BOOLEAN NOT NULL DEFAULT FALSE AFTER etapa,
-  ADD COLUMN IF NOT EXISTS verificado_en DATETIME NULL AFTER sin_verificar,
-  ADD KEY IF NOT EXISTS lead_verificar (telefono, sin_verificar);
+  ADD COLUMN IF NOT EXISTS sin_verificar BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS verificado_en TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS lead_verificar ON leads (telefono, sin_verificar);
 
 ALTER TABLE solicitudes_web
-  MODIFY COLUMN pagina VARCHAR(200) NULL,
-  ADD COLUMN IF NOT EXISTS datos_cifrados BLOB NULL AFTER interes,
-  ADD COLUMN IF NOT EXISTS datos_iv VARBINARY(16) NULL AFTER datos_cifrados,
-  ADD COLUMN IF NOT EXISTS datos_tag VARBINARY(16) NULL AFTER datos_iv,
-  ADD COLUMN IF NOT EXISTS version_conocida BOOLEAN NULL AFTER version_textos,
-  ADD COLUMN IF NOT EXISTS verificada_en DATETIME NULL AFTER enviado_en,
-  ADD COLUMN IF NOT EXISTS rechazada_en DATETIME NULL AFTER verificada_en,
-  ADD KEY IF NOT EXISTS solicitud_verificada (telefono, verificada_en);
+  ALTER COLUMN pagina DROP NOT NULL,
+  ADD COLUMN IF NOT EXISTS datos_cifrados BYTEA,
+  ADD COLUMN IF NOT EXISTS datos_iv BYTEA CONSTRAINT solicitudes_web_datos_iv_len CHECK (octet_length(datos_iv) <= 16),
+  ADD COLUMN IF NOT EXISTS datos_tag BYTEA CONSTRAINT solicitudes_web_datos_tag_len CHECK (octet_length(datos_tag) <= 16),
+  ADD COLUMN IF NOT EXISTS version_conocida BOOLEAN,
+  ADD COLUMN IF NOT EXISTS verificada_en TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS rechazada_en TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS solicitud_verificada ON solicitudes_web (telefono, verificada_en);
