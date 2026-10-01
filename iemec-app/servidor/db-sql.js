@@ -281,6 +281,7 @@ function adaptarSql(sql, params) {
         for (const c of claves) if (!COLUMNA.test(c)) throw new ErrorDeSql(`${donde}: «${c}» no es un nombre de columna válido (minúsculas y guiones bajos)`);
         if (m.insertSet) {
           salida[m.trasSet] = ''; // INSERT INTO t SET ? → INSERT INTO t (a, b) VALUES ($1, $2)
+          if (a.tokens[m.i - 1]?.k === 'ws') salida[m.i - 1] = ''; // y el espacio que había entre SET y ?
           salida[m.i] = `(${claves.map((c) => `"${c}"`).join(', ')}) VALUES (${claves.map((c) => poner(v[c], `${donde}.${c}`)).join(', ')})`;
         } else {
           salida[m.i] = claves.map((c) => `"${c}" = ${poner(v[c], `${donde}.${c}`)}`).join(', ');
